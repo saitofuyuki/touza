@@ -11,7 +11,7 @@
 
 ACLOCAL_AMFLAGS	=	-I m4c
 MOSTLYCLEANFILES	=
-EXTRA_DIST	=	autogen.sh INSTALL-sub.org
+EXTRA_DIST	=	autogen.sh README-touza.org
 
 include $(top_srcdir)/aminclude_static.am
 

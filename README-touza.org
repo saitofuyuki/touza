@@ -1,4 +1,67 @@
 #+title: TOUZA guide
 #+author: SAITO Fuyuki
 #+date: <2020-06-07 Sun>
-#+email: saitofuyuki@jamstec.go.jp
+#+email: saitofuyuki AT jamstec DOT go DOT jp
+
+* Introduction
+  *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
+  Fortran procedures mainly adopted in MIROC.
+
+* Installation
+** autotool files
+   Unless the package contains configuration file such as =configure=,
+   =Makefile.in=, etc, you need to generate these files first.  This
+   is a typical case when you are using a git version of the source.
+   =autogen.sh= in this package can help you generate them.
+
+   : % sh ./autogen.sh   ## dry-run
+   : ./autogen.sh: dry-run
+   : If you are sure, run as ./autogen.sh -y
+   : :
+   : % sh ./autogen.sh -y ## wet-run
+   : :
+
+   You need following tools to generate the autotool scripts.
+
+   - GNU autoconf (2.69 or later)
+   - GNU automake (1.16.3 or later)
+   - GNU libtool (2.4.6 or later)
+
+** build
+   For generic installation instructions please see the =INSTALL= file.
+
+   In short:
+
+   : % ./configure --help
+
+   to read the usage, and:
+
+   : % ./configure
+   : % make
+   : % make install
+
+   for typical installation.  After a series of commands, library and
+   headers will be installed under =PREFIX=.
+
+   : PREFIX
+   : local
+   : |-- include
+   : |   |-- touza
+   : |   |   |-- touza.mod
+   : |   |   `-- :
+   : |   |-- touza.h
+   : |   `-- :
+   : `-- lib
+   :     |-- libtouza.a
+   :     `-- libtouza.la
+
+   Depending on compiler, =*.mod= files are generated for each module,
+   which are necessary to be installed somewhere the compiler can
+   find (e.g., gfortran).  If configure is successful, the last
+   command will install =*.mod= files into =$(pkgincludedir)= (default is
+   =PREFIX/include/touza=).
+
+* Copyright and license
+Copyright 2020, 2021 Japan Agency for Marine-Earth Science and Technology
+Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)
