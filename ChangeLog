@@ -1,0 +1,23 @@
+
+Revision 0.97 / 2020-06-06
+==================
+
+  * (cal) [important] TOUZA/std dependencies reduced.
+  * (cal) sample interfaces of matsiro and ils.
+
+Revision 0.91 / 2020-06-13
+==========================
+
+  * Update submodules, with touza/std 0.999; touza/cal 0.98
+  * Import touza/emu 0.2.
+
+Revision 0.9 / 2020-06-10
+=========================
+
+  * Initial release beta, with touza/std and touza/cal.
+
+<!---
+  Local Variables:
+  mode: markdown
+  End:
+-->

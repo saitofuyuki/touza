@@ -1,0 +1,613 @@
+#+title: TOUZA/cal guide
+#+author: SAITO Fuyuki
+#+date: <2020-06-07 Sun>
+#+HTML_HEAD: <style type="text/css">.src-f90 {background-color: #333333; color: #ff0000;}</style>
+
+* Introduction
+  *TOUZA/cal* is a collection of Fortran subroutines for model
+  calendar procedures such as various conversion between date
+  and time, time stepping, etc.
+
+  *TOUZA/cal* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+  DOT go DOT jp>.
+
+  *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
+  Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
+  (expected to be in the parent directory) for general instruction of
+  *TOUZA* collection.
+
+* Build and installation
+
+* Tests
+  Three groups of the tests are included, namely MIROC, MATSIRO, ILS.
+  After successful build of *TOUZA/cal*, you can run all of them by:
+
+  : cp ${MIROC}/src/util/ucaln.F .  ## required for MIROC tests.
+  : make check
+
+  at *TOUZA* or *TOUZA/cal* directory (In the former case, tests of
+  other sub-packages are examined).
+
+  There are totally 89 tests (8 for MATSIRO, 9 for ILS, others for
+  MIROC).  You can examine tests of each groups with:
+
+  : make check-miroc
+  : make check-matsiro
+  : make check-ils
+
+  The files under =log= are the outputs of all the tests.
+  The summary is outputted in =test-suite.log=.
+  The files =*.log= and =*.trs= are diagnosis of individual results
+  (succeed, fail, etc).
+
+  An example of =test-suite.log=.
+  : =================================
+  :    touza 0: cal/test-suite.log
+  : =================================
+  :
+  : # TOTAL: 89
+  : # PASS:  89
+  : # SKIP:  0
+  : # XFAIL: 0
+  : # FAIL:  0
+  : # XPASS: 0
+  : # ERROR: 0
+
+** Tests (MIROC)
+   This group of tests examine *TOUZA/cal* implementation against
+   /MIROC/ original =ucaln.F=.  Before tests, you *have to* manually
+   copy the latest =ucaln.F= to here.
+
+   : % make check-miroc  # if no ucaln.F
+   : :
+   : Please manually install MIROC ucaln.F in current directory.
+
+   /MIROC/ features 4 calendar types.  With toggle of `Perpetual'
+   mode, there are 8 calendar modes.  For each mode 9 tests are
+   included (thus total 72 tests).
+
+   All the 9 tests are examined twice, once with =ucaln.F= and the
+   other with *TOUZA/std* compatible procedures.
+   The result status becomes PASS if two runs show identical results.
+
+   : # tests on `auto' mode
+   : PASS: auto 1 - consistent
+   : PASS: auto 2 - consistent
+   : PASS: auto 3 - consistent
+   : PASS: auto 4 - consistent
+   : PASS: auto 5 - consistent
+   : PASS: auto 6 - consistent
+   : # test 7 may take a long time
+   : PASS: auto 7 - consistent
+   : PASS: auto 8 - consistent
+   : # test 9 may take a loooong time
+   : PASS: auto 9 - consistent
+
+** Tests (MATSIRO)
+   This group of tests is *not* verification, therefore the results
+   should be checked.
+
+   There are 2 calendar modes and a similar test with 4 different
+   choice of parameters.  A test just tries some iteration of:
+
+   - Get new date from time which advances a time step (== only
+     parameter)
+   - Compute difference between new and old dates
+   - Compare the difference against the time step, which must be
+     identical
+   - Advance time to the new date
+
+   A part of example output:
+   : tests = 3 1468500  407 55 0
+   :      0 19730130 000010 -- 19730215 235510 T
+   :      1 19730215 235510 -- 19730304 235010 T
+   :      2 19730304 235010 -- 19730321 234510 T
+   :      3 19730321 234510 -- 19730407 234010 T
+   :      4 19730407 234010 -- 19730424 233510 T
+   :      5 19730424 233510 -- 19730511 233010 T
+   : :
+   :  10000 24380606 064010 -- 24380623 063510 T
+   : invalid count = 0
+
+   One iteration outputs one line, which contains the loop index, old
+   date, new date, check-flag which should be all T if succeeds.
+   Finally, it output the number of failed iteration, thus 0 when
+   succeeds.
+
+   Indeed, `success' means that all the operations of time advance
+   are consistent with all the operations of time difference.  It is
+   still possible that both two operations are wrong.....
+   It is needed to do manual check of the experiments.
+
+** Tests (ILS)
+   This group of tests is *NEVER* verification, therefore the results
+   should be checked.  All they do are to examine some example
+   operation, WITHOUT quality checks.
+
+   There are 3 calendar modes and three different tests each.
+   The first one examines time increment/decrement/differenciation in
+   the unit seconds in terms of 4-byte integer.  The second one does
+   the same but in terms of 8-byte integer.  The last one does similar
+   increment/decrement tests in the unit months (depending on calendar
+   year) as well as show two properties of the months.
+
+   A part of example output for the first one:
+   : DIFF = 1464479  0/1/17 22:47:59
+   : TTTTTTT 0 19730130 000010 -- 19730215 224809
+   : TTTTTTT 1 19730215 224809 -- 19730304 213608
+   : TTTTTTT 2 19730304 213608 -- 19730321 202407
+   : TTTTTTT 3 19730321 202407 -- 19730407 191206
+   : TTTTTTT 4 19730407 191206 -- 19730424 180005
+   : TTTTTTT 5 19730424 180005 -- 19730511 164804
+   : TTTTTTT 6 19730511 164804 -- 19730528 153603
+   :
+   : TTTTTTT 999 20190611 005531 -- 20190627 234330
+   : invalid count = 0
+
+   One iteration outputs one line, which contains check-flags (7
+   characters), loop index, old date and new dates.  The first letter
+   show whether increment, decrement and differentiation are
+   consistent.  The other 6 letters show whether the left date is
+   reverted by increment and decrement operation (corresponding to
+   year month day hour minute second).
+   Finally, it output the number of failed iteration, thus 0 when
+   succeeds.
+
+   Similar to the group of MATSIRO tests, they only check the
+   consistencies among operation...
+
+   The second tests perform similar series, but with very large
+   time stepping (more than the maximum of 4-byte integer).
+   : DIFF = 21474836470  680/7/5 8:21:10
+   : TTTTTTT 0 0000001973 0130 000010 -- 0000002653 0804 082120
+   : TTTTTTT 1 0000002653 0804 082120 -- 0000003334 0206 164230
+   : TTTTTTT 2 0000003334 0206 164230 -- 0000004014 0812 010340
+   : TTTTTTT 3 0000004014 0812 010340 -- 0000004695 0214 092450
+   : TTTTTTT 4 0000004695 0214 092450 -- 0000005375 0819 174600
+
+   The third tests perform again similar series with time stepping of
+   unit months.
+   : DMONTH = 11
+   : TTTTTT 0 0 31 // 19730130 000010 -- 19731230 000010
+   : TTTTTT 1 334 31 // 19731230 000010 -- 19741130 000010
+   : TTTTTT 2 304 30 // 19741130 000010 -- 19751030 000010
+   : TTTTTT 3 273 31 // 19751030 000010 -- 19760930 000010
+   : TTTTTT 4 244 30 // 19760930 000010 -- 19770830 000010
+   : TTTTTT 5 212 31 // 19770830 000010 -- 19780730 000010
+   : TTTTTT 6 181 31 // 19780730 000010 -- 19790630 000010
+   : TTTTTT 7 151 30 // 19790630 000010 -- 19800530 000010
+   : TTTTTT 8 121 31 // 19800530 000010 -- 19810430 000010
+   : TTTTTT 9 90 30 // 19810430 000010 -- 19820330 000010
+   : TFFTTT 10 59 31 // 19820330 000010 -- 19830302 000010   <<
+   : TTTTTT 11 59 31 // 19830302 000010 -- 19840202 000010
+   : TTTTTT 12 31 29 // 19840202 000010 -- 19850102 000010
+   :
+   : invalid count = 0
+   Since the algorithms of monthly increment and decrement in this
+   package are not symmetric, some iteration shows failure mark.
+
+   The final line in this test is a dummy line and *ALWAYS* 0.
+   Detailed manual check of the experiments is highly recommended.
+
+* Brief description of *TOUZA/cal* modules
+** sources
+   - =calendar.F90= - User interfaces for multiple calendar management
+   - =calendar_core.F90= - Dispatcher to primitive procedures
+   - =calendar_primitive.F90= - Primitive procedures
+   - =touza_cal.h= - Configuration
+
+   - =calendar_miroc.F90= - /MIROC/ compatible interfaces
+   - =test_calendar.F90= - /MIROC/ test program
+   - =calendar_matsiro.F90= - *sample* /MATSIRO/ compatible interfaces
+   - =calendar_ils.F90= - *sample* /ILS/ compatible interfaces
+
+** notation
+   - calendar :: a unique time *point* on the time coordinate
+   - calendar[sec] :: *calendar* in terms of unit seconds, i.e.,
+     duration in seconds since the epoch
+   - calendar[day] :: *calendar* in terms of unit days, i.e.,
+     duration in days since the epoch
+   - calendar[Y] :: *calendar* in terms of unit years, i.e.,
+     duration in years since the epoch
+   - calendar[YMD] :: Year/Month/Day representation of *calendar*
+   - calendar[YMD HMS] :: Year/Month/Day Hour:Minute:Second
+     representation of *calendar*
+   - calendar[day+sec] :: *calendar[day]* plus fraction in unit seconds
+   - serial-day :: number of days since the beginning of a year
+   - calendar[Y serial-day] :: *calendar[Y]* plus fraction in terms of
+     *serial-day*
+
+* References
+** constants
+   | name        | type    | description                              |
+   |-------------+---------+------------------------------------------|
+   | =KRC=       | integer | real kind used in *TOUZA/cal*            |
+   |-------------+---------+------------------------------------------|
+   | =p_ideal=   | integer | mode: idealized 360-day calendar         |
+   | =p_grego_i= | integer | mode: Gregorian no-leap calendar         |
+   | =p_grego_l= | integer | mode: Gregorian calendar                 |
+   | =p_user=    | ingeger | mode: reserved for user-defined calendar |
+
+** registration and allocation
+*** =calendar::init()=
+ #+begin_src f90
+ subroutine init(ierr,  ulog, ncals, mode, auto)
+   integer,intent(out)         :: ierr    ! error status
+   integer,intent(in),optional :: ulog    ! output unit for logging
+   integer,intent(in),optional :: ncals   ! number of non-global calendars to allocate
+   integer,intent(in),optional :: mode    ! mode of global calendar
+   logical,intent(in),optional :: auto    ! auto-switch of global calendar
+ #+end_src
+ Initialize *TOUZA/cal* system, and optionally configure the global calendar.
+
+ Optional =ulog= is an i/o unit number to output diagnostic
+ information of system.  If not present, =*= is applied or disabled,
+ which depends on configuration.
+
+ *TOUZA/cal* can generate multiple calendars with different modes.
+ Each calendar is identified by non-negative integer index (/calendar
+ id/), and id=0 corresponds to _global calendar_.
+ Most of the calendar procedures are controlled by calendar-id as an
+ argument.  If it is not set, _global calendar_ is chosen as default.
+ Limit number of calendars are set by the argument =ncals=.
+ If not specified, users can set the limit number with calling [[id:bef1ab4c-cd8c-4658-aded-a6ca9d6a2da8][=alloc ()=]]
+.
+
+ With the arguments =mode= and =auto=, the user can set the attributes
+ of _global calendar_, by internal calling of [[id:accf2026-373e-4a8a-8644-f299449a33a5][=new_calendar ()=]].  Note
+ that, if either =mode= or =auto= is set while =ncals= is not, the
+ default value is chosen for =ncals=.
+
+ =init()= must called only once before any calendar procedures.
+
+ Return =ierr= as 0 if succeeds.
+*** =calendar::alloc()=
+    :PROPERTIES:
+    :ID:       bef1ab4c-cd8c-4658-aded-a6ca9d6a2da8
+    :END:
+ #+begin_src f90
+ subroutine alloc(ierr, ncals)
+   integer,intent(out) :: ierr    ! error status
+   integer,intent(in)  :: ncals   ! number of non-global calendars to allocate
+ #+end_src
+ Allocate calendar slots of =ncals=.
+ If =init= is not called, =alloc= is already called, or fails in
+ allocation, return non-zero as =ierr=.
+
+ Return =ierr= as 0 if succeeds.
+*** =calendar::new_calendar()=
+    :PROPERTIES:
+    :ID:       accf2026-373e-4a8a-8644-f299449a33a5
+    :END:
+ #+begin_src f90
+ subroutine new_calendar(ierr, mode, auto, ulog, jcalh)
+   integer,intent(out)          :: ierr   ! error status
+   integer,intent(in), optional :: mode   ! calendar mode
+   logical,intent(in), optional :: auto   ! auto-switch
+   integer,intent(in), optional :: ulog   ! output unit for logging
+   integer,intent(out),optional :: jcalh  ! new calendar id
+ #+end_src
+
+ Generate new calendar with /calendar id/ =jcalh=.
+ The argument =jcalh= is optional, so users can ignore this argument
+ when only one calendar is used.
+
+** inquiry
+*** =calendar::inq_nday_month()=
+ #+begin_src f90
+ integer function inq_nday_month(cd, jcalh)
+ integer function inq_nday_month(ym, jcalh)
+   type(cal_date_t),intent(in)          :: cd      ! calendar-date
+   integer,         intent(in)          :: ym(2)   ! calendar-year, month
+   integer,         intent(in),optional :: jcalh   ! calendar id
+ #+end_src
+*** =calendar::inq_nday_year()=
+ #+begin_src f90
+ integer function inq_nday_year(cd, jcalh)
+ integer function inq_nday_year(y,  jcalh)
+   type(cal_date_t),intent(in)          :: cd      ! calendar-date
+   integer,         intent(in)          :: y       ! calendar-year
+   integer,         intent(in),optional :: jcalh   ! calendar id
+ #+end_src
+*** =calendar::inq_nmonth_year()=
+ #+begin_src f90
+ integer function inq_nmonth_year(cd, jcalh)
+ integer function inq_nmonth_year(y,  jcalh)
+   type(cal_date_t),intent(in)          :: cd      ! calendar-date
+   integer,         intent(in)          :: y       ! calendar-year
+   integer,         intent(in),optional :: jcalh   ! calendar id
+ #+end_src
+*** =calendar::inq_nsec_day()=
+ #+begin_src f90
+ integer function inq_nsec_day(cd, jcalh)
+ integer function inq_nsec_day(jcalh)
+   type(cal_date_t),intent(in)          :: cd      ! calendar-date
+   integer,         intent(in),optional :: jcalh   ! calendar id
+ #+end_src
+
+*** =calendar::inq_nsec_minute()=
+*** =calendar::inq_nsec_hour()=
+** conversion
+*** =calendar::conv_csec_cdaysec()=
+#+begin_src f90
+type(cal_daysec_t) function conv_csec_cdaysec(csec, cd, jcalh)
+  real(kind=KRC),  intent(in)          :: csec  !  calendar[sec]
+  type(cal_date_t),intent(in),optional :: cd    !  calendar[date]
+  integer,         intent(in),optional :: jcalh !  calendar id
+#+end_src
+*** =calendar::conv_csec_adaysec()=
+#+begin_src f90
+subroutine conv_csec_adaysec(cday, rsec, csec, jcalh)
+  integer,       intent(out)         :: cday    ! calendar[day]
+  real(kind=KRC),intent(out)         :: rsec    ! calendar[fraction sec]
+  real(kind=KRC),intent(in)          :: csec    ! calendar[sec]
+  integer,       intent(in),optional :: jcalh   ! calendar id
+#+end_src
+*** =calendar::conv_cdaysec_csec()=
+#+begin_src f90
+real(kind=KRC) function conv_cdaysec_csec(ds, xk, cd, jcalh)
+  type(cal_daysec_t),intent(in)          :: ds
+  real(kind=KRC),    intent(in)          :: xk ! dummy
+  type(cal_date_t),  intent(in),optional :: cd
+  integer,           intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_tsec_time()=
+#+begin_src f90
+type(cal_time_t) function conv_tsec_time(tsec, cd, jcalh)
+  real(kind=KRC),  intent(in)          :: tsec
+  integer,         intent(in)          :: tsec
+  type(cal_date_t),intent(in),optional :: cd
+  integer,         intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_tsec_atime()=
+#+begin_src f90
+integer        function conv_tsec_atime(tsec, jcalh)
+real(kind=KRC) function conv_tsec_atime(tsec, jcalh)
+  real(kind=KRC),intent(in)          :: tsec
+  integer,       intent(in)          :: tsec
+  integer,       intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_time_tsec()=
+#+begin_src f90
+integer function conv_time_tsec(t, cd, jcalh)
+integer function conv_time_tsec(hms, jcalh)
+  type(cal_time_t),intent(in)          :: t
+  integer,         intent(in)          :: hms(3)
+  type(cal_date_t),intent(in),optional :: cd
+  integer,         intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_cday_date()=
+#+begin_src f90
+type(cal_date_t) function conv_cday_date(cday, jcalh)
+  integer,       intent(in)          :: cday
+  real(kind=KRC),intent(in)          :: cday
+  integer,       intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_cday_adate()=
+#+begin_src f90
+integer(dim=3) function conv_cday_adate(cday, jcalh)
+  integer,       intent(in)          :: cday
+  real(kind=KRC),intent(in)          :: cday
+  integer,       intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_date_cday()=
+#+begin_src f90
+integer        function conv_date_cday(cd, xk, jcalh)
+real(kind=KRC) function conv_date_cday(cd, xk, jcalh)
+integer        function conv_date_cday(ymd, xk, jcalh)
+real(kind=KRC) function conv_date_cday(ymd, xk, jcalh)
+  type(cal_date_t),intent(in)          :: cd
+  integer,         intent(in)          :: ymd(3)
+  integer,         intent(in)          :: xk ! dummy
+  real(kind=KRC),  intent(in)          :: xk ! dummy
+  integer,         intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_date_dayy()=
+#+begin_src f90
+integer function conv_date_dayy(cd,  jcalh)
+integer function conv_date_dayy(ymd, jcalh)
+  type(cal_date_t),intent(in)          :: cd
+  integer,         intent(in)          :: ymd(3)
+  integer,         intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_date_dayy_compat()=
+#+begin_src f90
+integer function conv_date_dayy_compat(cd,  jcalh)
+integer function conv_date_dayy_compat(ymd, jcalh)
+  type(cal_date_t),intent(in)          :: cd
+  integer,         intent(in)          :: ymd(3)
+  integer,         intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_csec_calendar()=
+#+begin_src f90
+type(calendar_t) function conv_csec_calendar(csec, jcalh)
+  real(kind=KRC),intent(in)          :: csec
+  integer,       intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_csec_acalendar()=
+#+begin_src f90
+integer(6) function conv_csec_acalendar(csec, jcalh)
+  real(kind=KRC),intent(in)          :: csec
+  integer,       intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_calendar_csec()=
+#+begin_src f90
+real(kind=KRC) function conv_calendar_csec(cc, xk, jcalh)
+real(kind=KRC) function conv_calendar_csec(y,mo,d,h,mi,s, xk, jcalh)
+  type(calendar_t),intent(in)          :: cc
+  integer,         intent(in)          :: y, mo, d
+  integer,         intent(in)          :: h, mi, s
+  real(kind=KRC),  intent(in)          :: xk ! dummy
+  integer,         intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_cday_cydayy()=
+#+begin_src f90
+type(cal_ynday_t) function conv_cday_cydayy(cday, jcalh)
+  integer,intent(in)          :: cday
+  integer,intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_cday_aydayy()=
+#+begin_src f90
+integer(dim=2) function conv_cday_aydayy(cday, jcalh)
+  integer,intent(in)          :: cday
+  integer,intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_csec_date()=
+#+begin_src f90
+type(cal_date_t) function conv_csec_date(dsec, jcalh)
+  real(kind=KRC),intent(in)          :: dsec
+  integer,       intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_csec_adate()=
+#+begin_src f90
+integer(dim=3) function conv_csec_adate(dsec, jcalh)
+  real(kind=KRC),intent(in)          :: dsec
+  integer,       intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_csec_cydayy()=
+#+begin_src f90
+type(cal_ynday_t) function conv_csec_cydayy(csec, jcalh)
+  real(kind=KRC),intent(in)          :: csec
+  integer,       intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_csec_aydayy()=
+#+begin_src f90
+integer(dim=2) function conv_csec_aydayy(csec, jcalh)
+  real(kind=KRC),intent(in)          :: csec
+  integer,       intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_duration_sec()=
+#+begin_src f90
+real(kind=KRC) function conv_duration_sec(dur, unit, refsec, jcalh)
+  real(kind=KRC),  intent(in)          :: dur
+  character(len=*),intent(in)          :: unit
+  real(kind=KRC),  intent(in)          :: refsec
+  integer,         intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_string_acalendar()=
+#+begin_src f90
+integer(dim=6) function conv_string_acalendar(str)
+character(len=*),intent(in)  :: str
+#+end_src
+*** =calendar::conv_acalendar_string()=
+#+begin_src f90
+subroutine conv_string_acalendar(str, y,mo,d,h,mi,s)
+  character(len=*),intent(out) :: str
+  integer,         intent(in)  :: y,mo,d,h,mi,s
+#+end_src
+** calendar operation
+*** =calendar::advance_csec()=
+#+begin_src f90
+real(kind=KRC) function advance_csec(dur, unit, refsec, xk, jcalh)
+  real(kind=KRC),  intent(in)          :: dur
+  real(kind=KRC),  intent(in)          :: refsec
+  character(len=*),intent(in)          :: unit
+  real(kind=KRC),  intent(in)          :: xk ! dummy
+  integer,         intent(in),optional :: jcalh
+#+end_src
+*** =calendar::is_passed()=
+#+begin_src f90
+logical function is_passed(csec, refsec, orgsec, dur, unit, jcalh)
+  real(kind=KRC),  intent(in)          :: csec, refsec, orgsec, dur
+  character(len=*),intent(in)          :: unit
+  integer,         intent(in),optional :: jcalh
+#+end_src
+*** =calendar::is_passed_compat()=
+#+begin_src f90
+logical function is_passed_compat(csec, refsec, orgsec, dur, unit, jcalh)
+  real(kind=KRC),  intent(in)          :: csec, refsec, orgsec, dur
+  character(len=*),intent(in)          :: unit
+  integer,         intent(in),optional :: jcalh
+#+end_src
+
+* Recipes
+** MATSIRO
+*** Preparation
+    =calendar_matsiro.F90= contains a test program.
+
+#+begin_src f90
+use TOUZA_Cal_matsiro
+integer ierr      ! error status
+integer date(6)   ! current date YMD HMS
+integer ndate(6)  ! next date
+integer step      ! time step in seconds
+integer diff      ! time difference in seconds
+
+call init(ierr, CALENDAR_NORMAL)        ! Gregorian mode (with leap years)
+! call init(ierr, CALENDAR_NOLEAPYEAR)  ! 365-day mode
+! ierr == 0 if succeeds.
+date(1:6) = (/1970, 1, 1, 0, 0, 0/)     ! start date
+#+end_src
+
+*** Increment time-step in seconds from a date/time
+#+begin_src f90
+call calendar_advance(ndate, date, step)
+! ndate = date + step[sec]
+#+end_src
+
+*** Interval in seconds between two date/time
+#+begin_src f90
+diff = get_interval(date, ndate)
+! diff[sec] = ndate - date
+#+end_src
+
+** ILS
+*** Preparation
+#+begin_src f90
+use TOUZA_Cal_ils
+integer ierr      ! error status
+integer date(6)   ! current date YMD HMS
+integer ndate(6)  ! next date
+
+call init(ierr, CALENDAR_NORMAL)       ! Gregorian mode
+! call init(ierr, CALENDAR_NOLEAPYEAR) ! 365-day mode
+! call init(ierr, CALENDAR_30360)      ! 360-day mode
+
+date(1:6) = (/1970, 1, 1, 0, 0, 0/)     ! start date
+#+end_src
+*** Increment/decrement in seconds since a date
+#+begin_src f90
+! integer(4) delta_t
+call inc_calendar4(date, delta_t)  ! date += delta_t
+call dec_calendar4(date, delta_t)  ! date -= delta_t
+#+end_src
+*** Increment/decrement in seconds since a date (8-byte integer)
+#+begin_src f90
+! integer(8) delta_t
+call inc_calendar8(date, delta_t)  ! date += delta_t
+call dec_calendar8(date, delta_t)  ! date -= delta_t
+#+end_src
+*** Increment/decrement in months since a date
+#+begin_src f90
+! integer month
+call inc_month(date, month) ! date += month
+call dec_month(date, month) ! date -= month
+#+end_src
+*** Interval in seconds between two dates
+#+begin_src f90
+! integer(4) diff
+diff = cal_date_diff4(date, ndate) ! diff = ndate - date
+#+end_src
+*** Interval in seconds between two dates (8-byte integer)
+#+begin_src f90
+! integer(8) diff
+diff = cal_date_diff8(date, ndate) ! diff = ndate - date
+#+end_src
+*** Number of days since the New year's day by a calendar year/month
+#+begin_src f90
+! integer yyyy, mo  ! calendar year and month
+! integer day
+day = GetMonthDate(yyyy, mo)
+#+end_src
+*** Number of days in a calendar year/month
+#+begin_src f90
+! integer yyyy, mo  ! calendar year and month
+! integer ndays
+ndays = GetMonthNumDays(yyyy, mo)
+#+end_src
+
+
+* Copyright and license
+Copyright 2020, 2021 Japan Agency for Marine-Earth Science and Technology
+Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)

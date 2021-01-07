@@ -1,0 +1,16 @@
+=======
+ TOUZA
+=======
+
+TOUZA (楊座), MIROC base infrastructure, is a collection of Fortran procedures mainly adopted in
+MIROC.
+
+You can build TOUZA as a collection of whole packages, or choose a part of sub packages to build.
+
+TOUZA is maintained by SAITO Fuyuki <saitofuyuki AT jamstec DOT go DOT jp>.
+
+See LICENSE for license information.
+See NOTICE for copyright information.
+See AUTHORS for author(s) and contributors.
+See INSTALL for generic installation instructions.
+See README-touza.org for brief guide on TOUZA packages.

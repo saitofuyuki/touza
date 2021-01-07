@@ -1,0 +1,461 @@
+!!!_! test_calendar.F90 - touza/calendar test program
+! Maintainer: SAITO Fuyuki
+! Created: Mar 28 2012
+#define TIME_STAMP 'Time-stamp: <2021/01/07 12:09:39 fuyuki test_calendar.F90>'
+!!!_! MANIFESTO
+!
+! Copyright (C) 2020, 2021
+!           Japan Agency for Marine-Earth Science and Technology
+!
+! Licensed under the Apache License, Version 2.0
+!   (https://www.apache.org/licenses/LICENSE-2.0)
+!
+!!!_! Includes
+#ifdef HAVE_CONFIG_H
+#  include "touza_config.h"
+#endif
+#include "touza_cal.h"
+#include "touza_std.h"
+!!!_@ test_calendar - test program
+program test_calendar_suite
+  use TOUZA_Std,only: ifpar => uin, jfpar => uout
+  implicit none
+  integer,parameter :: KRC = OPT_KIND_REAL
+
+  integer :: iy_start, iy_end, iy_step
+  integer :: im_start, im_end, im_step
+  integer :: id_start, id_end, id_step
+
+  integer :: im_start_ym, im_end_ym, im_step_ym
+  integer :: id_start_ym, id_end_ym, id_step_ym
+
+  real(kind=KRC) :: ss_start, ss_end, ss_step
+  real(kind=KRC) :: rs_start, rs_end, rs_step
+
+  real(kind=KRC) :: dtorgn
+
+  integer ierr
+  integer KTEST
+  namelist /NMTEST/ KTEST
+!!!_ + Announce
+#ifdef OPT_USE_BASE_UCALN
+  write (*, *) '@@@ TEST CALENDAR MIROC/BASE'
+#else  /* not OPT_USE_BASE_UCALN */
+  write (*, *) '@@@ TEST CALENDAR MIROC/TOUZA'
+#endif /* not OPT_USE_BASE_UCALN */
+!!!_ + Test switch
+  rewind(ifpar, IOSTAT=ierr)
+  KTEST = 0
+  if (ierr.eq.0) then
+     read(ifpar, NML=NMTEST, IOSTAT=ierr)
+  endif
+!!!_ + Initialization
+#ifdef OPT_USE_BASE_UCALN
+  call CALNDR()
+#else  /* not OPT_USE_BASE_UCALN */
+  call CALNDR(ifpar, jfpar)
+#endif /* not OPT_USE_BASE_UCALN */
+  iy_start = 1
+  ! iy_start = -100
+  iy_end   = 3000
+  iy_step  = 1
+
+  im_start = 1
+  im_end   = 12
+  im_step  = 1
+
+  im_start_ym = -13
+  im_end_ym   = 25
+  im_step_ym  = 1
+
+  id_start_ym = 1
+  id_end_ym   = 31
+  id_step_ym  = 7
+
+  ss_start = real(iy_start,KIND=KRC) * 366.0e0_KRC * 86400.0e0_KRC
+  ss_end   = real(iy_end,  KIND=KRC) * 366.0e0_KRC * 86400.0e0_KRC
+  ss_step  = 864000.0e0_KRC - 10.0e0_KRC
+
+  rs_start = -86400.0e0_KRC
+  rs_end   = 86400.0e0_KRC * 2
+  rs_step  = 0.25e0_KRC
+
+  ! id_start = (iy_start - 1) * 366 + 1
+  id_start = (max (1, iy_start) - 1) * 366 + 1
+  id_end   =          (iy_end   - 1) * 366 + 1
+  id_step  = 11
+
+!!!_ + CDAYMO
+101 format('BEGIN TEST')
+109 format('END TEST')
+  write(jfpar, 101)
+  if (KTEST.eq.0.or.KTEST.eq.1) then
+     call test_CDAYMO (iy_start, iy_end, iy_step, im_start, im_end, im_step, jfpar)
+  endif
+!!!_ + C{DAY,MON}YR
+  if (KTEST.eq.0.or.KTEST.eq.2) then
+     call test_CxxxYR (iy_start, iy_end, iy_step, jfpar)
+  endif
+!!!_ + CSEC{DY,MI,HR}
+  if (KTEST.eq.0.or.KTEST.eq.3) then
+     call test_CSECxx (jfpar)
+  endif
+!!!_ + CSS2{DS,YH,YD,YM} and CYH2SS
+  if (KTEST.eq.0.or.KTEST.eq.4) then
+     call test_CSS2xx (ss_start, ss_end, ss_step, jfpar)
+  endif
+!!!_ + CDD2{YD,YM} and reverse
+  if (KTEST.eq.0.or.KTEST.eq.5) then
+     call test_CDD2xx (id_start, id_end, id_step, jfpar)
+  endif
+!!!_ + CYM2{DD,YD}
+  if (KTEST.eq.0.or.KTEST.eq.6) then
+     call test_CYM2xx &
+       & (iy_start,    iy_end,    iy_step, &
+       &  im_start_ym, im_end_ym, im_step_ym, &
+       &  id_start_ym, id_end_ym, id_step_ym, jfpar)
+  endif
+!!!_ + CRS2HM and reverse
+  if (KTEST.eq.0.or.KTEST.eq.7) then
+     call test_CRS2HM (rs_start, rs_end, rs_step, jfpar)
+  endif
+!!!_ + CYH2CC and reverse
+  if (KTEST.eq.0.or.KTEST.eq.8) then
+     call test_CYH2CC (ss_start, ss_end, ss_step, jfpar)
+  endif
+!!!_ + CXX2SS family
+  if (KTEST.eq.0.or.KTEST.eq.9) then
+     dtorgn = 0.0e0_KRC
+     call test_CXX2SS (1.0e0_KRC,   'SEC',  ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (1.0e0_KRC,   'MIN',  ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (1.0e0_KRC,   'HOUR', ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (1.0e0_KRC,   'DAY',  ss_start, ss_end, ss_step, dtorgn, jfpar)
+
+     call test_CXX2SS (1.0e0_KRC,   'MON',  ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (2.0e0_KRC,   'MON',  ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (3.0e0_KRC,   'MON',  ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (6.0e0_KRC,   'MON',  ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (12.0e0_KRC,  'MON',  ss_start, ss_end, ss_step, dtorgn, jfpar)
+
+     call test_CXX2SS (1.0e0_KRC,   'YR',   ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (5.0e0_KRC,   'YR',   ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (10.0e0_KRC,  'YR',   ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (20.0e0_KRC,  'YR',   ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (50.0e0_KRC,  'YR',   ss_start, ss_end, ss_step, dtorgn, jfpar)
+     call test_CXX2SS (100.0e0_KRC, 'YR',   ss_start, ss_end, ss_step, dtorgn, jfpar)
+  endif
+  write(jfpar, 109)
+
+  stop
+end program test_calendar_suite
+
+!!!_ + Individual tests
+!!!_  - (1) test_CDAYMO - number of days in date:Year/Month
+subroutine test_CDAYMO &
+     & (iy_start, iy_end, iy_step, im_start, im_end, im_step, jfpar)
+  implicit none
+  integer,intent(in) :: iy_start, iy_end, iy_step
+  integer,intent(in) :: im_start, im_end, im_step
+  integer,intent(in) :: jfpar
+
+  integer :: ndm
+  integer :: iy, im
+
+  im = im_start
+111 format('CDAYMO: D << y m')
+101 format('CDAYMO ', I0, 1x, I0, 1x, I0)
+  write (jfpar, 111)
+  do iy = iy_start, iy_end, iy_step
+     do
+        call CDAYMO (ndm, iy, im)
+        write (jfpar, 101) ndm, iy, im
+        im = im + im_step
+        if (im.gt.im_end) then
+           im = im - im_end
+           exit
+        endif
+     enddo
+  enddo
+end subroutine test_CDAYMO
+
+!!!_  - (2) test_CxxxYR - number of days, months in date:Year
+subroutine test_CxxxYR &
+     & (iy_start, iy_end, iy_step, jfpar)
+  implicit none
+  integer,intent(in) :: iy_start, iy_end, iy_step
+  integer,intent(in) :: jfpar
+
+  integer :: ndy, nmy
+  integer :: iy
+
+111 format('CxxxYR: D M << y')
+101 format('CxxxYR ', I0, 1x, I0, 1x, I0)
+  write (jfpar, 111)
+  do iy = iy_start, iy_end, iy_step
+     call CMONYR (nmy, iy)
+     call CDAYYR (ndy, iy)
+     write (jfpar, 101) ndy, nmy, iy
+  enddo
+end subroutine test_CxxxYR
+
+!!!_  - (3) test_CSECxx - number of seconds in a minute, an hour, a day
+subroutine test_CSECxx &
+     & (jfpar)
+  implicit none
+  integer,intent(in) :: jfpar
+
+  integer :: nsm, nsh, nsd
+
+  call CSECMI (nsm)
+  call CSECHR (nsh)
+  call CSECDY (nsd)
+
+111 format('CSECxx: S S S << 1M 1H 1D')
+101 format('CSECxx ', I0, 1x, I0, 1x, I0)
+  write (jfpar, 111)
+  write (jfpar, 101) nsm, nsh, nsd
+end subroutine test_CSECxx
+
+!!!_  - (4) test_CSS2xx - date:Second to date:Day
+subroutine test_CSS2xx &
+     & (ss_start, ss_end, ss_step, jfpar)
+  implicit none
+  integer,parameter :: KRC = OPT_KIND_REAL
+  real(kind=KRC),intent(in) :: ss_start, ss_end, ss_step
+  integer,       intent(in) :: jfpar
+
+  real(kind=KRC) :: ss
+  real(kind=KRC) :: ss_rev_ds, ss_rev_yh
+  integer :: iday
+  integer :: idate (6)
+  integer :: iyr, idy
+  integer :: iyy, imm, idd
+  logical :: check_yh_ym, check_rev_ds, check_rev_yh
+  real(kind=KRC) :: rsec
+
+  ss = ss_start
+111 format('CSS2xx: S>>DS YMDHMS Dy')
+101 format('CSS2xx ', F0.1, 1x, &
+         & I0, 1x, F0.1, 1x, 6(I0,1x), I0, 1x, 4L1, 1x, F0.1)
+  write (jfpar, 111)
+  do
+     if (ss.gt.ss_end) exit
+     call CSS2DS (iday,      rsec, ss)
+     call CDS2SS (ss_rev_ds, iday, rsec)
+     check_rev_ds   = (ss.eq.ss_rev_ds)
+
+     call CSS2YH (idate,       ss)
+     call CYH2SS (ss_rev_yh,   idate)
+     check_rev_yh   = (ss.eq.ss_rev_yh)
+
+     call CSS2YM (iyy,   imm,  idd, ss)
+     check_yh_ym = ((idate (1).eq.iyy) .and. (idate (2).eq.imm) .and. (idate (3).eq.idd))
+
+     call CSS2YD (iyr,   idy,  ss)
+
+     write (jfpar, 101) &
+          & ss, iday, rsec, idate, idy, &
+          & (idate (1).eq.iyr), check_yh_ym, check_rev_ds, check_rev_yh, ss_rev_yh
+
+     ss = ss + ss_step
+  enddo
+end subroutine test_CSS2xx
+
+!!!_  - (5) test_CDD2xx - date:Day to date:YMD date:YD
+subroutine test_CDD2xx &
+     & (id_start, id_end, id_step, jfpar)
+  implicit none
+  integer,parameter :: KRC = OPT_KIND_REAL
+  integer,intent(in) :: id_start, id_end, id_step
+  integer,intent(in) :: jfpar
+
+  integer :: iday
+  integer :: iyr, idy
+  integer :: iyy, imm, idd
+  integer :: idy_ym, iday_rev
+
+111 format('CDD2xx: D >> YMD Dy ... Dy D')
+101 format('CDD2xx ', I0, 1x, 3(I0,1x), I0, 1x, 3L1, 1x, I0, 1x, I0)
+  write (jfpar, 111)
+  do iday = id_start, id_end, id_step
+     call CDD2YM (iyy,   imm,  idd,  iday)
+     call CYM2DD (iday_rev, iyy,   imm,  idd)
+
+     call CDD2YD (iyr,   idy,        iday)
+     call CYM2YD (idy_ym,  iyy, imm, idd)
+
+     write (jfpar, 101) &
+          & iday, iyy, imm, idd, idy, &
+          & (iyy.eq.iyr), (idy.eq.idy_ym), (iday.eq.iday_rev), idy_ym, iday_rev
+  enddo
+end subroutine test_CDD2xx
+
+!!!_  - (6) test_CYM2xx - date:YMD to date:YD date:D
+subroutine test_CYM2xx &
+     & (iy_start, iy_end, iy_step, &
+     &  im_start, im_end, im_step, &
+     &  id_start, id_end, id_step,  jfpar)
+  implicit none
+  integer,intent(in) :: iy_start, iy_end, iy_step
+  integer,intent(in) :: im_start, im_end, im_step
+  integer,intent(in) :: id_start, id_end, id_step
+  integer,intent(in) :: jfpar
+
+  integer :: iday, idy_ym
+  integer :: iy, im, id
+
+  im = im_start
+111 format('CYM2xx: YMD >> D Dy')
+101 format('CYM2xx ', 3(I0,1x), I0, 1x, I0)
+  write (jfpar, 111)
+  do iy = iy_start, iy_end, iy_step
+     do
+        do id = id_start, id_end, id_step
+           call CYM2DD (iday,    iy,   im,  id)
+           call CYM2YD (idy_ym,  iy,   im,  id)
+           write (jfpar, 101) &
+                & iy, im, id, iday, idy_ym
+        enddo
+        im = im + im_step
+        if (im.gt.im_end) then
+           im = (im - im_end - 1) + im_start
+           exit
+        endif
+     enddo
+  enddo
+end subroutine test_CYM2xx
+
+!!!_  - (7) test_CRS2HM
+subroutine test_CRS2HM &
+     & (rs_start, rs_end, rs_step, jfpar)
+  implicit none
+  integer,parameter :: KRC = OPT_KIND_REAL
+  real(kind=KRC),intent(in) :: rs_start, rs_end, rs_step
+  integer,       intent(in) :: jfpar
+
+  real(kind=KRC) :: rs
+  real(kind=KRC) :: rs_rev
+  integer :: ihh, imm, iss
+
+111 format('CRS2HM: S >> HMS S')
+101 format('CRS2HM ', F0.2, 1x, 3(I0,1x), F0.2, 1x, L1)
+  write (jfpar, 111)
+  rs = rs_start
+  do
+     if (rs.gt.rs_end) exit
+
+     call CRS2HM (ihh,    imm, iss,  rs)
+     call CHM2RS (rs_rev, ihh, imm, iss)
+
+     write (jfpar, 101) rs, ihh, imm, iss, rs_rev, (rs.eq.rs_rev)
+
+     rs = rs + rs_step
+  enddo
+end subroutine test_CRS2HM
+
+!!!_  - (8) test_CYH2CC
+subroutine test_CYH2CC &
+     & (ss_start, ss_end, ss_step, jfpar)
+  implicit none
+  integer,parameter :: KRC = OPT_KIND_REAL
+  real(kind=KRC),intent(in) :: ss_start, ss_end, ss_step
+  integer,       intent(in) :: jfpar
+
+  real(kind=KRC) :: ss
+  integer :: idate (6), idate_rev (6)
+  character(len = 32) :: htime, htime_ss
+  integer j
+  logical chk_idate
+
+111 format('CYH2CC: YMDHMS STR STR')
+101 format('CYH2CC ', 6(I0,1x), A, 1x, A, 1x, L1)
+  write (jfpar, 111)
+  ss = ss_start
+  do
+     if (ss.gt.ss_end) exit
+     call CSS2YH (idate,       ss)
+
+     call CYH2CC (htime, idate)
+     call CCC2YH (idate_rev, htime)
+     call CSS2CC (htime_ss, ss)
+
+     chk_idate = .true.
+     do j = 1, 6
+        if (idate (j) .ne. idate_rev (j)) chk_idate = .false.
+     enddo
+     write (jfpar, 101) &
+          & (idate (j), j=1,6), trim (htime), trim (htime_ss), chk_idate
+     ss = ss + ss_step
+  enddo
+end subroutine test_CYH2CC
+
+!!!_  - (9) test_CXX2SS - time advancing
+subroutine test_CXX2SS &
+     & (dur, unit, ss_start, ss_end, ss_step, orgsec, jfpar)
+  implicit none
+  integer,parameter :: KRC = OPT_KIND_REAL
+  real(kind=KRC),  intent(in) :: dur, orgsec
+  character(len=*),intent(in) :: unit
+  real(kind=KRC),  intent(in) :: ss_start, ss_end, ss_step
+  integer,         intent(in) :: jfpar
+
+  real(kind=KRC) :: ss, ddsec, cnext, cprev
+  logical :: otp
+  logical OINTVL
+
+111 format('CXX2SS:', F0.1, 1x, A, 2x, 'S >> dS S+')
+101 format('CXX2SS ', F0.2, 1x, F0.2, 1x, F0.2, 1x, F0.2, 1x, L1)
+  write (jfpar, 111) dur, trim(unit)
+
+  ss = ss_start
+  cprev = ss
+  ! call CSSAFT (cnext, cprev, dur, unit)
+  cnext = cprev
+  do
+     if (ss.gt.ss_end) exit
+     call CXX2SS (ddsec, dur, unit, ss)
+     otp = OINTVL (ss, cprev, orgsec, dur, unit)
+
+     write (jfpar, 101) &
+          & ss, ddsec, cnext, cprev, otp
+     if (otp) then
+        cprev = cnext
+        call CSSAFT (cnext, cprev, dur, unit)
+     endif
+     ss = ss + ss_step
+  enddo
+
+end subroutine test_CXX2SS
+
+!!!_* compatible minimum procedures
+#ifdef OPT_USE_BASE_UCALN
+!!!_ & dgaus()
+real(kind=OPT_KIND_REAL) function dgaus &
+     & (DX) &
+     result (r)
+  integer,parameter :: KRC = OPT_KIND_REAL
+  real(kind=KRC),intent(in) :: dx
+  r = AINT (dx) + AINT (dx - AINT (dx) + 1.E0_KRC) - 1.E0_KRC
+  return
+end function dgaus
+
+!!!_ & rewnml
+subroutine rewnml (ifpar, jfpar)
+  use TOUZA_Std, only: uin
+  implicit none
+  integer,intent(out) :: ifpar, jfpar
+  ifpar = uin
+  rewind (ifpar)
+  call getjfp (jfpar)
+  return
+end subroutine rewnml
+
+!!!_ & getjfp
+subroutine getjfp (jfpar)
+  use TOUZA_Std, only: uout
+  implicit none
+  integer,intent(out) :: jfpar
+  jfpar = uout
+end subroutine getjfp
+
+#endif /* OPT_USE_BASE_UCALN */

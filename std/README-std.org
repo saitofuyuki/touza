@@ -1,0 +1,35 @@
+#+title: TOUZA/std guide
+#+author: SAITO Fuyuki
+#+date: <2020-06-07 Sun>
+
+* Introduction
+  *TOUZA/std* is a collection of Fortran subroutines for typical
+  standard procedures such as precision(kind) declaration, i/o unit
+  management, logging, etc.
+
+  *TOUZA/std* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+  DOT go DOT jp>.
+
+  *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
+  Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
+  (expected to be in the parent directory) for general instruction of
+  *TOUZA* collection.
+
+* Build and installation
+
+* Brief description of *TOUZA/std* modules
+** =TOUZA_Std=      (std.F90)
+** =TOUZA_Std_prc=  (std_prc.F90) - precision management
+** =TOUZA_Std_utl=  (std_utl.F90) - small utilities
+** =TOUZA_Std_env=  (std_env.F90) - standard environments
+** =TOUZA_Std_fun=  (std_fun.F90) - file units management
+** =TOUZA_Std_log=  (std_log.F90) - simple logging helper
+** =TOUZA_Std_mwe=  (std_mwe.F90) - MPI wrapper/emulator
+** =TOUZA_Std_arg=  (std_arg.F90) - run-time argument parser
+
+* Test suites
+
+* Copyright and license
+Copyright 2020, 2021 Japan Agency for Marine-Earth Science and Technology
+Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)
