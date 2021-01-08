@@ -18,7 +18,7 @@
 #include "touza_std.h"
 !!!_@ test_calendar - test program
 program test_calendar_suite
-  use TOUZA_Std,only: ifpar => uin, jfpar => uout
+  use TOUZA_Std, only: KDBL, KFLT, ifpar => uin, jfpar => uout
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
 
@@ -219,6 +219,7 @@ end subroutine test_CSECxx
 !!!_  - (4) test_CSS2xx - date:Second to date:Day
 subroutine test_CSS2xx &
      & (ss_start, ss_end, ss_step, jfpar)
+  use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
   real(kind=KRC),intent(in) :: ss_start, ss_end, ss_step
@@ -264,6 +265,7 @@ end subroutine test_CSS2xx
 !!!_  - (5) test_CDD2xx - date:Day to date:YMD date:YD
 subroutine test_CDD2xx &
      & (id_start, id_end, id_step, jfpar)
+  use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
   integer,intent(in) :: id_start, id_end, id_step
@@ -328,6 +330,7 @@ end subroutine test_CYM2xx
 !!!_  - (7) test_CRS2HM
 subroutine test_CRS2HM &
      & (rs_start, rs_end, rs_step, jfpar)
+  use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
   real(kind=KRC),intent(in) :: rs_start, rs_end, rs_step
@@ -356,6 +359,7 @@ end subroutine test_CRS2HM
 !!!_  - (8) test_CYH2CC
 subroutine test_CYH2CC &
      & (ss_start, ss_end, ss_step, jfpar)
+  use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
   real(kind=KRC),intent(in) :: ss_start, ss_end, ss_step
@@ -392,6 +396,7 @@ end subroutine test_CYH2CC
 !!!_  - (9) test_CXX2SS - time advancing
 subroutine test_CXX2SS &
      & (dur, unit, ss_start, ss_end, ss_step, orgsec, jfpar)
+  use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
   real(kind=KRC),  intent(in) :: dur, orgsec
@@ -433,6 +438,8 @@ end subroutine test_CXX2SS
 real(kind=OPT_KIND_REAL) function dgaus &
      & (DX) &
      result (r)
+  use TOUZA_Std, only: KDBL, KFLT
+  implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
   real(kind=KRC),intent(in) :: dx
   r = AINT (dx) + AINT (dx - AINT (dx) + 1.E0_KRC) - 1.E0_KRC

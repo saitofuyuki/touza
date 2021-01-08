@@ -80,7 +80,7 @@ TEST_COMMON_LIBS	+= $(FC_LDADD_touza_std)
 UCALN	=	ucaln.F
 
 $(UCALN):
-	@echo "Please manually install MIROC $(UCALN) in current directory." >&2; exit 1
+	@echo "Please manually install MIROC/src/util/$(UCALN) in $(abs_builddir)." >&2; exit 1
 
 check_PROGRAMS	=	test_calendar_comp test_calendar_trad \
 					test_calendar_matsiro test_calendar_ils

@@ -25,6 +25,8 @@
 !!!_@ TOUZA_Cal_primitive - calendar primitive attributes definition
 module TOUZA_Cal_primitive
 !!!_ = declaration
+!!!_  - modules
+  use TOUZA_Std, only: KFLT, KDBL
 !!!_  - default
   implicit none
   private

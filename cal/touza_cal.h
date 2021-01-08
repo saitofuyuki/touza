@@ -17,9 +17,20 @@
 #  define OPT_CALENDAR_MAX_LEAP  2
 #endif
 
-#ifndef   OPT_KIND_REAL  /* target real kind */
-#  define OPT_KIND_REAL 8
+#ifndef   OPT_KIND_REAL  /* target real kind (default: TOUZA_Std::KDBL) */
+#  define OPT_KIND_REAL KDBL
 #endif
+
+#  ifdef TOUZA_TRANSFORM
+#    define TOUZA_Cal           TOUZA_TRANSFORM(Cal)
+#  endif
+#  ifdef TOUZA_TRANSFORM_MEM
+#    define TOUZA_Cal_core      TOUZA_TRANSFORM_MEM(Cal, core)
+#    define TOUZA_Cal_ils       TOUZA_TRANSFORM_MEM(Cal, ils)
+#    define TOUZA_Cal_matsiro   TOUZA_TRANSFORM_MEM(Cal, matsiro)
+#    define TOUZA_Cal_miroc     TOUZA_TRANSFORM_MEM(Cal, miroc)
+#    define TOUZA_Cal_primitive TOUZA_TRANSFORM_MEM(Cal, primitive)
+#  endif
 
 #endif  /* not _TOUZA_CAL_H */
 !!!_! FOOTER
