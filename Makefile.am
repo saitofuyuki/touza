@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/01/07 15:25:51 fuyuki Makefile.am>
+# Time-stamp: <2021/01/11 21:49:05 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -12,34 +12,36 @@
 ACLOCAL_AMFLAGS	=	-I m4c
 MOSTLYCLEANFILES	=
 EXTRA_DIST	=	autogen.sh README-touza.org
-
 include $(top_srcdir)/aminclude_static.am
 
-SUBDIRS 			= std
-libtouza_la_LIBADD	= std/$(local_name)
-AM_FCFLAGS			= $(FC_MODULE_touza_std)
+nodist_bin_SCRIPTS 	= makeshift
+CLEANFILES			= $(nodist_bin_SCRIPTS)
+
+SUBDIRS 					= std
+lib@TOUZA_NAME@_la_LIBADD	= std/$(local_name)
+AM_FCFLAGS					= $(FC_MODULE_touza_std)
 
 if BUILD_cal
-SUBDIRS 			+= cal
-libtouza_la_LIBADD	+= cal/$(local_name)
-AM_FCFLAGS			+= $(FC_MODULE_touza_cal)
+SUBDIRS 					+= cal
+lib@TOUZA_NAME@_la_LIBADD	+= cal/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_cal)
 endif
 
 # if BUILD_emu
-# SUBDIRS 			+= emu
-# libtouza_la_LIBADD	+= emu/$(local_name)
-# AM_FCFLAGS			+= $(FC_MODULE_touza_emu)
+# SUBDIRS 					+= emu
+# lib@TOUZA_NAME@_la_LIBADD	+= emu/$(local_name)
+# AM_FCFLAGS					+= $(FC_MODULE_touza_emu)
 # endif
 
 # if BUILD_div
-# SUBDIRS 			+= div
-# libtouza_la_LIBADD	+= div/$(local_name)
-# AM_FCFLAGS			+= $(FC_MODULE_touza_div)
+# SUBDIRS 					+= div
+# lib@TOUZA_NAME@_la_LIBADD	+= div/$(local_name)
+# AM_FCFLAGS					+= $(FC_MODULE_touza_div)
 # endif
 
 include_HEADERS		= touza.h $(CONFIG_HEADER)
-lib_LTLIBRARIES 	= libtouza.la
-libtouza_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
+lib_LTLIBRARIES 	= lib@TOUZA_NAME@.la
+lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
 
 local_name			= libtouza_local.la
 

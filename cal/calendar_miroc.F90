@@ -1,7 +1,7 @@
 !!!_! calendar_miroc.F90 - touza/calendar: miroc compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/07 12:08:05 fuyuki calendar_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/10 19:56:15 fuyuki calendar_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -20,9 +20,167 @@
 module TOUZA_Cal_miroc
 !!!_ = declaration
   implicit none
+  public
 !!!_  * private
-  private
-  logical,save :: ofirst = .true.
+  logical,save,private :: ofirst = .true.
+!!!_  * interfaces (external)
+  interface
+     ! subroutine CALNDR(IFPAR, JFPAR)
+     !   implicit none
+     !   integer,intent(in),optional :: IFPAR
+     !   integer,intent(in),optional :: JFPAR
+     ! end subroutine CALNDR
+     subroutine CPERPT(IYEAR, IMONTH, IDAY)
+       implicit none
+       integer,intent(in) :: IYEAR, IMONTH, IDAY
+     end subroutine CPERPT
+     subroutine CPERPR (IYEAR, IMONTH, IDAY, OOPERP)
+       implicit none
+       integer,intent(out) :: IYEAR, IMONTH, IDAY
+       logical,intent(out) :: OOPERP
+     end subroutine CPERPR
+     subroutine CPERPO (OOPERP)
+       implicit none
+       logical,intent(in) :: OOPERP
+     end subroutine CPERPO
+     subroutine CDAYMO (NDAYMO, IYEAR,  IMONTH)
+       implicit none
+       integer,intent(out) :: NDAYMO
+       integer,intent(in)  :: IYEAR, IMONTH
+     end subroutine CDAYMO
+     subroutine CDAYYR (NDAYYR, IYEAR)
+       implicit none
+       integer,intent(out) :: NDAYYR
+       integer,intent(in)  :: IYEAR
+     end subroutine CDAYYR
+     subroutine CMONYR (NMONYR, IYEAR)
+       implicit none
+       integer,intent(out) :: NMONYR
+       integer,intent(in)  :: IYEAR
+     end subroutine CMONYR
+     subroutine CSECDY (NSECDY)
+       implicit none
+       integer,intent(out) :: NSECDY
+     end subroutine CSECDY
+     subroutine CSECMI (NSECMI)
+       implicit none
+       integer,intent(out) :: NSECMI
+     end subroutine CSECMI
+     subroutine CSECHR (NSECHR)
+       implicit none
+       integer,intent(out) :: NSECHR
+     end subroutine CSECHR
+     subroutine CSS2DS (IDAYS, RSEC, DSEC)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       integer,       intent(out) :: IDAYS
+       real(kind=KRC),intent(out) :: RSEC
+       real(kind=KRC),intent(in)  :: DSEC
+     end subroutine CSS2DS
+     subroutine CDS2SS (DSEC, IDAYS, RSEC)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       integer,       intent(in)  :: IDAYS
+       real(kind=KRC),intent(in)  :: RSEC
+       real(kind=KRC),intent(out) :: DSEC
+     end subroutine CDS2SS
+     subroutine CRS2HM (IHOUR, IMIN, ISEC, RSEC)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       integer,       intent(out) :: IHOUR, IMIN, ISEC
+       real(kind=KRC),intent(in)  :: RSEC
+     end subroutine CRS2HM
+     subroutine CHM2RS (RSEC, IHOUR, IMIN, ISEC)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       real(kind=KRC),intent(out) :: RSEC
+       integer,       intent(in)  :: IHOUR, IMIN, ISEC
+     end subroutine CHM2RS
+     subroutine CDD2YM (IYEAR, IMONTH, IDAY, IDAYS)
+       implicit none
+       integer,intent(out) :: IYEAR, IMONTH, IDAY
+       integer,intent(in)  :: IDAYS
+     end subroutine CDD2YM
+     subroutine CYM2DD (IDAYS, IYEAR, IMONTH, IDAY)
+       implicit none
+       integer,intent(out) :: IDAYS
+       integer,intent(in)  :: IYEAR, IMONTH, IDAY
+     end subroutine CYM2DD
+     subroutine CYM2YD (IDAYSY, IYEAR, IMONTH, IDAY)
+       implicit none
+       integer,intent(out) :: IDAYSY
+       integer,intent(in)  :: IYEAR, IMONTH, IDAY
+     end subroutine CYM2YD
+     subroutine CSS2YH (IDATE, DSEC)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       integer,       intent(out) :: IDATE (6)
+       real(kind=KRC),intent(in)  :: DSEC
+     end subroutine CSS2YH
+     subroutine CYH2SS (DSEC, IDATE)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       integer,       intent(in)  :: IDATE (6)
+       real(kind=KRC),intent(out) :: DSEC
+     end subroutine CYH2SS
+     subroutine CDD2YD (IYEAR, IDAYSY, IDAYS)
+       implicit none
+       integer,intent(out) :: IYEAR, IDAYSY
+       integer,intent(in)  :: IDAYS
+     end subroutine CDD2YD
+     subroutine CSS2YD (IYEAR, IDAYSY, DSEC)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       integer,       intent(out) :: IYEAR, IDAYSY
+       real(kind=KRC),intent(in)  :: DSEC
+     end subroutine CSS2YD
+     subroutine CSS2YM (IYEAR, IMONTH, IDAY, DSEC)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       integer,       intent(out) :: IYEAR, IMONTH, IDAY
+       real(kind=KRC),intent(in)  :: DSEC
+     end subroutine CSS2YM
+     subroutine CXX2SS (DDSEC, RTDUR, HUNIT, DSEC)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       real(kind=KRC),  intent(out) :: DDSEC
+       real(kind=KRC),  intent(in)  :: RTDUR, DSEC
+       character(len=*),intent(in)  :: HUNIT
+     end subroutine CXX2SS
+     subroutine CCC2YH (ITIME, HTIME)
+       implicit none
+       integer,         intent(out) :: ITIME (6)
+       character(len=*),intent(in)  :: HTIME
+     end subroutine CCC2YH
+     subroutine CYH2CC (HTIME, ITIME)
+       implicit none
+       integer,         intent(in)  :: ITIME (6)
+       character(len=*),intent(out) :: HTIME
+     end subroutine CYH2CC
+     subroutine CSS2CC (HTIME, DSEC)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       character(len=*),intent(out) :: HTIME
+       real(kind=KRC),  intent(in)  :: DSEC
+     end subroutine CSS2CC
+     logical function OCLEAP (IYEAR)
+       implicit none
+       integer,intent(in) :: IYEAR
+     end function OCLEAP
+     subroutine CSSAFT (DSECA, DSEC,  RAFTR, HUNIT)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       real(kind=KRC),  intent(out) :: DSECA
+       real(kind=KRC),  intent(in)  :: DSEC, RAFTR
+       character(len=*),intent(in)  :: HUNIT
+     end subroutine CSSAFT
+     logical function OINTVL (DTIME, DTPREV, DTORGN, RINTV, HTUNIT)
+       use TOUZA_Cal,only: KRC
+       implicit none
+       real(kind=KRC),  intent(in) :: DTIME, DTPREV, DTORGN, RINTV
+       character(len=*),intent(in) :: HTUNIT
+     end function OINTVL
+  end interface
 !!!_  * public
   public init, diag, finalize
 contains

@@ -1,8 +1,7 @@
 !!!_! calendar_core.F90 - touza/calendar core
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/07 12:09:04 fuyuki calendar_core.F90>'
-
+#define TIME_STAMP 'Time-stamp: <2021/01/10 20:18:51 fuyuki calendar_core.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -11,7 +10,6 @@
 ! Licensed under the Apache License, Version 2.0
 !   (https://www.apache.org/licenses/LICENSE-2.0)
 !
-
 !!!_* Includes
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"

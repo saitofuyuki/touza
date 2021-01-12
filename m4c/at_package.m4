@@ -1,7 +1,7 @@
 dnl Filename:   at_package.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 7 2020
-dnl Time-stamp: <2021/01/06 10:46:55 fuyuki at_package.m4>
+dnl Time-stamp: <2021/01/11 14:47:50 fuyuki at_package.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -42,14 +42,14 @@ AM_CONDITIONAL([CLEAN_FCMOD], [test x"$FC_MODEXT" != "x"])
 
 AC_ARG_ENABLE([install-modules],
               [AS_HELP_STRING([--enable-install-modules],
-                              [install module files if applicable. Default: '$(pkgincludedir)'])],
+                              [install module files if applicable. Default: '${pkgincludedir}'])],
               [pkgmoddir="$enableval"],
-              [pkgmoddir='$(pkgincludedir)'])
+              [pkgmoddir='${pkgincludedir}'])
 
 AM_CONDITIONAL([INSTALL_MODULES],
                [test x"[$]pkgmoddir" != "xno" -a x"$FC_MODEXT" != "x"])
 AS_IF([test x"[$]pkgmoddir" = xyes],
-      [pkgmoddir='[$](pkgincludedir)'])
+      [pkgmoddir='[$]{pkgincludedir}'])
 
 AC_SUBST([pkgmoddir])
 ])# AT_ENV_MODULES
@@ -59,18 +59,23 @@ AC_SUBST([pkgmoddir])
 # placeholder
 m4_define([AT_ALL_SUB_PACKAGES], [])
 
-# AT_SUB_PACKAGE(NAME, [DEP], [DIRECTORY])
-# ----------------------------------------
+# AT_SUB_PACKAGE(NAME, [ENABLE], [DEP], [DIRECTORY])
+# --------------------------------------------------
 # Declare NAME subpackage under DIRECTORY (or NAME if not set).
+# ENABLE: always yes no
 AC_DEFUN([AT_SUB_PACKAGE],
-[_$0([$1], [$2], m4_quote(m4_default([$3], [$1])))])# AT_SUB_PACKAGE
+[_$0([$1],
+     [m4_default([$2], [yes])],
+     [$3],
+     m4_quote(m4_default([$4], [$1])))])# AT_SUB_PACKAGE
 
-# _AT_SUB_PACKAGE(NAME, DEP, DIRECTORY)
-# -------------------------------------
+# _AT_SUB_PACKAGE(NAME, ENABLE, DEP, DIRECTORY)
+# ---------------------------------------------
 AC_DEFUN([_AT_SUB_PACKAGE],
 [m4_do([m4_append_uniq([AT_ALL_SUB_PACKAGES], [$1], [ ])],
-       [AT_PACKAGE_DEPS([$1], m4_quote($2))],
-       [m4_define([AT_DIRECTORY($1)], [$3])],
+       [AT_PACKAGE_DEPS([$1], m4_quote($3))],
+       [m4_define([AT_DEFAULT_SW($1)], [$2])],
+       [m4_define([AT_DIRECTORY($1)], [$4])],
        [AC_REQUIRE([AT_SUB_DEFAULT])],
        [AC_ARG_ENABLE([sub-$1],
                       [AS_HELP_STRING([--enable-sub-$1=(yes|no)],
@@ -91,7 +96,7 @@ AC_DEFUN([AT_SUB_DEFAULT],
                [AS_HELP_STRING([--disable-sub-all],
                                [disable to build all subpackages])],
                [],
-               [enable_sub_all=yes])])# AT_DEFAULT_SUB
+               [enable_sub_all=])])# AT_DEFAULT_SUB
 
 # AT_REQUIRE(SUB)
 # ----------------
@@ -102,6 +107,11 @@ AC_DEFUN([AT_REQUIRE], [m4_indir([$0($1)])])# AT_REQUIRE
 # ----------------
 # Return directory of SUB
 AC_DEFUN([AT_DIRECTORY], [m4_indir([$0($1)])])# AT_DIRECTORY
+
+# AT_DEFAULT_SW(SUB)
+# ------------------
+# Return default enable-switch of SUB
+AC_DEFUN([AT_DEFAULT_SW], [m4_indir([$0($1)])])# AT_DEFAULT_SW
 
 # AT_PACKAGE_DEPS(PACKAGE, LIST)
 # ------------------------------
@@ -144,14 +154,20 @@ dnl [_$0([$1], [AS_TR_SH([enable_sub-$1])])])# _AT_PACKAGE_CHECKS
 AC_DEFUN([AT_PACKAGE_CHECKS],
 [_$0([$1],
      [AT_VAR_ENABLE([$1])],
-     [AT_VAR_ENABLE([all])])])# _AT_PACKAGE_CHECKS
+     [AT_VAR_ENABLE([all])],
+     [AT_DEFAULT_SW([$1])])])# _AT_PACKAGE_CHECKS
 
-# _AT_PACKAGE_CHECKS(SUB, VARIABLE, VAR-DEFAULT)
+# _AT_PACKAGE_CHECKS(SUB, VARIABLE, VAR-DEFAULT, SW-DEFAULT)
 # ---------------------------------
 AC_DEFUN([_AT_PACKAGE_CHECKS],
-[AS_IF([test x"@S|@$2" = x],
-       [eval $2="@S|@$3"])
-AS_IF([test x"@S|@$2" = xyes],
+[dnl
+m4_if([$4], [always],
+      [eval $2="$4"],
+      [AS_IF([test x"@S|@$2" = x],
+             [eval $2="@S|@$3"])
+       AS_IF([test x"@S|@$2" = x],
+             [eval $2="$4"])])
+AS_IF([test x"@S|@$2" != xno],
 [m4_map_args_w(m4_quote(AT_REQUIRE($1)),
                [AT_ENABLE_SUB(], [)])])
 ])# _AT_PACKAGE_CHECKS
@@ -181,9 +197,10 @@ AC_DEFUN([AT_PACKAGE_LOAD],
 # -------------------------------
 AC_DEFUN([_AT_PACKAGE_LOAD],
 [AS_CASE(["@S|@$2"],
-         [yes], [AC_MSG_NOTICE([load subpackage $1])],
-         [dep], [AC_MSG_NOTICE([load subpackage $1 (dependency)])],
-         [no],  [AC_MSG_NOTICE([skip subpackage $1])],
+         [always], [AC_MSG_NOTICE([load subpackage $1 (mandatory)])],
+         [yes],    [AC_MSG_NOTICE([load subpackage $1])],
+         [dep],    [AC_MSG_NOTICE([load subpackage $1 (dependency)])],
+         [no],     [AC_MSG_NOTICE([skip subpackage $1])],
          [AC_MSG_FAILURE([invalid switch for subpackage $1 @S|@$2."])])
 AS_IF([test x"@S|@$2" != xno],
       [AT_LOAD([$3], [$1])])

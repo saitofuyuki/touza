@@ -1,8 +1,7 @@
 !!!_! calendar_matsiro.F90 - touza/calendar: (sample) matsiro interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/07 12:07:55 fuyuki calendar_matsiro.F90>'
-
+#define TIME_STAMP 'Time-stamp: <2021/01/10 20:13:38 fuyuki calendar_matsiro.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -11,7 +10,6 @@
 ! Licensed under the Apache License, Version 2.0
 !   (https://www.apache.org/licenses/LICENSE-2.0)
 !
-
 !!!_* Includes
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"

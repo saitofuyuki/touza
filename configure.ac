@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/01/07 15:25:42 fuyuki configure.ac>
+# Time-stamp: <2021/01/11 21:45:48 fuyuki configure.ac>
 
 AC_PREREQ([2.69])
 
@@ -43,6 +43,19 @@ AM_INIT_AUTOMAKE([-Wall])
 AM_MAINTAINER_MODE
 AC_PROG_MAKE_SET
 
+AC_MSG_CHECKING([if transform library name])
+AC_ARG_WITH([touza-name],
+[AS_HELP_STRING([--with-touza-name=STRING],
+                [Replace "lib]AC_PACKAGE_NAME[" with "libSTRING" (default=]AC_PACKAGE_NAME[)])])
+AS_IF([test "$with_touza_name" = "no"],
+[AC_MSG_RESULT([Error])
+ AC_MSG_ERROR([Invalid to specify --without-touza-name])])
+
+AS_IF([test "$with_touza_name" = "" || test "$with_touza_name" = "yes"],
+      [with_touza_name="$PACKAGE_NAME"])
+AC_MSG_RESULT([$with_touza_name])
+AC_SUBST([TOUZA_NAME], $with_touza_name)
+
 AM_PROG_AR
 LT_PREREQ([2.4.2])
 LT_INIT([disable-shared])
@@ -52,14 +65,13 @@ m4_define([TOUZA_config],
 
 AC_CONFIG_HEADER(m4_expand([TOUZA_config]))
 AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([makeshift], [chmod +x makeshift])
 
-AT_SUB_PACKAGE([std])
-AT_SUB_PACKAGE([cal], [std])
-dnl AT_SUB_PACKAGE([emu], [std])
-dnl AT_SUB_PACKAGE([div], [std])
+AT_SUB_PACKAGE([std], [always])
+AT_SUB_PACKAGE([cal], [],     [std])
+dnl AT_SUB_PACKAGE([emu], [],     [std])
+dnl AT_SUB_PACKAGE([div], [],     [std])
 
 AT_PARSE_PACKAGES()
-
-AC_DEFINE([TOUZA_PREFIX], [AS_TR_CPP(AC_PACKAGE_NAME)_], [module prefix])
 
 AC_OUTPUT

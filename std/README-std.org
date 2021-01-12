@@ -19,13 +19,168 @@
 
 * Brief description of *TOUZA/std* modules
 ** =TOUZA_Std=      (std.F90)
+
 ** =TOUZA_Std_prc=  (std_prc.F90) - precision management
+*** constants
+    | name   | type    | description                 |
+    |--------+---------+-----------------------------|
+    | =KFLT= | integer | real kind (float or single) |
+    | =KDBL= | integer | real kind (double)          |
+
+
 ** =TOUZA_Std_utl=  (std_utl.F90) - small utilities
+*** functions
+**** choice()
+#+begin_src f90
+  integer    function choice(d, a)
+  logical    function choice(d, a)
+  real(KFLT) function choice(d, a)
+  real(KDBL) function choice(d, a)
+    <type>,intent(in)          :: d
+    <type>,intent(in),optional :: a
+#+end_src
+    If =a= is present return =a=, otherwise return =d=.
+    =<type>= is the same type and kind as returned value.
+**** chcount()
+#+begin_src f90
+  integer function chcount(str, chs)
+    character(len=*),intent(in) :: str
+    character(len=*),intent(in) :: chs
+#+end_src
+  Count occurences of characters in =chs= in string =str=.
+*** subroutines
+**** choice_a
+#+begin_src f90
+  subroutine choice_a (v, d, a)
+    character(len=*),intent(inout)       :: v
+    character(len=*),intent(in),optional :: d
+    character(len=*),intent(in),optional :: a
+#+end_src
+   If =a= is present assign =a= for =v=, else if =d= is present,
+   assign =d=.
+**** set_if_present
+#+begin_src f90
+  subroutine set_if_present(var, val)
+    <type>,intent(out),optional :: var
+    <type>,intent(in)           :: val
+#+end_src
+    =<type>= is either integer, real, logical or character(len=*).
+    if =var= is present assign =var= for =val=, otherwise do nothing.
+
+
 ** =TOUZA_Std_env=  (std_env.F90) - standard environments
+*** constants
+    | name   | type    | description          |
+    |--------+---------+----------------------|
+    | =uin=  | integer | standard input unit  |
+    | =uout= | integer | standard output unit |
+
+
 ** =TOUZA_Std_fun=  (std_fun.F90) - file units management
+*** functions
+**** new_unit()
+#+begin_src f90
+  integer function new_unit (ksw)
+    integer,intent(in),optional :: ksw
+#+end_src
+   Return unused i/o unit number.
+   If ksw < 0, search from the begining.
+   If ksw == 0, search from the last checked number.
+   Otherwise, search from the last checked number plus 1.
+
+   Return -1 if units are exhausted.
+*** subroutines
+**** add_black_list
+#+begin_src f90
+  subroutine add_black_list (ierr, ub, ue)
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: ub
+    integer,intent(in),optional :: ue
+#+end_src
+   Register the number =ub= (if =ue= missing) or the numbers from =ub=
+   to =ue= (inclusive) to the black list.  The black-listed numbers
+   are excluded from search units by =new_unit()=, i.e., users can
+   control the usage.
+
 ** =TOUZA_Std_log=  (std_log.F90) - simple logging helper
+*** constants
+    | name        | type    | description             |
+    |-------------+---------+-------------------------|
+    | unit_star   | integer | special unit for *      |
+    | unit_global | integer | special unit for global |
+    | unit_none   | integer | special unit to null    |
+
+
 ** =TOUZA_Std_mwe=  (std_mwe.F90) - MPI wrapper/emulator
+*** subroutines
+**** get_ni
+#+begin_src f90
+  subroutine get_ni (ierr, nrank, irank, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(out)         :: nrank
+    integer,intent(out)         :: irank
+    integer,intent(in),optional :: icomm
+#+end_src
+   Return the rank and size of in the commnunicator ICOMM group.
+   If ICOMM is missing, default communicator is used (usually
+   =MPI_COMM_WORLD=).
+
 ** =TOUZA_Std_arg=  (std_arg.F90) - run-time argument parser
+*** description
+*** constants
+*** functions
+**** check_param()
+#+begin_src f90
+  integer function check_param (param, str, num, swch, ndef)
+    character(len=*),intent(in)         :: param
+    character(len=*),intent(in)         :: str
+    integer,         intent(in)         :: num
+    logical,         intent(in),optional:: swch
+    integer,         intent(in),optional:: ndef
+#+end_src
+**** inq_end_flags()
+#+begin_src f90
+  integer function inq_end_flags ()
+#+end_src
+*** subroutines
+**** decl_pos_arg
+#+begin_src f90
+  subroutine decl_pos_arg (ierr, tag, jpos)
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(in),optional :: tag
+    integer,         intent(in),optional :: jpos  ! start from 1
+#+end_src
+**** parse
+#+begin_src f90
+  subroutine parse (ierr)
+    integer,intent(out) :: ierr
+#+end_src
+**** get_param
+#+begin_src f90
+  subroutine get_param (ierr, val, jpos, def)
+    integer,intent(out)         :: ierr
+    <type>, intent(inout)       :: val
+    integer,intent(in)          :: jpos
+    <type>, intent(in),optional :: def
+#+end_src
+**** get_option
+#+begin_src f90
+  subroutine get_option (ierr, val, tag, def, idx)
+    integer,         intent(out)         :: ierr
+    <type>,          intent(inout)       :: val
+    character(len=*),intent(in)          :: tag
+    <type>,          intent(in),optional :: def
+    integer,         intent(in),optional :: idx
+#+end_src
+**** get_args
+#+begin_src f90
+  subroutine get_args (ierr, tag, val, jentr)
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(out)   :: tag
+    <type>,          intent(out)   :: val
+    integer,         intent(inout) :: jentr
+#+end_src
 
 * Test suites
 

@@ -1,0 +1,57 @@
+#!/bin/sh
+# Maintainer: SAITO Fuyuki
+# Created:    Dec 15 2020
+# Time-stamp: <2021/01/11 21:50:09 fuyuki makeshift.in>
+# Copyright: 2021 JAMSTEC
+# Licensed under the Apache License, Version 2.0
+#   (https://www.apache.org/licenses/LICENSE-2.0)
+
+PACKAGE='@PACKAGE_NAME@'
+VERSION='@PACKAGE_VERSION@'
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+includedir=@includedir@
+libdir=@libdir@
+pkgincludedir=${includedir}/@PACKAGE@
+pkglibdir=${libdir}/@PACKAGE@
+pkgmoddir=@pkgmoddir@
+fc_modinc="@FC_MODINC@"
+touza_lib="-l@TOUZA_NAME@"
+touza_name="@TOUZA_NAME@"
+
+FC="@FC@"
+FCFLAGS="@FCFLAGS@ -I${includedir} -I${pkgincludedir} ${fc_modinc}${pkgmoddir}"
+LDFLAGS="-L${libdir} ${touza_lib}"
+LTLIBRARY="${libdir}/lib${touza_name}.la"
+LIBRARY="${libdir}/lib${touza_name}.a"
+
+usage ()
+{
+
+  return 0
+}
+
+main ()
+{
+  test $# -eq 0 && usage && return 0
+  while test $# -gt 0
+  do
+    case $1 in
+    --fc)      echo "$FC";;
+    --fflags)  echo "$FCFLAGS";;
+    --ldflags) echo "$LDFLAGS";;
+    --ltlib*)  echo "$LTLIBRARY";;
+    --lib*)    echo "$LIBRARY";;
+    *) echo "invalid argument $1."; return 1;;
+    esac
+    shift
+  done
+}
+
+main "$@"; err=$?
+exit $err
+
+# Local Variables:
+# mode: sh
+# End:

@@ -44,7 +44,6 @@
    headers will be installed under =PREFIX=.
 
    : PREFIX
-   : local
    : |-- include
    : |   |-- touza
    : |   |   |-- touza.mod

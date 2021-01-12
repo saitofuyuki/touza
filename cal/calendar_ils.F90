@@ -1,7 +1,7 @@
 !!!_! calendar_ils.F90 - touza/calendar: (sample) ILS interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/07 12:07:39 fuyuki calendar_ils.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/10 20:08:29 fuyuki calendar_ils.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -10,7 +10,6 @@
 ! Licensed under the Apache License, Version 2.0
 !   (https://www.apache.org/licenses/LICENSE-2.0)
 !
-
 !!!_* Includes
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"

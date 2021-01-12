@@ -1,7 +1,7 @@
 !!!_! test_calendar.F90 - touza/calendar test program
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 28 2012
-#define TIME_STAMP 'Time-stamp: <2021/01/07 12:09:39 fuyuki test_calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/10 20:05:51 fuyuki test_calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -16,8 +16,15 @@
 #endif
 #include "touza_cal.h"
 #include "touza_std.h"
+!!!_* Macros
+#ifndef   OPT_USE_BASE_UCALN
+#  define OPT_USE_BASE_UCALN 0
+#endif
 !!!_@ test_calendar - test program
 program test_calendar_suite
+#if OPT_USE_BASE_UCALN == 0
+  use TOUZA_Cal_miroc
+#endif /* OPT_USE_BASE_UCALN == 0 */
   use TOUZA_Std, only: KDBL, KFLT, ifpar => uin, jfpar => uout
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
@@ -38,7 +45,7 @@ program test_calendar_suite
   integer KTEST
   namelist /NMTEST/ KTEST
 !!!_ + Announce
-#ifdef OPT_USE_BASE_UCALN
+#if OPT_USE_BASE_UCALN
   write (*, *) '@@@ TEST CALENDAR MIROC/BASE'
 #else  /* not OPT_USE_BASE_UCALN */
   write (*, *) '@@@ TEST CALENDAR MIROC/TOUZA'
@@ -50,7 +57,7 @@ program test_calendar_suite
      read(ifpar, NML=NMTEST, IOSTAT=ierr)
   endif
 !!!_ + Initialization
-#ifdef OPT_USE_BASE_UCALN
+#if OPT_USE_BASE_UCALN
   call CALNDR()
 #else  /* not OPT_USE_BASE_UCALN */
   call CALNDR(ifpar, jfpar)
@@ -153,6 +160,9 @@ end program test_calendar_suite
 !!!_  - (1) test_CDAYMO - number of days in date:Year/Month
 subroutine test_CDAYMO &
      & (iy_start, iy_end, iy_step, im_start, im_end, im_step, jfpar)
+#if OPT_USE_BASE_UCALN == 0
+  use TOUZA_Cal_miroc
+#endif /* OPT_USE_BASE_UCALN == 0 */
   implicit none
   integer,intent(in) :: iy_start, iy_end, iy_step
   integer,intent(in) :: im_start, im_end, im_step
@@ -181,6 +191,9 @@ end subroutine test_CDAYMO
 !!!_  - (2) test_CxxxYR - number of days, months in date:Year
 subroutine test_CxxxYR &
      & (iy_start, iy_end, iy_step, jfpar)
+#if OPT_USE_BASE_UCALN == 0
+  use TOUZA_Cal_miroc
+#endif /* OPT_USE_BASE_UCALN == 0 */
   implicit none
   integer,intent(in) :: iy_start, iy_end, iy_step
   integer,intent(in) :: jfpar
@@ -201,6 +214,9 @@ end subroutine test_CxxxYR
 !!!_  - (3) test_CSECxx - number of seconds in a minute, an hour, a day
 subroutine test_CSECxx &
      & (jfpar)
+#if OPT_USE_BASE_UCALN == 0
+  use TOUZA_Cal_miroc
+#endif /* OPT_USE_BASE_UCALN == 0 */
   implicit none
   integer,intent(in) :: jfpar
 
@@ -219,6 +235,9 @@ end subroutine test_CSECxx
 !!!_  - (4) test_CSS2xx - date:Second to date:Day
 subroutine test_CSS2xx &
      & (ss_start, ss_end, ss_step, jfpar)
+#if OPT_USE_BASE_UCALN == 0
+  use TOUZA_Cal_miroc
+#endif /* OPT_USE_BASE_UCALN == 0 */
   use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
@@ -265,6 +284,9 @@ end subroutine test_CSS2xx
 !!!_  - (5) test_CDD2xx - date:Day to date:YMD date:YD
 subroutine test_CDD2xx &
      & (id_start, id_end, id_step, jfpar)
+#if OPT_USE_BASE_UCALN == 0
+  use TOUZA_Cal_miroc
+#endif /* OPT_USE_BASE_UCALN == 0 */
   use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
@@ -297,6 +319,9 @@ subroutine test_CYM2xx &
      & (iy_start, iy_end, iy_step, &
      &  im_start, im_end, im_step, &
      &  id_start, id_end, id_step,  jfpar)
+#if OPT_USE_BASE_UCALN == 0
+  use TOUZA_Cal_miroc
+#endif /* OPT_USE_BASE_UCALN == 0 */
   implicit none
   integer,intent(in) :: iy_start, iy_end, iy_step
   integer,intent(in) :: im_start, im_end, im_step
@@ -330,6 +355,9 @@ end subroutine test_CYM2xx
 !!!_  - (7) test_CRS2HM
 subroutine test_CRS2HM &
      & (rs_start, rs_end, rs_step, jfpar)
+#if OPT_USE_BASE_UCALN == 0
+  use TOUZA_Cal_miroc
+#endif /* OPT_USE_BASE_UCALN == 0 */
   use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
@@ -359,6 +387,9 @@ end subroutine test_CRS2HM
 !!!_  - (8) test_CYH2CC
 subroutine test_CYH2CC &
      & (ss_start, ss_end, ss_step, jfpar)
+#if OPT_USE_BASE_UCALN == 0
+  use TOUZA_Cal_miroc
+#endif /* OPT_USE_BASE_UCALN == 0 */
   use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
@@ -396,6 +427,9 @@ end subroutine test_CYH2CC
 !!!_  - (9) test_CXX2SS - time advancing
 subroutine test_CXX2SS &
      & (dur, unit, ss_start, ss_end, ss_step, orgsec, jfpar)
+#if OPT_USE_BASE_UCALN == 0
+  use TOUZA_Cal_miroc
+#endif /* OPT_USE_BASE_UCALN == 0 */
   use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
@@ -406,8 +440,9 @@ subroutine test_CXX2SS &
 
   real(kind=KRC) :: ss, ddsec, cnext, cprev
   logical :: otp
+#if OPT_USE_BASE_UCALN
   logical OINTVL
-
+#endif
 111 format('CXX2SS:', F0.1, 1x, A, 2x, 'S >> dS S+')
 101 format('CXX2SS ', F0.2, 1x, F0.2, 1x, F0.2, 1x, F0.2, 1x, L1)
   write (jfpar, 111) dur, trim(unit)

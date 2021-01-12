@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/07 09:43:21 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/08 23:09:01 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -42,7 +42,7 @@ module TOUZA_Std_fun
   character(len=128) tmsg
 !!!_  - public
   public init, diag, finalize
-  public add_black_list, if_black_listed
+  public add_black_list, is_black_listed
   public brute_force_check_units
   public new_unit
 !!!_ + common interfaces
@@ -112,7 +112,7 @@ contains
     endif
     do ui = 0, limu
        un = mod(uoff + ui, limu + 1)
-       if (if_black_listed(un)) then
+       if (is_black_listed(un)) then
           continue
        else
           inquire(UNIT=un, IOSTAT=jerr, OPENED=opnd)
@@ -179,8 +179,8 @@ contains
 #   undef __PROC__
     return
   end subroutine add_black_list
-!!!_  & if_black_listed() - check if units is black-listed
-  logical function if_black_listed &
+!!!_  & is_black_listed() - check if units is black-listed
+  logical function is_black_listed &
        & (u) result (r)
     integer,intent(in) :: u
     integer jp
@@ -193,7 +193,7 @@ contains
     enddo
     r = .false.
     return
-  end function if_black_listed
+  end function is_black_listed
 !!!_  & diag_black_list
   subroutine diag_black_list &
        & (ierr, ulog)

@@ -1,8 +1,7 @@
 !!!_! calendar.F90 - touza/calendar: manager
 ! Maintainer: SAITO Fuyuki
 ! Created: May 31 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/07 12:07:03 fuyuki calendar.F90>'
-
+#define TIME_STAMP 'Time-stamp: <2021/01/10 20:19:16 fuyuki calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -11,7 +10,6 @@
 ! Licensed under the Apache License, Version 2.0
 !   (https://www.apache.org/licenses/LICENSE-2.0)
 !
-
 !!!_* Includes
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"
@@ -1167,10 +1165,8 @@ contains
     return
   end function check_id
 
-
 !!!_ + end module
 end module TOUZA_Cal
-
 !!!_@ test_calendar - test program
 #ifdef TEST_CALENDAR
 program test_calendar

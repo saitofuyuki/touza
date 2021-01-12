@@ -1,7 +1,7 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
 # Created: Jun 7 2020
-# Time-stamp: <2021/01/04 17:30:04 fuyuki autogen.sh>
+# Time-stamp: <2021/01/08 21:47:59 fuyuki autogen.sh>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -55,17 +55,9 @@ case $stdm4d in
 ../*) stdm4d="$(pwd)/$stdm4d";;
 esac
 
-# sync common files
-for f in INSTALL-sub.org autogen.sh LICENSE NOTICE
-do
-  s=$thisd/$f
-  test -f $f && cmp "$s" $f --quiet && continue
-  run cp "$s" "$f" || exit $?
-done
-
 TMP=
 # fake automake
-for t in NEWS AUTHORS ChangeLog COPYING
+for t in COPYING
 do
   test ! -f "$t" && TMP="$TMP $t"
 done

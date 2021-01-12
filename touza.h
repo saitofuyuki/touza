@@ -1,7 +1,7 @@
 !!!_! touza.h - touza definitions
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 5 2020
-! Time-stamp: <2021/01/07 11:54:21 fuyuki touza.h>
+! Time-stamp: <2021/01/09 00:11:02 fuyuki touza.h>
 
 /* Copyright (C) 2020, 2021 */
 /*           Japan Agency for Marine-Earth Science and Technology */
@@ -10,11 +10,6 @@
 
 #ifndef    _TOUZA_H
 #  define  _TOUZA_H
-
-/* preprocessor concatenation */
-#ifndef   HAVE_PP_CONCAT
-#  define HAVE_PP_CONCAT 0
-#endif
 
 #if   HAVE_PP_CONCAT == 1
 #  define _CONCAT(A,B) A ## B
@@ -25,14 +20,6 @@
 #else
 #  define CONCAT(A,B) B
 #endif
-
-#ifdef TOUZA_PREFIX
-#  define STD_NAME(T) CONCAT(TOUZA_PREFIX,T)
-#  define CAL_NAME(T) CONCAT(TOUZA_PREFIX,T)
-#else /* not TOUZA_PREFIX */
-#  define STD_NAME(T) T
-#  define CAL_NAME(T) T
-#endif /* not TOUZA_PREFIX */
 
 #endif  /* not _TOUZA_H */
 !!!_! FOOTER

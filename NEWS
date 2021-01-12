@@ -1,0 +1,22 @@
+# TOUZA news
+# Maintainer: SAITO Fuyuki
+# Time-stamp: <2021/01/08 21:47:44 fuyuki NEWS>
+
+TOUZA news - user-visible changes
+
+* Changes in 0.99 from 0.9
+  - git-submodule structure discarded.  Subpackages are no more stand
+    alone.
+  - Module naming modified.  Hard-coded module names are form of
+    `TOUZA_<Sub>' or `TOUZA_<Sub>_<member>'.   Transformation of
+    module names are redisigned and reserved for future development.
+  - Header files are renamed into `touza_<sub>.h'
+  - Default installation paths are changed.  Module files are under
+    $(pkgincludedir);  Header file are under $(includedir).
+
+* Changes in 0.9
+  - Beta release.
+
+# Local Variables:
+# mode: org
+# End:
