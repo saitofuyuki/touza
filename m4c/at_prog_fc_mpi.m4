@@ -1,7 +1,7 @@
 dnl Filename:   at_prog_fc_mpi.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Nov 30 2020
-dnl Time-stamp: <2020/11/30 14:32:49 fuyuki at_prog_fc_mpi.m4>
+dnl Time-stamp: <2021/01/13 09:38:12 fuyuki at_prog_fc_mpi.m4>
 
 dnl Copied from example in AX_PROG_FC_MPI description,
 dnl with little modification.
@@ -13,8 +13,8 @@ dnl Original license: Copyright (C) 2010,2011 Olaf Lenz
 AC_DEFUN([AT_PROG_FC_MPI],
 [AC_ARG_WITH([mpi],
   [AS_HELP_STRING([--with-mpi],
-                  [compile with MPI support. Default: auto])],,
-  [with_mpi=auto])
+                  [compile with MPI support @<:@default=auto@:>@])],
+  [], [with_mpi=auto])
 AX_PROG_FC_MPI([test x"$with_mpi" != xno],
 [use_mpi=yes],
 [use_mpi=no

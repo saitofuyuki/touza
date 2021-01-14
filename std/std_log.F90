@@ -1,7 +1,7 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/07 09:37:42 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/13 09:04:27 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -85,7 +85,8 @@ contains
     integer,         intent(in),optional :: u
     integer lt, ut
     lt = choice(0, lv)
-    ut = choice(global_unit, u)
+    ut = choice(unit_global, u)
+    if (ut.eq.unit_global) ut = global_unit
     if (present(tag)) then
        if      (ut.eq.unit_star) then
           write(*,   fmt_ytag) trim(tag), lt, trim(txt)

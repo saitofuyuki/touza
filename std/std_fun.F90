@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/08 23:09:01 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/12 22:29:50 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -222,7 +222,6 @@ contains
        & (ierr, limit, ulog)
 #   define __PROC__ 'std:fun:brute_force_check_units'
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_env,only: uout
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: limit
@@ -240,7 +239,7 @@ contains
     ierr = 0
     lchk = choice(limu, limit)
     if (lchk.lt.0) lchk = max(0, limu)
-    uli = choice(uout, ulog)
+    uli = choice(-1, ulog)
     allocate(stt(ubgn:lchk), STAT=ierr)
     stt(:) = 0
     if (ierr.eq.0) then

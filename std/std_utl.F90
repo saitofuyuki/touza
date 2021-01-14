@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/07 09:27:32 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/13 09:21:39 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -15,6 +15,14 @@
 #  include "touza_config.h"
 #endif
 #include "touza_std.h"
+!!!_* switch
+#if OPT_ENABLE_FORTRAN_ELEMENTAL
+#  define _ELEMENTAL ELEMENTAL
+#else
+#  define _ELEMENTAL
+#endif
+#define _CHOICE_DECL _ELEMENTAL
+#define _CONDOP_DECL _ELEMENTAL
 !!!_@ TOUZA_Std_utl - small utilities
 module TOUZA_Std_utl
   use TOUZA_Std_prc, only: KFLT, KDBL
@@ -37,10 +45,18 @@ module TOUZA_Std_utl
      module procedure set_if_present_a
   end interface set_if_present
 
+  interface condop
+     module procedure condop_i
+     module procedure condop_f
+     module procedure condop_d
+     module procedure condop_l
+  end interface condop
+
 !!!_  - public
   public init, diag, finalize
   public choice, choice_a
   public set_if_present
+  public condop
   public chcount
 contains
 !!!_ + common interfaces
@@ -72,7 +88,7 @@ contains
   end subroutine finalize
 !!!_ + user subroutines
 !!!_  & choice() - return D if not present A, otherwise A
-  integer function choice_i(d, a) result(r)
+  _CHOICE_DECL integer function choice_i(d, a) result(r)
     integer,intent(in)          :: d
     integer,intent(in),optional :: a
     if (present(a)) then
@@ -83,7 +99,7 @@ contains
     return
   end function choice_i
 
-  logical function choice_l(d, a) result(r)
+  _CHOICE_DECL logical function choice_l(d, a) result(r)
     logical,intent(in)          :: d
     logical,intent(in),optional :: a
     if (present(a)) then
@@ -94,7 +110,7 @@ contains
     return
   end function choice_l
 
-  real(kind=KFLT) function choice_f(d, a) result(r)
+  _CHOICE_DECL real(kind=KFLT) function choice_f(d, a) result(r)
     real(kind=KFLT),intent(in)          :: d
     real(kind=KFLT),intent(in),optional :: a
     if (present(a)) then
@@ -105,7 +121,7 @@ contains
     return
   end function choice_f
 
-  real(kind=KDBL) function choice_d(d, a) result(r)
+  _CHOICE_DECL real(kind=KDBL) function choice_d(d, a) result(r)
     real(kind=KDBL),intent(in)          :: d
     real(kind=KDBL),intent(in),optional :: a
     if (present(a)) then
@@ -183,6 +199,55 @@ contains
     endif
     return
   end subroutine set_if_present_a
+
+!!!_  & condop() - conditional operator
+  _CONDOP_DECL integer function condop_i (l, vt, vf) result(r)
+    implicit none
+    logical,intent(in) :: l
+    integer,intent(in) :: vt, vf
+    if (l) then
+       r = vt
+    else
+       r = vf
+    endif
+    return
+  end function condop_i
+
+  _CONDOP_DECL real(kind=KFLT) function condop_f (l, vt, vf) result(r)
+    implicit none
+    logical,        intent(in) :: l
+    real(kind=KFLT),intent(in) :: vt, vf
+    if (l) then
+       r = vt
+    else
+       r = vf
+    endif
+    return
+  end function condop_f
+
+  _CONDOP_DECL real(kind=KDBL) function condop_d (l, vt, vf) result(r)
+    implicit none
+    logical,        intent(in) :: l
+    real(kind=KDBL),intent(in) :: vt, vf
+    if (l) then
+       r = vt
+    else
+       r = vf
+    endif
+    return
+  end function condop_d
+
+  _CONDOP_DECL logical function condop_l (l, vt, vf) result(r)
+    implicit none
+    logical,intent(in) :: l
+    logical,intent(in) :: vt, vf
+    if (l) then
+       r = vt
+    else
+       r = vf
+    endif
+    return
+  end function condop_l
 
 !!!_  & chcount - count character(s) occurrence
   integer function chcount (str, chs) &

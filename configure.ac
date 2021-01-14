@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/01/11 21:45:48 fuyuki configure.ac>
+# Time-stamp: <2021/01/13 09:34:43 fuyuki configure.ac>
 
 AC_PREREQ([2.69])
 
@@ -46,7 +46,7 @@ AC_PROG_MAKE_SET
 AC_MSG_CHECKING([if transform library name])
 AC_ARG_WITH([touza-name],
 [AS_HELP_STRING([--with-touza-name=STRING],
-                [Replace "lib]AC_PACKAGE_NAME[" with "libSTRING" (default=]AC_PACKAGE_NAME[)])])
+                [replace "lib]AC_PACKAGE_NAME[" with "libSTRING" @<:@default=]AC_PACKAGE_NAME[@:>@])])
 AS_IF([test "$with_touza_name" = "no"],
 [AC_MSG_RESULT([Error])
  AC_MSG_ERROR([Invalid to specify --without-touza-name])])
@@ -66,6 +66,17 @@ m4_define([TOUZA_config],
 AC_CONFIG_HEADER(m4_expand([TOUZA_config]))
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([makeshift], [chmod +x makeshift])
+
+AC_MSG_CHECKING([if enable elemental function])
+AC_ARG_ENABLE([elemental],
+[AS_HELP_STRING([--disable-elemental], [disable elemental functions])],
+[], [enableval=yes])
+AS_IF([test x"$enableval" = x"no"],
+      [enable_elemental=0
+       AC_MSG_RESULT([disable])],
+      [enable_elemental=1
+       AC_MSG_RESULT([enable])])
+AC_DEFINE_UNQUOTED([OPT_ENABLE_FORTRAN_ELEMENTAL], [$enable_elemental], [prefer elemental function])
 
 AT_SUB_PACKAGE([std], [always])
 AT_SUB_PACKAGE([cal], [],     [std])

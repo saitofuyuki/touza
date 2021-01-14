@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/07 11:55:22 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/13 18:02:37 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -136,7 +136,6 @@ program test_std_mwe
   use TOUZA_Std_mwe
   implicit none
   integer ierr
-  integer ui, uo, ue
 
   call init(ierr)
   if (ierr.eq.0) call diag(ierr)

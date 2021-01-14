@@ -1,4 +1,12 @@
 
+Revision 0.99.1 / 2021-01-14
+==================
+
+  * (std) stderr unit introduced.
+  * elemental function switch.
+  * makeshift --fcincs argument
+  * several minor issues
+
 Revision 0.99 / 2021-01-12
 ==================
 

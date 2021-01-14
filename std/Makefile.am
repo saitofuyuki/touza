@@ -1,7 +1,7 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2021/01/07 09:24:37 fuyuki Makefile.am>
+# Time-stamp: <2021/01/13 17:39:53 fuyuki Makefile.am>
 #
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -30,7 +30,8 @@ MOSTLYCLEANFILES	+=	fort.*
 
 TEST_COMMON_LIBS		=	$(noinst_LTLIBRARIES)
 
-check_PROGRAMS			=	test_std_prc test_std_env test_std_log test_std_fun test_std_arg test_std
+check_PROGRAMS			=	test_std_prc test_std_env test_std_log test_std_fun test_std_arg test_std_mwe test_std
+
 test_std_env_SOURCES	=	std_env.F90
 test_std_env_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_ENV=1
 test_std_env_LDADD		=	$(TEST_COMMON_LIBS)
@@ -50,6 +51,10 @@ test_std_prc_LDADD		=	$(TEST_COMMON_LIBS)
 test_std_arg_SOURCES	=	std_arg.F90
 test_std_arg_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_ARG=1
 test_std_arg_LDADD		=	$(TEST_COMMON_LIBS)
+
+test_std_mwe_SOURCES	=	std_mwe.F90
+test_std_mwe_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_MWE=1
+test_std_mwe_LDADD		=	$(TEST_COMMON_LIBS)
 
 test_std_SOURCES	=	std.F90
 test_std_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD=1

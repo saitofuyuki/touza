@@ -1,7 +1,7 @@
 dnl Filename:   at_package.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 7 2020
-dnl Time-stamp: <2021/01/11 14:47:50 fuyuki at_package.m4>
+dnl Time-stamp: <2021/01/13 09:36:36 fuyuki at_package.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -42,7 +42,7 @@ AM_CONDITIONAL([CLEAN_FCMOD], [test x"$FC_MODEXT" != "x"])
 
 AC_ARG_ENABLE([install-modules],
               [AS_HELP_STRING([--enable-install-modules],
-                              [install module files if applicable. Default: '${pkgincludedir}'])],
+                              [install module files if applicable @<:@default='${pkgincludedir}'@:>@])],
               [pkgmoddir="$enableval"],
               [pkgmoddir='${pkgincludedir}'])
 

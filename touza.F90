@@ -1,7 +1,7 @@
 !!!_! touza.F90 - touza administration
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/06 23:43:00 fuyuki touza.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/13 16:55:27 fuyuki touza.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -36,8 +36,8 @@ module TOUZA
 !!!_   . std
   public :: KFLT,     KDBL
   public :: std_init, std_diag, std_finalize
-  public :: choice,   set_if_present
-  public :: uin, uout
+  public :: choice,   choice_a, set_if_present
+  public :: uin, uout, uerr
   public :: msg
   public :: unit_star, unit_none, unit_global
   public :: decl_pos_arg, parse, get_option, get_param
