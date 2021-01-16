@@ -1,8 +1,12 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2021/01/08 21:47:44 fuyuki NEWS>
+# Time-stamp: <2021/01/16 22:45:05 fuyuki NEWS>
 
 TOUZA news - user-visible changes
+
+* Changes in 0.99.2 from 0.99
+  - additional argument functions introduced.
+  - get_args renamed into get_arg.
 
 * Changes in 0.99 from 0.9
   - git-submodule structure discarded.  Subpackages are no more stand

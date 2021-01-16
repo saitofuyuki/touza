@@ -1,6 +1,12 @@
 
+Revision 0.99.2 / 2021-01-16
+============================
+
+  * (std/arg) additional argument functions introduced.
+  * (std/arg) [important] get_args renamed into get_arg.
+
 Revision 0.99.1 / 2021-01-14
-==================
+============================
 
   * (std) stderr unit introduced.
   * elemental function switch.
@@ -8,14 +14,14 @@ Revision 0.99.1 / 2021-01-14
   * several minor issues
 
 Revision 0.99 / 2021-01-12
-==================
+==========================
 
   * library name transformation introduced
   * (cal) [important] interfaces (as external procedure) introduced.
   * source cleaning (remove obsolete, etc).
 
 Revision 0.98.1 / 2021-01-08
-==================
+============================
 
   * Import upstream.
   * Description of installation updated.
@@ -24,13 +30,13 @@ Revision 0.98.1 / 2021-01-08
   * Copyright notices.
 
 Revision 0.98 / 2021-01-07
-=========================
+==========================
 
   * Release 0.98 (std cal).
   * Discard git submodule design.
 
 Revision 0.97 / 2020-06-06
-==================
+==========================
 
   * (cal) [important] TOUZA/std dependencies reduced.
   * (cal) sample interfaces of matsiro and ils.

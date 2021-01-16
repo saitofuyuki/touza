@@ -1,7 +1,7 @@
 !!!_! std.F90 - touza/std interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/13 16:59:22 fuyuki std.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/16 19:09:14 fuyuki std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -18,7 +18,7 @@
 !!!_@ TOUZA_Std - standard interfaces
 module TOUZA_Std
   use TOUZA_Std_prc,only: KFLT, KDBL
-  use TOUZA_Std_utl,only: choice, choice_a, set_if_present, chcount
+  use TOUZA_Std_utl,only: choice, choice_a, condop, set_if_present, chcount
   use TOUZA_Std_env,only: uin, uout, uerr
   use TOUZA_Std_log,only: &
        & msg, unit_star, unit_none, unit_global
@@ -26,9 +26,11 @@ module TOUZA_Std
        & add_black_list, brute_force_check_units, &
        & new_unit
   use TOUZA_Std_arg,only: &
-       & arg_init => init,    arg_diag => diag, &
+       & arg_init => init, arg_diag => diag, &
        & decl_pos_arg, parse, &
-       & get_param, get_option, get_args, check_param
+       & get_param,    get_array, get_option, get_arg,      check_param, &
+       & get_key,      get_value, get_value_seq
+
   use TOUZA_Std_mwe,only: &
        & mwe_init=>init, mwe_diag=>diag, mwe_finalize=>finalize, &
        & get_ni
@@ -42,14 +44,15 @@ module TOUZA_Std
 !!!_   . prc
   public KFLT, KDBL
 !!!_   . utl
-  public choice, choice_a, set_if_present, chcount
+  public choice, choice_a, condop, set_if_present, chcount
 !!!_   . env
   public uin, uout, uerr
 !!!_   . arg
   public :: arg_init, arg_diag
   public :: decl_pos_arg
   public :: parse
-  public :: get_param, get_option, get_args, check_param
+  public :: get_param, get_array, get_option, get_arg, check_param
+  public :: get_key,   get_value, get_value_seq
 !!!_   . fun
   public add_black_list
   public brute_force_check_units

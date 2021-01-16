@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/01/13 09:34:43 fuyuki configure.ac>
+# Time-stamp: <2021/01/15 21:56:15 fuyuki configure.ac>
 
 AC_PREREQ([2.69])
 
@@ -30,6 +30,12 @@ AC_FC_FREEFORM
 AC_FC_MODULE_EXTENSION
 AC_FC_MODULE_FLAG
 AC_FC_MODULE_OUTPUT_FLAG([], [AC_MSG_WARN])
+
+AC_ARG_ENABLE([warn-max],
+[AS_HELP_STRING([--enable-warn-max], [compile with maximum warning option if found @<:@default=no@:>@])],
+ [use_warn_max=$enableval],
+ [use_warn_max=no])
+AS_IF([test x"$use_warn_max" = xyes], [AX_FCFLAGS_WARN_ALL])
 
 dnl common procedures
 AT_PACKAGE_INIT()

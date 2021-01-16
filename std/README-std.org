@@ -172,9 +172,9 @@
     <type>,          intent(in),optional :: def
     integer,         intent(in),optional :: idx
 #+end_src
-**** get_args
+**** get_arg
 #+begin_src f90
-  subroutine get_args (ierr, tag, val, jentr)
+  subroutine get_arg (ierr, tag, val, jentr)
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(out)   :: tag

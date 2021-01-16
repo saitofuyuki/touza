@@ -1,7 +1,7 @@
 !!!_! touza.F90 - touza administration
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/13 16:55:27 fuyuki touza.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/16 22:24:38 fuyuki touza.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -34,35 +34,39 @@ module TOUZA
 !!!_   . self
   public :: init, diag, finalize
 !!!_   . std
-  public :: KFLT,     KDBL
-  public :: std_init, std_diag, std_finalize
-  public :: choice,   choice_a, set_if_present
-  public :: uin, uout, uerr
+  public :: KFLT,          KDBL
+  public :: std_init,      std_diag,  std_finalize
+  public :: choice,        choice_a,  condop,     set_if_present
+  public :: chcount
+  public :: uin,           uout,      uerr
   public :: msg
-  public :: unit_star, unit_none, unit_global
-  public :: decl_pos_arg, parse, get_option, get_param
+  public :: unit_star,     unit_none, unit_global
+  public :: decl_pos_arg,  parse,     get_option, get_param,  get_array
+  public :: get_arg,       get_key
+  public :: get_value,     get_value_seq
+  public :: arg_diag
 !!!_   . calendar
 #if ENABLE_TOUZA_CAL
-  public :: cal_init, cal_diag, cal_finalize
-  public :: alloc, new_calendar
-  public :: set_perpetual_date,     set_perpetual_adate
-  public :: get_perpetual_date,     set_perpetual_switch
-  public :: inq_nday_month,         inq_nday_year,      inq_nmonth_year
-  public :: inq_nsec_day,           inq_nsec_minute,    inq_nsec_hour
-  public :: conv_cdaysec_csec,      conv_time_tsec,     conv_date_cday
-  public :: conv_date_dayy,         conv_date_dayy_compat
-  public :: conv_calendar_csec,     conv_duration_sec,  conv_csec_string_ppt_off
-  public :: advance_csec,           conv_calendar_string
-  public :: is_passed,              is_passed_compat
-  public :: conv_csec_cdaysec,      conv_csec_adaysec
-  public :: conv_tsec_time,         conv_tsec_atime
-  public :: conv_cday_date,         conv_cday_adate
+  public :: cal_init,             cal_diag,          cal_finalize
+  public :: alloc,                new_calendar
+  public :: set_perpetual_date,   set_perpetual_adate
+  public :: get_perpetual_date,   set_perpetual_switch
+  public :: inq_nday_month,       inq_nday_year,     inq_nmonth_year
+  public :: inq_nsec_day,         inq_nsec_minute,   inq_nsec_hour
+  public :: conv_cdaysec_csec,    conv_time_tsec,    conv_date_cday
+  public :: conv_date_dayy,       conv_date_dayy_compat
+  public :: conv_calendar_csec,   conv_duration_sec, conv_csec_string_ppt_off
+  public :: advance_csec,         conv_calendar_string
+  public :: is_passed,            is_passed_compat
+  public :: conv_csec_cdaysec,    conv_csec_adaysec
+  public :: conv_tsec_time,       conv_tsec_atime
+  public :: conv_cday_date,       conv_cday_adate
   public :: conv_adate_cday
-  public :: conv_csec_calendar,     conv_csec_acalendar
-  public :: conv_cday_cydayy,       conv_cday_aydayy
-  public :: conv_csec_cydayy,       conv_csec_aydayy
-  public :: conv_csec_date,         conv_csec_adate
-  public :: conv_string_calendar,   conv_string_acalendar
+  public :: conv_csec_calendar,   conv_csec_acalendar
+  public :: conv_cday_cydayy,     conv_cday_aydayy
+  public :: conv_csec_cydayy,     conv_csec_aydayy
+  public :: conv_csec_date,       conv_csec_adate
+  public :: conv_string_calendar, conv_string_acalendar
   public :: KRC,     XREAL
   public :: p_error, p_ideal, p_grego_i, p_grego_l, p_user
 #endif /* ENABLE_TOUZA_CAL */
