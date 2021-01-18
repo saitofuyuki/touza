@@ -1,4 +1,9 @@
 
+Revision 0.99.3 / 2021-01-19
+==================
+
+  * (std/env) record-length function and variables.
+
 Revision 0.99.2 / 2021-01-16
 ============================
 

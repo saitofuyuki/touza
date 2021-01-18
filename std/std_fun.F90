@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/12 22:29:50 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/18 08:26:14 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -45,6 +45,7 @@ module TOUZA_Std_fun
   public add_black_list, is_black_listed
   public brute_force_check_units
   public new_unit
+  public new_unit_nn
 !!!_ + common interfaces
 contains
 !!!_  & init
@@ -125,6 +126,27 @@ contains
     un = -1
     return
   end function new_unit
+
+!!!_  & new_unit_nn () - return unbound i/o unit number (not existing file)
+  integer function new_unit_nn &
+       & (ksw) &
+       & result(un)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,intent(in),optional :: ksw
+    integer jerr
+    do
+       un = new_unit(ksw)
+       if (un.lt.0) exit
+       open(UNIT=un, STATUS='NEW', IOSTAT=jerr)
+       if (jerr.eq.0) then
+          close(UNIT=un, STATUS='delete', IOSTAT=jerr)
+          exit
+       endif
+       close(UNIT=un, IOSTAT=jerr)
+    enddo
+    return
+  end function new_unit_nn
 
 !!!_ + black list manipulation
 !!!_  & add_black_list - register unit(s) in the black list

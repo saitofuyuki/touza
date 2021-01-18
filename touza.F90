@@ -1,7 +1,7 @@
 !!!_! touza.F90 - touza administration
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/16 22:24:38 fuyuki touza.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/18 21:48:24 fuyuki touza.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -39,12 +39,15 @@ module TOUZA
   public :: choice,        choice_a,  condop,     set_if_present
   public :: chcount
   public :: uin,           uout,      uerr
+  public :: lbrec,         lreci,     lrecf,      lrecd
+  public :: get_rlu,       get_rlb
   public :: msg
   public :: unit_star,     unit_none, unit_global
   public :: decl_pos_arg,  parse,     get_option, get_param,  get_array
   public :: get_arg,       get_key
   public :: get_value,     get_value_seq
   public :: arg_diag
+  public :: new_unit
 !!!_   . calendar
 #if ENABLE_TOUZA_CAL
   public :: cal_init,             cal_diag,          cal_finalize

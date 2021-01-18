@@ -1,7 +1,7 @@
 !!!_! std.F90 - touza/std interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/16 19:09:14 fuyuki std.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/18 21:48:57 fuyuki std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -19,7 +19,9 @@
 module TOUZA_Std
   use TOUZA_Std_prc,only: KFLT, KDBL
   use TOUZA_Std_utl,only: choice, choice_a, condop, set_if_present, chcount
-  use TOUZA_Std_env,only: uin, uout, uerr
+  use TOUZA_Std_env,only: &
+       & uin, uout, uerr, lbrec, lreci, lrecf, lrecd, &
+       & get_rlu,   get_rlb
   use TOUZA_Std_log,only: &
        & msg, unit_star, unit_none, unit_global
   use TOUZA_Std_fun,only: &
@@ -46,7 +48,8 @@ module TOUZA_Std
 !!!_   . utl
   public choice, choice_a, condop, set_if_present, chcount
 !!!_   . env
-  public uin, uout, uerr
+  public uin, uout, uerr, lbrec, lreci, lrecf, lrecd
+  public get_rlu,   get_rlb
 !!!_   . arg
   public :: arg_init, arg_diag
   public :: decl_pos_arg
