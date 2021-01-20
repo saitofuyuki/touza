@@ -50,9 +50,13 @@
    : |   |   `-- :
    : |   |-- touza.h
    : |   `-- :
-   : `-- lib
-   :     |-- libtouza.a
-   :     `-- libtouza.la
+   : |-- lib
+   : |   |-- libtouza.a
+   : |   `-- libtouza.la
+   : `-- share
+   :     `-- touza
+   :         |-- at_init.m4
+   :         `-- :
 
    Depending on compiler, =*.mod= files are generated for each module,
    which are necessary to be installed somewhere the compiler can

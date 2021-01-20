@@ -1,7 +1,7 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
 # Created:    Dec 15 2020
-# Time-stamp: <2021/01/12 16:01:16 fuyuki makeshift.in>
+# Time-stamp: <2021/01/20 09:39:08 fuyuki makeshift.in>
 # Copyright: 2021 JAMSTEC
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -13,8 +13,11 @@ prefix=@prefix@
 exec_prefix=@exec_prefix@
 includedir=@includedir@
 libdir=@libdir@
+datarootdir=@datarootdir@
+datadir=@datadir@
 pkgincludedir=${includedir}/@PACKAGE@
 pkglibdir=${libdir}/@PACKAGE@
+pkgdatadir=${datadir}/@PACKAGE@
 pkgmoddir=@pkgmoddir@
 fc_modinc="@FC_MODINC@"
 touza_lib="-l@TOUZA_NAME@"
@@ -26,6 +29,7 @@ FCINCS="-I${includedir} -I${pkgincludedir} ${fc_modinc}${pkgmoddir}"
 LDFLAGS="-L${libdir} ${touza_lib}"
 LTLIBRARY="${libdir}/lib${touza_name}.la"
 LIBRARY="${libdir}/lib${touza_name}.a"
+touza_m4incs="${pkgdatadir}"
 
 usage ()
 {
@@ -46,6 +50,7 @@ main ()
     --ltlib*)  echo "$LTLIBRARY";;
     --lib*)    echo "$LIBRARY";;
     --name)    echo "$touza_name";;
+    --m4incs)  echo "$touza_m4incs";;
     *) echo "invalid argument $1."; return 1;;
     esac
     shift

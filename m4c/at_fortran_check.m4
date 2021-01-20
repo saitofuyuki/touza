@@ -1,7 +1,7 @@
 dnl Filename:  at_fortran_check.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 3 2020
-dnl Time-stamp: <2021/01/07 13:55:03 fuyuki at_fortran_check.m4>
+dnl Time-stamp: <2021/01/20 09:06:31 fuyuki at_fortran_check.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -290,6 +290,48 @@ AS_IF([test "x[$]at_result" = x"not found"],
       [$5],
       [$4])
 ])# AT_FORTRAN_SEARCH_LTLIBRARY
+
+# ======================================================================
+# fortran standard specific features
+
+# AT_FC_F2003_ALLOCATABLE_DUMMY()
+# -------------------------------
+# define HAVE_F2003_ALLOCATABLE_DUMMY if fortran understand allocatable
+# property for dummy arguments.
+AC_DEFUN([AT_FC_F2003_ALLOCATABLE_DUMMY],
+[AC_CACHE_CHECK([whether fortran accepts allocatable dummy arguments],
+  [at_cv_f2003_allocatable_dummy],
+  [AC_LANG_PUSH([Fortran])
+   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],
+[      contains
+       integer function f(x)
+       integer,intent(in),allocatable :: x
+       end function f])],
+  [at_cv_f2003_allocatable_dummy=yes],
+  [at_cv_f2003_allocatable_dummy=no])
+  AC_LANG_POP([Fortran])])
+AS_IF([test x"$at_cv_f2003_allocatable_dummy" = xyes],
+      [AC_DEFINE([HAVE_F2003_ALLOCATABLE_DUMMY], [1], [allocatable dummy argument])])
+])# AT_FC_F2003_ALLOCATABLE_DUMMY
+
+# AT_FC_F2003_ALLOCATABLE_MEMBER()
+# -------------------------------
+# define HAVE_F2003_ALLOCATABLE_MEMBER if fortran understand allocatable
+# member for user-define types
+AC_DEFUN([AT_FC_F2003_ALLOCATABLE_MEMBER],
+[AC_CACHE_CHECK([whether fortran accepts allocatable type members],
+  [at_cv_f2003_allocatable_member],
+  [AC_LANG_PUSH([Fortran])
+   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],
+[      type at_type
+         integer,allocatable :: x
+       end type at_type])],
+  [at_cv_f2003_allocatable_member=yes],
+  [at_cv_f2003_allocatable_member=no])
+  AC_LANG_POP([Fortran])])
+AS_IF([test x"$at_cv_f2003_allocatable_member" = xyes],
+      [AC_DEFINE([HAVE_F2003_ALLOCATABLE_MEMBER], [1], [allocatable type member])])
+])# AT_FC_F2003_ALLOCATABLE_MEMBER
 
 dnl Local Variables:
 dnl mode: autoconf

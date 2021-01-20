@@ -1,7 +1,7 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
 # Created: Jun 7 2020
-# Time-stamp: <2021/01/08 21:47:59 fuyuki autogen.sh>
+# Time-stamp: <2021/01/20 09:27:28 fuyuki autogen.sh>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -72,7 +72,7 @@ run aclocal $OPTS -I "$stdm4d" || exit $?
 run autoheader || exit $?
 
 # All we need is the file INSTALL
-run automake --add-missing || exit $?
+run automake --add-missing --gnu || exit $?
 echo "# automake rerun"
 # shellcheck disable=SC2086
 run rm -f $TMP

@@ -1,4 +1,9 @@
 
+Revision 0.99.4 / 2021-01-20
+==================
+
+  * autoconf macros (m4c/at_*) installation.
+
 Revision 0.99.3 / 2021-01-19
 ==================
 

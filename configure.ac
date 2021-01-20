@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/01/15 21:56:15 fuyuki configure.ac>
+# Time-stamp: <2021/01/20 09:26:02 fuyuki configure.ac>
 
 AC_PREREQ([2.69])
 
@@ -45,7 +45,7 @@ AC_ARG_PROGRAM
 AC_CONFIG_MACRO_DIRS([m4c])
 AC_CONFIG_AUX_DIR([build-aux])
 
-AM_INIT_AUTOMAKE([-Wall])
+AM_INIT_AUTOMAKE([-Wall foreign])
 AM_MAINTAINER_MODE
 AC_PROG_MAKE_SET
 
@@ -71,6 +71,7 @@ m4_define([TOUZA_config],
 
 AC_CONFIG_HEADER(m4_expand([TOUZA_config]))
 AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([m4c/Makefile])
 AC_CONFIG_FILES([makeshift], [chmod +x makeshift])
 
 AC_MSG_CHECKING([if enable elemental function])
