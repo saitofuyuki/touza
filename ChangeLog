@@ -1,4 +1,11 @@
 
+Revision 0.99.5 / 2021-01-22
+==================
+
+  * [CRITICAL] (m4c) at_ prefix replaced with mt_.
+  * (std/arg) get_option_*a introduced (to parse array).
+  * (std/utl) Implement case conversion subroutines.
+
 Revision 0.99.4 / 2021-01-20
 ==================
 

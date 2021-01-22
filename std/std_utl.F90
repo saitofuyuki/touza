@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/13 09:21:39 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/21 13:10:35 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -52,12 +52,23 @@ module TOUZA_Std_utl
      module procedure condop_l
   end interface condop
 
+  interface upcase
+     module procedure upcase_m
+     module procedure upcase_o
+  end interface upcase
+
+  interface downcase
+     module procedure downcase_m
+     module procedure downcase_o
+  end interface downcase
+
 !!!_  - public
   public init, diag, finalize
   public choice, choice_a
   public set_if_present
   public condop
   public chcount
+  public upcase, downcase
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -263,7 +274,73 @@ contains
        if (index(chs, str(i:i)).gt.0) n = n + 1
     enddo
   end function chcount
+
+!!!_  & upcase() - upper case conversion
+  subroutine upcase_m(S)
+    implicit none
+    character(len=*),intent(inout) :: S
+    integer ka, kz, kc, koff
+    integer j
+    ka = IACHAR('a')
+    kz = IACHAR('z')
+    koff = IACHAR('A') - ka
+    do j = 1, len_trim(S)
+       kc = IACHAR(S(j:j))
+       if (kc.ge.ka.and.kc.le.kz) S(j:j) = ACHAR(kc + koff)
+    enddo
+  end subroutine upcase_m
+
+  subroutine upcase_o(SO, SI)
+    implicit none
+    character(len=*),intent(out) :: SO
+    character(len=*),intent(in)  :: SI
+    SO = SI
+    call upcase_m(SO)
+  end subroutine upcase_o
+
+!!!_  & downcase() - lower case conversion
+  subroutine downcase_m(S)
+    implicit none
+    character(len=*),intent(inout) :: S
+    integer ka, kz, kc, koff
+    integer j
+    ka = IACHAR('A')
+    kz = IACHAR('Z')
+    koff = IACHAR('a') - ka
+    do j = 1, len_trim(S)
+       kc = IACHAR(S(j:j))
+       if (kc.ge.ka.and.kc.le.kz) S(j:j) = ACHAR(kc + koff)
+    enddo
+  end subroutine downcase_m
+
+  subroutine downcase_o(SO, SI)
+    implicit none
+    character(len=*),intent(out) :: SO
+    character(len=*),intent(in)  :: SI
+    SO = SI
+    call downcase_m(SO)
+  end subroutine downcase_o
+
 end module TOUZA_Std_utl
+
+!!!_@ test_std_utl - test program
+#if TEST_STD_UTL
+program test_std_utl
+  use TOUZA_Std_utl
+  implicit none
+  character(len=128) :: T0, T1
+
+  T0 = 'abcABCxyzXYZ012:;/'
+
+101 format('to:', A, 1x, '[', A, '] [', A, ']')
+  call upcase(T1, T0)
+  write(*, 101) 'U', trim(T0), trim(T1)
+  call downcase(T1, T0)
+  write(*, 101) 'D', trim(T0), trim(T1)
+
+  stop
+end program test_std_utl
+#endif /* TEST_STD_UTL */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

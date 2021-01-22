@@ -47,3 +47,4 @@ gmon.out
 /touza_config.h.in
 /makeshift
 /std/test_std_mwe
+/std/test_std_utl

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
 # Created: Jun 7 2020
-# Time-stamp: <2021/01/20 09:27:28 fuyuki autogen.sh>
+# Time-stamp: <2021/01/22 08:58:08 fuyuki autogen.sh>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -41,7 +41,7 @@ run ()
 }
 
 stdm4d=
-stdm4f=at_init.m4
+stdm4f=mt_init.m4
 for d in "m4c" "$@"
 do
   test -f "$d/$stdm4f" && stdm4d="$d" && break

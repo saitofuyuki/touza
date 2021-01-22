@@ -3,12 +3,12 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/01/20 09:26:02 fuyuki configure.ac>
+# Time-stamp: <2021/01/22 08:57:41 fuyuki configure.ac>
 
 AC_PREREQ([2.69])
 
-AT_INIT()
-AC_INIT([touza], AT_VERSION, [saitofuyuki@jamstec.go.jp])
+MT_INIT()
+AC_INIT([touza], MT_VERSION, [saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
 Copyright (C) 2020, 2021 Japan Agency for Marine-Earth Science and Technology
@@ -19,7 +19,7 @@ Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/L
 ])
 
 AC_CONFIG_SRCDIR([touza.F90])
-AT_PROG_FC_MPI
+MT_PROG_FC_MPI
 dnl AC_PROG_FC
 AC_PROG_F77
 
@@ -38,8 +38,8 @@ AC_ARG_ENABLE([warn-max],
 AS_IF([test x"$use_warn_max" = xyes], [AX_FCFLAGS_WARN_ALL])
 
 dnl common procedures
-AT_PACKAGE_INIT()
-AT_AM_INCLUDE()
+MT_PACKAGE_INIT()
+MT_AM_INCLUDE()
 
 AC_ARG_PROGRAM
 AC_CONFIG_MACRO_DIRS([m4c])
@@ -85,11 +85,11 @@ AS_IF([test x"$enableval" = x"no"],
        AC_MSG_RESULT([enable])])
 AC_DEFINE_UNQUOTED([OPT_ENABLE_FORTRAN_ELEMENTAL], [$enable_elemental], [prefer elemental function])
 
-AT_SUB_PACKAGE([std], [always])
-AT_SUB_PACKAGE([cal], [],     [std])
-dnl AT_SUB_PACKAGE([emu], [],     [std])
-dnl AT_SUB_PACKAGE([div], [],     [std])
+MT_SUB_PACKAGE([std], [always])
+MT_SUB_PACKAGE([cal], [],     [std])
+dnl MT_SUB_PACKAGE([emu], [],     [std])
+dnl MT_SUB_PACKAGE([div], [],     [std])
 
-AT_PARSE_PACKAGES()
+MT_PARSE_PACKAGES()
 
 AC_OUTPUT

@@ -48,6 +48,19 @@
     character(len=*),intent(in) :: chs
 #+end_src
   Count occurences of characters in =chs= in string =str=.
+**** condop()
+#+begin_src f90
+  integer    function condop(l, vt, vf)
+  logical    function condop(l, vt, vf)
+  real(KFLT) function condop(l, vt, vf)
+  real(KDBL) function condop(l, vt, vf)
+    logical,intent(in) :: l
+    <type>, intent(in) :: vt
+    <type>, intent(in) :: vf
+#+end_src
+   So called conditional (ternary) operator.
+   Return =VT= if =L= is true, or =VT= otherwise.
+
 *** subroutines
 **** choice_a
 #+begin_src f90
@@ -66,7 +79,24 @@
 #+end_src
     =<type>= is either integer, real, logical or character(len=*).
     if =var= is present assign =var= for =val=, otherwise do nothing.
-
+**** downcase
+ #+begin_src f90
+   subroutine downcase(S)
+     character(len=*),intent(inout) :: S
+   subroutine downcase(SO, SI)
+     character(len=*),intent(out) :: SO
+     character(len=*),intent(in)  :: SI
+ #+end_src
+   Lower case conversion of input string S (to modify), or SI onto SO.
+**** upcase
+ #+begin_src f90
+   subroutine upcase(S)
+     character(len=*),intent(inout) :: S
+   subroutine upcase(SO, SI)
+     character(len=*),intent(out) :: SO
+     character(len=*),intent(in)  :: SI
+ #+end_src
+   Upper case conversion of input string S (to modify), or SI onto SO.
 
 ** =TOUZA_Std_env=  (std_env.F90) - standard environments
 *** constants

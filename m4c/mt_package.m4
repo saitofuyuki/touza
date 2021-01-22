@@ -1,39 +1,39 @@
-dnl Filename:   at_package.m4
+dnl Filename:   touza/m4c/mt_package.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 7 2020
-dnl Time-stamp: <2021/01/13 09:36:36 fuyuki at_package.m4>
+dnl Time-stamp: <2021/01/22 08:49:16 fuyuki mt_package.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
 dnl   (https://www.apache.org/licenses/LICENSE-2.0)
 
-# AT_PACKAGE_INIT()
+# MT_PACKAGE_INIT()
 # ------------
 # subpackages management initialization
-AC_DEFUN([AT_PACKAGE_INIT],
-[AC_REQUIRE([AT_ONCE])])# AT_PACKAGE_INIT
+AC_DEFUN([MT_PACKAGE_INIT],
+[AC_REQUIRE([MT_ONCE])])# MT_PACKAGE_INIT
 
-# AT_ONCE
+# MT_ONCE
 # -------
 # common definition called once
-AC_DEFUN([AT_ONCE],
-[AT_ENV_PP()
-AT_ENV_MODULES()
-])# AT_ONCE
+AC_DEFUN([MT_ONCE],
+[MT_ENV_PP()
+MT_ENV_MODULES()
+])# MT_ONCE
 
-# AT_ENV_PP
+# MT_ENV_PP
 # ---------
 # preprocessor environment
-AC_DEFUN([AT_ENV_PP],
+AC_DEFUN([MT_ENV_PP],
 [AC_LANG_PUSH([Fortran])
-AT_FORTRAN_PP_CONCAT([HAVE_PP_CONCAT])
+MT_FORTRAN_PP_CONCAT([HAVE_PP_CONCAT])
 AC_LANG_POP([Fortran])
-])# AT_ENV_PP
+])# MT_ENV_PP
 
-# AT_ENV_MODULES
+# MT_ENV_MODULES
 # --------------
 # autoconf batch for fortran module treatment.
-AC_DEFUN([AT_ENV_MODULES],
+AC_DEFUN([MT_ENV_MODULES],
 [AC_REQUIRE([AC_FC_MODULE_EXTENSION])
 AC_REQUIRE([AC_FC_MODULE_FLAG])
 AC_REQUIRE([AC_FC_MODULE_OUTPUT_FLAG])
@@ -52,114 +52,114 @@ AS_IF([test x"[$]pkgmoddir" = xyes],
       [pkgmoddir='[$]{pkgincludedir}'])
 
 AC_SUBST([pkgmoddir])
-])# AT_ENV_MODULES
+])# MT_ENV_MODULES
 
-# AT_ALL_SUB_PACKAGES
+# MT_ALL_SUB_PACKAGES
 # -------------------
 # placeholder
-m4_define([AT_ALL_SUB_PACKAGES], [])
+m4_define([MT_ALL_SUB_PACKAGES], [])
 
-# AT_SUB_PACKAGE(NAME, [ENABLE], [DEP], [DIRECTORY])
+# MT_SUB_PACKAGE(NAME, [ENABLE], [DEP], [DIRECTORY])
 # --------------------------------------------------
 # Declare NAME subpackage under DIRECTORY (or NAME if not set).
 # ENABLE: always yes no
-AC_DEFUN([AT_SUB_PACKAGE],
+AC_DEFUN([MT_SUB_PACKAGE],
 [_$0([$1],
      [m4_default([$2], [yes])],
      [$3],
-     m4_quote(m4_default([$4], [$1])))])# AT_SUB_PACKAGE
+     m4_quote(m4_default([$4], [$1])))])# MT_SUB_PACKAGE
 
-# _AT_SUB_PACKAGE(NAME, ENABLE, DEP, DIRECTORY)
+# _MT_SUB_PACKAGE(NAME, ENABLE, DEP, DIRECTORY)
 # ---------------------------------------------
-AC_DEFUN([_AT_SUB_PACKAGE],
-[m4_do([m4_append_uniq([AT_ALL_SUB_PACKAGES], [$1], [ ])],
-       [AT_PACKAGE_DEPS([$1], m4_quote($3))],
-       [m4_define([AT_DEFAULT_SW($1)], [$2])],
-       [m4_define([AT_DIRECTORY($1)], [$4])],
-       [AC_REQUIRE([AT_SUB_DEFAULT])],
+AC_DEFUN([_MT_SUB_PACKAGE],
+[m4_do([m4_append_uniq([MT_ALL_SUB_PACKAGES], [$1], [ ])],
+       [MT_PACKAGE_DEPS([$1], m4_quote($3))],
+       [m4_define([MT_DEFAULT_SW($1)], [$2])],
+       [m4_define([MT_DIRECTORY($1)], [$4])],
+       [AC_REQUIRE([MT_SUB_DEFAULT])],
        [AC_ARG_ENABLE([sub-$1],
                       [AS_HELP_STRING([--enable-sub-$1=(yes|no)],
                                       [whether to build $1 subpackage.  @<:@default=yes@:>@])],
                       [], [])],
-       )])# _AT_SUB_PACKAGE
+       )])# _MT_SUB_PACKAGE
 
-# AT_VAR_ENABLE(SUB)
+# MT_VAR_ENABLE(SUB)
 # -------------------
 # shell variable to hold build condition of SUB subpackage.
-AC_DEFUN([AT_VAR_ENABLE], [AS_TR_SH([enable-sub-$1])])
+AC_DEFUN([MT_VAR_ENABLE], [AS_TR_SH([enable-sub-$1])])
 
-# AT_SUB_DEFAULT
+# MT_SUB_DEFAULT
 # --------------
 # set-up default build policy on subpackages.
-AC_DEFUN([AT_SUB_DEFAULT],
+AC_DEFUN([MT_SUB_DEFAULT],
 [AC_ARG_ENABLE([sub-all],
                [AS_HELP_STRING([--disable-sub-all],
                                [disable to build all subpackages])],
                [],
-               [enable_sub_all=])])# AT_DEFAULT_SUB
+               [enable_sub_all=])])# MT_DEFAULT_SUB
 
-# AT_REQUIRE(SUB)
+# MT_REQUIRE(SUB)
 # ----------------
 # Return dependencies of package SUB
-AC_DEFUN([AT_REQUIRE], [m4_indir([$0($1)])])# AT_REQUIRE
+AC_DEFUN([MT_REQUIRE], [m4_indir([$0($1)])])# MT_REQUIRE
 
-# AT_DIRECTORY(SUB)
+# MT_DIRECTORY(SUB)
 # ----------------
 # Return directory of SUB
-AC_DEFUN([AT_DIRECTORY], [m4_indir([$0($1)])])# AT_DIRECTORY
+AC_DEFUN([MT_DIRECTORY], [m4_indir([$0($1)])])# MT_DIRECTORY
 
-# AT_DEFAULT_SW(SUB)
+# MT_DEFAULT_SW(SUB)
 # ------------------
 # Return default enable-switch of SUB
-AC_DEFUN([AT_DEFAULT_SW], [m4_indir([$0($1)])])# AT_DEFAULT_SW
+AC_DEFUN([MT_DEFAULT_SW], [m4_indir([$0($1)])])# MT_DEFAULT_SW
 
-# AT_PACKAGE_DEPS(PACKAGE, LIST)
+# MT_PACKAGE_DEPS(PACKAGE, LIST)
 # ------------------------------
-AC_DEFUN([AT_PACKAGE_DEPS],
-[m4_define([AT_REQUIRE($1)], [$2])
+AC_DEFUN([MT_PACKAGE_DEPS],
+[m4_define([MT_REQUIRE($1)], [$2])
 m4_map_args_w([$2], [_$0([$1],], [)])
-])# AT_PACKAGE_DEPS
+])# MT_PACKAGE_DEPS
 
-# _AT_PACKAGE_DEPS(PACKAGE, DEP)
+# _MT_PACKAGE_DEPS(PACKAGE, DEP)
 # ------------------------------
-AC_DEFUN([_AT_PACKAGE_DEPS],
-[m4_ifndef([AT_REQUIRE($2)],
+AC_DEFUN([_MT_PACKAGE_DEPS],
+[m4_ifndef([MT_REQUIRE($2)],
            [m4_fatal([subpackage dependencies failure for $1::$2.  check the order])])
-m4_append_uniq_w([AT_REQUIRE($1)], m4_quote(AT_REQUIRE($2)))
-])# _AT_PACKAGE_DEPS
+m4_append_uniq_w([MT_REQUIRE($1)], m4_quote(MT_REQUIRE($2)))
+])# _MT_PACKAGE_DEPS
 
-# AT_PARSE_PACKAGES()
+# MT_PARSE_PACKAGES()
 # -----------------------
 # Finalize all the subpackage procedures
-AC_DEFUN([AT_PARSE_PACKAGES],
-[m4_do([m4_if([AT_PACKAGE_DEPS_DBG()])],
-       [AT_MAP_ALL_SUBS([AT_PACKAGE_CHECKS])],
-       [AT_MAP_ALL_SUBS([AT_PACKAGE_LOAD])],
-       [AT_MAP_ALL_SUBS([AT_PACKAGE_CONFIG])],
-)])# AT_PARSE_PACKAGES
+AC_DEFUN([MT_PARSE_PACKAGES],
+[m4_do([m4_if([MT_PACKAGE_DEPS_DBG()])],
+       [MT_MAP_ALL_SUBS([MT_PACKAGE_CHECKS])],
+       [MT_MAP_ALL_SUBS([MT_PACKAGE_LOAD])],
+       [MT_MAP_ALL_SUBS([MT_PACKAGE_CONFIG])],
+)])# MT_PARSE_PACKAGES
 
-# AT_MAP_ALL_SUBS(MACRO)
+# MT_MAP_ALL_SUBS(MACRO)
 # ----------------------
-# expand MACRO(SUB) for all packages in AT_ALL_SUB_PACKAGES
-AC_DEFUN([AT_MAP_ALL_SUBS],
-[m4_map_args_w(m4_quote(AT_ALL_SUB_PACKAGES),
+# expand MACRO(SUB) for all packages in MT_ALL_SUB_PACKAGES
+AC_DEFUN([MT_MAP_ALL_SUBS],
+[m4_map_args_w(m4_quote(MT_ALL_SUB_PACKAGES),
                [$1(],
-               [)])])# AT_MAP_ALL_SUBS
+               [)])])# MT_MAP_ALL_SUBS
 
-# AT_PACKAGE_CHECKS(SUB)
+# MT_PACKAGE_CHECKS(SUB)
 # ----------------------
-# wrap _AT_PACKAGE_CHECKS to check build condition of SUB subpackge.
-dnl AC_DEFUN([AT_PACKAGE_CHECKS],
-dnl [_$0([$1], [AS_TR_SH([enable_sub-$1])])])# _AT_PACKAGE_CHECKS
-AC_DEFUN([AT_PACKAGE_CHECKS],
+# wrap _MT_PACKAGE_CHECKS to check build condition of SUB subpackge.
+dnl AC_DEFUN([MT_PACKAGE_CHECKS],
+dnl [_$0([$1], [AS_TR_SH([enable_sub-$1])])])# _MT_PACKAGE_CHECKS
+AC_DEFUN([MT_PACKAGE_CHECKS],
 [_$0([$1],
-     [AT_VAR_ENABLE([$1])],
-     [AT_VAR_ENABLE([all])],
-     [AT_DEFAULT_SW([$1])])])# _AT_PACKAGE_CHECKS
+     [MT_VAR_ENABLE([$1])],
+     [MT_VAR_ENABLE([all])],
+     [MT_DEFAULT_SW([$1])])])# _MT_PACKAGE_CHECKS
 
-# _AT_PACKAGE_CHECKS(SUB, VARIABLE, VAR-DEFAULT, SW-DEFAULT)
+# _MT_PACKAGE_CHECKS(SUB, VARIABLE, VAR-DEFAULT, SW-DEFAULT)
 # ---------------------------------
-AC_DEFUN([_AT_PACKAGE_CHECKS],
+AC_DEFUN([_MT_PACKAGE_CHECKS],
 [dnl
 m4_if([$4], [always],
       [eval $2="$4"],
@@ -168,34 +168,34 @@ m4_if([$4], [always],
        AS_IF([test x"@S|@$2" = x],
              [eval $2="$4"])])
 AS_IF([test x"@S|@$2" != xno],
-[m4_map_args_w(m4_quote(AT_REQUIRE($1)),
-               [AT_ENABLE_SUB(], [)])])
-])# _AT_PACKAGE_CHECKS
+[m4_map_args_w(m4_quote(MT_REQUIRE($1)),
+               [MT_ENABLE_SUB(], [)])])
+])# _MT_PACKAGE_CHECKS
 
-# AT_ENABLE_SUB(SUB)
+# MT_ENABLE_SUB(SUB)
 # ------------------
-AC_DEFUN([AT_ENABLE_SUB],
-[_$0([$1], [AT_VAR_ENABLE([$1])])])# AT_ENABLE_SUB
+AC_DEFUN([MT_ENABLE_SUB],
+[_$0([$1], [MT_VAR_ENABLE([$1])])])# MT_ENABLE_SUB
 
-# _AT_ENABLE_SUB(SUB, VARIABLE)
+# _MT_ENABLE_SUB(SUB, VARIABLE)
 # -----------------------------
-AC_DEFUN([_AT_ENABLE_SUB],
+AC_DEFUN([_MT_ENABLE_SUB],
 [AS_CASE(["@S|@$2"],
          [no],  [eval $2=dep],
          [""],  [eval $2=yes])
 ])
 
-# AT_PACKAGE_LOAD(SUB)
+# MT_PACKAGE_LOAD(SUB)
 # --------------------
 # load subpackage m4 macros (conditionally)
-AC_DEFUN([AT_PACKAGE_LOAD],
+AC_DEFUN([MT_PACKAGE_LOAD],
 [_$0([$1],
-     [AT_VAR_ENABLE([$1])],
-     m4_quote(AT_DIRECTORY($1)))])# AT_PACKAGE_LOAD
+     [MT_VAR_ENABLE([$1])],
+     m4_quote(MT_DIRECTORY($1)))])# MT_PACKAGE_LOAD
 
-# _AT_PACKAGE_LOAD(SUB, VARIABLE, DIRECTORY)
+# _MT_PACKAGE_LOAD(SUB, VARIABLE, DIRECTORY)
 # -------------------------------
-AC_DEFUN([_AT_PACKAGE_LOAD],
+AC_DEFUN([_MT_PACKAGE_LOAD],
 [AS_CASE(["@S|@$2"],
          [always], [AC_MSG_NOTICE([load subpackage $1 (mandatory)])],
          [yes],    [AC_MSG_NOTICE([load subpackage $1])],
@@ -203,29 +203,29 @@ AC_DEFUN([_AT_PACKAGE_LOAD],
          [no],     [AC_MSG_NOTICE([skip subpackage $1])],
          [AC_MSG_FAILURE([invalid switch for subpackage $1 @S|@$2."])])
 AS_IF([test x"@S|@$2" != xno],
-      [AT_LOAD([$3], [$1])])
-])# _AT_PACKAGE_LOAD
+      [MT_LOAD([$3], [$1])])
+])# _MT_PACKAGE_LOAD
 
-# AT_LOAD(SUB, DIRECTORY)
+# MT_LOAD(SUB, DIRECTORY)
 # -----------------------
-AC_DEFUN([AT_LOAD], [_$0([$2]/AT_LOCAL_FILE)])# AT_LOAD
+AC_DEFUN([MT_LOAD], [_$0([$2]/MT_LOCAL_FILE)])# MT_LOAD
 
-# _AT_LOAD(SUB, DIRECTORY)
+# _MT_LOAD(SUB, DIRECTORY)
 # ------------------------
-AC_DEFUN([_AT_LOAD], [at_sinclude([$1])])# _AT_LOAD
+AC_DEFUN([_MT_LOAD], [mt_sinclude([$1])])# _MT_LOAD
 
-# AT_PACKAGE_CONFIG(SUB, [PACKAGE])
+# MT_PACKAGE_CONFIG(SUB, [PACKAGE])
 # --------------------
 # autoconf/automake macros for subpackage
-AC_DEFUN([AT_PACKAGE_CONFIG],
+AC_DEFUN([MT_PACKAGE_CONFIG],
 [_$0([$1],
-     [AT_VAR_ENABLE([$1])],
-     m4_quote(AT_DIRECTORY($1)),
-     m4_quote(m4_default([$2], [AC_PACKAGE_NAME])))])# AT_PACKAGE_CONFIG
+     [MT_VAR_ENABLE([$1])],
+     m4_quote(MT_DIRECTORY($1)),
+     m4_quote(m4_default([$2], [AC_PACKAGE_NAME])))])# MT_PACKAGE_CONFIG
 
-# _AT_PACKAGE_CONFIG(SUB, VARIABLE, DIRECTORY, PACKAGE)
+# _MT_PACKAGE_CONFIG(SUB, VARIABLE, DIRECTORY, PACKAGE)
 # --------------------------------------------
-AC_DEFUN([_AT_PACKAGE_CONFIG],
+AC_DEFUN([_MT_PACKAGE_CONFIG],
 [AC_CONFIG_FILES([$3/Makefile])
 AM_CONDITIONAL([BUILD_$1], [test x"@S|@$2" != xno])
 AS_IF([test x"@S|@$2" != xno],
@@ -234,20 +234,20 @@ FC_MODULE_$4_$1='[$](FC_MODINC)[$](top_builddir)/$3'
 FC_LDADD_$4_$1='[$](top_builddir)/$3/lib$4_local.la'
 AC_SUBST([FC_MODULE_$4_$1])
 AC_SUBST([FC_LDADD_$4_$1])
-])# _AT_PACKAGE_CONFIG
+])# _MT_PACKAGE_CONFIG
 
 
-# AT_PACKAGE_DEPS_DBG
+# MT_PACKAGE_DEPS_DBG
 # -------------------
-AC_DEFUN([AT_PACKAGE_DEPS_DBG],
-[@%:@ :AT@&t@_ {AT_ALL_SUB_PACKAGES}
-m4_foreach_w([_m4_pkg],
-             m4_quote(AT_ALL_SUB_PACKAGES),
-[@%:@ :AT@&t@_ _m4_pkg:: {AT_REQUIRE(_m4_pkg)}
+AC_DEFUN([MT_PACKAGE_DEPS_DBG],
+[@%:@ :MT@&t@_ {MT_ALL_SUB_PACKAGES}
+m4_foreach_w([_mt_pkg],
+             m4_quote(MT_ALL_SUB_PACKAGES),
+[@%:@ :MT@&t@_ _m4_pkg:: {MT_REQUIRE(_mt_pkg)}
 ])])
 
-dnl AS_VAR_SET([at_cv_enable_$3_$1], [0])
-dnl AS_VAR_SET([at_cv_enable_$3_$1], [1])
+dnl AS_VAR_SET([mt_cv_enable_$3_$1], [0])
+dnl AS_VAR_SET([mt_cv_enable_$3_$1], [1])
 
 dnl Local Variables:
 dnl mode: autoconf

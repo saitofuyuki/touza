@@ -1,7 +1,7 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2021/01/18 08:33:20 fuyuki Makefile.am>
+# Time-stamp: <2021/01/21 13:09:51 fuyuki Makefile.am>
 #
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -29,11 +29,15 @@ MOSTLYCLEANFILES	+=	fort.*
 
 TEST_COMMON_LIBS		=	$(noinst_LTLIBRARIES)
 
-check_PROGRAMS			=	test_std_prc test_std_env test_std_log test_std_fun test_std_arg test_std_mwe test_std
+check_PROGRAMS			=	test_std_utl test_std_prc test_std_env test_std_log test_std_fun test_std_arg test_std_mwe test_std
 
 test_std_env_SOURCES	=	std_env.F90
 test_std_env_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_ENV=1
 test_std_env_LDADD		=	$(TEST_COMMON_LIBS)
+
+test_std_utl_SOURCES	=	std_utl.F90
+test_std_utl_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_UTL=1
+test_std_utl_LDADD		=	$(TEST_COMMON_LIBS)
 
 test_std_log_SOURCES	=	std_log.F90
 test_std_log_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_LOG=1

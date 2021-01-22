@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2021/01/16 19:10:11 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/21 14:58:42 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2021
@@ -95,6 +95,9 @@ module TOUZA_Std_arg
      module procedure get_option_i
      module procedure get_option_f
      module procedure get_option_d
+     module procedure get_option_ia
+     module procedure get_option_fa
+     module procedure get_option_da
   end interface get_option
 
   interface get_arg
@@ -652,6 +655,56 @@ contains
     call extract_val_d(ierr, val, jentr, cundef, def)
     return
   end subroutine get_option_d
+
+  subroutine get_option_ia &
+       & (ierr, vals, tag, def, idx, sep)
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(inout)       :: vals(:)
+    character(len=*),intent(in)          :: tag
+    integer,         intent(in),optional :: def
+    integer,         intent(in),optional :: idx
+    character(len=*),intent(in),optional :: sep
+    integer jentr
+    ierr = 0
+    jentr = tag_search(tag, atags, mentry, idx)
+    call extract_vals_i(ierr, vals(:), jentr, cundef, def, sep)
+    return
+  end subroutine get_option_ia
+
+  subroutine get_option_fa &
+       & (ierr, vals, tag, def, idx, sep)
+    use TOUZA_Std_prc,only: KFLT
+    implicit none
+    integer,         intent(out)         :: ierr
+    real(kind=KFLT), intent(inout)       :: vals(:)
+    character(len=*),intent(in)          :: tag
+    real(kind=KFLT), intent(in),optional :: def
+    integer,         intent(in),optional :: idx
+    character(len=*),intent(in),optional :: sep
+    integer jentr
+    ierr = 0
+    jentr = tag_search(tag, atags, mentry, idx)
+    call extract_vals_f(ierr, vals(:), jentr, cundef, def, sep)
+    return
+  end subroutine get_option_fa
+
+  subroutine get_option_da &
+       & (ierr, vals, tag, def, idx, sep)
+    use TOUZA_Std_prc,only: KDBL
+    implicit none
+    integer,         intent(out)         :: ierr
+    real(kind=KDBL), intent(inout)       :: vals(:)
+    character(len=*),intent(in)          :: tag
+    real(kind=KDBL), intent(in),optional :: def
+    integer,         intent(in),optional :: idx
+    character(len=*),intent(in),optional :: sep
+    integer jentr
+    ierr = 0
+    jentr = tag_search(tag, atags, mentry, idx)
+    call extract_vals_d(ierr, vals(:), jentr, cundef, def, sep)
+    return
+  end subroutine get_option_da
 
 !!!_  * check_param() - check parameter to return integer
   integer function check_param &

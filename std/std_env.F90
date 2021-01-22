@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/18 21:49:56 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/21 22:20:10 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -118,8 +118,8 @@ contains
     integer,intent(in),optional :: levtry
 
     ierr = 0
-111 format('[STD/ENV] ISO_FORTRAN_ENV ', A, 1x, I0, 1x, I0, 1x, I0)
-112 format('[STD/ENV] INQUIRE(IOLENGTH) ', A)
+111 format('[TOUZA/Std/env] ISO_FORTRAN_ENV ', A, 1x, I0, 1x, I0, 1x, I0)
+112 format('[TOUZA/Std/env] INQUIRE(IOLENGTH) ', A)
     if (ofirst) then
 #     if HAVE_ISO_FORTRAN_ENV
        write(OUTPUT_UNIT, 111) 'ENABLED', INPUT_UNIT, OUTPUT_UNIT, ERROR_UNIT
