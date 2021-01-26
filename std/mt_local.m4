@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2021/01/22 08:55:31 fuyuki mt_local.m4>
+dnl Time-stamp: <2021/01/22 15:38:22 fuyuki mt_local.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -40,6 +40,8 @@ MT_VAR_SET_DEFAULT([OPT_STDERR_UNIT], [[$]mt_stderr_def])
 AC_DEFINE_UNQUOTED([OPT_STDIN_UNIT],  [$OPT_STDIN_UNIT],  [fortran i/o unit for stdin])
 AC_DEFINE_UNQUOTED([OPT_STDOUT_UNIT], [$OPT_STDOUT_UNIT], [fortran i/o unit for stdout])
 AC_DEFINE_UNQUOTED([OPT_STDERR_UNIT], [$OPT_STDERR_UNIT], [fortran i/o unit for stderr])
+
+MT_FC_CONCATENATION()
 
 AC_LANG_POP([Fortran])
 

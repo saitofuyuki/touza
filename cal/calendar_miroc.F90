@@ -1,7 +1,7 @@
 !!!_! calendar_miroc.F90 - touza/calendar: miroc compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/10 19:56:15 fuyuki calendar_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 11:15:32 fuyuki calendar_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -15,7 +15,6 @@
 #  include "touza_config.h"
 #endif
 #include "touza_cal.h"
-
 !!!_@ calendar_miroc - calendar/miroc compatible procedures
 module TOUZA_Cal_miroc
 !!!_ = declaration
@@ -23,6 +22,7 @@ module TOUZA_Cal_miroc
   public
 !!!_  * private
   logical,save,private :: ofirst = .true.
+# define __MDL__ 'miroc'
 !!!_  * interfaces (external)
   interface
      ! subroutine CALNDR(IFPAR, JFPAR)
@@ -185,13 +185,12 @@ module TOUZA_Cal_miroc
   public init, diag, finalize
 contains
 !!!_ & init - calendar init
-  subroutine init (ifpar, jfpar)
-    use TOUZA_Cal_primitive,only: msg
-    use TOUZA_Cal,only: &
-         & init_mng => init, &
-         & set_perpetual_date
+  subroutine init (ifpar, jfpar, levv)
+    use TOUZA_Cal_primitive,only: msg, msglev_normal, msglev_warning
+    use TOUZA_Cal,only: cal_init=>init, set_perpetual_date
     implicit none
-    integer,intent(in) :: ifpar, jfpar
+    integer,intent(in)          :: ifpar, jfpar
+    integer,intent(in),optional :: levv
     integer :: mode
     logical :: auto
     logical :: perpetual
@@ -200,14 +199,14 @@ contains
     if (ofirst) then
        ofirst = .false.
        call config_by_namelist (mode, auto, ifpar, jfpar, perpetual, idatpp)
-       call init_mng (jerr, jfpar, 0, mode, auto)
-       call msg(TIME_STAMP, 'CAL:MIROC', 0, jfpar)
+       call cal_init (jerr, jfpar, 0, mode, auto, levv)
+       call msg(msglev_normal, TIME_STAMP, __MDL__, jfpar)
        if (perpetual) then
           call set_perpetual_date &
                & (idatpp(1), idatpp(2), idatpp(3), perpetual)
        endif
     else
-       call msg('calendar_miroc::init skipped', 'CAL:MIROC', 0, jfpar)
+       call msg(msglev_warning, 'calendar_miroc::init skipped', __MDL__, jfpar)
     endif
     return
   end subroutine init

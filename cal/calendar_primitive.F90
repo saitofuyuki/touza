@@ -1,7 +1,7 @@
-!!!_! calendar_primitive.F90 - touza/calendar primitives
+!!!_! calendar_primitive.F90 - TOUZA/Cal primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 22 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/07 12:06:53 fuyuki calendar_primitive.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 15:10:52 fuyuki calendar_primitive.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -15,7 +15,6 @@
 #  include "touza_config.h"
 #endif
 #include "touza_cal.h"
-#include "touza_std.h"
 !!!_* Macros
 #ifdef TEST_CALENDAR_PRIMITIVE
 #  define DEBUG *
@@ -26,7 +25,13 @@
 module TOUZA_Cal_primitive
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Std, only: KFLT, KDBL
+  use TOUZA_Std, only: &
+       & KFLT, KDBL, &
+       & msglev_panic, &
+       & msglev_fatal,   msglev_critical, msglev_severe, &
+       & msglev_warning, msglev_normal,   msglev_info, &
+       & msglev_detail,  msglev_debug,    &
+       & choice
 !!!_  - default
   implicit none
   private
@@ -36,7 +41,10 @@ module TOUZA_Cal_primitive
   integer,parameter,private :: max_month = OPT_CALENDAR_MAX_MONTH
   integer,parameter,private :: max_leap  = OPT_CALENDAR_MAX_LEAP
 !!!_  - static
-  logical,save :: ofirst = .TRUE.
+  integer,save :: init_counts = 0
+  integer,save :: lev_verbose = CAL_MSG_LEVEL
+  integer,save :: lev_stdv = CAL_MSG_LEVEL
+# define __MDL__ 'p'
 !!!_  - cal_date_t
   type cal_date_t
      integer y, m, d
@@ -97,62 +105,85 @@ module TOUZA_Cal_primitive
   public :: is_leap_year
   public :: xreal
 
+!!!_   . inheritance from TOUZA_Std
+  public choice
+  public msglev_panic
+  public msglev_fatal,   msglev_critical, msglev_severe
+  public msglev_warning, msglev_normal,   msglev_info
+  public msglev_detail,  msglev_debug
+
 contains
 !!!_ & init - initialization
-  subroutine init &
-       & (ierr, ulog)
+  subroutine init(ierr, levv, stdv)
 !!!_  = declaration
-    use TOUZA_Std,only: std_init => init
+    use TOUZA_Std,only: std_init=>init, choice
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: ulog
-    integer :: im
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: stdv ! verbose level of TOUZA_Std
+    integer im
 !!!_  - body
     ierr = 0
-!!!_   + once
-    if (ofirst) then
-       call std_init(ierr, ulog)
-       if (ierr.eq.0) then
-          call msg(TIME_STAMP, 'CAL:PRM', 0, ulog)
-       endif
+
+    if (init_counts.eq.0) then
+       lev_stdv = choice(lev_stdv, stdv)
+       if (ierr.eq.0) call std_init(ierr, levv=lev_stdv)
+
+       lev_verbose = choice(lev_verbose, levv)
        do im = p_error, p_user
           call init_prop(props(im), im)
        enddo
     endif
-    if (ofirst) ofirst = .false.
+    init_counts = init_counts + 1
     return
   end subroutine init
 
 !!!_ & diag
-  subroutine diag(ierr, u)
+  subroutine diag(ierr, u, levv)
+    use TOUZA_Std,only: std_diag=>diag, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer lv
+
     ierr = 0
-    if (present(u)) continue    ! dummy
+    lv = choice(lev_verbose, levv)
+    if (ierr.eq.0) call std_diag(ierr, u, lev_stdv)
+    if (ierr.eq.0) then
+       call msg(lv, TIME_STAMP, __MDL__)
+    endif
     return
   end subroutine diag
 
 !!!_ & finalize
-  subroutine finalize(ierr, u)
+  subroutine finalize(ierr, u, levv)
+    use TOUZA_Std,only: std_finalize=>diag, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
-    ierr = 0
-    if (present(u)) continue    ! dummy
+    integer,intent(in),optional :: levv
+    ierr = 0 * choice(0, levv)
+    if (ierr.eq.0) call std_finalize(ierr, u, lev_stdv)
     return
   end subroutine finalize
 
 !!!_  & msg - message dispatcher
   subroutine msg &
-       & (txt, tag, lv, u)
-    use TOUZA_Std,only: choice, std_msg=>msg
+       & (levm, txt, mdl, u)
+    use TOUZA_Std,only: &
+         & choice, gen_tag, std_msg=>msg, is_msglev
     implicit none
+    integer,         intent(in)          :: levm
     character(len=*),intent(in)          :: txt
-    character(len=*),intent(in),optional :: tag
-    integer,         intent(in),optional :: lv
+    character(len=*),intent(in),optional :: mdl
     integer,         intent(in),optional :: u
-    call std_msg(txt, tag, lv, u)
+    character(len=128) tag
+
+    if (is_msglev(levm, lev_verbose)) then
+       call gen_tag(tag, PACKAGE_TAG, __GRP__, mdl)
+       call std_msg(txt, tag, u)
+    endif
     return
   end subroutine msg
 
@@ -825,21 +856,6 @@ contains
 
 !!!_ + end
 end module TOUZA_Cal_primitive
-
-!!!_@ test_calendar_attr - test program
-#ifdef TEST_CALENDAR_PRIMITIVE
-program test_calendar_primitive
-  use TOUZA_Cal_primitive
-  implicit none
-  integer,parameter :: ifp = -1
-
-  call init()
-  call init(ifp=ifp)
-
-  stop
-end program test_calendar_primitive
-
-#endif /* TEST_CALENDAR_PRIMITIVE */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

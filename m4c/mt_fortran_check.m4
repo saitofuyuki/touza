@@ -1,7 +1,7 @@
 dnl Filename:  touza/m4c/mt_fortran_check.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 3 2020
-dnl Time-stamp: <2021/01/22 08:45:46 fuyuki mt_fortran_check.m4>
+dnl Time-stamp: <2021/01/22 15:38:04 fuyuki mt_fortran_check.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -332,6 +332,23 @@ AC_DEFUN([MT_FC_F2003_ALLOCATABLE_MEMBER],
 AS_IF([test x"$mt_cv_f2003_allocatable_member" = xyes],
       [AC_DEFINE([HAVE_F2003_ALLOCATABLE_MEMBER], [1], [allocatable type member])])
 ])# MT_FC_F2003_ALLOCATABLE_MEMBER
+
+# MT_FC_CONCATENATION()
+# ------------------------------
+# define HAVE_FC_CONCATENATION if // works, i.e., not interpreted as
+# C preprocessor comment.
+AC_DEFUN([MT_FC_CONCATENATION],
+[AC_CACHE_CHECK([whether concatenation // works (not preprocessor comment)],
+  [mt_cv_concatenation],
+  [AC_LANG_PUSH([Fortran])
+   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],
+[      write(*,*) 'xyz' // 1])],
+  [mt_cv_concatenation=no],
+  [mt_cv_concatenation=yes])
+  AC_LANG_POP([Fortran])])
+AS_IF([test x"$mt_cv_concatenation" = xyes],
+      [AC_DEFINE([HAVE_FC_CONCATENATION], [1], [// works])])
+])# MT_FC_CONCATENATION
 
 dnl Local Variables:
 dnl mode: autoconf

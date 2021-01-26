@@ -1,7 +1,7 @@
-!!!_! calendar.F90 - touza/calendar: manager
+!!!_! calendar.F90 - TOUZA/Cal manager
 ! Maintainer: SAITO Fuyuki
 ! Created: May 31 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/10 20:19:16 fuyuki calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 11:20:42 fuyuki calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -21,6 +21,11 @@
 #endif
 !!!_& TOUZA_Cal - calendar manager
 module TOUZA_Cal
+  use TOUZA_Cal_primitive,only: &
+       & msglev_panic, &
+       & msglev_fatal,   msglev_critical, msglev_severe, &
+       & msglev_warning, msglev_normal,   msglev_info, &
+       & msglev_detail,  msglev_debug
   use TOUZA_Cal_core,only: &
        & KRC,         XREAL, &
        & cal_attr_t,  cal_daysec_t, cal_date_t, cal_time_t, &
@@ -144,6 +149,12 @@ module TOUZA_Cal
 
   public :: KRC,     XREAL
   public :: p_error, p_ideal, p_grego_i, p_grego_l, p_user
+
+  public msglev_panic
+  public msglev_fatal,   msglev_critical, msglev_severe
+  public msglev_warning, msglev_normal,   msglev_info
+  public msglev_detail,  msglev_debug
+
 !!!_  - static
   integer,save :: lcals = -1, mcals = -1
   type(cal_attr_t),allocatable :: CALH(:)
@@ -153,8 +164,9 @@ module TOUZA_Cal
 contains
 !!!_  & init - initialization and (optional) global calendar config
   subroutine init &
-       & (ierr,  ulog, &
-       &  ncals, mode, auto)
+       & (ierr, &
+       &  ulog, ncals, mode, auto, &
+       &  levv, stdv)
 #   define __PROC__ 'init'
     use TOUZA_Cal_primitive,only: msg
     use TOUZA_Cal_core,only: core_init => init
@@ -164,37 +176,32 @@ contains
     integer,intent(in),optional :: ncals
     integer,intent(in),optional :: mode
     logical,intent(in),optional :: auto
+    integer,intent(in),optional :: levv, stdv ! verbose levels
     integer jdummy
 
     ierr = 0
-    if (ierr.eq.0) call core_init(ierr, ulog)
+
     if (lcals.gt.0) then
        ierr = -1
-       call logging(ierr, __PROC__, 'reinit', ulog)
-       return
-    endif
-#ifdef PACKAGE_CAL_STRING
-    if (ierr.eq.0) call msg(PACKAGE_CAL_STRING, 'CAL', 0, ulog)
-#endif
-#ifndef   PACKAGE_STRING
-#  define PACKAGE_STRING 'cal 0.000'
-#endif
-    if (ierr.eq.0) call msg(PACKAGE_STRING, 'CAL', 0, ulog)
-    if (ierr.eq.0) call msg(TIME_STAMP, 'CAL', 0, ulog)
+       call logging(msglev_warning, 'reinit', __PROC__, ulog)
+    else
+       if (ierr.eq.0) call core_init(ierr, ulog, levv, stdv)
+       if (ierr.eq.0) call msg(msglev_normal, TIME_STAMP, u=ulog)
 
-    lcals = 0 ! to mark initialized
+       lcals = 0 ! to mark initialized
 
-    ! number of calendars
-    if (present(ncals)) then
-       if (ierr.eq.0) call alloc(ierr, ncals)
-    else if (present(mode).or.present(auto)) then
-       if (ierr.eq.0) call alloc(ierr, 0)
-    endif
-    ! global calendar declaration
-    if (present(mode).or.present(auto)) then
-       if (ierr.eq.0) then
-          call new_calendar(ierr, mode, auto, ulog, jdummy)
-          if (jdummy.ne.jglobal) ierr = -1
+       ! number of calendars
+       if (present(ncals)) then
+          if (ierr.eq.0) call alloc(ierr, ncals)
+       else if (present(mode).or.present(auto)) then
+          if (ierr.eq.0) call alloc(ierr, 0)
+       endif
+       ! global calendar declaration
+       if (present(mode).or.present(auto)) then
+          if (ierr.eq.0) then
+             call new_calendar(ierr, mode, auto, ulog, jdummy)
+             if (jdummy.ne.jglobal) ierr = -1
+          endif
        endif
     endif
     return
@@ -202,34 +209,38 @@ contains
   end subroutine init
 
 !!!_  & diag
-  subroutine diag(ierr, u)
+  subroutine diag(ierr, u, levv)
+    use TOUZA_Cal_core,only: core_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
     ierr = 0
-    if (present(u)) continue    ! dummy
+    if (ierr.eq.0) call core_diag(ierr, u, levv)
     return
   end subroutine diag
 
 !!!_  & finalize
-  subroutine finalize(ierr, u)
+  subroutine finalize(ierr, u, levv)
+    use TOUZA_Cal_core,only: core_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
     ierr = 0
-    if (present(u)) continue    ! dummy
+    if (ierr.eq.0) call core_finalize(ierr, u, levv)
     return
   end subroutine finalize
 
 !!!_   & logging
   subroutine logging &
-       & (istat, proc, txt, ulog)
+       & (levm, txt, proc, ulog)
     use TOUZA_Cal_primitive,only: msg
-    integer,         intent(in)          :: istat
-    character(len=*),intent(in)          :: proc
+    integer,         intent(in)          :: levm
     character(len=*),intent(in)          :: txt
+    character(len=*),intent(in)          :: proc
     integer,         intent(in),optional :: ulog
-    call msg(txt, proc, istat, ulog)
+    call msg(levm, txt, proc, ulog)
     return
   end subroutine logging
 
@@ -244,12 +255,12 @@ contains
     ierr = 0
     if (lcals.lt.0) then
        ierr = -1
-       call logging(ierr, __PROC__, 'Not initialized.')
+       call logging(msglev_critical, 'Not initialized.', __PROC__)
        return
     endif
     if (lcals.gt.0) then
        ierr = -2
-       call logging(ierr, __PROC__, 'Already allocated.')
+       call logging(msglev_critical, 'Already allocated.', __PROC__)
        return
     endif
     lcals = max(ncals, OPT_CALENDAR_HANDLES, 1)
@@ -257,7 +268,7 @@ contains
 
     allocate(CALH(0:lcals-1), STAT=ierr)
     if (ierr.ne.0) then
-       call logging(ierr, __PROC__, 'While allocation')
+       call logging(msglev_critical, 'While allocation', __PROC__)
        ierr = -3
     endif
     return
@@ -282,7 +293,7 @@ contains
     mcals = mcals + 1
     if (mcals.gt.lcals) then
        ierr = -1
-       call logging(ierr, __PROC__, 'overflow')
+       call logging(msglev_critical, 'overflow', __PROC__)
     endif
 
     call decl_cal(CALH(jc), mode=mode, auto=auto, ulog=ulog)
@@ -1172,6 +1183,12 @@ end module TOUZA_Cal
 program test_calendar
   use TOUZA_Cal
   implicit none
+  integer ierr
+
+  call init (ierr, stdv=-999)
+  call diag (ierr)
+  call finalize(ierr)
+
   stop
 end program test_calendar
 #endif /* TEST_CALENDAR */

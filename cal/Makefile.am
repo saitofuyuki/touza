@@ -1,7 +1,7 @@
 # touza/calendar Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2021/01/07 12:17:13 fuyuki Makefile.am>
+# Time-stamp: <2021/01/26 10:14:05 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -82,8 +82,13 @@ UCALN	=	ucaln.F
 $(UCALN):
 	@echo "Please manually install MIROC/src/util/$(UCALN) in $(abs_builddir)." >&2; exit 1
 
-check_PROGRAMS	=	test_calendar_comp test_calendar_trad \
+check_PROGRAMS	=	test_calendar \
+					test_calendar_comp test_calendar_trad \
 					test_calendar_matsiro test_calendar_ils
+
+test_calendar_SOURCES	= calendar.F90
+test_calendar_LDADD		= $(TEST_COMMON_LIBS)
+test_calendar_CPPFLAGS	= -DTEST_CALENDAR=1
 
 test_calendar_comp_SOURCES	= $(TEST_COMMON_SRCS)
 test_calendar_comp_LDADD	= $(TEST_COMMON_LIBS)
@@ -100,6 +105,15 @@ test_calendar_matsiro_CPPFLAGS	= -DTEST_CALENDAR_MATSIRO=1
 test_calendar_ils_SOURCES	= calendar_ils.F90
 test_calendar_ils_LDADD		= $(TEST_COMMON_LIBS)
 test_calendar_ils_CPPFLAGS	= -DTEST_CALENDAR_ILS=1
+
+# generate by makedepf90, with manual edits
+calendar.o : $(srcdir)/calendar.F90 $(srcdir)/touza_cal.h calendar_core.o calendar_primitive.o
+calendar_core.o : $(srcdir)/calendar_core.F90 $(srcdir)/touza_cal.h calendar_primitive.o
+calendar_ils.o : $(srcdir)/calendar_ils.F90 $(srcdir)/touza_cal.h calendar.o
+calendar_matsiro.o : $(srcdir)/calendar_matsiro.F90 $(srcdir)/touza_cal.h calendar.o
+calendar_miroc.o : $(srcdir)/calendar_miroc.F90 $(srcdir)/touza_cal.h calendar_core.o calendar_primitive.o calendar.o
+calendar_primitive.o : $(srcdir)/calendar_primitive.F90 $(srcdir)/touza_cal.h
+test_calendar.o : $(srcdir)/test_calendar.F90 $(srcdir)/touza_cal.h calendar_miroc.o
 
 ### Local Variables:
 ### mode: makefile-automake

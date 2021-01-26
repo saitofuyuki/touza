@@ -1,14 +1,14 @@
-#+title: TOUZA/cal guide
+#+title: TOUZA/Cal guide
 #+author: SAITO Fuyuki
 #+date: <2020-06-07 Sun>
 #+HTML_HEAD: <style type="text/css">.src-f90 {background-color: #333333; color: #ff0000;}</style>
 
 * Introduction
-  *TOUZA/cal* is a collection of Fortran subroutines for model
+  *TOUZA/Cal* is a collection of Fortran subroutines for model
   calendar procedures such as various conversion between date
   and time, time stepping, etc.
 
-  *TOUZA/cal* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+  *TOUZA/Cal* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
   DOT go DOT jp>.
 
   *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
@@ -20,12 +20,12 @@
 
 * Tests
   Three groups of the tests are included, namely MIROC, MATSIRO, ILS.
-  After successful build of *TOUZA/cal*, you can run all of them by:
+  After successful build of *TOUZA/Cal*, you can run all of them by:
 
   : cp ${MIROC}/src/util/ucaln.F .  ## required for MIROC tests.
   : make check
 
-  at *TOUZA* or *TOUZA/cal* directory (In the former case, tests of
+  at *TOUZA* or *TOUZA/Cal* directory (In the former case, tests of
   other sub-packages are examined).
 
   There are totally 89 tests (8 for MATSIRO, 9 for ILS, others for
@@ -54,7 +54,7 @@
   : # ERROR: 0
 
 ** Tests (MIROC)
-   This group of tests examine *TOUZA/cal* implementation against
+   This group of tests examine *TOUZA/Cal* implementation against
    /MIROC/ original =ucaln.F=.  Before tests, you *have to* manually
    copy the latest =ucaln.F= to here.
 
@@ -67,7 +67,7 @@
    included (thus total 72 tests).
 
    All the 9 tests are examined twice, once with =ucaln.F= and the
-   other with *TOUZA/std* compatible procedures.
+   other with *TOUZA/Cal* compatible procedures.
    The result status becomes PASS if two runs show identical results.
 
    : # tests on `auto' mode
@@ -189,7 +189,7 @@
    The final line in this test is a dummy line and *ALWAYS* 0.
    Detailed manual check of the experiments is highly recommended.
 
-* Brief description of *TOUZA/cal* modules
+* Brief description of *TOUZA/Cal* modules
 ** sources
    - =calendar.F90= - User interfaces for multiple calendar management
    - =calendar_core.F90= - Dispatcher to primitive procedures
@@ -221,7 +221,7 @@
 ** constants
    | name        | type    | description                              |
    |-------------+---------+------------------------------------------|
-   | =KRC=       | integer | real kind used in *TOUZA/cal*            |
+   | =KRC=       | integer | real kind used in *TOUZA/Cal*            |
    |-------------+---------+------------------------------------------|
    | =p_ideal=   | integer | mode: idealized 360-day calendar         |
    | =p_grego_i= | integer | mode: Gregorian no-leap calendar         |
@@ -231,20 +231,22 @@
 ** registration and allocation
 *** =calendar::init()=
  #+begin_src f90
- subroutine init(ierr,  ulog, ncals, mode, auto)
+ subroutine init(ierr, ulog, ncals, mode, auto, levv, stdv)
    integer,intent(out)         :: ierr    ! error status
    integer,intent(in),optional :: ulog    ! output unit for logging
    integer,intent(in),optional :: ncals   ! number of non-global calendars to allocate
    integer,intent(in),optional :: mode    ! mode of global calendar
    logical,intent(in),optional :: auto    ! auto-switch of global calendar
+   integer,intent(in),optional :: levv    ! verbose level
+   integer,intent(in),optional :: stdv    ! (advanced) verbose level of TOUZA/Std
  #+end_src
- Initialize *TOUZA/cal* system, and optionally configure the global calendar.
+ Initialize *TOUZA/Cal* system, and optionally configure the global calendar.
 
  Optional =ulog= is an i/o unit number to output diagnostic
  information of system.  If not present, =*= is applied or disabled,
  which depends on configuration.
 
- *TOUZA/cal* can generate multiple calendars with different modes.
+ *TOUZA/Cal* can generate multiple calendars with different modes.
  Each calendar is identified by non-negative integer index (/calendar
  id/), and id=0 corresponds to _global calendar_.
  Most of the calendar procedures are controlled by calendar-id as an
@@ -257,6 +259,10 @@
  of _global calendar_, by internal calling of [[id:accf2026-373e-4a8a-8644-f299449a33a5][=new_calendar ()=]].  Note
  that, if either =mode= or =auto= is set while =ncals= is not, the
  default value is chosen for =ncals=.
+
+ (New feature) Optional levv control the verbose level of *TOUZA/Cal* system.
+  A positive value increase the verbosity, while negative increases
+  the quietness.  Default is 0, normal level.
 
  =init()= must called only once before any calendar procedures.
 

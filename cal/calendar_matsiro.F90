@@ -1,7 +1,7 @@
 !!!_! calendar_matsiro.F90 - touza/calendar: (sample) matsiro interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/10 20:13:38 fuyuki calendar_matsiro.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 15:57:53 fuyuki calendar_matsiro.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -38,16 +38,15 @@ module TOUZA_Cal_matsiro
 
 contains
 !!!_ & init - calendar init
-  subroutine init (ierr, cmode)
-    use TOUZA_Cal,only: &
-         & init_mng => init, &
-         & inq_nsec_day
+  subroutine init (ierr, cmode, levv)
+    use TOUZA_Cal,only: cal_init=>init, inq_nsec_day
     implicit none
-    integer,intent(out) :: ierr
-    integer,intent(in)  :: cmode
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: cmode
+    integer,intent(in),optional :: levv
     if (ofirst) then
        ofirst = .false.
-       call init_mng (ierr, -1, 0, cmode)
+       call cal_init(ierr, mode=cmode, levv=levv, stdv=-8)
 
        nsecd = inq_nsec_day()
     endif
@@ -56,21 +55,21 @@ contains
 
 !!!_ & diag
   subroutine diag(ierr, u)
-    use TOUZA_Cal, only: diag_mng => diag
+    use TOUZA_Cal, only: cal_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
-    call diag_mng(ierr, u)
+    call cal_diag(ierr, u=u)
     return
   end subroutine diag
 
 !!!_ & finalize
   subroutine finalize(ierr, u)
-    use TOUZA_Cal, only: finalize_mng => finalize
+    use TOUZA_Cal, only: cal_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
-    call finalize_mng(ierr, u)
+    call cal_finalize(ierr, u=u)
     return
   end subroutine finalize
 

@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/21 13:10:35 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 11:37:46 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -29,6 +29,8 @@ module TOUZA_Std_utl
 !!!_ = declaration
   implicit none
   private
+!!!_  - paramters
+# define __TAG__ STD_FORMAT_MDL('utl')
 !!!_  - interfaces
   interface choice
      module procedure choice_i
@@ -69,32 +71,85 @@ module TOUZA_Std_utl
   public condop
   public chcount
   public upcase, downcase
+!!!_  - static
+  integer,save :: init_counts = 0
+  integer,save :: diag_counts = 0
+  integer,save :: lev_verbose = STD_MSG_LEVEL
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, u)
+  subroutine init(ierr, levv, mode)
+    use TOUZA_Std_prc,only: prc_init=>init
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: u
-    ierr = 0 * choice(0, u)
+    integer,intent(in),optional :: levv, mode
+    integer md, lv
+
+    ierr = 0
+
+    lv = choice(lev_verbose, levv)
+    md = choice(INIT_DEFAULT, mode)
+    if (md.eq.INIT_DEFAULT) md = INIT_DEEP
+
+    if (md.gt.INIT_DEFAULT) then
+       if (md.ge.INIT_DEEP) call prc_init(ierr, levv=lv, mode=md)
+       if (init_counts.eq.0) then
+          lev_verbose = lv
+       endif
+       init_counts = init_counts + 1
+    endif
     return
   end subroutine init
 
 !!!_  & diag
-  subroutine diag(ierr, u)
+  subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Std_prc,only: prc_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
-    ierr = 0 * choice(0, u)
+    integer,intent(in),optional :: levv, mode
+    integer utmp
+    integer lv, md
+
+    ierr = 0
+    utmp = choice(-1, u)
+    lv = choice(lev_verbose, levv)
+    md = choice(DIAG_DEFAULT, mode)
+    if (md.eq.DIAG_DEFAULT) md = DIAG_DEEP
+
+    if (md.gt.DIAG_DEFAULT) then
+       if (IAND(md, DIAG_DEEP).gt.0) then
+          if (ierr.eq.0) call prc_diag(ierr, utmp, lv, md)
+       endif
+       if (diag_counts.eq.0.or.IAND(md,DIAG_FORCE).gt.0) then
+          if (ierr.eq.0) then
+101          format(__TAG__, A)
+             if (VCHECK_NORMAL(lv)) then
+                if (utmp.ge.0) then
+                   write(utmp, 101) TIME_STAMP
+                else
+                   write(*,    101) TIME_STAMP
+                endif
+             endif
+          endif
+       endif
+       diag_counts = diag_counts + 1
+    endif
     return
   end subroutine diag
 
 !!!_  & finalize
-  subroutine finalize(ierr, u)
+  subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std_prc,only: prc_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
-    ierr = 0 * choice(0, u)
+    integer,intent(in),optional :: levv, mode
+    integer lv
+
+    ierr = 0
+    lv = choice(lev_verbose, levv)
+    call prc_finalize(ierr, u, lv, mode)
     return
   end subroutine finalize
 !!!_ + user subroutines
@@ -328,15 +383,20 @@ end module TOUZA_Std_utl
 program test_std_utl
   use TOUZA_Std_utl
   implicit none
+  integer ierr
   character(len=128) :: T0, T1
 
-  T0 = 'abcABCxyzXYZ012:;/'
+  call init(ierr)
+  call diag(ierr)
 
+  T0 = 'abcABCxyzXYZ012:;/'
 101 format('to:', A, 1x, '[', A, '] [', A, ']')
   call upcase(T1, T0)
   write(*, 101) 'U', trim(T0), trim(T1)
   call downcase(T1, T0)
   write(*, 101) 'D', trim(T0), trim(T1)
+
+  call finalize(ierr)
 
   stop
 end program test_std_utl

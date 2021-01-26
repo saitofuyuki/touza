@@ -1,7 +1,7 @@
 dnl Filename:   touza/m4c/mt_init.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 4 2020
-dnl Time-stamp: <2021/01/22 08:48:40 fuyuki mt_init.m4>
+dnl Time-stamp: <2021/01/22 11:13:59 fuyuki mt_init.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -17,7 +17,7 @@ dnl   (https://www.apache.org/licenses/LICENSE-2.0)
 #   AC_INIT(<PACKAGE>, MT_VERSION, ....)
 AC_DEFUN([MT_INIT],
 [m4_pattern_forbid([^[_]?MT_])
-_$0(m4_quote(m4_default([$2], mt_local.m4)))dnl
+_$0(m4_quote(m4_default([$1], mt_local.m4)))dnl
 ])# MT_INIT
 
 # _MT_INIT(LOCAL-FILE)
@@ -28,7 +28,6 @@ m4_errprintn(m4_location[: load $1])
 mt_sinclude([$1])
 m4_define([MT_LOCAL_FILE], [$1])
 m4_define([MT_VERSION()], m4_quote(_MT_PACKAGE_VERSION))dnl
-MT_DEBUG([$3], [MT_VERSION], [MT_VERSION($1)])dnl
 ])# _MT_INIT
 
 # MT_VERSION([NAME])

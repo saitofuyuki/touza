@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2021/01/21 14:58:42 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 11:55:25 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2021
@@ -46,8 +46,12 @@ module TOUZA_Std_arg
   integer,parameter,public :: PARAM_DEF  = 0
   integer,parameter,public :: PARAM_POS  = 1  ! parameters as positional arguments
   integer,parameter,public :: PARAM_FILE = 2  ! parameters as external files
+
 !!!_ + static
-  logical,save :: ofirst = .TRUE.
+#define __MDL__ 'arg'
+  integer,save :: init_counts = 0
+  integer,save :: diag_counts = 0
+  integer,save :: lev_verbose = STD_MSG_LEVEL
 
   integer,            save :: nacc(0:lentry) = 0
   character(len=ltag),save :: atags(0:lentry) = ' '
@@ -134,25 +138,41 @@ module TOUZA_Std_arg
 contains
 !!!_  & init
   subroutine init &
-       &  (ierr, ulog, &
-       &   lrec, cha,  chs, tagf, kmode)
+       &  (ierr, &
+       &   lrec, cha,  chs, tagf, kmode, &
+       &   levv, mode)
     use TOUZA_Std_prc,only: prc_init=>init
     use TOUZA_Std_env,only: env_init=>init
     use TOUZA_Std_fun,only: fun_init=>init
-    use TOUZA_Std_utl,only: choice, choice_a
+    use TOUZA_Std_log,only: log_init=>init
+    use TOUZA_Std_utl,only: utl_init=>init, choice, choice_a
     implicit none
     integer,         intent(out)         :: ierr
-    integer,         intent(in),optional :: ulog
     integer,         intent(in),optional :: lrec
     character(len=*),intent(in),optional :: cha, chs
     character(len=*),intent(in),optional :: tagf
     integer,         intent(in),optional :: kmode
+    integer,         intent(in),optional :: levv
+    integer,         intent(in),optional :: mode
+
+    integer md, lv
+
     ierr = 0
-    if (ofirst) then
-       if (ierr.eq.0) call prc_init(ierr, ulog)
-       if (ierr.eq.0) call env_init(ierr, ulog)
-       if (ierr.eq.0) call fun_init(ierr, ulog)
-       if (ierr.eq.0) then
+
+    lv = choice(lev_verbose, levv)
+    md = choice(INIT_DEFAULT, mode)
+    if (md.eq.INIT_DEFAULT) md = INIT_DEEP
+
+    if (md.gt.INIT_DEFAULT) then
+       if (md.ge.INIT_DEEP) then
+          if (ierr.eq.0) call prc_init(ierr, levv=lv, mode=md)
+          if (ierr.eq.0) call utl_init(ierr, levv=lv, mode=md)
+          if (ierr.eq.0) call log_init(ierr, levv=lv, mode=md)
+          if (ierr.eq.0) call env_init(ierr, levv=lv, mode=md)
+          if (ierr.eq.0) call fun_init(ierr, levv=lv, mode=md)
+       endif
+       if (init_counts.eq.0) then
+          lev_verbose = lv
           call choice_a(csep, chs)
           if (csep.eq.' ') csep = ','
           call choice_a(cassign, cha)
@@ -164,33 +184,76 @@ contains
           if (kparse_mode.eq.PARAM_DEF) kparse_mode = PARAM_POS
           ! call collect_entries(ierr, lrec)
        endif
-       ofirst = .false.
+       init_counts = init_counts + 1
     endif
 
     return
   end subroutine init
 
 !!!_  & diag
-  subroutine diag &
-       & (ierr, ulog)
+  subroutine diag (ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    use TOUZA_Std_prc,only: prc_diag=>diag
+    use TOUZA_Std_env,only: env_diag=>diag
+    use TOUZA_Std_fun,only: fun_diag=>diag
+    use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: mode
+    integer md, lv
+
     ierr = 0
-    if (ierr.eq.0) then
-       call report_entries &
-            & (ierr, nposargs, atags, avals, nacc, mentry, lentry, ulog)
+    lv = choice(lev_verbose, levv)
+    md = choice(DIAG_DEFAULT, mode)
+    if (md.eq.DIAG_DEFAULT) md = DIAG_DEEP
+
+    if (md.gt.DIAG_DEFAULT) then
+       if (IAND(md, DIAG_DEEP).gt.0) then
+          if (ierr.eq.0) call prc_diag(ierr, u, lv, md)
+          if (ierr.eq.0) call utl_diag(ierr, u, lv, md)
+          if (ierr.eq.0) call log_diag(ierr, u, lv, md)
+          if (ierr.eq.0) call prc_diag(ierr, u, lv, md)
+          if (ierr.eq.0) call env_diag(ierr, u, lv, md)
+       endif
+       if (diag_counts.eq.0.or.IAND(md,DIAG_FORCE).gt.0) then
+          if (ierr.eq.0) then
+             if (VCHECK_NORMAL(lv)) then
+                call msg_mdl(TIME_STAMP, __MDL__, u)
+             endif
+             if (VCHECK_NORMAL(lv)) then
+                call report_entries &
+                     & (ierr, nposargs, atags, avals, nacc, mentry, lentry, u)
+             endif
+          endif
+          diag_counts = diag_counts + 1
+       endif
     endif
     return
   end subroutine diag
 
 !!!_  & finalize
-  subroutine finalize(ierr, ulog)
+  subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
+    use TOUZA_Std_prc,only: prc_finalize=>finalize
+    use TOUZA_Std_env,only: env_finalize=>finalize
+    use TOUZA_Std_fun,only: fun_finalize=>finalize
+    use TOUZA_Std_log,only: log_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: mode
+    integer,intent(in),optional :: u
+    integer lv
+
     ierr = 0
-    if (present(ulog)) continue ! dummy
+    lv = choice(lev_verbose, levv)
+    if (ierr.eq.0) call utl_finalize(ierr, u, lv, mode)
+    if (ierr.eq.0) call log_finalize(ierr, u, lv, mode)
+    if (ierr.eq.0) call fun_finalize(ierr, u, lv, mode)
+    if (ierr.eq.0) call prc_finalize(ierr, u, lv, mode)
+    if (ierr.eq.0) call env_finalize(ierr, u, lv, mode)
     return
   end subroutine finalize
 
@@ -285,7 +348,6 @@ contains
        jarg = jarg + 1
        if (jarg.gt.nargs) exit
        CALL GET_COMMAND_ARGUMENT(jarg, S, l, STATUS=ierr)
-       ! write(*, *) 'G', jarg, trim(S)
        if (l.gt.lstr) then
 101       format('too long argument at ', I0, ':', A)
           write(*, 101) jarg, trim(S)
@@ -899,7 +961,7 @@ contains
        &  NP,   &
        &  T,    V,   NA, me, le, &
        &  ulog)
-    use TOUZA_Std_log,only: msg
+    use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: NP
@@ -917,7 +979,7 @@ contains
 103 format(I0, 2x, A, 3x, A)
     do je = 0, me - 1
        write(txt, 103) NA(je), trim(T(je)), trim(V(je))
-       call msg(txt, 'std/arg', 0, ulog)
+       call msg_mdl(txt, __MDL__, ulog)
     enddo
 
     return

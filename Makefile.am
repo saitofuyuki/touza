@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/01/20 09:14:47 fuyuki Makefile.am>
+# Time-stamp: <2021/01/22 21:03:08 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -51,6 +51,11 @@ check_PROGRAMS		= test_touza
 test_touza_SOURCES	= touza.F90
 test_touza_LDADD	= $(lib_LTLIBRARIES)
 test_touza_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_TOUZA=1
+
+if NEVER
+EXTRA_PROGRAMS = dummy_never_built
+nodist_dummy_never_built_SOURCES = dummy_never_built.c
+endif
 
 ### Local Variables:
 ### mode: makefile-automake

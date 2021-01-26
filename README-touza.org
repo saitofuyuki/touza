@@ -8,6 +8,9 @@
   Fortran procedures mainly adopted in MIROC.
 
 * Installation
+** distribution
+   Latest *TOUZA* can be obtained at [[https://github.com/saitofuyuki/touza]].
+
 ** autotool files
    Unless the package contains configuration file such as =configure=,
    =Makefile.in=, etc, you need to generate these files first.  This

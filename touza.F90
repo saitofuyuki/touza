@@ -1,7 +1,7 @@
 !!!_! touza.F90 - touza administration
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/18 21:48:24 fuyuki touza.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 15:55:47 fuyuki touza.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -13,6 +13,7 @@
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"
 #endif
+#include "touza.h"
 !!!_* Health check
 #if ENABLE_TOUZA_STD
 #else
@@ -30,6 +31,11 @@ module TOUZA
 !!!_  - default
   implicit none
   private
+!!!_  - parameters
+  integer,save :: init_counts = 0
+  integer,save :: lev_verbose = msglev_normal
+!!!_  - static
+  integer,save :: mode_cal = 0
 !!!_  - public
 !!!_   . self
   public :: init, diag, finalize
@@ -41,7 +47,7 @@ module TOUZA
   public :: uin,           uout,      uerr
   public :: lbrec,         lreci,     lrecf,      lrecd
   public :: get_rlu,       get_rlb
-  public :: msg
+  public :: msg,           msg_grp,   gen_tag
   public :: unit_star,     unit_none, unit_global
   public :: decl_pos_arg,  parse,     get_option, get_param,  get_array
   public :: get_arg,       get_key
@@ -76,47 +82,70 @@ module TOUZA
 contains
 !!!_ + common interfaces
 !!!_  & init - touza system initialization batch
-  subroutine init(ierr, logu, loglev)
+  subroutine init &
+       & (ierr, levv, mode, &
+       &  cal)
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: loglev
-    integer,intent(in),optional :: logu
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: mode
+    integer,intent(in),optional :: cal
+    integer lv, md
+
     ierr = 0
-    if (ierr.eq.0) call std_init(ierr, logu, loglev)
-#ifndef   PACKAGE_STRING
-#  define PACKAGE_STRING 'touza 0.000'
-#endif
-    if (ierr.eq.0) call msg(PACKAGE_STRING, 'TOUZA', 0, logu)
-    if (ierr.eq.0) call msg(TIME_STAMP, 'TOUZA', 0, logu)
+
+    lv = choice(lev_verbose, levv)
+    md = choice(INIT_DEFAULT, mode)
+    if (md.eq.INIT_DEFAULT) md = INIT_DEEP
+
+    if (md.gt.INIT_DEFAULT) then
+       if (md.ge.INIT_DEEP) then
+          if (ierr.eq.0) call std_init(ierr, levv=lv, mode=md)
 #if ENABLE_TOUZA_CAL
-    if (ierr.eq.0) call cal_init(ierr, logu)
-#endif /* ENABLE_TOUZA_CAL */
+          if (ierr.eq.0) call cal_init(ierr, levv=lv, mode=choice(md, cal))
+#else  /* not ENABLE_TOUZA_CAL */
+          if (ierr.eq.0) then
+             if (choice(INIT_SKIP, cal).ne.INIT_SKIP) then
+                ierr = -1
+                if (is_msglev_FATAL(lv)) call msg_grp('TOUZA/Cal disabled')
+             endif
+          endif
+#endif /* not ENABLE_TOUZA_CAL */
+       endif
+       if (init_counts.eq.0) then
+          lev_verbose = lv
+       endif
+       init_counts = init_counts + 1
+    endif
+
     return
   end subroutine init
 !!!_  & diag - touza system diagnosis batch
-  subroutine diag(ierr, u)
+  subroutine diag(ierr, u, levv, mode)
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
     ierr = 0
-    if (ierr.eq.0) call std_diag(ierr, u)
+    if (ierr.eq.0) call std_diag(ierr, u, levv, mode)
 #if ENABLE_TOUZA_CAL
-    if (ierr.eq.0) call cal_diag(ierr, u)
+    if (ierr.eq.0) call cal_diag(ierr, u, levv)
 #else  /* not ENABLE_TOUZA_CAL */
-    if (ierr.eq.0) call msg('cal disabled', 'TOUZA', 0, u)
+    if (ierr.eq.0) call msg_grp('cal disabled', u=u)
 #endif /* not ENABLE_TOUZA_CAL */
     return
   end subroutine diag
 !!!_  & finalize - touza system finalization batch
-  subroutine finalize(ierr, u)
+  subroutine finalize(ierr, u, levv, mode)
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
     ierr = 0
 #if ENABLE_TOUZA_CAL
-    if (ierr.eq.0) call cal_finalize(ierr, u)
+    if (ierr.eq.0) call cal_finalize(ierr, u, levv)
 #endif /* ENABLE_TOUZA_CAL */
-    if (ierr.eq.0) call std_finalize(ierr, u)
+    if (ierr.eq.0) call std_finalize(ierr, u, levv, mode)
     return
   end subroutine finalize
 end module TOUZA
@@ -127,6 +156,7 @@ program test_touza
   implicit none
   integer ierr
 
+  ! call init(ierr, cal=INIT_DEEP)
   call init(ierr)
   if (ierr.eq.0) call diag(ierr)
   if (ierr.eq.0) call finalize(ierr)

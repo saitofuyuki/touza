@@ -1,7 +1,7 @@
 # touza/m4c Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jan 20 2021
-# Time-stamp: <2021/01/22 08:37:33 fuyuki Makefile.am>
+# Time-stamp: <2021/01/22 18:24:27 fuyuki Makefile.am>
 
 # Copyright (C) 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -10,10 +10,13 @@
 
 install-mod:
 	@:
+check-bin:
+	@:
 
 dist_pkgdata_DATA	=	mt_am_include.m4 \
 						mt_fortran_check.m4 \
 						mt_init.m4 \
+						mt_define.m4 \
 						mt_package.m4 \
 						mt_prog_fc_mpi.m4 \
 						mt_shell.m4

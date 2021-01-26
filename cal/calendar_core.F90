@@ -1,7 +1,7 @@
-!!!_! calendar_core.F90 - touza/calendar core
+!!!_! calendar_core.F90 - TOUZA/Cal core
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/10 20:18:51 fuyuki calendar_core.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 11:20:25 fuyuki calendar_core.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -15,6 +15,7 @@
 #  include "touza_config.h"
 #endif
 #include "touza_cal.h"
+#include "touza.h"
 !!!_* Macros
 #ifdef TEST_CALENDAR_CORE
 #  define DEBUG *
@@ -85,6 +86,8 @@ module TOUZA_Cal_core
   integer,save :: global_id = -1
   integer,save :: udef = DEFAULT_LOG_UNIT
 
+  integer,save :: init_counts = 0
+#define __MDL__ 'c'
 !!!_  - misc
     character(len=1024) tmsg
 !!!_  * cal_perpetual_t - perpetual mode attributes
@@ -182,54 +185,59 @@ module TOUZA_Cal_core
 contains
 !!!_ + common interfaces
 !!!_  & init - initialization
-  subroutine init &
-       & (ierr, ulog)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_init => init, msg
+  subroutine init (ierr, ulog, levv, stdv)
+    use TOUZA_Cal_primitive,only: primitive_init=>init, msg, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: levv, stdv
 
-    if (global_id.ge.0) then
-       continue
-    else
+    ierr = 0
+    if (init_counts.eq.0) then
+       if (ierr.eq.0) call primitive_init(ierr, levv, stdv)
        global_id = 0
-       call primitive_init(ierr, ulog)
-       if (ierr.eq.0) then
-          call msg(TIME_STAMP, 'CAL:CORE', 0, ulog)
-       endif
        if (present(ulog)) then
           udef = ulog
        endif
+       init_counts = init_counts + 1
     endif
     return
   end subroutine init
 
 !!!_  & diag
-  subroutine diag(ierr, u)
-    use TOUZA_Cal_primitive,only: msg
+  subroutine diag(ierr, u, levv)
+    use TOUZA_Cal_primitive,only: primitive_diag=>diag, &
+         & choice, msg, msglev_normal, msglev_warning
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer utmp
+
     ierr = 0
-101 format('auto year = ', I0, 1x, I0)
-102 format('auto day = ', I0, 1x, I0)
-    write(tmsg, 101) auto_cyear_grego_l, auto_cyear_grego_i
-    call msg(tmsg, 'CAL:CORE', 0, u)
-    write(tmsg, 102) auto_cday_grego_l, auto_cday_grego_i
-    call msg(tmsg, 'CAL:CORE', 0, u)
+    utmp = choice(udef, u)
+    if (ierr.eq.0) call msg(msglev_normal, TIME_STAMP, __MDL__, utmp)
+    if (ierr.eq.0) call primitive_diag(ierr, utmp, levv)
+    if (ierr.eq.0) then
+101    format('auto year = ', I0, 1x, I0)
+102    format('auto day = ', I0, 1x, I0)
+       write(tmsg, 101) auto_cyear_grego_l, auto_cyear_grego_i
+       call msg(msglev_normal, tmsg, __MDL__, utmp)
+       write(tmsg, 102) auto_cday_grego_l, auto_cday_grego_i
+       call msg(msglev_normal, tmsg, __MDL__, utmp)
+    endif
     return
   end subroutine diag
 
 !!!_  & finalize
-  subroutine finalize(ierr, u)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_finalize => finalize
+  subroutine finalize(ierr, u, levv)
+    use TOUZA_Cal_primitive,only: primitive_finalize=>finalize, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
     ierr = 0
-    call primitive_finalize (ierr, u)
+    call primitive_finalize (ierr, u, levv)
     return
   end subroutine finalize
 
@@ -237,7 +245,7 @@ contains
 !!!_  & decl_cal - declaration of calendar type
   subroutine decl_cal &
        & (self, mode, auto, ulog)
-    use TOUZA_Cal_primitive,only: msg
+    use TOUZA_Cal_primitive,only: msg, msglev_normal, msglev_warning
     implicit none
     type(cal_attr_t),intent(inout)      :: self
     integer,         intent(in),optional:: mode
@@ -274,15 +282,15 @@ contains
     endif
 
     if (old_id.ge.0 .and. self%stt.ge.0) then
-101    format('reinit: [', I0, 1x, I0, 1x, I0, ']')
+101    format('reinit:', I0, 1x, I0, 1x, I0)
        write(tmsg, 101) old_id, self%id, self%stt
-       call msg(tmsg, 'CAL:DECL', 0, self%ulog)
+       call msg(msglev_warning, tmsg, __MDL__, self%ulog)
     endif
 
     if (present (ulog)) then
-201    format('[', I0, '] = ', I0, 1x, I0, 1x, L1, 1x, I0)
+201    format('decl:', I0, ' = ', I0, 1x, I0, 1x, L1, 1x, I0)
        write(tmsg, 201) self%id, self%stt, self%mode, self%auto, self%ulog
-       call msg(tmsg, 'CAL:DECL', 0, self%ulog)
+       call msg(msglev_normal, tmsg, __MDL__, self%ulog)
     endif
 
     return
@@ -1090,20 +1098,6 @@ contains
 
 !!!_ + end
 end module TOUZA_Cal_core
-
-!!!_@ test_calendar_core - test program
-#ifdef TEST_CALENDAR_CORE
-program test_calendar_core
-  use TOUZA_Cal_core
-  implicit none
-  type(cal_attr_t) :: ct
-
-  call init(ulog=-1)
-
-  stop
-end program test_calendar_core
-
-#endif /* TEST_CALENDAR_CORE */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

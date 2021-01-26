@@ -1,13 +1,13 @@
-#+title: TOUZA/std guide
+#+title: TOUZA/Std guide
 #+author: SAITO Fuyuki
 #+date: <2020-06-07 Sun>
 
 * Introduction
-  *TOUZA/std* is a collection of Fortran subroutines for typical
+  *TOUZA/Std* is a collection of Fortran subroutines for typical
   standard procedures such as precision(kind) declaration, i/o unit
   management, logging, etc.
 
-  *TOUZA/std* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+  *TOUZA/Std* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
   DOT go DOT jp>.
 
   *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
@@ -17,7 +17,7 @@
 
 * Build and installation
 
-* Brief description of *TOUZA/std* modules
+* Brief description of *TOUZA/Std* modules
 ** =TOUZA_Std=      (std.F90)
 
 ** =TOUZA_Std_prc=  (std_prc.F90) - precision management

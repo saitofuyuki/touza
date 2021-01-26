@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/18 08:26:14 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 14:56:05 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -30,16 +30,19 @@ module TOUZA_Std_fun
   private
 !!!_  - parameter
   integer,parameter :: lblack = OPT_MAX_BLACK_UNITS
+# define __MDL__ 'fun'
+# define __TAG__ STD_FORMAT_MDL(__MDL__)
 !!!_  - static
-  logical,save :: ofirst = .TRUE.
+  integer,save :: init_counts = 0
+  integer,save :: diag_counts = 0
+  integer,save :: lev_verbose = STD_MSG_LEVEL
+
   integer,save :: limu = OPT_MAX_FILE_UNITS
 
   integer,save :: nblack = 0
   integer,save :: ublist(lblack+1) = -1
 
   integer,save :: ulast = -1
-!!!_  - misc
-  character(len=128) tmsg
 !!!_  - public
   public init, diag, finalize
   public add_black_list, is_black_listed
@@ -49,46 +52,86 @@ module TOUZA_Std_fun
 !!!_ + common interfaces
 contains
 !!!_  & init
-  subroutine init(ierr, ulog)
+  subroutine init(ierr, levv, mode)
+    use TOUZA_Std_utl, only: utl_init=>init, choice
+    use TOUZA_Std_log, only: log_init=>init
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: levv, mode
+    integer md, lv
+
     ierr = 0
-    if (ofirst) ofirst = .false.
-    if (present(ulog)) continue ! dummy
+
+    lv = choice(lev_verbose, levv)
+    md = choice(INIT_DEFAULT, mode)
+    if (md.eq.INIT_DEFAULT) md = INIT_DEEP
+
+    if (md.gt.INIT_DEFAULT) then
+       if (md.ge.INIT_DEEP) then
+          if (ierr.eq.0) call utl_init(ierr, levv=lv, mode=md)
+          if (ierr.eq.0) call log_init(ierr, levv=lv, mode=md)
+       endif
+       if (init_counts.eq.0) then
+          lev_verbose = lv
+       endif
+       init_counts = init_counts + 1
+    endif
     return
   end subroutine init
 
 !!!_  & diag
-  subroutine diag(ierr, ulog)
-#   define __PROC__ 'std:fun:diag'
-    use TOUZA_Std_log, only: msg
+  subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Std_utl, only: utl_diag=>diag, choice
+    use TOUZA_Std_log, only: log_diag=>diag, msg_mdl
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: levv, mode
+    integer,intent(in),optional :: u
+    integer md, lv
 
     ierr = 0
-101 format('limit file units = ', I0)
-    write(tmsg, 101) limu
-    call msg(tmsg, __PROC__, 0, ulog)
-    call diag_black_list(ierr, ulog)
+    lv = choice(lev_verbose, levv)
+    md = choice(DIAG_DEFAULT, mode)
+    if (md.eq.DIAG_DEFAULT) md = DIAG_DEEP
 
+    if (md.gt.DIAG_DEFAULT) then
+       if (IAND(md, DIAG_DEEP).gt.0) then
+          if (ierr.eq.0) call utl_diag(ierr, u, lv, md)
+          if (ierr.eq.0) call log_diag(ierr, u, lv, md)
+       endif
+       if (diag_counts.eq.0.or.IAND(md,DIAG_FORCE).gt.0) then
+          if (ierr.eq.0) then
+             if (VCHECK_NORMAL(lv)) then
+                call msg_mdl(TIME_STAMP, __MDL__, u)
+             endif
+             if (VCHECK_NORMAL(lv)) then
+                call msg_mdl('(''limit file units = '', I0)', (/ limu /), __MDL__, u)
+             endif
+             if (VCHECK_INFO(lv)) then
+                call diag_black_list(ierr, u)
+             endif
+          endif
+       endif
+       diag_counts = diag_counts + 1
+    endif
     return
-#   undef __PROC__
   end subroutine diag
 
 !!!_  & finalize
-  subroutine finalize(ierr, ulog)
+  subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std_utl, only: utl_finalize=>finalize
+    use TOUZA_Std_log, only: log_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: levv, mode
+    integer,intent(in),optional :: u
     ierr = 0
-    if (present(ulog)) continue ! dummy
+    if (ierr.eq.0) call log_finalize(ierr, u, levv, mode)
+    if (ierr.eq.0) call utl_finalize(ierr, u, levv, mode)
     return
   end subroutine finalize
 
 !!!_ + file open/close
-
 !!!_ + unit number
 !!!_  & new_unit () - return unbound i/o unit number
   integer function new_unit &
@@ -152,8 +195,8 @@ contains
 !!!_  & add_black_list - register unit(s) in the black list
   subroutine add_black_list &
        & (ierr, ub, ue)
-#   define __PROC__ 'std:fun:add_black_list'
-    use TOUZA_Std_log,only: msg
+#   define __PROC__ 'add_black_list'
+    use TOUZA_Std_log,only: msg_fun
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(out)         :: ierr
@@ -196,7 +239,8 @@ contains
        jins = jins + 1
     enddo
     if (ierr.ne.0) then
-       call msg('Black list overflow', __PROC__, -1)
+       if (VCHECK_SEVERE(lev_verbose)) &
+            call msg_fun('Black list overflow', __MDL__, __PROC__)
     endif
 #   undef __PROC__
     return
@@ -218,32 +262,30 @@ contains
   end function is_black_listed
 !!!_  & diag_black_list
   subroutine diag_black_list &
-       & (ierr, ulog)
-#   define __PROC__ 'std:fun:diag_black_list'
-    use TOUZA_Std_log,only: msg
+       & (ierr, u)
+    use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: ulog
-    character(len=1024) tmsg
+    integer,intent(in),optional :: u
     integer jp, jbl, jbh
     integer,parameter :: nstp = 10
     ierr = 0
     do jp = 0, nblack - 1, nstp
        jbl = jp + 1
        jbh = min(nblack, jp + nstp)
-101    format('units in black list:', 10(1x, I0))
-       write(tmsg, 101) ublist(jbl:jbh)
-       call msg(tmsg, __PROC__, 0, ulog)
+       call msg_mdl &
+            & ('(''units in black list:'', 10(1x, I0))', ublist(jbl:jbh), &
+            &  __MDL__, u)
     enddo
     return
-#   undef __PROC__
   end subroutine diag_black_list
 !!!_ + limit check
 !!!_  & brute_force_check_units - numbers of units brute-force checker
   subroutine brute_force_check_units &
        & (ierr, limit, ulog)
-#   define __PROC__ 'std:fun:brute_force_check_units'
+#   define __PROC__ 'brute_force_check_units'
     use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: limit
@@ -256,7 +298,7 @@ contains
     integer nopn, ncls, nopnd
     logical opnd
     integer uli
-    character(len=1024) :: tmsg
+    character(len=1024) :: tmsg, txt
 
     ierr = 0
     lchk = choice(limu, limit)
@@ -264,9 +306,9 @@ contains
     uli = choice(-1, ulog)
     allocate(stt(ubgn:lchk), STAT=ierr)
     stt(:) = 0
+    nopn  = 0
+    nopnd = 0
     if (ierr.eq.0) then
-       nopn  = 0
-       nopnd = 0
        do jchk = ubgn, lchk
           inquire(UNIT=jchk, IOSTAT=ierr, OPENED=opnd)
           tmsg = ' '
@@ -281,16 +323,13 @@ contains
              endif
           endif
 101       format('file unit check[', I0, '] ', I0, 1x, I0, 1x, A)
-          if (uli.ge.0) then
-             write(uli, 101) jchk, stt(jchk), ierr, trim(tmsg)
-          else
-             write(*,   101) jchk, stt(jchk), ierr, trim(tmsg)
-          endif
+          write(txt, 101) jchk, stt(jchk), ierr, trim(tmsg)
+          call msg_mdl(txt, __MDL__, ulog)
           if (ierr.ne.0) exit
        enddo
     endif
+    ncls = 0
     if (allocated(stt)) then
-       ncls = 0
        do jchk = ubgn, lchk
           if (stt(jchk).eq.2) then
              close(UNIT=jchk, IOSTAT=jdmy)
@@ -299,12 +338,9 @@ contains
        enddo
        deallocate(stt, STAT=jdmy)
     endif
-102 format('file unit check counts = ', I0, 1x, I0, 1x, I0)
-    if (uli.ge.0) then
-       write(uli, 102) nopnd, nopn, ncls
-    else
-       write(*,   102) nopnd, nopn, ncls
-    endif
+    call msg_mdl('(''file unit check counts = '', I0, 1x, I0, 1x, I0)', &
+         & (/nopnd, nopn, ncls/), &
+         & __MDL__, ulog)
     return
 #   undef __PROC__
   end subroutine brute_force_check_units
@@ -312,7 +348,7 @@ contains
 !!!_  & open_scratch - open wrapper
   subroutine open_scratch &
        & (ierr, u, tmsg)
-#   define __PROC__ 'std:fun:open_scratch'
+#   define __PROC__ 'open_scratch'
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: u
@@ -351,7 +387,7 @@ program test_std_fun
   if (ierr.eq.0) call add_black_list(ierr, 3, 8)
   if (ierr.eq.0) call add_black_list(ierr, 28, 33)
 
-  if (ierr.eq.0) call diag(ierr)
+  if (ierr.eq.0) call diag(ierr, levv=+2)
   if (ierr.eq.0) call finalize(ierr)
   if (ierr.eq.0) then
      call brute_force_check_units(ierr, limit=20)

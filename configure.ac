@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/01/22 08:57:41 fuyuki configure.ac>
+# Time-stamp: <2021/01/22 21:04:32 fuyuki configure.ac>
 
 AC_PREREQ([2.69])
 
@@ -47,7 +47,11 @@ AC_CONFIG_AUX_DIR([build-aux])
 
 AM_INIT_AUTOMAKE([-Wall foreign])
 AM_MAINTAINER_MODE
+AM_CONDITIONAL([NEVER], [false])
+
 AC_PROG_MAKE_SET
+
+MT_FORTRAN_DEFINE([PACKAGE_TAG], m4_quote(m4_toupper(AC_PACKAGE_NAME)), [package name])
 
 AC_MSG_CHECKING([if transform library name])
 AC_ARG_WITH([touza-name],
