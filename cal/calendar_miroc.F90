@@ -1,7 +1,7 @@
 !!!_! calendar_miroc.F90 - touza/calendar: miroc compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/26 11:15:32 fuyuki calendar_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 21:47:19 fuyuki calendar_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -187,18 +187,25 @@ contains
 !!!_ & init - calendar init
   subroutine init (ifpar, jfpar, levv)
     use TOUZA_Cal_primitive,only: msg, msglev_normal, msglev_warning
-    use TOUZA_Cal,only: cal_init=>init, set_perpetual_date
+    use TOUZA_Cal,only: cal_init=>init, set_perpetual_date, &
+         & auto_once, auto_false
     implicit none
     integer,intent(in)          :: ifpar, jfpar
     integer,intent(in),optional :: levv
     integer :: mode
-    logical :: auto
+    logical :: is_auto
+    integer :: auto
     logical :: perpetual
     integer :: idatpp(3)
     integer jerr
     if (ofirst) then
        ofirst = .false.
-       call config_by_namelist (mode, auto, ifpar, jfpar, perpetual, idatpp)
+       call config_by_namelist (mode, is_auto, ifpar, jfpar, perpetual, idatpp)
+       if (is_auto) then
+          auto = auto_once
+       else
+          auto = auto_false
+       endif
        call cal_init (jerr, jfpar, 0, mode, auto, levv)
        call msg(msglev_normal, TIME_STAMP, __MDL__, jfpar)
        if (perpetual) then

@@ -1,5 +1,14 @@
 
-0.99.9 / 2021-01-26
+Revision 1.00 / 2021-01-26
+==================
+
+  * [CRITICAL] auto-mode treatment modified, following latest ucaln.F.
+  * [CRITICAL] miroc test(8) now ignore CCC2YH test.
+  * introduce FC_INCLUDE_* definition to find subpackage headers.
+  * insert AM_CPPFLAGS definition to find touza.h.
+  * (build) bug fixed in Makefiles.
+
+Revision 0.99.9 / 2021-01-26
 ==================
 
   * [IMPORTANT] standardized design for common procedures.

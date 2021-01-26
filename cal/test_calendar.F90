@@ -1,7 +1,7 @@
 !!!_! test_calendar.F90 - touza/calendar test program
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 28 2012
-#define TIME_STAMP 'Time-stamp: <2021/01/10 20:05:51 fuyuki test_calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 20:59:35 fuyuki test_calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -19,6 +19,9 @@
 !!!_* Macros
 #ifndef   OPT_USE_BASE_UCALN
 #  define OPT_USE_BASE_UCALN 0
+#endif
+#ifndef   WITH_TEST8_CCC2YH
+#  define WITH_TEST8_CCC2YH 0  /* CCC2YH disabled for a while */
 #endif
 !!!_@ test_calendar - test program
 program test_calendar_suite
@@ -411,13 +414,17 @@ subroutine test_CYH2CC &
      call CSS2YH (idate,       ss)
 
      call CYH2CC (htime, idate)
+#if WITH_TEST8_CCC2YH
      call CCC2YH (idate_rev, htime)
+#endif /* WITH_TEST8_CCC2YH */
      call CSS2CC (htime_ss, ss)
 
      chk_idate = .true.
+#if WITH_TEST8_CCC2YH
      do j = 1, 6
         if (idate (j) .ne. idate_rev (j)) chk_idate = .false.
      enddo
+#endif /* WITH_TEST8_CCC2YH */
      write (jfpar, 101) &
           & (idate (j), j=1,6), trim (htime), trim (htime_ss), chk_idate
      ss = ss + ss_step

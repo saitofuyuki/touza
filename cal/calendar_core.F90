@@ -1,7 +1,7 @@
 !!!_! calendar_core.F90 - TOUZA/Cal core
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/26 11:20:25 fuyuki calendar_core.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 22:10:54 fuyuki calendar_core.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -82,6 +82,10 @@ module TOUZA_Cal_core
   character(len=*),parameter,public :: unit_MI = 'MI'
   character(len=*),parameter,public :: unit_SC = 'S'
 
+  integer,parameter,public :: auto_false = 0   ! no-auto mode
+  integer,parameter,public :: auto_once  = 1   ! one-time auto-mode
+  integer,parameter,public :: auto_every = -1  ! legacy every step auto-mode
+
 !!!_  - static
   integer,save :: global_id = -1
   integer,save :: udef = DEFAULT_LOG_UNIT
@@ -103,7 +107,7 @@ module TOUZA_Cal_core
      integer :: id    = -1
      integer :: stt   = -1
      integer :: mode  = p_error
-     logical :: auto  = .false.
+     integer :: auto  = auto_false
      integer :: ulog  = DEFAULT_LOG_UNIT
      logical :: angular = .false.
 
@@ -249,7 +253,7 @@ contains
     implicit none
     type(cal_attr_t),intent(inout)      :: self
     integer,         intent(in),optional:: mode
-    logical,         intent(in),optional:: auto
+    integer,         intent(in),optional:: auto
     integer,         intent(in),optional:: ulog
 
     integer :: old_id
@@ -276,9 +280,9 @@ contains
 
     if (present (auto)) then
        self%auto = auto
-       if (auto) self%mode = p_error
+       if (auto.ne.auto_false) self%mode = p_error
     else
-       self%auto = .false.
+       self%auto = auto_false
     endif
 
     if (old_id.ge.0 .and. self%stt.ge.0) then
@@ -288,7 +292,7 @@ contains
     endif
 
     if (present (ulog)) then
-201    format('decl:', I0, ' = ', I0, 1x, I0, 1x, L1, 1x, I0)
+201    format('decl:', I0, ' = ', I0, 1x, I0, 1x, I0, 1x, I0)
        write(tmsg, 201) self%id, self%stt, self%mode, self%auto, self%ulog
        call msg(msglev_normal, tmsg, __MDL__, self%ulog)
     endif
@@ -349,8 +353,8 @@ contains
     use TOUZA_Cal_primitive,only: &
          & primitive_inq_nday_month => inq_nday_month
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    type(cal_date_t),intent(in) :: cd
+    type(cal_attr_t),intent(inout) :: self
+    type(cal_date_t),intent(in)    :: cd
     integer :: mode
     mode = check_mode_year (self, cd % y)
     r = primitive_inq_nday_month (mode, cd)
@@ -363,8 +367,8 @@ contains
     use TOUZA_Cal_primitive,only: &
          & primitive_inq_nday_year => inq_nday_year
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    type(cal_date_t),intent(in) :: cd
+    type(cal_attr_t),intent(inout) :: self
+    type(cal_date_t),intent(in)    :: cd
     integer :: mode
     mode = check_mode_year (self, cd % y)
     r = primitive_inq_nday_year (mode, cd)
@@ -561,8 +565,8 @@ contains
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_cday_date_i => conv_cday_date_i
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    integer,         intent(in) :: cday
+    type(cal_attr_t),intent(inout) :: self
+    integer,         intent(in)    :: cday
     integer :: mode
 
     if (self % pt % set .and. self % pt % toggle) then
@@ -581,8 +585,8 @@ contains
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_cday_date_c => conv_cday_date_c
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    real(kind=KRC),  intent(in) :: cday
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: cday
     integer :: mode
 
     if (self % pt % set .and. self % pt % toggle) then
@@ -601,9 +605,9 @@ contains
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_date_cday_i => conv_date_cday_i
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    type(cal_date_t),intent(in) :: cd
-    integer,         intent(in) :: xk ! dummy
+    type(cal_attr_t),intent(inout) :: self
+    type(cal_date_t),intent(in)    :: cd
+    integer,         intent(in)    :: xk ! dummy
     integer :: mode
     mode = check_mode_year (self, cd % y)
     r = primitive_conv_date_cday_i(mode, cd)
@@ -615,9 +619,9 @@ contains
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_date_cday_c => conv_date_cday_c
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    type(cal_date_t),intent(in) :: cd
-    real(kind=KRC),  intent(in) :: xk
+    type(cal_attr_t),intent(inout) :: self
+    type(cal_date_t),intent(in)    :: cd
+    real(kind=KRC),  intent(in)    :: xk
     integer :: mode
     mode = check_mode_year (self, cd % y)
     r = primitive_conv_date_cday_c(mode, cd)
@@ -630,8 +634,8 @@ contains
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_date_dayy => conv_date_dayy
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    type(cal_date_t),intent(in) :: cd
+    type(cal_attr_t),intent(inout) :: self
+    type(cal_date_t),intent(in)    :: cd
     integer :: mode
     mode = check_mode_year (self, cd % y)
     r = primitive_conv_date_dayy (mode, cd)
@@ -644,8 +648,8 @@ contains
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_date_dayy_compat => conv_date_dayy_compat
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    type(cal_date_t),intent(in) :: cd
+    type(cal_attr_t),intent(inout) :: self
+    type(cal_date_t),intent(in)    :: cd
     integer :: mode
     mode = check_mode_year (self, cd % y)
     r = primitive_conv_date_dayy_compat(mode, cd)
@@ -657,8 +661,8 @@ contains
        & (self, csec) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    real(kind=KRC),  intent(in) :: csec
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: csec
     type(cal_daysec_t) :: ds
 
     ds = conv_csec_cdaysec (self, csec)
@@ -672,8 +676,8 @@ contains
        & (self, csec) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    integer,         intent(in) :: csec
+    type(cal_attr_t),intent(inout) :: self
+    integer,         intent(in)    :: csec
     type(cal_daysec_t) :: ds
 
     ds = conv_csec_cdaysec (self, csec)
@@ -688,9 +692,9 @@ contains
        & (self, cal, xk) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    type(calendar_t),intent(in) :: cal
-    real(kind=KRC),  intent(in) :: xk ! dummy
+    type(cal_attr_t),intent(inout) :: self
+    type(calendar_t),intent(in)    :: cal
+    real(kind=KRC),  intent(in)    :: xk ! dummy
 
     type(cal_daysec_t) :: ds
 
@@ -705,9 +709,9 @@ contains
        & (self, cal, xk) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    type(calendar_t),intent(in) :: cal
-    integer,         intent(in) :: xk ! dummy
+    type(cal_attr_t),intent(inout) :: self
+    type(calendar_t),intent(in)    :: cal
+    integer,         intent(in)    :: xk ! dummy
 
     type(cal_daysec_t) :: ds
 
@@ -723,8 +727,8 @@ contains
        & (self, cday) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    integer,         intent(in) :: cday
+    type(cal_attr_t),intent(inout) :: self
+    integer,         intent(in)    :: cday
     type(cal_date_t) :: dt
 
     dt = conv_cday_date (self, cday)
@@ -737,8 +741,8 @@ contains
        & (self, csec) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    real(kind=KRC),  intent(in) :: csec
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: csec
     type(cal_date_t) :: dt
 
     dt = conv_csec_date (self, csec)
@@ -751,8 +755,8 @@ contains
        & (self, csec) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    real(kind=KRC),  intent(in) :: csec
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: csec
     type(cal_daysec_t) :: ds
     ds = conv_csec_cdaysec (self, csec)
     r = conv_cday_date (self, ds % d)
@@ -763,10 +767,10 @@ contains
        & (self, dur, unit, refsec) &
        & result (r)
     implicit none
-    type(cal_attr_t), intent(in) :: self
-    real(kind=KRC),   intent(in) :: dur
-    character(len=*), intent(in) :: unit
-    real(kind=KRC),   intent(in) :: refsec
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: dur
+    character(len=*),intent(in)    :: unit
+    real(kind=KRC),  intent(in)    :: refsec
 
     character (len=10) :: unit_buf
     integer ju
@@ -782,10 +786,10 @@ contains
        & (self, dur, junit, refsec) &
        & result (r)
     implicit none
-    type(cal_attr_t), intent(in) :: self
-    real(kind=KRC),   intent(in) :: dur
-    integer,          intent(in) :: junit
-    real(kind=KRC),   intent(in) :: refsec
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: dur
+    integer,         intent(in)    :: junit
+    real(kind=KRC),  intent(in)    :: refsec
 
     type(cal_date_t) :: cd
 
@@ -856,11 +860,11 @@ contains
        & (self, dur, unit, refsec, xk) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    real(kind=KRC),  intent(in) :: dur
-    real(kind=KRC),  intent(in) :: refsec
-    character(len=*),intent(in) :: unit
-    real(kind=KRC),  intent(in) :: xk ! dummy
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: dur
+    real(kind=KRC),  intent(in)    :: refsec
+    character(len=*),intent(in)    :: unit
+    real(kind=KRC),  intent(in)    :: xk ! dummy
 
     character (len=10) :: unit_buf
     integer ju
@@ -874,11 +878,11 @@ contains
        & (self, dur, junit, refsec, xk) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    real(kind=KRC),  intent(in) :: dur
-    real(kind=KRC),  intent(in) :: refsec
-    integer,         intent(in) :: junit
-    real(kind=KRC),  intent(in) :: xk ! dummy
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: dur
+    real(kind=KRC),  intent(in)    :: refsec
+    integer,         intent(in)    :: junit
+    real(kind=KRC),  intent(in)    :: xk ! dummy
 
     real(kind=KRC) :: step
     type(cal_daysec_t) :: ds
@@ -905,9 +909,9 @@ contains
        & (self, csec, refsec, orgsec, dur, unit) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    real(kind=KRC),  intent(in) :: csec, refsec, orgsec, dur
-    character(len=*),intent(in) :: unit
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: csec, refsec, orgsec, dur
+    character(len=*),intent(in)    :: unit
 
     r = (csec .eq. refsec)
     if (r) return
@@ -921,9 +925,9 @@ contains
        & (self, csec, refsec, orgsec, dur, unit) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    real(kind=KRC),  intent(in) :: csec, refsec, orgsec, dur
-    character(len=*),intent(in) :: unit
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: csec, refsec, orgsec, dur
+    character(len=*),intent(in)    :: unit
 
     character(len=5) :: utmp
     integer ju
@@ -943,9 +947,9 @@ contains
        & (self, csec, refsec, orgsec, dur, junit) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    real(kind=KRC),  intent(in) :: csec, refsec, orgsec, dur
-    integer,         intent(in) :: junit
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: csec, refsec, orgsec, dur
+    integer,         intent(in)    :: junit
 
     type(cal_date_t) :: cdt, cdtp
     real(kind=KRC)   :: dursec
@@ -993,16 +997,20 @@ contains
        & result (r)
 !!!_   = declaration
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    integer,         intent(in) :: cyear
+    type(cal_attr_t),intent(inout) :: self
+    integer,         intent(in)    :: cyear
 !!!_   . body
-    if (self % auto) then
+    if (self%auto .ne. auto_false) then
        if (cyear .ge. auto_cyear_grego_l) then
           r = p_grego_l
        else if (cyear .ge. auto_cyear_grego_i) then
           r = p_grego_i
        else
           r = p_ideal
+       endif
+       if (self%auto.eq.auto_once) then
+          self%auto = auto_false
+          self%mode = r
        endif
     else
        r = self % mode
@@ -1015,16 +1023,20 @@ contains
        & (self, cday) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    integer,         intent(in) :: cday
+    type(cal_attr_t),intent(inout) :: self
+    integer,         intent(in)    :: cday
 
-    if (self % auto) then
+    if (self%auto .ne. auto_false) then
        if (cday .ge. auto_cday_grego_l) then       !! 1900*365+1900/4-19+5
           r = p_grego_l
        else if (cday .ge. auto_cday_grego_i) then
           r = p_grego_i
        else
           r = p_ideal
+       endif
+       if (self%auto.eq.auto_once) then
+          self%auto = auto_false
+          self%mode = r
        endif
     else
        r = self % mode
@@ -1036,16 +1048,20 @@ contains
        & (self, cday) &
        & result (r)
     implicit none
-    type(cal_attr_t),intent(in) :: self
-    real(kind=KRC),  intent(in) :: cday
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: cday
 
-    if (self % auto) then
+    if (self%auto .ne. auto_false) then
        if (cday .ge. xreal(auto_cday_grego_l)) then
           r = p_grego_l
        else if (cday .ge. xreal(auto_cday_grego_i)) then
           r = p_grego_i
        else
           r = p_ideal
+       endif
+       if (self%auto.eq.auto_once) then
+          self%auto = auto_false
+          self%mode = r
        endif
     else
        r = self % mode

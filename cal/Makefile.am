@@ -1,7 +1,7 @@
 # touza/calendar Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2021/01/26 10:14:05 fuyuki Makefile.am>
+# Time-stamp: <2021/01/26 18:14:30 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -22,12 +22,13 @@ libtouza_local_la_SOURCES = calendar_primitive.F90 calendar_core.F90 \
 	calendar_matsiro.F90 calendar_ils.F90 $(include_HEADERS)
 
 AM_FCFLAGS = $(FC_MODULE_touza_std)
+AM_CPPFLAGS += $(FC_INCLUDE_touza_std)
 
 LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(BUILD_AUX)/tap-driver.sh
 LOG_DRIVER_FLAGS='--comments'
 
 noinst_SCRIPTS	=	$(WTC)
-CLEANFILES		=	$(noinst_SCRIPTS)
+CLEANFILES		=	$(noinst_SCRIPTS) $(MIROCH)
 
 WTC_LOGDIR	=	log
 WTC		=	wtc.sh
@@ -78,9 +79,19 @@ TEST_COMMON_SRCS	= test_calendar.F90 $(include_HEADERS)
 TEST_COMMON_LIBS	= $(noinst_LTLIBRARIES)
 TEST_COMMON_LIBS	+= $(FC_LDADD_touza_std)
 UCALN	=	ucaln.F
+MIROCH	=	miroc.h
 
-$(UCALN):
-	@echo "Please manually install MIROC/src/util/$(UCALN) in $(abs_builddir)." >&2; exit 1
+$(UCALN): $(MIROCH)
+	@if test -f $(srcdir)/$(UCALN); then :; else \
+		orgsrc=$${GCMDIR}/src/util/$(UCALN); \
+		if test -f "$${orgsrc}"; then \
+			echo "copy $${orgsrc}"; cp $${orgsrc} $(builddir)/$@; \
+		else \
+			echo "Please manually install MIROC/src/util/$(UCALN) in $(abs_builddir)." >&2; exit 1; \
+		fi; fi
+
+$(MIROCH):
+	touch $@
 
 check_PROGRAMS	=	test_calendar \
 					test_calendar_comp test_calendar_trad \
@@ -88,7 +99,7 @@ check_PROGRAMS	=	test_calendar \
 
 test_calendar_SOURCES	= calendar.F90
 test_calendar_LDADD		= $(TEST_COMMON_LIBS)
-test_calendar_CPPFLAGS	= -DTEST_CALENDAR=1
+test_calendar_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR=1
 
 test_calendar_comp_SOURCES	= $(TEST_COMMON_SRCS)
 test_calendar_comp_LDADD	= $(TEST_COMMON_LIBS)
@@ -96,24 +107,24 @@ test_calendar_comp_LDADD	= $(TEST_COMMON_LIBS)
 test_calendar_trad_SOURCES			= $(TEST_COMMON_SRCS)
 nodist_test_calendar_trad_SOURCES	= $(UCALN)
 test_calendar_trad_LDADD			= $(TEST_COMMON_LIBS)
-test_calendar_trad_CPPFLAGS			= -DOPT_USE_BASE_UCALN=1
+test_calendar_trad_CPPFLAGS			= $(AM_CPPFLAGS) -DOPT_USE_BASE_UCALN=1
 
 test_calendar_matsiro_SOURCES	= calendar_matsiro.F90
 test_calendar_matsiro_LDADD		= $(TEST_COMMON_LIBS)
-test_calendar_matsiro_CPPFLAGS	= -DTEST_CALENDAR_MATSIRO=1
+test_calendar_matsiro_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR_MATSIRO=1
 
 test_calendar_ils_SOURCES	= calendar_ils.F90
 test_calendar_ils_LDADD		= $(TEST_COMMON_LIBS)
-test_calendar_ils_CPPFLAGS	= -DTEST_CALENDAR_ILS=1
+test_calendar_ils_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR_ILS=1
 
 # generate by makedepf90, with manual edits
-calendar.o : $(srcdir)/calendar.F90 $(srcdir)/touza_cal.h calendar_core.o calendar_primitive.o
-calendar_core.o : $(srcdir)/calendar_core.F90 $(srcdir)/touza_cal.h calendar_primitive.o
-calendar_ils.o : $(srcdir)/calendar_ils.F90 $(srcdir)/touza_cal.h calendar.o
-calendar_matsiro.o : $(srcdir)/calendar_matsiro.F90 $(srcdir)/touza_cal.h calendar.o
-calendar_miroc.o : $(srcdir)/calendar_miroc.F90 $(srcdir)/touza_cal.h calendar_core.o calendar_primitive.o calendar.o
-calendar_primitive.o : $(srcdir)/calendar_primitive.F90 $(srcdir)/touza_cal.h
-test_calendar.o : $(srcdir)/test_calendar.F90 $(srcdir)/touza_cal.h calendar_miroc.o
+calendar.lo:           $(srcdir)/calendar.F90         	$(srcdir)/touza_cal.h calendar_core.lo calendar_primitive.lo
+calendar_core.lo:      $(srcdir)/calendar_core.F90    	$(srcdir)/touza_cal.h calendar_primitive.lo
+calendar_ils.lo:       $(srcdir)/calendar_ils.F90     	$(srcdir)/touza_cal.h calendar.lo
+calendar_matsiro.lo:   $(srcdir)/calendar_matsiro.F90 	$(srcdir)/touza_cal.h calendar.lo
+calendar_miroc.lo:     $(srcdir)/calendar_miroc.F90     $(srcdir)/touza_cal.h calendar_core.lo calendar_primitive.lo calendar.lo
+calendar_primitive.lo: $(srcdir)/calendar_primitive.F90 $(srcdir)/touza_cal.h
+test_calendar.lo:      $(srcdir)/test_calendar.F90      $(srcdir)/touza_cal.h calendar_miroc.lo
 
 ### Local Variables:
 ### mode: makefile-automake

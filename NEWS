@@ -1,10 +1,14 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2021/01/26 16:22:03 fuyuki NEWS>
+# Time-stamp: <2021/01/26 22:52:43 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.00 (initial-Release) from 0.99.9
+  * [CRITICAL] auto-mode treatment modified, following latest ucaln.F.
+  * [CRITICAL] miroc test(8) now ignore CCC2YH test.
 
 * Changes in 0.99.9 (pre-Release) from 0.99.5
   - [CRITICAL] standardized design for common procedures introduced.

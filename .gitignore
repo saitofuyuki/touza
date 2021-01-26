@@ -67,3 +67,4 @@ gmon.out
 /touza_config.h
 /touza_config.h.in
 /cal/ucaln.F
+/cal/miroc.h

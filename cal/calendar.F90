@@ -1,7 +1,7 @@
 !!!_! calendar.F90 - TOUZA/Cal manager
 ! Maintainer: SAITO Fuyuki
 ! Created: May 31 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/26 11:20:42 fuyuki calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/26 21:44:51 fuyuki calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -31,6 +31,7 @@ module TOUZA_Cal
        & cal_attr_t,  cal_daysec_t, cal_date_t, cal_time_t, &
        & cal_ynday_t, calendar_t, &
        & p_error, p_ideal, p_grego_i, p_grego_l, p_user, &
+       & auto_false, auto_once, auto_every, &
        & set_perpetual_date_core        => set_perpetual_date, &
        & get_perpetual_date_core        => get_perpetual_date, &
        & conv_string_calendar,          &
@@ -149,6 +150,7 @@ module TOUZA_Cal
 
   public :: KRC,     XREAL
   public :: p_error, p_ideal, p_grego_i, p_grego_l, p_user
+  public :: auto_false, auto_once, auto_every
 
   public msglev_panic
   public msglev_fatal,   msglev_critical, msglev_severe
@@ -175,7 +177,7 @@ contains
     integer,intent(in),optional :: ulog
     integer,intent(in),optional :: ncals
     integer,intent(in),optional :: mode
-    logical,intent(in),optional :: auto
+    integer,intent(in),optional :: auto
     integer,intent(in),optional :: levv, stdv ! verbose levels
     integer jdummy
 
@@ -283,7 +285,7 @@ contains
     implicit none
     integer,intent(out)          :: ierr
     integer,intent(in), optional :: mode
-    logical,intent(in), optional :: auto
+    integer,intent(in), optional :: auto
     integer,intent(in), optional :: ulog
     integer,intent(out),optional :: jcalh
     integer jc
