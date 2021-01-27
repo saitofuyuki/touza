@@ -1,7 +1,7 @@
 # touza/calendar Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2021/01/26 18:14:30 fuyuki Makefile.am>
+# Time-stamp: <2021/01/27 10:59:54 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -93,13 +93,17 @@ $(UCALN): $(MIROCH)
 $(MIROCH):
 	touch $@
 
-check_PROGRAMS	=	test_calendar \
+check_PROGRAMS	=	test_calendar test_calendar_core \
 					test_calendar_comp test_calendar_trad \
 					test_calendar_matsiro test_calendar_ils
 
 test_calendar_SOURCES	= calendar.F90
 test_calendar_LDADD		= $(TEST_COMMON_LIBS)
 test_calendar_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR=1
+
+test_calendar_core_SOURCES	= calendar_core.F90
+test_calendar_core_LDADD	= $(TEST_COMMON_LIBS)
+test_calendar_core_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR_CORE=1
 
 test_calendar_comp_SOURCES	= $(TEST_COMMON_SRCS)
 test_calendar_comp_LDADD	= $(TEST_COMMON_LIBS)

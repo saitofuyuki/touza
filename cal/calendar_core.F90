@@ -1,7 +1,7 @@
 !!!_! calendar_core.F90 - TOUZA/Cal core
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/26 22:10:54 fuyuki calendar_core.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/01/27 11:10:30 fuyuki calendar_core.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -22,6 +22,9 @@
 #endif
 #define OPT_USE_DGAUS_PRIVATE
 #define DEFAULT_LOG_UNIT -1
+#ifndef   OPT_CALENDAR_FIXED_YEAR_DIGITS
+#  define OPT_CALENDAR_FIXED_YEAR_DIGITS 0  /* 4-digits year as legacy */
+#endif
 !!!_@ calendar_core - calendar core
 module TOUZA_Cal_core
 !!!_ = declaration
@@ -59,8 +62,10 @@ module TOUZA_Cal_core
   public :: p_error,    p_ideal,    p_grego_i,   p_grego_l, p_user
   public :: is_leap_year
 !!!_  * parameters
-  character(len=*),parameter :: fmt_calendar_w = '(I4.4,''/'',I2.2,''/'',I2.2,''-'',I2.2,'':'',I2.2,'':'',I2.2)'
+  character(len=*),parameter :: fmt_calendar_w = '(I0.4,''/'',I2.2,''/'',I2.2,''-'',I2.2,'':'',I2.2,'':'',I2.2)'
+#if OPT_CALENDAR_FIXED_YEAR_DIGITS
   character(len=*),parameter :: fmt_calendar_r = '(I4.4,1X,   I2.2,1X,   I2.2,1X,   I2.2,1X,   I2.2,1X,   I2.2)'
+#endif
 
   integer,parameter :: auto_cyear_grego_l = 1900
   integer,parameter :: auto_cyear_grego_i = 1000
@@ -819,6 +824,7 @@ contains
        & result (r)
     implicit none
     character(len=*),intent(in) :: str
+#if OPT_CALENDAR_FIXED_YEAR_DIGITS
     integer y, m, d, h, mm, s
 
     read(str, fmt_calendar_r) y, m, d, h, mm, s
@@ -828,6 +834,36 @@ contains
     r % t % h = h
     r % t % m = mm
     r % t % s = s
+#else /* not OPT_CALENDAR_FIXED_YEAR_DIGITS */
+    integer nc(6), jc
+    integer jf, jt, ls
+
+    jc = 1
+    nc(:) = 0
+    ls = len_trim(str)
+    jf = 1
+    do jc = 1, 6
+       if (jf.gt.ls) exit
+       jt = verify(str(jf:ls), '0123456789')
+       ! write(*, *) jc, jf, jt, str(jf:ls)
+       if (jt.eq.0) then
+          jt = ls
+       else
+          jt = jf + jt - 2
+       endif
+       if (jt.ge.jf) then
+          read(str(jf:jt), *) nc(jc)
+       endif
+       jf = jt + 2
+    enddo
+    r % d % y = nc(1)
+    r % d % m = nc(2)
+    r % d % d = nc(3)
+    r % t % h = nc(4)
+    r % t % m = nc(5)
+    r % t % s = nc(6)
+
+#endif /* not OPT_CALENDAR_FIXED_YEAR_DIGITS */
   end function conv_string_calendar
 
 !!!_  & conv_calendar_string - format string from calendar[D,T]
@@ -1114,6 +1150,42 @@ contains
 
 !!!_ + end
 end module TOUZA_Cal_core
+!!!_@ test_calendar_core - test program
+#ifdef TEST_CALENDAR_CORE
+program test_calendar_core
+  use TOUZA_Cal_core
+  implicit none
+  integer ierr
+
+  call init (ierr, stdv=-9)
+  call diag (ierr)
+
+  call chk_conv_string('1234/56/78-12:34:56')
+  call chk_conv_string('1234/56/78 12:34:56')
+  call chk_conv_string('1234 56 78 12 34 56')
+  call chk_conv_string('12343 56 78 12 34 56')
+  call chk_conv_string('12343/56,78 12 34 56')
+  call chk_conv_string('123/56 78 12 34 56')
+  call chk_conv_string('1234//78-::56')
+
+  call finalize(ierr)
+
+  stop
+contains
+  subroutine chk_conv_string (str)
+    implicit none
+    character(len=*),intent(in) :: str
+    type(calendar_t) :: cal
+
+    cal = conv_string_calendar(str)
+
+101 format('<', A, '> == ', 6(1x, I0))
+    write(*, 101) trim(str), cal
+
+  end subroutine chk_conv_string
+
+end program test_calendar_core
+#endif /* TEST_CALENDAR_CORE */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

@@ -68,3 +68,4 @@ gmon.out
 /touza_config.h.in
 /cal/ucaln.F
 /cal/miroc.h
+/cal/test_calendar_core
