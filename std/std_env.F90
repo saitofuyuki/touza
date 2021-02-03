@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/26 14:59:08 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/02/03 09:07:03 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -264,7 +264,7 @@ contains
 102 format(__MDL__, 'ISO_FORTRAN_ENV disabled')
       utmp = choice(-1, u)
       call msg_mdl &
-           & 'ISO_FORTRAN_ENV disabled',  __MDL__, utmp)
+           & ('ISO_FORTRAN_ENV disabled',  __MDL__, utmp)
 #   endif
 
     call msg_mdl &

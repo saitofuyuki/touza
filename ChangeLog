@@ -1,4 +1,10 @@
 
+Revision 1.00.1 / 2021-02-03
+==================
+
+  * (std) [Critical] syntax error when iso_fortran_env disabled.
+  * (cal) [critical] calendar string parser/formatter improved.
+
 Revision 1.00 / 2021-01-26
 ==================
 

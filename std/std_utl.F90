@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/26 11:37:46 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/02/01 21:12:04 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -124,11 +124,19 @@ contains
        if (diag_counts.eq.0.or.IAND(md,DIAG_FORCE).gt.0) then
           if (ierr.eq.0) then
 101          format(__TAG__, A)
+102          format(__TAG__, 'with elemental = ', I0)
              if (VCHECK_NORMAL(lv)) then
                 if (utmp.ge.0) then
                    write(utmp, 101) TIME_STAMP
                 else
                    write(*,    101) TIME_STAMP
+                endif
+             endif
+             if (VCHECK_INFO(lv)) then
+                if (utmp.ge.0) then
+                   write(utmp, 102) OPT_ENABLE_FORTRAN_ELEMENTAL
+                else
+                   write(*,    102) OPT_ENABLE_FORTRAN_ELEMENTAL
                 endif
              endif
           endif
@@ -386,7 +394,7 @@ program test_std_utl
   integer ierr
   character(len=128) :: T0, T1
 
-  call init(ierr)
+  call init(ierr, levv=+8)
   call diag(ierr)
 
   T0 = 'abcABCxyzXYZ012:;/'
