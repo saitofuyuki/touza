@@ -69,3 +69,4 @@ gmon.out
 /cal/ucaln.F
 /cal/miroc.h
 /cal/test_calendar_core
+/cal/test_calendar_coco

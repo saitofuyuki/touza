@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2021/01/22 15:38:22 fuyuki mt_local.m4>
+dnl Time-stamp: <2021/02/13 10:33:03 fuyuki mt_local.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -15,6 +15,8 @@ MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT32])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT64])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL32])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL64])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INTEGER_KINDS])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL_KINDS])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([open], [iomsg],[
 character T*(30)

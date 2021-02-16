@@ -1,7 +1,7 @@
 # touza/calendar Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2021/01/27 10:59:54 fuyuki Makefile.am>
+# Time-stamp: <2021/02/16 15:03:50 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -17,9 +17,12 @@ include $(top_srcdir)/aminclude_static.am
 include_HEADERS	=	touza_cal.h
 
 noinst_LTLIBRARIES = libtouza_local.la
-libtouza_local_la_SOURCES = calendar_primitive.F90 calendar_core.F90 \
-	calendar.F90 calendar_miroc.F90 \
-	calendar_matsiro.F90 calendar_ils.F90 $(include_HEADERS)
+
+cal_SOURCES	=	calendar_primitive.F90 calendar_core.F90 calendar.F90 $(include_HEADERS)
+
+libtouza_local_la_SOURCES = $(cal_SOURCES) \
+	calendar_miroc.F90 calendar_coco.F90 \
+	calendar_matsiro.F90 calendar_ils.F90
 
 AM_FCFLAGS = $(FC_MODULE_touza_std)
 AM_CPPFLAGS += $(FC_INCLUDE_touza_std)
@@ -95,7 +98,8 @@ $(MIROCH):
 
 check_PROGRAMS	=	test_calendar test_calendar_core \
 					test_calendar_comp test_calendar_trad \
-					test_calendar_matsiro test_calendar_ils
+					test_calendar_matsiro test_calendar_ils \
+					test_calendar_coco
 
 test_calendar_SOURCES	= calendar.F90
 test_calendar_LDADD		= $(TEST_COMMON_LIBS)
@@ -121,13 +125,18 @@ test_calendar_ils_SOURCES	= calendar_ils.F90
 test_calendar_ils_LDADD		= $(TEST_COMMON_LIBS)
 test_calendar_ils_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR_ILS=1
 
+test_calendar_coco_SOURCES	= $(cal_SOURCES) calendar_coco.F90
+test_calendar_coco_LDADD	= $(TEST_COMMON_LIBS)
+test_calendar_coco_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR_COCO=1 -DOPT_KIND_REAL=8
+
 # generate by makedepf90, with manual edits
 calendar.lo:           $(srcdir)/calendar.F90         	$(srcdir)/touza_cal.h calendar_core.lo calendar_primitive.lo
 calendar_core.lo:      $(srcdir)/calendar_core.F90    	$(srcdir)/touza_cal.h calendar_primitive.lo
+calendar_primitive.lo: $(srcdir)/calendar_primitive.F90 $(srcdir)/touza_cal.h
+calendar_coco.lo:      $(srcdir)/calendar_coco.F90      $(srcdir)/touza_cal.h calendar.lo
 calendar_ils.lo:       $(srcdir)/calendar_ils.F90     	$(srcdir)/touza_cal.h calendar.lo
 calendar_matsiro.lo:   $(srcdir)/calendar_matsiro.F90 	$(srcdir)/touza_cal.h calendar.lo
 calendar_miroc.lo:     $(srcdir)/calendar_miroc.F90     $(srcdir)/touza_cal.h calendar_core.lo calendar_primitive.lo calendar.lo
-calendar_primitive.lo: $(srcdir)/calendar_primitive.F90 $(srcdir)/touza_cal.h
 test_calendar.lo:      $(srcdir)/test_calendar.F90      $(srcdir)/touza_cal.h calendar_miroc.lo
 
 ### Local Variables:

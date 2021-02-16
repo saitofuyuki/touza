@@ -1,7 +1,7 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/26 15:52:03 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/02/07 19:41:28 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -42,6 +42,7 @@ module TOUZA_Std_log
      module procedure msg_is
      module procedure msg_fs
      module procedure msg_ds
+     module procedure msg_as
      module procedure msg_ia
      module procedure msg_fa
      module procedure msg_da
@@ -49,6 +50,8 @@ module TOUZA_Std_log
   end interface msg
 
   interface msg_mdl
+     module procedure msg_mdl_as
+     module procedure msg_mdl_is
      module procedure msg_mdl_ia
      module procedure msg_mdl_txt
   end interface msg_mdl
@@ -192,7 +195,7 @@ contains
     return
   end subroutine msg_fun_txt
 
-!!!_  & msg_mdl_ia - log message [module level]
+!!!_  & msg_mdl - log message [module level]
   subroutine msg_mdl_ia &
        & (fmt, vv, mdl, u)
     implicit none
@@ -206,6 +209,35 @@ contains
     call msg_ia(fmt, vv, tag, u)
     return
   end subroutine msg_mdl_ia
+
+  subroutine msg_mdl_is &
+       & (fmt, v, mdl, u)
+    implicit none
+    character(len=*),intent(in)          :: fmt
+    integer,         intent(in)          :: v
+    character(len=*),intent(in)          :: mdl
+    integer,         intent(in),optional :: u
+    character(len=lpfx) :: tag
+
+    call gen_tag(tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl)
+    call msg_is(fmt, v, tag, u)
+    return
+  end subroutine msg_mdl_is
+
+  subroutine msg_mdl_as &
+       & (fmt, v, mdl, u)
+    implicit none
+    character(len=*),intent(in)          :: fmt
+    character(len=*),intent(in)          :: v
+    character(len=*),intent(in)          :: mdl
+    integer,         intent(in),optional :: u
+    character(len=lpfx) :: tag
+
+    call gen_tag(tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl)
+    call msg_as(fmt, v, tag, u)
+    return
+  end subroutine msg_mdl_as
+
 !!!_  & msg_mdl_txt - log message [module level]
   subroutine msg_mdl_txt &
        & (txt, mdl, u)
@@ -402,6 +434,20 @@ contains
     call msg_txt(txt, tag, u)
 
   end subroutine msg_ds
+
+  subroutine msg_as &
+       & (fmt, v, tag, u)
+    implicit none
+    character(len=*),intent(in)          :: fmt
+    character(len=*),intent(in)          :: v
+    character(len=*),intent(in)          :: tag
+    integer,         intent(in),optional :: u
+    character(len=ltxt) :: txt
+
+    write(txt, fmt) v
+    call msg_txt(txt, tag, u)
+
+  end subroutine msg_as
 
 !!!_  & msg_txt - message core
   subroutine msg_txt &

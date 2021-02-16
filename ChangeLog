@@ -1,12 +1,19 @@
 
+Revision 1.00.2 / 2021-02-16
+============================
+
+  * (cal) coco compatible interfaces introuced.
+  * (std/env) byte-order diagnostics implemented.
+  * (std/arg) [CRITCAL] the very first argument was skipped.
+
 Revision 1.00.1 / 2021-02-03
-==================
+============================
 
   * (std) [Critical] syntax error when iso_fortran_env disabled.
   * (cal) [critical] calendar string parser/formatter improved.
 
 Revision 1.00 / 2021-01-26
-==================
+==========================
 
   * [CRITICAL] auto-mode treatment modified, following latest ucaln.F.
   * [CRITICAL] miroc test(8) now ignore CCC2YH test.
@@ -15,25 +22,25 @@ Revision 1.00 / 2021-01-26
   * (build) bug fixed in Makefiles.
 
 Revision 0.99.9 / 2021-01-26
-==================
+============================
 
   * [IMPORTANT] standardized design for common procedures.
   * touza batch with module switches.
 
 Revision 0.99.5 / 2021-01-22
-==================
+============================
 
   * [CRITICAL] (m4c) at_ prefix replaced with mt_.
   * (std/arg) get_option_*a introduced (to parse array).
   * (std/utl) Implement case conversion subroutines.
 
 Revision 0.99.4 / 2021-01-20
-==================
+============================
 
   * autoconf macros (m4c/at_*) installation.
 
 Revision 0.99.3 / 2021-01-19
-==================
+============================
 
   * (std/env) record-length function and variables.
 

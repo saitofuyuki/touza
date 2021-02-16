@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2021/01/26 11:55:25 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/02/04 13:57:34 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2021
@@ -332,10 +332,12 @@ contains
     integer,intent(out) :: ierr
     integer,intent(in)  :: ucfg
 
+#if HAVE_GET_COMMAND_ARGUMENT
     integer jarg, nargs
-    integer,parameter :: lstr=ARG_LINE_LEN
     integer l
+    integer,parameter :: lstr=ARG_LINE_LEN
     character(len=lstr) :: S
+#endif
 
     ierr = 0
 
@@ -401,7 +403,7 @@ contains
 
     looprec: do jr = 0, lrecurs
        expand = .false.
-       je = 0
+       je = -1
        if (ierr.ne.0) exit
        loope: do
           je = je + 1
