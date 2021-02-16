@@ -1,7 +1,7 @@
 !!!_! calendar_core.F90 - TOUZA/Cal core
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/27 11:10:30 fuyuki calendar_core.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/02/16 22:58:35 fuyuki calendar_core.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -194,16 +194,16 @@ module TOUZA_Cal_core
 contains
 !!!_ + common interfaces
 !!!_  & init - initialization
-  subroutine init (ierr, ulog, levv, stdv)
+  subroutine init (ierr, ulog, levv, inim, stdv)
     use TOUZA_Cal_primitive,only: primitive_init=>init, msg, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: ulog
-    integer,intent(in),optional :: levv, stdv
+    integer,intent(in),optional :: levv, inim, stdv
 
     ierr = 0
     if (init_counts.eq.0) then
-       if (ierr.eq.0) call primitive_init(ierr, levv, stdv)
+       if (ierr.eq.0) call primitive_init(ierr, levv, inim, stdv)
        global_id = 0
        if (present(ulog)) then
           udef = ulog

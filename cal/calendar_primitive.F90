@@ -1,7 +1,7 @@
 !!!_! calendar_primitive.F90 - TOUZA/Cal primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 22 2011
-#define TIME_STAMP 'Time-stamp: <2021/01/26 15:10:52 fuyuki calendar_primitive.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/02/16 22:57:34 fuyuki calendar_primitive.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -44,6 +44,7 @@ module TOUZA_Cal_primitive
   integer,save :: init_counts = 0
   integer,save :: lev_verbose = CAL_MSG_LEVEL
   integer,save :: lev_stdv = CAL_MSG_LEVEL
+  integer,save :: ini_mode = INIT_SKIP
 # define __MDL__ 'p'
 !!!_  - cal_date_t
   type cal_date_t
@@ -114,12 +115,13 @@ module TOUZA_Cal_primitive
 
 contains
 !!!_ & init - initialization
-  subroutine init(ierr, levv, stdv)
+  subroutine init(ierr, levv, inim, stdv)
 !!!_  = declaration
     use TOUZA_Std,only: std_init=>init, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: levv
+    integer,intent(in),optional :: inim ! initialization mode
     integer,intent(in),optional :: stdv ! verbose level of TOUZA_Std
     integer im
 !!!_  - body
@@ -127,7 +129,11 @@ contains
 
     if (init_counts.eq.0) then
        lev_stdv = choice(lev_stdv, stdv)
-       if (ierr.eq.0) call std_init(ierr, levv=lev_stdv)
+       ini_mode = choice(INIT_DEFAULT, inim)
+       if (ini_mode.eq.INIT_DEFAULT) ini_mode = INIT_DEEP
+       if (ini_mode.ge.INIT_DEEP) then
+          if (ierr.eq.0) call std_init(ierr, levv=lev_stdv)
+       endif
 
        lev_verbose = choice(lev_verbose, levv)
        do im = p_error, p_user
@@ -149,7 +155,9 @@ contains
 
     ierr = 0
     lv = choice(lev_verbose, levv)
-    if (ierr.eq.0) call std_diag(ierr, u, lev_stdv)
+    if (ini_mode.ge.INIT_DEEP) then
+       if (ierr.eq.0) call std_diag(ierr, u, lev_stdv)
+    endif
     if (ierr.eq.0) then
        call msg(lv, TIME_STAMP, __MDL__)
     endif
@@ -164,7 +172,9 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     ierr = 0 * choice(0, levv)
-    if (ierr.eq.0) call std_finalize(ierr, u, lev_stdv)
+    if (ini_mode.ge.INIT_DEEP) then
+       if (ierr.eq.0) call std_finalize(ierr, u, lev_stdv)
+    endif
     return
   end subroutine finalize
 
@@ -181,8 +191,12 @@ contains
     character(len=128) tag
 
     if (is_msglev(levm, lev_verbose)) then
-       call gen_tag(tag, PACKAGE_TAG, __GRP__, mdl)
-       call std_msg(txt, tag, u)
+       if (ini_mode.ge.INIT_DEEP) then
+          call gen_tag(tag, PACKAGE_TAG, __GRP__, mdl)
+          call std_msg(txt, tag, u)
+       else
+          write(*, *) trim(txt)
+       endif
     endif
     return
   end subroutine msg

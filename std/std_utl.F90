@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2021/02/01 21:12:04 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/02/16 18:09:45 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -15,6 +15,10 @@
 #  include "touza_config.h"
 #endif
 #include "touza_std.h"
+!!!_* macros
+#ifndef   OPT_ENABLE_FORTRAN_ELEMENTAL
+#  define OPT_ENABLE_FORTRAN_ELEMENTAL 0
+#endif
 !!!_* switch
 #if OPT_ENABLE_FORTRAN_ELEMENTAL
 #  define _ELEMENTAL ELEMENTAL

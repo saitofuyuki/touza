@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/26 15:15:55 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/02/16 19:32:16 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -53,6 +53,7 @@ contains
     integer,intent(in), optional :: mode
     integer ic, ir
     integer md, lv
+    logical isini
 
     ierr = 0
 
@@ -68,7 +69,12 @@ contains
        if (init_counts.eq.0) then
           lev_verbose = lv
 #if OPT_USE_MPI
-          if (ierr.eq.0) call MPI_Init(ierr)
+          if (ierr.eq.0) then
+             call MPI_Initialized(isini, ierr)
+             if (ierr.eq.0) then
+                if (.not.isini) call MPI_Init(ierr)
+             endif
+          endif
           if (ierr.eq.0) then
              ic = MPI_COMM_WORLD
              call MPI_Comm_rank(ic, ir, ierr)
@@ -140,11 +146,17 @@ contains
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: mode
     integer lv
+    logical isfin
 
     ierr = 0
     lv = choice(lev_verbose, levv)
 #if OPT_USE_MPI
-    call MPI_finalize(ierr)
+    if (ierr.eq.0) then
+       call MPI_Finalized(isfin, ierr)
+       if (ierr.eq.0) then
+          if (.not.isfin) call MPI_finalize(ierr)
+       endif
+    endif
 #else  /* not OPT_USE_MPI */
     continue
 #endif /* not OPT_USE_MPI */

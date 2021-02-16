@@ -1,11 +1,13 @@
 /* touza_cal.h - touza/calendar definitions */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Jul 31 2011 */
-/* Time-stamp: <2021/01/26 11:06:55 fuyuki touza_cal.h> */
+/* Time-stamp: <2021/02/16 22:57:02 fuyuki touza_cal.h> */
 /* Copyright (C) 2011-2021 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
 /*   (https://www.apache.org/licenses/LICENSE-2.0) */
+
+#include "touza.h"
 
 #ifndef    _TOUZA_CAL_H
 #  define  _TOUZA_CAL_H 1
@@ -28,6 +30,10 @@
 #  define __GRP__ GROUP_TAG
 #  endif
 
+#  ifndef PACKAGE_TAG
+#  define PACKAGE_TAG GROUP_TAG
+#  endif
+
 #  define CAL_FORMAT          TOUZA_FORMAT_GRP(GROUP_TAG)
 #  define CAL_FORMAT_MDL(M)   TOUZA_FORMAT_MDL(GROUP_TAG,M)
 #  define CAL_FORMAT_PRC(M,F) TOUZA_FORMAT_PRC(GROUP_TAG,M,F)
@@ -40,6 +46,7 @@
 #    define TOUZA_Cal_ils       TOUZA_TRANSFORM_MDL(Cal,ils)
 #    define TOUZA_Cal_matsiro   TOUZA_TRANSFORM_MDL(Cal,matsiro)
 #    define TOUZA_Cal_miroc     TOUZA_TRANSFORM_MDL(Cal,miroc)
+#    define TOUZA_Cal_coco      TOUZA_TRANSFORM_MDL(Cal,coco)
 #    define TOUZA_Cal_primitive TOUZA_TRANSFORM_MDL(Cal,primitive)
 #  endif
 

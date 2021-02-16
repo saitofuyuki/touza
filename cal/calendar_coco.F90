@@ -1,7 +1,7 @@
 !!!_! calendar_coco.F90 - touza/calendar: coco compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2021
-#define TIME_STAMP 'Time-stamp: <2021/02/16 15:23:07 fuyuki calendar_coco.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/02/16 23:00:56 fuyuki calendar_coco.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -63,12 +63,14 @@ contains
     integer auto
     integer jerr
     integer levv
+    integer inim
     integer u
 
     levv  = msglev_normal
     auto  = auto_false
+    inim  = INIT_SKIP
     u = choice(-99, jfpar)
-    call cal_init (jerr, u, 0, mode, auto, levv)
+    call cal_init (jerr, u, 0, mode, auto, levv, inim)
 
     return
   end subroutine init

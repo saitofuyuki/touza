@@ -3,6 +3,7 @@ Revision 1.00.2 / 2021-02-16
 ============================
 
   * (cal) coco compatible interfaces introuced.
+  * (cal) inim argument added to control TOUZA/Std initialization.
   * (std/env) byte-order diagnostics implemented.
   * (std/arg) [CRITCAL] the very first argument was skipped.
 

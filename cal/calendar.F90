@@ -1,7 +1,7 @@
 !!!_! calendar.F90 - TOUZA/Cal manager
 ! Maintainer: SAITO Fuyuki
 ! Created: May 31 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/26 21:44:51 fuyuki calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/02/16 22:59:29 fuyuki calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -168,7 +168,7 @@ contains
   subroutine init &
        & (ierr, &
        &  ulog, ncals, mode, auto, &
-       &  levv, stdv)
+       &  levv, inim,  stdv)
 #   define __PROC__ 'init'
     use TOUZA_Cal_primitive,only: msg
     use TOUZA_Cal_core,only: core_init => init
@@ -178,7 +178,7 @@ contains
     integer,intent(in),optional :: ncals
     integer,intent(in),optional :: mode
     integer,intent(in),optional :: auto
-    integer,intent(in),optional :: levv, stdv ! verbose levels
+    integer,intent(in),optional :: levv, inim, stdv ! verbose levels, initialization mode
     integer jdummy
 
     ierr = 0
@@ -187,7 +187,7 @@ contains
        ierr = -1
        call logging(msglev_warning, 'reinit', __PROC__, ulog)
     else
-       if (ierr.eq.0) call core_init(ierr, ulog, levv, stdv)
+       if (ierr.eq.0) call core_init(ierr, ulog, levv, inim, stdv)
        if (ierr.eq.0) call msg(msglev_normal, TIME_STAMP, u=ulog)
 
        lcals = 0 ! to mark initialized
