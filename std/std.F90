@@ -1,7 +1,7 @@
 !!!_! std.F90 - touza/std interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/26 15:23:25 fuyuki std.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/03/06 09:55:25 fuyuki std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -17,7 +17,8 @@
 #include "touza_std.h"
 !!!_@ TOUZA_Std - standard interfaces
 module TOUZA_Std
-  use TOUZA_Std_prc,only: KFLT, KDBL
+  use TOUZA_Std_prc,only: KFLT, KDBL, KI8, KI32, KI64, &
+       & check_real_zero, check_real_one, check_real_inf, check_real_dnm
   use TOUZA_Std_utl,only: choice, choice_a, condop, set_if_present, chcount
   use TOUZA_Std_env,only: &
        & uin, uout, uerr, lbrec, lreci, lrecf, lrecd, &
@@ -36,7 +37,7 @@ module TOUZA_Std
        & is_msglev_detail,  is_msglev_debug
   use TOUZA_Std_fun,only: &
        & add_black_list, brute_force_check_units, &
-       & new_unit
+       & new_unit,       new_unit_tmp,          set_tempfile
   use TOUZA_Std_arg,only: &
        & arg_init => init, arg_diag => diag, &
        & decl_pos_arg, parse, &
@@ -59,7 +60,8 @@ module TOUZA_Std
 !!!_  - public
   public init, diag, finalize
 !!!_   . prc
-  public KFLT, KDBL
+  public KFLT, KDBL, KI8, KI32, KI64
+  public check_real_zero, check_real_one, check_real_inf, check_real_dnm
 !!!_   . utl
   public choice, choice_a, condop, set_if_present, chcount
 !!!_   . env
@@ -74,7 +76,7 @@ module TOUZA_Std
 !!!_   . fun
   public add_black_list
   public brute_force_check_units
-  public new_unit
+  public new_unit, new_unit_tmp, set_tempfile
 !!!_   . log
   public msg, msg_grp, gen_tag
   public unit_star, unit_none, unit_global

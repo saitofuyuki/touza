@@ -1,4 +1,15 @@
 
+Revision 1.00.3 / 2021-03-06
+============================
+
+  * (std) new_unit_nn () is now deprecated.
+  * (std) new_unit_temp introduced.
+  * (std) integer kinds introduced.
+  * (std) real property checkers introduced.
+  * (cal) TOUZA/Std initialization disabled.
+  * (std) MPI initialized/finalized checks introduced.
+  * (cal) coco module transformation.
+
 Revision 1.00.2 / 2021-02-16
 ============================
 

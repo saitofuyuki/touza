@@ -1,7 +1,7 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2021/02/07 19:41:28 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/03/06 09:30:06 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -15,6 +15,10 @@
 #  include "touza_config.h"
 #endif
 #include "touza_std.h"
+!!!_* Macros
+#ifndef    HAVE_FC_CONCATENATION
+#  define  HAVE_FC_CONCATENATION 0
+#endif
 !!!_@ TOUZA_Std_log - simple logging
 module TOUZA_Std_log
 !!!_ = declaration
@@ -443,10 +447,20 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) v
-    call msg_txt(txt, tag, u)
-
+    write(txt, fmt, IOSTAT=jerr) v
+    if (jerr.eq.0) then
+       call msg_txt(txt, tag, u)
+    else
+       if (HAVE_FC_CONCATENATION.ne.0) then
+          txt = trim(fmt) // ' ' // trim(v)
+          call msg_txt(txt, tag, u)
+       else
+          call msg_txt(fmt, tag, u)
+          call msg_txt(v,   tag, u)
+       endif
+    endif
   end subroutine msg_as
 
 !!!_  & msg_txt - message core

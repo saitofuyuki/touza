@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2021/02/13 10:33:03 fuyuki mt_local.m4>
+dnl Time-stamp: <2021/03/05 08:33:01 fuyuki mt_local.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -11,12 +11,20 @@ AC_LANG_PUSH([Fortran])
 
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_command_argument], [1])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT8])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT32])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT64])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL32])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL64])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INTEGER_KINDS])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL_KINDS])
+
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT8_T])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT32_T])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT64_T])
+
+MT_FORTRAN_BATCH_CHECK_MODULE([ieee_arithmetic])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([open], [iomsg],[
 character T*(30)

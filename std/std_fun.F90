@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/26 14:56:05 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/03/06 10:39:27 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -21,6 +21,12 @@
 #endif
 #ifndef   OPT_MAX_BLACK_UNITS
 #  define OPT_MAX_BLACK_UNITS 128 /* maximum number of black-list units */
+#endif
+#ifndef   OPT_PATH_LEN
+#  define OPT_PATH_LEN 1024 /* fie path limit length */
+#endif
+#ifndef   OPT_TEMPORARY_FORMAT
+#  define OPT_TEMPORARY_FORMAT '(''Temp__ToUzA__'', I4.4)'
 #endif
 !!!_@ TOUZA_Std_fun - file units manipulation
 module TOUZA_Std_fun
@@ -43,12 +49,13 @@ module TOUZA_Std_fun
   integer,save :: ublist(lblack+1) = -1
 
   integer,save :: ulast = -1
+  character(len=OPT_PATH_LEN),save :: tmpfmt = OPT_TEMPORARY_FORMAT
 !!!_  - public
   public init, diag, finalize
   public add_black_list, is_black_listed
   public brute_force_check_units
   public new_unit
-  public new_unit_nn
+  public new_unit_tmp, set_tempfile
 !!!_ + common interfaces
 contains
 !!!_  & init
@@ -107,6 +114,9 @@ contains
              if (VCHECK_NORMAL(lv)) then
                 call msg_mdl('(''limit file units = '', I0)', (/ limu /), __MDL__, u)
              endif
+             if (VCHECK_NORMAL(lv)) then
+                call msg_mdl('(''temporary file format = '', A)', tmpfmt,  __MDL__, u)
+             endif
              if (VCHECK_INFO(lv)) then
                 call diag_black_list(ierr, u)
              endif
@@ -132,6 +142,17 @@ contains
   end subroutine finalize
 
 !!!_ + file open/close
+!!!_  & set_tempfile - set temporary path format
+  subroutine set_tempfile (fmt)
+    implicit none
+    character(len=*),intent(in) :: fmt
+    if (fmt.eq.' ') then
+       tmpfmt = OPT_TEMPORARY_FORMAT
+    else
+       tmpfmt = fmt
+    endif
+    return
+  end subroutine set_tempfile
 !!!_ + unit number
 !!!_  & new_unit () - return unbound i/o unit number
   integer function new_unit &
@@ -170,18 +191,42 @@ contains
     return
   end function new_unit
 
-!!!_  & new_unit_nn () - return unbound i/o unit number (not existing file)
-  integer function new_unit_nn &
-       & (ksw) &
-       & result(un)
-    use TOUZA_Std_utl,only: choice
+!!!_  & new_unit_tmp () - return unbound i/o unit number and temporal file name
+  subroutine new_unit_tmp &
+       & (un, fn, ksw)
     implicit none
-    integer,intent(in),optional :: ksw
+    integer,         intent(out)         :: un
+    character(len=*),intent(out)         :: fn
+    integer,         intent(in),optional :: ksw
     integer jerr
+    fn = ' '
     do
        un = new_unit(ksw)
        if (un.lt.0) exit
-       open(UNIT=un, STATUS='NEW', IOSTAT=jerr)
+       write(fn, tmpfmt) un
+       open(UNIT=un, FILE=fn, STATUS='NEW', IOSTAT=jerr)
+       if (jerr.eq.0) then
+          close(UNIT=un, STATUS='delete', IOSTAT=jerr)
+          exit
+       endif
+       close(UNIT=un, IOSTAT=jerr)
+    enddo
+    return
+  end subroutine new_unit_tmp
+
+!!!_  & [DEPRECATED] new_unit_nn () - return unbound i/o unit number (not existing file)
+  integer function new_unit_nn &
+       & (ksw) &
+       & result(un)
+    implicit none
+    integer,intent(in),optional :: ksw
+    integer jerr
+    character(len=OPT_PATH_LEN) :: fn
+    do
+       un = new_unit(ksw)
+       if (un.lt.0) exit
+       write(fn, tmpfmt) un
+       open(UNIT=un, FILE=fn, STATUS='NEW', IOSTAT=jerr)
        if (jerr.eq.0) then
           close(UNIT=un, STATUS='delete', IOSTAT=jerr)
           exit

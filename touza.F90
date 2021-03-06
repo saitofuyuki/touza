@@ -1,7 +1,7 @@
 !!!_! touza.F90 - touza administration
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2021/01/26 15:55:47 fuyuki touza.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/03/06 09:55:08 fuyuki touza.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -40,20 +40,21 @@ module TOUZA
 !!!_   . self
   public :: init, diag, finalize
 !!!_   . std
-  public :: KFLT,          KDBL
-  public :: std_init,      std_diag,  std_finalize
-  public :: choice,        choice_a,  condop,     set_if_present
+  public :: KFLT,            KDBL,           KI8,            KI32,           KI64
+  public :: check_real_zero, check_real_one, check_real_inf, check_real_dnm
+  public :: std_init,        std_diag,       std_finalize
+  public :: choice,          choice_a,       condop,         set_if_present
   public :: chcount
-  public :: uin,           uout,      uerr
-  public :: lbrec,         lreci,     lrecf,      lrecd
-  public :: get_rlu,       get_rlb
-  public :: msg,           msg_grp,   gen_tag
-  public :: unit_star,     unit_none, unit_global
-  public :: decl_pos_arg,  parse,     get_option, get_param,  get_array
-  public :: get_arg,       get_key
-  public :: get_value,     get_value_seq
+  public :: uin,             uout,           uerr
+  public :: lbrec,           lreci,          lrecf,          lrecd
+  public :: get_rlu,         get_rlb
+  public :: msg,             msg_grp,        gen_tag
+  public :: unit_star,       unit_none,      unit_global
+  public :: decl_pos_arg,    parse,          get_option,     get_param, get_array
+  public :: get_arg,         get_key
+  public :: get_value,       get_value_seq
   public :: arg_diag
-  public :: new_unit
+  public :: new_unit,        new_unit_tmp,   set_tempfile
 !!!_   . calendar
 #if ENABLE_TOUZA_CAL
   public :: cal_init,             cal_diag,          cal_finalize

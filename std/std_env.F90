@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2021/02/07 20:54:31 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/03/06 10:46:23 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -33,6 +33,9 @@
 #endif
 #ifndef   OPT_CHAR_STORAGE_BITS
 #  define OPT_CHAR_STORAGE_BITS 0  /* character storage unit in BITS */
+#endif
+#ifndef   OPT_PATH_LEN
+#  define OPT_PATH_LEN 1024 /* fie path limit length */
 #endif
 !!!_@ TOUZA_Std_env - standard environments
 module TOUZA_Std_env
@@ -495,7 +498,7 @@ contains
   subroutine check_storage_units &
        & (ierr, lrd, lrf, lri, lunit, ulog, lbf, lbc, levtry)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_fun,only: new_unit_nn
+    use TOUZA_Std_fun,only: new_unit_tmp
     use TOUZA_Std_prc,only: KDBL, KFLT
     implicit none
     integer,intent(out)         :: ierr
@@ -504,6 +507,8 @@ contains
     integer,intent(in),optional :: ulog
     integer,intent(in),optional :: lbf, lbc
     integer,intent(in),optional :: levtry
+
+    character(len=OPT_PATH_LEN) :: tmpf
 
     integer utest
     logical isf
@@ -518,9 +523,9 @@ contains
     endif
 
     if (lunit.le.0 .or. isf) then
-       if (utest.lt.0) utest = new_unit_nn()
+       if (utest.lt.0) call new_unit_tmp(utest, tmpf)
        if (utest.lt.0) ierr = -1
-       if (ierr.eq.0) call brute_force_storage_unit(ierr, lunit, utest, ulog)
+       if (ierr.eq.0) call brute_force_storage_unit(ierr, lunit, utest, tmpf, ulog)
     endif
 
     if (ierr.eq.0) then
@@ -534,11 +539,11 @@ contains
        isf = .true.
 #     endif /* not HAVE_INQUIRE_IOLENGTH */
        if (isf) then
-          if (utest.lt.0) utest = new_unit_nn()
+          if (utest.lt.0) call new_unit_tmp(utest, tmpf)
           if (utest.lt.0) ierr = -1
-          if (ierr.eq.0) call brute_force_recl(ierr, lrd, utest, real(0, KIND=KDBL))
-          if (ierr.eq.0) call brute_force_recl(ierr, lrf, utest, real(0, KIND=KFLT))
-          if (ierr.eq.0) call brute_force_recl(ierr, lri, utest, int(0))
+          if (ierr.eq.0) call brute_force_recl(ierr, lrd, utest, tmpf, real(0, KIND=KDBL))
+          if (ierr.eq.0) call brute_force_recl(ierr, lrf, utest, tmpf, real(0, KIND=KFLT))
+          if (ierr.eq.0) call brute_force_recl(ierr, lri, utest, tmpf, int(0))
        endif
     endif
     return
@@ -546,33 +551,37 @@ contains
 
 !!!_  & brute_force_storage_unit - lazy trial to find file storage unit
   subroutine brute_force_storage_unit &
-       & (ierr, lunit, utest, ulog)
+       & (ierr, lunit, utest, fn, ulog)
     use TOUZA_Std_utl,only: choice
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(out)         :: lunit
-    integer,intent(in)          :: utest
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: lunit
+    integer,         intent(in)  :: utest
+    character(len=*),intent(in)  :: fn
     integer,intent(in),optional :: ulog
+
     integer lrec
     character(len=*),parameter :: teststr = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     character(len=1) :: C
 
     ierr = 0
     lunit = -1
-    call check_new_file(ierr, utest, ulog)
+    call check_new_file(ierr, utest, fn, ulog) ! for safety
     if (ierr.ne.0) return
 
     if (ierr.eq.0) then
        lrec = len(teststr) + 10
-       open(UNIT=utest, STATUS='UNKNOWN', ACCESS='DIRECT', &
-            & FORM='UNFORMATTED', ACTION='WRITE', RECL=lrec, IOSTAT=ierr)
+       open(UNIT=utest, FILE=fn,  RECL=lrec,       &
+            & STATUS='UNKNOWN',   ACCESS='DIRECT', &
+            & FORM='UNFORMATTED', ACTION='WRITE',  IOSTAT=ierr)
     endif
     if (ierr.eq.0) write(UNIT=utest, REC=1, IOSTAT=ierr) teststr
     if (ierr.eq.0) close(UNIT=utest, IOSTAT=ierr)
     if (ierr.eq.0) then
        lrec = 1
-       open(UNIT=utest, STATUS='UNKNOWN', ACCESS='DIRECT', &
-            & FORM='UNFORMATTED', ACTION='READWRITE', RECL=lrec, IOSTAT=ierr)
+       open(UNIT=utest, FILE=fn,  RECL=lrec, &
+            & STATUS='UNKNOWN',   ACCESS='DIRECT', &
+            & FORM='UNFORMATTED', ACTION='READWRITE', IOSTAT=ierr)
     endif
     if (ierr.eq.0) read(UNIT=utest, REC=2, IOSTAT=ierr) C
     if (ierr.eq.0) close(UNIT=utest, STATUS='delete', IOSTAT=ierr)
@@ -585,77 +594,81 @@ contains
 
 !!!_  & brute_force_recl - lazy trial to find record length for unit type
   subroutine brute_force_recl_d &
-       & (ierr, lrec, utest, v, lunit, nini, ulog)
+       & (ierr, lrec, utest, fn, v, lunit, nini, ulog)
     use TOUZA_Std_prc, only: KDBL
     use TOUZA_Std_utl, only: choice
     implicit none
-    integer,        intent(out)         :: ierr
-    integer,        intent(out)         :: lrec
-    integer,        intent(in)          :: utest
-    real(kind=KDBL),intent(in)          :: v     ! dummy placeholder
-    integer,        intent(in),optional :: lunit ! unit record length in bytes
-    integer,        intent(in),optional :: nini  ! initial guess
-    integer,        intent(in),optional :: ulog
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: lrec
+    integer,         intent(in)          :: utest
+    character(len=*),intent(in)          :: fn
+    real(kind=KDBL), intent(in)          :: v     ! dummy placeholder
+    integer,         intent(in),optional :: lunit ! unit record length in bytes
+    integer,         intent(in),optional :: nini  ! initial guess
+    integer,         intent(in),optional :: ulog
 
     integer ni
     ni = choice(8, nini) + 0 * KIND(V)
     call brute_force_recl_core &
-         & (ierr, lrec, utest, check_single_write_d, ni, lunit, ulog)
+         & (ierr, lrec, utest, fn, check_single_write_d, ni, lunit, ulog)
 
   end subroutine brute_force_recl_d
 
   subroutine brute_force_recl_f &
-       & (ierr, lrec, utest, v, lunit, nini, ulog)
+       & (ierr, lrec, utest, fn, v, lunit, nini, ulog)
     use TOUZA_Std_prc, only: KFLT
     use TOUZA_Std_utl, only: choice
     implicit none
-    integer,        intent(out)         :: ierr
-    integer,        intent(out)         :: lrec
-    integer,        intent(in)          :: utest
-    real(kind=KFLT),intent(in)          :: v     ! dummy placeholder
-    integer,        intent(in),optional :: lunit ! unit record length in bytes
-    integer,        intent(in),optional :: nini  ! initial guess
-    integer,        intent(in),optional :: ulog
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: lrec
+    integer,         intent(in)          :: utest
+    character(len=*),intent(in)          :: fn
+    real(kind=KFLT), intent(in)          :: v     ! dummy placeholder
+    integer,         intent(in),optional :: lunit ! unit record length in bytes
+    integer,         intent(in),optional :: nini  ! initial guess
+    integer,         intent(in),optional :: ulog
 
     integer ni
     ni = choice(4, nini) + 0 * KIND(V)
     call brute_force_recl_core &
-         & (ierr, lrec, utest, check_single_write_f, ni, lunit, ulog)
+         & (ierr, lrec, utest, fn, check_single_write_f, ni, lunit, ulog)
 
   end subroutine brute_force_recl_f
 
   subroutine brute_force_recl_i &
-       & (ierr, lrec, utest, v, lunit, nini, ulog)
+       & (ierr, lrec, utest, fn, v, lunit, nini, ulog)
     use TOUZA_Std_prc, only: KDBL
     use TOUZA_Std_utl, only: choice
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(out)         :: lrec
-    integer,intent(in)          :: utest
-    integer,intent(in)          :: v     ! dummy placeholder
-    integer,intent(in),optional :: lunit ! unit record length in bytes
-    integer,intent(in),optional :: nini  ! initial guess
-    integer,intent(in),optional :: ulog
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: lrec
+    integer,         intent(in)          :: utest
+    character(len=*),intent(in)          :: fn
+    integer,         intent(in)          :: v     ! dummy placeholder
+    integer,         intent(in),optional :: lunit ! unit record length in bytes
+    integer,         intent(in),optional :: nini  ! initial guess
+    integer,         intent(in),optional :: ulog
 
     integer ni
     ni = choice(4, nini) + 0 * KIND(V)
     call brute_force_recl_core &
-         & (ierr, lrec, utest, check_single_write_i, ni, lunit, ulog)
+         & (ierr, lrec, utest, fn, check_single_write_i, ni, lunit, ulog)
 
   end subroutine brute_force_recl_i
 
 !!!_  & brute_force_recl_core - lazy trial to find record length for unit type (core)
   subroutine brute_force_recl_core &
-       & (ierr, lrec, utest, xfunc, nini, lunit, ulog)
+       & (ierr, lrec, utest, fn, xfunc, nini, lunit, ulog)
     use TOUZA_Std_utl,only: choice
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(out)         :: lrec
-    integer,intent(in)          :: utest
-    logical                     :: xfunc
-    integer,intent(in)          :: nini  ! initial guess
-    integer,intent(in),optional :: lunit ! unit record length in bytes
-    integer,intent(in),optional :: ulog
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: lrec
+    integer,         intent(in)          :: utest
+    character(len=*),intent(in)          :: fn
+    logical                              :: xfunc
+    integer,         intent(in)          :: nini  ! initial guess
+    integer,         intent(in),optional :: lunit ! unit record length in bytes
+    integer,         intent(in),optional :: ulog
 
     logical sccs
     integer lu
@@ -663,17 +676,17 @@ contains
 
     ierr = 0
     lrec = -1
-    call check_new_file(ierr, utest, ulog)
+    call check_new_file(ierr, utest, fn, ulog)
     if (ierr.ne.0) return
 
     lu = choice(0, lunit)
-    if (lu.le.0) call brute_force_storage_unit(ierr, lu, utest, ulog)
+    if (lu.le.0) call brute_force_storage_unit(ierr, lu, utest, fn, ulog)
     if (ierr.ne.0) return
 
     ! find good
     ngood = nini / lu
     do
-       sccs = xfunc(ierr, utest, ngood)
+       sccs = xfunc(ierr, utest, fn, ngood)
        if (ierr.ne.0) exit
        if (sccs) exit
        ngood = ngood * 2
@@ -686,7 +699,7 @@ contains
     ! find bad
     nbad = max(1, ngood / 2)
     do
-       sccs = xfunc(ierr, utest, nbad)
+       sccs = xfunc(ierr, utest, fn, nbad)
        if (ierr.ne.0) exit
        if (.not.sccs) exit
        nbad = nbad / 2
@@ -704,7 +717,7 @@ contains
           return
        endif
        ntry = (ngood + nbad) / 2
-       sccs = xfunc(ierr, utest, ntry)
+       sccs = xfunc(ierr, utest, fn, ntry)
        if (ierr.ne.0) return
        if (sccs) then
           ngood = ntry
@@ -717,19 +730,19 @@ contains
 
 !!!_  & check_single_write () - checker functions
   logical function check_single_write_d &
-       & (ierr, utest, n) result(sccs)
+       & (ierr, utest, fn, n) result(sccs)
     use TOUZA_Std_prc, only: KDBL
     implicit none
-    integer,intent(out) :: ierr
-    integer,intent(in)  :: utest
-    integer,intent(in)  :: n
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: utest
+    integer,         intent(in)  :: n
+    character(len=*),intent(in)  :: fn
     real(kind=KDBL),parameter :: V = 0
     integer jchk
 
     ierr = 0
     sccs = .false.
-    open(UNIT=utest, STATUS='NEW', ACCESS='DIRECT', &
-         & FORM='UNFORMATTED', ACTION='WRITE', RECL=n, IOSTAT=ierr)
+    ierr = check_single_open(utest, n, fn)
     if (ierr.ne.0) return
     write(utest, REC=1, IOSTAT=jchk) V
     sccs = (jchk.eq.0)
@@ -738,19 +751,19 @@ contains
   end function check_single_write_d
 
   logical function check_single_write_f &
-       & (ierr, utest, n) result(sccs)
+       & (ierr, utest, fn, n) result(sccs)
     use TOUZA_Std_prc, only: KFLT
     implicit none
-    integer,intent(out) :: ierr
-    integer,intent(in)  :: utest
-    integer,intent(in)  :: n
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: utest
+    integer,         intent(in)  :: n
+    character(len=*),intent(in)  :: fn
     real(kind=KFLT),parameter :: V = 0
     integer jchk
 
     ierr = 0
     sccs = .false.
-    open(UNIT=utest, STATUS='NEW', ACCESS='DIRECT', &
-         & FORM='UNFORMATTED', ACTION='WRITE', RECL=n, IOSTAT=ierr)
+    ierr = check_single_open(utest, n, fn)
     if (ierr.ne.0) return
     write(utest, REC=1, IOSTAT=jchk) V
     sccs = (jchk.eq.0)
@@ -759,18 +772,18 @@ contains
   end function check_single_write_f
 
   logical function check_single_write_i &
-       & (ierr, utest, n) result(sccs)
+       & (ierr, utest, fn, n) result(sccs)
     implicit none
-    integer,intent(out) :: ierr
-    integer,intent(in)  :: utest
-    integer,intent(in)  :: n
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: utest
+    integer,         intent(in)  :: n
+    character(len=*),intent(in)  :: fn
     integer,parameter :: V = 0
     integer jchk
 
     ierr = 0
     sccs = .false.
-    open(UNIT=utest, STATUS='NEW', ACCESS='DIRECT', &
-         & FORM='UNFORMATTED', ACTION='WRITE', RECL=n, IOSTAT=ierr)
+    ierr = check_single_open(utest, n, fn)
     if (ierr.ne.0) return
     write(utest, REC=1, IOSTAT=jchk) V
     sccs = (jchk.eq.0)
@@ -778,24 +791,41 @@ contains
     return
   end function check_single_write_i
 
-!!!_  & check_new_file - check if new (unnamed) file
-  subroutine check_new_file(ierr, utgt, ulog)
+!!!_  & check_single_open ()
+  integer function check_single_open &
+       & (u, n, p) result(ierr)
+    implicit none
+    integer,         intent(in) :: u
+    integer,         intent(in) :: n
+    character(len=*),intent(in) :: p
+    open(UNIT=u, FILE=p,RECL=n, &
+         & STATUS='NEW',    &
+         & ACCESS='DIRECT', FORM='UNFORMATTED', ACTION='WRITE', IOSTAT=ierr)
+    return
+  end function check_single_open
+
+!!!_  & check_new_file - check if new file
+  subroutine check_new_file(ierr, utgt, fn, ulog)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in)          :: utgt
-    integer,intent(in),optional :: ulog
+    integer,         intent(out)         :: ierr
+    integer,         intent(in)          :: utgt
+    character(len=*),intent(in)          :: fn
+    integer,         intent(in),optional :: ulog
     integer ul
 
     ierr = 0
     ul = choice(-1, ulog)
-    open(UNIT=utgt, STATUS='NEW', IOSTAT=ierr)
+    open(UNIT=utgt, FILE=fn, STATUS='NEW', IOSTAT=ierr)
     if (ierr.ne.0) then
        if (VCHECK_SEVERE(lev_verbose)) then
           call msg_mdl &
                & ('(''ERROR: not a new file = '', I0, 1x, I0)', &
                &  (/utgt, ierr/), __MDL__, ul)
+          call msg_mdl &
+               & ('(''ERROR: not a new file = '', A)', &
+               &  fn, __MDL__, ul)
        endif
     endif
     if (ierr.eq.0) close(UNIT=utgt, STATUS='delete', IOSTAT=ierr)
@@ -859,7 +889,7 @@ contains
        & (ierr, KENDI, ulog, levv, ubgn, uend, ustp)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
-    use TOUZA_Std_fun,only: new_unit_nn
+    use TOUZA_Std_fun,only: new_unit
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: kendi
@@ -891,7 +921,7 @@ contains
     ub = choice(-1, ubgn)
     ue = ub - 1
     us = 1
-    if (ub.lt.0) ub = new_unit_nn()
+    if (ub.lt.0) ub = new_unit()
     if (ub.lt.0) ierr = -1
     if (ierr.eq.0) then
        ue = choice(-1, uend)
@@ -907,9 +937,9 @@ contains
        if (ierr.eq.0) then
           if (OPND) cycle
           lrec = 32
-          open(UNIT=ju, IOSTAT=ierr, &
-               & ACCESS='DIRECT', FORM='UNFORMATTED', RECL=lrec, &
-               & STATUS='SCRATCH', ACTION='READWRITE')
+          open(UNIT=ju,  RECL=lrec, &
+               & ACCESS='DIRECT',  FORM='UNFORMATTED', &
+               & STATUS='SCRATCH', ACTION='READWRITE', IOSTAT=ierr)
        endif
        if (ierr.eq.0) write(UNIT=ju, IOSTAT=ierr, REC=1) TA
        if (ierr.eq.0) read(UNIT=ju,  IOSTAT=ierr, REC=1) TI
