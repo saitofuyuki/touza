@@ -11,7 +11,7 @@
 
 ACLOCAL_AMFLAGS	=	-I m4c
 MOSTLYCLEANFILES	=
-EXTRA_DIST	=	autogen.sh README-touza.org
+EXTRA_DIST	=	autogen.sh README-touza.org LICENSE NOTICE
 include $(top_srcdir)/aminclude_static.am
 
 nodist_bin_SCRIPTS 	= makeshift
