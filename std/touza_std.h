@@ -1,7 +1,7 @@
 /* touza_std.h - touza/std common definition */
 /* Maintainer: SAITO Fuyuki */
 /* Created: May 30 2020 */
-/* Time-stamp: <2021/01/26 14:02:45 fuyuki touza_std.h> */
+/* Time-stamp: <2021/03/24 14:30:16 fuyuki touza_std.h> */
 /* Copyright (C) 2020, 2021 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -25,10 +25,6 @@
 #  endif
 
 /* message formats (general) */
-
-#ifndef   PACKAGE_TAG
-#  define PACKAGE_TAG 'touza'
-#endif
 
 #ifndef    TOUZA_TAG_SEP
 #  define  TOUZA_TAG_SEP '/'
@@ -95,5 +91,9 @@
 #ifndef   STD_MSG_LEVEL
 #  define STD_MSG_LEVEL MSG_LEVEL_NORMAL
 #endif
+
+#  ifndef PACKAGE_TAG
+#  define PACKAGE_TAG GROUP_TAG
+#  endif
 
 #endif /* not _TOUZA_STD_H */
