@@ -1,7 +1,7 @@
 !!!_! calendar_matsiro.F90 - touza/calendar: (sample) matsiro interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2021/02/16 23:18:01 fuyuki calendar_matsiro.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/03/27 16:46:40 fuyuki calendar_matsiro.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -38,15 +38,19 @@ module TOUZA_Cal_matsiro
 
 contains
 !!!_ & init - calendar init
-  subroutine init (ierr, cmode, levv, inim)
+  subroutine init (ierr, cmode, levv)
     use TOUZA_Cal,only: cal_init=>init, inq_nsec_day
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in)          :: cmode
-    integer,intent(in),optional :: levv, inim
+    integer,intent(in),optional :: levv
+    integer inim, stdv
+
     if (ofirst) then
        ofirst = .false.
-       call cal_init(ierr, mode=cmode, levv=levv, inim=inim, stdv=-8)
+       inim = INIT_SKIP         ! skip TOUZA_Std initialization
+       stdv = -99               ! verbose level TOUZA_Std (quiet)
+       call cal_init(ierr, mode=cmode, levv=levv, inim=inim, stdv=stdv)
 
        nsecd = inq_nsec_day()
     endif
