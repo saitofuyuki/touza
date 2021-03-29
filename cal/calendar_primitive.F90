@@ -1,7 +1,7 @@
 !!!_! calendar_primitive.F90 - TOUZA/Cal primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 22 2011
-#define TIME_STAMP 'Time-stamp: <2021/02/16 22:57:34 fuyuki calendar_primitive.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/03/29 15:55:52 fuyuki calendar_primitive.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -189,13 +189,20 @@ contains
     character(len=*),intent(in),optional :: mdl
     integer,         intent(in),optional :: u
     character(len=128) tag
+    integer utmp
 
     if (is_msglev(levm, lev_verbose)) then
        if (ini_mode.ge.INIT_DEEP) then
           call gen_tag(tag, PACKAGE_TAG, __GRP__, mdl)
           call std_msg(txt, tag, u)
        else
-          write(*, *) trim(txt)
+          utmp = choice(-1, u)
+101       format(A)
+          if (utmp.ge.0) then
+             write(utmp, 101) trim(txt)
+          else if (utmp.eq.-1) then
+             write(*,    101) trim(txt)
+          endif
        endif
     endif
     return
