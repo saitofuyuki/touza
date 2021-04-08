@@ -1,7 +1,7 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
 # Created: Jun 7 2020
-# Time-stamp: <2021/01/22 08:58:08 fuyuki autogen.sh>
+# Time-stamp: <2021/03/27 16:50:46 fuyuki autogen.sh>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -11,9 +11,11 @@
 
 DRY=T
 OPTS=''
+CLEAR=''
 while test $# -gt 0
 do
   case $1 in
+  -c) CLEAR=T;;
   -y) DRY=;;
   -I) OPTS="$OPTS $1 $2"; shift;;
   *)  break;;
@@ -67,6 +69,9 @@ test x"$TMP" != x && run touch $TMP
 
 trap 'run rm -f $TMP; exit $err' 1 2 3 15
 
+if test x$CLEAR != x; then
+  run rm -rf aclocal.m4 autom4te.cache || exit $?
+fi
 run libtoolize || exit $?
 run aclocal $OPTS -I "$stdm4d" || exit $?
 run autoheader || exit $?

@@ -1,7 +1,7 @@
 !!!_! calendar_ils.F90 - touza/calendar: (sample) ILS interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2021/02/16 23:18:04 fuyuki calendar_ils.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/03/24 22:22:36 fuyuki calendar_ils.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -53,15 +53,25 @@ module TOUZA_Cal_ils
   public :: GetMonthDate,  GetMonthNumDays
 contains
 !!!_ & init - calendar init
-  subroutine init (ierr, cmode, levv, inim)
-    use TOUZA_Cal,only: cal_init=>init, inq_nsec_day, xreal
+  subroutine init (ierr, cmode, levv)
+    use TOUZA_Cal,only: cal_init=>init, inq_nsec_day, xreal, &
+         &              auto_false
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in)          :: cmode
-    integer,intent(in),optional :: levv, inim
+    integer,intent(in),optional :: levv
+    integer auto
+    integer ulog
+    integer inim, stdv
+
     if (ofirst) then
        ofirst = .false.
-       call cal_init (ierr, -1, 0, cmode, levv=levv, inim=inim, stdv=-8)
+       auto = auto_false
+       ulog = -99               ! no logging unit
+       inim = INIT_SKIP         ! skip TOUZA_Std initialization
+       stdv = -99               ! verbose level TOUZA_Std (quiet)
+       call cal_init (ierr, ulog, 0, cmode, &
+            & auto=auto, levv=levv, inim=inim, stdv=stdv)
        nsecd = inq_nsec_day()
        nsecd_c = xreal(nsecd)
     endif

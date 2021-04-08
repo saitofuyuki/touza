@@ -1,4 +1,10 @@
 
+Revision 1.00.4 / 2021-03-24
+==================
+
+  * (cal) adjustment for ils, matsiro
+  * (cal) independent from TOUZA_Std functions (but variables)
+
 Revision 1.00.3 / 2021-03-06
 ============================
 
