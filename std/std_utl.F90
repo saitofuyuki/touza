@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2021/02/16 18:09:45 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/11/20 23:09:07 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -29,7 +29,8 @@
 #define _CONDOP_DECL _ELEMENTAL
 !!!_@ TOUZA_Std_utl - small utilities
 module TOUZA_Std_utl
-  use TOUZA_Std_prc, only: KFLT, KDBL
+  use TOUZA_Std_prc, only: KFLT, KDBL, KI64
+#define __MDL__ 'utl'
 !!!_ = declaration
   implicit none
   private
@@ -38,6 +39,7 @@ module TOUZA_Std_utl
 !!!_  - interfaces
   interface choice
      module procedure choice_i
+     module procedure choice_long
      module procedure choice_l
      module procedure choice_f
      module procedure choice_d
@@ -75,32 +77,44 @@ module TOUZA_Std_utl
   public condop
   public chcount
   public upcase, downcase
+  public control_mode, control_deep, is_first_force
 !!!_  - static
+  integer,save :: init_mode = 0
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
+  integer,save :: fine_counts = 0
   integer,save :: lev_verbose = STD_MSG_LEVEL
+  integer,save :: err_default = ERR_NO_INIT - ERR_MASK_STD_UTL
+  integer,save :: ulog = -1
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, levv, mode)
+  subroutine init(ierr, u, levv, mode)
     use TOUZA_Std_prc,only: prc_init=>init
     implicit none
     integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer md, lv
+    integer md, lv, lmd
 
     ierr = 0
 
-    lv = choice(lev_verbose, levv)
-    md = choice(INIT_DEFAULT, mode)
-    if (md.eq.INIT_DEFAULT) md = INIT_DEEP
+    md = control_mode(mode, MODE_DEEPEST)
+    init_mode = md
 
-    if (md.gt.INIT_DEFAULT) then
-       if (md.ge.INIT_DEEP) call prc_init(ierr, levv=lv, mode=md)
-       if (init_counts.eq.0) then
+    if (md.ge.MODE_SURFACE) then
+       err_default = ERR_SUCCESS
+       lv = choice(lev_verbose, levv)
+       if (is_first_force(init_counts, md)) then
+          ulog = choice(ulog, u)
           lev_verbose = lv
        endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
+       endif
        init_counts = init_counts + 1
+       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_UTL
     endif
     return
   end subroutine init
@@ -113,19 +127,27 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
     integer utmp
-    integer lv, md
+    integer lv, md, lmd
 
-    ierr = 0
-    utmp = choice(-1, u)
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
     lv = choice(lev_verbose, levv)
-    md = choice(DIAG_DEFAULT, mode)
-    if (md.eq.DIAG_DEFAULT) md = DIAG_DEEP
 
-    if (md.gt.DIAG_DEFAULT) then
-       if (IAND(md, DIAG_DEEP).gt.0) then
-          if (ierr.eq.0) call prc_diag(ierr, utmp, lv, md)
+    if (md.ge.MODE_SURFACE) then
+       if (ierr.ne.0 .and. IAND(md, MODE_LOOSE).gt.0) then
+          if (VCHECK_NORMAL(lv)) then
+301          format(STD_FORMAT_FUN(__MDL__, 'diag'), 'loose: ', I0)
+             if (utmp.ge.0) then
+                write(utmp, 301) ierr
+             else
+                write(*,    301) ierr
+             endif
+          endif
+          ierr = 0
        endif
-       if (diag_counts.eq.0.or.IAND(md,DIAG_FORCE).gt.0) then
+       if (is_first_force(diag_counts, md)) then
           if (ierr.eq.0) then
 101          format(__TAG__, A)
 102          format(__TAG__, 'with elemental = ', I0)
@@ -145,6 +167,10 @@ contains
              endif
           endif
        endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
+       endif
        diag_counts = diag_counts + 1
     endif
     return
@@ -157,11 +183,43 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer lv
 
-    ierr = 0
+    integer utmp, lv, md, lmd
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
     lv = choice(lev_verbose, levv)
-    call prc_finalize(ierr, u, lv, mode)
+
+    if (md.ge.MODE_SURFACE) then
+       if (is_first_force(fine_counts, md)) then
+          if (VCHECK_DEBUG(lv)) then
+311          format(STD_FORMAT_FUN(__MDL__, 'finalize'), 'fine: ', I0, 1x, I0, 1x, I0, 1x, I0)
+             if (utmp.ge.0) then
+                write(utmp, 311) ierr, init_counts, diag_counts, fine_counts
+             else
+                write(*,    311) ierr, init_counts, diag_counts, fine_counts
+             endif
+          endif
+       endif
+       if (ierr.ne.0 .and. IAND(md, MODE_LOOSE).gt.0) then
+          if (VCHECK_NORMAL(lv)) then
+301          format(STD_FORMAT_FUN(__MDL__, 'finalize'), 'loose: ', I0)
+             if (utmp.ge.0) then
+                write(utmp, 301) ierr
+             else
+                write(*,    301) ierr
+             endif
+          endif
+          ierr = 0
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
+       endif
+       fine_counts = fine_counts + 1
+    endif
     return
   end subroutine finalize
 !!!_ + user subroutines
@@ -176,6 +234,17 @@ contains
     endif
     return
   end function choice_i
+
+  _CHOICE_DECL integer(kind=KI64) function choice_long(d, a) result(r)
+    integer(kind=KI64),intent(in)          :: d
+    integer(kind=KI64),intent(in),optional :: a
+    if (present(a)) then
+       r = a
+    else
+       r = d
+    endif
+    return
+  end function choice_long
 
   _CHOICE_DECL logical function choice_l(d, a) result(r)
     logical,intent(in)          :: d
@@ -387,6 +456,38 @@ contains
     SO = SI
     call downcase_m(SO)
   end subroutine downcase_o
+
+!!!_ + (system) control procedures
+!!!_  - is_first_force () - check if first time or force
+  logical function is_first_force(n, mode) result(b)
+    implicit none
+    integer,intent(in) :: n
+    integer,intent(in) :: mode
+    b = (n.eq.0) .or. (IAND(mode, MODE_FORCE).gt.0)
+    return
+  end function is_first_force
+!!!_  - control_mode () - set init/diag/finalize mode
+  integer function control_mode(mode, def) result(n)
+    implicit none
+    integer,intent(in),optional :: mode
+    integer,intent(in),optional :: def
+    n = choice(MODE_DEFAULT, mode)
+    if (n.eq.MODE_DEFAULT) n = choice(MODE_DEEPEST, def)
+    return
+  end function control_mode
+!!!_  - control_deep () - set init/diag/finalize mode at deep level
+  integer function control_deep(mode) result(n)
+    implicit none
+    integer,intent(in) :: mode
+    integer lmd
+    integer,parameter :: mskd = MODE_BIT_DEEP - 1
+    integer,parameter :: mskl = MODE_FORCE - 1
+    integer,parameter :: mskh = NOT(mskl)
+    lmd = IAND(mode, mskl)
+    if (lmd.lt.MODE_DEEPEST) lmd = IAND(lmd, mskd)
+    n = IOR(IAND(mode, mskh), lmd)
+    return
+  end function control_deep
 
 end module TOUZA_Std_utl
 

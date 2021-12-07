@@ -1,7 +1,7 @@
 !!!_! calendar_matsiro.F90 - touza/calendar: (sample) matsiro interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2021/03/27 16:46:40 fuyuki calendar_matsiro.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/11/14 15:50:14 fuyuki calendar_matsiro.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -48,9 +48,9 @@ contains
 
     if (ofirst) then
        ofirst = .false.
-       inim = INIT_SKIP         ! skip TOUZA_Std initialization
+       inim = MODE_SHALLOW      ! skip TOUZA_Std initialization
        stdv = -99               ! verbose level TOUZA_Std (quiet)
-       call cal_init(ierr, mode=cmode, levv=levv, inim=inim, stdv=stdv)
+       call cal_init(ierr, global=cmode, levv=levv, mode=inim, stdv=stdv)
 
        nsecd = inq_nsec_day()
     endif

@@ -1,7 +1,7 @@
 !!!_! calendar_ils.F90 - touza/calendar: (sample) ILS interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2021/03/24 22:22:36 fuyuki calendar_ils.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/11/15 13:19:31 fuyuki calendar_ils.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -68,10 +68,11 @@ contains
        ofirst = .false.
        auto = auto_false
        ulog = -99               ! no logging unit
-       inim = INIT_SKIP         ! skip TOUZA_Std initialization
+       inim = MODE_SHALLOW      ! skip TOUZA_Std initialization
        stdv = -99               ! verbose level TOUZA_Std (quiet)
-       call cal_init (ierr, ulog, 0, cmode, &
-            & auto=auto, levv=levv, inim=inim, stdv=stdv)
+       call cal_init &
+            & (ierr, u=ulog, levv=levv, mode=inim, stdv=stdv, &
+            &  ncals=0, global=cmode, auto=auto)
        nsecd = inq_nsec_day()
        nsecd_c = xreal(nsecd)
     endif

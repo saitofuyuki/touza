@@ -1,7 +1,7 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
 # Created: Jun 7 2020
-# Time-stamp: <2021/03/27 16:50:46 fuyuki autogen.sh>
+# Time-stamp: <2021/12/04 17:06:35 fuyuki autogen.sh>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -12,9 +12,11 @@
 DRY=T
 OPTS=''
 CLEAR=''
+VERBOSE=''
 while test $# -gt 0
 do
   case $1 in
+  -v) VERBOSE=-v;;
   -c) CLEAR=T;;
   -y) DRY=;;
   -I) OPTS="$OPTS $1 $2"; shift;;
@@ -83,4 +85,4 @@ echo "# automake rerun"
 run rm -f $TMP
 run automake --foreign || exit $?
 
-run autoconf || exit $?
+run autoconf $VERBOSE || exit $?

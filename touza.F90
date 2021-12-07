@@ -1,7 +1,7 @@
 !!!_! touza.F90 - touza administration
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2021/03/06 09:55:08 fuyuki touza.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/12/06 08:51:34 fuyuki touza.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -22,101 +22,74 @@
 !!!_* Macros
 !!!_@ TOUZA - touza interfaces
 module TOUZA
-  use TOUZA_Std,&
-       & std_init=>init, std_diag=>diag, std_finalize=>finalize
+!!!_ + modules
+!!!_  - std(mandatory)
+  use TOUZA_Std, std_init=>init, std_diag=>diag, std_finalize=>finalize
+!!!_  - cal(conditional)
 #if ENABLE_TOUZA_CAL
-  use TOUZA_Cal, &
-       & cal_init=>init, cal_diag=>diag, cal_finalize=>finalize
+  use TOUZA_Cal, cal_init=>init, cal_diag=>diag, cal_finalize=>finalize
 #endif /* ENABLE_TOUZA_CAL */
-!!!_  - default
+!!!_  - trp(conditional)
+#if ENABLE_TOUZA_TRP
+  use TOUZA_Trp, trp_init=>init, trp_diag=>diag, trp_finalize=>finalize
+#endif /* ENABLE_TOUZA_TRP */
+!!!_  - nng(conditional)
+#if ENABLE_TOUZA_NNG
+  use TOUZA_Nng, nng_init=>init, nng_diag=>diag, nng_finalize=>finalize, &
+       &         ngg_msg=>msg
+#endif /* ENABLE_TOUZA_NNG */
+!!!_ + default
   implicit none
-  private
-!!!_  - parameters
-  integer,save :: init_counts = 0
-  integer,save :: lev_verbose = msglev_normal
-!!!_  - static
-  integer,save :: mode_cal = 0
-!!!_  - public
-!!!_   . self
+  public
+!!!_ + static
+  integer,save,private :: init_mode = 0
+  integer,save,private :: init_counts = 0
+  integer,save,private :: diag_counts = 0
+  integer,save,private :: fine_counts = 0
+  integer,save,private :: lev_verbose = msglev_normal
+  integer,save,private :: err_default = ERR_NO_INIT
+  integer,save,private :: ulog = unit_global
+!!!_ + public
   public :: init, diag, finalize
-!!!_   . std
-  public :: KFLT,            KDBL,           KI8,            KI32,           KI64
-  public :: check_real_zero, check_real_one, check_real_inf, check_real_dnm
-  public :: std_init,        std_diag,       std_finalize
-  public :: choice,          choice_a,       condop,         set_if_present
-  public :: chcount
-  public :: uin,             uout,           uerr
-  public :: lbrec,           lreci,          lrecf,          lrecd
-  public :: get_rlu,         get_rlb
-  public :: msg,             msg_grp,        gen_tag
-  public :: unit_star,       unit_none,      unit_global
-  public :: decl_pos_arg,    parse,          get_option,     get_param, get_array
-  public :: get_arg,         get_key
-  public :: get_value,       get_value_seq
-  public :: arg_diag
-  public :: new_unit,        new_unit_tmp,   set_tempfile
-!!!_   . calendar
-#if ENABLE_TOUZA_CAL
-  public :: cal_init,             cal_diag,          cal_finalize
-  public :: alloc,                new_calendar
-  public :: set_perpetual_date,   set_perpetual_adate
-  public :: get_perpetual_date,   set_perpetual_switch
-  public :: inq_nday_month,       inq_nday_year,     inq_nmonth_year
-  public :: inq_nsec_day,         inq_nsec_minute,   inq_nsec_hour
-  public :: conv_cdaysec_csec,    conv_time_tsec,    conv_date_cday
-  public :: conv_date_dayy,       conv_date_dayy_compat
-  public :: conv_calendar_csec,   conv_duration_sec, conv_csec_string_ppt_off
-  public :: advance_csec,         conv_calendar_string
-  public :: is_passed,            is_passed_compat
-  public :: conv_csec_cdaysec,    conv_csec_adaysec
-  public :: conv_tsec_time,       conv_tsec_atime
-  public :: conv_cday_date,       conv_cday_adate
-  public :: conv_adate_cday
-  public :: conv_csec_calendar,   conv_csec_acalendar
-  public :: conv_cday_cydayy,     conv_cday_aydayy
-  public :: conv_csec_cydayy,     conv_csec_aydayy
-  public :: conv_csec_date,       conv_csec_adate
-  public :: conv_string_calendar, conv_string_acalendar
-  public :: KRC,     XREAL
-  public :: p_error, p_ideal, p_grego_i, p_grego_l, p_user
-#endif /* ENABLE_TOUZA_CAL */
 contains
 !!!_ + common interfaces
 !!!_  & init - touza system initialization batch
   subroutine init &
-       & (ierr, levv, mode, &
-       &  cal)
+       & (ierr, u, levv, mode)
     implicit none
     integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: mode
-    integer,intent(in),optional :: cal
-    integer lv, md
+    integer lv, md, lmd
 
     ierr = 0
 
-    lv = choice(lev_verbose, levv)
-    md = choice(INIT_DEFAULT, mode)
-    if (md.eq.INIT_DEFAULT) md = INIT_DEEP
+    md = control_mode(mode, MODE_DEEPEST)
+    init_mode = md
 
-    if (md.gt.INIT_DEFAULT) then
-       if (md.ge.INIT_DEEP) then
-          if (ierr.eq.0) call std_init(ierr, levv=lv, mode=md)
-#if ENABLE_TOUZA_CAL
-          if (ierr.eq.0) call cal_init(ierr, levv=lv, mode=choice(md, cal))
-#else  /* not ENABLE_TOUZA_CAL */
-          if (ierr.eq.0) then
-             if (choice(INIT_SKIP, cal).ne.INIT_SKIP) then
-                ierr = -1
-                if (is_msglev_FATAL(lv)) call msg_grp('TOUZA/Cal disabled')
-             endif
-          endif
-#endif /* not ENABLE_TOUZA_CAL */
-       endif
-       if (init_counts.eq.0) then
+    if (md.ge.MODE_SURFACE) then
+       err_default = ERR_SUCCESS
+       lv = choice(lev_verbose, levv)
+       if (is_first_force(init_counts, md)) then
+          ulog = choice(ulog, u)
           lev_verbose = lv
        endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_DEEP) then
+          if (ierr.eq.0) call std_init(ierr, u=ulog, levv=lv, mode=lmd)
+#if ENABLE_TOUZA_CAL
+          if (ierr.eq.0) call cal_init(ierr, u=ulog, levv=lv, mode=lmd)
+#endif /* ENABLE_TOUZA_CAL */
+#if ENABLE_TOUZA_TRP
+          if (ierr.eq.0) call trp_init(ierr, u=ulog, levv=lv, mode=lmd)
+#endif /* ENABLE_TOUZA_TRP */
+#if ENABLE_TOUZA_NNG
+          if (ierr.eq.0) call nng_init(ierr, u=ulog, levv=lv, mode=lmd)
+#endif /* ENABLE_TOUZA_NNG */
+       endif
        init_counts = init_counts + 1
+       if (ierr.ne.0) err_default = ERR_FAILURE_INIT
     endif
 
     return
@@ -127,13 +100,43 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    ierr = 0
-    if (ierr.eq.0) call std_diag(ierr, u, levv, mode)
+    integer utmp, lv, md, lmd
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(uout, u)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       call trace_control(ierr, md, pkg=__PKG__, fun='diag', u=utmp, levv=lv)
+       if (is_first_force(diag_counts, md)) then
+          if (ierr.eq.0) then
+             if (is_msglev_normal(lv)) call msg(TIME_STAMP, __PKG__, u=utmp)
+          endif
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_DEEP) then
+          if (ierr.eq.0) call std_diag(ierr, utmp, levv, mode=lmd)
 #if ENABLE_TOUZA_CAL
-    if (ierr.eq.0) call cal_diag(ierr, u, levv)
+          if (ierr.eq.0) call cal_diag(ierr, utmp, levv, mode=lmd)
 #else  /* not ENABLE_TOUZA_CAL */
-    if (ierr.eq.0) call msg_grp('cal disabled', u=u)
+          if (ierr.eq.0) call msg_grp('cal disabled', u=utmp)
 #endif /* not ENABLE_TOUZA_CAL */
+#if ENABLE_TOUZA_TRP
+          if (ierr.eq.0) call trp_diag(ierr, utmp, levv, mode=lmd)
+#else  /* not ENABLE_TOUZA_TRP */
+          if (ierr.eq.0) call msg_grp('trp disabled', u=utmp)
+#endif /* not ENABLE_TOUZA_TRP */
+#if ENABLE_TOUZA_NNG
+          if (ierr.eq.0) call nng_diag(ierr, utmp, levv, mode=lmd)
+#else  /* not ENABLE_TOUZA_NNG */
+          if (ierr.eq.0) call msg_grp('nng disabled', u=utmp)
+#endif /* not ENABLE_TOUZA_NNG */
+       endif
+       diag_counts = diag_counts + 1
+    endif
+
     return
   end subroutine diag
 !!!_  & finalize - touza system finalization batch
@@ -142,11 +145,35 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    ierr = 0
+    integer utmp, md, lmd, lv
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(uout, u)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       if (is_first_force(fine_counts, md)) then
+          call trace_fine &
+               & (ierr, md, init_counts, diag_counts, fine_counts, &
+               &  pkg=__PKG__, fun='finalize', u=utmp, levv=lv)
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_DEEP) then
+#if ENABLE_TOUZA_NNG
+          if (ierr.eq.0) call nng_finalize(ierr, utmp, levv, mode=lmd)
+#endif /* ENABLE_TOUZA_NNG */
+#if ENABLE_TOUZA_TRP
+          if (ierr.eq.0) call trp_finalize(ierr, utmp, levv, mode=lmd)
+#endif /* ENABLE_TOUZA_TRP */
 #if ENABLE_TOUZA_CAL
-    if (ierr.eq.0) call cal_finalize(ierr, u, levv)
+          if (ierr.eq.0) call cal_finalize(ierr, utmp, levv, mode=lmd)
 #endif /* ENABLE_TOUZA_CAL */
-    if (ierr.eq.0) call std_finalize(ierr, u, levv, mode)
+          if (ierr.eq.0) call std_finalize(ierr, utmp, levv, mode=lmd)
+       endif
+       fine_counts = fine_counts + 1
+    endif
     return
   end subroutine finalize
 end module TOUZA
@@ -158,11 +185,13 @@ program test_touza
   integer ierr
 
   ! call init(ierr, cal=INIT_DEEP)
+101 format(A, ' = ', I0)
   call init(ierr)
-  if (ierr.eq.0) call diag(ierr)
-  if (ierr.eq.0) call finalize(ierr)
-101 format('FINAL = ', I0)
-  write(*, 101) ierr
+  write(*, 101) 'init', ierr
+  if (ierr.eq.0) call diag(ierr, mode=MODE_LOOSE+MODE_DEEPER, levv=+99)
+  write(*, 101) 'diag', ierr
+  if (ierr.eq.0) call finalize(ierr, levv=+99)
+  write(*, 101) 'finalize', ierr
   stop
 end program test_touza
 
