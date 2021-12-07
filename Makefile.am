@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/01/22 21:03:08 fuyuki Makefile.am>
+# Time-stamp: <2021/11/25 22:50:56 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -19,13 +19,16 @@ CLEANFILES			= $(nodist_bin_SCRIPTS)
 
 SUBDIRS 					= std
 lib@TOUZA_NAME@_la_LIBADD	= std/$(local_name)
-AM_FCFLAGS					= $(FC_MODULE_touza_std)
+AM_FCFLAGS					+= $(FC_MODULE_touza_std)
 
 if BUILD_cal
 SUBDIRS 					+= cal
 lib@TOUZA_NAME@_la_LIBADD	+= cal/$(local_name)
 AM_FCFLAGS					+= $(FC_MODULE_touza_cal)
 endif
+
+pkgconfigdir	=	$(libdir)/pkgconfig
+pkgconfig_DATA	=	touza.pc
 
 # if BUILD_emu
 # SUBDIRS 					+= emu
@@ -39,7 +42,21 @@ endif
 # AM_FCFLAGS					+= $(FC_MODULE_touza_div)
 # endif
 
+if BUILD_trp
+SUBDIRS 					+= trp
+lib@TOUZA_NAME@_la_LIBADD	+= trp/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_trp)
+endif
+
+if BUILD_nng
+SUBDIRS 					+= nng
+lib@TOUZA_NAME@_la_LIBADD	+= nng/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_nng)
+endif
+
 SUBDIRS	+=	m4c
+
+SUBDIRS	+=	. $(subdirs_extra)
 
 include_HEADERS		= touza.h $(CONFIG_HEADER)
 lib_LTLIBRARIES 	= lib@TOUZA_NAME@.la

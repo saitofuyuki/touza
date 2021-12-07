@@ -1,7 +1,7 @@
 !!!_! calendar_primitive.F90 - TOUZA/Cal primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 22 2011
-#define TIME_STAMP 'Time-stamp: <2021/03/29 15:55:52 fuyuki calendar_primitive.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/11/15 13:09:14 fuyuki calendar_primitive.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -29,9 +29,10 @@ module TOUZA_Cal_primitive
        & KFLT, KDBL, &
        & msglev_panic, &
        & msglev_fatal,   msglev_critical, msglev_severe, &
-       & msglev_warning, msglev_normal,   msglev_info, &
+       & msglev_warning, msglev_normal,   msglev_info,   &
        & msglev_detail,  msglev_debug,    &
-       & choice
+       & choice,         control_mode,    control_deep,  is_first_force, &
+       & trace_control,  trace_fine
 !!!_  - default
   implicit none
   private
@@ -41,10 +42,15 @@ module TOUZA_Cal_primitive
   integer,parameter,private :: max_month = OPT_CALENDAR_MAX_MONTH
   integer,parameter,private :: max_leap  = OPT_CALENDAR_MAX_LEAP
 !!!_  - static
+  integer,save :: init_mode = 0
   integer,save :: init_counts = 0
+  integer,save :: diag_counts = 0
+  integer,save :: fine_counts = 0
   integer,save :: lev_verbose = CAL_MSG_LEVEL
   integer,save :: lev_stdv = CAL_MSG_LEVEL
-  integer,save :: ini_mode = INIT_SKIP
+  integer,save :: err_default = ERR_NO_INIT
+  integer,save :: ulog = -1
+
 # define __MDL__ 'p'
 !!!_  - cal_date_t
   type cal_date_t
@@ -108,6 +114,8 @@ module TOUZA_Cal_primitive
 
 !!!_   . inheritance from TOUZA_Std
   public choice
+  public control_mode,   control_deep
+  public trace_control,  trace_fine,      is_first_force
   public msglev_panic
   public msglev_fatal,   msglev_critical, msglev_severe
   public msglev_warning, msglev_normal,   msglev_info
@@ -115,65 +123,105 @@ module TOUZA_Cal_primitive
 
 contains
 !!!_ & init - initialization
-  subroutine init(ierr, levv, inim, stdv)
+  subroutine init(ierr, u, levv, mode, stdv)
 !!!_  = declaration
-    use TOUZA_Std,only: std_init=>init, choice
-    implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: levv
-    integer,intent(in),optional :: inim ! initialization mode
-    integer,intent(in),optional :: stdv ! verbose level of TOUZA_Std
-    integer im
-!!!_  - body
-    ierr = 0
-
-    if (init_counts.eq.0) then
-       lev_stdv = choice(lev_stdv, stdv)
-       ini_mode = choice(INIT_DEFAULT, inim)
-       if (ini_mode.eq.INIT_DEFAULT) ini_mode = INIT_DEEP
-       if (ini_mode.ge.INIT_DEEP) then
-          if (ierr.eq.0) call std_init(ierr, levv=lev_stdv)
-       endif
-
-       lev_verbose = choice(lev_verbose, levv)
-       do im = p_error, p_user
-          call init_prop(props(im), im)
-       enddo
-    endif
-    init_counts = init_counts + 1
-    return
-  end subroutine init
-
-!!!_ & diag
-  subroutine diag(ierr, u, levv)
-    use TOUZA_Std,only: std_diag=>diag, choice
+    use TOUZA_Std,only: std_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
-    integer lv
-
+    integer,intent(in),optional :: mode ! initialization mode
+    integer,intent(in),optional :: stdv ! verbose level of TOUZA_Std
+    integer im
+    integer md, lv, lmd
+!!!_  - body
     ierr = 0
-    lv = choice(lev_verbose, levv)
-    if (ini_mode.ge.INIT_DEEP) then
-       if (ierr.eq.0) call std_diag(ierr, u, lev_stdv)
+
+    md = control_mode(mode, MODE_SHALLOW)
+    init_mode = md
+
+    if (md.ge.MODE_SURFACE) then
+       err_default = ERR_SUCCESS
+       lv = choice(lev_verbose, levv)
+       if (is_first_force(init_counts, md)) then
+          ulog = choice(ulog, u)
+          lev_verbose = lv
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_DEEP) then
+          lev_stdv = choice(lev_stdv, stdv)
+          if (ierr.eq.0) call std_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
+       endif
+       if (is_first_force(init_counts, md)) then
+          do im = p_error, p_user
+             call init_prop(props(im), im)
+          enddo
+       endif
+       init_counts = init_counts + 1
+       if (ierr.ne.0) err_default = ERR_FAILURE_INIT
     endif
-    if (ierr.eq.0) then
-       call msg(lv, TIME_STAMP, __MDL__)
+    return
+  end subroutine init
+
+!!!_ & diag
+  subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Std,only: std_diag=>diag
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+    integer lv, md, utmp, lmd
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       call trace_control &
+            & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
+       if (is_first_force(diag_counts, md)) then
+          if (ierr.eq.0) then
+             call msg(msglev_normal, TIME_STAMP, __MDL__, utmp)
+          endif
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_DEEP) then
+          if (ierr.eq.0) call std_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
+       endif
+       diag_counts = diag_counts + 1
     endif
     return
   end subroutine diag
 
 !!!_ & finalize
-  subroutine finalize(ierr, u, levv)
-    use TOUZA_Std,only: std_finalize=>diag, choice
+  subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std,only: std_finalize=>diag, is_msglev_normal
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
-    ierr = 0 * choice(0, levv)
-    if (ini_mode.ge.INIT_DEEP) then
-       if (ierr.eq.0) call std_finalize(ierr, u, lev_stdv)
+    integer,intent(in),optional :: mode
+    integer utmp, lv, md, lmd
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       if (is_first_force(fine_counts, md)) then
+          call trace_fine &
+               & (ierr, md, init_counts, diag_counts, fine_counts, &
+               &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_DEEP) then
+          if (ierr.eq.0) call std_finalize(ierr, utmp, levv=lev_stdv, mode=lmd)
+       endif
+       fine_counts = fine_counts + 1
     endif
     return
   end subroutine finalize
@@ -192,7 +240,7 @@ contains
     integer utmp
 
     if (is_msglev(levm, lev_verbose)) then
-       if (ini_mode.ge.INIT_DEEP) then
+       if (init_mode.ge.MODE_DEEP) then
           call gen_tag(tag, PACKAGE_TAG, __GRP__, mdl)
           call std_msg(txt, tag, u)
        else
@@ -272,7 +320,7 @@ contains
     integer,intent(in)  :: mode
     integer,intent(in)  :: lp
 
-    ierr = 0
+    ierr = err_default
     nmon = props(mode) % nmon_year
     nday_mon(1:nmon) = props(mode)%nday_mon(1:nmon, lp)
     return
