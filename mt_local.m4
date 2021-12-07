@@ -9,7 +9,7 @@ dnl
 dnl Licensed under the Apache License, Version 2.0
 dnl   (https://www.apache.org/licenses/LICENSE-2.0)
 
-MT_PACKAGE_VERSION([1.00.4])
+MT_PACKAGE_VERSION([1.01.0])
 
 dnl Local Variables:
 dnl mode: autoconf
