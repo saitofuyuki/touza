@@ -6,53 +6,63 @@ TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
+* Changes in 1.01.0 from 1.00.4
+- Alpha release to provide URT-format trials
+- (jmz) sample utilities to build with TOUZA library
+- (nng) n-n-g is not gtool
+- (trp) trapiche, real/integer arrays compression
+- (cal) restructured (except for miroc/jcup/ils/matsiro/coco interfaces)
+- pkgconf
+- clean common procedures (init/diag/finalize)
+- various bug fixes
+
 * Changes in 1.00.4 from 1.00.3
-  - (cal) adjustment for ILS
-  - (cal) adjustment for MATSIRO
+- (cal) adjustment for ILS
+- (cal) adjustment for MATSIRO
 
 * Changes in 1.00.3 from 1.00.2
-  - bug fixed (for installation on ES4 systems)
+- bug fixed (for installation on ES4 systems)
 
 * Changes in 1.00.2 from 1.00.1
-  - (cal) COCO compatible interface
-  - (cal) inim argument added to control TOUZA/Std initialization.
-  - (std/env) byte-order diagnostics implemented
-  - bug fixed
+- (cal) COCO compatible interface
+- (cal) inim argument added to control TOUZA/Std initialization.
+- (std/env) byte-order diagnostics implemented
+- bug fixed
 
 * Changes in 1.00.1 from 1.00
-  - (std) [Critical] syntax error when iso_fortran_env disabled.
-  - (cal) [critical] calendar string parser/formatter improved.
+- (std) [Critical] syntax error when iso_fortran_env disabled.
+- (cal) [critical] calendar string parser/formatter improved.
 
 * Changes in 1.00 (initial-Release) from 0.99.9
-  - [CRITICAL] auto-mode treatment modified, following latest ucaln.F.
-  - [CRITICAL] miroc test(8) now ignore CCC2YH test.
+- [CRITICAL] auto-mode treatment modified, following latest ucaln.F.
+- [CRITICAL] miroc test(8) now ignore CCC2YH test.
 
 * Changes in 0.99.9 (pre-Release) from 0.99.5
-  - [CRITICAL] standardized design for common procedures introduced.
-    - contents and order of the arguments of init() diag() finalize()
-      are modified and unified.
+- [CRITICAL] standardized design for common procedures introduced.
+  - contents and order of the arguments of init() diag() finalize()
+    are modified and unified.
 
 * Changes in 0.99.5 from 0.99.2
-  - [CRITICAL] (m4c) at_ prefix replaced with mt_.
-  - autoconf macros (m4c/mt_*) installation.
-  - (std) add some procedures.
+- [CRITICAL] (m4c) at_ prefix replaced with mt_.
+- autoconf macros (m4c/mt_*) installation.
+- (std) add some procedures.
 
 * Changes in 0.99.2 from 0.99
-  - additional argument functions introduced.
-  - get_args renamed into get_arg.
+- additional argument functions introduced.
+- get_args renamed into get_arg.
 
 * Changes in 0.99 from 0.9
-  - git-submodule structure discarded.  Subpackages are no more stand
-    alone.
-  - Module naming modified.  Hard-coded module names are form of
-    `TOUZA_<Sub>' or `TOUZA_<Sub>_<member>'.   Transformation of
-    module names are redisigned and reserved for future development.
-  - Header files are renamed into `touza_<sub>.h'
-  - Default installation paths are changed.  Module files are under
-    $(pkgincludedir);  Header file are under $(includedir).
+- git-submodule structure discarded.  Subpackages are no more stand
+  alone.
+- Module naming modified.  Hard-coded module names are form of
+  `TOUZA_<Sub>' or `TOUZA_<Sub>_<member>'.   Transformation of
+  module names are redisigned and reserved for future development.
+- Header files are renamed into `touza_<sub>.h'
+- Default installation paths are changed.  Module files are under
+  $(pkgincludedir);  Header file are under $(includedir).
 
 * Changes in 0.9
-  - Beta release.
+- Beta release.
 
 # Local Variables:
 # mode: org
