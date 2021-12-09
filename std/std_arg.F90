@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2021/02/04 13:57:34 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/11/21 10:10:06 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2021
@@ -34,6 +34,8 @@
 #endif
 !!!_@ TOUZA_Std_arg - argument parser by command-line and/or input file
 module TOUZA_Std_arg
+  use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
+  use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
 !!!_ + default
   implicit none
   private
@@ -49,9 +51,13 @@ module TOUZA_Std_arg
 
 !!!_ + static
 #define __MDL__ 'arg'
+  integer,save :: init_mode = 0
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
+  integer,save :: fine_counts = 0
   integer,save :: lev_verbose = STD_MSG_LEVEL
+  integer,save :: err_default = ERR_NO_INIT
+  integer,save :: ulog = unit_global
 
   integer,            save :: nacc(0:lentry) = 0
   character(len=ltag),save :: atags(0:lentry) = ' '
@@ -139,8 +145,8 @@ contains
 !!!_  & init
   subroutine init &
        &  (ierr, &
-       &   lrec, cha,  chs, tagf, kmode, &
-       &   levv, mode)
+       &   u,    levv, mode, &
+       &   lrec, cha,  chs, tagf, kmode)
     use TOUZA_Std_prc,only: prc_init=>init
     use TOUZA_Std_env,only: env_init=>init
     use TOUZA_Std_fun,only: fun_init=>init
@@ -148,43 +154,44 @@ contains
     use TOUZA_Std_utl,only: utl_init=>init, choice, choice_a
     implicit none
     integer,         intent(out)         :: ierr
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv
+    integer,         intent(in),optional :: mode
     integer,         intent(in),optional :: lrec
     character(len=*),intent(in),optional :: cha, chs
     character(len=*),intent(in),optional :: tagf
     integer,         intent(in),optional :: kmode
-    integer,         intent(in),optional :: levv
-    integer,         intent(in),optional :: mode
 
-    integer md, lv
+    integer md, lv, lmd
 
     ierr = 0
 
-    lv = choice(lev_verbose, levv)
-    md = choice(INIT_DEFAULT, mode)
-    if (md.eq.INIT_DEFAULT) md = INIT_DEEP
+    md = control_mode(mode, MODE_DEEPEST)
+    init_mode = md
 
-    if (md.gt.INIT_DEFAULT) then
-       if (md.ge.INIT_DEEP) then
-          if (ierr.eq.0) call prc_init(ierr, levv=lv, mode=md)
-          if (ierr.eq.0) call utl_init(ierr, levv=lv, mode=md)
-          if (ierr.eq.0) call log_init(ierr, levv=lv, mode=md)
-          if (ierr.eq.0) call env_init(ierr, levv=lv, mode=md)
-          if (ierr.eq.0) call fun_init(ierr, levv=lv, mode=md)
-       endif
-       if (init_counts.eq.0) then
+    if (md.ge.MODE_SURFACE) then
+       err_default = ERR_SUCCESS
+       lv = choice(lev_verbose, levv)
+       if (is_first_force(init_counts, md)) then
+          ulog = choice(ulog, u)
           lev_verbose = lv
-          call choice_a(csep, chs)
-          if (csep.eq.' ') csep = ','
-          call choice_a(cassign, cha)
-          if (cassign.eq.' ') cassign = '='
-          lrecurs = choice(0, lrec)
-          if (lrecurs.le.0) lrecurs = 5
-          call choice_a(tag_file, tagf)
-          kparse_mode = choice(PARAM_DEF, kmode)
-          if (kparse_mode.eq.PARAM_DEF) kparse_mode = PARAM_POS
-          ! call collect_entries(ierr, lrec)
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call env_init(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call fun_init(ierr, ulog, levv=lv, mode=lmd)
+       endif
+       if (is_first_force(init_counts, md)) then
+          if (ierr.eq.0) then
+             call init_batch &
+                  &  (ierr, lrec, cha,  chs, tagf, kmode, ulog, lv)
+          endif
        endif
        init_counts = init_counts + 1
+       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_ARG
     endif
 
     return
@@ -202,33 +209,37 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: mode
-    integer md, lv
+    integer utmp, md, lv, lmd
 
-    ierr = 0
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
     lv = choice(lev_verbose, levv)
-    md = choice(DIAG_DEFAULT, mode)
-    if (md.eq.DIAG_DEFAULT) md = DIAG_DEEP
 
-    if (md.gt.DIAG_DEFAULT) then
-       if (IAND(md, DIAG_DEEP).gt.0) then
-          if (ierr.eq.0) call prc_diag(ierr, u, lv, md)
-          if (ierr.eq.0) call utl_diag(ierr, u, lv, md)
-          if (ierr.eq.0) call log_diag(ierr, u, lv, md)
-          if (ierr.eq.0) call prc_diag(ierr, u, lv, md)
-          if (ierr.eq.0) call env_diag(ierr, u, lv, md)
-       endif
-       if (diag_counts.eq.0.or.IAND(md,DIAG_FORCE).gt.0) then
+    if (md.ge.MODE_SURFACE) then
+       call trace_control &
+            & (ierr, md, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
+       if (is_first_force(diag_counts, md)) then
           if (ierr.eq.0) then
              if (VCHECK_NORMAL(lv)) then
-                call msg_mdl(TIME_STAMP, __MDL__, u)
+                call msg_mdl(TIME_STAMP, __MDL__, utmp)
              endif
              if (VCHECK_NORMAL(lv)) then
                 call report_entries &
-                     & (ierr, nposargs, atags, avals, nacc, mentry, lentry, u)
+                     & (ierr, nposargs, atags, avals, nacc, mentry, lentry, utmp)
              endif
           endif
-          diag_counts = diag_counts + 1
        endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call env_diag(ierr, utmp, lv, mode=lmd)
+       endif
+       diag_counts = diag_counts + 1
     endif
     return
   end subroutine diag
@@ -245,18 +256,63 @@ contains
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: mode
     integer,intent(in),optional :: u
-    integer lv
+    integer utmp, lv, md, lmd
 
-    ierr = 0
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
     lv = choice(lev_verbose, levv)
-    if (ierr.eq.0) call utl_finalize(ierr, u, lv, mode)
-    if (ierr.eq.0) call log_finalize(ierr, u, lv, mode)
-    if (ierr.eq.0) call fun_finalize(ierr, u, lv, mode)
-    if (ierr.eq.0) call prc_finalize(ierr, u, lv, mode)
-    if (ierr.eq.0) call env_finalize(ierr, u, lv, mode)
+
+    if (md.ge.MODE_SURFACE) then
+       if (is_first_force(fine_counts, md)) then
+          call trace_fine &
+               & (ierr, md, init_counts, diag_counts, fine_counts, &
+               &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call fun_finalize(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call env_finalize(ierr, utmp, lv, mode=lmd)
+       endif
+       fine_counts = fine_counts + 1
+    endif
     return
   end subroutine finalize
+!!!_ + init subcontracts
+!!!_  & init_batch
+  subroutine init_batch &
+       &  (ierr, &
+       &   lrec, cha,  chs, tagf, kmode, &
+       &   u,    levv)
+    use TOUZA_Std_utl,only: choice, choice_a
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(in),optional :: lrec
+    character(len=*),intent(in),optional :: cha, chs
+    character(len=*),intent(in),optional :: tagf
+    integer,         intent(in),optional :: kmode
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv
 
+    ierr = 0
+
+    call choice_a(csep, chs)
+    if (csep.eq.' ') csep = ','
+    call choice_a(cassign, cha)
+    if (cassign.eq.' ') cassign = '='
+    lrecurs = choice(0, lrec)
+    if (lrecurs.le.0) lrecurs = 5
+    call choice_a(tag_file, tagf)
+    kparse_mode = choice(PARAM_DEF, kmode)
+    if (kparse_mode.eq.PARAM_DEF) kparse_mode = PARAM_POS
+    ! call collect_entries(ierr, lrec)
+
+    return
+  end subroutine init_batch
 !!!_ + parsers
 !!!_  & decl_pos_arg
   subroutine decl_pos_arg &
@@ -269,10 +325,10 @@ contains
 
     integer jpi, jentr
 
-    ierr = 0
+    ierr = err_default
     if (nposargs.ge.0) then
        ! error if parsed already
-       ierr = -1
+       ierr = -1 - ERR_MASK_STD_ARG
        return
     endif
 
@@ -280,7 +336,7 @@ contains
     if (jpi.le.0) jpi = mentry + 1
     jentr = jpi - 1
     if (jentr.gt.lentry) then
-       ierr = -1
+       ierr = -1 - ERR_MASK_STD_ARG
        return
     endif
     if (present(tag)) then
@@ -299,11 +355,11 @@ contains
     implicit none
     integer,intent(out) :: ierr
     integer ucfg
-    ierr = 0
 
+    ierr = err_default
     ucfg = new_unit()
     if (ucfg.le.0) then
-       ierr = -1
+       ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ARG
        return
     endif
 
@@ -339,7 +395,7 @@ contains
     character(len=lstr) :: S
 #endif
 
-    ierr = 0
+    ierr = err_default
 
     open(unit=ucfg, IOSTAT=ierr, FORM='FORMATTED', STATUS='SCRATCH', ACTION='READWRITE')
 #if HAVE_GET_COMMAND_ARGUMENT
@@ -353,7 +409,7 @@ contains
        if (l.gt.lstr) then
 101       format('too long argument at ', I0, ':', A)
           write(*, 101) jarg, trim(S)
-          ierr = -1
+          ierr = -1 - ERR_MASK_STD_ARG
        else if (ierr.eq.0) then
           write(ucfg, '(A)', IOSTAT=ierr) trim(S)
        endif
@@ -397,7 +453,7 @@ contains
     logical expand
     integer ucur
 
-    ierr  = 0
+    ierr = err_default
 
     write(fdone, '(A, A)') trim(ccomment), trim(tag_file)
 
@@ -466,7 +522,7 @@ contains
     integer jpx
     character(len=ltag) :: tag
 
-    ierr  = 0
+    ierr = err_default
     jpx = 0
 
     do jentr = 0, mentry - 1
@@ -482,90 +538,91 @@ contains
 !!!_ + inquiries
 !!!_  & get_param - get parameter (positional argument)
   subroutine get_param_a &
-       & (ierr, val, jpos, def)
+       & (ierr, val, jpos, def, unset)
     use TOUZA_Std_utl,only: choice_a
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: val
     integer,         intent(in)          :: jpos
     character(len=*),intent(in),optional :: def
+    logical,         intent(in),optional :: unset
     integer jentr
 
-    ierr = 0
+    ierr = err_default
     jentr = tag_search(jpos, atags, mentry)
-    call extract_val_a(ierr, val, jentr, cundef, def)
+    call extract_val_a(ierr, val, jentr, cundef, def, unset=unset)
     return
   end subroutine get_param_a
 
   subroutine get_param_i &
-       & (ierr, val, jpos, def)
+       & (ierr, val, jpos, def, unset)
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(inout)       :: val
     integer,intent(in)          :: jpos
     integer,intent(in),optional :: def
+    logical,intent(in),optional :: unset
     integer jentr
 
-    ierr = 0
+    ierr = err_default
     jentr = tag_search(jpos, atags, mentry)
-    call extract_val_i(ierr, val, jentr, cundef, def)
-
+    call extract_val_i(ierr, val, jentr, cundef, def, unset=unset)
     return
   end subroutine get_param_i
 
   subroutine get_param_f &
-       & (ierr, val, jpos, def)
+       & (ierr, val, jpos, def, unset)
     use TOUZA_Std_prc,only: KFLT
     implicit none
     integer,        intent(out)         :: ierr
     real(kind=KFLT),intent(inout)       :: val
     integer,        intent(in)          :: jpos
     real(kind=KFLT),intent(in),optional :: def
+    logical,        intent(in),optional :: unset
     integer jentr
 
-    ierr = 0
+    ierr = err_default
     jentr = tag_search(jpos, atags, mentry)
-    call extract_val_f(ierr, val, jentr, cundef, def)
-
+    call extract_val_f(ierr, val, jentr, cundef, def, unset=unset)
     return
   end subroutine get_param_f
 
   subroutine get_param_d &
-       & (ierr, val, jpos, def)
+       & (ierr, val, jpos, def, unset)
     use TOUZA_Std_prc,only: KDBL
     implicit none
     integer,        intent(out)         :: ierr
     real(kind=KDBL),intent(inout)       :: val
     integer,        intent(in)          :: jpos
     real(kind=KDBL),intent(in),optional :: def
+    logical,        intent(in),optional :: unset
     integer jentr
 
-    ierr = 0
+    ierr = err_default
     jentr = tag_search(jpos, atags, mentry)
-    call extract_val_d(ierr, val, jentr, cundef, def)
-
+    call extract_val_d(ierr, val, jentr, cundef, def, unset=unset)
     return
   end subroutine get_param_d
 
   subroutine get_param_ia &
-       & (ierr, vals, jpos, def, sep)
+       & (ierr, vals, jpos, def, sep, unset)
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(inout)       :: vals(:)
     integer,         intent(in)          :: jpos
     integer,         intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
     integer jentr
 
-    ierr = 0
+    ierr = err_default
     jentr = tag_search(jpos, atags, mentry)
-    call extract_vals_i(ierr, vals(:), jentr, cundef, def, sep)
-
+    call extract_vals_i(ierr, vals(:), jentr, cundef, def, sep, unset=unset)
     return
   end subroutine get_param_ia
 
   subroutine get_param_fa &
-       & (ierr, vals, jpos, def, sep)
+       & (ierr, vals, jpos, def, sep, unset)
     use TOUZA_Std_prc,only: KFLT
     implicit none
     integer,         intent(out)         :: ierr
@@ -573,17 +630,17 @@ contains
     integer,         intent(in)          :: jpos
     real(kind=KFLT), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
     integer jentr
 
-    ierr = 0
+    ierr = err_default
     jentr = tag_search(jpos, atags, mentry)
-    call extract_vals_f(ierr, vals(:), jentr, cundef, def, sep)
-
+    call extract_vals_f(ierr, vals(:), jentr, cundef, def, sep, unset=unset)
     return
   end subroutine get_param_fa
 
   subroutine get_param_da &
-       & (ierr, vals, jpos, def, sep)
+       & (ierr, vals, jpos, def, sep, unset)
     use TOUZA_Std_prc,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
@@ -591,18 +648,18 @@ contains
     integer,         intent(in)          :: jpos
     real(kind=KDBL), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
     integer jentr
 
-    ierr = 0
+    ierr = err_default
     jentr = tag_search(jpos, atags, mentry)
-    call extract_vals_d(ierr, vals(:), jentr, cundef, def, sep)
-
+    call extract_vals_d(ierr, vals(:), jentr, cundef, def, sep, unset=unset)
     return
   end subroutine get_param_da
 
 !!!_  & get_array - get parameter array (positional argument)
   subroutine get_array_i &
-       & (ierr, nitem, vals, jpos, def, sep)
+       & (ierr, nitem, vals, jpos, def, sep, unset)
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(out)         :: nitem
@@ -610,17 +667,17 @@ contains
     integer,         intent(in)          :: jpos
     integer,         intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
     integer jentr
 
-    ierr = 0
+    ierr = err_default
     jentr = tag_search(jpos, atags, mentry)
-    call extract_vals_i(ierr, vals(:), jentr, cundef, def, sep, nitem)
-
+    call extract_vals_i(ierr, vals(:), jentr, cundef, def, sep, nitem, unset=unset)
     return
   end subroutine get_array_i
 
   subroutine get_array_f &
-       & (ierr, nitem, vals, jpos, def, sep)
+       & (ierr, nitem, vals, jpos, def, sep, unset)
     use TOUZA_Std_prc,only: KFLT
     implicit none
     integer,         intent(out)         :: ierr
@@ -629,17 +686,17 @@ contains
     integer,         intent(in)          :: jpos
     real(kind=KFLT), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
     integer jentr
 
-    ierr = 0
+    ierr = err_default
     jentr = tag_search(jpos, atags, mentry)
-    call extract_vals_f(ierr, vals(:), jentr, cundef, def, sep, nitem)
-
+    call extract_vals_f(ierr, vals(:), jentr, cundef, def, sep, nitem, unset=unset)
     return
   end subroutine get_array_f
 
   subroutine get_array_d &
-       & (ierr, nitem, vals, jpos, def, sep)
+       & (ierr, nitem, vals, jpos, def, sep, unset)
     use TOUZA_Std_prc,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
@@ -648,48 +705,52 @@ contains
     integer,         intent(in)          :: jpos
     real(kind=KDBL), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
     integer jentr
 
-    ierr = 0
+    ierr = err_default
     jentr = tag_search(jpos, atags, mentry)
-    call extract_vals_d(ierr, vals(:), jentr, cundef, def, sep, nitem)
-
+    call extract_vals_d(ierr, vals(:), jentr, cundef, def, sep, nitem, unset=unset)
     return
   end subroutine get_array_d
 
 !!!_  & get_option - get option (key/value argument)
   subroutine get_option_a &
-       & (ierr, val, tag, def, idx)
+       & (ierr, val, tag, def, idx, unset)
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: val
     character(len=*),intent(in)          :: tag
     character(len=*),intent(in),optional :: def
     integer,         intent(in),optional :: idx
+    logical,         intent(in),optional :: unset
     integer jentr
-    ierr = 0
+
+    ierr = err_default
     jentr = tag_search(tag, atags, mentry, idx)
-    call extract_val_a(ierr, val, jentr, cundef, def)
+    call extract_val_a(ierr, val, jentr, cundef, def, unset=unset)
     return
   end subroutine get_option_a
 
   subroutine get_option_i &
-       & (ierr, val, tag, def, idx)
+       & (ierr, val, tag, def, idx, unset)
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(inout)       :: val
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: def
     integer,         intent(in),optional :: idx
+    logical,         intent(in),optional :: unset
     integer jentr
-    ierr = 0
+
+    ierr = err_default
     jentr = tag_search(tag, atags, mentry, idx)
-    call extract_val_i(ierr, val, jentr, cundef, def)
+    call extract_val_i(ierr, val, jentr, cundef, def, unset=unset)
     return
   end subroutine get_option_i
 
   subroutine get_option_f &
-       & (ierr, val, tag, def, idx)
+       & (ierr, val, tag, def, idx, unset)
     use TOUZA_Std_prc,only: KFLT
     implicit none
     integer,         intent(out)         :: ierr
@@ -697,15 +758,17 @@ contains
     character(len=*),intent(in)          :: tag
     real(kind=KFLT), intent(in),optional :: def
     integer,         intent(in),optional :: idx
+    logical,         intent(in),optional :: unset
     integer jentr
-    ierr = 0
+
+    ierr = err_default
     jentr = tag_search(tag, atags, mentry, idx)
-    call extract_val_f(ierr, val, jentr, cundef, def)
+    call extract_val_f(ierr, val, jentr, cundef, def, unset=unset)
     return
   end subroutine get_option_f
 
   subroutine get_option_d &
-       & (ierr, val, tag, def, idx)
+       & (ierr, val, tag, def, idx, unset)
     use TOUZA_Std_prc,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
@@ -713,15 +776,17 @@ contains
     character(len=*),intent(in)          :: tag
     real(kind=KDBL), intent(in),optional :: def
     integer,         intent(in),optional :: idx
+    logical,         intent(in),optional :: unset
     integer jentr
-    ierr = 0
+
+    ierr = err_default
     jentr = tag_search(tag, atags, mentry, idx)
-    call extract_val_d(ierr, val, jentr, cundef, def)
+    call extract_val_d(ierr, val, jentr, cundef, def, unset=unset)
     return
   end subroutine get_option_d
 
   subroutine get_option_ia &
-       & (ierr, vals, tag, def, idx, sep)
+       & (ierr, vals, tag, def, idx, sep, unset)
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(inout)       :: vals(:)
@@ -729,15 +794,17 @@ contains
     integer,         intent(in),optional :: def
     integer,         intent(in),optional :: idx
     character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
     integer jentr
-    ierr = 0
+
+    ierr = err_default
     jentr = tag_search(tag, atags, mentry, idx)
-    call extract_vals_i(ierr, vals(:), jentr, cundef, def, sep)
+    call extract_vals_i(ierr, vals(:), jentr, cundef, def, sep, unset=unset)
     return
   end subroutine get_option_ia
 
   subroutine get_option_fa &
-       & (ierr, vals, tag, def, idx, sep)
+       & (ierr, vals, tag, def, idx, sep, unset)
     use TOUZA_Std_prc,only: KFLT
     implicit none
     integer,         intent(out)         :: ierr
@@ -746,15 +813,17 @@ contains
     real(kind=KFLT), intent(in),optional :: def
     integer,         intent(in),optional :: idx
     character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
     integer jentr
-    ierr = 0
+
+    ierr = err_default
     jentr = tag_search(tag, atags, mentry, idx)
-    call extract_vals_f(ierr, vals(:), jentr, cundef, def, sep)
+    call extract_vals_f(ierr, vals(:), jentr, cundef, def, sep, unset=unset)
     return
   end subroutine get_option_fa
 
   subroutine get_option_da &
-       & (ierr, vals, tag, def, idx, sep)
+       & (ierr, vals, tag, def, idx, sep, unset)
     use TOUZA_Std_prc,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
@@ -763,10 +832,12 @@ contains
     real(kind=KDBL), intent(in),optional :: def
     integer,         intent(in),optional :: idx
     character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
     integer jentr
-    ierr = 0
+
+    ierr = err_default
     jentr = tag_search(tag, atags, mentry, idx)
-    call extract_vals_d(ierr, vals(:), jentr, cundef, def, sep)
+    call extract_vals_d(ierr, vals(:), jentr, cundef, def, sep, unset=unset)
     return
   end subroutine get_option_da
 
@@ -807,7 +878,7 @@ contains
     character(len=*),intent(out)   :: val
     integer,         intent(inout) :: jentr
 
-    ierr = 0
+    ierr = err_default
     tag = ' '
     val = ' '
     do
@@ -838,7 +909,7 @@ contains
     character(len=*),intent(out)   :: tag
     integer,         intent(inout) :: jentr
 
-    ierr = 0
+    ierr = err_default
     tag = ' '
     do
        if (jentr.ge.mentry) then
@@ -867,7 +938,7 @@ contains
     character(len=*),intent(out)   :: val
     integer,         intent(inout) :: jentr
 
-    ierr = 0
+    ierr = err_default
     val = ' '
     do
        if (jentr.ge.mentry) then
@@ -898,10 +969,11 @@ contains
     integer,         intent(inout) :: jentr
 
     integer j
-    ierr = 0
+
+    ierr = err_default
     do j = 1, num
        if (jentr.lt.0) then
-          ierr = -1
+          ierr = -1 - ERR_MASK_STD_ARG
           exit
        endif
        call get_value_a(ierr, val(j), jentr)
@@ -977,7 +1049,7 @@ contains
     integer je
     character(len=1024) :: txt
 
-    ierr  = 0
+    ierr = err_default
 103 format(I0, 2x, A, 3x, A)
     do je = 0, me - 1
        write(txt, 103) NA(je), trim(T(je)), trim(V(je))
@@ -1014,7 +1086,7 @@ contains
     integer lcha
     logical bset
 
-    ierr  = 0
+    ierr = err_default
     lcha = len_trim(cha)
     do
        if (ierr.ne.0) exit
@@ -1104,12 +1176,13 @@ contains
 
     integer mbtm
     integer j
-    ierr = 0
+
+    ierr = err_default
 
     mbtm = me
     me   = me + mins
     if (me.gt.le) then
-       ierr = -1
+       ierr = -1 - ERR_MASK_STD_ARG
        return
     endif
 
@@ -1220,16 +1293,17 @@ contains
 
 !!!_  & extract_val - single
   subroutine extract_val_i &
-       & (ierr, val, jentr, cud, def)
-    use TOUZA_Std_utl,only: choice
+       & (ierr, val, jentr, cud, def, unset)
+    use TOUZA_Std_utl,only: choice, condop
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(inout)       :: val
     integer,         intent(in)          :: jentr
     character(len=*),intent(in)          :: cud
     integer,         intent(in),optional :: def
+    logical,         intent(in),optional :: unset
 
-    ierr = 0
+    ierr = err_default
     if (jentr.ge.0.and.jentr.lt.mentry) then
        if (avals(jentr).eq.cud) ierr = 1
     else
@@ -1244,11 +1318,12 @@ contains
        val = choice(val, def)
        ierr = 0
     endif
-
+    if (choice(.false.,unset)) ierr = min(0, ierr)
+    return
   end subroutine extract_val_i
 
   subroutine extract_val_f &
-       & (ierr, val, jentr, cud, def)
+       & (ierr, val, jentr, cud, def, unset)
     use TOUZA_Std_prc,only: KFLT
     use TOUZA_Std_utl,only: choice
     implicit none
@@ -1257,8 +1332,9 @@ contains
     integer,          intent(in)          :: jentr
     character(len=*), intent(in)          :: cud
     real(kind=KFLT),  intent(in),optional :: def
+    logical,          intent(in),optional :: unset
 
-    ierr = 0
+    ierr = err_default
     if (jentr.ge.0.and.jentr.lt.mentry) then
        if (avals(jentr).eq.cud) ierr = 1
     else
@@ -1273,11 +1349,12 @@ contains
        val = choice(val, def)
        ierr = 0
     endif
-
+    if (choice(.false.,unset)) ierr = min(0, ierr)
+    return
   end subroutine extract_val_f
 
   subroutine extract_val_d &
-       & (ierr, val, jentr, cud, def)
+       & (ierr, val, jentr, cud, def, unset)
     use TOUZA_Std_prc,only: KDBL
     use TOUZA_Std_utl,only: choice
     implicit none
@@ -1286,8 +1363,9 @@ contains
     integer,         intent(in)          :: jentr
     character(len=*),intent(in)          :: cud
     real(kind=KDBL), intent(in),optional :: def
+    logical,         intent(in),optional :: unset
 
-    ierr = 0
+    ierr = err_default
     if (jentr.ge.0.and.jentr.lt.mentry) then
        if (avals(jentr).eq.cud) ierr = 1
     else
@@ -1302,20 +1380,22 @@ contains
        val = choice(val, def)
        ierr = 0
     endif
-
+    if (choice(.false.,unset)) ierr = min(0, ierr)
+    return
   end subroutine extract_val_d
 
   subroutine extract_val_a &
-       & (ierr, val, jentr, cud, def)
-    use TOUZA_Std_utl,only: choice_a
+       & (ierr, val, jentr, cud, def, unset)
+    use TOUZA_Std_utl,only: choice_a, choice
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: val
     integer,         intent(in)          :: jentr
     character(len=*),intent(in)          :: cud
     character(len=*),intent(in),optional :: def
+    logical,         intent(in),optional :: unset
 
-    ierr = 0
+    ierr = err_default
     if (jentr.ge.0.and.jentr.lt.mentry) then
        if (avals(jentr).eq.cud) ierr = 1
     else
@@ -1327,12 +1407,13 @@ contains
        call choice_a(val, ' ', def)
        ierr = 0
     endif
+    if (choice(.false.,unset)) ierr = min(0, ierr)
     return
   end subroutine extract_val_a
 
 !!!_  & extract_vals - array
   subroutine extract_vals_i &
-       & (ierr, vals, jentr, cud, def, sep, nitem)
+       & (ierr, vals, jentr, cud, def, sep, nitem, unset)
     use TOUZA_Std_utl,only: choice, choice_a
     implicit none
     integer,         intent(out)          :: ierr
@@ -1342,11 +1423,12 @@ contains
     integer,         intent(in), optional :: def
     character(len=*),intent(in), optional :: sep
     integer,         intent(out),optional :: nitem
-    integer jb, je
+    logical,         intent(in), optional :: unset
+    integer jb, je, le
     integer jv, nv
     character(len=ltag) :: chs
 
-    ierr = 0
+    ierr = err_default
     jv = 0
     if (jentr.ge.0.and.jentr.lt.mentry) then
        if (avals(jentr).eq.cud) ierr = 1
@@ -1356,18 +1438,20 @@ contains
     if (ierr.eq.0) then
        call choice_a(chs, csep, sep)
        jb = 1
+       le = len_trim(avals(jentr))
        nv = size(vals)
+       if (present(def)) then
+          vals(:) = def
+       endif
        do
-          if (jb.le.0) exit
+          if (jb.le.0.or.jb.gt.le) exit
           if (jv.ge.nv) ierr = 1
           if (ierr.ne.0) exit
           je = search_next_sep(avals(jentr), jb, chs)
           if (je.gt.jb) then
              read(avals(jentr)(jb:je-1), *, IOSTAT=ierr) vals(1+jv)
           else if (jb.eq.je) then
-             if (present(def)) then
-                vals(jv) = def
-             endif
+             continue
           else
              read(avals(jentr)(jb:), *, IOSTAT=ierr) vals(1+jv)
           endif
@@ -1383,11 +1467,13 @@ contains
     if (present(nitem)) then
        nitem = jv
     endif
+    ! write(*, *) nv, vals(:)
+    if (choice(.false.,unset)) ierr = min(0, ierr)
     return
   end subroutine extract_vals_i
 
   subroutine extract_vals_f &
-       & (ierr, vals, jentr, cud, def, sep, nitem)
+       & (ierr, vals, jentr, cud, def, sep, nitem, unset)
     use TOUZA_Std_prc,only: KFLT
     use TOUZA_Std_utl,only: choice, choice_a
     implicit none
@@ -1398,11 +1484,12 @@ contains
     real(kind=KFLT), intent(in), optional :: def
     character(len=*),intent(in), optional :: sep
     integer,         intent(out),optional :: nitem
-    integer jb, je
+    logical,         intent(in), optional :: unset
+    integer jb, je, le
     integer jv, nv
     character(len=ltag) :: chs
 
-    ierr = 0
+    ierr = err_default
     jv = 0
     if (jentr.ge.0.and.jentr.lt.mentry) then
        if (avals(jentr).eq.cud) ierr = 1
@@ -1412,18 +1499,20 @@ contains
     if (ierr.eq.0) then
        call choice_a(chs, csep, sep)
        jb = 1
+       le = len_trim(avals(jentr))
        nv = size(vals)
+       if (present(def)) then
+          vals(:) = def
+       endif
        do
-          if (jb.le.0) exit
+          if (jb.le.0.or.jb.gt.le) exit
           if (jv.ge.nv) ierr = 1
           if (ierr.ne.0) exit
           je = search_next_sep(avals(jentr), jb, chs)
           if (je.gt.jb) then
              read(avals(jentr)(jb:je-1), *, IOSTAT=ierr) vals(1+jv)
           else if (jb.eq.je) then
-             if (present(def)) then
-                vals(jv) = def
-             endif
+             continue
           else
              read(avals(jentr)(jb:), *, IOSTAT=ierr) vals(1+jv)
           endif
@@ -1439,11 +1528,12 @@ contains
     if (present(nitem)) then
        nitem = jv
     endif
+    if (choice(.false.,unset)) ierr = min(0, ierr)
     return
   end subroutine extract_vals_f
 
   subroutine extract_vals_d &
-       & (ierr, vals, jentr, cud, def, sep, nitem)
+       & (ierr, vals, jentr, cud, def, sep, nitem, unset)
     use TOUZA_Std_prc,only: KDBL
     use TOUZA_Std_utl,only: choice, choice_a
     implicit none
@@ -1454,11 +1544,12 @@ contains
     real(kind=KDBL), intent(in), optional :: def
     character(len=*),intent(in), optional :: sep
     integer,         intent(out),optional :: nitem
-    integer jb, je
+    logical,         intent(in), optional :: unset
+    integer jb, je, le
     integer jv, nv
     character(len=ltag) :: chs
 
-    ierr = 0
+    ierr = err_default
     jv = 0
     if (jentr.ge.0.and.jentr.lt.mentry) then
        if (avals(jentr).eq.cud) ierr = 1
@@ -1468,18 +1559,20 @@ contains
     if (ierr.eq.0) then
        call choice_a(chs, csep, sep)
        jb = 1
+       le = len_trim(avals(jentr))
        nv = size(vals)
+       if (present(def)) then
+          vals(:) = def
+       endif
        do
-          if (jb.le.0) exit
+          if (jb.le.0.or.jb.gt.le) exit
           if (jv.ge.nv) ierr = 1
           if (ierr.ne.0) exit
           je = search_next_sep(avals(jentr), jb, chs)
           if (je.gt.jb) then
              read(avals(jentr)(jb:je-1), *, IOSTAT=ierr) vals(1+jv)
           else if (jb.eq.je) then
-             if (present(def)) then
-                vals(jv) = def
-             endif
+             continue
           else
              read(avals(jentr)(jb:), *, IOSTAT=ierr) vals(1+jv)
           endif
@@ -1495,6 +1588,7 @@ contains
     if (present(nitem)) then
        nitem = jv
     endif
+    if (choice(.false.,unset)) ierr = min(0, ierr)
     return
   end subroutine extract_vals_d
 
@@ -1514,6 +1608,18 @@ contains
        r = -1
     endif
   end function search_next_sep
+
+!!!_  & post_get() - adjust error if unset is true
+  integer function post_get &
+       & (jerr, unset) &
+       & result(ierr)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,intent(in)          :: jerr
+    logical,intent(in),optional :: unset
+    ierr = jerr
+    if (choice(.false., unset)) ierr = min(0, jerr)
+  end function post_get
 
 end module TOUZA_Std_arg
 
@@ -1545,16 +1651,24 @@ program test_std_arg
   ivals(:)= -9999
   if (ierr.eq.0) then
      do jp = 1, 5
+        val = ' '
         call get_param(ierr, val, jp)
-        write(*, *) 'POS=', jp, ierr, '[', trim(val), ']'
+        write(*, *) 'v:POS=', jp, ierr, '[', trim(val), ']'
      enddo
      do jp = 1, 5
+        ival = -999
         call get_param(ierr, ival, jp)
-        write(*, *) 'POS=', jp, ierr, '[', ival, ']'
+        write(*, *) 'i:POS=', jp, ierr, '[', ival, ']'
      enddo
      do jp = 1, 5
+        ivals(:) = -999
         call get_param(ierr, ivals(:), jp)
-        write(*, *) 'POS=', jp, ierr, '[', ivals(:), ']'
+        write(*, *) 'ii:POS=', jp, ierr, '[', ivals(:), ']'
+     enddo
+     do jp = 1, 5
+        ivals(:) = -999
+        call get_param(ierr, ivals(:), jp, 1234)
+        write(*, *) 'iid:POS=', jp, ierr, '[', ivals(:), ']'
      enddo
 
      tag = 'X'
@@ -1564,6 +1678,16 @@ program test_std_arg
      tag = 'Y'
      call get_option(ierr, val, tag)
      write(*, *) 'TAG=', trim(tag), ' ', ierr, '[', trim(val), ']'
+
+     tag = 'X'
+     ivals(:) = -999
+     call get_option(ierr, ivals, tag)
+     write(*, *) 'ii:TAG=', trim(tag), ' ', ierr, '[', ivals(:), ']'
+
+     tag = 'Y'
+     ivals(:) = -999
+     call get_option(ierr, ivals, tag)
+     write(*, *) 'ii:TAG=', trim(tag), ' ', ierr, '[', ivals(:), ']'
 
      ierr = 0
   endif
@@ -1577,6 +1701,7 @@ program test_std_arg
      enddo
   endif
   call diag(ierr)
+  call finalize(ierr, levv=+10)
   stop
 end program test_std_arg
 #endif /* TEST_STD_ARG */

@@ -1,7 +1,7 @@
 !!!_! calendar.F90 - TOUZA/Cal manager
 ! Maintainer: SAITO Fuyuki
 ! Created: May 31 2020
-#define TIME_STAMP 'Time-stamp: <2021/02/16 22:59:29 fuyuki calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/11/15 13:17:30 fuyuki calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -25,7 +25,9 @@ module TOUZA_Cal
        & msglev_panic, &
        & msglev_fatal,   msglev_critical, msglev_severe, &
        & msglev_warning, msglev_normal,   msglev_info, &
-       & msglev_detail,  msglev_debug
+       & msglev_detail,  msglev_debug,    &
+       & control_mode,   control_deep,    is_first_force, &
+       & trace_control,  trace_fine
   use TOUZA_Cal_core,only: &
        & KRC,         XREAL, &
        & cal_attr_t,  cal_daysec_t, cal_date_t, cal_time_t, &
@@ -162,75 +164,139 @@ module TOUZA_Cal
   type(cal_attr_t),allocatable :: CALH(:)
 
   integer,parameter,private :: jglobal = 0
+
+  integer,save :: init_mode = 0
+  integer,save :: init_counts = 0
+  integer,save :: diag_counts = 0
+  integer,save :: fine_counts = 0
+  integer,save :: lev_verbose = CAL_MSG_LEVEL
+  integer,save :: err_default = ERR_NO_INIT
+  integer,save :: ulog = -1
+
 !!!_ + common procedures
 contains
 !!!_  & init - initialization and (optional) global calendar config
   subroutine init &
        & (ierr, &
-       &  ulog, ncals, mode, auto, &
-       &  levv, inim,  stdv)
+       &  u,     levv,   mode,  stdv, &
+       &  ncals, global, auto)
 #   define __PROC__ 'init'
-    use TOUZA_Cal_primitive,only: msg
+    use TOUZA_Cal_primitive,only: msg, choice, control_mode, control_deep
     use TOUZA_Cal_core,only: core_init => init
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode, stdv ! verbose levels, initialization mode
     integer,intent(in),optional :: ncals
-    integer,intent(in),optional :: mode
+    integer,intent(in),optional :: global
     integer,intent(in),optional :: auto
-    integer,intent(in),optional :: levv, inim, stdv ! verbose levels, initialization mode
     integer jdummy
+    integer lv, md, lmd
 
     ierr = 0
 
-    if (lcals.gt.0) then
-       ierr = -1
-       call logging(msglev_warning, 'reinit', __PROC__, ulog)
-    else
-       if (ierr.eq.0) call core_init(ierr, ulog, levv, inim, stdv)
-       if (ierr.eq.0) call msg(msglev_normal, TIME_STAMP, u=ulog)
+    md = control_mode(mode, MODE_SHALLOW)
+    init_mode = md
 
-       lcals = 0 ! to mark initialized
-
-       ! number of calendars
-       if (present(ncals)) then
-          if (ierr.eq.0) call alloc(ierr, ncals)
-       else if (present(mode).or.present(auto)) then
-          if (ierr.eq.0) call alloc(ierr, 0)
+    if (md.ge.MODE_SURFACE) then
+       err_default = ERR_SUCCESS
+       lv = choice(lev_verbose, levv)
+       if (is_first_force(init_counts, md)) then
+          ulog = choice(ulog, u)
+          lev_verbose = lv
        endif
-       ! global calendar declaration
-       if (present(mode).or.present(auto)) then
-          if (ierr.eq.0) then
-             call new_calendar(ierr, mode, auto, ulog, jdummy)
-             if (jdummy.ne.jglobal) ierr = -1
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call core_init(ierr, ulog, levv, mode=lmd, stdv=stdv)
+       endif
+       if (lcals.gt.0) then
+          ierr = -1
+          call logging(msglev_warning, 'reinit', __PROC__, ulog)
+       endif
+       if (init_counts.eq.0) then
+          lcals = 0 ! to mark initialized
+          ! number of calendars
+          if (present(ncals)) then
+             if (ierr.eq.0) call alloc(ierr, ncals)
+          else if (present(global).or.present(auto)) then
+             if (ierr.eq.0) call alloc(ierr, 0)
+          endif
+          ! global calendar declaration
+          if (present(global).or.present(auto)) then
+             if (ierr.eq.0) then
+                call new_calendar(ierr, global, auto, ulog, jdummy)
+                if (jdummy.ne.jglobal) ierr = -1
+             endif
           endif
        endif
+       init_counts = init_counts + 1
+       if (ierr.ne.0) err_default = ERR_FAILURE_INIT
     endif
     return
 #   undef __PROC__
   end subroutine init
 
 !!!_  & diag
-  subroutine diag(ierr, u, levv)
+  subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Cal_primitive,only: msg, choice
     use TOUZA_Cal_core,only: core_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
-    integer,intent(in),optional :: levv
-    ierr = 0
-    if (ierr.eq.0) call core_diag(ierr, u, levv)
+    integer,intent(in),optional :: levv, mode
+    integer utmp, lv, md, lmd
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       call trace_control &
+            & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, fun='diag', u=utmp, levv=lv)
+       if (is_first_force(diag_counts, md)) then
+          if (ierr.eq.0) call msg(msglev_normal, TIME_STAMP, u=utmp)
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call core_diag(ierr, utmp, levv, mode=lmd)
+       endif
+       diag_counts = diag_counts + 1
+    endif
+
     return
   end subroutine diag
 
 !!!_  & finalize
-  subroutine finalize(ierr, u, levv)
-    use TOUZA_Cal_core,only: core_finalize=>finalize
+  subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Cal_primitive,only: choice
+    use TOUZA_Cal_core,     only: core_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
-    ierr = 0
-    if (ierr.eq.0) call core_finalize(ierr, u, levv)
+    integer,intent(in),optional :: mode
+    integer utmp, lv, md, lmd
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       if (is_first_force(fine_counts, md)) then
+          call trace_fine &
+               & (ierr, md, init_counts, diag_counts, fine_counts, &
+               &  pkg=__PKG__, grp=__GRP__, fun='finalize', u=utmp, levv=lv)
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call core_finalize(ierr, utmp, lv, mode=lmd)
+       endif
+       fine_counts = fine_counts + 1
+    endif
     return
   end subroutine finalize
 
@@ -279,14 +345,14 @@ contains
 
 !!!_   & new_calendar - decleare new calendar and assign id
   subroutine new_calendar &
-       & (ierr, mode, auto, ulog, jcalh)
+       & (ierr, mode, auto, u, jcalh)
 #   define __PROC__ 'new_calendar'
     use TOUZA_Cal_core,only: decl_cal
     implicit none
     integer,intent(out)          :: ierr
     integer,intent(in), optional :: mode
     integer,intent(in), optional :: auto
-    integer,intent(in), optional :: ulog
+    integer,intent(in), optional :: u
     integer,intent(out),optional :: jcalh
     integer jc
 
@@ -298,7 +364,7 @@ contains
        call logging(msglev_critical, 'overflow', __PROC__)
     endif
 
-    call decl_cal(CALH(jc), mode=mode, auto=auto, ulog=ulog)
+    call decl_cal(CALH(jc), mode=mode, auto=auto, u=u)
 
     if (present(jcalh)) then
        if (ierr.eq.0) then

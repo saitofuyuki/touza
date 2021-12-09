@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2021/03/06 10:39:27 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/11/21 10:02:00 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -17,7 +17,7 @@
 #include "touza_std.h"
 !!!_* macros
 #ifndef   OPT_MAX_FILE_UNITS
-#  define OPT_MAX_FILE_UNITS 512 /* maximum number of file units */
+#  define OPT_MAX_FILE_UNITS 4096 /* maximum number of file units */
 #endif
 #ifndef   OPT_MAX_BLACK_UNITS
 #  define OPT_MAX_BLACK_UNITS 128 /* maximum number of black-list units */
@@ -31,6 +31,8 @@
 !!!_@ TOUZA_Std_fun - file units manipulation
 module TOUZA_Std_fun
 !!!_ = declaration
+  use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
+  use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
 !!!_  - default
   implicit none
   private
@@ -39,9 +41,13 @@ module TOUZA_Std_fun
 # define __MDL__ 'fun'
 # define __TAG__ STD_FORMAT_MDL(__MDL__)
 !!!_  - static
+  integer,save :: init_mode = 0
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
+  integer,save :: fine_counts = 0
   integer,save :: lev_verbose = STD_MSG_LEVEL
+  integer,save :: err_default = ERR_NO_INIT
+  integer,save :: ulog = unit_global
 
   integer,save :: limu = OPT_MAX_FILE_UNITS
 
@@ -59,29 +65,34 @@ module TOUZA_Std_fun
 !!!_ + common interfaces
 contains
 !!!_  & init
-  subroutine init(ierr, levv, mode)
+  subroutine init(ierr, u, levv, mode)
     use TOUZA_Std_utl, only: utl_init=>init, choice
     use TOUZA_Std_log, only: log_init=>init
     implicit none
     integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer md, lv
+    integer md, lv, lmd
 
     ierr = 0
 
-    lv = choice(lev_verbose, levv)
-    md = choice(INIT_DEFAULT, mode)
-    if (md.eq.INIT_DEFAULT) md = INIT_DEEP
+    md = control_mode(mode, MODE_DEEPEST)
+    init_mode = md
 
-    if (md.gt.INIT_DEFAULT) then
-       if (md.ge.INIT_DEEP) then
-          if (ierr.eq.0) call utl_init(ierr, levv=lv, mode=md)
-          if (ierr.eq.0) call log_init(ierr, levv=lv, mode=md)
-       endif
-       if (init_counts.eq.0) then
+    if (md.ge.MODE_SURFACE) then
+       err_default = ERR_SUCCESS
+       lv = choice(lev_verbose, levv)
+       if (is_first_force(init_counts, md)) then
+          ulog = choice(ulog, u)
           lev_verbose = lv
        endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
+       endif
        init_counts = init_counts + 1
+       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_FUN
     endif
     return
   end subroutine init
@@ -94,33 +105,37 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: levv, mode
     integer,intent(in),optional :: u
-    integer md, lv
+    integer md, lv, lmd, utmp
 
-    ierr = 0
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
     lv = choice(lev_verbose, levv)
-    md = choice(DIAG_DEFAULT, mode)
-    if (md.eq.DIAG_DEFAULT) md = DIAG_DEEP
+    utmp = choice(ulog, u)
 
-    if (md.gt.DIAG_DEFAULT) then
-       if (IAND(md, DIAG_DEEP).gt.0) then
-          if (ierr.eq.0) call utl_diag(ierr, u, lv, md)
-          if (ierr.eq.0) call log_diag(ierr, u, lv, md)
-       endif
-       if (diag_counts.eq.0.or.IAND(md,DIAG_FORCE).gt.0) then
+    if (md.ge.MODE_SURFACE) then
+       call trace_control &
+            & (ierr, md, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
+       if (is_first_force(diag_counts, md)) then
           if (ierr.eq.0) then
              if (VCHECK_NORMAL(lv)) then
-                call msg_mdl(TIME_STAMP, __MDL__, u)
+                call msg_mdl(TIME_STAMP, __MDL__, utmp)
              endif
              if (VCHECK_NORMAL(lv)) then
-                call msg_mdl('(''limit file units = '', I0)', (/ limu /), __MDL__, u)
+                call msg_mdl('(''limit file units = '', I0)', (/ limu /), __MDL__, utmp)
              endif
              if (VCHECK_NORMAL(lv)) then
-                call msg_mdl('(''temporary file format = '', A)', tmpfmt,  __MDL__, u)
+                call msg_mdl('(''temporary file format = '', A)', tmpfmt,  __MDL__, utmp)
              endif
              if (VCHECK_INFO(lv)) then
-                call diag_black_list(ierr, u)
+                call diag_black_list(ierr, utmp)
              endif
           endif
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -129,15 +144,32 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std_utl, only: utl_finalize=>finalize
+    use TOUZA_Std_utl, only: utl_finalize=>finalize, choice
     use TOUZA_Std_log, only: log_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: levv, mode
     integer,intent(in),optional :: u
-    ierr = 0
-    if (ierr.eq.0) call log_finalize(ierr, u, levv, mode)
-    if (ierr.eq.0) call utl_finalize(ierr, u, levv, mode)
+    integer utmp, lv, md, lmd
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       if (is_first_force(fine_counts, md)) then
+          call trace_fine &
+               & (ierr, md, init_counts, diag_counts, fine_counts, &
+               &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call log_finalize(ierr, utmp, levv, mode=lmd)
+          if (ierr.eq.0) call utl_finalize(ierr, utmp, levv, mode=lmd)
+       endif
+    endif
     return
   end subroutine finalize
 
@@ -145,11 +177,15 @@ contains
 !!!_  & set_tempfile - set temporary path format
   subroutine set_tempfile (fmt)
     implicit none
-    character(len=*),intent(in) :: fmt
-    if (fmt.eq.' ') then
-       tmpfmt = OPT_TEMPORARY_FORMAT
+    character(len=*),intent(in),optional :: fmt
+    if (present(fmt)) then
+       if (fmt.eq.' ') then
+          tmpfmt = OPT_TEMPORARY_FORMAT
+       else
+          tmpfmt = fmt
+       endif
     else
-       tmpfmt = fmt
+       tmpfmt = OPT_TEMPORARY_FORMAT
     endif
     return
   end subroutine set_tempfile
@@ -161,6 +197,9 @@ contains
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(in),optional :: ksw
+    ! kswi < 0:  search starts from 0
+    ! kswi = 0:  search from last unit
+    ! kswi > 0:  search from last unit + 1 (default)
     integer :: kswi
     integer :: ui
     integer :: uoff
@@ -206,7 +245,7 @@ contains
        write(fn, tmpfmt) un
        open(UNIT=un, FILE=fn, STATUS='NEW', IOSTAT=jerr)
        if (jerr.eq.0) then
-          close(UNIT=un, STATUS='delete', IOSTAT=jerr)
+          close(UNIT=un, STATUS='DELETE', IOSTAT=jerr)
           exit
        endif
        close(UNIT=un, IOSTAT=jerr)
@@ -228,7 +267,7 @@ contains
        write(fn, tmpfmt) un
        open(UNIT=un, FILE=fn, STATUS='NEW', IOSTAT=jerr)
        if (jerr.eq.0) then
-          close(UNIT=un, STATUS='delete', IOSTAT=jerr)
+          close(UNIT=un, STATUS='DELETE', IOSTAT=jerr)
           exit
        endif
        close(UNIT=un, IOSTAT=jerr)
@@ -251,7 +290,7 @@ contains
     integer ut
     integer jp, jins
 
-    ierr = 0
+    ierr = err_default
 
     ! ublist is a sorted list of integers.
     ul = ub
@@ -268,7 +307,7 @@ contains
           ut = min(uh, ublist(jins) - 1)
           nu = ut - ul + 1
           if (nblack + nu.gt.lblack) then
-             ierr = -1
+             ierr = -1 - ERR_MASK_STD_FUN
              exit
           endif
           do jp = nblack, jins, -1
@@ -314,7 +353,7 @@ contains
     integer,intent(in),optional :: u
     integer jp, jbl, jbh
     integer,parameter :: nstp = 10
-    ierr = 0
+    ierr = err_default
     do jp = 0, nblack - 1, nstp
        jbl = jp + 1
        jbh = min(nblack, jp + nstp)
@@ -350,10 +389,12 @@ contains
     if (lchk.lt.0) lchk = max(0, limu)
     uli = choice(-1, ulog)
     allocate(stt(ubgn:lchk), STAT=ierr)
-    stt(:) = 0
-    nopn  = 0
-    nopnd = 0
-    if (ierr.eq.0) then
+    if (ierr.ne.0) then
+       ierr = ERR_ALLOCATION - ERR_MASK_STD_FUN
+    else
+       nopn  = 0
+       nopnd = 0
+       stt(:) = 0
        do jchk = ubgn, lchk
           inquire(UNIT=jchk, IOSTAT=ierr, OPENED=opnd)
           tmsg = ' '
@@ -433,7 +474,7 @@ program test_std_fun
   if (ierr.eq.0) call add_black_list(ierr, 28, 33)
 
   if (ierr.eq.0) call diag(ierr, levv=+2)
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+10)
   if (ierr.eq.0) then
      call brute_force_check_units(ierr, limit=20)
      call brute_force_check_units(ierr, limit=200)

@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2021/02/16 19:32:16 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/11/21 10:11:06 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -24,14 +24,20 @@ module TOUZA_Std_mwe
 #else
 #  define MPI_COMM_NULL 0
 #endif /* OPT_USE_MPI */
+  use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
+  use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
 !!!_  - default
   implicit none
   private
 !!!_  - static
 #define __MDL__ 'mwe'
+  integer,save :: init_mode = 0
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
+  integer,save :: fine_counts = 0
   integer,save :: lev_verbose = STD_MSG_LEVEL
+  integer,save :: err_default = ERR_NO_INIT
+  integer,save :: ulog = unit_global
 
   integer,save :: icomm_default = MPI_COMM_NULL
 !!!_  - public
@@ -42,55 +48,40 @@ module TOUZA_Std_mwe
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, icomm, irank, levv, mode)
+  subroutine init(ierr, u, levv, mode, icomm, irank)
     use TOUZA_Std_log,only: log_init=>init
     use TOUZA_Std_utl,only: utl_init=>init, choice, set_if_present
     implicit none
     integer,intent(out)          :: ierr
-    integer,intent(out),optional :: icomm ! default commnunicator (world)
-    integer,intent(out),optional :: irank ! rank in icomm
+    integer,intent(in), optional :: u
     integer,intent(in), optional :: levv
     integer,intent(in), optional :: mode
-    integer ic, ir
-    integer md, lv
-    logical isini
+    integer,intent(out),optional :: icomm ! default commnunicator (world)
+    integer,intent(out),optional :: irank ! rank in icomm
+    integer md, lv, lmd
 
     ierr = 0
 
-    lv = choice(lev_verbose, levv)
-    md = choice(INIT_DEFAULT, mode)
-    if (md.eq.INIT_DEFAULT) md = INIT_DEEP
+    md = control_mode(mode, MODE_DEEPEST)
+    init_mode = md
 
-    if (md.gt.INIT_DEFAULT) then
-       if (md.ge.INIT_DEEP) then
-          if (ierr.eq.0) call utl_init(ierr, levv=lv, mode=md)
-          if (ierr.eq.0) call log_init(ierr, levv=lv, mode=md)
-       endif
-       if (init_counts.eq.0) then
+    if (md.ge.MODE_SURFACE) then
+       err_default = ERR_SUCCESS
+       lv = choice(lev_verbose, levv)
+       if (is_first_force(init_counts, md)) then
+          ulog = choice(ulog, u)
           lev_verbose = lv
-#if OPT_USE_MPI
-          if (ierr.eq.0) then
-             call MPI_Initialized(isini, ierr)
-             if (ierr.eq.0) then
-                if (.not.isini) call MPI_Init(ierr)
-             endif
-          endif
-          if (ierr.eq.0) then
-             ic = MPI_COMM_WORLD
-             call MPI_Comm_rank(ic, ir, ierr)
-          else
-             ic = MPI_COMM_NULL
-             ir = -1
-          endif
-#else  /* not OPT_USE_MPI */
-          ic = MPI_COMM_NULL
-          ir = -1
-#endif /* not OPT_USE_MPI */
-          call set_if_present(icomm, ic)
-          call set_if_present(irank, ir)
-          icomm_default = ic
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
+       endif
+       if (is_first_force(init_counts, md)) then
+          if (ierr.eq.0) call init_batch(ierr, icomm, irank, ulog, levv)
        endif
        init_counts = init_counts + 1
+       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_MWE
     endif
     return
   end subroutine init
@@ -105,21 +96,19 @@ contains
     integer,intent(in),optional :: mode
     integer,intent(in),optional :: icomm
     integer ir, nr
-    integer lv, md
+    integer utmp, md, lv, lmd
 
-    ierr = 0
+    ierr = err_default
 
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
     lv = choice(lev_verbose, levv)
-    md = choice(DIAG_DEFAULT, mode)
-    if (md.eq.DIAG_DEFAULT) md = DIAG_DEEP
 
-    if (md.gt.DIAG_DEFAULT) then
-       if (IAND(md, DIAG_DEEP).gt.0) then
-          if (ierr.eq.0) call utl_diag(ierr, u, lv, md)
-          if (ierr.eq.0) call log_diag(ierr, u, lv, md)
-       endif
-       if (diag_counts.eq.0.or.IAND(md,DIAG_FORCE).gt.0) then
-          if (VCHECK_NORMAL(lv)) call msg_mdl(TIME_STAMP, __MDL__, u)
+    if (md.ge.MODE_SURFACE) then
+       call trace_control &
+            & (ierr, md, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
+       if (is_first_force(diag_counts, md)) then
+          if (VCHECK_NORMAL(lv)) call msg_mdl(TIME_STAMP, __MDL__, utmp)
           if (VCHECK_NORMAL(lv)) then
              call get_ni(ierr, nr, ir, icomm)
 101          format('ranks = ', I0, 1x, I0, 1x, I0)
@@ -128,8 +117,13 @@ contains
              else
                 write(tmsg, 101) ir, nr
              endif
-             call msg_mdl(tmsg, __MDL__, u)
+             call msg_mdl(tmsg, __MDL__, utmp)
           endif
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -145,25 +139,78 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: mode
-    integer lv
+    integer utmp, lv, md, lmd
     logical isfin
 
-    ierr = 0
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
     lv = choice(lev_verbose, levv)
-#if OPT_USE_MPI
-    if (ierr.eq.0) then
-       call MPI_Finalized(isfin, ierr)
-       if (ierr.eq.0) then
-          if (.not.isfin) call MPI_finalize(ierr)
+
+    if (md.ge.MODE_SURFACE) then
+       if (is_first_force(fine_counts, md)) then
+          call trace_fine &
+               & (ierr, md, init_counts, diag_counts, fine_counts, &
+               &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
+#if OPT_USE_MPI
+       if (ierr.eq.0) then
+          call MPI_Finalized(isfin, ierr)
+          if (ierr.eq.0) then
+             if (.not.isfin) call MPI_finalize(ierr)
+          endif
+       endif
+#endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)
+       endif
+       fine_counts = fine_counts + 1
     endif
-#else  /* not OPT_USE_MPI */
-    continue
-#endif /* not OPT_USE_MPI */
-    if (ierr.eq.0) call utl_finalize(ierr, u, lv, mode)
 
     return
   end subroutine finalize
+!!!_ + init subcontracts
+!!!_  - init_batch
+  subroutine init_batch(ierr, icomm, irank, u, levv)
+    use TOUZA_Std_utl,only: choice, set_if_present
+    implicit none
+    integer,intent(out)          :: ierr
+    integer,intent(out),optional :: icomm ! default commnunicator (world)
+    integer,intent(out),optional :: irank ! rank in icomm
+    integer,intent(in), optional :: u
+    integer,intent(in), optional :: levv
+    integer ic, ir
+    logical isini
+
+    ierr = 0
+
+#if OPT_USE_MPI
+    if (ierr.eq.0) then
+       call MPI_Initialized(isini, ierr)
+       if (ierr.eq.0) then
+          if (.not.isini) call MPI_Init(ierr)
+       endif
+    endif
+    if (ierr.eq.0) then
+       ic = MPI_COMM_WORLD
+       call MPI_Comm_rank(ic, ir, ierr)
+    else
+       ic = MPI_COMM_NULL
+       ir = -1
+    endif
+#else  /* not OPT_USE_MPI */
+    ic = MPI_COMM_NULL
+    ir = -1
+#endif /* not OPT_USE_MPI */
+    call set_if_present(icomm, ic)
+    call set_if_present(irank, ir)
+    icomm_default = ic
+    return
+  end subroutine init_batch
+
 !!!_ + user subroutines
 !!!_  & get_ni - return rank and size
   subroutine get_ni &
@@ -198,7 +245,7 @@ program test_std_mwe
 
   call init(ierr)
   if (ierr.eq.0) call diag(ierr)
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+10)
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop

@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2021/03/06 10:46:23 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/11/21 09:52:23 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -31,14 +31,26 @@
 #ifndef   OPT_FILE_STORAGE_BITS
 #  define OPT_FILE_STORAGE_BITS 0  /* file storage unit in BITS */
 #endif
+#ifndef   OPT_STREAM_STORAGE_BITS
+#  define OPT_STREAM_STORAGE_BITS 0  /* file storage unit in BITS for stream i/o */
+#endif
 #ifndef   OPT_CHAR_STORAGE_BITS
 #  define OPT_CHAR_STORAGE_BITS 0  /* character storage unit in BITS */
 #endif
+#ifndef   OPT_BYTE_BITS
+#  define OPT_BYTE_BITS 0  /* (parameter) number of bits in a byte (character) */
+#endif
 #ifndef   OPT_PATH_LEN
-#  define OPT_PATH_LEN 1024 /* fie path limit length */
+#  define OPT_PATH_LEN 1024 /* file path limit length */
+#endif
+#ifndef   OPT_IOSTAT_EOF
+#  define OPT_IOSTAT_EOF 0 /* end-of-file IOSTAT */
 #endif
 !!!_@ TOUZA_Std_env - standard environments
 module TOUZA_Std_env
+  use TOUZA_Std_prc,only: KI32, KI64
+  use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
+  use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
 !!!_ = declaration
 !!!_  - ISO_FORTRAN_ENV module
 #if HAVE_ISO_FORTRAN_ENV
@@ -67,21 +79,54 @@ module TOUZA_Std_env
 #    warning "Force to use OPT_STDERR_UNIT"
 #  endif
 
-#  if OPT_FILE_STORAGE_BITS
+#  if OPT_FILE_STORAGE_BITS >= 0
 #    warning "Force to use OPT_FILE_STORAGE_BITS"
 #  else
 #    undef  OPT_FILE_STORAGE_BITS
 #    define OPT_FILE_STORAGE_BITS FILE_STORAGE_SIZE
 #  endif
 
-#  if OPT_CHAR_STORAGE_BITS
+#  if OPT_CHAR_STORAGE_BITS >= 0
 #    warning "Force to use OPT_CHAR_STORAGE_BITS"
 #  else
 #    undef  OPT_CHAR_STORAGE_BITS
 #    define OPT_CHAR_STORAGE_BITS CHARACTER_STORAGE_SIZE
 #  endif
 
-#endif /* HAVE_ISO_FORTRAN_ENV */
+#  if OPT_BYTE_BITS > 0
+#    warning "Force to use OPT_BYTE_BITS"
+#  else
+#    undef  OPT_BYTE_BITS
+#    define OPT_BYTE_BITS CHARACTER_STORAGE_SIZE
+#  endif
+
+#  if OPT_FILE_STREAM_BITS > 0
+#    warning "Force to use OPT_FILE_STREAM_BITS"
+#  else
+#    undef  OPT_FILE_STREAM_BITS
+#    define OPT_FILE_STREAM_BITS FILE_STORAGE_SIZE
+#  endif
+
+#else  /* not HAVE_ISO_FORTRAN_ENV */
+
+#  if OPT_BYTE_BITS > 0
+#    warning "Force to use OPT_BYTE_BITS"
+#  else
+#    undef  OPT_BYTE_BITS
+#    define OPT_BYTE_BITS 8   /* typically 1 byte = 8 bits */
+#  endif
+
+#endif /* not HAVE_ISO_FORTRAN_ENV */
+!!!_  - ISO_FORTRAN_ENV/IOSTAT_EOF
+#if    HAVE_ISO_FORTRAN_ENV_IOSTAT_END
+  use ISO_FORTRAN_ENV,only: IOSTAT_END
+#  if OPT_IOSTAT_EOF
+#    warning "Force to use OPT_IOSTAT_EOF"
+#  else /* not OPT_IOSTAT_EOF */
+#    undef   OPT_IOSTAT_EOF
+#    define  OPT_IOSTAT_EOF IOSTAT_END
+#  endif /* not OPT_IOSTAT_EOF */
+#endif /* HAVE_ISO_FORTRAN_ENV_IOSTAT_END */
 !!!_  - ISO_C_BINDING module
 #if HAVE_ISO_C_BINDING
 #endif /* HAVE_ISO_C_BINDING */
@@ -95,78 +140,139 @@ module TOUZA_Std_env
   integer,parameter,public :: endian_BIG    = 1234
   integer,parameter,public :: endian_LITTLE = 4321
   integer,parameter,public :: endian_MULTI  = 9999
+
+  integer,parameter,public :: nbits_byte = OPT_BYTE_BITS
 !!!_  - public constants
   integer,save,public :: uin  = OPT_STDIN_UNIT
   integer,save,public :: uout = OPT_STDOUT_UNIT
   integer,save,public :: uerr = OPT_STDERR_UNIT
-  integer,save,public :: lbrec = 0                       ! unit record length in bytes
-  integer,save,public :: lreci = 0, lrecf = 0, lrecd = 0 ! record lengths of single integer/float/double
+
+  ! sequential unformatted
+  integer,save,public :: nb_recl = 0          ! number of bytes per unit record length
+  ! stream unformatted
+  integer,save,public :: nc_strm = 0          ! number of characters per unit length for stream i/o
 
   integer,save,public :: kendi_mem  = endian_UNKNOWN
   integer,save,public :: kendi_file = endian_UNKNOWN
+
+  integer,save,public :: err_eof = OPT_IOSTAT_EOF
 !!!_  - static
   integer,save :: lfileu = OPT_FILE_STORAGE_BITS
   integer,save :: lcharu = OPT_CHAR_STORAGE_BITS
+  integer,save :: lstrmu = OPT_STREAM_STORAGE_BITS
 
+  integer,save :: lreci = 0, lrecl = 0 ! (sequential) record lengths of single 32/64-bit integer
+  integer,save :: lrecf = 0, lrecd = 0 ! (sequential) record lengths of single float/double
+
+  integer,save :: mstrmi = 0, mstrml = 0 ! (stream) unit length of single float/double
+  integer,save :: mstrmf = 0, mstrmd = 0 ! (stream) unit length single float/double
+
+  integer,save :: nbyti = 0, nbytl = 0 ! (bytes) single float/double
+  integer,save :: nbytf = 0, nbytd = 0 ! (bytes) single float/double
+
+  integer,save :: init_mode = 0
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
+  integer,save :: fine_counts = 0
   integer,save :: lev_verbose = STD_MSG_LEVEL
-!!!_  - publicG
+  integer,save :: ulog = unit_global
+
+  integer,save :: err_default = ERR_NO_INIT - ERR_MASK_STD_ENV
+!!!_  - public
   public init, diag, finalize
+  public init_batch
   public check_all
   public brute_force_std_units
   public check_storage_units
   public brute_force_storage_unit
   public brute_force_recl
-  public check_bodr_mem,   check_bodr_files
-  public get_rlu, get_rlb
+  public check_bodr_mem, check_bodr_files
+  public get_size_bytes, get_size_seq, get_size_strm
+  public conv_b2strm,    get_mems_bytes
+  public is_eof_ss
 
 !!!_  - interfaces
   interface brute_force_recl
-     module procedure brute_force_recl_d
-     module procedure brute_force_recl_f
      module procedure brute_force_recl_i
+     module procedure brute_force_recl_l
+     module procedure brute_force_recl_f
+     module procedure brute_force_recl_d
   end interface brute_force_recl
 
-  interface get_rlu
-     module procedure get_rlu_d
-     module procedure get_rlu_f
-     module procedure get_rlu_i
-  end interface get_rlu
+  interface get_size_seq
+     module procedure get_size_seq_i
+     module procedure get_size_seq_l
+     module procedure get_size_seq_f
+     module procedure get_size_seq_d
+  end interface get_size_seq
+
+  interface get_size_strm
+     module procedure get_size_strm_i
+     module procedure get_size_strm_l
+     module procedure get_size_strm_f
+     module procedure get_size_strm_d
+  end interface get_size_strm
+
+  interface get_size_bytes
+     module procedure get_size_bytes_a,  get_size_bytes_la
+     module procedure get_size_bytes_i,  get_size_bytes_li
+     module procedure get_size_bytes_l,  get_size_bytes_ll
+     module procedure get_size_bytes_f,  get_size_bytes_lf
+     module procedure get_size_bytes_d,  get_size_bytes_ld
+  end interface get_size_bytes
+
+  interface get_mems_bytes
+     module procedure get_mems_bytes_a, get_mems_bytes_la
+     module procedure get_mems_bytes_i, get_mems_bytes_li
+     module procedure get_mems_bytes_l, get_mems_bytes_ll
+     module procedure get_mems_bytes_f, get_mems_bytes_lf
+     module procedure get_mems_bytes_d, get_mems_bytes_ld
+  end interface get_mems_bytes
+
+  interface conv_b2strm
+     module procedure conv_b2strm_i
+     module procedure conv_b2strm_l
+  end interface conv_b2strm
 
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, levtry, levv, mode)
+  subroutine init(ierr, u, levv, mode, levtry)
     use TOUZA_Std_utl,only: utl_init=>init, choice
     use TOUZA_Std_log,only: log_init=>init
+    use TOUZA_Std_prc,only: prc_init=>init
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: levtry ! brute-force level
+    integer,intent(in),optional :: u      ! log unit
     integer,intent(in),optional :: levv   ! verbose level
     integer,intent(in),optional :: mode   ! initialization flag
+    integer,intent(in),optional :: levtry ! brute-force level
 
-    integer md, lv
+    integer md, lv, lmd
 
     ierr = 0
 
-    lv = choice(lev_verbose, levv)
-    md = choice(INIT_DEFAULT, mode)
-    if (md.eq.INIT_DEFAULT) md = INIT_DEEP
+    md = control_mode(mode, MODE_DEEPEST)
+    init_mode = md
 
-    if (md.gt.INIT_DEFAULT) then
-       if (md.ge.INIT_DEEP) then
-          if (ierr.eq.0) call utl_init(ierr, levv=lv, mode=md)
-          if (ierr.eq.0) call log_init(ierr, levv=lv, mode=md)
-       endif
-       if (init_counts.eq.0) then
+    if (md.ge.MODE_SURFACE) then
+       err_default = ERR_SUCCESS
+       lv = choice(lev_verbose, levv)
+       if (is_first_force(init_counts, md)) then
+          ulog = choice(ulog, u)
           lev_verbose = lv
-          if (ierr.eq.0) then
-             call check_all (ierr, -1, lv, levtry)
-          endif
-          if (ierr.eq.0) call health_check(ierr, lev_verbose)
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
+       endif
+       if (is_first_force(init_counts, md)) then
+          if (ierr.eq.0) call init_batch(ierr, levtry, u=ulog, levv=lv)
        endif
        init_counts = init_counts + 1
+       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
     endif
 
     return
@@ -176,25 +282,24 @@ contains
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std_utl, only: utl_diag=>diag, choice
     use TOUZA_Std_log, only: log_diag=>diag, msg_mdl
+    use TOUZA_Std_prc, only: prc_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: mode
-    integer lv, md, utmp
+    integer lv, md, utmp, lmd
 
-    ierr = 0
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
     utmp = choice(uout, u)
     lv = choice(lev_verbose, levv)
-    md = choice(DIAG_DEFAULT, mode)
-    if (md.eq.DIAG_DEFAULT) md = DIAG_DEEP
 
-    if (md.gt.DIAG_DEFAULT) then
-       if (IAND(md, DIAG_DEEP).gt.0) then
-          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, md)
-          if (ierr.eq.0) call log_diag(ierr, utmp, lv, md)
-       endif
-       if (diag_counts.eq.0.or.IAND(md,DIAG_FORCE).gt.0) then
+    if (md.ge.MODE_SURFACE) then
+       call trace_control &
+            & (ierr, md, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
+       if (is_first_force(diag_counts, md)) then
           if (ierr.eq.0) then
              if (VCHECK_NORMAL(lv)) then
                 call msg_mdl(TIME_STAMP, __MDL__, utmp)
@@ -207,27 +312,88 @@ contains
              if (ierr.eq.0) call diag_stdu(ierr, utmp)
              if (ierr.eq.0) call diag_recl(ierr, utmp)
              if (ierr.eq.0) call diag_bodr(ierr, utmp)
+             if (ierr.eq.0) call diag_stat(ierr, utmp)
           endif
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
     return
   end subroutine diag
 
-!!!_   & check_all - check and set environments
+!!!_  & finalize
+  subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
+    use TOUZA_Std_log,only: log_finalize=>finalize
+    use TOUZA_Std_prc,only: prc_finalize=>finalize
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: mode
+    integer utmp, lv, md, lmd
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(uout, u)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       if (is_first_force(fine_counts, md)) then
+          call trace_fine &
+               & (ierr, md, init_counts, diag_counts, fine_counts, &
+               &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
+       endif
+       fine_counts = fine_counts + 1
+    endif
+    return
+  end subroutine finalize
+
+!!!_ + init subcontracts
+!!!_  & init_batch - initialization
+  subroutine init_batch &
+       & (ierr, levtry, ubgn, uend, ustp, u, levv)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: levtry ! negative to skip
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: ubgn, uend, ustp
+    ierr = 0
+    if (choice(0, levtry).ge.0) then
+       if (ierr.eq.0) call check_all(ierr, u, levv, levtry, ubgn, uend, ustp)
+       if (ierr.eq.0) call health_check(ierr, levv)
+    endif
+    return
+  end subroutine init_batch
+!!!_  & check_all - check and set environments
   subroutine check_all &
-       & (ierr, ulog, levv, levtry, ubgn, uend, ustp)
+       & (ierr, u, levv, levtry, ubgn, uend, ustp)
     use TOUZA_Std_utl, only: choice
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: levtry
     integer,intent(in),optional :: ubgn, uend, ustp
     integer lv
     integer ul
 
-    ierr = 0
+    ierr = ERR_SUCCESS
+
     lv = choice(lev_verbose, levv)
 
     if (ierr.eq.0) then
@@ -235,16 +401,33 @@ contains
     endif
     if (ierr.eq.0) then
        call check_storage_units &
-            & (ierr, lrecd, lrecf, lreci, lbrec, uout, lfileu, lcharu, levtry)
+            & (ierr, &
+            &  lrecd,   lrecf, lreci, lrecl, &
+            &  nb_recl, nc_strm, &
+            &  uout,    lfileu, lstrmu, lcharu, levtry)
     endif
     if (ierr.eq.0) then
-       ul = choice(-1, ulog)
+       nbyti = (nb_recl * lreci)
+       nbytl = (nb_recl * lrecl)
+       nbytf = (nb_recl * lrecf)
+       nbytd = (nb_recl * lrecd)
+       mstrmi = nbyti / max(1, nc_strm)
+       mstrml = nbytl / max(1, nc_strm)
+       mstrmf = nbytf / max(1, nc_strm)
+       mstrmd = nbytd / max(1, nc_strm)
+    endif
+    if (ierr.eq.0) then
+       ul = choice(-1, u)
        call check_byte_order &
             & (ierr, kendi_mem, kendi_file, ul, lv, ubgn, uend, ustp)
     endif
+    if (ierr.eq.0) then
+       ul = choice(-1, u)
+       call check_eof(ierr, err_eof, ul, lv)
+    endif
   end subroutine check_all
 
-!!!_   & health_check
+!!!_  & health_check
   subroutine health_check(ierr, levv, u)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
@@ -255,7 +438,8 @@ contains
     integer lv, utmp
     character(len=128) :: txt
 
-    ierr = 0
+    ierr = ERR_SUCCESS
+
     lv   = choice(lev_verbose, levv)
     utmp = choice(-1,u)
 
@@ -265,26 +449,27 @@ contains
           write(txt, 101) 'OPT_STDIN_UNIT'
           call msg_mdl(txt, __MDL__, utmp)
        endif
-       ierr = ERR_FAILURE_INIT
+       ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
     endif
     if (uout.lt.0) then
        if (VCHECK_FATAL(lv)) then
           write(txt, 101) 'OPT_STDOUT_UNIT'
           call msg_mdl(txt, __MDL__, utmp)
        endif
-       ierr = ERR_FAILURE_INIT
+       ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
     endif
     if (uerr.lt.0) then
        if (VCHECK_FATAL(lv)) then
           write(txt, 101) 'OPT_STDERR_UNIT'
           call msg_mdl(txt, __MDL__, utmp)
        endif
-       ierr = ERR_FAILURE_INIT
+       ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
     endif
 
     return
   end subroutine health_check
-!!!_   & diag_stdu
+!!!_ + diag subcontracts
+!!!_  & diag_stdu
   subroutine diag_stdu(ierr, u)
     use TOUZA_Std_log,only: msg_mdl
     use TOUZA_Std_utl,only: choice
@@ -293,7 +478,8 @@ contains
     integer,intent(in),optional :: u
     integer utmp
 
-    ierr = 0
+    ierr = err_default
+
 #   if HAVE_ISO_FORTRAN_ENV
       utmp = choice(OUTPUT_UNIT, u)
       call msg_mdl &
@@ -313,8 +499,44 @@ contains
     return
   end subroutine diag_stdu
 
-!!!_   & diag_recl
+!!!_  & diag_stat
+  subroutine diag_stat(ierr, u)
+    use TOUZA_Std_log,only: msg_mdl
+    use TOUZA_Std_utl,only: choice
+#if HAVE_ISO_FORTRAN_ENV_IOSTAT_END
+    use ISO_FORTRAN_ENV,only: IOSTAT_END
+#endif
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer utmp
+
+    ierr = err_default
+
+#   if HAVE_ISO_FORTRAN_ENV_IOSTAT_END
+      utmp = choice(OUTPUT_UNIT, u)
+      call msg_mdl &
+           & ('(''ISO_FORTRAN_ENV::IOSTAT_END enabled = '', I0)', &
+           &  IOSTAT_END, &
+           &  __MDL__, utmp)
+#   else /* not HAVE_ISO_FORTRAN_ENV */
+      utmp = choice(-1, u)
+      call msg_mdl &
+           & ('ISO_FORTRAN_ENV::IOSTAT_END disabled',  __MDL__, utmp)
+#   endif
+
+    call msg_mdl &
+         & ('(''eof = '', I0)', err_eof, __MDL__, utmp)
+
+    return
+  end subroutine diag_stat
+
+!!!_  & diag_recl
   subroutine diag_recl(ierr, u)
+#if HAVE_ISO_FORTRAN_ENV
+  use ISO_FORTRAN_ENV,only: &
+       &  FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
+#endif
     use TOUZA_Std_log,only: msg_mdl
     use TOUZA_Std_utl,only: choice
     implicit none
@@ -322,21 +544,39 @@ contains
     integer,intent(in),optional :: u
     integer utmp
 
-    ierr = 0
+    ierr = err_default
     utmp = choice(uout, u)
 
     call msg_mdl &
          & ('(''storage bits = '', I0, 1x, I0)', &
          &  (/lfileu, lcharu/), &
          &  __MDL__, utmp)
+#if HAVE_ISO_FORTRAN_ENV
     call msg_mdl &
-         & ('(''storage recl = '', I0, '' / '', I0, 1x, I0, 1x, I0)', &
-         &  (/lbrec,  lreci, lrecf, lrecd/), &
+         & ('(''storage bits (iso_fortran_env) = '', I0, 1x, I0)', &
+         &  (/FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE/), &
+         &  __MDL__, utmp)
+#endif /* HAVE_ISO_FORTRAN_ENV */
+    call msg_mdl &
+         & ('(''size = '', I0, 1x, I0, 1x, I0, 1x, I0)', &
+         &  (/nbyti, nbytl, nbytf, nbytd/), &
+         &  __MDL__, utmp)
+    call msg_mdl &
+         & ('(''sequential unit bytes = '', I0)', nb_recl, __MDL__, utmp)
+    call msg_mdl &
+         & ('(''sequential recl = '', I0, 1x, I0, 1x, I0, 1x, I0)', &
+         &  (/lreci, lrecl, lrecf, lrecd/), &
+         &  __MDL__, utmp)
+    call msg_mdl &
+         & ('(''stream unit bytes = '', I0)', nc_strm,  __MDL__, utmp)
+    call msg_mdl &
+         & ('(''stream length = '', I0, 1x, I0, 1x, I0, 1x, I0)', &
+         &  (/mstrmi, mstrml, mstrmf, mstrmd/), &
          &  __MDL__, utmp)
     return
   end subroutine diag_recl
 
-!!!_   & diag_bodr
+!!!_  & diag_bodr
   subroutine diag_bodr(ierr, u)
     use TOUZA_Std_log,only: msg_mdl
     use TOUZA_Std_utl,only: choice
@@ -345,7 +585,7 @@ contains
     integer,intent(in),optional :: u
     integer utmp
 
-    ierr = 0
+    ierr = err_default
     utmp = choice(uout, u)
 
     call msg_mdl &
@@ -357,47 +597,270 @@ contains
     return
   end subroutine diag_bodr
 
-!!!_  & finalize
-  subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std_utl, only: utl_finalize=>finalize, choice
-    use TOUZA_Std_log, only: log_finalize=>finalize
+!!!_ + conversion
+!!!_  & conv_b2strm - convert bytes to sizes in stream units
+  PURE &
+  integer(KIND=KTGT) function conv_b2strm_i(nb) result (ms)
+    use TOUZA_Std_prc,only: KTGT=>KI32
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: u
-    integer,intent(in),optional :: levv
-    integer,intent(in),optional :: mode
-    integer lv
-    ierr = 0
-    lv = choice(lev_verbose, levv)
-    if (ierr.eq.0) call log_finalize(ierr, u, lv, mode)
-    if (ierr.eq.0) call utl_finalize(ierr, u, lv, mode)
-    return
-  end subroutine finalize
+    integer(KIND=KTGT),intent(in) :: nb
+    ms = nb / nc_strm
+  end function conv_b2strm_i
+  PURE &
+  integer(KIND=KTGT) function conv_b2strm_l(nb) result (ms)
+    use TOUZA_Std_prc,only: KTGT=>KI64
+    implicit none
+    integer(KIND=KTGT),intent(in) :: nb
+    ms = nb / nc_strm
+  end function conv_b2strm_l
 !!!_ + queries
-!!!_  & get_rlb - get unit record length in bytes
-  integer function get_rlb() result(l)
+!!!_  & get_size_strm - get unit length in stream i/o
+  PURE &
+  integer function get_size_strm_i (V) result(l)
+    use TOUZA_Std_prc,only: KI32
     implicit none
-    l = lbrec
-  end function get_rlb
+    integer(KIND=KI32),intent(in) :: V
+    l = mstrmi + 0 * KIND(V)
+  end function get_size_strm_i
+  PURE &
+  integer function get_size_strm_l (V) result(l)
+    use TOUZA_Std_prc,only: KI64
+    implicit none
+    integer(KIND=KI64),intent(in) :: V
+    l = mstrml + 0 * KIND(V)
+  end function get_size_strm_l
+  PURE &
+  integer function get_size_strm_f (V) result(l)
+    use TOUZA_Std_prc,only: KFLT
+    implicit none
+    real(KIND=KFLT),intent(in) :: V
+    l = mstrmf + 0 * KIND(V)
+  end function get_size_strm_f
+  PURE &
+  integer function get_size_strm_d (V) result(l)
+    use TOUZA_Std_prc,only: KDBL
+    implicit none
+    real(KIND=KDBL),intent(in) :: V
+    l = mstrmd + 0 * KIND(V)
+  end function get_size_strm_d
 
-!!!_  & get_rlu - get record length unit
-  integer function get_rlu_d (V) result(l)
+!!!_  & get_size_bytes - get unit/total length in bytes
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_a (V, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KMEM=>KI32
+    implicit none
+    character(len=*),  intent(in)          :: V
+    integer(KIND=KMEM),intent(in),optional :: n
+    !! todo: nbyta detection
+    l = len(V) * choice(1_KMEM, n)  + 0 * KIND(V)
+  end function get_size_bytes_a
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_i (V, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KI32,KMEM=>KI32
+    implicit none
+    integer(KIND=KI32),intent(in)          :: V
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = nbyti * choice(1_KMEM, n)  + 0 * KIND(V)
+  end function get_size_bytes_i
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_l (V, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KI64,KMEM=>KI32
+    implicit none
+    integer(KIND=KI64),intent(in)          :: V
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = nbytl * choice(1_KMEM, n)  + 0 * KIND(V)
+  end function get_size_bytes_l
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_f (V, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KFLT,KMEM=>KI32
+    implicit none
+    real(KIND=KFLT),   intent(in)          :: V
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = nbytf * choice(1_KMEM, n) + 0 * KIND(V)
+  end function get_size_bytes_f
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_d (V, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KDBL,KMEM=>KI32
+    implicit none
+    real(KIND=KDBL),   intent(in)          :: V
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = nbytd * choice(1_KMEM, n)  + 0 * KIND(V)
+  end function get_size_bytes_d
+
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_la (V, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KMEM=>KI64
+    implicit none
+    character(len=*),  intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: n
+    !! todo: nbyta detection
+    l = len(V) * n  + 0 * KIND(V)
+  end function get_size_bytes_la
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_li (V, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KI32,KMEM=>KI64
+    implicit none
+    integer(KIND=KI32),intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: n
+    l = nbyti * n  + 0 * KIND(V)
+  end function get_size_bytes_li
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_ll (V, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KI64,KMEM=>KI64
+    implicit none
+    integer(KIND=KI64),intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: n
+    l = nbytl * n  + 0 * KIND(V)
+  end function get_size_bytes_ll
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_lf (V, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KFLT,KMEM=>KI64
+    implicit none
+    real(KIND=KFLT),   intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: n
+    l = nbytf * n + 0 * KIND(V)
+  end function get_size_bytes_lf
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_ld (V, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KDBL,KMEM=>KI64
+    implicit none
+    real(KIND=KDBL),   intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: n
+    l = nbytd * n  + 0 * KIND(V)
+  end function get_size_bytes_ld
+
+!!!_  & get_mems_bytes - get members from byte-length
+  PURE &
+  integer(kind=KMEM) function get_mems_bytes_a (l, V) result(n)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KMEM=>KI32
+    implicit none
+    character(len=*),  intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: l
+    !! todo: nbyta detection
+    n = l / len(V)   + 0 * KIND(V)
+  end function get_mems_bytes_a
+  PURE &
+  integer(kind=KMEM) function get_mems_bytes_i (l, V) result(n)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KI32,KMEM=>KI32
+    implicit none
+    integer(KIND=KI32),intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: l
+    n = l / nbyti  + 0 * KIND(V)
+  end function get_mems_bytes_i
+  PURE &
+  integer(kind=KMEM) function get_mems_bytes_l (l, V) result(n)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KI64,KMEM=>KI32
+    implicit none
+    integer(KIND=KI64),intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: l
+    n = l / nbytl  + 0 * KIND(V)
+  end function get_mems_bytes_l
+  PURE &
+  integer(kind=KMEM) function get_mems_bytes_f (l, V) result(n)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KFLT,KMEM=>KI32
+    implicit none
+    real(KIND=KFLT),   intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: l
+    n = l / nbytf  + 0 * KIND(V)
+  end function get_mems_bytes_f
+  PURE &
+  integer(kind=KMEM) function get_mems_bytes_d (l, V) result(n)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KDBL,KMEM=>KI32
+    implicit none
+    real(KIND=KDBL),   intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: l
+    n = l / nbytd  + 0 * KIND(V)
+  end function get_mems_bytes_d
+
+  PURE &
+  integer(kind=KMEM) function get_mems_bytes_la (l, V) result(n)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KMEM=>KI64
+    implicit none
+    character(len=*),  intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: l
+    !! todo: nbyta detection
+    n = l / len(V)   + 0 * KIND(V)
+  end function get_mems_bytes_la
+  PURE &
+  integer(kind=KMEM) function get_mems_bytes_li (l, V) result(n)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KI32,KMEM=>KI64
+    implicit none
+    integer(KIND=KI32),intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: l
+    n = l / nbyti  + 0 * KIND(V)
+  end function get_mems_bytes_li
+  PURE &
+  integer(kind=KMEM) function get_mems_bytes_ll (l, V) result(n)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KI64,KMEM=>KI64
+    implicit none
+    integer(KIND=KI64),intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: l
+    n = l / nbytl  + 0 * KIND(V)
+  end function get_mems_bytes_ll
+  PURE &
+  integer(kind=KMEM) function get_mems_bytes_lf (l, V) result(n)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KFLT,KMEM=>KI64
+    implicit none
+    real(KIND=KFLT),   intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: l
+    n = l / nbytf  + 0 * KIND(V)
+  end function get_mems_bytes_lf
+  PURE &
+  integer(kind=KMEM) function get_mems_bytes_ld (l, V) result(n)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KDBL,KMEM=>KI64
+    implicit none
+    real(KIND=KDBL),   intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: l
+    n = l / nbytd  + 0 * KIND(V)
+  end function get_mems_bytes_ld
+
+!!!_  & get_size_seq - get unit length in sequential i/o
+  PURE &
+  integer function get_size_seq_d (V) result(l)
     use TOUZA_Std_prc,only: KDBL
     implicit none
     real(kind=KDBL),intent(in) :: V
     l = lrecd + 0 * kind(V)
-  end function get_rlu_d
-  integer function get_rlu_f (V) result(l)
+  end function get_size_seq_d
+  PURE &
+  integer function get_size_seq_f (V) result(l)
     use TOUZA_Std_prc,only: KFLT
     implicit none
     real(kind=KFLT),intent(in) :: V
     l = lrecf + 0 * kind(V)
-  end function get_rlu_f
-  integer function get_rlu_i (V) result(l)
+  end function get_size_seq_f
+  PURE &
+  integer function get_size_seq_i (V) result(l)
     implicit none
-    integer,intent(in) :: V
+    integer(KIND=KI32),intent(in) :: V
     l = lreci + 0 * kind(V)
-  end function get_rlu_i
+  end function get_size_seq_i
+  PURE &
+  integer function get_size_seq_l (V) result(l)
+    implicit none
+    integer(KIND=KI64),intent(in) :: V
+    l = lreci + 0 * kind(V)
+  end function get_size_seq_l
 !!!_ + i/o units
 !!!_  & check_std_units - standard i/o units
   subroutine check_std_units &
@@ -496,16 +959,16 @@ contains
 !!!_ + storage size/record length detection
 !!!_  & check_storage_units
   subroutine check_storage_units &
-       & (ierr, lrd, lrf, lri, lunit, ulog, lbf, lbc, levtry)
+       & (ierr, lrd, lrf, lri, lrl, lunit, lustr, u, lbf, lbs, lbc, levtry)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_fun,only: new_unit_tmp
     use TOUZA_Std_prc,only: KDBL, KFLT
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(out)         :: lrd, lrf, lri
-    integer,intent(out)         :: lunit
-    integer,intent(in),optional :: ulog
-    integer,intent(in),optional :: lbf, lbc
+    integer,intent(out)         :: lrd,   lrf,  lri, lrl
+    integer,intent(out)         :: lunit, lustr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: lbf, lbs, lbc
     integer,intent(in),optional :: levtry
 
     character(len=OPT_PATH_LEN) :: tmpf
@@ -521,11 +984,20 @@ contains
     if (present(lbf).and.present(lbc)) then
        lunit = max(0, lbf) / max(1, lbc)
     endif
-
     if (lunit.le.0 .or. isf) then
        if (utest.lt.0) call new_unit_tmp(utest, tmpf)
-       if (utest.lt.0) ierr = -1
-       if (ierr.eq.0) call brute_force_storage_unit(ierr, lunit, utest, tmpf, ulog)
+       if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+       if (ierr.eq.0) call brute_force_storage_unit(ierr, lunit, utest, tmpf, u)
+    endif
+
+    lustr = 0
+    if (present(lbs)) then
+       lustr = max(0, lbs)
+    endif
+    if (lustr.le.0 .or. isf) then
+       if (utest.lt.0) call new_unit_tmp(utest, tmpf)
+       if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+       if (ierr.eq.0) call brute_force_stream_unit(ierr, lustr, utest, tmpf, u)
     endif
 
     if (ierr.eq.0) then
@@ -533,17 +1005,19 @@ contains
        if (.NOT.isf) then
           INQUIRE(IOLENGTH=lrd) real(0, KIND=KDBL)
           INQUIRE(IOLENGTH=lrf) real(0, KIND=KFLT)
-          INQUIRE(IOLENGTH=lri) int(0)
+          INQUIRE(IOLENGTH=lri) int(0, KIND=KI32)
+          INQUIRE(IOLENGTH=lrl) int(0, KIND=KI64)
        endif
 #     else  /* not HAVE_INQUIRE_IOLENGTH */
        isf = .true.
 #     endif /* not HAVE_INQUIRE_IOLENGTH */
        if (isf) then
           if (utest.lt.0) call new_unit_tmp(utest, tmpf)
-          if (utest.lt.0) ierr = -1
+          if (utest.lt.0) ierr = -1 - ERR_MASK_STD_ENV
           if (ierr.eq.0) call brute_force_recl(ierr, lrd, utest, tmpf, real(0, KIND=KDBL))
           if (ierr.eq.0) call brute_force_recl(ierr, lrf, utest, tmpf, real(0, KIND=KFLT))
-          if (ierr.eq.0) call brute_force_recl(ierr, lri, utest, tmpf, int(0))
+          if (ierr.eq.0) call brute_force_recl(ierr, lri, utest, tmpf, int(0, KIND=KI32))
+          if (ierr.eq.0) call brute_force_recl(ierr, lrl, utest, tmpf, int(0, KIND=KI64))
        endif
     endif
     return
@@ -551,14 +1025,14 @@ contains
 
 !!!_  & brute_force_storage_unit - lazy trial to find file storage unit
   subroutine brute_force_storage_unit &
-       & (ierr, lunit, utest, fn, ulog)
+       & (ierr, lunit, utest, fn, u)
     use TOUZA_Std_utl,only: choice
     implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: lunit
-    integer,         intent(in)  :: utest
-    character(len=*),intent(in)  :: fn
-    integer,intent(in),optional :: ulog
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: lunit
+    integer,         intent(in)          :: utest
+    character(len=*),intent(in)          :: fn
+    integer,         intent(in),optional :: u
 
     integer lrec
     character(len=*),parameter :: teststr = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -566,7 +1040,7 @@ contains
 
     ierr = 0
     lunit = -1
-    call check_new_file(ierr, utest, fn, ulog) ! for safety
+    call check_new_file(ierr, utest, fn, u) ! for safety
     if (ierr.ne.0) return
 
     if (ierr.eq.0) then
@@ -584,7 +1058,7 @@ contains
             & FORM='UNFORMATTED', ACTION='READWRITE', IOSTAT=ierr)
     endif
     if (ierr.eq.0) read(UNIT=utest, REC=2, IOSTAT=ierr) C
-    if (ierr.eq.0) close(UNIT=utest, STATUS='delete', IOSTAT=ierr)
+    if (ierr.eq.0) close(UNIT=utest, STATUS='DELETE', IOSTAT=ierr)
     if (ierr.eq.0) then
        lunit = INDEX(teststr, C) - 1
     endif
@@ -592,9 +1066,55 @@ contains
     return
   end subroutine brute_force_storage_unit
 
+!!!_  & brute_force_stream_unit - lazy trial to find file stream i/o unit
+  subroutine brute_force_stream_unit &
+       & (ierr, lustr, utest, fn, u)
+    use TOUZA_Std_log,only: msg_mdl
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: lustr
+    integer,         intent(in)          :: utest
+    character(len=*),intent(in)          :: fn
+    integer,         intent(in),optional :: u
+
+    integer lrec, jposh, jposf
+    character(len=*),parameter :: teststr = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    character(len=1) :: C
+    character(len=8) :: CS
+
+    ierr = 0
+    lustr = -1
+    call check_new_file(ierr, utest, fn, u) ! for safety
+    if (ierr.ne.0) return
+#   if HAVE_INQUIRE_POS
+    if (ierr.eq.0) then
+       open(UNIT=utest, FILE=fn,  &
+            & STATUS='UNKNOWN',   ACCESS='STREAM', &
+            & FORM='UNFORMATTED', ACTION='WRITE',  IOSTAT=ierr)
+    endif
+    if (ierr.eq.0) INQUIRE(UNIT=utest, POS=jposh, IOSTAT=ierr)
+    if (ierr.eq.0) then
+       lrec = len(CS)
+       CS = teststr(1:lrec)
+       write(UNIT=utest, IOSTAT=ierr) CS
+    endif
+    if (ierr.eq.0) INQUIRE(UNIT=utest, POS=jposf, IOSTAT=ierr)
+    if (ierr.eq.0) then
+       if (jposf.gt.jposh) then
+          lustr = lrec / (jposf - jposh)
+       endif
+    endif
+    if (ierr.eq.0) close(UNIT=utest, STATUS='DELETE', IOSTAT=ierr)
+#   else  /* not HAVE_INQUIRE_POS */
+    call msg_mdl('inquire pos disabled', __MDL__, u)
+#   endif /* not HAVE_INQUIRE_POS */
+    return
+  end subroutine brute_force_stream_unit
+
 !!!_  & brute_force_recl - lazy trial to find record length for unit type
   subroutine brute_force_recl_d &
-       & (ierr, lrec, utest, fn, v, lunit, nini, ulog)
+       & (ierr, lrec, utest, fn, v, lunit, nini, u)
     use TOUZA_Std_prc, only: KDBL
     use TOUZA_Std_utl, only: choice
     implicit none
@@ -605,17 +1125,17 @@ contains
     real(kind=KDBL), intent(in)          :: v     ! dummy placeholder
     integer,         intent(in),optional :: lunit ! unit record length in bytes
     integer,         intent(in),optional :: nini  ! initial guess
-    integer,         intent(in),optional :: ulog
+    integer,         intent(in),optional :: u
 
     integer ni
     ni = choice(8, nini) + 0 * KIND(V)
     call brute_force_recl_core &
-         & (ierr, lrec, utest, fn, check_single_write_d, ni, lunit, ulog)
+         & (ierr, lrec, utest, fn, check_single_write_d, ni, lunit, u)
 
   end subroutine brute_force_recl_d
 
   subroutine brute_force_recl_f &
-       & (ierr, lrec, utest, fn, v, lunit, nini, ulog)
+       & (ierr, lrec, utest, fn, v, lunit, nini, u)
     use TOUZA_Std_prc, only: KFLT
     use TOUZA_Std_utl, only: choice
     implicit none
@@ -626,39 +1146,60 @@ contains
     real(kind=KFLT), intent(in)          :: v     ! dummy placeholder
     integer,         intent(in),optional :: lunit ! unit record length in bytes
     integer,         intent(in),optional :: nini  ! initial guess
-    integer,         intent(in),optional :: ulog
+    integer,         intent(in),optional :: u
 
     integer ni
     ni = choice(4, nini) + 0 * KIND(V)
     call brute_force_recl_core &
-         & (ierr, lrec, utest, fn, check_single_write_f, ni, lunit, ulog)
+         & (ierr, lrec, utest, fn, check_single_write_f, ni, lunit, u)
 
   end subroutine brute_force_recl_f
 
   subroutine brute_force_recl_i &
-       & (ierr, lrec, utest, fn, v, lunit, nini, ulog)
-    use TOUZA_Std_prc, only: KDBL
+       & (ierr, lrec, utest, fn, v, lunit, nini, u)
+    use TOUZA_Std_prc, only: KI32
     use TOUZA_Std_utl, only: choice
     implicit none
-    integer,         intent(out)         :: ierr
-    integer,         intent(out)         :: lrec
-    integer,         intent(in)          :: utest
-    character(len=*),intent(in)          :: fn
-    integer,         intent(in)          :: v     ! dummy placeholder
-    integer,         intent(in),optional :: lunit ! unit record length in bytes
-    integer,         intent(in),optional :: nini  ! initial guess
-    integer,         intent(in),optional :: ulog
+    integer,           intent(out)         :: ierr
+    integer,           intent(out)         :: lrec
+    integer,           intent(in)          :: utest
+    character(len=*),  intent(in)          :: fn
+    integer(kind=KI32),intent(in)          :: v     ! dummy placeholder
+    integer,           intent(in),optional :: lunit ! unit record length in bytes
+    integer,           intent(in),optional :: nini  ! initial guess
+    integer,           intent(in),optional :: u
 
     integer ni
     ni = choice(4, nini) + 0 * KIND(V)
     call brute_force_recl_core &
-         & (ierr, lrec, utest, fn, check_single_write_i, ni, lunit, ulog)
+         & (ierr, lrec, utest, fn, check_single_write_i, ni, lunit, u)
 
   end subroutine brute_force_recl_i
 
+  subroutine brute_force_recl_l &
+       & (ierr, lrec, utest, fn, v, lunit, nini, u)
+    use TOUZA_Std_prc, only: KI64
+    use TOUZA_Std_utl, only: choice
+    implicit none
+    integer,           intent(out)         :: ierr
+    integer,           intent(out)         :: lrec
+    integer,           intent(in)          :: utest
+    character(len=*),  intent(in)          :: fn
+    integer(kind=KI64),intent(in)          :: v     ! dummy placeholder
+    integer,           intent(in),optional :: lunit ! unit record length in bytes
+    integer,           intent(in),optional :: nini  ! initial guess
+    integer,           intent(in),optional :: u
+
+    integer ni
+    ni = choice(8, nini) + 0 * KIND(V)
+    call brute_force_recl_core &
+         & (ierr, lrec, utest, fn, check_single_write_l, ni, lunit, u)
+
+  end subroutine brute_force_recl_l
+
 !!!_  & brute_force_recl_core - lazy trial to find record length for unit type (core)
   subroutine brute_force_recl_core &
-       & (ierr, lrec, utest, fn, xfunc, nini, lunit, ulog)
+       & (ierr, lrec, utest, fn, xfunc, nini, lunit, u)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(out)         :: ierr
@@ -668,7 +1209,7 @@ contains
     logical                              :: xfunc
     integer,         intent(in)          :: nini  ! initial guess
     integer,         intent(in),optional :: lunit ! unit record length in bytes
-    integer,         intent(in),optional :: ulog
+    integer,         intent(in),optional :: u
 
     logical sccs
     integer lu
@@ -676,11 +1217,11 @@ contains
 
     ierr = 0
     lrec = -1
-    call check_new_file(ierr, utest, fn, ulog)
+    call check_new_file(ierr, utest, fn, u)
     if (ierr.ne.0) return
 
     lu = choice(0, lunit)
-    if (lu.le.0) call brute_force_storage_unit(ierr, lu, utest, fn, ulog)
+    if (lu.le.0) call brute_force_storage_unit(ierr, lu, utest, fn, u)
     if (ierr.ne.0) return
 
     ! find good
@@ -746,7 +1287,7 @@ contains
     if (ierr.ne.0) return
     write(utest, REC=1, IOSTAT=jchk) V
     sccs = (jchk.eq.0)
-    close(UNIT=utest, STATUS='delete', IOSTAT=ierr)
+    close(UNIT=utest, STATUS='DELETE', IOSTAT=ierr)
     return
   end function check_single_write_d
 
@@ -767,7 +1308,7 @@ contains
     if (ierr.ne.0) return
     write(utest, REC=1, IOSTAT=jchk) V
     sccs = (jchk.eq.0)
-    close(UNIT=utest, STATUS='delete', IOSTAT=ierr)
+    close(UNIT=utest, STATUS='DELETE', IOSTAT=ierr)
     return
   end function check_single_write_f
 
@@ -778,7 +1319,7 @@ contains
     integer,         intent(in)  :: utest
     integer,         intent(in)  :: n
     character(len=*),intent(in)  :: fn
-    integer,parameter :: V = 0
+    integer(KIND=KI32),parameter :: V = 0
     integer jchk
 
     ierr = 0
@@ -787,9 +1328,29 @@ contains
     if (ierr.ne.0) return
     write(utest, REC=1, IOSTAT=jchk) V
     sccs = (jchk.eq.0)
-    close(UNIT=utest, STATUS='delete', IOSTAT=ierr)
+    close(UNIT=utest, STATUS='DELETE', IOSTAT=ierr)
     return
   end function check_single_write_i
+
+  logical function check_single_write_l &
+       & (ierr, utest, fn, n) result(sccs)
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: utest
+    integer,         intent(in)  :: n
+    character(len=*),intent(in)  :: fn
+    integer(KIND=KI64),parameter :: V = 0
+    integer jchk
+
+    ierr = 0
+    sccs = .false.
+    ierr = check_single_open(utest, n, fn)
+    if (ierr.ne.0) return
+    write(utest, REC=1, IOSTAT=jchk) V
+    sccs = (jchk.eq.0)
+    close(UNIT=utest, STATUS='DELETE', IOSTAT=ierr)
+    return
+  end function check_single_write_l
 
 !!!_  & check_single_open ()
   integer function check_single_open &
@@ -805,18 +1366,18 @@ contains
   end function check_single_open
 
 !!!_  & check_new_file - check if new file
-  subroutine check_new_file(ierr, utgt, fn, ulog)
+  subroutine check_new_file(ierr, utgt, fn, u)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: utgt
     character(len=*),intent(in)          :: fn
-    integer,         intent(in),optional :: ulog
+    integer,         intent(in),optional :: u
     integer ul
 
     ierr = 0
-    ul = choice(-1, ulog)
+    ul = choice(-1, u)
     open(UNIT=utgt, FILE=fn, STATUS='NEW', IOSTAT=ierr)
     if (ierr.ne.0) then
        if (VCHECK_SEVERE(lev_verbose)) then
@@ -828,37 +1389,37 @@ contains
                &  fn, __MDL__, ul)
        endif
     endif
-    if (ierr.eq.0) close(UNIT=utgt, STATUS='delete', IOSTAT=ierr)
+    if (ierr.eq.0) close(UNIT=utgt, STATUS='DELETE', IOSTAT=ierr)
     return
   end subroutine check_new_file
 
 !!!_ + byte-order
 !!!_  & check_byte_order - byte-order checks
   subroutine check_byte_order &
-       & (ierr, kendm, kendf, ulog, levv, ubgn, uend, ustp)
+       & (ierr, kendm, kendf, u, levv, ubgn, uend, ustp)
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: kendm, kendf
-    integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: ubgn, uend, ustp
 
     ierr = 0
-    call check_bodr_mem(ierr, kendm, ulog, levv)
+    call check_bodr_mem(ierr, kendm, u, levv)
     if (ierr.eq.0) then
-       call check_bodr_files(ierr, kendf, ulog, levv, ubgn, uend, ustp)
+       call check_bodr_files(ierr, kendf, u, levv, ubgn, uend, ustp)
     endif
     return
   end subroutine check_byte_order
 !!!_  & check_bodr_mem - check byte-order (memory)
   subroutine check_bodr_mem &
-       & (ierr, KENDI, ulog, levv)
+       & (ierr, KENDI, u, levv)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: kendi
-    integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer ul
     integer,parameter :: L = 8
@@ -867,8 +1428,9 @@ contains
 
     ierr = 0
     lv = choice(lev_verbose, levv)
-    ul = choice(-1, ulog)
+    ul = choice(-1, u)
 
+    write(C, '(8A)') ' '
     C = transfer(1684234849, C, L)
     write(T, '(8A)') C
     if (T(1:4).eq.'abcd') then
@@ -886,14 +1448,14 @@ contains
   end subroutine check_bodr_mem
 !!!_  & check_bodr_files - check byte-order (files)
   subroutine check_bodr_files &
-       & (ierr, KENDI, ulog, levv, ubgn, uend, ustp)
+       & (ierr, KENDI, u, levv, ubgn, uend, ustp)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
     use TOUZA_Std_fun,only: new_unit
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: kendi
-    integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: ubgn, uend, ustp
     integer ju
@@ -907,7 +1469,7 @@ contains
 
     ierr = 0
     lv = choice(lev_verbose, levv)
-    ul = choice(-1, ulog)
+    ul = choice(-1, u)
 
     kendi = endian_UNKNOWN
     RL = 0
@@ -922,7 +1484,7 @@ contains
     ue = ub - 1
     us = 1
     if (ub.lt.0) ub = new_unit()
-    if (ub.lt.0) ierr = -1
+    if (ub.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
     if (ierr.eq.0) then
        ue = choice(-1, uend)
        if (present(ubgn)) then
@@ -967,12 +1529,104 @@ contains
              kendi = endian_MULTI
           endif
        endif
-       if (ierr.eq.0) close(UNIT=ju, IOSTAT=ierr)
+       if (ierr.eq.0) close(UNIT=ju, STATUS='DELETE', IOSTAT=ierr)
     enddo
 
     return
   end subroutine check_bodr_files
 
+!!!_ + io status
+!!!_  & is_eof_ss() - check if iostat is eof (stream or sequential)
+  logical function is_eof_ss(e) result(b)
+    implicit none
+    integer,intent(in) :: e
+
+    !!! force check even if err_eof is not detected
+    if (err_eof.eq.0) then
+       b = e.lt.0               ! eor and eof are not distinguished
+    else
+       b = e.eq.err_eof
+    endif
+    return
+    ! integer jerr
+    ! jerr = err_default
+    ! if (jerr.eq.0) then
+    !    b = (e.eq.err_eof) .and. (e.ne.0)
+    ! else
+    !    b = .false.
+    ! endif
+  end function is_eof_ss
+
+!!!_  & check_eof
+  subroutine check_eof &
+       & (ierr, keof, u, levv)
+    use TOUZA_Std_log,only: msg_mdl
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_fun,only: new_unit
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(inout)       :: keof
+    integer,intent(in),optional :: u, levv
+
+    integer utest
+    integer j
+    integer jerr_eof
+    integer lv
+    character(len=128) :: txt
+
+    ierr = 0
+    lv = choice(lev_verbose, levv)
+
+    jerr_eof = 0
+    utest = new_unit()
+    if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+    if (ierr.eq.0) then
+       open(UNIT=utest, &
+            & STATUS='SCRATCH',   ACCESS='STREAM', &
+            & FORM='UNFORMATTED', ACTION='READWRITE',  IOSTAT=ierr)
+    endif
+    if (ierr.eq.0) write(UNIT=utest, IOSTAT=ierr) 0
+    if (ierr.eq.0) rewind(UNIT=utest, IOSTAT=ierr)
+    if (ierr.eq.0) read(UNIT=utest, IOSTAT=ierr) j
+    if (ierr.eq.0) then
+       read(UNIT=utest, IOSTAT=jerr_eof) j
+       close(UNIT=utest, IOSTAT=ierr)
+    endif
+    if (ierr.ne.0) then
+       if (VCHECK_NORMAL(lv)) then
+101       format('eof check failed = ', I0)
+          write(txt, 101) ierr
+          call msg_mdl(txt, __MDL__)
+       endif
+    else if (keof.eq.0) then
+       if (jerr_eof.eq.0) then
+          if (VCHECK_NORMAL(lv)) then
+             call msg_mdl('eof not detected', __MDL__)
+          endif
+       else
+          keof = jerr_eof
+102       format('eof detected = ', I0)
+          if (VCHECK_DEBUG(lv)) then
+             write(txt, 102) jerr_eof
+             call msg_mdl(txt, __MDL__)
+          endif
+       endif
+    else if (keof.ne.jerr_eof) then
+       keof = jerr_eof
+103    format('eof ignored = ', I0)
+       if (VCHECK_NORMAL(lv)) then
+          write(txt, 103) jerr_eof
+          call msg_mdl(txt, __MDL__)
+       endif
+    else
+104    format('eof kept = ', I0)
+       if (VCHECK_DEBUG(lv)) then
+          write(txt, 104) jerr_eof
+          call msg_mdl(txt, __MDL__)
+       endif
+    endif
+    return
+  end subroutine check_eof
 end module TOUZA_Std_env
 
 !!!_@ test_std_env - test program
@@ -983,19 +1637,21 @@ program test_std_env
   implicit none
   integer ierr
   integer ui, uo, ue
-  integer lrb, lrd, lrf, lri
+  integer lrb, lrs, lrd, lrf, lri, lrl
   integer kendi
 
   call init(ierr)
-  if (ierr.eq.0) call diag(ierr)
+  if (ierr.eq.0) call diag(ierr, levv=+99)
   if (ierr.eq.0) then
      call brute_force_std_units(ierr, ui, uo, ue, levv=1024)
      write(*, *) 'STD = ', ui, uo, ue
   endif
   if (ierr.eq.0) then
-     call check_storage_units (ierr, lrd, lrf, lri, lrb, uo, levtry=16)
+     call check_storage_units (ierr, lrd, lrf, lri, lrl, lrb, lrs, uo, levtry=16)
      write(*, *) 'RECU:B = ', lrb
+     write(*, *) 'RECU:S = ', lrs
      write(*, *) 'RECL:I = ', lri
+     write(*, *) 'RECL:L = ', lrl
      write(*, *) 'RECL:F = ', lrf
      write(*, *) 'RECL:D = ', lrd
   endif
@@ -1005,11 +1661,11 @@ program test_std_env
      write(*, *) 'ENDIANNESS = ', kendi
   endif
   if (ierr.eq.0) then
-     call check_bodr_files (ierr, kendi, ulog=uo, levv=+10, ubgn=10, uend=20, ustp=3)
+     call check_bodr_files (ierr, kendi, u=uo, levv=+10, ubgn=10, uend=20, ustp=3)
      write(*, *) 'ENDIANNESS = ', kendi
   endif
 
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+10)
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop

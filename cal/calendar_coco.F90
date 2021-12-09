@@ -1,7 +1,7 @@
 !!!_! calendar_coco.F90 - touza/calendar: coco compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2021
-#define TIME_STAMP 'Time-stamp: <2021/02/17 14:22:52 fuyuki calendar_coco.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/11/15 13:18:40 fuyuki calendar_coco.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -54,11 +54,11 @@ module TOUZA_Cal_coco
   public init, diag, finalize
 contains
 !!!_ & init - calendar init
-  subroutine init (mode, jfpar)
+  subroutine init (cmode, jfpar)
     use TOUZA_Cal_primitive,only: msg, msglev_normal, msglev_warning, choice
     use TOUZA_Cal,only: cal_init=>init, auto_once, auto_false
     implicit none
-    integer,intent(in)          :: mode
+    integer,intent(in)          :: cmode
     integer,intent(in),optional :: jfpar
     integer auto
     integer jerr
@@ -68,9 +68,10 @@ contains
 
     levv  = -99
     auto  = auto_false
-    inim  = INIT_SKIP
+    inim  = MODE_SHALLOW
     u = choice(-99, jfpar)
-    call cal_init (jerr, u, 0, mode, auto, levv, inim)
+    call cal_init &
+         & (jerr, u=u, levv=levv, mode=inim, ncals=0, global=cmode, auto=auto)
 
     return
   end subroutine init
