@@ -96,6 +96,8 @@ module TOUZA_Nng_io
   integer,save :: bodr_wnative = BODR_ASSUME_SYSTEM
 
   integer(kind=KI32),save :: lsubr = 0
+
+  integer,save :: last_iostat = 0
 !!!_  - interfaces
   interface ssq_write_irec
      module procedure ssq_write_irec_i
@@ -150,7 +152,7 @@ module TOUZA_Nng_io
      module procedure ssq_write_l
      module procedure ssq_write_d
      module procedure ssq_write_f
-     ! module procedure ssq_write_a
+     module procedure ssq_write_a
   end interface ssq_write
 
   interface ssq_read
@@ -158,7 +160,7 @@ module TOUZA_Nng_io
      module procedure ssq_read_l
      module procedure ssq_read_d
      module procedure ssq_read_f
-     ! module procedure ssq_read_a
+     module procedure ssq_read_a
   end interface ssq_read
 
   interface ssq_eswap
@@ -296,7 +298,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Nng_std,only: choice, ns_finalize=>finalize
+    use TOUZA_Nng_std,only: choice, ns_finalize=>finalize, msg, is_msglev_info
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -318,6 +320,9 @@ contains
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
+       endif
+       if (is_msglev_info(lv)) then
+          call msg('(''final iostat saved = '', I0)', last_iostat, __MDL__, u)
        endif
        fine_counts = fine_counts + 1
     endif
@@ -516,9 +521,11 @@ contains
   end subroutine ssq_close
 
 !!!_  - ssq_skip_irec - forward/backward 32-bit marker records
+  ! call ssq_skip_irec(ierr, u, WHENCE)      cue only
+  ! call ssq_skip_irec(ierr, u, N, WHENCE)   skip N records from WHENCE
   subroutine ssq_skip_irec &
        & (ierr, u, n, whence, swap)
-    use TOUZA_Nng_std,only: conv_b2strm
+    use TOUZA_Nng_std,only: conv_b2strm, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI32
     integer,intent(out)         :: ierr
@@ -540,12 +547,20 @@ contains
     if (n.gt.0) then
        j = 0
        do
-          if (ierr.eq.0) call ssq_read_isep(ierr, u, iseph, swap=swap)
+          if (ierr.eq.0) then
+             call ssq_read_isep(ierr, u, iseph, swap=swap)
+             if (is_eof_ss(ierr)) then
+                ierr = ERR_EOF
+                exit
+             endif
+          endif
           if (ierr.eq.0) jpos = jpos + conv_b2strm(abs(iseph)) + mstrm_sep(iseph)
           if (ierr.eq.0) call ssq_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
           if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
           if (ierr.eq.0) then
              if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          else
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
           if (ierr.ne.0) exit
           if (iseph.ge.0) j = j + 1
@@ -560,6 +575,8 @@ contains
           if (ierr.eq.0) call ssq_read_isep(ierr, u, iseph, pos=jpos, swap=swap)
           if (ierr.eq.0) then
              if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          else
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
           if (ierr.ne.0) exit
           if (isepf.ge.0) j = j + 1
@@ -576,7 +593,7 @@ contains
 !!!_  - ssq_skip_lrec - forward/backward 64-bit marker records
   subroutine ssq_skip_lrec &
        & (ierr, u, n, whence, swap)
-    use TOUZA_Nng_std,only: conv_b2strm
+    use TOUZA_Nng_std,only: conv_b2strm, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI64
     integer,intent(out)         :: ierr
@@ -597,13 +614,22 @@ contains
     inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
     if (n.gt.0) then
        do j = 1, n
-          if (ierr.eq.0) call ssq_read_lsep(ierr, u, lseph, swap=swap)
+          if (ierr.eq.0) then
+             call ssq_read_lsep(ierr, u, lseph, swap=swap)
+             if (is_eof_ss(ierr)) then
+                ierr = ERR_EOF
+                exit
+             endif
+          endif
           if (ierr.eq.0) jpos = jpos + conv_b2strm(lseph) + mstrm_sep(lseph)
           if (ierr.eq.0) call ssq_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
           if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
           if (ierr.eq.0) then
              if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          else
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
+          if (ierr.ne.0) exit
        enddo
     else if (n.lt.0) then
        do j = 1, -n
@@ -613,7 +639,10 @@ contains
           if (ierr.eq.0) call ssq_read_lsep(ierr, u, lseph, pos=jpos, swap=swap)
           if (ierr.eq.0) then
              if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          else
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
+          if (ierr.ne.0) exit
        enddo
 #if OPT_STREAM_RPOS_WORKAROUND
        if (ierr.eq.0) call ssq_rseek_workaround(ierr, u, jpos)
@@ -834,7 +863,7 @@ contains
     if (n.le.ns) then
        isep = get_size_bytes(V(1), n)
        if (ierr.eq.0) call ssq_write_isep(ierr, u, isep, swap=swap, sub=post)
-       if (ierr.eq.0) write(UNIT=u, IOSTAT=ierr) V(1:n)
+       if (ierr.eq.0) call ssq_write(ierr, u, V, n, swap)
        if (ierr.eq.0) call ssq_write_isep(ierr, u, isep, swap=swap, sub=pre)
     else
        m = n
@@ -842,7 +871,7 @@ contains
        isep = get_size_bytes(V(1), ns)
        ! first
        if (ierr.eq.0) call ssq_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
-       if (ierr.eq.0) write(UNIT=u, IOSTAT=ierr) V(j+1:j+ns)
+       if (ierr.eq.0) call ssq_write(ierr, u, V(j+1:j+ns), ns, swap)
        if (ierr.eq.0) call ssq_write_isep(ierr, u, isep, swap=swap, sub=pre)
        ! middle
        do
@@ -850,13 +879,13 @@ contains
           j = j + ns
           if (m.le.ns) exit
           if (ierr.eq.0) call ssq_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
-          if (ierr.eq.0) write(UNIT=u, IOSTAT=ierr) V(j+1:j+ns)
+          if (ierr.eq.0) call ssq_write(ierr, u, V(j+1:j+ns), ns, swap)
           if (ierr.eq.0) call ssq_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
        enddo
        ! last
        isep = get_size_bytes(V(1), m)
        if (ierr.eq.0) call ssq_write_isep(ierr, u, isep, swap=swap, sub=post)
-       if (ierr.eq.0) write(UNIT=u, IOSTAT=ierr) V(j+1:j+m)
+       if (ierr.eq.0) call ssq_write(ierr, u, V(j+1:j+m), m, swap)
        if (ierr.eq.0) call ssq_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
     endif
     return
@@ -949,7 +978,7 @@ contains
     ierr = err_default
     lsep = get_size_bytes(V(1), int(n, kind=KISEP))
     if (ierr.eq.0) call ssq_write_lsep(ierr, u, lsep, swap=swap)
-    if (ierr.eq.0) write(UNIT=u, IOSTAT=ierr) V(1:n)
+    if (ierr.eq.0) call ssq_write(ierr, u, V, n, swap)
     if (ierr.eq.0) call ssq_write_lsep(ierr, u, lsep, swap=swap)
     return
   end subroutine ssq_write_lrec_a
@@ -957,7 +986,7 @@ contains
 !!!_  - ssq_read_irec - read a record with 32bit-marker
   subroutine ssq_read_irec_i &
        & (ierr, u, v, n, swap, sub)
-    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes
+    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI32, KARG=KI32
     integer,           intent(out)            :: ierr
@@ -975,7 +1004,13 @@ contains
     j = 0
     m = n
     do
-       if (ierr.eq.0) call ssq_read_isep(ierr, u, iseph, swap=swap)
+       if (ierr.eq.0) then
+          call ssq_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit
+          endif
+       endif
        if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
        if (ierr.eq.0) then
           jpos = jpos + conv_b2strm(abs(iseph))
@@ -988,7 +1023,10 @@ contains
           if (iseph.ge.0) exit
           if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
        endif
-       if (ierr.ne.0) exit
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit
+       endif
        if (m.eq.0) exit
        j = j + ns
     enddo
@@ -1007,7 +1045,7 @@ contains
   end subroutine ssq_read_irec_i
   subroutine ssq_read_irec_l &
        & (ierr, u, v, n, swap, sub)
-    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes
+    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI32, KARG=KI64
     integer,           intent(out)            :: ierr
@@ -1023,7 +1061,13 @@ contains
     j = 0
     m = n
     do
-       if (ierr.eq.0) call ssq_read_isep(ierr, u, iseph, swap=swap)
+       if (ierr.eq.0) then
+          call ssq_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit
+          endif
+       endif
        if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
        if (ierr.eq.0) then
           jpos = jpos + conv_b2strm(abs(iseph))
@@ -1036,7 +1080,10 @@ contains
           if (iseph.ge.0) exit
           if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
        endif
-       if (ierr.ne.0) exit
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit
+       endif
        if (m.eq.0) exit
        j = j + ns
     enddo
@@ -1055,7 +1102,7 @@ contains
   end subroutine ssq_read_irec_l
   subroutine ssq_read_irec_f &
        & (ierr, u, v, n, swap, sub)
-    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes
+    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI32, KARG=KFLT
     integer,        intent(out)            :: ierr
@@ -1071,7 +1118,13 @@ contains
     j = 0
     m = n
     do
-       if (ierr.eq.0) call ssq_read_isep(ierr, u, iseph, swap=swap)
+       if (ierr.eq.0) then
+          call ssq_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit
+          endif
+       endif
        if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
        if (ierr.eq.0) then
           jpos = jpos + conv_b2strm(abs(iseph))
@@ -1084,7 +1137,10 @@ contains
           if (iseph.ge.0) exit
           if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
        endif
-       if (ierr.ne.0) exit
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit
+       endif
        if (m.eq.0) exit
        j = j + ns
     enddo
@@ -1103,7 +1159,7 @@ contains
   end subroutine ssq_read_irec_f
   subroutine ssq_read_irec_d &
        & (ierr, u, v, n, swap, sub)
-    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes
+    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI32, KARG=KDBL
     integer,        intent(out)            :: ierr
@@ -1119,7 +1175,13 @@ contains
     j = 0
     m = n
     do
-       if (ierr.eq.0) call ssq_read_isep(ierr, u, iseph, swap=swap)
+       if (ierr.eq.0) then
+          call ssq_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit
+          endif
+       endif
        if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
        if (ierr.eq.0) then
           jpos = jpos + conv_b2strm(abs(iseph))
@@ -1132,7 +1194,10 @@ contains
           if (iseph.ge.0) exit
           if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
        endif
-       if (ierr.ne.0) exit
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit
+       endif
        if (m.eq.0) exit
        j = j + ns
     enddo
@@ -1151,7 +1216,7 @@ contains
   end subroutine ssq_read_irec_d
   subroutine ssq_read_irec_a &
        & (ierr, u, v, n, swap, sub)
-    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes
+    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI32
     integer,         intent(out)            :: ierr
@@ -1167,21 +1232,29 @@ contains
     j = 0
     m = n
     do
-       if (ierr.eq.0) call ssq_read_isep(ierr, u, iseph, swap=swap)
+       if (ierr.eq.0) then
+          call ssq_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit
+          endif
+       endif
        if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
        if (ierr.eq.0) then
           jpos = jpos + conv_b2strm(abs(iseph))
           ns = min(m, get_mems_bytes(abs(iseph), V(1)))
           m = m - ns
        endif
-       ! if (ierr.eq.0) call ssq_read(ierr, u, V(j+1:j+ns), ns, swap)
-       if (ierr.eq.0) read(UNIT=u, IOSTAT=ierr) V(j+1:j+ns)
+       if (ierr.eq.0) call ssq_read(ierr, u, V(j+1:j+ns), ns, swap)
        if (ierr.eq.0) call ssq_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
        if (ierr.eq.0) then
           if (iseph.ge.0) exit
           if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
        endif
-       if (ierr.ne.0) exit
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit
+       endif
        if (m.eq.0) exit
        j = j + ns
     enddo
@@ -1204,7 +1277,7 @@ contains
 !!!_  - ssq_read_lrec - read a record with 64bit-marker
   subroutine ssq_read_lrec_i &
        & (ierr, u, v, n, swap)
-    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes
+    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI64, KARG=KI32
     integer,           intent(out)         :: ierr
@@ -1216,7 +1289,13 @@ contains
     integer(KIND=KISEP) :: lseph, lsepf
     integer(KIND=KIOFS) :: jpos
     ierr = err_default
-    if (ierr.eq.0) call ssq_read_lsep(ierr, u, lseph, swap=swap)
+    if (ierr.eq.0) then
+       call ssq_read_lsep(ierr, u, lseph, swap=swap)
+       if (is_eof_ss(ierr)) then
+          ierr = ERR_EOF
+          return
+       endif
+    endif
     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
     if (ierr.eq.0) then
        jpos = jpos + conv_b2strm(abs(lseph))
@@ -1231,12 +1310,14 @@ contains
     if (ierr.eq.0) call ssq_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
     if (ierr.eq.0) then
        if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+    else
+       ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
     endif
     return
   end subroutine ssq_read_lrec_i
   subroutine ssq_read_lrec_l &
        & (ierr, u, v, n, swap)
-    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes
+    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI64, KARG=KI64
     integer,           intent(out)         :: ierr
@@ -1248,7 +1329,13 @@ contains
     integer(KIND=KISEP) :: lseph, lsepf
     integer(KIND=KIOFS) :: jpos
     ierr = err_default
-    if (ierr.eq.0) call ssq_read_lsep(ierr, u, lseph, swap=swap)
+    if (ierr.eq.0) then
+       call ssq_read_lsep(ierr, u, lseph, swap=swap)
+       if (is_eof_ss(ierr)) then
+          ierr = ERR_EOF
+          return
+       endif
+    endif
     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
     if (ierr.eq.0) then
        jpos = jpos + conv_b2strm(abs(lseph))
@@ -1263,12 +1350,14 @@ contains
     if (ierr.eq.0) call ssq_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
     if (ierr.eq.0) then
        if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+    else
+       ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
     endif
     return
   end subroutine ssq_read_lrec_l
   subroutine ssq_read_lrec_f &
        & (ierr, u, v, n, swap)
-    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes
+    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI64, KARG=KFLT
     integer,        intent(out)         :: ierr
@@ -1280,7 +1369,13 @@ contains
     integer(KIND=KISEP) :: lseph, lsepf
     integer(KIND=KIOFS) :: jpos
     ierr = err_default
-    if (ierr.eq.0) call ssq_read_lsep(ierr, u, lseph, swap=swap)
+    if (ierr.eq.0) then
+       call ssq_read_lsep(ierr, u, lseph, swap=swap)
+       if (is_eof_ss(ierr)) then
+          ierr = ERR_EOF
+          return
+       endif
+    endif
     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
     if (ierr.eq.0) then
        jpos = jpos + conv_b2strm(abs(lseph))
@@ -1295,12 +1390,14 @@ contains
     if (ierr.eq.0) call ssq_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
     if (ierr.eq.0) then
        if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+    else
+       ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
     endif
     return
   end subroutine ssq_read_lrec_f
   subroutine ssq_read_lrec_d &
        & (ierr, u, v, n, swap)
-    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes
+    use TOUZA_Nng_std,only: choice, conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI64, KARG=KDBL
     integer,        intent(out)         :: ierr
@@ -1312,7 +1409,13 @@ contains
     integer(KIND=KISEP) :: lseph, lsepf
     integer(KIND=KIOFS) :: jpos
     ierr = err_default
-    if (ierr.eq.0) call ssq_read_lsep(ierr, u, lseph, swap=swap)
+    if (ierr.eq.0) then
+       call ssq_read_lsep(ierr, u, lseph, swap=swap)
+       if (is_eof_ss(ierr)) then
+          ierr = ERR_EOF
+          return
+       endif
+    endif
     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
     if (ierr.eq.0) then
        jpos = jpos + conv_b2strm(abs(lseph))
@@ -1327,12 +1430,14 @@ contains
     if (ierr.eq.0) call ssq_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
     if (ierr.eq.0) then
        if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+    else
+       ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
     endif
     return
   end subroutine ssq_read_lrec_d
   subroutine ssq_read_lrec_a &
        & (ierr, u, v, n, swap)
-    use TOUZA_Nng_std,only: conv_b2strm, get_mems_bytes
+    use TOUZA_Nng_std,only: conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI64
     integer,         intent(out)         :: ierr
@@ -1344,7 +1449,13 @@ contains
     integer(KIND=KISEP) :: lseph, lsepf
     integer(KIND=KIOFS) :: jpos
     ierr = err_default
-    if (ierr.eq.0) call ssq_read_lsep(ierr, u, lseph, swap=swap)
+    if (ierr.eq.0) then
+       call ssq_read_lsep(ierr, u, lseph, swap=swap)
+       if (is_eof_ss(ierr)) then
+          ierr = ERR_EOF
+          return
+       endif
+    endif
     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
     if (ierr.eq.0) then
        jpos = jpos + conv_b2strm(abs(lseph))
@@ -1353,13 +1464,14 @@ contains
           ierr = ERR_INVALID_RECORD_SIZE
        else
           m = min(m, n)
-          read(UNIT=u, IOSTAT=ierr) V(1:m)
-          ! call ssq_read(ierr, u, V, m, swap)
+          call ssq_read(ierr, u, V, m, swap)
        endif
     endif
     if (ierr.eq.0) call ssq_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
     if (ierr.eq.0) then
        if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+    else
+       ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
     endif
     return
   end subroutine ssq_read_lrec_a
@@ -1409,34 +1521,34 @@ contains
 !     endif
 !     return
 !   end subroutine ssq_write_end_irec
-!!!_  - ssq_read_begin_irec
-  subroutine ssq_read_begin_irec &
-       & (ierr, u, jpos, swap)
-    use TOUZA_Nng_std,only: nc_strm
-    implicit none
-    integer,            intent(out)         :: ierr
-    integer,            intent(in)          :: u
-    integer(KIND=KIOFS),intent(out)         :: jpos
-    logical,            intent(in),optional :: swap
-    integer(KIND=KI32) :: isep
-    ierr = 0
-    if (ierr.eq.0) call ssq_read_isep(ierr, u, isep, swap=swap)
-    if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
-    if (ierr.eq.0) jpos = jpos + isep / nc_strm
-    return
-  end subroutine ssq_read_begin_irec
-!!!_  - ssq_read_end_irec
-  subroutine ssq_read_end_irec &
-       & (ierr, u, jpos, swap)
-    implicit none
-    integer,            intent(out)         :: ierr
-    integer,            intent(in)          :: u
-    integer(KIND=KIOFS),intent(in)          :: jpos
-    logical,            intent(in),optional :: swap
-    integer(KIND=KI32)  :: isep
-    call ssq_read_isep(ierr, u, isep, pos=jpos, swap=swap)
-    return
-  end subroutine ssq_read_end_irec
+! !!!_  - ssq_read_begin_irec
+!   subroutine ssq_read_begin_irec &
+!        & (ierr, u, jpos, swap)
+!     use TOUZA_Nng_std,only: nc_strm
+!     implicit none
+!     integer,            intent(out)         :: ierr
+!     integer,            intent(in)          :: u
+!     integer(KIND=KIOFS),intent(out)         :: jpos
+!     logical,            intent(in),optional :: swap
+!     integer(KIND=KI32) :: isep
+!     ierr = 0
+!     if (ierr.eq.0) call ssq_read_isep(ierr, u, isep, swap=swap)
+!     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+!     if (ierr.eq.0) jpos = jpos + isep / nc_strm
+!     return
+!   end subroutine ssq_read_begin_irec
+! !!!_  - ssq_read_end_irec
+!   subroutine ssq_read_end_irec &
+!        & (ierr, u, jpos, swap)
+!     implicit none
+!     integer,            intent(out)         :: ierr
+!     integer,            intent(in)          :: u
+!     integer(KIND=KIOFS),intent(in)          :: jpos
+!     logical,            intent(in),optional :: swap
+!     integer(KIND=KI32)  :: isep
+!     call ssq_read_isep(ierr, u, isep, pos=jpos, swap=swap)
+!     return
+!   end subroutine ssq_read_end_irec
 !!!_  - ssq_write
   subroutine ssq_write_i &
        & (ierr, u, v, n, swap)
@@ -1503,6 +1615,17 @@ contains
        write(UNIT=u, IOSTAT=ierr) V(1:n)
     endif
   end subroutine ssq_write_d
+  subroutine ssq_write_a &
+       & (ierr, u, v, n, swap)
+    use TOUZA_Nng_std,only: choice
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(in)          :: u
+    character(len=*),intent(in)          :: V(*)
+    integer,         intent(in)          :: n
+    logical,         intent(in),optional :: swap
+    write(UNIT=u, IOSTAT=ierr) V(1:n)
+  end subroutine ssq_write_a
 !!!_  - ssq_read
   subroutine ssq_read_i &
        & (ierr, u, v, n, swap)
@@ -1576,6 +1699,17 @@ contains
        read(UNIT=u, IOSTAT=ierr) V(1:n)
     endif
   end subroutine ssq_read_d
+  subroutine ssq_read_a &
+       & (ierr, u, v, n, swap)
+    use TOUZA_Nng_std,only: choice
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(in)          :: u
+    character(len=*),intent(out)         :: V(*)
+    integer,         intent(in)          :: n
+    logical,         intent(in),optional :: swap
+    read(UNIT=u, IOSTAT=ierr) V(1:n)
+  end subroutine ssq_read_a
 !!!_ + private subroutines
 !!!_  - ssq_write_isep
   subroutine ssq_write_isep_i (ierr, u, sep, pos, swap, sub)
@@ -1949,6 +2083,19 @@ contains
     real(kind=KARG),intent(in) :: vhld
     m = maxmemi_d
   end function max_members_d
+
+!!!_  - transf_iostat
+  integer function transf_iostat &
+       & (istat, ierr, line) &
+       & result (n)
+    implicit none
+    integer,intent(in) :: istat
+    integer,intent(in) :: ierr
+    integer,intent(in) :: line
+    last_iostat = istat
+    n = ierr
+    return
+  end function transf_iostat
 
 end module TOUZA_Nng_io
 

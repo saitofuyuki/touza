@@ -95,7 +95,7 @@ module TOUZA_Std_log
   public is_msglev_warning, is_msglev_normal,   is_msglev_info
   public is_msglev_detail,  is_msglev_debug
   public trace_control,     trace_fine
-
+  public is_error_match
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -644,6 +644,29 @@ contains
     if (lu.eq.unit_global) lu = default_unit
     return
   end function get_logu
+!!!_  & is_error_match () - check if error-code matches
+  logical function is_error_match &
+       & (ierr, jcode, mdl) &
+       & result(b)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,intent(in)          :: ierr
+    integer,intent(in)          :: jcode
+    integer,intent(in),optional :: mdl
+    integer je
+    if (ierr.ge.0) then
+       b = (jcode.eq.ierr)
+    else if (present(mdl)) then
+       b = (jcode - mdl) .eq. ierr
+    else
+       je = IOR(ierr, NOT(ERR_MASK_MODULE - 1))
+       if (je.eq.-ERR_MASK_MODULE) then
+          b = (jcode.eq.0)
+       else
+          b = jcode .eq. je
+       endif
+    endif
+  end function is_error_match
 !!!_ + end
 end module TOUZA_Std_log
 !!!_@ test_std_log - test program
@@ -652,6 +675,7 @@ program test_std_log
   use TOUZA_Std_log
   implicit none
   integer ierr
+  integer je
 
   call init(ierr)
 
@@ -677,6 +701,16 @@ program test_std_log
   call test_gen_tag('P', 'G', isfx=123)
   call test_gen_tag('P', 'G', 'M', isfx=123)
 
+  do je = 0, ERR_MASK_MODULE-1
+     call test_error(-je, ERR_EOF)
+  enddo
+  do je = 0, ERR_MASK_MODULE-1
+     call test_error(-je - ERR_MASK_CAL, ERR_EOF, ERR_MASK_CAL)
+  enddo
+  do je = 0, ERR_MASK_MODULE-1
+     call test_error(-je - ERR_MASK_NNG, ERR_EOF, ERR_MASK_CAL)
+  enddo
+
   call finalize(ierr, levv=+10)
 
   stop
@@ -697,6 +731,22 @@ contains
          & trim(tag)
     return
   end subroutine test_gen_tag
+
+  subroutine test_error &
+       & (ierr, jcode, mdl)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,intent(in)          :: ierr
+    integer,intent(in)          :: jcode
+    integer,intent(in),optional :: mdl
+
+101 format('error match: ', I0, ' = ', I0, ' & ', I0)
+    if (is_error_match(ierr, jcode, mdl)) then
+       write(*, 101) ierr, jcode, choice(0, mdl)
+    endif
+
+  end subroutine test_error
+
 end program test_std_log
 #endif /* TEST_STD_LOG */
 !!!_! FOOTER

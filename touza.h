@@ -1,7 +1,7 @@
 !!!_! touza.h - touza definitions
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 5 2020
-! Time-stamp: <2021/11/23 13:36:45 fuyuki touza.h>
+! Time-stamp: <2021/12/09 12:32:14 fuyuki touza.h>
 
 /* Copyright (C) 2020, 2021 */
 /*           Japan Agency for Marine-Earth Science and Technology */
@@ -42,14 +42,16 @@
 #define ERR_NO_INIT   -2   /* module is not initialized */
 #define ERR_MULTIPLE_INIT -16
 #define ERR_FAILURE_INIT  -17
+#define ERR_NOT_IMPLEMENTED -251
 #define ERR_SEVERE    -252
 #define ERR_CRITICAL  -253
 #define ERR_FATAL     -254
 #define ERR_PANIC     -255
 
-#define ERR_ALLOCATION -32 /* allocation error */
-#define ERR_NO_IO_UNIT -33 /* io unit allocation error */
-#define ERR_EOF        -34 /* end of file */
+#define ERR_ALLOCATION    -32 /* allocation error */
+#define ERR_NO_IO_UNIT    -33 /* io unit allocation error */
+#define ERR_EOF           -34 /* end of file */
+#define ERR_BROKEN_RECORD -35 /* broken record (sequential) */
 
 /* module specific errors */
 

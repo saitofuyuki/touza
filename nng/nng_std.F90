@@ -32,7 +32,8 @@ module TOUZA_Nng_std
        & nc_strm,         nbits_byte, &
        & conv_b2strm,     get_size_bytes, &
        & get_mems_bytes,  get_size_strm,  kendi_file, kendi_mem, check_bodr_files, &
-       & endian_BIG,      endian_LITTLE
+       & endian_BIG,      endian_LITTLE,  &
+       & is_eof_ss
   use TOUZA_Std_fun,only: new_unit
 !!!_  - default
   implicit none
@@ -71,6 +72,7 @@ module TOUZA_Nng_std
   public is_msglev_fatal,  is_msglev_info
   public is_msglev_severe, is_msglev_debug, is_msglev_normal, is_msglev_detail
   public get_logu,         trace_fine,      trace_control,    unit_global
+  public is_eof_ss
 contains
 !!!_ + common interfaces
 !!!_  & init

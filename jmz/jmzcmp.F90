@@ -1,7 +1,7 @@
 !!!_! jmzcmp.F90 - TOUZA/Jmz nng comparison
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 28 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/07 09:10:41 fuyuki jmzcmp.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/12/09 09:54:00 fuyuki jmzcmp.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -49,13 +49,16 @@ program jmzcmp
   if (ierr.eq.0) call nng_diag(ierr)
   if (ierr.eq.0) call nng_finalize(ierr)
   if (ierr.eq.0) call arg_diag(ierr, levv=stdv)
+  if (ierr.ne.0) then
+     write(*, *) 'exit = ', ierr
+  endif
   stop
 !!!_ + Subroutines
 contains
 !!!_  - comparison main
   subroutine cmp_main &
        & (ierr, japos, levv, kflag)
-    use TOUZA_Std,only: get_param, get_option, upcase, uout, uerr
+    use TOUZA_Std,only: get_param, get_option, upcase, uout, uerr, is_error_match
     use TOUZA_Nng_std,only: KI32, KFLT, KDBL
     use TOUZA_Nng_header
     use TOUZA_Nng_record,only: set_urt_defs, switch_urt_diag, KCODE_CLIPPING
@@ -77,7 +80,7 @@ contains
     character(len=litem)        :: headr(nitem), headt(nitem), headd(nitem)
     character(len=lfmt)         :: fmtr,         fmtt,         fmtd
     integer                     :: nref,         ntgt
-    integer                     :: kswr,         kswt,         kswd
+    integer                     :: krectr,       krectt,       krectd
 
     integer nemiss_r
     integer nemiss_t
@@ -161,8 +164,8 @@ contains
          & 'miss.tgt', 'miss.ref'
     do
        ! reference
-       if (ierr.eq.0) call nng_read_header(ierr, headr, kswr, uref)
-       if (ierr.ne.0) then
+       if (ierr.eq.0) call nng_read_header(ierr, headr, krectr, uref)
+       if (is_error_match(ierr, ERR_EOF)) then
           ierr = 0
           exit
        endif
@@ -177,10 +180,13 @@ contains
        if (ierr.eq.0) then
           if (levv.gt.1) call switch_urt_diag(rfile, jrec, udiag)
        endif
-       if (ierr.eq.0) call nng_read_data(ierr, vref, nref, headr, kswr, uref)
-
+       if (ierr.eq.0) call nng_read_data(ierr, vref, nref, headr, krectr, uref)
        ! target
-       if (ierr.eq.0) call nng_read_header(ierr, headt, kswt, utgt)
+       if (ierr.eq.0) call nng_read_header(ierr, headt, krectt, utgt)
+       if (is_error_match(ierr, ERR_EOF)) then
+          ierr = 0
+          exit
+       endif
        if (ierr.eq.0) then
           ntgt = parse_header_size(headt, 0)
           if (nref.ne.ntgt) then
@@ -192,7 +198,9 @@ contains
        if (ierr.eq.0) then
           if (levv.gt.1) call switch_urt_diag(tfile, jrec, udiag)
        endif
-       if (ierr.eq.0) call nng_read_data(ierr, vtgt, ntgt, headt, kswt, utgt)
+       if (ierr.eq.0) call nng_read_data(ierr, vtgt, ntgt, headt, krectt, utgt)
+
+       if (ierr.ne.0) exit
 
        ! comparison operation
        if (ierr.eq.0) call get_item(ierr, headr, vmisr, hi_MISS, def=zero)
@@ -286,7 +294,7 @@ contains
        if (udif.ge.0) then
           if (ierr.eq.0) then
              headd(:) = headr(:)
-             kswd = kswr
+             krectd = krectr
           endif
           if (ierr.eq.0) call put_item(ierr, headd, 'UR8', hi_DFMT)
           if (ierr.eq.0) call put_item(ierr, headd, vmisd, hi_MISS)
@@ -295,8 +303,8 @@ contains
              write(vitemd, 1021) trim(vitemt), trim(vitemr)
              if (ierr.eq.0) call put_item(ierr, headd, trim(vitemd), hi_ITEM)
           endif
-          if (ierr.eq.0) call nng_write_header(ierr, headd, kswd, udif)
-          if (ierr.eq.0) call nng_write_data(ierr, vdfa, nref, headd, kswd, udif)
+          if (ierr.eq.0) call nng_write_header(ierr, headd, krectd, udif)
+          if (ierr.eq.0) call nng_write_data(ierr, vdfa, nref, headd, krectd, udif)
        endif
        jrec = jrec + 1
     enddo

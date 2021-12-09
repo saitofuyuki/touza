@@ -18,7 +18,11 @@ include_HEADERS	=	touza_nng.h
 
 noinst_LTLIBRARIES = libtouza_local.la
 libtouza_local_la_SOURCES = nng_std.F90 nng_io.F90 nng_header.F90 \
-							nng_record.F90 nng.F90 $(include_HEADERS)
+							nng_record.F90 nng.F90 \
+							$(include_HEADERS)
+EXTRA_libtouza_local_la_SOURCES	= nng_miroc.F90
+libtouza_local_la_SOURCES	+=	$(libtouza_APPENDS)
+libtouza_APPENDS = nng_miroc.F90
 
 AM_FCFLAGS = $(FC_MODULE_touza_std) $(FC_MODULE_touza_trp)
 AM_CPPFLAGS += $(FC_INCLUDE_touza_std) $(FC_INCLUDE_touza_trp)
