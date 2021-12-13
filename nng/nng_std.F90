@@ -1,7 +1,7 @@
 !!!_! nng_std.F90 - TOUZA/Nng utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/06 08:50:36 fuyuki nng_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/12/12 10:40:21 fuyuki nng_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -29,9 +29,10 @@ module TOUZA_Nng_std
        & is_msglev_severe, is_msglev_fatal,  &
        & get_logu,         unit_global,      trace_fine,       trace_control
   use TOUZA_Std_env,only: &
+       & KIOFS,           &
        & nc_strm,         nbits_byte, &
        & conv_b2strm,     get_size_bytes, &
-       & get_mems_bytes,  get_size_strm,  kendi_file, kendi_mem, check_bodr_files, &
+       & get_mems_bytes,  get_size_strm,  kendi_file, kendi_mem, check_bodr_unit, &
        & endian_BIG,      endian_LITTLE,  &
        & is_eof_ss
   use TOUZA_Std_fun,only: new_unit
@@ -60,13 +61,13 @@ module TOUZA_Nng_std
   public init, diag, finalize
   public msg
 !!!_   . TOUZA_Std
-  public KI32, KI64, KDBL, KFLT
+  public KI32, KI64, KDBL, KFLT, KIOFS
   public choice, choice_a, condop
   public control_mode, control_deep, is_first_force
   public nc_strm, nbits_byte
   public conv_b2strm,     get_size_bytes
   public get_mems_bytes,  get_size_strm
-  public kendi_file,      kendi_mem,        check_bodr_files
+  public kendi_file,      kendi_mem,        check_bodr_unit
   public endian_BIG,      endian_LITTLE
   public new_unit
   public is_msglev_fatal,  is_msglev_info

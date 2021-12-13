@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2021/11/21 09:52:23 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/12/12 10:31:57 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -45,6 +45,9 @@
 #endif
 #ifndef   OPT_IOSTAT_EOF
 #  define OPT_IOSTAT_EOF 0 /* end-of-file IOSTAT */
+#endif
+#ifndef    OPT_INTEGER_OFFSET_KIND
+#  define  OPT_INTEGER_OFFSET_KIND 0  /* kind to store file position */
 #endif
 !!!_@ TOUZA_Std_env - standard environments
 module TOUZA_Std_env
@@ -130,10 +133,23 @@ module TOUZA_Std_env
 !!!_  - ISO_C_BINDING module
 #if HAVE_ISO_C_BINDING
 #endif /* HAVE_ISO_C_BINDING */
+!!!_  - MPI for offset only
+#if OPT_INTEGER_OFFSET_KIND
+#else /* not OPT_INTEGER_OFFSET_KIND */
+#  undef OPT_INTEGER_OFFSET_KIND
+#  if OPT_USE_MPI
+#    define OPT_INTEGER_OFFSET_KIND MPI_OFFSET_KIND
+  use mpi,only: MPI_OFFSET_KIND
+#  else
+#    define OPT_INTEGER_OFFSET_KIND KI32
+#  endif
+#endif /* not OPT_INTEGER_OFFSET_KIND */
 !!!_  - default
   implicit none
   private
 !!!_  - parameters
+  integer,parameter,public :: KIOFS = OPT_INTEGER_OFFSET_KIND
+
 # define __MDL__ 'env'
   integer,parameter,public :: endian_UNKNOWN = 0
   integer,parameter,public :: endian_ERROR  = -1
@@ -178,6 +194,10 @@ module TOUZA_Std_env
   integer,save :: ulog = unit_global
 
   integer,save :: err_default = ERR_NO_INIT - ERR_MASK_STD_ENV
+
+  character(len=*),parameter :: etest_org = 'abcd'
+  integer,save :: etest_big = 0, etest_little = 0
+
 !!!_  - public
   public init, diag, finalize
   public init_batch
@@ -186,7 +206,7 @@ module TOUZA_Std_env
   public check_storage_units
   public brute_force_storage_unit
   public brute_force_recl
-  public check_bodr_mem, check_bodr_files
+  public check_bodr_mem, check_bodr_files, check_bodr_unit
   public get_size_bytes, get_size_seq, get_size_strm
   public conv_b2strm,    get_mems_bytes
   public is_eof_ss
@@ -303,6 +323,7 @@ contains
           if (ierr.eq.0) then
              if (VCHECK_NORMAL(lv)) then
                 call msg_mdl(TIME_STAMP, __MDL__, utmp)
+                call msg_mdl('(''offset kind = '', I0)', KIOFS, __MDL__, utmp)
              endif
              if (VCHECK_DEBUG(lv)) then
                 call msg_mdl('(''init = '', I0)', (/init_counts/), __MDL__, utmp)
@@ -374,11 +395,30 @@ contains
     integer,intent(in),optional :: ubgn, uend, ustp
     ierr = 0
     if (choice(0, levtry).ge.0) then
+       if (ierr.eq.0) call set_endian_tester(ierr)
        if (ierr.eq.0) call check_all(ierr, u, levv, levtry, ubgn, uend, ustp)
        if (ierr.eq.0) call health_check(ierr, levv)
     endif
     return
   end subroutine init_batch
+!!!_  & set_endian_tester
+  subroutine set_endian_tester (ierr)
+    implicit none
+    integer,intent(out) :: ierr
+    integer j
+    ierr = 0
+    if (etest_big .eq. 0) then
+       do j = 1, len_trim(etest_org)
+          etest_big = etest_big * 256 + IACHAR(etest_org(j:j))
+       enddo
+    endif
+    if (etest_little .eq. 0) then
+       do j = len_trim(etest_org), 1, -1
+          etest_little = etest_little * 256 + IACHAR(etest_org(j:j))
+       enddo
+    endif
+  end subroutine set_endian_tester
+
 !!!_  & check_all - check and set environments
   subroutine check_all &
        & (ierr, u, levv, levtry, ubgn, uend, ustp)
@@ -1078,7 +1118,8 @@ contains
     character(len=*),intent(in)          :: fn
     integer,         intent(in),optional :: u
 
-    integer lrec, jposh, jposf
+    integer(kind=KIOFS) :: jposh, jposf
+    integer lrec
     character(len=*),parameter :: teststr = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     character(len=1) :: C
     character(len=8) :: CS
@@ -1102,7 +1143,7 @@ contains
     if (ierr.eq.0) INQUIRE(UNIT=utest, POS=jposf, IOSTAT=ierr)
     if (ierr.eq.0) then
        if (jposf.gt.jposh) then
-          lustr = lrec / (jposf - jposh)
+          lustr = lrec / int(jposf - jposh, kind=kind(lustr))
        endif
     endif
     if (ierr.eq.0) close(UNIT=utest, STATUS='DELETE', IOSTAT=ierr)
@@ -1463,8 +1504,6 @@ contains
     integer ul, lv
     integer lrec
     logical opnd
-    character(len=*),parameter :: TA = 'abcd'
-    integer TI, RL, RB, j
     integer kcur
 
     ierr = 0
@@ -1472,14 +1511,9 @@ contains
     ul = choice(-1, u)
 
     kendi = endian_UNKNOWN
-    RL = 0
-    RB = 0
-    do j = 1, len_trim(TA)
-       RB = RB * 256 + IACHAR(TA(j:j))
-    enddo
-    do j = len_trim(TA), 1, -1
-       RL = RL * 256 + IACHAR(TA(j:j))
-    enddo
+
+    if (ierr.eq.0) call set_endian_tester(ierr)
+
     ub = choice(-1, ubgn)
     ue = ub - 1
     us = 1
@@ -1503,16 +1537,8 @@ contains
                & ACCESS='DIRECT',  FORM='UNFORMATTED', &
                & STATUS='SCRATCH', ACTION='READWRITE', IOSTAT=ierr)
        endif
-       if (ierr.eq.0) write(UNIT=ju, IOSTAT=ierr, REC=1) TA
-       if (ierr.eq.0) read(UNIT=ju,  IOSTAT=ierr, REC=1) TI
+       if (ierr.eq.0) call check_bodr_unit(ierr, kcur, ju, jrec=1)
        if (ierr.eq.0) then
-          if (TI.eq.RL) then
-             kcur = endian_LITTLE
-          else if (TI.eq.RB) then
-             kcur = endian_BIG
-          else
-             kcur = endian_ERROR
-          endif
           if (VCHECK_DETAIL(lv)) then
              call msg_mdl &
                   & ('(''endianness:'', I0, 1x, I0)', (/ju, kcur/), __MDL__, ul)
@@ -1534,6 +1560,60 @@ contains
 
     return
   end subroutine check_bodr_files
+
+!!!_  & check_bodr_unit - check byte-order (single unit)
+  ! file positioning must be managed by caller
+  subroutine check_bodr_unit &
+    & (ierr, kendi, utest, jrec, u, levv)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_log,only: msg_mdl
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(out)         :: kendi
+    integer,intent(in)          :: utest  ! test unit (must be opened)
+    integer,intent(in),optional :: jrec   ! direct>0  stream==0  sequential<0
+    integer,intent(in),optional :: u      ! log unit
+    integer,intent(in),optional :: levv
+    integer rec
+    integer ul, lv
+    integer(kind=KI32)  :: TI
+    integer(kind=KIOFS) :: jend
+    ierr = 0
+    kendi = endian_ERROR
+    lv = choice(lev_verbose, levv)
+    ul = choice(-1, u)
+
+    rec = choice(0, jrec)
+    if (rec.gt.0) then
+       ! direct access (test at current, keep test)
+       if (ierr.eq.0) write(UNIT=utest, IOSTAT=ierr, REC=rec) etest_org
+       if (ierr.eq.0) read(UNIT=utest,  IOSTAT=ierr, REC=rec) TI
+    else if (rec.eq.0) then
+       ! stream access (test at final, truncate)
+       if (ierr.eq.0) inquire(UNIT=utest, IOSTAT=ierr, SIZE=jend)
+       if (ierr.eq.0) write(UNIT=utest, IOSTAT=ierr, POS=jend+1) etest_org
+       if (ierr.eq.0) read(UNIT=utest,  IOSTAT=ierr, POS=jend+1) TI
+       if (ierr.eq.0) write(UNIT=utest, IOSTAT=ierr, POS=jend+1)
+       if (ierr.eq.0) endfile(UNIT=utest, IOSTAT=ierr)
+    else
+       ! sequential access (test at current, truncate there)
+       if (ierr.eq.0) write(UNIT=utest, IOSTAT=ierr) etest_org
+       if (ierr.eq.0) backspace(UNIT=utest,  IOSTAT=ierr)
+       if (ierr.eq.0) read(UNIT=utest,  IOSTAT=ierr) TI
+       if (ierr.eq.0) backspace(UNIT=utest,  IOSTAT=ierr)
+    endif
+    if (ierr.eq.0) then
+       if (TI.eq.etest_little) then
+          kendi = endian_LITTLE
+       else if (TI.eq.etest_big) then
+          kendi = endian_BIG
+       endif
+    else
+       if (VCHECK_SEVERE(lv)) then
+          call msg_mdl('(''endianness(unit) failed = '', I0, 1x, I0)', (/ierr, utest/), __MDL__, ul)
+       endif
+    endif
+  end subroutine check_bodr_unit
 
 !!!_ + io status
 !!!_  & is_eof_ss() - check if iostat is eof (stream or sequential)
@@ -1637,6 +1717,7 @@ program test_std_env
   implicit none
   integer ierr
   integer ui, uo, ue
+  integer ut
   integer lrb, lrs, lrd, lrf, lri, lrl
   integer kendi
 
@@ -1656,13 +1737,23 @@ program test_std_env
      write(*, *) 'RECL:D = ', lrd
   endif
 
+  kendi = endian_ERROR
   if (ierr.eq.0) then
      call check_bodr_mem (ierr, kendi, uo, +10)
-     write(*, *) 'ENDIANNESS = ', kendi
+     write(*, *) 'ENDIANNESS(mem) = ', kendi, ierr
   endif
+  kendi = endian_ERROR
   if (ierr.eq.0) then
      call check_bodr_files (ierr, kendi, u=uo, levv=+10, ubgn=10, uend=20, ustp=3)
-     write(*, *) 'ENDIANNESS = ', kendi
+     write(*, *) 'ENDIANNESS(files) = ', kendi, ierr
+  endif
+  kendi = endian_ERROR
+  if (ierr.eq.0) then
+     ut=10
+     open(ut, FILE='etest_stream', ACCESS='STREAM', STATUS='REPLACE', ACTION='READWRITE', IOSTAT=ierr)
+     if (ierr.eq.0) write(ut, IOSTAT=ierr) 'wxyz'
+     if (ierr.eq.0) call check_bodr_unit(ierr, kendi, ut, jrec=0)
+     write(*, *) 'ENDIANNESS(unit) = ', kendi, ierr
   endif
 
   if (ierr.eq.0) call finalize(ierr, levv=+10)

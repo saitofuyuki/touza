@@ -1,7 +1,7 @@
 !!!_! nng_record.F90 - TOUZA/Nng record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/09 13:58:23 fuyuki nng_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/12/13 08:49:30 fuyuki nng_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -21,6 +21,7 @@ module TOUZA_Nng_record
        & KI32, KI64, KDBL, KFLT, &
        & control_mode, control_deep, is_first_force, &
        & get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Nng_header,only: litem, nitem
   use TOUZA_Trp, only: &
        & KCODE_CLIPPING,  KCODE_ROUND,      &
        & KCODE_TRANSPOSE, KCODE_SEQUENTIAL, KCODE_INCREMENTAL, &
@@ -44,6 +45,10 @@ module TOUZA_Nng_record
   integer,parameter :: HEADER_SPACES = 538976288 ! 20 20 20 20 [l]
 
   integer,parameter :: GFMT_ID_LEGACY = 9010
+
+  integer,parameter,public :: BODR_ASSUME_SYSTEM  = 0    ! assume file byte-order == system
+  integer,parameter,public :: BODR_ASSUME_FILE    = 1    ! assume file byte-order == common
+  integer,parameter,public :: BODR_CHECK_VERBOSE  = 2    ! check for each unit at open-write
 
 !!!_   . formats
   integer,parameter,public :: GFMT_ERR  = -1
@@ -118,6 +123,9 @@ module TOUZA_Nng_record
 
   integer,save :: def_krectw = 0  !  default record switch to write
 
+  character(len=litem),save :: head_def(nitem) = ' '
+
+  integer,save :: bodr_wnative = BODR_ASSUME_SYSTEM
 !!!_  - private static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -260,17 +268,18 @@ module TOUZA_Nng_record
 !!!_  - public procedures
   public init, diag, finalize
   public set_default_switch
-  public nng_read_header,   nng_write_header
-  public nng_read_data,     nng_write_data
+  public set_default_header, get_default_header
+  public nng_read_header,    nng_write_header
+  public nng_read_data,      nng_write_data
   public nng_skip_records
-  public parse_header_base, parse_record_fmt
+  public parse_header_base,  parse_record_fmt
   public parse_header_size
   public get_switch
   public set_urt_defs
   public switch_urt_diag
 
 !!!_  - public shared
-!!!_   . from TTrp
+!!!_   . from Trp
   public KCODE_CLIPPING
   public KCODE_TRANSPOSE, KCODE_SEQUENTIAL, KCODE_INCREMENTAL
   public KCODE_MANUAL,    RELLENO_SEQUENTIAL
@@ -278,18 +287,25 @@ module TOUZA_Nng_record
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, stdv, krectw, klenc, kldec, knenc, kndec)
-    use TOUZA_Nng_std,   only: choice, get_size_bytes
+  subroutine init &
+       & (ierr,   u,      levv,  mode,  stdv,  &
+       &  bodrw,  krectw, klenc, kldec, knenc, kndec, &
+       &  vmiss,  utime,  csign, msign)
+    use TOUZA_Nng_std,   only: choice, get_size_bytes, KDBL
     use TOUZA_Nng_header,only: nh_init=>init, litem, nitem
     use TOUZA_Nng_io,    only: ns_init=>init
     use TOUZA_Trp,       only: trp_init=>init
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: u
-    integer,intent(in),optional :: krectw        ! default record switch (write)
-    integer,intent(in),optional :: klenc,kldec ! packing method for legacy-format (ury)
-    integer,intent(in),optional :: knenc,kndec ! packing method for new format (urt)
-    integer,intent(in),optional :: levv, mode, stdv
+    integer,         intent(out)         :: ierr
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv, mode, stdv
+    integer,         intent(in),optional :: bodrw       ! byte-order native flag
+    integer,         intent(in),optional :: krectw      ! default record switch (write)
+    integer,         intent(in),optional :: klenc,kldec ! packing method for legacy-format (ury)
+    integer,         intent(in),optional :: knenc,kndec ! packing method for new format (urt)
+    real(kind=KDBL), intent(in),optional :: vmiss       ! default header properties
+    character(len=*),intent(in),optional :: utime
+    character(len=*),intent(in),optional :: csign, msign
     integer lv, md, lmd
     character(len=litem) :: hdummy
 
@@ -315,10 +331,13 @@ contains
        endif
        if (init_counts.eq.0) then
           nlhead_std = get_size_bytes(hdummy, nitem)
+          if (ierr.eq.0) call set_bodr_wnative(ierr, bodrw, ulog, lv)
           if (ierr.eq.0) call set_default_switch(ierr, krectw, ulog, lv)
           if (ierr.eq.0) then
-             call init_batch &
-                  & (ierr, klenc, kldec, knenc, kndec, ulog, lv)
+             call init_batch(ierr, klenc, kldec, knenc, kndec, ulog, lv)
+          endif
+          if (ierr.eq.0) then
+             call set_default_header(ierr, vmiss, utime, csign, msign)
           endif
        endif
        init_counts = init_counts + 1
@@ -329,8 +348,8 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Nng_std,   only: choice, msg, is_msglev_normal
-    use TOUZA_Nng_header,only: nh_diag=>diag
+    use TOUZA_Nng_std,   only: choice, msg, is_msglev_normal, is_msglev_info
+    use TOUZA_Nng_header,only: nh_diag=>diag, show_header
     use TOUZA_Nng_io,    only: ns_diag=>diag
     use TOUZA_Trp,       only: trp_diag=>diag
     implicit none
@@ -351,6 +370,10 @@ contains
        if (is_first_force(diag_counts, md)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
+             if (is_msglev_normal(lv)) call msg('(''byte-order assumption = '', I0)', bodr_wnative, __MDL__, utmp)
+             if (is_msglev_info(lv)) then
+                call show_header(ierr, head_def, ' ', utmp, lv)
+             endif
           endif
        endif
        lmd = control_deep(md)
@@ -403,8 +426,42 @@ contains
     return
   end subroutine finalize
 
-!!!_ + init subcontracts
-!!!_  - set_default_switch
+!!!_  - init subcontracts
+!!!_   & set_bodr_wnative
+  subroutine set_bodr_wnative(ierr, bodrw, u, levv)
+    use TOUZA_Nng_std,only: &
+         & choice, msg, is_msglev_info, is_msglev_fatal, &
+         & kendi_mem, kendi_file
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: bodrw
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    ierr = 0
+    bodr_wnative = choice(bodr_wnative, bodrw)
+    select case (bodr_wnative)
+    case (BODR_ASSUME_SYSTEM)
+       if (is_msglev_info(levv)) then
+          call msg('(''assume system byte-order when write = '', I0)', kendi_mem, __MDL__, u)
+       endif
+    case (BODR_ASSUME_FILE)
+       if (is_msglev_info(levv)) then
+          call msg('(''assume estimated file byte-order when write = '', I0)', kendi_file, __MDL__, u)
+       endif
+    case (BODR_CHECK_VERBOSE)
+       if (is_msglev_info(levv)) then
+          call msg('check file byte-order when write',  __MDL__, u)
+       endif
+    case default
+       ierr = -1
+       if (is_msglev_fatal(levv)) then
+          call msg('(''invalid byte-order switch = '', I0)', bodr_wnative, __MDL__, u)
+       endif
+    end select
+    return
+  end subroutine set_bodr_wnative
+
+!!!_   . set_default_switch
   subroutine set_default_switch &
        & (ierr, krectw, u, levv)
     use TOUZA_Nng_std,only: choice, msg, is_msglev_fatal
@@ -431,7 +488,7 @@ contains
     return
   end subroutine set_default_switch
 
-!!!_  - init_batch
+!!!_   . init_batch
   subroutine init_batch &
        & (ierr, klenc, kldec, knenc, kndec, u, levv)
     use TOUZA_Nng_std,only: choice
@@ -452,33 +509,79 @@ contains
     return
   end subroutine init_batch
 
-!!!_ + user interfaces
-!!!_  & get_switch - get record-format switch to write
-  subroutine get_switch (krect, kendi, kcfg)
-    use TOUZA_Nng_std,only: choice, endian_BIG, endian_LITTLE
+!!!_   . set_default_header
+  subroutine set_default_header &
+       & (ierr,  &
+       &  vmiss, &
+       &  utime, &
+       &  csign, msign)
+    use TOUZA_Nng_header,only: &
+         & put_item, &
+         & hi_IDFM,  hi_UTIM,  hi_FNUM,  hi_DNUM,  &
+         & hi_ASTR1, hi_AEND1, hi_ASTR2, hi_AEND2, hi_ASTR3, hi_AEND3,  &
+         & hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL,  &
+         & hi_STYP,  hi_IOPTN, hi_ROPTN, hi_CSIGN, hi_MSIGN
+    use TOUZA_Nng_std,only: KDBL
     implicit none
-    integer,intent(out)         :: krect
-    integer,intent(in)          :: kendi  ! estimated file byte-order
-    integer,intent(in),optional :: kcfg   ! user setting to overwrite default
+    integer,         intent(out)         :: ierr
+    real(kind=KDBL), intent(in),optional :: vmiss
+    character(len=*),intent(in),optional :: utime
+    character(len=*),intent(in),optional :: csign, msign
+    ierr = 0
+    if (ierr.eq.0) call put_item(ierr, head_def, GFMT_ID_LEGACY, hi_IDFM)
+    if (ierr.eq.0) call put_item(ierr, head_def, 1,              hi_FNUM)
+    if (ierr.eq.0) call put_item(ierr, head_def, 1,              hi_DNUM)
+    if (present(utime)) then
+       if (ierr.eq.0) call put_item(ierr, head_def, utime,  hi_UTIM)
+    else
+       if (ierr.eq.0) call put_item(ierr, head_def, 'HOUR', hi_UTIM)
+    endif
+    if (ierr.eq.0) call put_item(ierr, head_def, 1, hi_ASTR1)
+    if (ierr.eq.0) call put_item(ierr, head_def, 1, hi_AEND1)
+    if (ierr.eq.0) call put_item(ierr, head_def, 1, hi_ASTR2)
+    if (ierr.eq.0) call put_item(ierr, head_def, 1, hi_AEND2)
+    if (ierr.eq.0) call put_item(ierr, head_def, 1, hi_ASTR3)
+    if (ierr.eq.0) call put_item(ierr, head_def, 1, hi_AEND3)
 
-    integer ktmp
+    if (ierr.eq.0) call put_item(ierr, head_def, 1, hi_STYP)
 
-    krect = REC_DEFAULT
-
-    ktmp = choice(def_krectw, kcfg)
-    if (ktmp.lt.0) ktmp = def_krectw
-
-    if (IAND(ktmp, REC_LSEP).gt.0) krect = krect + REC_LSEP
-    if (IAND(ktmp, REC_SWAP).gt.0) then
-       krect = krect + REC_SWAP
-    else if (IAND(ktmp, REC_BIG).gt.0) then
-       if (kendi.eq.endian_LITTLE) krect = krect + REC_SWAP
-    else if (IAND(ktmp, REC_LITTLE).gt.0) then
-       if (kendi.eq.endian_BIG) krect = krect + REC_SWAP
+    if (present(vmiss)) then
+       if (ierr.eq.0) call put_item(ierr, head_def, vmiss, hi_MISS)
+       if (ierr.eq.0) call put_item(ierr, head_def, vmiss, hi_DMIN)
+       if (ierr.eq.0) call put_item(ierr, head_def, vmiss, hi_DMAX)
+       if (ierr.eq.0) call put_item(ierr, head_def, vmiss, hi_DIVS)
+       if (ierr.eq.0) call put_item(ierr, head_def, vmiss, hi_DIVL)
+    else
+       if (ierr.eq.0) call put_item(ierr, head_def, def_VMISS, hi_MISS)
+       if (ierr.eq.0) call put_item(ierr, head_def, def_VMISS, hi_DMIN)
+       if (ierr.eq.0) call put_item(ierr, head_def, def_VMISS, hi_DMAX)
+       if (ierr.eq.0) call put_item(ierr, head_def, def_VMISS, hi_DIVS)
+       if (ierr.eq.0) call put_item(ierr, head_def, def_VMISS, hi_DIVL)
     endif
 
+    if (ierr.eq.0) call put_item(ierr, head_def, 0,        hi_IOPTN)
+    if (ierr.eq.0) call put_item(ierr, head_def, 0.0_KDBL, hi_ROPTN)
+
+    if (present(csign)) then
+       if (ierr.eq.0) call put_item(ierr, head_def, csign, hi_CSIGN)
+    endif
+    if (present(msign)) then
+       if (ierr.eq.0) call put_item(ierr, head_def, msign, hi_MSIGN)
+    endif
     return
-  end subroutine get_switch
+  end subroutine set_default_header
+
+!!!_ + user interfaces
+!!!_  - get_default_header - get default header
+  subroutine get_default_header &
+       & (head)
+    use TOUZA_Nng_header,only: litem, nitem
+    implicit none
+    character(len=*),intent(out) :: head(*)
+    head(1:nitem) = head_def(1:nitem)
+    return
+  end subroutine get_default_header
+
 !!!_  & nng_read_header - read header and set current properties
   subroutine nng_read_header &
        & (ierr, &
@@ -506,6 +609,7 @@ contains
     integer,         intent(in)    :: u
 
     ierr = err_default
+    if (ierr.eq.0) call set_wrecord_prop(ierr, krect, u)
     if (ierr.eq.0) call put_header(ierr, head, u, krect)
 
   end subroutine nng_write_header
@@ -2880,10 +2984,10 @@ contains
 !!!_  & get_record_prop - get sequential record properties (byte-order and separator size)
   subroutine get_record_prop &
        & (ierr, krect, u)
-    use TOUZA_Nng_std,   only: KI32, KI64, is_eof_ss
+    use TOUZA_Nng_std,   only: KI32, KI64, KIOFS, is_eof_ss
     use TOUZA_Nng_header,only: nitem, litem
     use TOUZA_Nng_io,    only: &
-         & KIOFS, WHENCE_ABS, &
+         & WHENCE_ABS, &
          & ssq_read_isep, ssq_rseek, &
          & ssq_eswap
     implicit none
@@ -2960,9 +3064,9 @@ contains
   subroutine get_header &
        & (ierr, &
        &  head,  u, krect)
+    use TOUZA_Nng_std,   only: KIOFS
     use TOUZA_Nng_header,only: nitem
-    use TOUZA_Nng_io,    only: &
-         & KIOFS, ssq_read_lrec, ssq_read_irec
+    use TOUZA_Nng_io,    only: ssq_read_lrec, ssq_read_irec
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: head(*)
@@ -2994,13 +3098,80 @@ contains
     ! write(*, *) '/', head(1), '/'
     return
   end subroutine get_header
+
+!!!_  & set_wrecord_prop - set sequential record properties to write (byte-order and separator size)
+  subroutine set_wrecord_prop &
+       & (ierr, krect, u, kendi)
+    use TOUZA_Nng_std,only: &
+         & choice, check_bodr_unit, KIOFS, kendi_mem, kendi_file
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(inout)       :: krect
+    integer,intent(in)          :: u
+    integer,intent(in),optional :: kendi
+    integer ke, kr
+    integer(kind=KIOFS) :: jpos
+
+    ierr = err_default
+
+    if (present(kendi)) then
+       ke = kendi
+    else
+       select case(bodr_wnative)
+       case (BODR_ASSUME_SYSTEM)
+          ke = kendi_mem
+       case (BODR_ASSUME_FILE)
+          ke = kendi_file
+       case (BODR_CHECK_VERBOSE)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) call check_bodr_unit(ierr, ke, utest=u, jrec=0)
+          if (ierr.eq.0) write(UNIT=u, IOSTAT=ierr, POS=jpos)
+       case default
+          ke = kendi_mem
+       end select
+    endif
+    if (ierr.eq.0) then
+       call get_switch(kr, ke, krect)
+       krect = kr
+    endif
+
+    return
+  end subroutine set_wrecord_prop
+
+!!!_  & get_switch - get record-format switch to write
+  subroutine get_switch (krect, kendi, kcfg)
+    use TOUZA_Nng_std,only: choice, endian_BIG, endian_LITTLE
+    implicit none
+    integer,intent(out)         :: krect
+    integer,intent(in)          :: kendi  ! estimated file byte-order
+    integer,intent(in),optional :: kcfg   ! user setting to overwrite default
+
+    integer ktmp
+
+    krect = REC_DEFAULT
+
+    ktmp = choice(def_krectw, kcfg)
+    if (ktmp.lt.0) ktmp = def_krectw
+
+    if (IAND(ktmp, REC_LSEP).gt.0) krect = krect + REC_LSEP
+    if (IAND(ktmp, REC_SWAP).gt.0) then
+       krect = krect + REC_SWAP
+    else if (IAND(ktmp, REC_BIG).gt.0) then
+       if (kendi.eq.endian_LITTLE) krect = krect + REC_SWAP
+    else if (IAND(ktmp, REC_LITTLE).gt.0) then
+       if (kendi.eq.endian_BIG) krect = krect + REC_SWAP
+    endif
+
+    return
+  end subroutine get_switch
+
 !!!_  & put_header - write header block
   subroutine put_header &
        & (ierr, &
        &  head, u, krect)
+    use TOUZA_Nng_std,   only: KIOFS
     use TOUZA_Nng_header,only: nitem
-    use TOUZA_Nng_io,    only: &
-         & KIOFS, ssq_write_lrec, ssq_write_irec
+    use TOUZA_Nng_io,    only: ssq_write_lrec, ssq_write_irec
     implicit none
     integer,            intent(out) :: ierr
     character(len=*),   intent(in)  :: head(*)
@@ -3714,7 +3885,7 @@ contains
              else
                 kfmt = kfmt + GFMT_URC
              endif
-          case ('Y')
+          case ('Y', 'X')
              kfmt = kfmt + GFMT_URY
              read(str(4:), *, IOSTAT=ierr) kk
              if (ierr.eq.0) then
@@ -4169,11 +4340,9 @@ end module TOUZA_Nng_record
 #ifdef TEST_NNG_RECORD
 program test_nng_record
   use TOUZA_Std,       only: parse, get_param, arg_diag, arg_init
-  use TOUZA_Nng_std,   only: KDBL
+  use TOUZA_Nng_std,   only: KDBL,  KIOFS
   use TOUZA_Nng_header,only: nitem, litem
-  use TOUZA_Nng_io,    only: &
-       & KIOFS, &
-       & ssq_open, ssq_close, ssq_write_irec, ssq_write_lrec
+  use TOUZA_Nng_io,    only: ssq_write_irec, ssq_write_lrec
   use TOUZA_Nng_record
   implicit none
   integer ierr
@@ -4272,10 +4441,9 @@ contains
 !!!_ + test_auto_record - auto record parser tests
   subroutine test_auto_record &
        & (ierr, jarg)
-    use TOUZA_Nng_std,   only: KDBL
+    use TOUZA_Nng_std,   only: KDBL,  KIOFS
     use TOUZA_Nng_header,only: nitem, litem, hi_ITEM, put_item, get_item
     use TOUZA_Nng_io,    only: &
-         & KIOFS, &
          & ssq_open, ssq_close, ssq_write_irec, ssq_write_lrec
     use TOUZA_Nng_record
     implicit none
@@ -4401,6 +4569,7 @@ contains
     use TOUZA_Std,    only: get_param, upcase
     use TOUZA_Nng_std,only: KBUF=>KDBL
     use TOUZA_Nng_header
+    use TOUZA_Nng_io,only: ssq_open, ssq_close
     implicit none
     integer,intent(out)   :: ierr
     integer,intent(inout) :: jarg
@@ -4501,6 +4670,7 @@ contains
        & (ierr, jarg)
     use TOUZA_Std,only: endian_LITTLE, endian_BIG
     use TOUZA_Nng_std,only: KBUF=>KDBL
+    use TOUZA_Nng_io, only: ssq_open,  ssq_close
     use TOUZA_Nng_header
     implicit none
     integer,intent(out)   :: ierr
@@ -4567,48 +4737,47 @@ contains
     if (ierr.eq.0) call put_item(ierr, hd, 'z',    hi_AITM3)
     if (ierr.eq.0) call put_item(ierr, hd, vmiss,  hi_MISS)
 
-    if (ierr.eq.0) call ssq_open(ierr, ufile, wfile, ACTION='RW', STATUS='R', kendi=kendi)
-    if (ierr.eq.0) call get_switch(krect, kendi)
+    if (ierr.eq.0) call ssq_open(ierr, ufile, wfile, ACTION='RW', STATUS='R')
 
     if (ierr.eq.0) then
        ! all zero
        v(:) = 0.0_KBUF
-       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, krect, '0')
+       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, '0')
     endif
     if (ierr.eq.0) then
        ! all positive
        v(:) = +1.0_KBUF
-       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, krect, '+1')
+       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, '+1')
     endif
     if (ierr.eq.0) then
        ! all negative
        v(:) = -1.0_KBUF
-       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, krect, '-1')
+       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, '-1')
     endif
     if (ierr.eq.0) then
        ! all missing
        v(:) = vmiss
-       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, krect, 'miss')
+       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, 'miss')
     endif
     if (ierr.eq.0) then
        ! all huge
        v(:) = +HUGE(vmiss)
-       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, krect, '+H')
+       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, '+H')
     endif
     if (ierr.eq.0) then
        ! all huge
        v(:) = -HUGE(vmiss)
-       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, krect, '-H')
+       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, '-H')
     endif
     if (ierr.eq.0) then
        ! all huge
        v(:) = +TINY(vmiss)
-       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, krect, '+T')
+       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, '+T')
     endif
     if (ierr.eq.0) then
        ! all huge
        v(:) = -TINY(vmiss)
-       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, krect, '-T')
+       call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, '-T')
     endif
 
     if (ierr.eq.0) call ssq_close(ierr, ufile, wfile)
@@ -4616,7 +4785,7 @@ contains
   end subroutine test_encoding
 !!!_  - test_encoding_sub
   subroutine test_encoding_sub &
-       & (ierr, hd, v, n, nz, vmiss, ufile, krect, tag)
+       & (ierr, hd, v, n, nz, vmiss, ufile, tag)
     use TOUZA_Nng_std,only: KBUF=>KDBL
     use TOUZA_Nng_header
     implicit none
@@ -4626,7 +4795,6 @@ contains
     real(kind=KBUF), intent(in)    :: vmiss
     integer,         intent(in)    :: ufile
     integer,         intent(in)    :: n, nz
-    integer,         intent(in)    :: krect
     character(len=*),intent(in)    :: tag
 
     real(kind=KBUF),parameter :: x0 = 0.0_KBUF
@@ -4638,31 +4806,31 @@ contains
     ierr = 0
 
     if (ierr.eq.0) then
-       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, krect, tag, ' ')
+       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, tag, ' ')
     endif
     if (ierr.eq.0) then
        v(1) = x1
-       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, krect, tag, '+1')
+       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, tag, '+1')
     endif
     if (ierr.eq.0) then
        v(1) = -x1
-       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, krect, tag, '-1')
+       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, tag, '-1')
     endif
     if (ierr.eq.0) then
        v(1) = +xh
-       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, krect, tag, '+H')
+       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, tag, '+H')
     endif
     if (ierr.eq.0) then
        v(1) = -xh
-       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, krect, tag, '-H')
+       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, tag, '-H')
     endif
     if (ierr.eq.0) then
        v(1) = +xt
-       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, krect, tag, '+T')
+       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, tag, '+T')
     endif
     if (ierr.eq.0) then
        v(1) = -xt
-       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, krect, tag, '-T')
+       call test_encoding_check(ierr, hd, v, n, nz, vmiss, ufile, tag, '-T')
     endif
 
     return
@@ -4670,7 +4838,7 @@ contains
 
 !!!_  - test_encoding_check
   subroutine test_encoding_check &
-       & (ierr, hd, v, n, nz, vmiss, ufile, krect, tag, tmod)
+       & (ierr, hd, v, n, nz, vmiss, ufile, tag, tmod)
     use TOUZA_Nng_std,only: KBUF=>KDBL
     use TOUZA_Nng_header
     implicit none
@@ -4680,7 +4848,6 @@ contains
     real(kind=KBUF), intent(in)    :: vmiss
     integer,         intent(in)    :: ufile
     integer,         intent(in)    :: n, nz
-    integer,         intent(in)    :: krect
     character(len=*),intent(in)    :: tag, tmod
 
     character(len=litem) :: hdi(nitem)
@@ -4708,12 +4875,12 @@ contains
 
     if (ierr.eq.0) call put_item(ierr, hd, trim(txt), hi_ITEM)
 
-    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, krect, 'URY01')
-    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, krect, 'MRY01')
-    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, krect, 'URY02')
-    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, krect, 'MRY02')
-    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, krect, 'URY31')
-    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, krect, 'MRY31')
+    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, 'URY01')
+    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, 'MRY01')
+    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, 'URY02')
+    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, 'MRY02')
+    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, 'URY31')
+    if (ierr.eq.0) call test_encoding_write(ierr, hd, v, n, ufile, 'MRY31')
 
     if (ierr.eq.0) write(UNIT=ufile, IOSTAT=ierr, POS=jpos)
 
@@ -4749,7 +4916,7 @@ contains
   end subroutine test_encoding_check
 
   subroutine test_encoding_write &
-       & (ierr, hd, v, n, u, krect, fmt)
+       & (ierr, hd, v, n, u, fmt)
     use TOUZA_Nng_std,only: KBUF=>KDBL
     use TOUZA_Nng_header
     implicit none
@@ -4758,13 +4925,12 @@ contains
     real(kind=KBUF), intent(in)    :: v(*)
     integer,         intent(in)    :: n
     integer,         intent(in)    :: u
-    integer,         intent(in)    :: krect
     character(len=*),intent(in)    :: fmt
 
     integer krectw
 
     ierr = 0
-    krectw = krect
+    krectw = REC_DEFAULT
     if (ierr.eq.0) call put_item(ierr, hd, trim(fmt), hi_DFMT)
     if (ierr.eq.0) call nng_write_header(ierr, hd, krectw, u)
     if (ierr.eq.0) call nng_write_data(ierr, v, n, hd, krectw, u)

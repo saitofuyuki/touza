@@ -1,7 +1,7 @@
 !!!_! nng_miroc.F90 - TOUZA/Nng MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/09 16:57:15 fuyuki nng_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/12/12 11:28:48 fuyuki nng_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -31,6 +31,8 @@ module TOUZA_Nng_miroc
   implicit none
   public
   integer,parameter :: KMD = MIROC_DOUBLE
+  real(kind=KMD),parameter   :: vmiss_def = -999.0_KMD
+  character(len=*),parameter :: csign_def = 'MIROC'
 !!!_  - miroc include original
 #if WITH_MIROC
 # include "zhdim.F"  /* NCC NDC (No. of characters) */
@@ -52,17 +54,17 @@ module TOUZA_Nng_miroc
           &  DSIZE)
        implicit none
        integer,            parameter   :: KMD = MIROC_DOUBLE
-       INTEGER,            intent(in)  :: DSIZE
-       REAL(kind=KMD),     intent(out) :: DDATA(DSIZE)  !! data
-       CHARACTER(len=_NCC),intent(out) :: HEAD(_NDC)
-       INTEGER,            intent(out) :: IEOD
-       INTEGER,            intent(out) :: ISTA, IEND
-       INTEGER,            intent(out) :: JSTA, JEND
-       INTEGER,            intent(out) :: KSTA, KEND
-       INTEGER,            intent(in)  :: IFILE
-       CHARACTER(len=*),   intent(in)  :: HITEM(*)  !! name for identify
-       CHARACTER(len=*),   intent(in)  :: HDFMT(*)  !! data format : neglected
-       CHARACTER(len=*),   intent(in)  :: HCLAS(*)  !! driver : neglected
+       integer,            intent(in)  :: DSIZE
+       real(kind=KMD),     intent(out) :: DDATA(DSIZE)  !! data
+       character(len=_NCC),intent(out) :: HEAD(_NDC)
+       integer,            intent(out) :: IEOD
+       integer,            intent(out) :: ISTA, IEND
+       integer,            intent(out) :: JSTA, JEND
+       integer,            intent(out) :: KSTA, KEND
+       integer,            intent(in)  :: IFILE
+       character(len=*),   intent(in)  :: HITEM(*)  !! name for identify
+       character(len=*),   intent(in)  :: HDFMT(*)  !! data format : neglected
+       character(len=*),   intent(in)  :: HCLAS(*)  !! driver : neglected
      end subroutine GTZRDZ
      subroutine GFPEEK &
           & (HEAD, IEOD, IFILE)
@@ -78,18 +80,31 @@ module TOUZA_Nng_miroc
        integer,intent(in)  :: IFILE
      end subroutine GFSKIP
   end interface
-!!!_  - public
+!!!_  - private
+  logical,save,private :: binit = .FALSE.
+  logical,save,private :: bdiag = .FALSE.
+
 contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv)
-    use TOUZA_Nng,only: nng_init=>init
+    use TOUZA_Nng,only: nng_init=>init, set_default_header
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
+    logical,save :: ofirst = .TRUE.
     ierr = 0
-    if (ierr.eq.0) call nng_init(ierr, u, levv, mode, stdv)
+    if (.not.binit) then
+       binit = .TRUE.
+       if (ierr.eq.0) then
+          call nng_init (ierr, u, levv, mode, stdv)
+       endif
+       if (ierr.eq.0) then
+          call set_default_header &
+               (ierr, vmiss=vmiss_def, csign=csign_def, msign=csign_def)
+       endif
+    endif
     return
   end subroutine init
 
@@ -102,9 +117,12 @@ contains
     integer,intent(in),optional :: mode
     integer,intent(in),optional :: levv
     ierr = 0
-    if (ierr.eq.0) call nng_diag(ierr, u, levv, mode)
-    if (ierr.eq.0) call nng_msg(TIME_STAMP, __MDL__, u)
-    if (ierr.eq.0) call nng_msg('(''WITH_MIROC = '', I0, )', WITH_MIROC, __MDL__, u)
+    if (.not.bdiag) then
+       bdiag = .TRUE.
+       if (ierr.eq.0) call nng_diag(ierr, u, levv, mode)
+       if (ierr.eq.0) call nng_msg(TIME_STAMP, __MDL__, u)
+       if (ierr.eq.0) call nng_msg('(''WITH_MIROC = '', I0, )', WITH_MIROC, __MDL__, u)
+    endif
     return
   end subroutine diag
 
@@ -121,6 +139,18 @@ contains
   end subroutine finalize
 
 !!!_ + user subroutines
+  subroutine put_item_time(ierr, head, time, kentr)
+    use TOUZA_Nng_header,only: put_item
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: head(*)
+    real(kind=KMD),  intent(in)  :: time
+    integer,         intent(in)  :: kentr
+    integer idate(6)
+    ierr = 0
+    call css2yh(idate, time)
+    call put_item(ierr, head, idate, kentr)
+  end subroutine put_item_time
 !!!_ + end module
 end module TOUZA_Nng_Miroc
 !!!_* /nonmodule/ interfaces
@@ -135,17 +165,17 @@ subroutine GTZRDZ &
        & hi_ASTR1, hi_ASTR2, hi_ASTR3, hi_AEND1, hi_AEND2, hi_AEND3
   use TOUZA_Nng_miroc,only: nm_init=>init, nm_diag=>diag, KMD, NCC, NDC
   implicit none
-  INTEGER,            intent(in)  :: DSIZE
-  REAL(kind=KMD),     intent(out) :: DDATA(DSIZE)  !! data
-  CHARACTER(len=_NCC),intent(out) :: HEAD(_NDC)
-  INTEGER,            intent(out) :: IEOD
-  INTEGER,            intent(out) :: ISTA, IEND
-  INTEGER,            intent(out) :: JSTA, JEND
-  INTEGER,            intent(out) :: KSTA, KEND
-  INTEGER,            intent(in)  :: IFILE
-  CHARACTER(len=*),   intent(in)  :: HITEM(*)  !! name for identify
-  CHARACTER(len=*),   intent(in)  :: HDFMT(*)  !! data format : neglected
-  CHARACTER(len=*),   intent(in)  :: HCLAS(*)  !! driver : neglected
+  integer,            intent(in)  :: DSIZE
+  real(kind=kmd),     intent(out) :: DDATA(DSIZE)  !! data
+  character(len=_NCC),intent(out) :: HEAD(_NDC)
+  integer,            intent(out) :: IEOD
+  integer,            intent(out) :: ISTA, IEND
+  integer,            intent(out) :: JSTA, JEND
+  integer,            intent(out) :: KSTA, KEND
+  integer,            intent(in)  :: IFILE
+  character(len=*),   intent(in)  :: HITEM(*)  !! name for identify
+  character(len=*),   intent(in)  :: HDFMT(*)  !! data format : neglected
+  character(len=*),   intent(in)  :: HCLAS(*)  !! driver : neglected
 
   logical,save :: ofirst = .TRUE.
   integer krect                 ! record type
@@ -225,7 +255,7 @@ subroutine GFPEEK &
 
   IEOD = 0
 
-  inquire(UNIT=IFILE, IOSTAT=jerr, SIZE=jpos)
+  inquire(UNIT=IFILE, IOSTAT=jerr, POS=jpos)
   if (jerr.ne.0) then
      IEOD = MM_ERR
      return
@@ -257,6 +287,153 @@ subroutine GFSKIP &
   if (jerr.ne.0) IEOD = -1
   return
 end subroutine GFSKIP
+!!!_ + io/igtiow.F
+!!!_  & GTZWRZ
+subroutine GTZWRZ &
+     & (DDATA, &
+     &  HITEM, HTITL, HUNIT, HDSET, &
+     &  TIME,  TDUR,  JFILE, HDFMT, HCLAS, &
+     &  TIME1, TIME2, RMISS, &
+     &  HALON, HALAT, HASIG, &
+     &  ISTA,  IEND,  JSTA,  JEND,  KSTA,  KEND, &
+     &  DSIZE)
+  use TOUZA_Nng_miroc,only:  nm_init=>init, nm_diag=>diag, vmiss_def
+  use TOUZA_Nng_header,only: litem, nitem, put_item, &
+       & hi_DSET,  hi_ITEM,  hi_TITL1, hi_TITL2, &
+       & hi_UNIT,  hi_TIME,  hi_TDUR,  hi_DFMT,  &
+       & hi_DATE,  hi_DATE1, hi_DATE2, &
+       & hi_CDATE, hi_MDATE, hi_SIZE,  &
+       & hi_AITM1, hi_AITM2, hi_AITM3, &
+       & hi_ASTR1, hi_AEND1, hi_ASTR2, hi_AEND2, hi_ASTR3, hi_AEND3,  &
+       & hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL,  &
+       & hi_EDIT1, hi_EDIT2, hi_EDIT3, &
+       & hi_ETTL1, hi_ETTL2, hi_ETTL3
+  use TOUZA_Nng_record,only: &
+       & get_default_header, nng_write_header, nng_write_data, &
+       & REC_DEFAULT
+  implicit none
+  integer,parameter :: KMD = MIROC_DOUBLE
+  integer,         intent(in) :: DSIZE
+  real(kind=KMD),  intent(in) :: DDATA(DSIZE)    !! data
+  character(len=*),intent(in) :: HITEM
+  character(len=*),intent(in) :: HTITL           !! title
+  character(len=*),intent(in) :: HUNIT           !! unit
+  character(len=*),intent(in) :: HDSET           !! name of dataset
+  real(kind=KMD),  intent(in) :: TIME            !! time
+  real(kind=KMD),  intent(in) :: TDUR            !! representative time
+  integer,         intent(in) :: JFILE           !! output file No.
+  character(len=*),intent(in) :: HDFMT           !! data format
+  character(len=*),intent(in) :: HCLAS
+  real(kind=KMD),  intent(in) :: RMISS           !! missing value
+  real(kind=KMD),  intent(in) :: TIME1           !! time
+  real(kind=KMD),  intent(in) :: TIME2           !! time
+  character(len=*),intent(in) :: HALON
+  character(len=*),intent(in) :: HALAT
+  character(len=*),intent(in) :: HASIG
+  integer,         intent(in) :: ISTA, IEND, JSTA, JEND, KSTA, KEND   !! for HEADER
+
+  integer jerr
+  logical,save :: ofirst = .TRUE.
+  integer,save :: jfpar
+  integer :: idtv(8)
+  real(kind=KMD),save      :: TIME_PREV = - HUGE(0.0_KMD)
+  real(kind=KMD),parameter :: LAZINESS  = 24 * 3600.0_KMD
+
+  character(len=litem),save :: hdefv(nitem)
+  character(len=litem)      :: head (nitem)
+
+  real(kind=KMD),parameter :: TSCL = 3600.0_KMD
+
+  integer krect
+  integer n
+
+  jerr = 0
+  if (ofirst) then
+     ofirst = .FALSE.
+#if WITH_MIROC
+     call GETJFP(jfpar)
+#else
+     jfpar = 0  ! hard-coded
+#endif
+     call nm_init(jerr, u=jfpar)
+     if (jerr.eq.0) call nm_diag(jerr)
+     if (jerr.eq.0) call get_default_header(hdefv)
+  endif
+
+
+  if (TIME .ge. TIME_PREV + LAZINESS) then
+     call date_and_time(values=idtv(:))
+     idtv(4:6) = idtv(5:7)
+     call put_item(jerr, hdefv, idtv(1:6), hi_CDATE)
+     call put_item(jerr, hdefv, idtv(1:6), hi_MDATE)
+     TIME_PREV = TIME
+  endif
+
+  head(:) = hdefv(:)
+  n = (IEND - ISTA + 1) * (JEND - JSTA + 1) * (KEND - KSTA + 1)
+  call put_item(jerr, head, HDSET, hi_DSET)
+  call put_item(jerr, head, HITEM, hi_ITEM)
+  call put_item(jerr, head, HTITL, hi_TITL1, hi_TITL2)
+  call put_item(jerr, head, HUNIT, hi_UNIT)
+  call put_item(jerr, head, NINT(TIME/TSCL), hi_TIME)
+  call put_item(jerr, head, NINT(TDUR/TSCL), hi_TDUR)
+
+  if (RMISS .ne. vmiss_def) then
+     call put_item(jerr, head, RMISS, hi_MISS)
+     call put_item(jerr, head, RMISS, hi_DMIN)
+     call put_item(jerr, head, RMISS, hi_DMAX)
+     call put_item(jerr, head, RMISS, hi_DIVS)
+     call put_item(jerr, head, RMISS, hi_DIVL)
+  endif
+
+  CALL CPERPO(.FALSE.)
+  call put_item_time(jerr, head, time,  HI_DATE)
+  call put_item_time(jerr, head, time1, HI_DATE1)
+  call put_item_time(jerr, head, time2, HI_DATE2)
+  CALL CPERPO(.TRUE.)
+
+  if (HALON.eq.'AV' .or. HALON(1:1).eq.'=') then
+     call put_item(jerr, head, 'LON'//HALON, hi_EDIT1)
+     call put_item(jerr, head, 'LON'//HALON, hi_ETTL1)
+  else
+     call put_item(jerr, head, HALON, hi_AITM1)
+     call put_item(jerr, head, ISTA,  hi_ASTR1)
+     call put_item(jerr, head, IEND,  hi_AEND1)
+  endif
+  if (HALAT.eq.'AV' .or. HALAT(1:1).eq.'=') then
+     call put_item(jerr, head, 'LAT'//HALAT, hi_EDIT2)
+     call put_item(jerr, head, 'LAT'//HALAT, hi_ETTL2)
+  else
+     call put_item(jerr, head, HALAT, hi_AITM2)
+     call put_item(jerr, head, JSTA,  hi_ASTR2)
+     call put_item(jerr, head, JEND,  hi_AEND2)
+  endif
+  if (HASIG.eq.'AV' .or. HASIG(1:1).eq.'=') then
+     call put_item(jerr, head, 'LEV'//HASIG, hi_EDIT3)
+     call put_item(jerr, head, 'LEV'//HASIG, hi_ETTL3)
+  else
+     call put_item(jerr, head, HASIG, hi_AITM3)
+     call put_item(jerr, head, KSTA,  hi_ASTR3)
+     call put_item(jerr, head, KEND,  hi_AEND3)
+  endif
+  call put_item(jerr, head, n, hi_SIZE)
+
+  ! no adjustment for obsolete formats
+  call put_item(jerr, head, HDFMT, hi_DFMT)
+
+  call nng_write_header(jerr, head, krect, JFILE)
+  ! if (ierr.eq.0) then
+  !    if (levv.gt.1) call switch_urt_diag(wfile, jrec, udiag)
+  ! endif
+  krect = REC_DEFAULT
+  if (jerr.eq.0) call nng_write_data(jerr, DDATA, n, head, krect, JFILE)
+
+  return
+end subroutine GTZWRZ
+!!!_ + io/igtmeta.F
+!!!_  & GTINID
+!!!_  & PUT_DATETUPLE
+!!!_  & GET_DATETUPLE
 !!!_@ test_nng_miroc - test program
 #ifdef TEST_NNG_MIROC
 program test_nng_miroc

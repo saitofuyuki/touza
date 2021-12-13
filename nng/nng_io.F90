@@ -1,7 +1,7 @@
 !!!_! nng_io.F90 - TOUZA/Nng unformatted sequential access emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 17 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/05 22:14:18 fuyuki nng_io.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/12/12 21:25:07 fuyuki nng_io.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -14,9 +14,6 @@
 #  include "touza_config.h"
 #endif
 #include "touza_nng.h"
-#ifndef    OPT_INTEGER_OFFSET_KIND
-#  define  OPT_INTEGER_OFFSET_KIND 0
-#endif
 #ifndef    OPT_PROHIBIT_AUTO_WORKAROUND
 #  define  OPT_PROHIBIT_AUTO_WORKAROUND 0
 #endif
@@ -43,11 +40,8 @@
 !!!_@ TOUZA_Nng_io - Nng stream interfaces
 module TOUZA_Nng_io
 !!!_ = declaration
-#if OPT_USE_MPI
-  use mpi,only: MPI_OFFSET_KIND
-#endif /* OPT_USE_MPI */
   use TOUZA_Nng_std,only: &
-       & KI32, KI64, KFLT, KDBL, &
+       & KI32, KI64, KFLT, KDBL, KIOFS , &
        & LBU=>nbits_byte, &
        & control_mode, control_deep, is_first_force, &
        & unit_global,  trace_fine,   trace_control,  &
@@ -55,17 +49,6 @@ module TOUZA_Nng_io
   implicit none
   private
 !!!_  - public parameters
-#if OPT_INTEGER_OFFSET_KIND
-#else /* not OPT_INTEGER_OFFSET_KIND */
-#  undef OPT_INTEGER_OFFSET_KIND
-#  if OPT_USE_MPI
-#    define OPT_INTEGER_OFFSET_KIND MPI_OFFSET_KIND
-#  else
-#    define OPT_INTEGER_OFFSET_KIND KI32
-#  endif
-#endif /* not OPT_INTEGER_OFFSET_KIND */
-  integer,parameter,public :: KIOFS = OPT_INTEGER_OFFSET_KIND
-
   integer,parameter,public :: WHENCE_BEGIN = -1
   integer,parameter,public :: WHENCE_CURRENT = 0
   integer,parameter,public :: WHENCE_END = +1
@@ -73,10 +56,6 @@ module TOUZA_Nng_io
 
   integer,parameter,public :: RECL_MAX_BYTES = HUGE(0_KI32) - 4 * 2
   ! integer,parameter,public :: RECL_MAX_BYTES = 24
-
-  integer,parameter,public :: BODR_ASSUME_SYSTEM  = 0    ! assume file byte-order == system
-  integer,parameter,public :: BODR_ASSUME_FILE    = 1    ! assume file byte-order == common
-  integer,parameter,public :: BODR_CHECK_VERBOSE  = 2    ! check for each unit at open-write
 
 !!!_  - static
   integer,save :: init_mode = 0
@@ -92,8 +71,6 @@ module TOUZA_Nng_io
 
   integer,save :: maxmemi_i = 0, maxmemi_l = 0 !! max members in a sub-record (32-bit marker)
   integer,save :: maxmemi_f = 0, maxmemi_d = 0
-
-  integer,save :: bodr_wnative = BODR_ASSUME_SYSTEM
 
   integer(kind=KI32),save :: lsubr = 0
 
@@ -205,7 +182,7 @@ module TOUZA_Nng_io
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, stdv, bodr)
+  subroutine init(ierr, u, levv, mode, stdv)
     use TOUZA_Nng_std,only: KI32, KI64, KFLT, KDBL, &
          & choice, get_size_strm, get_size_bytes, &
          & ns_init=>init
@@ -213,7 +190,6 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
-    integer,intent(in),optional :: bodr
     integer lv, md, lmd
 
     ierr = 0
@@ -234,7 +210,6 @@ contains
        endif
        if (is_first_force(init_counts, md)) then
           ! if (ierr.eq.0) call ssq_check_kinds_literal(ierr, ulog)
-          if (ierr.eq.0) call init_batch(ierr, bodr, ulog, lv)
           if (ierr.eq.0) call ssq_check_stream_pos(ierr)
           if (ierr.eq.0) then
              mstrm_isep = get_size_strm(0_KI32)
@@ -283,8 +258,6 @@ contains
        if (is_first_force(diag_counts, md)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
-             if (is_msglev_normal(lv)) call msg('(''offset kind = '', I0)', KIOFS, __MDL__, utmp)
-             if (is_msglev_normal(lv)) call msg('(''byte-order assumption = '', I0)', bodr_wnative, __MDL__, utmp)
           endif
        endif
        lmd = control_deep(md)
@@ -329,38 +302,6 @@ contains
     return
   end subroutine finalize
 
-!!!_  - init subcontracts
-!!!_   & init_batch
-  subroutine init_batch(ierr, bodr, u, levv)
-    use TOUZA_Nng_std,only: choice, msg, is_msglev_info, is_msglev_fatal
-    implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: bodr
-    integer,intent(in),optional :: u
-    integer,intent(in),optional :: levv
-    ierr = 0
-    bodr_wnative = choice(bodr_wnative, bodr)
-    select case (bodr_wnative)
-    case (BODR_ASSUME_SYSTEM)
-       if (is_msglev_info(levv)) then
-          call msg('(''assume system byte-order when write = '', I0)', kendi_mem, __MDL__, u)
-       endif
-    case (BODR_ASSUME_FILE)
-       if (is_msglev_info(levv)) then
-          call msg('(''assume estimated file byte-order when write = '', I0)', kendi_file, __MDL__, u)
-       endif
-    case (BODR_CHECK_VERBOSE)
-       if (is_msglev_info(levv)) then
-          call msg('check file byte-order when write',  __MDL__, u)
-       endif
-    case default
-       ierr = -1
-       if (is_msglev_fatal(levv)) then
-          call msg('(''invalid byte-order switch = '', I0)', bodr_wnative, __MDL__, u)
-       endif
-    end select
-    return
-  end subroutine init_batch
 !!!_  - diag subcontracts
 !!!_   & ssq_check_stream_pos - health_check
   subroutine ssq_check_stream_pos &
@@ -450,8 +391,8 @@ contains
 !!!_  - ssq_open
   subroutine ssq_open &
        & (ierr, u,      file, &
-       &  form, status, action, kendi)
-    use TOUZA_Nng_std,only: choice_a, kendi_file, kendi_mem, check_bodr_files
+       &  form, status, action)
+    use TOUZA_Nng_std,only: choice_a
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: u
@@ -459,8 +400,8 @@ contains
     character(len=*),intent(in), optional :: form
     character(len=*),intent(in), optional :: status
     character(len=*),intent(in), optional :: action
-    integer,         intent(out),optional :: kendi
 
+    integer(kind=KIOFS) :: jpos
     character(len=16) :: STT, ACT, FRM
 
     ierr = ERR_SUCCESS
@@ -484,6 +425,7 @@ contains
     else if (ACT.eq.'R'.or.ACT.eq.' ') then
        ACT = 'READ'
     else if (ACT.eq.'W') then
+       ! ACT = 'READWRITE'
        ACT = 'WRITE'
     endif
 
@@ -493,18 +435,6 @@ contains
        FRM='FORMATTED'
     endif
 
-    if (present(kendi) .and. ACT.ne.'READ') then
-       select case(bodr_wnative)
-       case (BODR_ASSUME_SYSTEM)
-          kendi = kendi_mem
-       case (BODR_ASSUME_FILE)
-          kendi = kendi_file
-       case (BODR_CHECK_VERBOSE)
-          call check_bodr_files (ierr, kendi, ubgn=u)
-       case default
-          kendi = kendi_mem
-       end select
-    endif
     if (ierr.eq.0) then
        open(UNIT=u, IOSTAT=ierr, &
             &       FILE=file,   ACCESS='STREAM', FORM=FRM, STATUS=STT, ACTION=ACT)
@@ -1991,7 +1921,7 @@ contains
 
     if (wh.eq.WHENCE_END) then
        inquire(UNIT=u, IOSTAT=ierr, SIZE=jpos)
-       if (ierr.eq.0) jpos = jpos + st
+       if (ierr.eq.0) jpos = jpos + 1_KIOFS + st
     else if (wh.eq.WHENCE_BEGIN) then
        jpos = 1_KIOFS + st
     else if (wh.eq.WHENCE_ABS) then
@@ -2124,7 +2054,7 @@ program test_nng_io
 
 101 format(A, ' = ', I0)
 
-  call init(ierr, bodr=BODR_CHECK_VERBOSE)
+  call init(ierr)
   if (ierr.eq.0) call diag(ierr, u=-1, levv=+1)
 
   mi = min(lv, 8)
@@ -2152,10 +2082,7 @@ program test_nng_io
   write(*, *) 'members = ', mi, ml, mf, md, ma, la
 
   u = 10
-  if (ierr.eq.0) call ssq_open(ierr, u, file, ACTION='W', STATUS='R', kendi=kendi)
-  if (ierr.eq.0) then
-     write(*, *) 'endianness = ', kendi, u
-  endif
+  if (ierr.eq.0) call ssq_open(ierr, u, file, ACTION='W', STATUS='R')
 
   if (ierr.eq.0) then
      call batch_write(ierr, u, vis, mi, vls, ml, vfs, mf, vds, md, vas, ma, 'IN')

@@ -1,7 +1,7 @@
 !!!_! nng.F90 - TOUZA/Nng manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 11 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/06 08:40:24 fuyuki nng.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/12/10 21:47:00 fuyuki nng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -18,10 +18,10 @@
 module TOUZA_Nng
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Nng_std,    ts_init=>init, ts_diag=>diag, ts_finalize=>finalize
-  use TOUZA_Nng_io,     ti_init=>init, ti_diag=>diag, ti_finalize=>finalize
-  use TOUZA_Nng_header, th_init=>init, th_diag=>diag, th_finalize=>finalize
-  use TOUZA_Nng_record, tr_init=>init, tr_diag=>diag, tr_finalize=>finalize
+  use TOUZA_Nng_std,    ns_init=>init, ns_diag=>diag, ns_finalize=>finalize
+  use TOUZA_Nng_io,     ni_init=>init, ni_diag=>diag, ni_finalize=>finalize
+  use TOUZA_Nng_header, nh_init=>init, nh_diag=>diag, nh_finalize=>finalize
+  use TOUZA_Nng_record, nr_init=>init, nr_diag=>diag, nr_finalize=>finalize
 !!!_  - default
   implicit none
   public
@@ -58,10 +58,10 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ts_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
-          if (ierr.eq.0) call th_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call ti_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call tr_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
+          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call ni_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nr_init(ierr, u=ulog, levv=lv, mode=lmd)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -95,10 +95,10 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ts_diag(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call ti_diag(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call th_diag(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call tr_diag(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call ns_diag(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call ni_diag(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_diag(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nr_diag(ierr, ulog, levv=lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -128,10 +128,10 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ts_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call ti_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call th_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call tr_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call ni_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nr_finalize(ierr, utmp, levv=lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
     endif
