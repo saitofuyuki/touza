@@ -1,9 +1,9 @@
 !!!_! touza.h - touza definitions
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 5 2020
-! Time-stamp: <2021/12/09 12:32:14 fuyuki touza.h>
+! Time-stamp: <2022/02/16 15:12:03 fuyuki touza.h>
 
-/* Copyright (C) 2020, 2021 */
+/* Copyright (C) 2020-2022 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
 /*   (https://www.apache.org/licenses/LICENSE-2.0) */
@@ -21,6 +21,16 @@
 #  define CONCAT(A,B) B
 #endif
 
+/* mpi module */
+#ifndef _MPI_
+#  if    HAVE_FORTRAN_MPI_MPI_BCAST
+#    define _MPI_ MPI
+#  elif  HAVE_FORTRAN_MPI_F08
+#    define _MPI_ MPI_F08
+#  else
+#    define _MPI_ MPI
+#  endif
+#endif /* _MPI_ */
 /* init/diag/finalize mode */
 #define MODE_SKIP      -1   /* skip */
 #define MODE_DEFAULT    0   /* default init mode */
@@ -71,6 +81,8 @@
 #define ERR_MASK_STD_ARG (ERR_MASK_STD + ERR_MASK_MODULE * 7)
 #define ERR_MASK_STD_MWE (ERR_MASK_STD + ERR_MASK_MODULE * 8)
 #define ERR_MASK_STD_WSH (ERR_MASK_STD + ERR_MASK_MODULE * 9)
+#define ERR_MASK_STD_SUS (ERR_MASK_STD + ERR_MASK_MODULE *10)
+#define ERR_MASK_STD_HTB (ERR_MASK_STD + ERR_MASK_MODULE *11)
 
 #define ERR_MASK_CAL     (ERR_MASK_GROUP * 2)
 #define ERR_MASK_EMU     (ERR_MASK_GROUP * 3)

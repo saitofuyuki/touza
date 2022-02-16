@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/11/28 13:24:13 fuyuki configure.ac>
+# Time-stamp: <2022/02/15 21:35:08 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -11,7 +11,7 @@ MT_INIT()
 AC_INIT([touza],MT_VERSION,[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
-Copyright (C) 2020, 2021 Japan Agency for Marine-Earth Science and Technology
+Copyright (C) 2020-2022 Japan Agency for Marine-Earth Science and Technology
 
 This is TOUZA, a collection of MIROC base infrastructure.
 
@@ -33,6 +33,10 @@ AC_FC_MODULE_FLAG
 AC_FC_MODULE_OUTPUT_FLAG([], [AC_MSG_WARN])
 AX_COMPILER_VENDOR
 AC_LANG_POP([Fortran])
+
+AC_CANONICAL_HOST
+AC_CANONICAL_BUILD
+AC_CANONICAL_TARGET
 
 AC_ARG_ENABLE([warn-max],
 [AS_HELP_STRING([--enable-warn-max], [compile with maximum warning option if found @<:@default=no@:>@])],
@@ -94,10 +98,11 @@ AS_IF([test x"$enableval" = x"no"],
 AC_DEFINE_UNQUOTED([OPT_ENABLE_FORTRAN_ELEMENTAL], [$enable_elemental], [prefer elemental function])
 
 MT_SUB_PACKAGE([std], [always])
+MT_SUB_PACKAGE([emu], [],     [std])
 MT_SUB_PACKAGE([cal], [],     [std])
 MT_SUB_PACKAGE([trp], [],     [std])
 MT_SUB_PACKAGE([nng], [],     [std trp])
-dnl MT_SUB_PACKAGE([emu], [],     [std])
+MT_SUB_PACKAGE([ppp], [],     [std emu])
 dnl MT_SUB_PACKAGE([div], [],     [std])
 
 AC_MSG_CHECKING([if also build jmz])
@@ -126,6 +131,9 @@ PKG_PREREQ([0.29])
 dnl AX_CREATE_PKGCONFIG_INFO()
 AC_SUBST([PACKAGE_REQUIRES], [])
 AC_CONFIG_FILES([touza.pc])
+
+AC_PATH_PROGS([AUTOREVISION], [autorevision], [:])
+AC_PATH_PROGS([REALPATH], [realpath], [false])
 
 
 AC_OUTPUT

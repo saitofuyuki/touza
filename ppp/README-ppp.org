@@ -1,0 +1,24 @@
+#+title: TOUZA/ppp guide
+#+author: SAITO Fuyuki
+#+date: <2022-01-26 Wed>
+
+* Introduction
+  *TOUZA/ppp* is a collection of Fortran subroutines for `parallel
+  processing procedures', to support MPI.
+
+  *TOUZA/ppp* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+  DOT go DOT jp>.
+
+  *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
+  Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
+  (expected to be in the parent directory) for general instruction of
+  *TOUZA* collection.
+
+* Build and installation
+
+* Brief description of *TOUZA/ppp* modules
+
+* Copyright and license
+Copyright 2022 Japan Agency for Marine-Earth Science and Technology
+Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)

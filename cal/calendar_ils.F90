@@ -1,7 +1,7 @@
 !!!_! calendar_ils.F90 - touza/calendar: (sample) ILS interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2021/11/15 13:19:31 fuyuki calendar_ils.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/16 15:02:42 fuyuki calendar_ils.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021
@@ -286,7 +286,7 @@ contains
 end module TOUZA_Cal_ils
 !!!_@ test_calendar_ils - test program
 #ifdef TEST_CALENDAR_ILS
-#if HAVE_HUGE == 0
+#if HAVE_FORTRAN_HUGE == 0
 #  error 'Require huge() intrinsic of Fortran-95 standards'
 #endif
 program test_calendar_ils

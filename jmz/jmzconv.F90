@@ -1,7 +1,7 @@
 !!!_! jmzconv.F90 - TOUZA/Jmz nng conversion
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/09 16:43:02 fuyuki jmzconv.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/12/24 11:00:00 fuyuki jmzconv.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -126,7 +126,7 @@ contains
 119 format('error=', I0, ' at ', A, 1x A)
 
     uread  = max(uout, 10) + 1
-    if (ierr.eq.0) call ssq_open(ierr, uread,  rfile, ACTION='R')
+    if (ierr.eq.0) call sus_open(ierr, uread,  rfile, ACTION='R')
     if (ierr.ne.0) then
        write(uerr, 119) ierr, 'read', trim(rfile)
        return
@@ -214,8 +214,8 @@ contains
           jb = je
        enddo
     endif
-    if (ierr.eq.0) call ssq_close(ierr, uread, rfile)
-    if (ierr.eq.0.and.uwrite.ne.uout) call ssq_close(ierr, uwrite, wfile)
+    if (ierr.eq.0) call sus_close(ierr, uread, rfile)
+    if (ierr.eq.0.and.uwrite.ne.uout) call sus_close(ierr, uwrite, wfile)
     if (ierr.eq.0) deallocate(v, STAT=ierr)
     return
   end subroutine conv_main
@@ -225,7 +225,7 @@ contains
        & (ierr,   jrec,   v,     &
        &  uread,  uwrite, udiag, jrbgn, jrend, &
        &  wfile,  fmt,    kfmt,  kopts)
-    use TOUZA_Nng,only: KI32, KFLT, KDBL, ssq_rseek, WHENCE_BEGIN
+    use TOUZA_Nng,only: KI32, KFLT, KDBL, sus_rseek, WHENCE_BEGIN
     use TOUZA_Std,only: is_error_match
     implicit none
     integer,parameter :: KARG = KDBL
@@ -252,7 +252,7 @@ contains
 
     if (jrbgn.lt.jrec) then
        jrec = 0
-       call ssq_rseek(ierr, uread, WHENCE=WHENCE_BEGIN)
+       call sus_rseek(ierr, uread, WHENCE=WHENCE_BEGIN)
        inquire(uread, POS=jpos)
     endif
     if (ierr.eq.0) then
@@ -338,7 +338,7 @@ contains
        else if (fmt(1:1).eq.'B') then
           ! binary mode
           kfmt = kfmt_binary
-          if (ierr.eq.0) call ssq_open(ierr, uwrite, wfile, ACTION='W', STATUS=CSTT)
+          if (ierr.eq.0) call sus_open(ierr, uwrite, wfile, ACTION='W', STATUS=CSTT)
        else
           if (fmt(2:3).eq.'RT') then
              kfmt = kfmt_gtool_trapiche
@@ -346,7 +346,7 @@ contains
              kfmt = kfmt_gtool_legacy
           endif
           ! gtool mode
-          if (ierr.eq.0) call ssq_open(ierr, uwrite, wfile, ACTION='W', STATUS=CSTT)
+          if (ierr.eq.0) call sus_open(ierr, uwrite, wfile, ACTION='W', STATUS=CSTT)
        endif
        if (ierr.ne.0) then
 201       format('error = ', I0, ' to open ', A)

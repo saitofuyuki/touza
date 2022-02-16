@@ -1,26 +1,28 @@
-!!!_! nng.F90 - TOUZA/Nng manager
+!!!_! emu.F90 - touza/emu interfaces
 ! Maintainer: SAITO Fuyuki
-! Created: Oct 11 2021
-#define TIME_STAMP 'Time-stamp: <2022/02/07 14:17:31 fuyuki nng.F90>'
+! Created: Jun 6 2020
+#define TIME_STAMP 'Time-stamp: <2022/02/07 16:48:08 fuyuki emu.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2020,2021,2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
 !   (https://www.apache.org/licenses/LICENSE-2.0)
 !
+!!!_* Includes
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"
 #endif
-#include "touza_nng.h"
-!!!_@ TOUZA_Nng - Nng interfaces
-module TOUZA_Nng
-!!!_ = declaration
-!!!_  - modules
-  use TOUZA_Nng_std,    ns_init=>init, ns_diag=>diag, ns_finalize=>finalize
-  use TOUZA_Nng_header, nh_init=>init, nh_diag=>diag, nh_finalize=>finalize
-  use TOUZA_Nng_record, nr_init=>init, nr_diag=>diag, nr_finalize=>finalize
+#include "touza_emu.h"
+#include "touza_std.h"
+!!!_* Macros
+!!!_@ TOUZA_Emu - touza/emu interfaces
+module TOUZA_Emu
+  use TOUZA_Emu_usi, usi_init=>init, usi_diag=>diag, usi_finalize=>finalize
+  use TOUZA_Std,only: &
+       & control_mode, control_deep, is_first_force, &
+       & get_logu,     unit_global,  trace_fine,   trace_control
 !!!_  - default
   implicit none
   public
@@ -29,25 +31,25 @@ module TOUZA_Nng
   integer,save,private :: init_counts = 0
   integer,save,private :: diag_counts = 0
   integer,save,private :: fine_counts = 0
-  integer,save,private :: lev_verbose = NNG_MSG_LEVEL
+  integer,save,private :: lev_verbose = EMU_MSG_LEVEL
   integer,save,private :: err_default = ERR_NO_INIT
   integer,save,private :: ulog = unit_global
-
 contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
-    use TOUZA_Nng_std,   only: choice
+    use TOUZA_Std,only: msg_grp, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
-    integer,intent(in),optional :: levv, mode, stdv
+    integer,intent(in),optional :: levv, mode
+    integer,intent(in),optional :: stdv
     integer,intent(in),optional :: icomm
     integer lv, md, lmd
 
     ierr = 0
 
-    md = control_mode(mode, MODE_DEEPEST)
+    md = control_mode(mode, MODE_DEEPER)
     init_mode = md
 
     if (md.ge.MODE_SURFACE) then
@@ -59,24 +61,20 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
-          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nr_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call usi_init(ierr, ulog, lv, mode=md, stdv=stdv, icomm=icomm)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
     endif
     return
   end subroutine init
-
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Nng_std,   only: choice
+    use TOUZA_Std,only: choice, is_msglev_NORMAL, msg
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
-    integer,intent(in),optional :: mode
-    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: levv, mode
     integer utmp, lv, md, lmd
 
     ierr = err_default
@@ -89,24 +87,23 @@ contains
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, fun='diag', u=utmp, levv=lv)
        if (is_first_force(diag_counts, md)) then
-          if (ierr.eq.0) then
-             if (is_msglev_normal(lv)) call msg(TIME_STAMP, u=utmp)
+          if (is_msglev_NORMAL(lv)) then
+             if (ierr.eq.0) call msg(TIME_STAMP, __GRP__, utmp)
           endif
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nr_diag(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call usi_diag(ierr, utmp, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
     return
-  end subroutine diag
 
+    return
+  end subroutine diag
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Nng_std,   only: choice
+    use TOUZA_Std,only: choice, is_msglev_NORMAL, msg_grp
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -127,36 +124,29 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nr_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call usi_finalize(ierr, utmp, lmd)
        endif
        fine_counts = fine_counts + 1
     endif
     return
   end subroutine finalize
-
-!!!_ + user subroutines
-!!!_ + private subroutines
-end module TOUZA_Nng
-
-!!!_@ test_nng - test program
-#ifdef TEST_NNG
-program test_nng
-  use TOUZA_Nng
+end module TOUZA_Emu
+!!!_@ test_emu - test program
+#ifdef TEST_EMU
+program test_emu
+  use TOUZA_Emu
   implicit none
   integer ierr
 
-  ierr = 0
-  if (ierr.eq.0) call init(ierr, levv=-1)
+  call init(ierr)
   if (ierr.eq.0) call diag(ierr)
   if (ierr.eq.0) call finalize(ierr)
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop
-end program test_nng
+end program test_emu
 
-#endif /* TEST_NNG */
+#endif /* TEST_EMU */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

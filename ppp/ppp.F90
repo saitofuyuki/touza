@@ -1,10 +1,10 @@
-!!!_! nng.F90 - TOUZA/Nng manager
+!!!_! ppp.F90 - touza/ppp ppp manager
 ! Maintainer: SAITO Fuyuki
-! Created: Oct 11 2021
-#define TIME_STAMP 'Time-stamp: <2022/02/07 14:17:31 fuyuki nng.F90>'
+! Created: Jan 26 2022
+#define TIME_STAMP 'Time-stamp: <2022/02/02 08:50:44 fuyuki ppp.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -13,14 +13,14 @@
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"
 #endif
-#include "touza_nng.h"
-!!!_@ TOUZA_Nng - Nng interfaces
-module TOUZA_Nng
+#include "touza_ppp.h"
+!!!_@ TOUZA_Ppp - ppp interfaces
+module TOUZA_Ppp
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Nng_std,    ns_init=>init, ns_diag=>diag, ns_finalize=>finalize
-  use TOUZA_Nng_header, nh_init=>init, nh_diag=>diag, nh_finalize=>finalize
-  use TOUZA_Nng_record, nr_init=>init, nr_diag=>diag, nr_finalize=>finalize
+  use TOUZA_Ppp_std,  ps_init=>init, ps_diag=>diag, ps_finalize=>finalize
+  use TOUZA_Ppp_comm, pc_init=>init, pc_diag=>diag, pc_finalize=>finalize
+  use TOUZA_Ppp_king, pk_init=>init, pk_diag=>diag, pk_finalize=>finalize
 !!!_  - default
   implicit none
   public
@@ -29,15 +29,15 @@ module TOUZA_Nng
   integer,save,private :: init_counts = 0
   integer,save,private :: diag_counts = 0
   integer,save,private :: fine_counts = 0
-  integer,save,private :: lev_verbose = NNG_MSG_LEVEL
+  integer,save,private :: lev_verbose = PPP_MSG_LEVEL
   integer,save,private :: err_default = ERR_NO_INIT
   integer,save,private :: ulog = unit_global
-
+!!!_  - private procedures
 contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
-    use TOUZA_Nng_std,   only: choice
+    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -59,9 +59,9 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
-          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nr_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call ps_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
+          if (ierr.eq.0) call pc_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pk_init(ierr, u=ulog, levv=lv, mode=lmd)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -71,7 +71,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Nng_std,   only: choice
+    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -95,9 +95,9 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nr_diag(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call ps_diag(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pc_diag(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pk_diag(ierr, ulog, levv=lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -106,7 +106,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Nng_std,   only: choice
+    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -127,36 +127,37 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nr_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call ps_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pc_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pk_finalize(ierr, utmp, levv=lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
     endif
     return
   end subroutine finalize
 
-!!!_ + user subroutines
-!!!_ + private subroutines
-end module TOUZA_Nng
+end module TOUZA_Ppp
 
-!!!_@ test_nng - test program
-#ifdef TEST_NNG
-program test_nng
-  use TOUZA_Nng
+!!!_@ test_ppp - test program
+#ifdef TEST_PPP
+program test_ppp
+  use TOUZA_Ppp
   implicit none
   integer ierr
 
-  ierr = 0
-  if (ierr.eq.0) call init(ierr, levv=-1)
-  if (ierr.eq.0) call diag(ierr)
-  if (ierr.eq.0) call finalize(ierr)
+  call init(ierr, levv=+99, stdv=+99)
+  if (ierr.eq.0) then
+     call diag(ierr)
+  endif
+  if (ierr.eq.0) then
+     call finalize(ierr)
+  endif
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop
-end program test_nng
+end program test_ppp
 
-#endif /* TEST_NNG */
+#endif /* TEST_PPP */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

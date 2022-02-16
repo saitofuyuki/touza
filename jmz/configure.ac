@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Nov 24 2021
-# Time-stamp: <2021/11/25 15:28:31 fuyuki configure.ac>
+# Time-stamp: <2021/12/24 11:12:16 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -53,6 +53,7 @@ AM_PROG_AR
 LT_PREREQ([2.4.2])
 LT_INIT([disable-shared])
 
+AC_CONFIG_HEADERS([jmz_config.h])
 AC_CONFIG_FILES([Makefile])
 
 PKG_PROG_PKG_CONFIG()

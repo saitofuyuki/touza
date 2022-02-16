@@ -1,7 +1,7 @@
 !!!_! nng_header.F90 - TOUZA/Nng header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/12 11:20:36 fuyuki nng_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/12/26 15:47:14 fuyuki nng_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -173,12 +173,13 @@ module TOUZA_Nng_header
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, stdv)
+  subroutine init(ierr, u, levv, mode, stdv, icomm)
     use TOUZA_Nng_std,only: choice, ns_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
+    integer,intent(in),optional :: icomm
     integer lv, md, lmd
 
     ierr = 0
@@ -195,7 +196,7 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
+          if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
        if (is_first_force(init_counts, md)) then
           if (ierr.eq.0) call set_def_types(ierr, hitypes)

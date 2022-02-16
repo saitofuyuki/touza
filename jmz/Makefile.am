@@ -1,12 +1,14 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2021/12/07 09:15:26 fuyuki Makefile.am>
+# Time-stamp: <2021/12/24 11:24:27 fuyuki Makefile.am>
 
 # Copyright (C) 2021
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
+
+ACLOCAL_AMFLAGS	=	-I ../m4c
 
 AM_FCFLAGS +=	$(DEBUG) $(TOUZA_CFLAGS)
 AM_LDFLAGS =	$(TOUZA_LIBS)

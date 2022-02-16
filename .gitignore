@@ -92,3 +92,5 @@ gmon.out
 /jmz/install-sh
 /jmz/jmzconv
 /jmz/ltmain.sh
+/jmz/jmz_config.h.in
+/autorevision.cache

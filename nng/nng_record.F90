@@ -1,7 +1,7 @@
 !!!_! nng_record.F90 - TOUZA/Nng record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/13 08:49:30 fuyuki nng_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/07 11:17:33 fuyuki nng_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -290,10 +290,9 @@ contains
   subroutine init &
        & (ierr,   u,      levv,  mode,  stdv,  &
        &  bodrw,  krectw, klenc, kldec, knenc, kndec, &
-       &  vmiss,  utime,  csign, msign)
-    use TOUZA_Nng_std,   only: choice, get_size_bytes, KDBL
+       &  vmiss,  utime,  csign, msign, icomm)
+    use TOUZA_Nng_std,   only: ns_init=>init, choice, get_size_bytes, KDBL
     use TOUZA_Nng_header,only: nh_init=>init, litem, nitem
-    use TOUZA_Nng_io,    only: ns_init=>init
     use TOUZA_Trp,       only: trp_init=>init
     implicit none
     integer,         intent(out)         :: ierr
@@ -306,6 +305,7 @@ contains
     real(kind=KDBL), intent(in),optional :: vmiss       ! default header properties
     character(len=*),intent(in),optional :: utime
     character(len=*),intent(in),optional :: csign, msign
+    integer,         intent(in),optional :: icomm
     integer lv, md, lmd
     character(len=litem) :: hdummy
 
@@ -323,7 +323,7 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
+          if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
           if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
        endif
        if (md.ge.MODE_DEEP) then
@@ -348,9 +348,8 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Nng_std,   only: choice, msg, is_msglev_normal, is_msglev_info
+    use TOUZA_Nng_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
     use TOUZA_Nng_header,only: nh_diag=>diag, show_header
-    use TOUZA_Nng_io,    only: ns_diag=>diag
     use TOUZA_Trp,       only: trp_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
@@ -391,9 +390,8 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Nng_std,   only: choice
+    use TOUZA_Nng_std,   only: ns_finalize=>finalize, choice
     use TOUZA_Nng_header,only: nh_finalize=>finalize
-    use TOUZA_Nng_io,    only: ns_finalize=>finalize
     use TOUZA_Trp,       only: trp_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -1127,7 +1125,7 @@ contains
 !!!_  & nng_skip_records - forward record skip
   subroutine nng_skip_records &
        & (ierr, n, u)
-    use TOUZA_Nng_io,only: WHENCE_CURRENT, ssq_skip_irec, ssq_skip_lrec
+    use TOUZA_Nng_std,   only: WHENCE_CURRENT, sus_skip_irec, sus_skip_lrec
     use TOUZA_Nng_header,only: &
          & nitem, litem, hi_DFMT, get_item
     implicit none
@@ -1181,9 +1179,9 @@ contains
           swap = IAND(krect, REC_SWAP).ne.0
           lrec = IAND(krect, REC_LSEP).ne.0
           if (lrec) then
-             call ssq_skip_lrec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
+             call sus_skip_lrec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
           else
-             call ssq_skip_irec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
+             call sus_skip_irec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
           endif
        endif
     enddo
@@ -2984,12 +2982,10 @@ contains
 !!!_  & get_record_prop - get sequential record properties (byte-order and separator size)
   subroutine get_record_prop &
        & (ierr, krect, u)
-    use TOUZA_Nng_std,   only: KI32, KI64, KIOFS, is_eof_ss
+    use TOUZA_Nng_std,   only: &
+         & KI32, KI64, KIOFS, is_eof_ss, &
+         & WHENCE_ABS, sus_read_isep, sus_rseek, sus_eswap
     use TOUZA_Nng_header,only: nitem, litem
-    use TOUZA_Nng_io,    only: &
-         & WHENCE_ABS, &
-         & ssq_read_isep, ssq_rseek, &
-         & ssq_eswap
     implicit none
     integer,intent(out) :: ierr
     integer,intent(out) :: krect
@@ -3011,12 +3007,12 @@ contains
     ! yx00....   yx00....  ....00xy
 
     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
-    if (ierr.eq.0) call ssq_read_isep(ierr, u, iseph)
+    if (ierr.eq.0) call sus_read_isep(ierr, u, iseph)
     if (is_eof_ss(ierr)) then
        ierr = ERR_EOF
        return
     endif
-    if (ierr.eq.0) call ssq_read_isep(ierr, u, isepl)
+    if (ierr.eq.0) call sus_read_isep(ierr, u, isepl)
     if (ierr.eq.0) then
        if (iseph.eq.0) then
           ! [00 00 00 00] [00 00 04 00]  long/big
@@ -3025,7 +3021,7 @@ contains
              nlh = isepl
           else
              KRECT = IOR(IOR(KRECT, REC_LSEP), REC_SWAP) ! long swap
-             nlh = ssq_eswap(isepl)
+             nlh = sus_eswap(isepl)
           endif
        else if (isepl.eq.0) then
           ! [00 04 00 00] [00 00 00 00]  long/little
@@ -3034,7 +3030,7 @@ contains
              nlh = iseph
           else
              KRECT = IOR(IOR(KRECT, REC_LSEP), REC_SWAP) ! long swap
-             nlh = ssq_eswap(iseph)
+             nlh = sus_eswap(iseph)
           endif
        else if (isepl.eq.HEADER_SPACES) then
           ! [ff ff fc 00] [20 20 20 20] short/big/cont
@@ -3046,12 +3042,12 @@ contains
              nlh = abs(iseph)
           else
              KRECT = IOR(KRECT, REC_SWAP) ! short swap
-             nlh = abs(ssq_eswap(iseph))
+             nlh = abs(sus_eswap(iseph))
           endif
        else
           nlh = nlhead_std - 1
        endif
-       call ssq_rseek(ierr, u, jpos, whence=WHENCE_ABS)
+       call sus_rseek(ierr, u, jpos, whence=WHENCE_ABS)
        if (nlh.lt.nlhead_std .or. nlh.ge.HEADER_LIMIT) KRECT = REC_ERROR
        ! write(*, *) 'SEP', iseph, isepl, nlh, KRECT, ierr
     else
@@ -3064,9 +3060,8 @@ contains
   subroutine get_header &
        & (ierr, &
        &  head,  u, krect)
-    use TOUZA_Nng_std,   only: KIOFS
+    use TOUZA_Nng_std,   only: KIOFS, sus_read_lrec, sus_read_irec
     use TOUZA_Nng_header,only: nitem
-    use TOUZA_Nng_io,    only: ssq_read_lrec, ssq_read_irec
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: head(*)
@@ -3081,9 +3076,9 @@ contains
        swap = IAND(krect, REC_SWAP).ne.0
        lrec = IAND(krect, REC_LSEP).ne.0
        if (lrec) then
-          call ssq_read_lrec(ierr, u, head, nitem, swap)
+          call sus_read_lrec(ierr, u, head, nitem, swap)
        else
-          call ssq_read_irec(ierr, u, head, nitem, swap)
+          call sus_read_irec(ierr, u, head, nitem, swap)
        endif
        ! write(*, *) 'header', ierr, KRECT, head(1), swap, lrec
        if (ierr.eq.0) then
@@ -3103,7 +3098,7 @@ contains
   subroutine set_wrecord_prop &
        & (ierr, krect, u, kendi)
     use TOUZA_Nng_std,only: &
-         & choice, check_bodr_unit, KIOFS, kendi_mem, kendi_file
+         & choice, check_bodr_unit, KIOFS, kendi_mem, kendi_file, endian_OTHER
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(inout)       :: krect
@@ -3123,12 +3118,15 @@ contains
        case (BODR_ASSUME_FILE)
           ke = kendi_file
        case (BODR_CHECK_VERBOSE)
-          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
-          if (ierr.eq.0) call check_bodr_unit(ierr, ke, utest=u, jrec=0)
-          if (ierr.eq.0) write(UNIT=u, IOSTAT=ierr, POS=jpos)
+          ke = endian_OTHER
        case default
           ke = kendi_mem
        end select
+    endif
+    if (ke.eq.endian_OTHER) then
+       if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+       if (ierr.eq.0) call check_bodr_unit(ierr, ke, utest=u, jrec=0)
+       if (ierr.eq.0) write(UNIT=u, IOSTAT=ierr, POS=jpos)
     endif
     if (ierr.eq.0) then
        call get_switch(kr, ke, krect)
@@ -3169,9 +3167,8 @@ contains
   subroutine put_header &
        & (ierr, &
        &  head, u, krect)
-    use TOUZA_Nng_std,   only: KIOFS
+    use TOUZA_Nng_std,   only: KIOFS, sus_write_lrec, sus_write_irec
     use TOUZA_Nng_header,only: nitem
-    use TOUZA_Nng_io,    only: ssq_write_lrec, ssq_write_irec
     implicit none
     integer,            intent(out) :: ierr
     character(len=*),   intent(in)  :: head(*)
@@ -3184,9 +3181,9 @@ contains
     swap = IAND(krect, REC_SWAP).ne.0
     lrec = IAND(krect, REC_LSEP).ne.0
     if (lrec) then
-       call ssq_write_lrec(ierr, u, head, nitem, swap)
+       call sus_write_lrec(ierr, u, head, nitem, swap)
     else
-       call ssq_write_irec(ierr, u, head, nitem, swap)
+       call sus_write_irec(ierr, u, head, nitem, swap)
     endif
     return
   end subroutine put_header
@@ -3194,8 +3191,7 @@ contains
   subroutine get_data_record_i &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
+    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)            :: ierr
@@ -3211,17 +3207,16 @@ contains
     swap = IAND(krect, REC_SWAP).ne.0
     lrec = IAND(krect, REC_LSEP).ne.0
     if (lrec) then
-       call ssq_read_lrec(ierr, u, d, n, swap)
+       call sus_read_lrec(ierr, u, d, n, swap)
     else
-       call ssq_read_irec(ierr, u, d, n, swap, sub)
+       call sus_read_irec(ierr, u, d, n, swap, sub)
     endif
     return
   end subroutine get_data_record_i
   subroutine get_data_record_f &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
+    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KFLT
     integer,        intent(out)            :: ierr
@@ -3237,17 +3232,16 @@ contains
     swap = IAND(krect, REC_SWAP).ne.0
     lrec = IAND(krect, REC_LSEP).ne.0
     if (lrec) then
-       call ssq_read_lrec(ierr, u, d, n, swap)
+       call sus_read_lrec(ierr, u, d, n, swap)
     else
-       call ssq_read_irec(ierr, u, d, n, swap, sub)
+       call sus_read_irec(ierr, u, d, n, swap, sub)
     endif
     return
   end subroutine get_data_record_f
   subroutine get_data_record_d &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
+    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KDBL
     integer,        intent(out)            :: ierr
@@ -3263,9 +3257,9 @@ contains
     swap = IAND(krect, REC_SWAP).ne.0
     lrec = IAND(krect, REC_LSEP).ne.0
     if (lrec) then
-       call ssq_read_lrec(ierr, u, d, n, swap)
+       call sus_read_lrec(ierr, u, d, n, swap)
     else
-       call ssq_read_irec(ierr, u, d, n, swap, sub)
+       call sus_read_irec(ierr, u, d, n, swap, sub)
     endif
     return
   end subroutine get_data_record_d
@@ -3273,8 +3267,7 @@ contains
   subroutine get_data_record_i1 &
        & (ierr, &
        &  d,  u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
+    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)            :: ierr
@@ -3290,9 +3283,9 @@ contains
     swap = IAND(krect, REC_SWAP).ne.0
     lrec = IAND(krect, REC_LSEP).ne.0
     if (lrec) then
-       call ssq_read_lrec(ierr, u, b, 1, swap)
+       call sus_read_lrec(ierr, u, b, 1, swap)
     else
-       call ssq_read_irec(ierr, u, b, 1, swap, sub)
+       call sus_read_irec(ierr, u, b, 1, swap, sub)
     endif
     if (ierr.eq.0) d = b(1)
     return
@@ -3300,8 +3293,7 @@ contains
   subroutine get_data_record_f1 &
        & (ierr, &
        &  d,  u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
+    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KFLT
     integer,        intent(out)            :: ierr
@@ -3317,9 +3309,9 @@ contains
     swap = IAND(krect, REC_SWAP).ne.0
     lrec = IAND(krect, REC_LSEP).ne.0
     if (lrec) then
-       call ssq_read_lrec(ierr, u, b, 1, swap)
+       call sus_read_lrec(ierr, u, b, 1, swap)
     else
-       call ssq_read_irec(ierr, u, b, 1, swap, sub)
+       call sus_read_irec(ierr, u, b, 1, swap, sub)
     endif
     if (ierr.eq.0) d = b(1)
     return
@@ -3327,8 +3319,7 @@ contains
   subroutine get_data_record_d1 &
        & (ierr, &
        &  d, u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
+    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KDBL
     integer,        intent(out)            :: ierr
@@ -3344,9 +3335,9 @@ contains
     swap = IAND(krect, REC_SWAP).ne.0
     lrec = IAND(krect, REC_LSEP).ne.0
     if (lrec) then
-       call ssq_read_lrec(ierr, u, b, 1, swap)
+       call sus_read_lrec(ierr, u, b, 1, swap)
     else
-       call ssq_read_irec(ierr, u, b, 1, swap, sub)
+       call sus_read_irec(ierr, u, b, 1, swap, sub)
     endif
     if (ierr.eq.0) d = b(1)
     return
@@ -3355,8 +3346,6 @@ contains
   subroutine get_data_irecord_f &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
     implicit none
     integer,parameter :: KARG=KFLT, KSRC=KI32
     integer,        intent(out)            :: ierr
@@ -3376,8 +3365,6 @@ contains
   subroutine get_data_irecord_d &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
     implicit none
     integer,parameter :: KARG=KDBL, KSRC=KI32
     integer,        intent(out)            :: ierr
@@ -3398,8 +3385,6 @@ contains
   subroutine get_data_frecord_i &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
     implicit none
     integer,parameter :: KARG=KI32, KSRC=KFLT
     integer,           intent(out)            :: ierr
@@ -3419,8 +3404,6 @@ contains
   subroutine get_data_frecord_d &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
     implicit none
     integer,parameter :: KARG=KDBL, KSRC=KFLT
     integer,        intent(out)            :: ierr
@@ -3442,8 +3425,6 @@ contains
   subroutine get_data_drecord_i &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
     implicit none
     integer,parameter :: KARG=KI32, KSRC=KDBL
     integer,           intent(out)            :: ierr
@@ -3463,8 +3444,6 @@ contains
   subroutine get_data_drecord_f &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_io, only: &
-         & ssq_read_lrec, ssq_read_irec
     implicit none
     integer,parameter :: KARG=KFLT, KSRC=KDBL
     integer,        intent(out)            :: ierr
@@ -3485,8 +3464,7 @@ contains
   subroutine put_data_record_i &
        & (ierr, &
        &  d,  n, u, krect, pre, post)
-    use TOUZA_Nng_io, only: &
-         & ssq_write_lrec, ssq_write_irec
+    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)         :: ierr
@@ -3502,17 +3480,16 @@ contains
     swap = IAND(krect, REC_SWAP).ne.0
     lrec = IAND(krect, REC_LSEP).ne.0
     if (lrec) then
-       call ssq_write_lrec(ierr, u, d, n, swap)
+       call sus_write_lrec(ierr, u, d, n, swap)
     else
-       call ssq_write_irec(ierr, u, d, n, swap, pre, post)
+       call sus_write_irec(ierr, u, d, n, swap, pre, post)
     endif
     return
   end subroutine put_data_record_i
   subroutine put_data_record_f &
        & (ierr, &
        &  d,  n, u, krect, pre, post)
-    use TOUZA_Nng_io, only: &
-         & ssq_write_lrec, ssq_write_irec
+    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KFLT
     integer,        intent(out)         :: ierr
@@ -3528,17 +3505,16 @@ contains
     swap = IAND(krect, REC_SWAP).ne.0
     lrec = IAND(krect, REC_LSEP).ne.0
     if (lrec) then
-       call ssq_write_lrec(ierr, u, d, n, swap)
+       call sus_write_lrec(ierr, u, d, n, swap)
     else
-       call ssq_write_irec(ierr, u, d, n, swap, pre, post)
+       call sus_write_irec(ierr, u, d, n, swap, pre, post)
     endif
     return
   end subroutine put_data_record_f
   subroutine put_data_record_d &
        & (ierr, &
        &  d,  n, u, krect, pre, post)
-    use TOUZA_Nng_io, only: &
-         & ssq_write_lrec, ssq_write_irec
+    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KDBL
     integer,        intent(out)         :: ierr
@@ -3554,9 +3530,9 @@ contains
     swap = IAND(krect, REC_SWAP).ne.0
     lrec = IAND(krect, REC_LSEP).ne.0
     if (lrec) then
-       call ssq_write_lrec(ierr, u, d, n, swap)
+       call sus_write_lrec(ierr, u, d, n, swap)
     else
-       call ssq_write_irec(ierr, u, d, n, swap, pre, post)
+       call sus_write_irec(ierr, u, d, n, swap, pre, post)
     endif
     return
   end subroutine put_data_record_d
@@ -3564,8 +3540,7 @@ contains
   subroutine put_data_record_i1 &
        & (ierr, &
        &  d,  u, krect, pre, post)
-    use TOUZA_Nng_io, only: &
-         & ssq_write_lrec, ssq_write_irec
+    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)         :: ierr
@@ -3582,17 +3557,16 @@ contains
     lrec = IAND(krect, REC_LSEP).ne.0
     b(1) = d
     if (lrec) then
-       call ssq_write_lrec(ierr, u, b, 1, swap)
+       call sus_write_lrec(ierr, u, b, 1, swap)
     else
-       call ssq_write_irec(ierr, u, b, 1, swap, pre, post)
+       call sus_write_irec(ierr, u, b, 1, swap, pre, post)
     endif
     return
   end subroutine put_data_record_i1
   subroutine put_data_record_f1 &
        & (ierr, &
        &  d,  u, krect, pre, post)
-    use TOUZA_Nng_io, only: &
-         & ssq_write_lrec, ssq_write_irec
+    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KFLT
     integer,        intent(out)         :: ierr
@@ -3609,17 +3583,16 @@ contains
     lrec = IAND(krect, REC_LSEP).ne.0
     b(1) = d
     if (lrec) then
-       call ssq_write_lrec(ierr, u, b, 1, swap)
+       call sus_write_lrec(ierr, u, b, 1, swap)
     else
-       call ssq_write_irec(ierr, u, b, 1, swap, pre, post)
+       call sus_write_irec(ierr, u, b, 1, swap, pre, post)
     endif
     return
   end subroutine put_data_record_f1
   subroutine put_data_record_d1 &
        & (ierr, &
        &  d, u, krect, pre, post)
-    use TOUZA_Nng_io, only: &
-         & ssq_write_lrec, ssq_write_irec
+    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KDBL
     integer,        intent(out)         :: ierr
@@ -3636,9 +3609,9 @@ contains
     lrec = IAND(krect, REC_LSEP).ne.0
     b(1) = d
     if (lrec) then
-       call ssq_write_lrec(ierr, u, b, 1, swap)
+       call sus_write_lrec(ierr, u, b, 1, swap)
     else
-       call ssq_write_irec(ierr, u, b, 1, swap, pre, post)
+       call sus_write_irec(ierr, u, b, 1, swap, pre, post)
     endif
     return
   end subroutine put_data_record_d1
@@ -3654,7 +3627,6 @@ contains
     integer,        intent(in)          :: krect
     integer,        intent(in)          :: u
     logical,        intent(in),optional :: pre, post
-
 
     integer(kind=KSRC) :: w(n)
 
@@ -4340,9 +4312,8 @@ end module TOUZA_Nng_record
 #ifdef TEST_NNG_RECORD
 program test_nng_record
   use TOUZA_Std,       only: parse, get_param, arg_diag, arg_init
-  use TOUZA_Nng_std,   only: KDBL,  KIOFS
+  use TOUZA_Nng_std,   only: KDBL,  KIOFS, sus_write_irec, sus_write_lrec
   use TOUZA_Nng_header,only: nitem, litem
-  use TOUZA_Nng_io,    only: ssq_write_irec, ssq_write_lrec
   use TOUZA_Nng_record
   implicit none
   integer ierr
@@ -4441,10 +4412,9 @@ contains
 !!!_ + test_auto_record - auto record parser tests
   subroutine test_auto_record &
        & (ierr, jarg)
-    use TOUZA_Nng_std,   only: KDBL,  KIOFS
+    use TOUZA_Nng_std,   only: KDBL,  KIOFS, &
+         & sus_open, sus_close, sus_write_irec, sus_write_lrec
     use TOUZA_Nng_header,only: nitem, litem, hi_ITEM, put_item, get_item
-    use TOUZA_Nng_io,    only: &
-         & ssq_open, ssq_close, ssq_write_irec, ssq_write_lrec
     use TOUZA_Nng_record
     implicit none
     integer,intent(out)   :: ierr
@@ -4483,30 +4453,30 @@ contains
     if (ierr.eq.0) call set_test_header(ierr, hd)
 
     if (ierr.eq.0) then
-       call ssq_open(ierr, udat, file, ACTION='W', STATUS='R')
+       call sus_open(ierr, udat, file, ACTION='W', STATUS='R')
        if (ierr.eq.0) call put_item(ierr, hd, 'def', hi_ITEM)
-       if (ierr.eq.0) call ssq_write_irec(ierr, udat, hd, nhi)
+       if (ierr.eq.0) call sus_write_irec(ierr, udat, hd, nhi)
        if (ierr.eq.0) call put_item(ierr, hd, 'swap', hi_ITEM)
-       if (ierr.eq.0) call ssq_write_irec(ierr, udat, hd, nhi, swap=.TRUE.)
+       if (ierr.eq.0) call sus_write_irec(ierr, udat, hd, nhi, swap=.TRUE.)
        if (ierr.eq.0) call put_item(ierr, hd, 'long', hi_ITEM)
-       if (ierr.eq.0) call ssq_write_lrec(ierr, udat, hd, nhi)
+       if (ierr.eq.0) call sus_write_lrec(ierr, udat, hd, nhi)
        if (ierr.eq.0) call put_item(ierr, hd, 'long/swap', hi_ITEM)
-       if (ierr.eq.0) call ssq_write_lrec(ierr, udat, hd, nhi, swap=.TRUE.)
+       if (ierr.eq.0) call sus_write_lrec(ierr, udat, hd, nhi, swap=.TRUE.)
 
        if (ierr.eq.0) call put_item(ierr, hd, 'cont', hi_ITEM)
-       if (ierr.eq.0) call ssq_write_irec(ierr, udat, hd,  nhi, post=.TRUE.)
-       if (ierr.eq.0) call ssq_write_irec(ierr, udat, xhd, lxh, pre=.TRUE.)
+       if (ierr.eq.0) call sus_write_irec(ierr, udat, hd,  nhi, post=.TRUE.)
+       if (ierr.eq.0) call sus_write_irec(ierr, udat, xhd, lxh, pre=.TRUE.)
 
        if (ierr.eq.0) call put_item(ierr, hd, 'cont/swap', hi_ITEM)
-       if (ierr.eq.0) call ssq_write_irec(ierr, udat, hd,  nhi, swap=.TRUE., post=.TRUE.)
-       if (ierr.eq.0) call ssq_write_irec(ierr, udat, xhd, lxh, swap=.TRUE., pre=.TRUE.)
+       if (ierr.eq.0) call sus_write_irec(ierr, udat, hd,  nhi, swap=.TRUE., post=.TRUE.)
+       if (ierr.eq.0) call sus_write_irec(ierr, udat, xhd, lxh, swap=.TRUE., pre=.TRUE.)
 
-       if (ierr.eq.0) call ssq_close(ierr, udat, file)
+       if (ierr.eq.0) call sus_close(ierr, udat, file)
     endif
 301 format('FULL/W:', I0, 1x, I0, 1x, I0)
     write (*, 301) ierr
 
-    if (ierr.eq.0) call ssq_open(ierr, udat, file, ACTION='R')
+    if (ierr.eq.0) call sus_open(ierr, udat, file, ACTION='R')
 
     jrec = 0
 401 format('FULL:', I0, 1x, I0, 1x, I0)
@@ -4569,7 +4539,7 @@ contains
     use TOUZA_Std,    only: get_param, upcase
     use TOUZA_Nng_std,only: KBUF=>KDBL
     use TOUZA_Nng_header
-    use TOUZA_Nng_io,only: ssq_open, ssq_close
+    use TOUZA_Std_sus,only: sus_open, sus_close
     implicit none
     integer,intent(out)   :: ierr
     integer,intent(inout) :: jarg
@@ -4613,13 +4583,13 @@ contains
 
     uread = 21
 
-    if (ierr.eq.0) call ssq_open(ierr, uread,  rfile, ACTION='R')
+    if (ierr.eq.0) call sus_open(ierr, uread,  rfile, ACTION='R')
     if (ierr.eq.0) then
        if (wfile.eq.' ') then
           uwrite = -1
        else
           uwrite = uread + 1
-          call ssq_open(ierr, uwrite, wfile, ACTION='W', STATUS='R')
+          call sus_open(ierr, uwrite, wfile, ACTION='W', STATUS='R')
        endif
     endif
 
@@ -4659,8 +4629,8 @@ contains
        endif
        jrec = jrec + 1
     enddo
-    if (ierr.eq.0) call ssq_close(ierr, uread, rfile)
-    if (ierr.eq.0.and.uwrite.ge.0) call ssq_close(ierr, uwrite, wfile)
+    if (ierr.eq.0) call sus_close(ierr, uread, rfile)
+    if (ierr.eq.0.and.uwrite.ge.0) call sus_close(ierr, uwrite, wfile)
     if (ierr.eq.0) deallocate(v, STAT=ierr)
     return
   end subroutine test_read_write_ext
@@ -4670,7 +4640,7 @@ contains
        & (ierr, jarg)
     use TOUZA_Std,only: endian_LITTLE, endian_BIG
     use TOUZA_Nng_std,only: KBUF=>KDBL
-    use TOUZA_Nng_io, only: ssq_open,  ssq_close
+    use TOUZA_Std_sus,only: sus_open,  sus_close
     use TOUZA_Nng_header
     implicit none
     integer,intent(out)   :: ierr
@@ -4737,7 +4707,7 @@ contains
     if (ierr.eq.0) call put_item(ierr, hd, 'z',    hi_AITM3)
     if (ierr.eq.0) call put_item(ierr, hd, vmiss,  hi_MISS)
 
-    if (ierr.eq.0) call ssq_open(ierr, ufile, wfile, ACTION='RW', STATUS='R')
+    if (ierr.eq.0) call sus_open(ierr, ufile, wfile, ACTION='RW', STATUS='R')
 
     if (ierr.eq.0) then
        ! all zero
@@ -4780,7 +4750,7 @@ contains
        call test_encoding_sub(ierr, hd, v, nn, nz, vmiss, ufile, '-T')
     endif
 
-    if (ierr.eq.0) call ssq_close(ierr, ufile, wfile)
+    if (ierr.eq.0) call sus_close(ierr, ufile, wfile)
 
   end subroutine test_encoding
 !!!_  - test_encoding_sub
@@ -4867,7 +4837,7 @@ contains
 101 format('############ ', A, 1x, A)
     write(*, 101) trim(tag), trim(tmod)
 
-    ! if (ierr.eq.0) call ssq_open(ierr, ufile,  wfile, ACTION='W')
+    ! if (ierr.eq.0) call sus_open(ierr, ufile,  wfile, ACTION='W')
 
     if (ierr.eq.0) inquire(UNIT=ufile, IOSTAT=ierr, POS=jpos)
 
@@ -4910,7 +4880,7 @@ contains
        endif
        jrec = jrec + 1
     enddo
-    ! if (ierr.eq.0) call ssq_close(ierr, ufile, wfile)
+    ! if (ierr.eq.0) call sus_close(ierr, ufile, wfile)
     if (ierr.eq.0) deallocate(w, STAT=ierr)
     return
   end subroutine test_encoding_check

@@ -1,15 +1,23 @@
 !!!_! nng_miroc.F90 - TOUZA/Nng MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/12 11:28:48 fuyuki nng_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/02 08:34:04 fuyuki nng_miroc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021,2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
 !   (https://www.apache.org/licenses/LICENSE-2.0)
 !
+!!!_* Includes
+#ifndef   WITH_MIROC
+#  define WITH_MIROC 0
+#endif
+#if WITH_MIROC
+#  include "miroc.h"
+#  include "ztouza.h"
+#endif
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"
 #endif
@@ -21,38 +29,46 @@
 #ifndef    MIROC_DOUBLE
 #  define  MIROC_DOUBLE 8
 #endif
-#ifndef   WITH_MIROC
-#  define WITH_MIROC 0
-#endif
 !!!_@ TOUZA_Nng_miroc - Nng miroc compatible interfaces
 module TOUZA_Nng_miroc
 !!!_ = declaration
 !!!_  - default
   implicit none
-  public
-  integer,parameter :: KMD = MIROC_DOUBLE
-  real(kind=KMD),parameter   :: vmiss_def = -999.0_KMD
-  character(len=*),parameter :: csign_def = 'MIROC'
+  private
+  integer,         parameter,public :: KMD = MIROC_DOUBLE
+  real(kind=KMD),  parameter,public :: vmiss_def = -999.0_KMD
+  character(len=*),parameter,public :: csign_def = 'MIROC'
+
+  integer,parameter,public :: categ_normal = 0
+  integer,parameter,public :: categ_nng = 1
 !!!_  - miroc include original
 #if WITH_MIROC
 # include "zhdim.F"  /* NCC NDC (No. of characters) */
-# include "ziopara.F"
+#else  /* not WITH_MIROC */
+  integer,parameter :: NCC=0, NDC=0 ! dummy
+#endif /* not WITH_MIROC */
+
+#if WITH_MIROC
 # define _NCC NCC
 # define _NDC NDC
 #else  /* not WITH_MIROC */
-  integer,parameter :: NCC=0, NDC=0 ! dummy
 # define _NCC *
 # define _NDC *
 #endif /* not WITH_MIROC */
+
 #define __MDL__ 'm'
 !!!_  - interfaces (external)
   interface
+!!!_   . GTZRDZ
      subroutine GTZRDZ &
           & (DDATA, HEAD,  IEOD,  &
           &  ISTA,  IEND,  JSTA,  JEND,  KSTA, KEND, &
           &  IFILE, HITEM, HDFMT, HCLAS, &
           &  DSIZE)
        implicit none
+#if WITH_MIROC
+# include "zhdim.F"  /* NCC NDC (No. of characters) */
+#endif
        integer,            parameter   :: KMD = MIROC_DOUBLE
        integer,            intent(in)  :: DSIZE
        real(kind=KMD),     intent(out) :: DDATA(DSIZE)  !! data
@@ -62,28 +78,79 @@ module TOUZA_Nng_miroc
        integer,            intent(out) :: JSTA, JEND
        integer,            intent(out) :: KSTA, KEND
        integer,            intent(in)  :: IFILE
-       character(len=*),   intent(in)  :: HITEM(*)  !! name for identify
-       character(len=*),   intent(in)  :: HDFMT(*)  !! data format : neglected
-       character(len=*),   intent(in)  :: HCLAS(*)  !! driver : neglected
+       character(len=*),   intent(in)  :: HITEM  !! name for identify
+       character(len=*),   intent(in)  :: HDFMT  !! data format : neglected
+       character(len=*),   intent(in)  :: HCLAS  !! driver : neglected
      end subroutine GTZRDZ
+!!!_   . GFPEEK
      subroutine GFPEEK &
           & (HEAD, IEOD, IFILE)
        implicit none
+#if WITH_MIROC
+# include "zhdim.F"  /* NCC NDC (No. of characters) */
+#endif
        character(len=_NCC),intent(out) :: HEAD(_NDC)
        integer,            intent(out) :: IEOD
        integer,            intent(in)  :: IFILE
      end subroutine GFPEEK
+!!!_   . GFSKIP
      subroutine GFSKIP &
           & (IEOD, IFILE)
        implicit none
        integer,intent(out) :: IEOD
        integer,intent(in)  :: IFILE
      end subroutine GFSKIP
+!!!_   . FOPEN
+     subroutine FOPEN &
+          & (IOS, IFILE, HFILE, HACT, HFORM, HACCSS)
+      implicit none
+      integer,         intent(out) :: IOS
+      integer,         intent(in)  :: IFILE
+      character(len=*),intent(in)  :: HFILE
+      character(len=*),intent(in)  :: HACT
+      character(len=*),intent(in)  :: HFORM
+      character(len=*),intent(in)  :: HACCSS
+    end subroutine FOPEN
+!!!_   . FREWND
+    subroutine FREWND &
+         & (IFILE)
+      implicit none
+      integer,intent(in) :: IFILE
+    end subroutine FREWND
+!!!_   . FINQUX
+    subroutine FINQUX &
+         & (IERR,  OEXIST, OPND, IFILE, HFILE, HFORM)
+      implicit none
+      integer,         intent(out) :: IERR
+      logical,         intent(out) :: OEXIST, OPND
+      integer,         intent(out) :: IFILE
+      character(len=*),intent(in)  :: HFILE
+      character(len=*),intent(in)  :: HFORM
+    end subroutine FINQUX
+!!!_   . FNUINI
+    subroutine FNUINI &
+         & (IFILMN, IFILMX)
+      implicit none
+      integer,intent(in)  :: IFILMN, IFILMX
+    end subroutine FNUINI
+!!!_   . FNEWU
+    subroutine FNEWU &
+         & (OFOUND, IFILE,  HFORM, IFILED)
+      implicit none
+      integer,         intent(out) :: IFILE
+      logical,         intent(out) :: OFOUND
+      character(len=*),intent(in)  :: HFORM
+      integer,         intent(in)  :: IFILED
+    end subroutine FNEWU
   end interface
 !!!_  - private
   logical,save,private :: binit = .FALSE.
   logical,save,private :: bdiag = .FALSE.
 
+!!!_  - public
+  public init, diag, finalize
+  public put_item_time
+  public NCC,  NDC
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -93,7 +160,6 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
-    logical,save :: ofirst = .TRUE.
     ierr = 0
     if (.not.binit) then
        binit = .TRUE.
@@ -121,7 +187,7 @@ contains
        bdiag = .TRUE.
        if (ierr.eq.0) call nng_diag(ierr, u, levv, mode)
        if (ierr.eq.0) call nng_msg(TIME_STAMP, __MDL__, u)
-       if (ierr.eq.0) call nng_msg('(''WITH_MIROC = '', I0, )', WITH_MIROC, __MDL__, u)
+       if (ierr.eq.0) call nng_msg('(''WITH_MIROC = '', I0)', WITH_MIROC, __MDL__, u)
     endif
     return
   end subroutine diag
@@ -161,7 +227,9 @@ subroutine GTZRDZ &
      &  ISTA,  IEND,  JSTA,  JEND,  KSTA, KEND, &
      &  IFILE, HITEM, HDFMT, HCLAS, &
      &  DSIZE)
-  use TOUZA_Nng,only: nng_read_header, parse_header_size, nng_read_data, &
+  use TOUZA_Nng,only: &
+       & nng_msg=>msg,    get_item, &
+       & nng_read_header, parse_header_size, nng_read_data, &
        & hi_ASTR1, hi_ASTR2, hi_ASTR3, hi_AEND1, hi_AEND2, hi_AEND3
   use TOUZA_Nng_miroc,only: nm_init=>init, nm_diag=>diag, KMD, NCC, NDC
   implicit none
@@ -173,9 +241,9 @@ subroutine GTZRDZ &
   integer,            intent(out) :: JSTA, JEND
   integer,            intent(out) :: KSTA, KEND
   integer,            intent(in)  :: IFILE
-  character(len=*),   intent(in)  :: HITEM(*)  !! name for identify
-  character(len=*),   intent(in)  :: HDFMT(*)  !! data format : neglected
-  character(len=*),   intent(in)  :: HCLAS(*)  !! driver : neglected
+  character(len=*),   intent(in)  :: HITEM  !! name for identify
+  character(len=*),   intent(in)  :: HDFMT  !! data format : neglected
+  character(len=*),   intent(in)  :: HCLAS  !! driver : neglected
 
   logical,save :: ofirst = .TRUE.
   integer krect                 ! record type
@@ -236,11 +304,10 @@ end subroutine GTZRDZ
 subroutine GFPEEK &
      & (HEAD, IEOD, IFILE)
   use TOUZA_Std,only: is_error_match
-  use TOUZA_Nng,only: nng_read_header,nitem,KIOFS,WHENCE_ABS,ssq_rseek
+  use TOUZA_Nng,only: nng_read_header,nitem,KIOFS,WHENCE_ABS,sus_rseek
   use TOUZA_Nng_miroc,only: NCC, NDC
   implicit none
 #if WITH_MIROC
-# include "zhdim.F"  /* NCC NDC (No. of characters) */
 # include "ziopara.F"
 #else
   integer,parameter :: MM_EOF = -128, MM_ERR = -256 ! dummy
@@ -270,7 +337,7 @@ subroutine GFPEEK &
      endif
      return
   endif
-  call ssq_rseek(jerr, IFILE, jpos, WHENCE_ABS)
+  call sus_rseek(jerr, IFILE, jpos, WHENCE_ABS)
   if (jerr.ne.0) IEOD = MM_ERR
   return
 end subroutine GFPEEK
@@ -297,7 +364,9 @@ subroutine GTZWRZ &
      &  HALON, HALAT, HASIG, &
      &  ISTA,  IEND,  JSTA,  JEND,  KSTA,  KEND, &
      &  DSIZE)
-  use TOUZA_Nng_miroc,only:  nm_init=>init, nm_diag=>diag, vmiss_def
+  use TOUZA_Nng_miroc,only:  &
+       & nm_init=>init, nm_diag=>diag, vmiss_def, &
+       & put_item_time
   use TOUZA_Nng_header,only: litem, nitem, put_item, &
        & hi_DSET,  hi_ITEM,  hi_TITL1, hi_TITL2, &
        & hi_UNIT,  hi_TIME,  hi_TDUR,  hi_DFMT,  &
@@ -434,6 +503,107 @@ end subroutine GTZWRZ
 !!!_  & GTINID
 !!!_  & PUT_DATETUPLE
 !!!_  & GET_DATETUPLE
+!!!_ + io/ibase.F
+!!!_  - FOPEN
+subroutine FOPEN &
+     & (IOS, IFILE, HFILE, HACT, HFORM, HACCSS)
+  use TOUZA_Nng,only: sus_open
+  implicit none
+  integer,         intent(out) :: IOS
+  integer,         intent(in)  :: IFILE
+  character(len=*),intent(in)  :: HFILE
+  character(len=*),intent(in)  :: HACT
+  character(len=*),intent(in)  :: HFORM
+  character(len=*),intent(in)  :: HACCSS
+
+  character(LEN=9)  :: action
+  character(LEN=6)  :: position
+
+  if (HACT == 'APPEND') then
+     action = 'WRITE'
+     position = 'APPEND'
+  else
+     action = HACT
+     position = 'ASIS'
+  endif
+
+  if (HFORM == 'GTOOL3') then
+     call sus_open(IOS, IFILE, HFILE, ACTION=action, position=position)
+     return
+  endif
+
+  if (HACCSS == 'DIRECT') then
+     open(UNIT=IFILE, FILE=HFILE, IOSTAT=IOS, &
+          & ACCESS=HACCSS, FORM=HFORM, ACTION=action)
+  else
+     open(UNIT=IFILE, FILE=HFILE, IOSTAT=IOS, &
+          & ACCESS=HACCSS, FORM=HFORM, ACTION=action, POSITION=position)
+  endif
+  return
+end subroutine FOPEN
+!!!_  - FREWND
+subroutine FREWND &
+     & (IFILE)
+  implicit none
+  integer,intent(in) :: IFILE
+  rewind(IFILE)
+  return
+end subroutine FREWND
+!!!_  - FINQUX
+subroutine FINQUX &
+     & (IERR,  OEXIST, OPND, IFILE, HFILE, HFORM)
+  implicit none
+  integer,         intent(out) :: IERR
+  logical,         intent(out) :: OEXIST, OPND
+  integer,         intent(out) :: IFILE
+  character(len=*),intent(in)  :: HFILE
+  character(len=*),intent(in)  :: HFORM
+  inquire(FILE=HFILE, IOSTAT=IERR, EXIST=OEXIST, OPENED=OPND, NUMBER=IFILE)
+  return
+end subroutine FINQUX
+!!!_  - FNUINI
+subroutine FNUINI &
+     & (IFILMN, IFILMX)
+  use TOUZA_Std,only: kucat_black, set_category_bound
+  use TOUZA_Nng_miroc,only: categ_nng, categ_normal
+  implicit none
+  integer jerr
+  integer,intent(in)  :: IFILMN, IFILMX
+  call set_category_bound(jerr, kucat_black, IFILMN)
+  call set_category_bound(jerr, categ_normal, IFILMX+1)
+  return
+end subroutine FNUINI
+!!!_  - FNEWU
+subroutine FNEWU &
+     & (OFOUND, IFILE,  HFORM, IFILED)
+  use TOUZA_Std,only: search_from_last, search_from_head, new_unit
+  use TOUZA_Nng_miroc,only: categ_nng, categ_normal
+  implicit none
+  integer,         intent(out) :: IFILE
+  logical,         intent(out) :: OFOUND
+  character(len=*),intent(in)  :: HFORM
+  integer,         intent(in)  :: IFILED
+  integer kc
+  integer ubase
+  if (HFORM .EQ. 'GTOOL3') THEN
+     kc = categ_nng
+     if (IFILED.lt.0) then
+        ubase = search_from_last
+     else
+        ubase = IFILED
+     endif
+  else
+     kc = categ_normal
+     if (IFILED.lt.0) then
+        ubase = search_from_head
+     else
+        ubase = IFILED
+     endif
+  endif
+  IFILE = new_unit(ubase, kc)
+  OFOUND = IFILE.ge.0
+  return
+end subroutine FNEWU
 !!!_@ test_nng_miroc - test program
 #ifdef TEST_NNG_MIROC
 program test_nng_miroc

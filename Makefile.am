@@ -1,9 +1,9 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/11/25 22:50:56 fuyuki Makefile.am>
+# Time-stamp: <2022/02/15 19:49:54 fuyuki Makefile.am>
 
-# Copyright (C) 2020, 2021
+# Copyright (C) 2020, 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
@@ -21,6 +21,12 @@ SUBDIRS 					= std
 lib@TOUZA_NAME@_la_LIBADD	= std/$(local_name)
 AM_FCFLAGS					+= $(FC_MODULE_touza_std)
 
+if BUILD_emu
+SUBDIRS 					+= emu
+lib@TOUZA_NAME@_la_LIBADD	+= emu/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_emu)
+endif
+
 if BUILD_cal
 SUBDIRS 					+= cal
 lib@TOUZA_NAME@_la_LIBADD	+= cal/$(local_name)
@@ -29,12 +35,6 @@ endif
 
 pkgconfigdir	=	$(libdir)/pkgconfig
 pkgconfig_DATA	=	touza.pc
-
-# if BUILD_emu
-# SUBDIRS 					+= emu
-# lib@TOUZA_NAME@_la_LIBADD	+= emu/$(local_name)
-# AM_FCFLAGS					+= $(FC_MODULE_touza_emu)
-# endif
 
 # if BUILD_div
 # SUBDIRS 					+= div
@@ -52,6 +52,12 @@ if BUILD_nng
 SUBDIRS 					+= nng
 lib@TOUZA_NAME@_la_LIBADD	+= nng/$(local_name)
 AM_FCFLAGS					+= $(FC_MODULE_touza_nng)
+endif
+
+if BUILD_ppp
+SUBDIRS 					+= ppp
+lib@TOUZA_NAME@_la_LIBADD	+= ppp/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_ppp)
 endif
 
 SUBDIRS	+=	m4c
@@ -73,6 +79,31 @@ if NEVER
 EXTRA_PROGRAMS = dummy_never_built
 nodist_dummy_never_built_SOURCES = dummy_never_built.c
 endif
+
+EXTRA_DIST += $(AUTOREVISION_cache) $(AUTOREVISION_h)
+
+AUTOREVISION_h = autorevision.h
+AUTOREVISION_cache = autorevision.cache
+
+$(AUTOREVISION_h): autorevision-cache
+	@if test x"$(AUTOREVISION)" = x:; then \
+		echo "skip to run autorevision" >&2; touch $@; \
+	else \
+		$(AUTOREVISION) -f -t h -o $(top_srcdir)/$(AUTOREVISION_cache) | sed -e "s/\"/'/g" -e "s/''$$/' '/" > $@; \
+	fi
+
+autorevision-cache::
+	@cd $(top_srcdir) && $(AUTOREVISION) -t h -o $(AUTOREVISION_cache) > /dev/null
+
+EXPORT=
+
+export: $(AUTOREVISION_h)
+	@if test x"$(EXPORT)" = x; then \
+		echo "EXPORT must be set as destination" >&2; exit 1; \
+	else \
+		export=`$(REALPATH) --relative-to=$(top_builddir) $(EXPORT)` || exit $$?; \
+		$(MAKE) distdir=$${export} distdir; \
+	fi
 
 ### Local Variables:
 ### mode: makefile-automake
