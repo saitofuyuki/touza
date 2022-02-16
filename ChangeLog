@@ -1,4 +1,18 @@
 
+Revision 1.02.0 / 2022-02-16
+==================
+
+  * New upstream release.
+  * HAVE_* macros are renamed to HAVE_FORTRAN_*
+  * (ppp) parallel processing procedures, to replace xmcomm/xmking in
+    MIROC.
+  * (emu) emulate miroc utilitly
+  * (std/env) [important] on-demand checker introduced.
+  * (std/mwe) MPI group procedures
+  * (std/sus) replaces (original) nng_io.
+  * various bug fixes
+  * copyrights updated (partially)
+
 Revision 1.01.0 / 2021-12-07
 ==================
 

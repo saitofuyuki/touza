@@ -1,10 +1,15 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2021/04/08 14:27:20 fuyuki NEWS>
+# Time-stamp: <2022/02/16 21:43:57 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.02.0 from 1.01.0
+- MIROC with-T pilot (xmcomm replacement)
+- (ppp) parallel processing procedures, to replace xmcomm/xmking
+- (emu) emulate miroc utilitly
 
 * Changes in 1.01.0 from 1.00.4
 - Alpha release to provide URT-format trials
