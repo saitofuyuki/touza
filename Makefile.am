@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/02/17 10:22:18 fuyuki Makefile.am>
+# Time-stamp: <2022/02/17 12:41:22 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -95,8 +95,12 @@ $(AUTOREVISION_h): $(top_srcdir)/$(AUTOREVISION_cache)
 		$(AUTOREVISION) -f -t h -o $(top_srcdir)/$(AUTOREVISION_cache) | sed -e "s/\"/'/g" -e "s/''$$/' '/" > $@; \
 	fi
 
+# only update when top_srcdir is the top-level directory in git work-tree
 autorevision-cache:
-	@cd $(top_srcdir) && $(AUTOREVISION) -t h -o $(AUTOREVISION_cache) > /dev/null
+	@if cd $(top_srcdir); then \
+		top=`git rev-parse --show-cdup` || exit 1; \
+		test x$${top} = x && $(AUTOREVISION) -t h -o $(AUTOREVISION_cache) > /dev/null; \
+	fi
 
 EXPORT=
 
