@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/02/15 19:49:54 fuyuki Makefile.am>
+# Time-stamp: <2022/02/17 10:22:18 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -67,6 +67,7 @@ SUBDIRS	+=	. $(subdirs_extra)
 include_HEADERS		= touza.h $(CONFIG_HEADER)
 lib_LTLIBRARIES 	= lib@TOUZA_NAME@.la
 lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
+lib@TOUZA_NAME@_la_DEPENDENCIES	= autorevision
 
 local_name			= libtouza_local.la
 
@@ -85,14 +86,16 @@ EXTRA_DIST += $(AUTOREVISION_cache) $(AUTOREVISION_h)
 AUTOREVISION_h = autorevision.h
 AUTOREVISION_cache = autorevision.cache
 
-$(AUTOREVISION_h): autorevision-cache
+autorevision: autorevision-cache $(AUTOREVISION_h)
+
+$(AUTOREVISION_h): $(top_srcdir)/$(AUTOREVISION_cache)
 	@if test x"$(AUTOREVISION)" = x:; then \
 		echo "skip to run autorevision" >&2; touch $@; \
 	else \
 		$(AUTOREVISION) -f -t h -o $(top_srcdir)/$(AUTOREVISION_cache) | sed -e "s/\"/'/g" -e "s/''$$/' '/" > $@; \
 	fi
 
-autorevision-cache::
+autorevision-cache:
 	@cd $(top_srcdir) && $(AUTOREVISION) -t h -o $(AUTOREVISION_cache) > /dev/null
 
 EXPORT=
@@ -100,6 +103,8 @@ EXPORT=
 export: $(AUTOREVISION_h)
 	@if test x"$(EXPORT)" = x; then \
 		echo "EXPORT must be set as destination" >&2; exit 1; \
+	elif test -d "$(EXPORT)"; then \
+		echo "$(EXPORT) exists, aborts." >&2; exit 1; \
 	else \
 		export=`$(REALPATH) --relative-to=$(top_builddir) $(EXPORT)` || exit $$?; \
 		$(MAKE) distdir=$${export} distdir; \

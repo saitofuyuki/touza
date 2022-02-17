@@ -1,7 +1,7 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/02/15 18:13:30 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/17 07:16:35 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -698,11 +698,11 @@ program test_ppp_miroc
   implicit none
   integer ierr
 # if TEST_PPP_MIROC == 1
-#   define _DRIVER 'A'
+#   define _DRIVER 'AB0C1'
 # elif TEST_PPP_MIROC == 2
-#   define _DRIVER 'O'
+#   define _DRIVER 'OO0O1'
 # else
-#   define _DRIVER 'AO'
+#   define _DRIVER 'AB0C1OO0O1'
 # endif
   integer kaa, koo
   integer kaw, kow
