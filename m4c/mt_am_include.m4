@@ -1,7 +1,7 @@
 dnl Filename:   touza/m4c/mt_am_include.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 16 2020
-dnl Time-stamp: <2021/11/25 16:02:53 fuyuki mt_am_include.m4>
+dnl Time-stamp: <2022/03/29 11:41:45 fuyuki mt_am_include.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -24,9 +24,12 @@ AM_FCFLAGS  = @AM_FCFLAGS@ ${AX_DOLLAR}(DEBUG)
 AM_CPPFLAGS = -I${AX_DOLLAR}(top_srcdir)
 
 moddir      = @moddir@
-pkgmoddir   = ${AX_DOLLAR}(moddir)/@PACKAGE@
 
 install-exec-hook: install-mod
+install-data-hook: install-switchDATA
+
+switchdir     = @switchdir@
+switch_DATA   =
 
 ])
 
@@ -48,11 +51,11 @@ ${AX_DOLLAR}(DIFF_SOURCE_TARGETS):
 
 MT_ADD_RECURSIVE_AM_MACRO_STATIC([install-mod],
 [if INSTALL_MODULES
-	if test -z '${AX_DOLLAR}(pkgmoddir)'; then \\
+	if test -z '${AX_DOLLAR}(moddir)'; then \\
 		false; \\
 	else \\
-		${AX_DOLLAR}(MKDIR_P) ${AX_DOLLAR}(pkgmoddir); \\
-		${AX_DOLLAR}(install_sh_DATA) -t ${AX_DOLLAR}(pkgmoddir) *.${AX_DOLLAR}(FC_MODEXT); \\
+		${AX_DOLLAR}(MKDIR_P) ${AX_DOLLAR}(moddir); \\
+		${AX_DOLLAR}(install_sh_DATA) -t ${AX_DOLLAR}(moddir) *.${AX_DOLLAR}(FC_MODEXT); \\
 	fi
 endif
 

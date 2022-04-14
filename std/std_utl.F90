@@ -1,10 +1,10 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2021/11/20 23:09:07 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/07 20:41:18 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021
+! Copyright (C) 2020, 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -70,6 +70,10 @@ module TOUZA_Std_utl
      module procedure downcase_o
   end interface downcase
 
+  interface ndigits
+     module procedure ndigits_i
+  end interface ndigits
+
 !!!_  - public
   public init, diag, finalize
   public choice, choice_a
@@ -77,7 +81,9 @@ module TOUZA_Std_utl
   public condop
   public chcount
   public upcase, downcase
+  public ndigits
   public control_mode, control_deep, is_first_force
+  public set_defu
 !!!_  - static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -223,6 +229,14 @@ contains
     return
   end subroutine finalize
 !!!_ + user subroutines
+!!!_  & set_defu - set global logging unit
+  subroutine set_defu(u)
+    implicit none
+    integer,intent(in) :: u
+    ulog = u
+    return
+  end subroutine set_defu
+
 !!!_  & choice() - return D if not present A, otherwise A
   _CHOICE_DECL integer function choice_i(d, a) result(r)
     integer,intent(in)          :: d
@@ -457,13 +471,43 @@ contains
     call downcase_m(SO)
   end subroutine downcase_o
 
+!!!_  & ndigits() - number of digits
+  integer function ndigits_i(n) result(r)
+    implicit none
+    integer,intent(in) :: n
+    integer b
+    integer,parameter :: k8 = 10**8
+    integer,parameter :: k4 = 10**4
+    integer,parameter :: k2 = 10**2
+    integer,parameter :: k1 = 10**1
+    r = 1
+    b = abs(n)
+    do
+       if (b.lt.k8) exit
+       r = r + 8
+       b = b / k8
+    enddo
+    if (b.ge.k4) then
+       b = b / k4
+       r = r + 4
+    endif
+    if (b.ge.k2) then
+       b = b / k2
+       r = r + 2
+    endif
+    if (b.ge.k1) then
+       b = b / k1
+       r = r + 1
+    endif
+    r = sign(r, n)
+  end function ndigits_i
 !!!_ + (system) control procedures
 !!!_  - is_first_force () - check if first time or force
   logical function is_first_force(n, mode) result(b)
     implicit none
-    integer,intent(in) :: n
-    integer,intent(in) :: mode
-    b = (n.eq.0) .or. (IAND(mode, MODE_FORCE).gt.0)
+    integer,intent(in)          :: n
+    integer,intent(in),optional :: mode
+    b = (n.eq.0) .or. (IAND(choice(0, mode), MODE_FORCE).gt.0)
     return
   end function is_first_force
 !!!_  - control_mode () - set init/diag/finalize mode
@@ -471,8 +515,10 @@ contains
     implicit none
     integer,intent(in),optional :: mode
     integer,intent(in),optional :: def
+    integer,parameter :: mskl = MODE_FORCE - 1
     n = choice(MODE_DEFAULT, mode)
     if (n.eq.MODE_DEFAULT) n = choice(MODE_DEEPEST, def)
+    n = IAND(n, mskl)
     return
   end function control_mode
 !!!_  - control_deep () - set init/diag/finalize mode at deep level
@@ -509,9 +555,27 @@ program test_std_utl
   call downcase(T1, T0)
   write(*, 101) 'D', trim(T0), trim(T1)
 
+  call test_ndigits(0)
+  call test_ndigits(1)
+  call test_ndigits(9)
+  call test_ndigits(10)
+  call test_ndigits(10**9)
+  call test_ndigits(10**9-1)
+  call test_ndigits(10**9+1)
+
   call finalize(ierr)
 
   stop
+contains
+  subroutine test_ndigits(n)
+    implicit none
+    integer,intent(in) :: n
+    integer r
+    r = ndigits(n)
+102 format('ndigits: ', I0, ' = ', I0)
+    write(*, 102) n, r
+    return
+  end subroutine test_ndigits
 end program test_std_utl
 #endif /* TEST_STD_UTL */
 !!!_! FOOTER

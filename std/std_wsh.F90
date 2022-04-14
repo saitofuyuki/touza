@@ -1,10 +1,10 @@
 !!!_! std_wsh.F90 - touza/std standard work-sharing
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2021/11/23 15:17:11 fuyuki std_wsh.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/05 15:52:24 fuyuki std_wsh.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -94,7 +94,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
@@ -139,7 +139,7 @@ contains
           endif
           ierr = 0
        endif
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
 101          format(__TAG__, A)
              if (VCHECK_NORMAL(lv)) then
@@ -179,7 +179,7 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           if (VCHECK_DEBUG(lv)) then
 311          format(STD_FORMAT_FUN(__MDL__, 'finalize'), 'fine: ', I0, 1x, I0, 1x, I0, 1x, I0)
              if (utmp.ge.0) then

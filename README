@@ -14,3 +14,5 @@ See NOTICE for copyright information.
 See AUTHORS for author(s) and contributors.
 See INSTALL for generic installation instructions.
 See README-touza.org for brief guide on TOUZA packages.
+
+TOUZA package may be embedded in MIROC.  Not to be confused with the license of MIROC.

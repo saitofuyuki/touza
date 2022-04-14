@@ -1,10 +1,10 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2021/12/06 08:34:11 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/16 15:00:30 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2011-2021
+! Copyright (C) 2011-2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -16,8 +16,8 @@
 #endif
 #include "touza_std.h"
 !!!_* Macros
-#ifndef    HAVE_FC_CONCATENATION
-#  define  HAVE_FC_CONCATENATION 0
+#ifndef    HAVE_FORTRAN_FC_CONCATENATION
+#  define  HAVE_FORTRAN_FC_CONCATENATION 0
 #endif
 !!!_@ TOUZA_Std_log - simple logging
 module TOUZA_Std_log
@@ -53,6 +53,7 @@ module TOUZA_Std_log
      module procedure msg_ia
      module procedure msg_fa
      module procedure msg_da
+     module procedure msg_aa
      module procedure msg_txt
   end interface msg
 
@@ -65,6 +66,7 @@ module TOUZA_Std_log
 
   interface msg_grp
      module procedure msg_grp_ia
+     module procedure msg_grp_aa
      module procedure msg_grp_txt
   end interface msg_grp
 
@@ -72,6 +74,10 @@ module TOUZA_Std_log
      module procedure msg_fun_ia
      module procedure msg_fun_txt
   end interface msg_fun
+
+  interface banner
+     module procedure banner_core
+  end interface banner
 
 !!!_  - message levels
   integer,parameter,public :: msglev_panic    = MSG_LEVEL_PANIC
@@ -86,7 +92,7 @@ module TOUZA_Std_log
 
 !!!_  - public
   public init, diag, finalize
-  public get_logu
+  public get_logu,   set_defu
   public msg,  msg_grp, msg_mdl, msg_fun
   public gen_tag
   public is_msglev
@@ -94,12 +100,14 @@ module TOUZA_Std_log
   public is_msglev_fatal,   is_msglev_critical, is_msglev_severe
   public is_msglev_warning, is_msglev_normal,   is_msglev_info
   public is_msglev_detail,  is_msglev_debug
+  public banner
   public trace_control,     trace_fine
   public is_error_match
 contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode)
+    use TOUZA_Std_prc,only: prc_init=>init
     use TOUZA_Std_utl,only: utl_init=>init, choice
     implicit none
     integer,intent(out)         :: ierr
@@ -116,13 +124,14 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           utmp = choice(unit_star, u)
           if (utmp.ne.unit_global) default_unit = utmp
           lev_verbose = lv
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call prc_init(ierr, default_unit, levv=lv, mode=lmd)
           if (ierr.eq.0) call utl_init(ierr, default_unit, levv=lv, mode=lmd)
        endif
        init_counts = init_counts + 1
@@ -134,6 +143,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Std_prc,only: prc_diag=>diag
     use TOUZA_Std_utl,only: utl_diag=>diag, choice
     implicit none
     integer,intent(out)         :: ierr
@@ -150,13 +160,14 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_NORMAL(lv)) call msg_mdl_txt(TIME_STAMP, __MDL__, utmp)
           endif
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -166,6 +177,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std_prc,only: prc_finalize=>finalize
     use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
     implicit none
     integer,intent(out)         :: ierr
@@ -179,13 +191,14 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
@@ -363,6 +376,22 @@ contains
     call msg_ia(fmt, vv, tag, u)
     return
   end subroutine msg_grp_ia
+!!!_  & msg_grp_aa - log message [module level]
+  subroutine msg_grp_aa &
+       & (fmt, vv, grp, mdl, u)
+    implicit none
+    character(len=*),intent(in)          :: fmt
+    character(len=*),intent(in)          :: vv(:)
+    character(len=*),intent(in),optional :: grp
+    character(len=*),intent(in),optional :: mdl
+    integer,         intent(in),optional :: u
+    character(len=lpfx) :: tag
+
+    call gen_tag(tag, pkg=PACKAGE_TAG, grp=grp, mdl=mdl)
+    call msg_aa(fmt, vv(:), tag, u)
+    return
+  end subroutine msg_grp_aa
+
 !!!_  & msg_grp_txt - log message [module level]
   subroutine msg_grp_txt &
        & (txt, grp, mdl, u)
@@ -486,6 +515,22 @@ contains
 
   end subroutine msg_da
 
+  subroutine msg_aa &
+       & (fmt, vv, tag, u)
+    use TOUZA_Std_prc,only: KDBL
+    implicit none
+    character(len=*),intent(in)          :: fmt
+    character(len=*),intent(in)          :: vv(:)
+    character(len=*),intent(in)          :: tag
+    integer,         intent(in),optional :: u
+    character(len=ltxt) :: txt
+    integer j
+
+    write(txt, fmt) (trim(vv(j)), j=1, size(vv))
+    call msg_txt(txt, tag, u)
+
+  end subroutine msg_aa
+
 !!!_  & msg_*s - log message (format and single variable)
   subroutine msg_is &
        & (fmt, v, tag, u)
@@ -545,7 +590,7 @@ contains
     if (jerr.eq.0) then
        call msg_txt(txt, tag, u)
     else
-       if (HAVE_FC_CONCATENATION.ne.0) then
+       if (HAVE_FORTRAN_FC_CONCATENATION.ne.0) then
           txt = trim(fmt) // ' ' // trim(v)
           call msg_txt(txt, tag, u)
        else
@@ -628,6 +673,49 @@ contains
 
   end subroutine gen_tag
 
+!!!_  & banner - output banner
+  subroutine banner_core &
+       & (ierr, txt, u, ch, ww)
+    use TOUZA_Std_utl,only: choice, choice_a
+    implicit none
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(in)          :: txt
+    integer,         intent(in),optional :: u
+    character(len=*),intent(in),optional :: ch
+    integer,         intent(in),optional :: ww
+    integer ut
+    integer wi
+    integer ll
+    integer rl, rw
+    integer,parameter :: lc = 1 ! fixed
+    character(len=lc) :: ci
+    ierr = 0
+
+    ut = choice(unit_global, u)
+    if (ut.eq.unit_global) ut = default_unit
+
+    call choice_a(ci, '+', ch)
+    wi = max(choice(3, ww), lc)
+    rw = wi / lc
+
+    ll = len_trim(txt) + wi * 2 + 2
+    rl = (ll - 1) / lc + 1
+    ll = rl * lc
+
+101 format(1x, A)
+102 format(1x, A, 1x, A, 1x, A)
+    if (ut.ge.0) then
+       write(ut, 101) repeat(trim(ci), rl)
+       write(ut, 102) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
+       write(ut, 101) repeat(trim(ci), rl)
+    else if (ut.eq.-1) then
+       write(*, 101) repeat(trim(ci), rl)
+       write(*, 102) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
+       write(*, 101) repeat(trim(ci), rl)
+    endif
+    return
+  end subroutine banner_core
+
 !!!_  & get_logu - get logging unit
   PURE &
   integer function get_logu(u, udef) result(lu)
@@ -644,6 +732,19 @@ contains
     if (lu.eq.unit_global) lu = default_unit
     return
   end function get_logu
+
+!!!_  & set_defu - set global logging unit
+  subroutine set_defu(u)
+    use TOUZA_Std_utl,only: uset_defu=>set_defu
+    use TOUZA_Std_prc,only: pset_defu=>set_defu
+    implicit none
+    integer,intent(in) :: u
+    default_unit = u
+    call uset_defu(default_unit)
+    call pset_defu(default_unit)
+    return
+  end subroutine set_defu
+
 !!!_  & is_error_match () - check if error-code matches
   logical function is_error_match &
        & (ierr, jcode, mdl) &
@@ -676,6 +777,10 @@ program test_std_log
   implicit none
   integer ierr
   integer je
+
+  call banner(ierr, 'test std_log', -1)
+  call banner(ierr, 'test std_log', -1, '*')
+  call banner(ierr, 'test std_log', -1, '=', 5)
 
   call init(ierr)
 

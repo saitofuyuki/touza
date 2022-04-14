@@ -1,10 +1,10 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/07 07:23:45 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/04/04 21:57:23 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -40,12 +40,12 @@
 #define  _PREFER_WHERE OPT_PREFER_WHERE.ne.0
 #define  _PREFER_DOIF  OPT_PREFER_WHERE.eq.0
 !!!_ + ieee
-#ifndef   HAVE_IEEE_ARITMETIC
-#  define HAVE_IEEE_ARITMETIC 0
+#ifndef   HAVE_FORTRAN_IEEE_ARITMETIC
+#  define HAVE_FORTRAN_IEEE_ARITMETIC 0
 #endif
 #define OPT_TRAPICHE_IEEE 0
 #ifndef   OPT_TRAPICHE_IEEE
-#  define OPT_TRAPICHE_IEEE HAVE_IEEE_ARITMETIC
+#  define OPT_TRAPICHE_IEEE HAVE_FORTRAN_IEEE_ARITMETIC
 #endif
 !!!_@ TOUZA_Trp_float - trapiche floating-point manager
 module TOUZA_Trp_float
@@ -173,11 +173,11 @@ module TOUZA_Trp_float
 !!!_  - common
   character(len=256) :: tmsg
 !!!_  - interfaces
-! #if HAVE_IEEE_ARITHMETIC
+! #if HAVE_FORTRAN_IEEE_ARITHMETIC
 !   interface catalogar_ieee
 !      module procedure catalogar_ieee_d
 !   end interface catalogar_ieee
-! #endif /* HAVE_IEEE_ARITHMETIC */
+! #endif /* HAVE_FORTRAN_IEEE_ARITHMETIC */
 
   interface helper_props
      module procedure helper_props_d, helper_props_f
@@ -505,15 +505,15 @@ contains
 #   if OPT_TRAPICHE_SX_SPECIALS
     call msg('(''sx special procedures enabled '', I0)', &
          & OPT_TRAPICHE_SX_SPECIALS, __MDL__, u)
-    if (HAVE_AMT.eq.0) then
+    if (HAVE_FORTRAN_AMT.eq.0) then
        ierr = -1
        call msg('not found amt()', __MDL__, u)
     endif
-    if (HAVE_IRE.eq.0) then
+    if (HAVE_FORTRAN_IRE.eq.0) then
        ierr = -1
        call msg('not found ire()', __MDL__, u)
     endif
-    if (HAVE_EXP2.eq.0) then
+    if (HAVE_FORTRAN_EXP2.eq.0) then
        ierr = -1
        call msg('not found exp2()', __MDL__, u)
     endif
@@ -530,7 +530,8 @@ contains
        endif
     enddo
 102 format('exp2:', A, ':', I0, ': ', L1, 1x, E24.16, 1x, E24.16)
-    do j = -2, +2
+    ! overflow occurs when j == +1
+    do j = -2, 0
        jx = MH + j
        vx = AMT(one) * EXP2(REAL(jx, KIND=KRTGT))
        vy = AMT(one) * EXP2(REAL(1, KIND=KRTGT)) * EXP2(REAL(jx-1, KIND=KRTGT))
@@ -3267,7 +3268,7 @@ contains
   function set_special_d &
        & (kschm, mbits, ixdnm, ixlbd, ixubd, vmiss) &
        & result (r)
-#if HAVE_IEEE_ARITHMETIC
+#if HAVE_FORTRAN_IEEE_ARITHMETIC
     use IEEE_ARITHMETIC
 #endif
     implicit none
@@ -3285,10 +3286,10 @@ contains
     integer ixd
 
     select case (kschm)
-#   if HAVE_IEEE_ARITHMETIC
+#   if HAVE_FORTRAN_IEEE_ARITHMETIC
     case (KS_MISS)
        r(0:1) = vmiss
-#   else /* not HAVE_IEEE_ARITHMETIC */
+#   else /* not HAVE_FORTRAN_IEEE_ARITHMETIC */
     case (KS_MISS,KS_NAN,KS_INF)
        r(0:1) = vmiss
 #   endif
@@ -3296,7 +3297,7 @@ contains
        select case (kschm)
        case (KS_ZERO)
           vpos = 0.0_KRFLD
-#      if HAVE_IEEE_ARITHMETIC
+#      if HAVE_FORTRAN_IEEE_ARITHMETIC
        case (KS_NAN)
           vpos = IEEE_VALUE(vpos, IEEE_QUIET_NAN)
        case (KS_INF)
@@ -3334,7 +3335,7 @@ contains
   function set_special_f &
        & (kschm, mbits, ixdnm, ixlbd, ixubd, vmiss) &
        & result (r)
-#if HAVE_IEEE_ARITHMETIC
+#if HAVE_FORTRAN_IEEE_ARITHMETIC
     use IEEE_ARITHMETIC
 #endif
     implicit none
@@ -3352,10 +3353,10 @@ contains
     integer ixd
 
     select case (kschm)
-#   if HAVE_IEEE_ARITHMETIC
+#   if HAVE_FORTRAN_IEEE_ARITHMETIC
     case (KS_MISS)
        r(0:1) = vmiss
-#   else /* not HAVE_IEEE_ARITHMETIC */
+#   else /* not HAVE_FORTRAN_IEEE_ARITHMETIC */
     case (KS_MISS,KS_NAN,KS_INF)
        r(0:1) = vmiss
 #   endif
@@ -3363,7 +3364,7 @@ contains
        select case (kschm)
        case (KS_ZERO)
           vpos = 0.0_KRFLD
-#      if HAVE_IEEE_ARITHMETIC
+#      if HAVE_FORTRAN_IEEE_ARITHMETIC
        case (KS_NAN)
           vpos = IEEE_VALUE(vpos, IEEE_QUIET_NAN)
        case (KS_INF)

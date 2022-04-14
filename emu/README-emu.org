@@ -1,0 +1,24 @@
+#+title: TOUZA/emu guide
+#+author: SAITO Fuyuki
+#+date: <2020-06-14 Sun>
+
+* Introduction
+  *TOUZA/emu* is a collection of Fortran subroutines for typical
+  standard procedures emulating /MIROC/.
+
+  *TOUZA/emu* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+  DOT go DOT jp>.
+
+  *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
+  Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
+  (expected to be in the parent directory) for general instruction of
+  *TOUZA* collection.
+
+* Build and installation
+
+* Brief description of *TOUZA/emu* modules
+
+* Copyright and license
+Copyright 2020, 2021 Japan Agency for Marine-Earth Science and Technology
+Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)

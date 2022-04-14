@@ -1,7 +1,7 @@
 !!!_! jmzcmp.F90 - TOUZA/Jmz nng comparison
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 28 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/09 09:54:00 fuyuki jmzcmp.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/12/24 10:59:40 fuyuki jmzcmp.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -126,13 +126,13 @@ contains
 
 119 format('error=', I0, ' at ', A, 1x A)
     uref  = max(uerr, uout, 10) + 1
-    if (ierr.eq.0) call ssq_open(ierr, uref, rfile, ACTION='R', STATUS='O')
+    if (ierr.eq.0) call sus_open(ierr, uref, rfile, ACTION='R', STATUS='O')
     if (ierr.ne.0) then
        write(uerr, 119) ierr, 'read', trim(rfile)
        return
     endif
     utgt  = uref + 1
-    if (ierr.eq.0) call ssq_open(ierr, utgt, tfile, ACTION='R', STATUS='O')
+    if (ierr.eq.0) call sus_open(ierr, utgt, tfile, ACTION='R', STATUS='O')
     if (ierr.ne.0) then
        write(uerr, 119) ierr, 'read', trim(tfile)
        return
@@ -143,7 +143,7 @@ contains
        udif = utgt + 1
        CSTT = 'NEW'
        if (IAND(kflag, bforce).ne.0) CSTT = 'REPLACE'
-       if (ierr.eq.0) call ssq_open(ierr, udif, dfile, ACTION='W', STATUS=CSTT)
+       if (ierr.eq.0) call sus_open(ierr, udif, dfile, ACTION='W', STATUS=CSTT)
        if (ierr.ne.0) then
           write(uerr, 119) ierr, 'write', trim(dfile)
           return

@@ -1,10 +1,10 @@
 !!!_! std.F90 - touza/std interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2021/11/26 10:51:39 fuyuki std.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/07 20:45:07 fuyuki std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021
+! Copyright (C) 2020, 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -19,13 +19,14 @@
 module TOUZA_Std
 !!!_ + Declaration
 !!!_  - modules
-  use TOUZA_Std_prc, prc_init=>init, prc_diag=>diag, prc_finalize=>finalize
-  use TOUZA_Std_utl, utl_init=>init, utl_diag=>diag, utl_finalize=>finalize
+  use TOUZA_Std_prc, prc_init=>init, prc_diag=>diag, prc_finalize=>finalize, pset_defu=>set_defu
+  use TOUZA_Std_utl, utl_init=>init, utl_diag=>diag, utl_finalize=>finalize, uset_defu=>set_defu
   use TOUZA_Std_env, env_init=>init, env_diag=>diag, env_finalize=>finalize
   use TOUZA_Std_log, log_init=>init, log_diag=>diag, log_finalize=>finalize
   use TOUZA_Std_fun, fun_init=>init, fun_diag=>diag, fun_finalize=>finalize
   use TOUZA_Std_arg, arg_init=>init, arg_diag=>diag, arg_finalize=>finalize
   use TOUZA_Std_mwe, mwe_init=>init, mwe_diag=>diag, mwe_finalize=>finalize
+  use TOUZA_Std_sus, sus_init=>init, sus_diag=>diag, sus_finalize=>finalize
   use TOUZA_Std_bld, bld_init=>init, bld_diag=>diag, bld_finalize=>finalize
   use TOUZA_Std_wsh, wsh_init=>init, wsh_diag=>diag, wsh_finalize=>finalize
 !!!_  - default
@@ -41,8 +42,6 @@ module TOUZA_Std
   integer,save,private :: err_default = ERR_NO_INIT
   integer,save,private :: ulog = unit_global
 
-  logical,save,private :: enable_mwe = .TRUE.
-
   character(len=64),save,private :: tagmsg = ' '
 !!!_  - public
   public init, diag, finalize
@@ -53,7 +52,7 @@ contains
   subroutine init &
        & (ierr,   &
        &  u,      levv, mode, &
-       &  envtry, mwe)
+       &  envtry, icomm)
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -61,7 +60,7 @@ contains
     integer,intent(in),optional :: mode
 
     integer,intent(in),optional :: envtry
-    logical,intent(in),optional :: mwe
+    integer,intent(in),optional :: icomm
 
     integer lv, md, lmd
 
@@ -73,26 +72,30 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
-          enable_mwe = choice(enable_mwe, mwe)
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call utl_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call wsh_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call log_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) then
-             if (enable_mwe) call mwe_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
-          endif
-          if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE, levtry=envtry)
-          if (ierr.eq.0) call fun_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call arg_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
+
+          if (ierr.eq.0) call utl_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc
+
+          if (ierr.eq.0) call wsh_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc utl
+          if (ierr.eq.0) call log_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc utl
+
+          if (ierr.eq.0) call mwe_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE, icomm=icomm) ! utl log
+          if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! utl log
+
+          if (ierr.eq.0) call fun_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! utl log mew
+
+          if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE, levtry=envtry) ! prc utl log fun mwe
+
+          if (ierr.eq.0) call sus_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc utl log fun env
+          if (ierr.eq.0) call arg_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc utl log fun env
        endif
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           call gen_tag(tagmsg, pkg=PACKAGE_TAG, grp=__GRP__)
        endif
        init_counts = init_counts + 1
@@ -119,7 +122,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (VCHECK_NORMAL(lv)) call msg(TIME_STAMP, tagmsg, u=utmp)
           endif
@@ -130,12 +133,11 @@ contains
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call wsh_diag(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) then
-             if (enable_mwe) call mwe_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          endif
+          if (ierr.eq.0) call mwe_diag(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call bld_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call env_diag(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call fun_diag(ierr, utmp, lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call env_diag(ierr, utmp, lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call sus_diag(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call arg_diag(ierr, utmp, lv, mode=MODE_SURFACE)
        endif
        diag_counts = diag_counts + 1
@@ -158,7 +160,7 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, fun='finalize', u=utmp, levv=lv)
@@ -169,12 +171,11 @@ contains
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call wsh_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) then
-             if (enable_mwe) call mwe_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          endif
+          if (ierr.eq.0) call mwe_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call bld_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call env_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call fun_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call env_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call sus_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call arg_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
        endif
        fine_counts = fine_counts + 1
@@ -202,7 +203,7 @@ program test_std
 101 format(A, ' = ', I0)
   ierr = 0
   write(*, 111) levv
-  if (ierr.eq.0) call init(ierr, levv=levv, mwe=.FALSE.)
+  if (ierr.eq.0) call init(ierr, levv=levv)
   write(*, 101) 'init:0', ierr
   if (ierr.eq.0) call init(ierr, levv=levv)
   write(*, 101) 'init:1', ierr

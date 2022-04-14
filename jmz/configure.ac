@@ -3,14 +3,14 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Nov 24 2021
-# Time-stamp: <2021/11/25 15:28:31 fuyuki configure.ac>
+# Time-stamp: <2022/02/25 15:30:20 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
 AC_INIT([touza-jmz],[1.00],[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
-Copyright (C) 2021 Japan Agency for Marine-Earth Science and Technology
+Copyright (C) 2022 Japan Agency for Marine-Earth Science and Technology
 
 This is TOUZA/Jmz (Ji-Mo-Tsu), a collection of sample programs using TOUZA.
 
@@ -53,6 +53,7 @@ AM_PROG_AR
 LT_PREREQ([2.4.2])
 LT_INIT([disable-shared])
 
+AC_CONFIG_HEADERS([jmz_config.h])
 AC_CONFIG_FILES([Makefile])
 
 PKG_PROG_PKG_CONFIG()
@@ -61,5 +62,10 @@ PKG_CHECK_MODULES_STATIC([TOUZA], [touza])
 
 dnl AX_CREATE_PKGCONFIG_INFO()
 AC_SUBST([PACKAGE_REQUIRES], [])
+
+AM_PATH_PYTHON([3.9], , [:])
+AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
+AX_PYTHON()
+AX_PYTHON_MODULE([pyparsing], , [python3])
 
 AC_OUTPUT

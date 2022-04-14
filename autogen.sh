@@ -1,7 +1,7 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
 # Created: Jun 7 2020
-# Time-stamp: <2021/12/04 17:06:35 fuyuki autogen.sh>
+# Time-stamp: <2021/12/24 11:06:50 fuyuki autogen.sh>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -25,7 +25,8 @@ do
   shift
 done
 
-thisd=$(dirname "$0")
+thisd="$(dirname "$0")"
+thisd="$(realpath $thisd)" || exit $?
 
 if test x"$DRY" != x; then
   echo "$0: dry-run"
@@ -55,34 +56,36 @@ if test x"$stdm4d" = x; then
   echo "$0: rerun as $0 SEARCH-PATH" >&2
   exit 1
 fi
-case $stdm4d in
-../*) stdm4d="$(pwd)/$stdm4d";;
-esac
+stdm4d="$(realpath $stdm4d)" || exit $?
 
-TMP=
-# fake automake
-for t in COPYING
+for dir in jmz .
 do
-  test ! -f "$t" && TMP="$TMP $t"
+  cd "$thisd/$dir" || exit $?
+  TMP=
+  # fake automake
+  for t in COPYING
+  do
+    test ! -f "$t" && TMP="$TMP $t"
+  done
+  echo "# Create $TMP temporally to fake automake."
+  # shellcheck disable=SC2086
+  test x"$TMP" != x && run touch $TMP
+
+  trap 'run rm -f $TMP; exit $err' 1 2 3 15
+
+  if test x$CLEAR != x; then
+    run rm -rf aclocal.m4 autom4te.cache || exit $?
+  fi
+  run libtoolize || exit $?
+  run aclocal $OPTS -I "$stdm4d" || exit $?
+  run autoheader || exit $?
+
+  # All we need is the file INSTALL
+  run automake --add-missing --gnu || exit $?
+  echo "# automake rerun"
+  # shellcheck disable=SC2086
+  run rm -f $TMP
+  run automake --foreign || exit $?
+
+  run autoconf $VERBOSE || exit $?
 done
-echo "# Create $TMP temporally to fake automake."
-# shellcheck disable=SC2086
-test x"$TMP" != x && run touch $TMP
-
-trap 'run rm -f $TMP; exit $err' 1 2 3 15
-
-if test x$CLEAR != x; then
-  run rm -rf aclocal.m4 autom4te.cache || exit $?
-fi
-run libtoolize || exit $?
-run aclocal $OPTS -I "$stdm4d" || exit $?
-run autoheader || exit $?
-
-# All we need is the file INSTALL
-run automake --add-missing --gnu || exit $?
-echo "# automake rerun"
-# shellcheck disable=SC2086
-run rm -f $TMP
-run automake --foreign || exit $?
-
-run autoconf $VERBOSE || exit $?

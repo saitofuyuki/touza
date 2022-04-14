@@ -1,10 +1,10 @@
 !!!_! trapiche_pack.F90 - TOUZA/Trapiche integer packing/unpacking
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/06 12:20:57 fuyuki trapiche_pack.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/03/14 11:20:41 fuyuki trapiche_pack.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021,2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -802,7 +802,7 @@ contains
 
   end subroutine pack_restore_seq_ll
 
-!!!_  & pack_store_seq_sp1 - sequential packing special (1/329
+!!!_  & pack_store_seq_sp1 - sequential packing special (1/32)
   subroutine pack_store_seq_sp1_ii &
        & (ierr,   ibagaz, &
        &  icanaz, mem,   nbits)

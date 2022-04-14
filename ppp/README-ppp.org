@@ -1,0 +1,125 @@
+#+title: TOUZA/ppp guide
+#+author: SAITO Fuyuki
+#+date: <2022-01-26 Wed>
+
+* Introduction
+*TOUZA/ppp* is a collection of Fortran subroutines for `parallel
+processing procedures', to support MPI.
+
+The original motivation to develop this package is to replace
+legacy =xmcomm.F= in MIROC, with improving the interfaces and
+the algorithms to control the MPI communicator and the `king' ranks.
+
+*TOUZA/ppp* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+DOT go DOT jp>.
+
+*TOUZA (楊座)*, MIROC base infrastructure, is a collection of
+Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
+(expected to be in the parent directory) for general instruction of
+*TOUZA* collection.
+
+* Build and installation
+
+* Brief description of *TOUZA/ppp* modules
+** summary
+** =TOUZA_Ppp_amng= - agent manager (mpi communicator control)
+*** =query_agent()=
+#+begin_src f90
+  integer function query_agent(name, iagent)
+    character(len=*),intent(in) :: name
+    integer,optional,intent(in) :: iagent ! current agent if null
+#+end_src
+Return agent id corresponding to =NAME=.
+*** =inquire_agent=
+#+begin_src f90
+  subroutine inquire_agent &
+       & (ierr,   &
+       &  agent,  &
+       &  irank,  nrank, icomm, igroup, name, ismem)
+  subroutine inquire_agent &
+       & (ierr,   &
+       &  iagent, &
+       &  irank,  nrank, icomm, igroup, name, ismem)
+    implicit none
+    integer,         intent(out)          :: ierr
+    character(len=*),intent(in)           :: agent   ! target agent name
+    integer,         intent(in), optional :: iagent  ! target agent id
+    integer,         intent(out),optional :: irank   ! the rank of calling process on the target agent
+    integer,         intent(out),optional :: nrank   ! size of the group associated with the target agent
+    integer,         intent(out),optional :: icomm   ! mpi communicator associated with the target agent
+    integer,         intent(out),optional :: igroup  ! mpi group associated with the target agent
+    character(len=*),intent(out),optional :: name    ! agent identifier string associated with the target agent
+    logical,         intent(out),optional :: ismem   ! whether or not the member of target agent
+#+end_src
+Inquire about properties of a particular agent of =NAME= or
+corresponding to a particular id of =IAGENT=.
+
+*** =switch_agent=
+#+begin_src f90
+  subroutine switch_agent (ierr, iagent)
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: iagent
+#+end_src
+*** =new_agent_root=
+#+begin_src f90
+  subroutine new_agent_root &
+       & (ierr, icomm, name)
+    integer,         intent(out)         :: ierr
+    integer,         intent(in),optional :: icomm
+    character(len=*),intent(in),optional :: name
+#+end_src
+*** =new_agent_color=
+#+begin_src f90
+  subroutine new_agent_color &
+       & (ierr, color, name, src)
+    integer,         intent(out)         :: ierr
+    integer,         intent(in)          :: color
+    character(len=*),intent(in),optional :: name
+    integer,         intent(in),optional :: src
+#+end_src
+Split communicator associated with SRC agent using COLOR.
+*** =new_agent_family=
+#+begin_src f90
+  subroutine new_agent_family &
+       & (ierr, drivers, src)
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: drivers(:)   ! self drivers to belong to
+    integer,optional,intent(in)  :: src
+#+end_src
+Create communicator family based on the communicator associated with
+SRC agent using DRIVERS array.
+*** =new_agent_derived=
+#+begin_src f90
+  subroutine new_agent_derived &
+       & (ierr, name, drivers, iagent)
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: name         ! new name
+    character(len=*),intent(in)  :: drivers(:)   ! derived drivers to belong to
+    integer,optional,intent(in)  :: iagent       ! current agent-id if null
+#+end_src
+Create new derived agent using DRIVERS array.
+** =TOUZA_Ppp_king= - king-rank control
+*** =get_king= - get KING under AREF agent
+#+begin_src f90
+  subroutine get_king &
+       & (ierr, king, mdl, aref, adef)
+    integer,                  intent(out) :: ierr
+    integer,                  intent(out) :: king
+    character(len=*),         intent(in)  :: mdl
+    character(len=*),         intent(in)  :: aref   ! KING reference agent
+    character(len=*),optional,intent(in)  :: adef   ! KING definition agent  (same as AREF if null)
+#+end_src
+*** =set_king=
+#+begin_src f90
+  subroutine set_king &
+       & (ierr, king, pat, adef)
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: king
+    character(len=*),intent(in)  :: pat
+    character(len=*),intent(in)  :: adef   ! KING definition agent
+#+end_src
+** =TOUZA_Ppp_miroc= - MIROC =xmcomm= compatible interfaces
+* Copyright and license
+Copyright 2022 Japan Agency for Marine-Earth Science and Technology
+Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)

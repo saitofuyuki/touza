@@ -1,7 +1,7 @@
 # TOUZA/Trp Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Feb 26 2021
-# Time-stamp: <2021/11/16 20:50:04 fuyuki Makefile.am>
+# Time-stamp: <2022/03/23 09:54:50 fuyuki Makefile.am>
 
 # Copyright (C) 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -84,7 +84,7 @@ test_trapiche_float_LDADD	= $(TEST_COMMON_LIBS)
 test_trapiche_float_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_TRAPICHE_FLOAT=1
 
 distclean-local:
-	@test -h $(test_helpd) && rm -f $(test_helpd)
+	if test -h $(test_helpd); then rm -f $(test_helpd); else true; fi
 
 link-bin:
 	@sub=$(test_helpd); bin=$(srcdir)/$${sub}; \

@@ -1,10 +1,10 @@
 !!!_! std_prc.F90 - touza/std precision(kind) manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Sep 6 2020
-#define TIME_STAMP 'Time-stamp: <2021/11/28 20:59:49 fuyuki std_prc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/16 14:59:53 fuyuki std_prc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021
+! Copyright (C) 2020, 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -34,9 +34,9 @@
 #endif
 #if OPT_INTEGER_32_KIND == 0
 #   undef OPT_INTEGER_32_KIND
-#   if HAVE_ISO_FORTRAN_ENV_INT32
+#   if HAVE_FORTRAN_ISO_FORTRAN_ENV_INT32
 #      define OPT_INTEGER_32_KIND  INT32
-#   elif HAVE_ISO_C_BINDING_C_INT32_T
+#   elif HAVE_FORTRAN_ISO_C_BINDING_C_INT32_T
 #      define OPT_INTEGER_32_KIND C_INT32_T
 #   else
 #      define OPT_INTEGER_32_KIND SELECTED_INT_KIND(9)
@@ -48,9 +48,9 @@
 #endif
 #if OPT_INTEGER_64_KIND == 0
 #   undef OPT_INTEGER_64_KIND
-#   if HAVE_ISO_FORTRAN_ENV_INT64
+#   if HAVE_FORTRAN_ISO_FORTRAN_ENV_INT64
 #      define OPT_INTEGER_64_KIND  INT64
-#   elif HAVE_ISO_C_BINDING_C_INT64_T
+#   elif HAVE_FORTRAN_ISO_C_BINDING_C_INT64_T
 #      define OPT_INTEGER_64_KIND C_INT64_T
 #   else
 #      define OPT_INTEGER_64_KIND SELECTED_INT_KIND(18)
@@ -62,9 +62,9 @@
 #endif
 #if OPT_INTEGER_8_KIND == 0
 #   undef OPT_INTEGER_8_KIND
-#   if HAVE_ISO_FORTRAN_ENV_INT8
+#   if HAVE_FORTRAN_ISO_FORTRAN_ENV_INT8
 #      define OPT_INTEGER_8_KIND  INT8
-#   elif HAVE_ISO_C_BINDING_C_INT64_T
+#   elif HAVE_FORTRAN_ISO_C_BINDING_C_INT64_T
 #      define OPT_INTEGER_8_KIND C_INT8_T
 #   else
 #      define OPT_INTEGER_8_KIND SELECTED_INT_KIND(2)
@@ -74,10 +74,10 @@
 !!!_@ TOUZA_Std_prc - precision
 module TOUZA_Std_prc
 !!!_ = declaration
-#if HAVE_ISO_FORTRAN_ENV
+#if HAVE_FORTRAN_ISO_FORTRAN_ENV
   use ISO_FORTRAN_ENV
 #endif
-#if HAVE_IEEE_ARITMETIC
+#if HAVE_FORTRAN_IEEE_ARITMETIC
   use IEEE_ARITHMETIC
 #endif
   implicit none
@@ -127,6 +127,7 @@ module TOUZA_Std_prc
   public check_real_props
   public check_real_zero, check_real_one, check_real_inf, check_real_dnm
   public check_real_mantissa
+  public set_defu
 !!!_  - static
   integer,save :: init_mode   = 0
   integer,save :: init_counts = 0
@@ -461,6 +462,15 @@ contains
     enddo
 
   end subroutine diag_real_kinds
+
+!!!_ + misc
+!!!_  & set_defu - set global logging unit
+  subroutine set_defu(u)
+    implicit none
+    integer,intent(in) :: u
+    ulog = u
+    return
+  end subroutine set_defu
 
 !!!_ + real properties checker
 !!!_  & check_real_props - batch property checker

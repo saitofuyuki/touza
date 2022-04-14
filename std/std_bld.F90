@@ -1,10 +1,10 @@
 !!!_! std_bld.F90 - touza/std build environments
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 27 2021
-#define TIME_STAMP 'Time-stamp: <2021/11/21 10:10:40 fuyuki std_bld.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/05 15:53:12 fuyuki std_bld.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -62,7 +62,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
@@ -98,7 +98,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (VCHECK_NORMAL(lv)) call msg_mdl(TIME_STAMP, __MDL__, utmp)
              if (VCHECK_DEBUG(lv)) then
@@ -137,7 +137,7 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)

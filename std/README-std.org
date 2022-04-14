@@ -3,18 +3,17 @@
 #+date: <2020-06-07 Sun>
 
 * Introduction
-  *TOUZA/Std* is a collection of Fortran subroutines for typical
-  standard procedures such as precision(kind) declaration, i/o unit
-  management, logging, etc.
+*TOUZA/Std* is a collection of Fortran subroutines for typical
+standard procedures such as precision(kind) declaration, i/o unit
+management, logging, etc.
 
-  *TOUZA/Std* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
-  DOT go DOT jp>.
+*TOUZA/Std* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+DOT go DOT jp>.
 
-  *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
-  Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
-  (expected to be in the parent directory) for general instruction of
-  *TOUZA* collection.
-
+*TOUZA (楊座)*, MIROC base infrastructure, is a collection of
+Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
+(expected to be in the parent directory) for general instruction of
+*TOUZA* collection.
 * Build and installation
 
 * Brief description of *TOUZA/Std* modules
@@ -22,10 +21,12 @@
 
 ** =TOUZA_Std_prc=  (std_prc.F90) - precision management
 *** constants
-    | name   | type    | description                 |
-    |--------+---------+-----------------------------|
-    | =KFLT= | integer | real kind (float or single) |
-    | =KDBL= | integer | real kind (double)          |
+| name   | type    | description                 |
+|--------+---------+-----------------------------|
+| =KFLT= | integer | real kind (float or single) |
+| =KDBL= | integer | real kind (double)          |
+| =KI32= | integer | integer kind (32bit signed) |
+| =KI64= | integer | integer kind (64bit signed) |
 
 
 ** =TOUZA_Std_utl=  (std_utl.F90) - small utilities
@@ -39,15 +40,15 @@
     <type>,intent(in)          :: d
     <type>,intent(in),optional :: a
 #+end_src
-    If =a= is present return =a=, otherwise return =d=.
-    =<type>= is the same type and kind as returned value.
+If =a= is present return =a=, otherwise return =d=.
+=<type>= is the same type and kind as returned value.
 **** chcount()
 #+begin_src f90
   integer function chcount(str, chs)
     character(len=*),intent(in) :: str
     character(len=*),intent(in) :: chs
 #+end_src
-  Count occurences of characters in =chs= in string =str=.
+Count occurences of characters in =chs= in string =str=.
 **** condop()
 #+begin_src f90
   integer    function condop(l, vt, vf)
@@ -58,8 +59,14 @@
     <type>, intent(in) :: vt
     <type>, intent(in) :: vf
 #+end_src
-   So called conditional (ternary) operator.
-   Return =VT= if =L= is true, or =VT= otherwise.
+So called conditional (ternary) operator.
+Return =VT= if =L= is true, or =VT= otherwise.
+**** ndigits()
+#+begin_src f90
+  integer function ndigits(n)
+    integer,intent(in) :: n
+#+end_src
+Count number of non-zero digits.  Return 0 if n equails zero.
 
 *** subroutines
 **** choice_a
@@ -69,16 +76,15 @@
     character(len=*),intent(in),optional :: d
     character(len=*),intent(in),optional :: a
 #+end_src
-   If =a= is present assign =a= for =v=, else if =d= is present,
-   assign =d=.
+If =a= is present assign =a= for =v=, else if =d= is present, assign =d=.
 **** set_if_present
 #+begin_src f90
   subroutine set_if_present(var, val)
     <type>,intent(out),optional :: var
     <type>,intent(in)           :: val
 #+end_src
-    =<type>= is either integer, real, logical or character(len=*).
-    if =var= is present assign =var= for =val=, otherwise do nothing.
+=<type>= is either integer, real, logical or character(len=*).
+if =var= is present assign =var= for =val=, otherwise do nothing.
 **** downcase
  #+begin_src f90
    subroutine downcase(S)
@@ -87,7 +93,7 @@
      character(len=*),intent(out) :: SO
      character(len=*),intent(in)  :: SI
  #+end_src
-   Lower case conversion of input string S (to modify), or SI onto SO.
+Lower case conversion of input string S (to modify), or SI onto SO.
 **** upcase
  #+begin_src f90
    subroutine upcase(S)
@@ -96,54 +102,179 @@
      character(len=*),intent(out) :: SO
      character(len=*),intent(in)  :: SI
  #+end_src
-   Upper case conversion of input string S (to modify), or SI onto SO.
+Upper case conversion of input string S (to modify), or SI onto SO.
+
 
 ** =TOUZA_Std_env=  (std_env.F90) - standard environments
 *** constants
-    | name   | type    | description          |
-    |--------+---------+----------------------|
-    | =uin=  | integer | standard input unit  |
-    | =uout= | integer | standard output unit |
+| name   | type    | description          |
+|--------+---------+----------------------|
+| =uin=  | integer | standard input unit  |
+| =uout= | integer | standard output unit |
+| =uerr= | integer | standard error unit  |
 
+| name    | type    | description          |
+|---------+---------+----------------------|
+| =KIOFS= | integer | integer offset kind  |
+
+| name            | type    | description      |
+|-----------------+---------+------------------|
+| =endian_BIG=    | integer | big-endian id    |
+| =endian_LITTLE= | integer | little-endian id |
+
+*** variables
+| name         | type    | description       |
+|--------------+---------+-------------------|
+| =kendi_mem=  | integer | memory byte-order |
+| =kendi_file= | integer | file byte-order   |
+
+*** subroutines
+**** init_unfmtd_recl
+#+begin_src f90
+  subroutine init_unfmtd_recl &
+       & (ierr, u, levv, levtry, iroot, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: levtry
+    integer,intent(in),optional :: iroot, icomm
+#+end_src
+
+**** init_unfmtd_strm
+#+begin_src f90
+  subroutine init_unfmtd_strm &
+       & (ierr, u, levv, levtry, iroot, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: levtry
+    integer,intent(in),optional :: iroot, icomm
+#+end_src
+**** init_file_bodr
+#+begin_src f90
+  subroutine init_file_bodr &
+       & (ierr, u, levv, ubgn, uend, ustp, iroot, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: ubgn,  uend, ustp
+    integer,intent(in),optional :: iroot, icomm
+#+end_src
+
+**** init_io_status
+#+begin_src f90
+  subroutine init_io_status &
+       & (ierr, u, levv, iroot, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: iroot, icomm
+#+end_src
+**** check_byte_order
+#+begin_src f90
+  subroutine check_byte_order &
+       & (ierr, KENDI, utest, force, u, levv)
+    integer,intent(out)         :: ierr
+    integer,intent(out)         :: kendi
+    integer,intent(in)          :: utest
+    logical,intent(in),optional :: force
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+#+end_src
+**** check_bodr_unit
+#+begin_src f90
+  subroutine check_bodr_unit &
+    & (ierr, kendi, utest, jrec, u, levv)
+    integer,intent(out)         :: ierr
+    integer,intent(out)         :: kendi
+    integer,intent(in)          :: utest  ! test unit (must be opened)
+    integer,intent(in),optional :: jrec   ! direct>0  stream==0  sequential<0
+    integer,intent(in),optional :: u      ! log unit
+    integer,intent(in),optional :: levv
+#+end_src
+*** functions
+**** get_size_ufd
+#+begin_src f90
+  integer function get_size_ufd (V)
+    real(kind=KDBL),   intent(in) :: V
+    real(kind=KFLT),   intent(in) :: V
+    integer(kind=KI32),intent(in) :: V
+    integer(kind=KI64),intent(in) :: V
+#+end_src
+**** get_size_strm
+#+begin_src f90
+  integer function get_size_strm (V)
+    real(kind=KDBL),   intent(in) :: V
+    real(kind=KFLT),   intent(in) :: V
+    integer(kind=KI32),intent(in) :: V
+    integer(kind=KI64),intent(in) :: V
+#+end_src
+**** get_size_bytes
+#+begin_src f90
+  integer(kind=KMEM) function get_size_bytes(V, n)
+    real(kind=KDBL),   intent(in)          :: V
+    real(kind=KFLT),   intent(in)          :: V
+    integer(kind=KI32),intent(in)          :: V
+    integer(kind=KI64),intent(in)          :: V
+    integer(KIND=KMEM),intent(in),optional :: n
+#+end_src
+**** conv_b2strm
+#+begin_src f90
+  integer(KIND=KI32) function conv_b2strm(nb)
+    integer(KIND=KI32),intent(in) :: nb
+  integer(KIND=KI64) function conv_b2strm(nb)
+    integer(KIND=KI64),intent(in) :: nb
+#+end_src
+**** get_mems_bytes
+#+begin_src f90
+  integer(kind=KMEM) function get_mems_bytes (l, V)
+    character(len=*),  intent(in) :: V
+    integer(KIND=KI32),intent(in) :: V
+    integer(KIND=KI64),intent(in) :: V
+    real(kind=KDBL),   intent(in) :: V
+    real(kind=KFLT),   intent(in) :: V
+    integer(KIND=KMEM),intent(in) :: l
+#+end_src
+**** is_eof_ss
+#+begin_src f90
+  logical function is_eof_ss(e)
+    integer,intent(in) :: e
+#+end_src
 
 ** =TOUZA_Std_fun=  (std_fun.F90) - file units management
+*** constants
+| name             | type    | description                                              |
+| search_from_head | integer | new_unit() special, to search from category head         |
+| search_from_last | integer | new_unit() special, to search from last unit             |
+| search_from_next | integer | new_unit() special, to search from next unit of the last |
+
 *** functions
 **** new_unit()
 #+begin_src f90
-  integer function new_unit (ksw)
-    integer,intent(in),optional :: ksw
+  integer function new_unit (ubase, kcat)
+    integer,intent(in),optional :: ubase
+    integer,intent(in),optional :: kcat
 #+end_src
-   Return unused i/o unit number.
-   If ksw < 0, search from the begining.
-   If ksw == 0, search from the last checked number.
-   Otherwise, search from the last checked number plus 1.
+If =ubase= is 0 or positive, teturn unused i/o unit number, searched
+from =ubase=.
+If =ubase= < 0, special treatment is performed to search from.
 
-   Return -1 if units are exhausted.
+Return -1 if units are exhausted or an error occurs.
 *** subroutines
-**** add_black_list
-#+begin_src f90
-  subroutine add_black_list (ierr, ub, ue)
-    integer,intent(out)         :: ierr
-    integer,intent(in)          :: ub
-    integer,intent(in),optional :: ue
-#+end_src
-   Register the number =ub= (if =ue= missing) or the numbers from =ub=
-   to =ue= (inclusive) to the black list.  The black-listed numbers
-   are excluded from search units by =new_unit()=, i.e., users can
-   control the usage.
+
 
 ** =TOUZA_Std_log=  (std_log.F90) - simple logging helper
 *** constants
-    | name        | type    | description             |
-    |-------------+---------+-------------------------|
-    | unit_star   | integer | special unit for *      |
-    | unit_global | integer | special unit for global |
-    | unit_none   | integer | special unit to null    |
+| name        | type    | description             |
+|-------------+---------+-------------------------|
+| unit_star   | integer | special unit for *      |
+| unit_global | integer | special unit for global |
+| unit_none   | integer | special unit to null    |
 
 
 ** =TOUZA_Std_mwe=  (std_mwe.F90) - MPI wrapper/emulator
 *** subroutines
-**** get_ni
+**** get_ni - return rank and size with =MPI_COMM_NULL= guard
 #+begin_src f90
   subroutine get_ni (ierr, nrank, irank, icomm)
     integer,intent(out)         :: ierr
@@ -151,10 +282,66 @@
     integer,intent(out)         :: irank
     integer,intent(in),optional :: icomm
 #+end_src
-   Return the rank and size of in the commnunicator ICOMM group.
-   If ICOMM is missing, default communicator is used (usually
-   =MPI_COMM_WORLD=).
-
+Return the rank and size of in the commnunicator ICOMM group.
+If ICOMM is missing, default communicator is used (usually
+=MPI_COMM_WORLD=).
+**** get_ni_safe - return rank and size with =MPI_COMM_NULL= guard, checking mpi activation
+#+begin_src f90
+  subroutine get_ni_safe &
+       & (ierr, nrank, irank, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(out)         :: nrank
+    integer,intent(out)         :: irank
+    integer,intent(in),optional :: icomm
+#+end_src
+**** get_wni - return world rank and size
+#+begin_src f90
+  subroutine get_wni &
+       & (ierr, nrank, irank, icomm)
+    integer,intent(out)          :: ierr
+    integer,intent(out),optional :: nrank
+    integer,intent(out),optional :: irank
+    integer,intent(out),optional :: icomm
+#+end_src
+**** get_wni_safe - return world rank and size, checking mpi activation
+#+begin_src f90
+  subroutine get_wni_safe &
+       & (ierr, nrank, irank, icomm)
+    integer,intent(out)          :: ierr
+    integer,intent(out),optional :: nrank
+    integer,intent(out),optional :: irank
+    integer,intent(out),optional :: icomm
+#+end_src
+**** get_gni - return rank and size from group with =MPI_GROUP_NULL= guard
+#+begin_src f90
+  subroutine get_gni &
+       & (ierr, igrp, nrank, irank)
+    integer,intent(out)          :: ierr
+    integer,intent(in)           :: igrp
+    integer,intent(out),optional :: nrank
+    integer,intent(out),optional :: irank
+#+end_src
+**** set_comm - set default communicator
+#+begin_src f90
+  subroutine set_comm(ierr, icomm, u, levv)
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: icomm
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+#+end_src
+**** get_comm - get default communicator
+#+begin_src f90
+  subroutine get_comm &
+       & (ierr, icomm)
+    integer,intent(out) :: ierr
+    integer,intent(out) :: icomm
+#+end_src
+*** functions
+**** is_mpi_activated() - check if during =MPI_Init= and =MPI_Finalize=
+#+begin_src f90
+  logical function is_mpi_activated ()
+#+end_src
 ** =TOUZA_Std_arg=  (std_arg.F90) - run-time argument parser
 *** description
 *** constants
@@ -212,9 +399,100 @@
     integer,         intent(inout) :: jentr
 #+end_src
 
+** =TOUZA_Std_bld=  (std_bld.F90) - build information
+
+** =TOUZA_Std_sus= (std_sus.F90) - emulation of (typical) unformatted sequential access
+*** subroutines
+**** sus_open
+#+begin_src f90
+  subroutine sus_open &
+       & (ierr, u,      file, &
+       &  form, status, action, position)
+    integer,         intent(out)         :: ierr
+    integer,         intent(in)          :: u
+    character(len=*),intent(in)          :: file
+    character(len=*),intent(in),optional :: form
+    character(len=*),intent(in),optional :: status
+    character(len=*),intent(in),optional :: action
+    character(len=*),intent(in),optional :: position
+#+end_src
+**** sus_close
+#+begin_src f90
+  subroutine sus_close(ierr, u, file)
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: u
+    character(len=*),intent(in)  :: file
+#+end_src
+**** sus_write_irec
+#+begin_src f90
+  subroutine sus_write_irec &
+       & (ierr, u, v, n, swap, pre, post)
+  integer,           intent(out)         :: ierr
+  integer,           intent(in)          :: u
+  integer,           intent(in)          :: n
+  logical,           intent(in),optional :: swap
+  logical,           intent(in),optional :: pre, post
+
+  integer(KIND=KI32),intent(in)          :: V(*)
+  integer(KIND=KI64),intent(in)          :: V(*)
+  integer(KIND=KFLT),intent(in)          :: V(*)
+  integer(KIND=KDBL),intent(in)          :: V(*)
+  character(LEN=*),  intent(in)          :: V(*)
+#+end_src
+
+**** sus_read_irec
+#+begin_src f90
+  subroutine sus_read_irec &
+       & (ierr, u, v, n, swap, sub)
+    integer,           intent(out)            :: ierr
+    integer,           intent(in)             :: u
+    integer,           intent(in)             :: n
+    logical,           intent(in),   optional :: swap
+    logical,           intent(inout),optional :: sub
+
+    integer(KIND=KI32),intent(out)            :: V(*)
+    integer(KIND=KI64),intent(out)            :: V(*)
+    integer(KIND=KFLT),intent(out)            :: V(*)
+    integer(KIND=KDBL),intent(out)            :: V(*)
+    character(LEN=*),  intent(out)            :: V(*)
+#+end_src
+**** sus_skip_irec
+#+begin_src f90
+  subroutine sus_skip_irec &
+       & (ierr, u, n, whence, swap)
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: u
+    integer,intent(in),optional :: n
+    integer,intent(in),optional :: whence
+    logical,intent(in),optional :: swap
+#+end_src
+**** sus_write_lrec
+**** sus_read_lrec
+**** sus_skip_lrec
+**** sus_write_isep
+**** sus_read_isep
+**** sus_write_lsep
+**** sus_read_lsep
+**** sus_rseek
+#+begin_src f90
+  subroutine sus_rseek &
+       & (ierr, u, step, whence)
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    integer(KIND=KIOFS),intent(in),optional :: step
+    integer,            intent(in),optional :: whence
+#+end_src
+*** functions
+**** sus_eswap ()
+#+begin_src f90
+  ELEMENTAL integer(KIND=KI32) function sus_eswap(V)
+    integer(kind=KI32),intent(in) :: V
+  ELEMENTAL integer(KIND=KI64) function sus_eswap(V)
+    integer(kind=KI64),intent(in) :: V
+#+end_src
 * Test suites
 
 * Copyright and license
-Copyright 2020, 2021 Japan Agency for Marine-Earth Science and Technology
+Copyright 2020-2022 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)

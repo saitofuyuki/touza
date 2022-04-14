@@ -1,10 +1,10 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2021/11/21 10:02:00 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/16 15:00:43 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021
+! Copyright (C) 2020, 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -16,17 +16,20 @@
 #endif
 #include "touza_std.h"
 !!!_* macros
-#ifndef   OPT_MAX_FILE_UNITS
-#  define OPT_MAX_FILE_UNITS 4096 /* maximum number of file units */
+#ifndef   OPT_UNIT_CATEGORIES
+#  define OPT_UNIT_CATEGORIES 2   /* number of i/o unit categories */
 #endif
-#ifndef   OPT_MAX_BLACK_UNITS
-#  define OPT_MAX_BLACK_UNITS 128 /* maximum number of black-list units */
+#ifndef   OPT_MIN_FILE_UNIT
+#  define OPT_MIN_FILE_UNIT 10   /* service unit minimum (black-listed if less than) */
+#endif
+#ifndef   OPT_MAX_FILE_UNIT
+#  define OPT_MAX_FILE_UNIT 2048 /* service unit maximum (black-listed if more than) */
 #endif
 #ifndef   OPT_PATH_LEN
-#  define OPT_PATH_LEN 1024 /* fie path limit length */
+#  define OPT_PATH_LEN 1024 /* file path limit length */
 #endif
 #ifndef   OPT_TEMPORARY_FORMAT
-#  define OPT_TEMPORARY_FORMAT '(''Temp__ToUzA__'', I4.4)'
+#  define OPT_TEMPORARY_FORMAT '(''Temp__ToUzA__'', I0, ''-'', I0)'
 #endif
 !!!_@ TOUZA_Std_fun - file units manipulation
 module TOUZA_Std_fun
@@ -37,7 +40,12 @@ module TOUZA_Std_fun
   implicit none
   private
 !!!_  - parameter
-  integer,parameter :: lblack = OPT_MAX_BLACK_UNITS
+  integer,parameter,public :: search_from_head = -3 ! search from category head
+  integer,parameter,public :: search_from_last = -2 ! search from last unit
+  integer,parameter,public :: search_from_next = -1 ! search from last unit + 1 (deafult)
+
+  integer,parameter,public :: kucat_black = -1
+  integer,parameter :: lucat = OPT_UNIT_CATEGORIES
 # define __MDL__ 'fun'
 # define __TAG__ STD_FORMAT_MDL(__MDL__)
 !!!_  - static
@@ -49,30 +57,39 @@ module TOUZA_Std_fun
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
 
-  integer,save :: limu = OPT_MAX_FILE_UNITS
+  integer,save :: kucat_def = 0
+  integer,save :: ucend(kucat_black:lucat-1) = -9
+  integer,save :: ulast(0:lucat-1) = -9
+  integer,save :: limu = OPT_MAX_FILE_UNIT
 
-  integer,save :: nblack = 0
-  integer,save :: ublist(lblack+1) = -1
+  integer,save :: ltry_newu = 1024
 
-  integer,save :: ulast = -1
-  character(len=OPT_PATH_LEN),save :: tmpfmt = OPT_TEMPORARY_FORMAT
+  character(len=OPT_PATH_LEN),save :: tmp_fmt = OPT_TEMPORARY_FORMAT
+  integer,save :: tmp_id = -1
 !!!_  - public
   public init, diag, finalize
-  public add_black_list, is_black_listed
+  public set_category_bound, set_category_default
+  ! public add_black_list, is_black_listed
   public brute_force_check_units
   public new_unit
   public new_unit_tmp, set_tempfile
+  public set_tmptmpl
 !!!_ + common interfaces
 contains
 !!!_  & init
-  subroutine init(ierr, u, levv, mode)
-    use TOUZA_Std_utl, only: utl_init=>init, choice
-    use TOUZA_Std_log, only: log_init=>init
+  subroutine init(ierr, u, levv, mode, ubgn, uend, ucdef, icomm)
+    use TOUZA_Std_utl,only: utl_init=>init, choice
+    use TOUZA_Std_log,only: log_init=>init
+    use TOUZA_Std_mwe,only: mwe_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
+    integer,intent(in),optional :: ubgn, uend ! service unit boundaries (to override OPT_*_FILE_UNIT)
+    integer,intent(in),optional :: ucdef      ! unit category default
+    integer,intent(in),optional :: icomm      ! mwe argument
     integer md, lv, lmd
+    integer jc
 
     ierr = 0
 
@@ -82,7 +99,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
@@ -90,6 +107,15 @@ contains
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call mwe_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
+       endif
+       if (is_first_force(init_counts, mode)) then
+          if (ierr.eq.0) call set_tmptmpl(ierr)
+          if (ierr.eq.0) call set_category_default(ierr, choice(kucat_def, ucdef))
+          if (ierr.eq.0) call set_category_bound(ierr, kucat_black, choice(OPT_MIN_FILE_UNIT, ubgn) - 1)
+          do jc = 0, lucat - 1
+             if (ierr.eq.0) call set_category_bound(ierr, jc, choice(OPT_MAX_FILE_UNIT, uend))
+          enddo
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_FUN
@@ -99,8 +125,9 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std_utl, only: utl_diag=>diag, choice
-    use TOUZA_Std_log, only: log_diag=>diag, msg_mdl
+    use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
+    use TOUZA_Std_mwe,only: mwe_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: levv, mode
@@ -116,26 +143,21 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (VCHECK_NORMAL(lv)) then
                 call msg_mdl(TIME_STAMP, __MDL__, utmp)
+                call msg_mdl('(''temporary file format = '', A)',  tmp_fmt, __MDL__, utmp)
+                call msg_mdl('(''temporary file number = '', I0)', tmp_id,  __MDL__, utmp)
              endif
-             if (VCHECK_NORMAL(lv)) then
-                call msg_mdl('(''limit file units = '', I0)', (/ limu /), __MDL__, utmp)
-             endif
-             if (VCHECK_NORMAL(lv)) then
-                call msg_mdl('(''temporary file format = '', A)', tmpfmt,  __MDL__, utmp)
-             endif
-             if (VCHECK_INFO(lv)) then
-                call diag_black_list(ierr, utmp)
-             endif
+             if (VCHECK_INFO(lv)) call diag_category(ierr, utmp)
           endif
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call mwe_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -144,8 +166,9 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std_utl, only: utl_finalize=>finalize, choice
-    use TOUZA_Std_log, only: log_finalize=>finalize
+    use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
+    use TOUZA_Std_log,only: log_finalize=>finalize
+    use TOUZA_Std_log,only: mwe_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: levv, mode
@@ -159,7 +182,7 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
@@ -168,201 +191,182 @@ contains
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call log_finalize(ierr, utmp, levv, mode=lmd)
           if (ierr.eq.0) call utl_finalize(ierr, utmp, levv, mode=lmd)
+          if (ierr.eq.0) call mwe_finalize(ierr, utmp, levv, mode=lmd)
        endif
     endif
     return
   end subroutine finalize
 
+!!!_ + subcontracts
+!!!_  & set_tmptmpl - set template for temporary file
+  subroutine set_tmptmpl(ierr, icomm)
+    use TOUZA_Std_mwe,only: get_ni
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: icomm
+    integer ir, nr
+    ierr = 0
+    call get_ni(ierr, nr, ir, icomm)
+    if (ierr.eq.0) call set_tempfile(' ', ir)
+  end subroutine set_tmptmpl
+!!!_  & set_category_bound - set i/o unit range limit
+  subroutine set_category_bound (ierr, jc, uend)
+    use TOUZA_Std_log,only: msg_mdl
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: jc
+    integer,intent(in)  :: uend
+    ierr = 0
+    if (jc.lt.kucat_black .or. jc.ge.lucat) then
+       ierr = -1
+       call msg_mdl('(''invalid unit category = '', I0)', (/ jc /), __MDL__)
+       return
+    endif
+    ucend(jc) = uend
+    return
+  end subroutine set_category_bound
+
+!!!_  & set_category_default - set default category
+  subroutine set_category_default (ierr, jc)
+    use TOUZA_Std_log,only: msg_mdl
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: jc
+    ierr = 0
+    if (jc.lt.kucat_black .or. jc.ge.lucat) then
+       ierr = -1
+       call msg_mdl('(''invalid unit category = '', I0)', (/ jc /), __MDL__)
+       return
+    endif
+    kucat_def = jc
+    return
+  end subroutine set_category_default
+
+!!!_  & diag_category
+  subroutine diag_category &
+       & (ierr, u)
+    use TOUZA_Std_log,only: msg_mdl
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer jc
+    ierr = err_default
+    call msg_mdl &
+         & ('(''default unit category: '', I0, 1x, I0)', kucat_def, &
+         &  __MDL__, u)
+    do jc = kucat_black, lucat - 1
+       call msg_mdl &
+            & ('(''unit boundary: '', I0, 1x, I0)', (/jc, ucend(jc)/), &
+            &  __MDL__, u)
+    enddo
+    return
+  end subroutine diag_category
+
 !!!_ + file open/close
 !!!_  & set_tempfile - set temporary path format
-  subroutine set_tempfile (fmt)
+  subroutine set_tempfile (fmt, id)
     implicit none
     character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: id
     if (present(fmt)) then
        if (fmt.eq.' ') then
-          tmpfmt = OPT_TEMPORARY_FORMAT
+          tmp_fmt = OPT_TEMPORARY_FORMAT
        else
-          tmpfmt = fmt
+          tmp_fmt = fmt
        endif
     else
-       tmpfmt = OPT_TEMPORARY_FORMAT
+       tmp_fmt = OPT_TEMPORARY_FORMAT
+    endif
+    if (present(id)) then
+       tmp_id = id
     endif
     return
   end subroutine set_tempfile
 !!!_ + unit number
 !!!_  & new_unit () - return unbound i/o unit number
   integer function new_unit &
-       & (ksw) &
+       & (ubase, kcat) &
        & result(un)
     use TOUZA_Std_utl,only: choice
     implicit none
-    integer,intent(in),optional :: ksw
-    ! kswi < 0:  search starts from 0
-    ! kswi = 0:  search from last unit
-    ! kswi > 0:  search from last unit + 1 (default)
-    integer :: kswi
+    integer,intent(in),optional :: ubase  ! unit base to search
+    integer,intent(in),optional :: kcat   ! category
     integer :: ui
     integer :: uoff
+    integer :: ub, ue
     integer jerr
     logical opnd
+    integer kc
 
-    kswi = choice(+1, ksw)
-    if (kswi.lt.0) then
-       uoff = 0
-    else if (kswi.eq.0) then
-       uoff = mod(max(0, ulast), limu + 1)
-    else
-       uoff = mod(ulast + 1, limu + 1)
+    un = -1
+
+    uoff = choice(search_from_next, ubase)
+
+    kc = choice(kucat_def, kcat)
+    if (kc.le.kucat_black .or. kc.ge.lucat) return
+
+    ub = ucend(kc-1) + 1
+    ue = ucend(kc)
+    if (ub.gt.ue .or. ue.lt.0) return
+
+    if (uoff.eq.search_from_head) then
+       uoff = ub
+    else if (uoff.eq.search_from_last) then
+       uoff = max(ub, ulast(kc))
+    else if (uoff.eq.search_from_next) then
+       uoff = max(ub, ulast(kc) + 1)
+    else if (uoff.lt.ub .or. uoff.gt.ue) then
+       ! category unmatch
+       return
     endif
-    do ui = 0, limu
-       un = mod(uoff + ui, limu + 1)
-       if (is_black_listed(un)) then
-          continue
-       else
-          inquire(UNIT=un, IOSTAT=jerr, OPENED=opnd)
-          if (jerr.eq.0 .and. .not.opnd) then
-             ulast = un
-             return
-          endif
+
+    do ui = uoff, ue
+       inquire(UNIT=ui, IOSTAT=jerr, OPENED=opnd)
+       if (jerr.eq.0 .and. .not.opnd) then
+          un = ui
+          ulast = un
+          return
        endif
     enddo
-    un = -1
+    do ui = ub, uoff - 1
+       inquire(UNIT=ui, IOSTAT=jerr, OPENED=opnd)
+       if (jerr.eq.0 .and. .not.opnd) then
+          un = ui
+          ulast = un
+          return
+       endif
+    enddo
     return
   end function new_unit
 
 !!!_  & new_unit_tmp () - return unbound i/o unit number and temporal file name
   subroutine new_unit_tmp &
-       & (un, fn, ksw)
+       & (un, fn, ubase, kcat)
     implicit none
     integer,         intent(out)         :: un
     character(len=*),intent(out)         :: fn
-    integer,         intent(in),optional :: ksw
+    integer,         intent(in),optional :: ubase
+    integer,         intent(in),optional :: kcat
     integer jerr
+    integer jc
     fn = ' '
-    do
-       un = new_unit(ksw)
-       if (un.lt.0) exit
-       write(fn, tmpfmt) un
+    un = new_unit(ubase, kcat)
+    if (un.lt.0) return
+
+    do jc = 0, ltry_newu
+       write(fn, tmp_fmt) tmp_id, jc
        open(UNIT=un, FILE=fn, STATUS='NEW', IOSTAT=jerr)
        if (jerr.eq.0) then
-          close(UNIT=un, STATUS='DELETE', IOSTAT=jerr)
-          exit
+          close(UNIT=un, IOSTAT=jerr)   ! not delete but keep
+          return
        endif
        close(UNIT=un, IOSTAT=jerr)
     enddo
+    un = -1
+    fn = ' '
     return
   end subroutine new_unit_tmp
 
-!!!_  & [DEPRECATED] new_unit_nn () - return unbound i/o unit number (not existing file)
-  integer function new_unit_nn &
-       & (ksw) &
-       & result(un)
-    implicit none
-    integer,intent(in),optional :: ksw
-    integer jerr
-    character(len=OPT_PATH_LEN) :: fn
-    do
-       un = new_unit(ksw)
-       if (un.lt.0) exit
-       write(fn, tmpfmt) un
-       open(UNIT=un, FILE=fn, STATUS='NEW', IOSTAT=jerr)
-       if (jerr.eq.0) then
-          close(UNIT=un, STATUS='DELETE', IOSTAT=jerr)
-          exit
-       endif
-       close(UNIT=un, IOSTAT=jerr)
-    enddo
-    return
-  end function new_unit_nn
-
-!!!_ + black list manipulation
-!!!_  & add_black_list - register unit(s) in the black list
-  subroutine add_black_list &
-       & (ierr, ub, ue)
-#   define __PROC__ 'add_black_list'
-    use TOUZA_Std_log,only: msg_fun
-    use TOUZA_Std_utl,only: choice
-    implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in)          :: ub
-    integer,intent(in),optional :: ue
-    integer ul, uh, nu
-    integer ut
-    integer jp, jins
-
-    ierr = err_default
-
-    ! ublist is a sorted list of integers.
-    ul = ub
-    uh = min(limu, max(ul, choice(ul, ue)))
-
-    jins = 1
-    ublist(nblack+1) = limu + 1 ! sentry
-    do
-       if (ul.gt.uh) exit
-       if (jins.gt.nblack+1) exit
-       if (ul.eq.ublist(jins)) then
-          ul = ul + 1
-       else if (ul.lt.ublist(jins)) then
-          ut = min(uh, ublist(jins) - 1)
-          nu = ut - ul + 1
-          if (nblack + nu.gt.lblack) then
-             ierr = -1 - ERR_MASK_STD_FUN
-             exit
-          endif
-          do jp = nblack, jins, -1
-             ublist(jp + nu) = ublist(jp)
-          enddo
-          do jp = jins, jins + nu - 1
-             ublist(jp) = ul + jp - jins
-          enddo
-          ul = ut + 1
-          jins = jins + nu
-          nblack = nblack + nu
-       endif
-       jins = jins + 1
-    enddo
-    if (ierr.ne.0) then
-       if (VCHECK_SEVERE(lev_verbose)) &
-            call msg_fun('Black list overflow', __MDL__, __PROC__)
-    endif
-#   undef __PROC__
-    return
-  end subroutine add_black_list
-!!!_  & is_black_listed() - check if units is black-listed
-  logical function is_black_listed &
-       & (u) result (r)
-    integer,intent(in) :: u
-    integer jp
-    do jp = 1, nblack
-       if (u.eq.ublist(jp)) then
-          r = .true.
-          return
-       endif
-       if (u.lt.ublist(jp)) exit
-    enddo
-    r = .false.
-    return
-  end function is_black_listed
-!!!_  & diag_black_list
-  subroutine diag_black_list &
-       & (ierr, u)
-    use TOUZA_Std_log,only: msg_mdl
-    implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: u
-    integer jp, jbl, jbh
-    integer,parameter :: nstp = 10
-    ierr = err_default
-    do jp = 0, nblack - 1, nstp
-       jbl = jp + 1
-       jbh = min(nblack, jp + nstp)
-       call msg_mdl &
-            & ('(''units in black list:'', 10(1x, I0))', ublist(jbl:jbh), &
-            &  __MDL__, u)
-    enddo
-    return
-  end subroutine diag_black_list
 !!!_ + limit check
 !!!_  & brute_force_check_units - numbers of units brute-force checker
   subroutine brute_force_check_units &
@@ -389,11 +393,11 @@ contains
     if (lchk.lt.0) lchk = max(0, limu)
     uli = choice(-1, ulog)
     allocate(stt(ubgn:lchk), STAT=ierr)
+    nopn  = 0
+    nopnd = 0
     if (ierr.ne.0) then
        ierr = ERR_ALLOCATION - ERR_MASK_STD_FUN
     else
-       nopn  = 0
-       nopnd = 0
        stt(:) = 0
        do jchk = ubgn, lchk
           inquire(UNIT=jchk, IOSTAT=ierr, OPENED=opnd)
@@ -410,7 +414,7 @@ contains
           endif
 101       format('file unit check[', I0, '] ', I0, 1x, I0, 1x, A)
           write(txt, 101) jchk, stt(jchk), ierr, trim(tmsg)
-          call msg_mdl(txt, __MDL__, ulog)
+          call msg_mdl(txt, __MDL__, uli)
           if (ierr.ne.0) exit
        enddo
     endif
@@ -426,7 +430,7 @@ contains
     endif
     call msg_mdl('(''file unit check counts = '', I0, 1x, I0, 1x, I0)', &
          & (/nopnd, nopn, ncls/), &
-         & __MDL__, ulog)
+         & __MDL__, uli)
     return
 #   undef __PROC__
   end subroutine brute_force_check_units
@@ -441,15 +445,15 @@ contains
     character(len=*),intent(out) :: tmsg
     ierr = 0
     tmsg = ' '
-#if HAVE_OPEN_IOMSG
+#if HAVE_FORTRAN_OPEN_IOMSG
     open(UNIT=u, STATUS='SCRATCH', IOSTAT=iErr, IOMSG=tmsg)
-#else  /* not HAVE_OPEN_IOMSG */
+#else  /* not HAVE_FORTRAN_OPEN_IOMSG */
     open(UNIT=u, STATUS='SCRATCH', IOSTAT=iErr)
     if (ierr.ne.0) then
 101    format('open error for scratch = ', I0)
        write(tmsg, 101) iErr
     endif
-#endif /* not HAVE_OPEN_IOMSG */
+#endif /* not HAVE_FORTRAN_OPEN_IOMSG */
     return
 #   undef __PROC__
   end subroutine open_scratch
@@ -463,28 +467,37 @@ program test_std_fun
   implicit none
   integer ierr
   integer n, un
+  integer jc
+  integer utmp
+  character(len=128) :: fn
 
-  call init(ierr)
-  if (ierr.eq.0) call add_black_list(ierr, 30)
-  if (ierr.eq.0) call add_black_list(ierr, 40)
-  if (ierr.eq.0) call add_black_list(ierr, 50)
-  if (ierr.eq.0) call add_black_list(ierr, 20)
-  if (ierr.eq.0) call add_black_list(ierr, 35)
-  if (ierr.eq.0) call add_black_list(ierr, 3, 8)
-  if (ierr.eq.0) call add_black_list(ierr, 28, 33)
-
+  call init(ierr, ubgn=20, uend=80)
+  if (ierr.eq.0) call set_category_bound(ierr, 0, 70)
   if (ierr.eq.0) call diag(ierr, levv=+2)
-  if (ierr.eq.0) call finalize(ierr, levv=+10)
+
   if (ierr.eq.0) then
      call brute_force_check_units(ierr, limit=20)
      call brute_force_check_units(ierr, limit=200)
   endif
   if (ierr.eq.0) then
-     do n = 0, 30
-        un = new_unit()
-        write(*, *) 'new unit: ', n, un
+     do jc = 0, 1
+        do n = 0, 30
+           un = new_unit(kcat=jc)
+           write(*, *) 'new unit: ', jc, n, un
+        enddo
      enddo
   endif
+  if (ierr.eq.0) then
+     call new_unit_tmp(utmp, fn)
+201  format('temporary file = ', I0, ': ', A)
+     write(*, 201) utmp, trim(fn)
+     if (utmp.ge.0) then
+        open(utmp, FILE=fn)
+        close(utmp, STATUS='delete')
+     endif
+  endif
+
+  if (ierr.eq.0) call finalize(ierr, levv=+10)
 
 101 format('FINAL = ', I0)
   write(*, 101) ierr

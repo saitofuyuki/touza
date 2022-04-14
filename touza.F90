@@ -1,10 +1,10 @@
 !!!_! touza.F90 - touza administration
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2021/12/06 08:51:34 fuyuki touza.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/02 08:51:50 fuyuki touza.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021
+! Copyright (C) 2020, 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -31,13 +31,16 @@ module TOUZA
 #endif /* ENABLE_TOUZA_CAL */
 !!!_  - trp(conditional)
 #if ENABLE_TOUZA_TRP
-  use TOUZA_Trp, trp_init=>init, trp_diag=>diag, trp_finalize=>finalize
+  use TOUZA_Trp, trp_init=>init, trp_diag=>diag, trp_finalize=>finalize, trp_msg=>msg
 #endif /* ENABLE_TOUZA_TRP */
 !!!_  - nng(conditional)
 #if ENABLE_TOUZA_NNG
-  use TOUZA_Nng, nng_init=>init, nng_diag=>diag, nng_finalize=>finalize, &
-       &         ngg_msg=>msg
+  use TOUZA_Nng, nng_init=>init, nng_diag=>diag, nng_finalize=>finalize, nng_msg=>msg
 #endif /* ENABLE_TOUZA_NNG */
+!!!_  - ppp(conditional)
+#if ENABLE_TOUZA_PPP
+  use TOUZA_Ppp, ppp_init=>init, ppp_diag=>diag, ppp_finalize=>finalize, ppp_msg=>msg
+#endif /* ENABLE_TOUZA_PPP */
 !!!_ + default
   implicit none
   public
@@ -55,12 +58,13 @@ contains
 !!!_ + common interfaces
 !!!_  & init - touza system initialization batch
   subroutine init &
-       & (ierr, u, levv, mode)
+       & (ierr, u, levv, mode, icomm)
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: mode
+    integer,intent(in),optional :: icomm ! std argument
     integer lv, md, lmd
 
     ierr = 0
@@ -77,7 +81,10 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_DEEP) then
-          if (ierr.eq.0) call std_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call std_init(ierr, u=ulog, levv=lv, mode=lmd, icomm=icomm)
+#if ENABLE_TOUZA_PPP
+          if (ierr.eq.0) call ppp_init(ierr, u=ulog, levv=lv, mode=lmd, icomm=icomm)
+#endif /* ENABLE_TOUZA_PPP */
 #if ENABLE_TOUZA_CAL
           if (ierr.eq.0) call cal_init(ierr, u=ulog, levv=lv, mode=lmd)
 #endif /* ENABLE_TOUZA_CAL */
@@ -118,6 +125,11 @@ contains
        lmd = control_deep(md)
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call std_diag(ierr, utmp, levv, mode=lmd)
+#if ENABLE_TOUZA_PPP
+          if (ierr.eq.0) call ppp_diag(ierr, utmp, levv, mode=lmd)
+#else  /* not ENABLE_TOUZA_PPP */
+          if (ierr.eq.0) call msg_grp('ppp disabled', u=utmp)
+#endif /* not ENABLE_TOUZA_PPP */
 #if ENABLE_TOUZA_CAL
           if (ierr.eq.0) call cal_diag(ierr, utmp, levv, mode=lmd)
 #else  /* not ENABLE_TOUZA_CAL */
@@ -170,6 +182,9 @@ contains
 #if ENABLE_TOUZA_CAL
           if (ierr.eq.0) call cal_finalize(ierr, utmp, levv, mode=lmd)
 #endif /* ENABLE_TOUZA_CAL */
+#if ENABLE_TOUZA_PPP
+          if (ierr.eq.0) call ppp_finalize(ierr, utmp, levv, mode=lmd)
+#endif /* ENABLE_TOUZA_PPP */
           if (ierr.eq.0) call std_finalize(ierr, utmp, levv, mode=lmd)
        endif
        fine_counts = fine_counts + 1

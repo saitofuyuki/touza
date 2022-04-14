@@ -2,10 +2,10 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2021/11/21 10:10:06 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/16 15:01:29 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2019-2021
+! Copyright (C) 2019-2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -32,10 +32,21 @@
 #ifndef   TEST_STD_ARG
 #  define TEST_STD_ARG 0
 #endif
+!!!_ + command-line argument parser switch
+#ifndef   OPT_USE_COMMAND_LINE_ARGS
+#  if     HAVE_FORTRAN_GET_COMMAND_ARGUMENT && HAVE_FORTRAN_COMMAND_ARGUMENT_COUNT
+#     define OPT_USE_COMMAND_LINE_ARGS 1
+#  elif   HAVE_FORTRAN_GETARG && HAVE_FORTRAN_IARGC
+#     define OPT_USE_COMMAND_LINE_ARGS 1
+#  endif
+#endif
+#ifndef   OPT_USE_COMMAND_LINE_ARGS
+#  define OPT_USE_COMMAND_LINE_ARGS 0
+#endif
 !!!_@ TOUZA_Std_arg - argument parser by command-line and/or input file
 module TOUZA_Std_arg
   use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-  use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
+  use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control,  get_logu
 !!!_ + default
   implicit none
   private
@@ -65,7 +76,7 @@ module TOUZA_Std_arg
 
   integer,save :: lrecurs = 0
   integer,save :: mentry = 0
-  integer,save :: jparam = 0, nposargs = -1
+  integer,save :: jparam = 0, nregs = -1, nposs = -1
   integer,save :: mflags = 0
 
   integer,save :: kparse_mode = PARAM_DEF
@@ -134,6 +145,7 @@ module TOUZA_Std_arg
   public :: init, diag, finalize
   public :: decl_pos_arg
   public :: parse
+  public :: get_nparam
   public :: get_param, get_array, get_option, get_arg
   public :: get_key
   public :: get_value,     get_value_a
@@ -146,7 +158,7 @@ contains
   subroutine init &
        &  (ierr, &
        &   u,    levv, mode, &
-       &   lrec, cha,  chs, tagf, kmode)
+       &   lrec, cha,  chs, tagf, kmode, icomm)
     use TOUZA_Std_prc,only: prc_init=>init
     use TOUZA_Std_env,only: env_init=>init
     use TOUZA_Std_fun,only: fun_init=>init
@@ -161,6 +173,7 @@ contains
     character(len=*),intent(in),optional :: cha, chs
     character(len=*),intent(in),optional :: tagf
     integer,         intent(in),optional :: kmode
+    integer,         intent(in),optional :: icomm
 
     integer md, lv, lmd
 
@@ -172,7 +185,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
@@ -181,10 +194,10 @@ contains
           if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call env_init(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call fun_init(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call fun_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
+          if (ierr.eq.0) call env_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
        endif
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           if (ierr.eq.0) then
              call init_batch &
                   &  (ierr, lrec, cha,  chs, tagf, kmode, ulog, lv)
@@ -201,8 +214,8 @@ contains
   subroutine diag (ierr, u, levv, mode)
     use TOUZA_Std_utl,only: utl_diag=>diag, choice
     use TOUZA_Std_prc,only: prc_diag=>diag
-    use TOUZA_Std_env,only: env_diag=>diag
     use TOUZA_Std_fun,only: fun_diag=>diag
+    use TOUZA_Std_env,only: env_diag=>diag
     use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
     implicit none
     integer,intent(out)         :: ierr
@@ -220,14 +233,16 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (VCHECK_NORMAL(lv)) then
                 call msg_mdl(TIME_STAMP, __MDL__, utmp)
+                call msg_mdl('(''command-line parser = '', I0)', &
+                     & OPT_USE_COMMAND_LINE_ARGS, __MDL__, utmp)
              endif
              if (VCHECK_NORMAL(lv)) then
                 call report_entries &
-                     & (ierr, nposargs, atags, avals, nacc, mentry, lentry, utmp)
+                     & (ierr, nregs, nposs, atags, avals, nacc, mentry, lentry, utmp)
              endif
           endif
        endif
@@ -236,7 +251,7 @@ contains
           if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
+          if (ierr.eq.0) call fun_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call env_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -248,9 +263,9 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
     use TOUZA_Std_prc,only: prc_finalize=>finalize
-    use TOUZA_Std_env,only: env_finalize=>finalize
-    use TOUZA_Std_fun,only: fun_finalize=>finalize
     use TOUZA_Std_log,only: log_finalize=>finalize
+    use TOUZA_Std_fun,only: fun_finalize=>finalize
+    use TOUZA_Std_env,only: env_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: levv
@@ -265,17 +280,17 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call fun_finalize(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call env_finalize(ierr, utmp, lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
@@ -326,7 +341,7 @@ contains
     integer jpi, jentr
 
     ierr = err_default
-    if (nposargs.ge.0) then
+    if (nregs.ge.0) then
        ! error if parsed already
        ierr = -1 - ERR_MASK_STD_ARG
        return
@@ -351,20 +366,28 @@ contains
 
 !!!_  & parse - batch parser
   subroutine parse (ierr)
+    use TOUZA_Std_log,only: msg_mdl
     use TOUZA_Std_fun,only: new_unit
     implicit none
     integer,intent(out) :: ierr
     integer ucfg
+    integer lu
 
     ierr = err_default
+    if (nregs.ge.0) then
+       lu = get_logu(ulog)
+       call msg_mdl('parse twice.', __MDL__, lu)
+       return
+    endif
+
     ucfg = new_unit()
-    if (ucfg.le.0) then
+    if (ucfg.lt.0) then
        ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ARG
        return
     endif
 
     ! mark number of registered arguments
-    nposargs = mentry
+    nregs = mentry
 
     jparam = 0
     if (ierr.eq.0) then
@@ -388,24 +411,33 @@ contains
     integer,intent(out) :: ierr
     integer,intent(in)  :: ucfg
 
-#if HAVE_GET_COMMAND_ARGUMENT
+#if OPT_USE_COMMAND_LINE_ARGS
     integer jarg, nargs
     integer l
     integer,parameter :: lstr=ARG_LINE_LEN
     character(len=lstr) :: S
-#endif
+
+#   if HAVE_FORTRAN_COMMAND_ARGUMENT_COUNT
+#     define _COMMAND_ARGUMENT_COUNT() COMMAND_ARGUMENT_COUNT()
+#   elif HAVE_FORTRAN_IARGC
+#     define _COMMAND_ARGUMENT_COUNT() IARGC()
+#   else
+#     error "neither COMMAND_ARGUMENT_COUNT nor IARGC found"
+#   endif
+
+#endif /* OPT_USE_COMMAND_LINE_ARGS */
 
     ierr = err_default
 
     open(unit=ucfg, IOSTAT=ierr, FORM='FORMATTED', STATUS='SCRATCH', ACTION='READWRITE')
-#if HAVE_GET_COMMAND_ARGUMENT
+#if OPT_USE_COMMAND_LINE_ARGS
     jarg  = 0
-    nargs = COMMAND_ARGUMENT_COUNT()
+    nargs = _COMMAND_ARGUMENT_COUNT()
     do
        if (ierr.ne.0) exit
        jarg = jarg + 1
        if (jarg.gt.nargs) exit
-       CALL GET_COMMAND_ARGUMENT(jarg, S, l, STATUS=ierr)
+       call cmdline_arg_wrap(jarg, S, l, ierr)
        if (l.gt.lstr) then
 101       format('too long argument at ', I0, ':', A)
           write(*, 101) jarg, trim(S)
@@ -414,19 +446,19 @@ contains
           write(ucfg, '(A)', IOSTAT=ierr) trim(S)
        endif
     enddo
-#else  /* not HAVE_GET_COMMAND_ARGUMENT */
+#else  /* not OPT_USE_COMMAND_LINE_ARGS */
 102 format(A, A, A)
     if (ierr.eq.0) then
        write(ucfg, 102) trim(tag_file), trim(cassign), trim(cstdin)
     endif
-#endif /* not HAVE_GET_COMMAND_ARGUMENT */
+#endif /* not OPT_USE_COMMAND_LINE_ARGS */
 
     if (ierr.eq.0) rewind(ucfg, IOSTAT=ierr)
 
     if (ierr.eq.0) then
        call store_entries &
             & (ierr,   atags,    avals,    &
-            &  jparam, nposargs, mentry,   lentry,  &
+            &  jparam, nregs,    mentry,   lentry,  &
             &  ucfg,   cassign,  ccomment, ctagend, cundef)
     endif
 
@@ -466,7 +498,7 @@ contains
           if (je.gt.mentry) exit
           ! write(*, *) 'P', jr, je, trim(atags(je)), trim(avals(je))
           if (trim(atags(je)).eq.trim(tag_file) &
-               & .or. (atags(je).eq.' '.and.je.gt.nposargs &
+               & .or. (atags(je).eq.' '.and.je.gt.nregs &
                &       .and. kparse_mode.eq.PARAM_FILE)) then
              ! write(*, *) 'X', jr, je, trim(atags(je)), trim(avals(je))
              ! check if already expanded
@@ -519,16 +551,15 @@ contains
     integer,intent(out)   :: ierr
 
     integer jentr
-    integer jpx
     character(len=ltag) :: tag
 
     ierr = err_default
-    jpx = 0
+    nposs = 0
 
     do jentr = 0, mentry - 1
        if (atags(jentr).eq.' ') then
-          jpx = jpx + 1
-          call tag_pos(tag, jpx)
+          nposs = nposs + 1
+          call tag_pos(tag, nposs)
           atags(jentr) = tag
        endif
     enddo
@@ -536,6 +567,16 @@ contains
   end subroutine post_parse
 
 !!!_ + inquiries
+  integer function get_nparam () result (n)
+    implicit none
+    integer jerr
+    jerr = err_default
+    if (jerr.eq.0) then
+       n = nposs
+    else
+       n = -1
+    endif
+  end function get_nparam
 !!!_  & get_param - get parameter (positional argument)
   subroutine get_param_a &
        & (ierr, val, jpos, def, unset)
@@ -1032,13 +1073,13 @@ contains
 !!!_  & report_entries
   subroutine report_entries &
        & (ierr, &
-       &  NP,   &
+       &  NR,   NP,  &
        &  T,    V,   NA, me, le, &
        &  ulog)
     use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,         intent(out)         :: ierr
-    integer,         intent(in)          :: NP
+    integer,         intent(in)          :: NR, NP
     character(len=*),intent(in)          :: T(0:*)
     character(len=*),intent(in)          :: V(0:*)
     integer,         intent(in)          :: NA(0:*)
@@ -1050,6 +1091,9 @@ contains
     character(len=1024) :: txt
 
     ierr = err_default
+104 format('arguments = ', I0, 1x, I0)
+    write(txt, 104) NP, NR
+    call msg_mdl(txt, __MDL__, ulog)
 103 format(I0, 2x, A, 3x, A)
     do je = 0, me - 1
        write(txt, 103) NA(je), trim(T(je)), trim(V(je))
@@ -1621,6 +1665,31 @@ contains
     if (choice(.false., unset)) ierr = min(0, jerr)
   end function post_get
 
+!!!_  & cmdline_arg_wrap
+  subroutine cmdline_arg_wrap &
+       & (n, v, l, s)
+    implicit none
+    integer,         intent(in)  :: n
+    character(len=*),intent(out) :: v
+    integer,optional,intent(out) :: l
+    integer,optional,intent(out) :: s
+#if OPT_USE_COMMAND_LINE_ARGS
+#   if HAVE_FORTRAN_GET_COMMAND_ARGUMENT
+    call GET_COMMAND_ARGUMENT(n, v, l, s)
+#   elif HAVE_FORTRAN_GETARG
+    call GETARG(n, v)
+    if (present(l)) l = -1
+    if (present(s)) s = -1
+#   else
+#     error "neither GET_COMMAND_ARGUMENT nor GETARG found"
+#   endif
+#else
+    v = ' '
+    if (present(l)) l = -1
+    if (present(s)) s = -1
+#endif
+  end subroutine cmdline_arg_wrap
+
 end module TOUZA_Std_arg
 
 !!!_@ test_std_arg - test program
@@ -1644,6 +1713,7 @@ program test_std_arg
   if (ierr.eq.0) call decl_pos_arg(ierr, 'X')
   if (ierr.eq.0) call decl_pos_arg(ierr, 'Y')
 
+  if (ierr.eq.0) call parse(ierr)
   if (ierr.eq.0) call parse(ierr)
 
   val = ' '

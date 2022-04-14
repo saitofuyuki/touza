@@ -1,7 +1,7 @@
 !!!_! nng_header.F90 - TOUZA/Nng header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/05 22:14:33 fuyuki nng_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/04/06 12:47:16 fuyuki nng_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -102,10 +102,15 @@ module TOUZA_Nng_header
   integer,parameter,public :: hi_MSIGN  = 63
   integer,parameter,public :: hi_SIZE   = 64
 
+  ! miroc definition (different from gtool original)
+  integer,parameter,public :: hi_DATE1  = 48
+  integer,parameter,public :: hi_DATE2  = 49
+
   character(len=*),parameter :: def_fmt_I = '(I16)'
   character(len=*),parameter :: def_fmt_R = '(E16.7)'
   character(len=*),parameter :: def_fmt_date_trad = '(I4.4,I2.2,I2.2,1X,I2.2,I2.2,I2.2)'
   character(len=*),parameter :: def_fmt_date_long = '(I5.5,I2.2,I2.2,1X,I2.2,I2.2,I2.2)'
+  character(len=*),parameter :: def_fmt_date_full = '(I6.6,I2.2,I2.2,   I2.2,I2.2,I2.2)'
 
   integer,parameter :: ht_str    = 0
   integer,parameter :: ht_int    = 1
@@ -160,7 +165,7 @@ module TOUZA_Nng_header
   public init, diag, finalize
   public put_item,   put_item_date, store_item
   public get_item,   get_item_date, restore_item
-  public diag_header
+  public show_header
 
 !!!_  - todo notes
   ! subroutine append_item
@@ -168,12 +173,13 @@ module TOUZA_Nng_header
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, stdv)
+  subroutine init(ierr, u, levv, mode, stdv, icomm)
     use TOUZA_Nng_std,only: choice, ns_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
+    integer,intent(in),optional :: icomm
     integer lv, md, lmd
 
     ierr = 0
@@ -190,7 +196,7 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
+          if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
        if (is_first_force(init_counts, md)) then
           if (ierr.eq.0) call set_def_types(ierr, hitypes)
@@ -264,8 +270,8 @@ contains
   end subroutine finalize
 
 !!!_ + user interfaces
-!!!_  - diag_header - diag entries
-  subroutine diag_header &
+!!!_  - show_header - diag entries
+  subroutine show_header &
        & (ierr, head, fmt, u, lev)
     use TOUZA_Nng_std,only: choice
     implicit none
@@ -294,7 +300,7 @@ contains
        enddo
     endif
     return
-  end subroutine diag_header
+  end subroutine show_header
 
 !!!_  - put_item - set entry (with type check)
   subroutine put_item_a &
@@ -364,7 +370,7 @@ contains
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
-    integer,         intent(in)          :: dt(*)
+    integer,         intent(in)          :: dt(:)
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
     ierr = check_hitem_types(item, (/ht_date, ht_str/))
@@ -563,17 +569,19 @@ contains
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
-    integer,         intent(in)          :: dt(*)
+    integer,         intent(in)          :: dt(:)
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
     character(len=128) f
     ierr = 0
     call choice_a(f, ' ', fmt)
     if (f.eq.' ') then
-       if (dt(1).ge.10000) then
+       if (dt(1).lt.10000) then
+          write(head(item), def_fmt_date_trad, IOSTAT=ierr) dt(1:6)
+       else if (dt(1).lt.100000) then
           write(head(item), def_fmt_date_long, IOSTAT=ierr) dt(1:6)
        else
-          write(head(item), def_fmt_date_trad, IOSTAT=ierr) dt(1:6)
+          write(head(item), def_fmt_date_full, IOSTAT=ierr) dt(1:6)
        endif
     else if (f.eq.'*') then
        write(head(item), def_fmt_date_trad, IOSTAT=ierr) dt(1:6)
@@ -594,7 +602,7 @@ contains
     integer,         intent(in),optional :: iteme
     character(len=*),intent(in),optional :: fmt
     character(len=lhead) BUF
-    integer ji, jb, je, l
+    integer ji, jb, je
 
     ierr = 0
     if (present(iteme)) then
@@ -940,7 +948,7 @@ program test_nng_header
   if (ierr.eq.0) call put_item(ierr, ha, 'THIS IS VERY LONG TITLE TO BE SPLITTED', hi_TITL1, hi_TITL2)
   if (ierr.eq.0) call put_item(ierr, ha, 'THIS IS VERY LONG TITLE TO BE SPLITTED', hi_MEMO1, 0)
 
-  if (ierr.eq.0) call diag_header(ierr, ha)
+  if (ierr.eq.0) call show_header(ierr, ha)
 
   if (ierr.eq.0) call finalize(ierr)
   write(*, 101) 'FINAL', ierr

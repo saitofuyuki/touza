@@ -1,10 +1,10 @@
 !!!_! trapiche.F90 - TOUZA/Trapiche manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2021/11/15 12:02:47 fuyuki trapiche.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/02/02 08:52:47 fuyuki trapiche.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021,2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -17,7 +17,7 @@
 !!!_@ TOUZA_Trp - Trapiche interfaces
 module TOUZA_Trp
 !!!_ = declaration
-  use TOUZA_Trp_std,   ts_init=>init, ts_diag=>diag, ts_finalize=>finalize, trp_msg=>msg
+  use TOUZA_Trp_std,   ts_init=>init, ts_diag=>diag, ts_finalize=>finalize
   use TOUZA_Trp_pack,  tp_init=>init, tp_diag=>diag, tp_finalize=>finalize
   use TOUZA_Trp_float, tf_init=>init, tf_diag=>diag, tf_finalize=>finalize
   use TOUZA_Trp_ctl,   tc_init=>init, tc_diag=>diag, tc_finalize=>finalize
@@ -90,7 +90,7 @@ contains
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, fun='diag', u=utmp, levv=lv)
        if (is_first_force(diag_counts, md)) then
           if (ierr.eq.0) then
-             if (is_msglev_normal(lv)) call trp_msg(TIME_STAMP, u=utmp)
+             if (is_msglev_normal(lv)) call msg(TIME_STAMP, u=utmp)
           endif
        endif
        lmd = control_deep(md)
