@@ -1,7 +1,7 @@
 dnl Filename:   touza/m4c/mt_package.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 7 2020
-dnl Time-stamp: <2021/01/26 17:09:40 fuyuki mt_package.m4>
+dnl Time-stamp: <2022/02/15 09:37:09 fuyuki mt_package.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -42,16 +42,16 @@ AM_CONDITIONAL([CLEAN_FCMOD], [test x"$FC_MODEXT" != "x"])
 
 AC_ARG_ENABLE([install-modules],
               [AS_HELP_STRING([--enable-install-modules],
-                              [install module files if applicable @<:@default='${pkgincludedir}'@:>@])],
-              [pkgmoddir="$enableval"],
-              [pkgmoddir='${pkgincludedir}'])
+                              [install module files if applicable @<:@default='${exec_prefix}/include/PACKAGE'@:>@])],
+              [moddir="$enableval"],
+              [moddir='yes'])
 
 AM_CONDITIONAL([INSTALL_MODULES],
-               [test x"[$]pkgmoddir" != "xno" -a x"$FC_MODEXT" != "x"])
-AS_IF([test x"[$]pkgmoddir" = xyes],
-      [pkgmoddir='[$]{pkgincludedir}'])
+               [test x"[$]moddir" != "xno" -a x"$FC_MODEXT" != "x"])
+AS_IF([test x"[$]moddir" = xyes],
+      [moddir='[$]{exec_prefix}/include/[$]{PACKAGE}'])
 
-AC_SUBST([pkgmoddir])
+AC_SUBST([moddir])
 ])# MT_ENV_MODULES
 
 # MT_ALL_SUB_PACKAGES

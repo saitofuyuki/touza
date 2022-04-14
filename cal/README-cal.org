@@ -231,13 +231,14 @@
 ** registration and allocation
 *** =calendar::init()=
  #+begin_src f90
- subroutine init(ierr, ulog, ncals, mode, auto, levv, stdv)
+ subroutine init(ierr, ulog, ncals, global, auto, levv, mode, stdv)
    integer,intent(out)         :: ierr    ! error status
    integer,intent(in),optional :: ulog    ! output unit for logging
    integer,intent(in),optional :: ncals   ! number of non-global calendars to allocate
-   integer,intent(in),optional :: mode    ! mode of global calendar
+   integer,intent(in),optional :: global  ! mode of global calendar
    logical,intent(in),optional :: auto    ! auto-switch of global calendar
    integer,intent(in),optional :: levv    ! verbose level
+   integer,intent(in),optional :: mode    ! initialization mode
    integer,intent(in),optional :: stdv    ! (advanced) verbose level of TOUZA/Std
  #+end_src
  Initialize *TOUZA/Cal* system, and optionally configure the global calendar.
@@ -255,9 +256,9 @@
  If not specified, users can set the limit number with calling [[id:bef1ab4c-cd8c-4658-aded-a6ca9d6a2da8][=alloc ()=]]
 .
 
- With the arguments =mode= and =auto=, the user can set the attributes
+ With the arguments =global= and =auto=, the user can set the attributes
  of _global calendar_, by internal calling of [[id:accf2026-373e-4a8a-8644-f299449a33a5][=new_calendar ()=]].  Note
- that, if either =mode= or =auto= is set while =ncals= is not, the
+ that, if either =global= or =auto= is set while =ncals= is not, the
  default value is chosen for =ncals=.
 
  (New feature) Optional levv control the verbose level of *TOUZA/Cal* system.

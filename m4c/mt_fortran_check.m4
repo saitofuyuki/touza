@@ -1,7 +1,7 @@
 dnl Filename:  touza/m4c/mt_fortran_check.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 3 2020
-dnl Time-stamp: <2021/01/22 15:38:04 fuyuki mt_fortran_check.m4>
+dnl Time-stamp: <2022/04/14 12:09:35 fuyuki mt_fortran_check.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -22,23 +22,23 @@ dnl   MT_FORTRAN_BATCH_LDADD
 AC_DEFUN([MT_FORTRAN_CHECK])
 
 # ======================================================================
-# MT_FORTRAN_BATCH_CHECK_FUNCTION(FUNCTION, [ARGUMENTS])
+# MT_FORTRAN_BATCH_CHECK_FUNCTION(FUNCTION, ARGUMENTS)
 # ------------------------------------------------------
 AC_DEFUN([MT_FORTRAN_BATCH_CHECK_FUNCTION],
 [m4_indir([MT_FORTRAN_BATCH_CHECK],
           [whether function $1 works],
           [MT_FORTRAN_CACHE_ID($1)],
-          [MT_FORTRAN_CPP_ID([HAVE_$1])],
+          [MT_FORTRAN_CPP_HAVE([$1])],
           [MT_FORTRAN_CHECK_FUNCTION],
           $@)])# MT_FORTRAN_BATCH_CHECK_FUNCTION
 
-# MT_FORTRAN_BATCH_CHECK_SUBROUTINE(SUBROUTINE, [ARGUMENTS])
+# MT_FORTRAN_BATCH_CHECK_SUBROUTINE(SUBROUTINE, ARGUMENTS, PROLOGUE)
 # ------------------------------------------------------
 AC_DEFUN([MT_FORTRAN_BATCH_CHECK_SUBROUTINE],
 [m4_indir([MT_FORTRAN_BATCH_CHECK],
           [whether subroutine $1 works],
           [MT_FORTRAN_CACHE_ID($1)],
-          [MT_FORTRAN_CPP_ID([HAVE_$1])],
+          [MT_FORTRAN_CPP_HAVE([$1])],
           [MT_FORTRAN_CHECK_SUBROUTINE],
           $@)])# MT_FORTRAN_BATCH_CHECK_SUBROUTINE
 
@@ -49,13 +49,13 @@ AC_DEFUN([MT_FORTRAN_BATCH_CHECK_MODULE],
             [m4_indir([MT_FORTRAN_BATCH_CHECK],
                       [whether module $1 works],
                       [MT_FORTRAN_CACHE_ID($1)],
-                      [MT_FORTRAN_CPP_ID([HAVE_$1])],
+                      [MT_FORTRAN_CPP_HAVE([$1])],
                       [MT_FORTRAN_CHECK_MODULE],
                       $@)],
             [m4_indir([MT_FORTRAN_BATCH_CHECK],
                       [whether module $1 works with $2],
                       [MT_FORTRAN_CACHE_ID($1_$2)],
-                      [MT_FORTRAN_CPP_ID([HAVE_$1_$2])],
+                      [MT_FORTRAN_CPP_HAVE([$1_$2])],
                       [MT_FORTRAN_CHECK_MODULE_MEMBER],
                       $@)])])# MT_FORTRAN_BATCH_CHECK_MODULE
 
@@ -65,7 +65,7 @@ AC_DEFUN([MT_FORTRAN_BATCH_CHECK_STATEMENT],
 [m4_indir([MT_FORTRAN_BATCH_CHECK],
           [whether statement $1 works with $2 specifier],
           [MT_FORTRAN_CACHE_ID($1_$2)],
-          [MT_FORTRAN_CPP_ID([HAVE_$1_$2])],
+          [MT_FORTRAN_CPP_HAVE([$1_$2])],
           [MT_FORTRAN_CHECK_STATEMENT_SPEC],
           $@)])# MT_FORTRAN_BATCH_CHECK_STATEMENT
 
@@ -92,12 +92,13 @@ AC_DEFUN([MT_FORTRAN_CHECK_FUNCTION],
 [MT_FORTRAN_CHECK_DEFINE([$1],
       [write(*,*) $1($2)], [$3], [$4])])# MT_FORTRAN_CHECK_FUNCTION
 
-# MT_FORTRAN_CHECK_SUBROUTINE(SUBROUTINE, [ARGUMENTS], [ACTION-IF-TRUE], [ACTION-IF-FALSE])
+# MT_FORTRAN_CHECK_SUBROUTINE(SUBROUTINE, [ARGUMENTS], [PROLOGUE], [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # -----------------------------------------------------------------------------------------
 # Check whether SUBROUTINE can be used.
 AC_DEFUN([MT_FORTRAN_CHECK_SUBROUTINE],
 [MT_FORTRAN_CHECK_DEFINE([$1],
-      [call $1($2)], [$3], [$4])])# MT_FORTRAN_CHECK_SUBROUTINE
+      [$3
+       call $1($2)], [$4], [$5])])# MT_FORTRAN_CHECK_SUBROUTINE
 
 # MT_FORTRAN_CHECK_MODULE(MODULE, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # --------------------------------------------------------------------
@@ -168,6 +169,10 @@ dnl @%:@endif])
 # MT_FORTRAN_CACHE_ID(NAME)
 # -------------------------
 AC_DEFUN([MT_FORTRAN_CACHE_ID], [AS_TR_SH([mt_cv_fortran_$1])])
+
+# MT_FORTRAN_CPP_HAVE(NAME)
+# -----------------------
+AC_DEFUN([MT_FORTRAN_CPP_HAVE], [AS_TR_CPP([HAVE_FORTRAN_$@])])
 
 # MT_FORTRAN_CPP_ID(NAME)
 # -----------------------

@@ -1,0 +1,32 @@
+#+title: TOUZA/Trp (Trapiche) guide
+#+author: SAITO Fuyuki
+#+date: <2021-02-26 Fri>
+
+* Introduction
+  *TOUZA/Trp* (aka /Trapiche/) is a collection of Fortran subroutines
+  for compression (squeezing) and decompression (rehydrating).
+
+  *TOUZA/Trp* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+  DOT go DOT jp>.
+
+  *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
+  Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
+  (expected to be in the parent directory) for general instruction of
+  *TOUZA* collection.
+
+* Build and installation
+
+* Brief description of *TOUZA/Trp* modules
+
+* Description of *TOUZA/Trp* design
+** n-bit integer array packing
+** floating-point array compression
+
+* Notes
+  *Trapiche* is a spanish word, which means a /squeezer/.
+  The naming comes from a standard music work by Ernesto Cavour (Bolivia).
+
+* Copyright and license
+Copyright 2021 Japan Agency for Marine-Earth Science and Technology
+Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)

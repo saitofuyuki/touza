@@ -1,25 +1,31 @@
 # touza/m4c Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jan 20 2021
-# Time-stamp: <2021/01/22 18:24:27 fuyuki Makefile.am>
+# Time-stamp: <2022/02/15 11:33:32 fuyuki Makefile.am>
 
-# Copyright (C) 2021
+# Copyright (C) 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
+
+# # need for exteranl distdir
+# MOSTLYCLEANFILES	=
+# include $(top_srcdir)/aminclude_static.am
+
+EXTRA_DIST = mt_am_include.m4 \
+             mt_fortran_check.m4 \
+             mt_init.m4 \
+             mt_define.m4 \
+             mt_package.m4 \
+             mt_prog_fc_mpi.m4 \
+             mt_shell.m4
+
+dist_pkgdata_DATA = $(EXTRA_DIST)
 
 install-mod:
 	@:
 check-bin:
 	@:
-
-dist_pkgdata_DATA	=	mt_am_include.m4 \
-						mt_fortran_check.m4 \
-						mt_init.m4 \
-						mt_define.m4 \
-						mt_package.m4 \
-						mt_prog_fc_mpi.m4 \
-						mt_shell.m4
 
 ### Local Variables:
 ### mode: makefile-automake

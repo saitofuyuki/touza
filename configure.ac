@@ -3,15 +3,15 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/01/22 21:04:32 fuyuki configure.ac>
+# Time-stamp: <2022/03/29 11:31:46 fuyuki configure.ac>
 
-AC_PREREQ([2.69])
+AC_PREREQ([2.71])
 
 MT_INIT()
-AC_INIT([touza], MT_VERSION, [saitofuyuki@jamstec.go.jp])
+AC_INIT([touza],MT_VERSION,[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
-Copyright (C) 2020, 2021 Japan Agency for Marine-Earth Science and Technology
+Copyright (C) 2020-2022 Japan Agency for Marine-Earth Science and Technology
 
 This is TOUZA, a collection of MIROC base infrastructure.
 
@@ -19,6 +19,7 @@ Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/L
 ])
 
 AC_CONFIG_SRCDIR([touza.F90])
+AC_LANG_PUSH([Fortran])
 MT_PROG_FC_MPI
 dnl AC_PROG_FC
 AC_PROG_F77
@@ -30,12 +31,19 @@ AC_FC_FREEFORM
 AC_FC_MODULE_EXTENSION
 AC_FC_MODULE_FLAG
 AC_FC_MODULE_OUTPUT_FLAG([], [AC_MSG_WARN])
+AX_COMPILER_VENDOR
+AC_LANG_POP([Fortran])
+
+AC_CANONICAL_HOST
+AC_CANONICAL_BUILD
+AC_CANONICAL_TARGET
 
 AC_ARG_ENABLE([warn-max],
 [AS_HELP_STRING([--enable-warn-max], [compile with maximum warning option if found @<:@default=no@:>@])],
  [use_warn_max=$enableval],
  [use_warn_max=no])
-AS_IF([test x"$use_warn_max" = xyes], [AX_FCFLAGS_WARN_ALL])
+AS_IF([test x"$use_warn_max" = xyes], [AX_FCFLAGS_WARN_ALL([AM_FCFLAGS])])
+AC_SUBST([AM_FCFLAGS])
 
 dnl common procedures
 MT_PACKAGE_INIT()
@@ -73,7 +81,7 @@ LT_INIT([disable-shared])
 m4_define([TOUZA_config],
           [m4_join([_], AC_PACKAGE_NAME, [config.h])])
 
-AC_CONFIG_HEADER(m4_expand([TOUZA_config]))
+AC_CONFIG_HEADERS(m4_expand(TOUZA_config))
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([m4c/Makefile])
 AC_CONFIG_FILES([makeshift], [chmod +x makeshift])
@@ -90,10 +98,51 @@ AS_IF([test x"$enableval" = x"no"],
 AC_DEFINE_UNQUOTED([OPT_ENABLE_FORTRAN_ELEMENTAL], [$enable_elemental], [prefer elemental function])
 
 MT_SUB_PACKAGE([std], [always])
+MT_SUB_PACKAGE([emu], [],     [std])
 MT_SUB_PACKAGE([cal], [],     [std])
-dnl MT_SUB_PACKAGE([emu], [],     [std])
+MT_SUB_PACKAGE([trp], [],     [std])
+MT_SUB_PACKAGE([nng], [],     [std emu trp])
+MT_SUB_PACKAGE([ppp], [],     [std emu])
 dnl MT_SUB_PACKAGE([div], [],     [std])
 
+AC_MSG_CHECKING([if also build jmz])
+AC_ARG_WITH([build-jmz],
+   [AS_HELP_STRING([--with-build-jmz=(yes|no)],
+                   [whether to build jmz programs.  @<:@default=no@:>@])],
+   [], [with_build_jmz=no])
+AS_IF([test "x$with_build_jmz" != xno],
+      [AC_MSG_RESULT([yes])
+       enable_sub_all=yes],
+      [AC_MSG_RESULT([no])])
+
 MT_PARSE_PACKAGES()
+
+AS_IF([test "x$with_build_jmz" != xno],
+[AX_SUBDIRS_CONFIGURE([jmz],
+    [],
+    [[TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nng ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std],
+     [TOUZA_LIBS=${ac_top_build_prefix}lib${with_touza_name}.la]],
+    [],
+    [--with-build-jmz])])
+
+PKG_PROG_PKG_CONFIG()
+PKG_PREREQ([0.29])
+
+AC_ARG_ENABLE([install-switches],
+              [AS_HELP_STRING([--enable-install-switches],
+                              [install switcher sources if applicable @<:@default='${datadir}/PACKAGE'@:>@])],
+              [switchdir="$enableval"],
+              [switchdir='yes'])
+AS_IF([test x"[$]switchdir" = xyes],
+      [switchdir='[$]{datadir}/[$]{PACKAGE}'])
+AC_SUBST([switchdir])
+
+dnl AX_CREATE_PKGCONFIG_INFO()
+AC_SUBST([PACKAGE_REQUIRES], [])
+AC_CONFIG_FILES([touza.pc])
+
+AC_PATH_PROGS([AUTOREVISION], [autorevision], [:])
+AC_PATH_PROGS([REALPATH], [realpath], [false])
+
 
 AC_OUTPUT

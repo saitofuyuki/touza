@@ -1,7 +1,7 @@
 /* touza_std.h - touza/std common definition */
 /* Maintainer: SAITO Fuyuki */
 /* Created: May 30 2020 */
-/* Time-stamp: <2021/03/24 14:30:16 fuyuki touza_std.h> */
+/* Time-stamp: <2022/01/28 08:50:29 fuyuki touza_std.h> */
 /* Copyright (C) 2020, 2021 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -22,6 +22,7 @@
 #    define TOUZA_Std_mwe  TOUZA_TRANSFORM_MDL(Std,mwe)
 #    define TOUZA_Std_prc  TOUZA_TRANSFORM_MDL(Std,prc)
 #    define TOUZA_Std_utl  TOUZA_TRANSFORM_MDL(Std,utl)
+#    define TOUZA_Std_htb  TOUZA_TRANSFORM_MDL(Std,htb)
 #  endif
 
 /* message formats (general) */
@@ -95,5 +96,8 @@
 #  ifndef PACKAGE_TAG
 #  define PACKAGE_TAG GROUP_TAG
 #  endif
+
+#define ERR_INVALID_RECORD_SIZE         (ERR_MASK_SPECIFIC-1)  /* insufficient sequential record length */
+#define ERR_INCONSISTENT_RECORD_MARKERS (ERR_MASK_SPECIFIC-2)  /* different head/foot markers */
 
 #endif /* not _TOUZA_STD_H */

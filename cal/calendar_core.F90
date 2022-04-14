@@ -1,7 +1,7 @@
 !!!_! calendar_core.F90 - TOUZA/Cal core
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2021/02/16 22:58:35 fuyuki calendar_core.F90>'
+#define TIME_STAMP 'Time-stamp: <2021/11/15 13:12:01 fuyuki calendar_core.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2021
@@ -33,7 +33,9 @@ module TOUZA_Cal_core
        & KRC,        XREAL,      &
        & cal_date_t, cal_time_t, cal_daysec_t, &
        & p_error,    p_ideal,    p_grego_i,    p_grego_l, p_user, &
-       & is_leap_year
+       & is_leap_year, &
+       & trace_control, trace_fine, &
+       & control_mode,  control_deep, is_first_force
 !!!_  - private
   implicit none
 
@@ -93,9 +95,14 @@ module TOUZA_Cal_core
 
 !!!_  - static
   integer,save :: global_id = -1
-  integer,save :: udef = DEFAULT_LOG_UNIT
-
+  integer,save :: ulog = DEFAULT_LOG_UNIT
+  integer,save :: init_mode = 0
   integer,save :: init_counts = 0
+  integer,save :: diag_counts = 0
+  integer,save :: fine_counts = 0
+  integer,save :: lev_verbose = CAL_MSG_LEVEL
+  integer,save :: err_default = ERR_NO_INIT
+
 #define __MDL__ 'c'
 !!!_  - misc
     character(len=1024) tmsg
@@ -194,72 +201,122 @@ module TOUZA_Cal_core
 contains
 !!!_ + common interfaces
 !!!_  & init - initialization
-  subroutine init (ierr, ulog, levv, inim, stdv)
+  subroutine init (ierr, u, levv, mode, stdv)
     use TOUZA_Cal_primitive,only: primitive_init=>init, msg, choice
     implicit none
     integer,intent(out)         :: ierr
-    integer,intent(in),optional :: ulog
-    integer,intent(in),optional :: levv, inim, stdv
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode, stdv
+    integer lv, md, lmd
 
     ierr = 0
-    if (init_counts.eq.0) then
-       if (ierr.eq.0) call primitive_init(ierr, levv, inim, stdv)
-       global_id = 0
-       if (present(ulog)) then
-          udef = ulog
+
+    md = control_mode(mode, MODE_SHALLOW)
+    init_mode = md
+
+    if (md.ge.MODE_SURFACE) then
+       err_default = ERR_SUCCESS
+       lv = choice(lev_verbose, levv)
+       if (is_first_force(init_counts, md)) then
+          ulog = choice(ulog, u)
+          lev_verbose = lv
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call primitive_init(ierr, ulog, levv, mode=lmd, stdv=stdv)
+       endif
+       if (is_first_force(init_counts, md)) then
+          global_id = 0
        endif
        init_counts = init_counts + 1
+       if (ierr.ne.0) err_default = ERR_FAILURE_INIT
     endif
+
     return
   end subroutine init
 
 !!!_  & diag
-  subroutine diag(ierr, u, levv)
+  subroutine diag(ierr, u, levv, mode)
     use TOUZA_Cal_primitive,only: primitive_diag=>diag, &
-         & choice, msg, msglev_normal, msglev_warning
+         & choice, msg, msglev_normal, msglev_warning, &
+         & control_mode, control_deep
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
-    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: levv, mode
     integer utmp
+    integer lv, md, lmd
 
-    ierr = 0
-    utmp = choice(udef, u)
-    if (ierr.eq.0) call msg(msglev_normal, TIME_STAMP, __MDL__, utmp)
-    if (ierr.eq.0) call primitive_diag(ierr, utmp, levv)
-    if (ierr.eq.0) then
-101    format('auto year = ', I0, 1x, I0)
-102    format('auto day = ', I0, 1x, I0)
-       write(tmsg, 101) auto_cyear_grego_l, auto_cyear_grego_i
-       call msg(msglev_normal, tmsg, __MDL__, utmp)
-       write(tmsg, 102) auto_cday_grego_l, auto_cday_grego_i
-       call msg(msglev_normal, tmsg, __MDL__, utmp)
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       call trace_control &
+            & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
+       if (is_first_force(diag_counts, md)) then
+          if (ierr.eq.0) call msg(msglev_normal, TIME_STAMP, __MDL__, utmp)
+          if (ierr.eq.0) then
+101          format('auto year = ', I0, 1x, I0)
+102          format('auto day = ', I0, 1x, I0)
+             write(tmsg, 101) auto_cyear_grego_l, auto_cyear_grego_i
+             call msg(msglev_normal, tmsg, __MDL__, utmp)
+             write(tmsg, 102) auto_cday_grego_l, auto_cday_grego_i
+             call msg(msglev_normal, tmsg, __MDL__, utmp)
+          endif
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call primitive_diag(ierr, utmp, levv, mode=lmd)
+       endif
+       diag_counts = diag_counts + 1
     endif
     return
   end subroutine diag
 
 !!!_  & finalize
-  subroutine finalize(ierr, u, levv)
+  subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Cal_primitive,only: primitive_finalize=>finalize, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
-    ierr = 0
-    call primitive_finalize (ierr, u, levv)
+    integer,intent(in),optional :: mode
+    integer utmp, lv, md, lmd
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = choice(ulog, u)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       if (is_first_force(fine_counts, md)) then
+          call trace_fine &
+               & (ierr, md, init_counts, diag_counts, fine_counts, &
+               &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
+       endif
+       lmd = control_deep(md)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call primitive_finalize (ierr, utmp, lv, mode=lmd)
+       endif
+       fine_counts = fine_counts + 1
+    endif
     return
   end subroutine finalize
 
 !!!_ + calendar property interfaces
 !!!_  & decl_cal - declaration of calendar type
   subroutine decl_cal &
-       & (self, mode, auto, ulog)
+       & (self, mode, auto, u)
     use TOUZA_Cal_primitive,only: msg, msglev_normal, msglev_warning
     implicit none
     type(cal_attr_t),intent(inout)      :: self
     integer,         intent(in),optional:: mode
     integer,         intent(in),optional:: auto
-    integer,         intent(in),optional:: ulog
+    integer,         intent(in),optional:: u
 
     integer :: old_id
     integer jerr
@@ -271,10 +328,10 @@ contains
 
     self%id   = global_id
     global_id = global_id + 1
-    if (present(ulog)) then
-       self%ulog = ulog
+    if (present(u)) then
+       self%ulog = u
     else
-       self%ulog = udef
+       self%ulog = ulog
     endif
 
     if (present (mode)) then
@@ -296,7 +353,7 @@ contains
        call msg(msglev_warning, tmsg, __MDL__, self%ulog)
     endif
 
-    if (present (ulog)) then
+    if (present (u)) then
 201    format('decl:', I0, ' = ', I0, 1x, I0, 1x, I0, 1x, I0)
        write(tmsg, 201) self%id, self%stt, self%mode, self%auto, self%ulog
        call msg(msglev_normal, tmsg, __MDL__, self%ulog)

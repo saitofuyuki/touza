@@ -1,0 +1,31 @@
+# touza.pc
+# Maintainer: SAITO Fuyuki
+# Created: Oct 10 2021
+# Time-stamp: <2022/02/15 09:36:53 fuyuki touza.pc.in>
+#
+# manually modified after automatic generation with AX_CREATE_PKGCONFIG_INFO
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+bindir=@bindir@
+libdir=@libdir@
+datarootdir=@datarootdir@
+datadir=@datadir@
+sysconfdir=@sysconfdir@
+includedir=@includedir@
+PACKAGE=@PACKAGE@
+package=@PACKAGE@
+# suffix=@suffix@
+pkgincludedir=${includedir}/@PACKAGE@
+pkglibdir=${libdir}/@PACKAGE@
+pkgdatadir=${datadir}/@PACKAGE@
+moddir=@moddir@
+fc_modinc="@FC_MODINC@"
+touza_lib="-l@TOUZA_NAME@"
+touza_name="@TOUZA_NAME@"
+
+Name: @PACKAGE_NAME@
+Description: @TOUZA_NAME@ library
+Version: @PACKAGE_VERSION@
+Requires: @PACKAGE_REQUIRES@
+Libs: -L${libdir} ${touza_lib} @LDFLAGS@ @LIBS@
+Cflags: -I${includedir}  -I${pkgincludedir} ${fc_modinc}${moddir} @CPPFLAGS@

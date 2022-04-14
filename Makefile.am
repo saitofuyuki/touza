@@ -1,9 +1,9 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2021/01/22 21:03:08 fuyuki Makefile.am>
+# Time-stamp: <2022/02/17 12:59:05 fuyuki Makefile.am>
 
-# Copyright (C) 2020, 2021
+# Copyright (C) 2020, 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
@@ -19,7 +19,13 @@ CLEANFILES			= $(nodist_bin_SCRIPTS)
 
 SUBDIRS 					= std
 lib@TOUZA_NAME@_la_LIBADD	= std/$(local_name)
-AM_FCFLAGS					= $(FC_MODULE_touza_std)
+AM_FCFLAGS					+= $(FC_MODULE_touza_std)
+
+if BUILD_emu
+SUBDIRS 					+= emu
+lib@TOUZA_NAME@_la_LIBADD	+= emu/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_emu)
+endif
 
 if BUILD_cal
 SUBDIRS 					+= cal
@@ -27,11 +33,8 @@ lib@TOUZA_NAME@_la_LIBADD	+= cal/$(local_name)
 AM_FCFLAGS					+= $(FC_MODULE_touza_cal)
 endif
 
-# if BUILD_emu
-# SUBDIRS 					+= emu
-# lib@TOUZA_NAME@_la_LIBADD	+= emu/$(local_name)
-# AM_FCFLAGS					+= $(FC_MODULE_touza_emu)
-# endif
+pkgconfigdir	=	$(libdir)/pkgconfig
+pkgconfig_DATA	=	touza.pc
 
 # if BUILD_div
 # SUBDIRS 					+= div
@@ -39,11 +42,32 @@ endif
 # AM_FCFLAGS					+= $(FC_MODULE_touza_div)
 # endif
 
+if BUILD_trp
+SUBDIRS 					+= trp
+lib@TOUZA_NAME@_la_LIBADD	+= trp/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_trp)
+endif
+
+if BUILD_nng
+SUBDIRS 					+= nng
+lib@TOUZA_NAME@_la_LIBADD	+= nng/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_nng)
+endif
+
+if BUILD_ppp
+SUBDIRS 					+= ppp
+lib@TOUZA_NAME@_la_LIBADD	+= ppp/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_ppp)
+endif
+
 SUBDIRS	+=	m4c
+
+SUBDIRS	+=	. $(subdirs_extra)
 
 include_HEADERS		= touza.h $(CONFIG_HEADER)
 lib_LTLIBRARIES 	= lib@TOUZA_NAME@.la
 lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
+lib@TOUZA_NAME@_la_DEPENDENCIES	= autorevision
 
 local_name			= libtouza_local.la
 
@@ -56,6 +80,40 @@ if NEVER
 EXTRA_PROGRAMS = dummy_never_built
 nodist_dummy_never_built_SOURCES = dummy_never_built.c
 endif
+
+EXTRA_DIST += $(AUTOREVISION_cache) $(AUTOREVISION_h)
+
+AUTOREVISION_h = autorevision.h
+AUTOREVISION_cache = autorevision.cache
+
+autorevision: autorevision-cache $(AUTOREVISION_h)
+
+$(AUTOREVISION_h): $(top_srcdir)/$(AUTOREVISION_cache)
+	@if test x"$(AUTOREVISION)" = x:; then \
+		echo "skip to run autorevision" >&2; touch $@; \
+	else \
+		$(AUTOREVISION) -f -t h -o $(top_srcdir)/$(AUTOREVISION_cache) | sed -e "s/\"/'/g" -e "s/''$$/' '/" > $@; \
+	fi
+
+# only update when top_srcdir is the top-level directory in git work-tree
+autorevision-cache:
+	@if cd $(top_srcdir); then \
+		top=`git rev-parse --show-cdup` || exit 1; \
+		if test x$${top} != x; then :; else \
+			$(AUTOREVISION) -t h -o $(AUTOREVISION_cache) > /dev/null; \
+		fi; fi
+
+EXPORT=
+
+export: $(AUTOREVISION_h)
+	@if test x"$(EXPORT)" = x; then \
+		echo "EXPORT must be set as destination" >&2; exit 1; \
+	elif test -d "$(EXPORT)"; then \
+		echo "$(EXPORT) exists, aborts." >&2; exit 1; \
+	else \
+		export=`$(REALPATH) --relative-to=$(top_builddir) $(EXPORT)` || exit $$?; \
+		$(MAKE) distdir=$${export} distdir; \
+	fi
 
 ### Local Variables:
 ### mode: makefile-automake

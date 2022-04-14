@@ -1,15 +1,28 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2021/03/05 08:33:01 fuyuki mt_local.m4>
+dnl Time-stamp: <2022/04/14 12:33:13 fuyuki mt_local.m4>
 
-dnl Copyright: 2020, 2021 JAMSTEC
+dnl Copyright: 2020-2022 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
 dnl   (https://www.apache.org/licenses/LICENSE-2.0)
 
 AC_LANG_PUSH([Fortran])
 
-MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_command_argument], [1])
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_command_argument], [1], [])
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getarg], [1, T], [
+character T*30])
+MT_FORTRAN_BATCH_CHECK_FUNCTION([command_argument_count], [])
+dnl SX
+MT_FORTRAN_BATCH_CHECK_FUNCTION([iargc], [])
+MT_FORTRAN_BATCH_CHECK_FUNCTION([fseek],  [0,0,0])
+MT_FORTRAN_BATCH_CHECK_FUNCTION([ftell],  [0])
+MT_FORTRAN_BATCH_CHECK_FUNCTION([ftelli8], [0])
+
+MT_FORTRAN_BATCH_CHECK_MODULE([mpi_f08])
+MT_FORTRAN_BATCH_CHECK_MODULE([mpi])
+MT_FORTRAN_BATCH_CHECK_MODULE([mpi], [mpi_bcast])
+
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT8])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT32])
@@ -18,6 +31,7 @@ MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL32])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL64])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INTEGER_KINDS])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL_KINDS])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [IOSTAT_END])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT8_T])
@@ -30,9 +44,23 @@ MT_FORTRAN_BATCH_CHECK_STATEMENT([open], [iomsg],[
 character T*(30)
 open(UNIT=1,IOMSG=T)])
 
+MT_FORTRAN_BATCH_CHECK_STATEMENT([open], [convert],[
+open(UNIT=1,CONVERT='BIG_ENDIAN')])
+
+MT_FORTRAN_BATCH_CHECK_STATEMENT([open], [stream],[
+open(UNIT=1,ACCESS='STREAM')])
+
 MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [iolength],[
 integer L
 inquire(IOLENGTH=L) int(0)])
+
+MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [pos],[
+integer L
+inquire(10, POS=L)])
+
+MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [convert],[
+character T*(30)
+inquire(10, CONVERT=T)])
 
 AC_ARG_VAR([OPT_STDIN_UNIT],    [fortran i/o unit for stdin])
 AC_ARG_VAR([OPT_STDOUT_UNIT],   [fortran i/o unit for stdout])
