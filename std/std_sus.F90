@@ -2,10 +2,10 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2022/02/16 15:00:18 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/03/26 16:43:26 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022
+! Copyright (C) 2021,2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -221,6 +221,9 @@ contains
        endif
        if (is_first_force(init_counts, mode)) then
           ! if (ierr.eq.0) call sus_check_kinds_literal(ierr, ulog)
+          if (ierr.eq.0) then
+             call sus_check_envs(ierr, ulog, levv=lv, icomm=icomm)
+          endif
           if (ierr.eq.0) call sus_check_stream_pos(ierr)
           if (ierr.eq.0) then
              mstrm_isep = get_size_strm(0_KI32)
@@ -331,7 +334,22 @@ contains
     return
   end subroutine finalize
 
-!!!_  - diag subcontracts
+!!!_  - init subcontracts
+!!!_   & sus_check_envs - on-demand environment checker (std_env dispatcher)
+  subroutine sus_check_envs &
+       & (ierr, ulog, levv, levtry, iroot, icomm)
+    use TOUZA_Std_env,only: init_unfmtd_recl, init_unfmtd_strm
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: ulog
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: levtry
+    integer,intent(in),optional :: iroot, icomm
+    ierr = 0
+    if (ierr.eq.0) call init_unfmtd_recl(ierr, ulog, levv, levtry, iroot, icomm)
+    if (ierr.eq.0) call init_unfmtd_strm(ierr, ulog, levv, levtry, iroot, icomm)
+    return
+  end subroutine sus_check_envs
 !!!_   & sus_check_stream_pos - health_check
   subroutine sus_check_stream_pos &
        & (ierr, utest, ulog)

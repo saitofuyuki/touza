@@ -1,7 +1,7 @@
 # TOUZA/Nng Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2022/02/16 17:45:00 fuyuki Makefile.am>
+# Time-stamp: <2022/04/06 12:35:49 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -20,11 +20,12 @@ noinst_LTLIBRARIES = libtouza_local.la
 libtouza_local_la_SOURCES = nng_std.F90 nng_header.F90 \
 							nng_record.F90 nng.F90 \
 							$(include_HEADERS)
+switch_DATA	+= nng_miroc.F90
 EXTRA_libtouza_local_la_SOURCES	= nng_miroc.F90
 libtouza_local_la_SOURCES	+=	$(libtouza_APPENDS)
 libtouza_APPENDS =
 
-AM_FCFLAGS = $(FC_MODULE_touza_std) $(FC_MODULE_touza_trp)
+AM_FCFLAGS += $(FC_MODULE_touza_std) $(FC_MODULE_touza_trp)
 AM_CPPFLAGS += $(FC_INCLUDE_touza_std) $(FC_INCLUDE_touza_trp)
 
 TEST_COMMON_LIBS	= $(noinst_LTLIBRARIES)
@@ -59,7 +60,7 @@ $(CAL_SWITCH):
 test_helpd	=	bin
 
 distclean-local:
-	@test -h $(test_helpd) && rm -f $(test_helpd)
+	if test -h $(test_helpd); then rm -f $(test_helpd); else true; fi
 
 link-bin:
 	@sub=$(test_helpd); bin=$(srcdir)/$${sub}; \

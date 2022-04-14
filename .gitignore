@@ -94,3 +94,4 @@ gmon.out
 /jmz/ltmain.sh
 /jmz/jmz_config.h.in
 /autorevision.cache
+/jmz/py-compile

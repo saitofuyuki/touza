@@ -1,7 +1,7 @@
 !!!_! nng_header.F90 - TOUZA/Nng header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/26 15:47:14 fuyuki nng_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/04/06 12:47:16 fuyuki nng_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -602,7 +602,7 @@ contains
     integer,         intent(in),optional :: iteme
     character(len=*),intent(in),optional :: fmt
     character(len=lhead) BUF
-    integer ji, jb, je, l
+    integer ji, jb, je
 
     ierr = 0
     if (present(iteme)) then

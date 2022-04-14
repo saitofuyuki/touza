@@ -1,10 +1,10 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2022/02/16 15:02:26 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/04/04 21:57:23 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -530,7 +530,8 @@ contains
        endif
     enddo
 102 format('exp2:', A, ':', I0, ': ', L1, 1x, E24.16, 1x, E24.16)
-    do j = -2, +2
+    ! overflow occurs when j == +1
+    do j = -2, 0
        jx = MH + j
        vx = AMT(one) * EXP2(REAL(jx, KIND=KRTGT))
        vy = AMT(one) * EXP2(REAL(1, KIND=KRTGT)) * EXP2(REAL(jx-1, KIND=KRTGT))

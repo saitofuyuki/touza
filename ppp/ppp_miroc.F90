@@ -1,7 +1,7 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/02/17 07:16:35 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/03/19 22:18:04 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -37,6 +37,7 @@
 module TOUZA_Ppp_miroc
 !!!_ = declaration
   use TOUZA_Ppp_std,only: unit_global
+  use TOUZA_Ppp,only: diag_maps_batch
 !!!_  - default
   implicit none
   private
@@ -51,13 +52,27 @@ module TOUZA_Ppp_miroc
 !!!   - public static
   integer,save,public :: nproc_quit = 0
   integer,save,public :: icomm_quit = 0
+!!!_  - interface aliases
+  interface diag_agent_maps
+     module procedure diag_maps_batch
+  end interface diag_agent_maps
+  interface terminate
+     module procedure terminate_core
+     module procedure terminate_aa, terminate_ai
+  end interface terminate
 !!!_  - interfaces (external)
   interface
-     subroutine XCKINI(HDRVR, GREETING)
+     subroutine XCKINI(AFFILS, N, GREETING)
+       implicit none
+       character(len=*),intent(in) :: AFFILS(*) ! array of agents I belong to.
+       integer,         intent(in) :: N
+       external :: greeting
+     end subroutine XCKINI
+     subroutine XCKINI_legacy(HDRVR, GREETING)
        implicit none
        character(len=*),intent(in) :: HDRVR         ! sequence of <CI> I belong to.
-       external :: GREETING
-     end subroutine XCKINI
+       external :: greeting
+     end subroutine XCKINI_legacy
      subroutine MMGetColor(ICLR, NCLR)
        implicit none
        integer,intent(out) :: ICLR, NCLR     ! color
@@ -125,12 +140,20 @@ module TOUZA_Ppp_miroc
 !!!_  - public
   public init, diag, finalize
   public get_wcolor
+  public affils_legacy
+  public gen_agent_union
+  public push_agent, pop_agent, top_agent, switch_agent
+  public diag_agent_maps
+  public query_handle, query_nprocs, query_comm
+  public terminate
+
   public XCKINI, MMGetColor, XMGetColor, XMIComm, XMCOMM, XMGETK, XMProc, XMOKNG
   public XMquit, XMabort,    XMabort0,   XMFinal
+  public XCKINI_legacy
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, stdv, icomm, dstr, greeting)
+  subroutine init(ierr, u, levv, mode, stdv, icomm, affils, greeting)
     use TOUZA_Ppp,only: ppp_init=>init, choice, &
          & control_mode, control_deep, is_first_force, is_msglev_NORMAL
     use TOUZA_Std,only: mwe_init
@@ -140,7 +163,7 @@ contains
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv, mode, stdv
     integer,         intent(in),optional :: icomm
-    character(len=*),intent(in),optional :: dstr
+    character(len=*),intent(in),optional :: affils(:)
     optional :: greeting
     interface
        subroutine greeting(jfpar)
@@ -170,8 +193,8 @@ contains
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ppp_init(ierr, u, levv, mode=md, stdv=stdv, icomm=icomm)
        endif
-       if (present(dstr)) then
-          if (ierr.eq.0) call init_batch(ierr, dstr, greeting)
+       if (present(affils)) then
+          if (ierr.eq.0) call init_batch(ierr, affils(:), greeting)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -257,11 +280,11 @@ contains
 !!!_ + init subcontracts
 !!!_  & init_batch - XCKINI compatible procedure
   subroutine init_batch &
-       & (ierr, dstr, greeting)
+       & (ierr, affils, greeting)
     use TOUZA_Std,only: set_defu
     implicit none
     integer,         intent(out) :: ierr
-    character(len=*),intent(in)  :: dstr
+    character(len=*),intent(in)  :: affils(:)
     optional :: greeting
     interface
        subroutine greeting(jfpar)
@@ -288,7 +311,7 @@ contains
     if (ierr.eq.0) &
          call init_sysi_colored(ierr, ifpar, jfpar, ncolor, icolor)
     if (ierr.eq.0) &
-         call init_comms(ierr, dstr, ncolor, icolor, nrank, irank, ifpar, jfpar)
+         call init_comms(ierr, affils(:), ncolor, icolor, nrank, irank, ifpar, jfpar)
     if (ierr.eq.0) &
          call init_king(ierr, ifpar, jfpar)
 
@@ -404,59 +427,30 @@ contains
 !!!_  & init_comms
   subroutine init_comms &
        & (ierr,   &
-       &  dstr,   &
+       &  affils, &
        &  ncolor, icolor, &
        &  nrank,  irank,  ifpar,  jfpar, icomm)
     use MPI,only: MPI_COMM_WORLD
     use TOUZA_Std,only: choice
-    use TOUZA_Ppp,only: ldrv, &
+    use TOUZA_Ppp,only: lagent, &
          & new_agent_color, new_agent_derived, &
          & new_agent_family, new_agent_root
     implicit none
     integer,         intent(out) :: ierr
-    character(len=*),intent(in)  :: dstr
+    character(len=*),intent(in)  :: affils(:)
     integer,         intent(in)  :: ncolor, icolor
     integer,         intent(in)  :: nrank,  irank
     integer,         intent(in)  :: ifpar,  jfpar
     integer,optional,intent(in)  :: icomm
 
     integer ic
-    integer,parameter :: mdrvs = 16
-    character(len=ldrv) :: drivers(mdrvs)
-
-    integer js, j, nd, ls
 
     ierr = 0
-
-    ls = len_trim(dstr)
-    nd = 0
-    js = 1
-    do
-       if (js.gt.ls) exit
-       nd = nd + 1
-       if (nd.gt.mdrvs) then
-101       format('driver overflows: ', A, 1x, I0)
-          write(jfpar, 101) trim(dstr), mdrvs
-          ierr = -1
-          return
-       endif
-       j = 0
-       if (js.lt.ls) j = verify(dstr(js+1:ls), '0123456789')
-       if (j.eq.0) then
-          j = ls
-       else
-          j = js + j - 1
-       endif
-       drivers(nd) = dstr(js:j)
-       js = j + 1
-    enddo
 
     ic = choice(MPI_COMM_WORLD, icomm)
     if (ierr.eq.0) call new_agent_root(ierr, ic)
     if (ierr.eq.0) call new_agent_color(ierr, icolor, 'X')
-    if (ierr.eq.0) call new_agent_family(ierr, drivers(1:nd))
-    if (ierr.eq.0) call new_agent_derived(ierr, 'W', (/'A', 'O'/))
-    if (ierr.eq.0) call new_agent_derived(ierr, 'H', (/'@'/))
+    if (ierr.eq.0) call new_agent_family(ierr, affils(:))
 
   end subroutine init_comms
 
@@ -473,6 +467,7 @@ contains
     integer krank
     NAMELIST /NMKING/ HMOD, KRANK, HREF
     ierr = 0
+
     ! call set_king(ierr, 0, 'A', 'A')
     ! call set_king(ierr, 0, 'O', 'O')
 
@@ -496,38 +491,270 @@ contains
     if (is_eof_ss(ierr)) ierr = 0
     return
   end subroutine init_king
+!!!_  - affils_legacy - create affils array from string
+  subroutine affils_legacy &
+       & (ierr, affils, na, dstr)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: affils(:)
+    integer,         intent(out) :: na
+    character(len=*),intent(in)  :: dstr
+
+    integer la
+    integer js, j, ls
+
+    ierr = 0
+
+    la = size(affils)
+    ls = len_trim(dstr)
+    na = 0
+    js = 1
+    do
+       if (js.gt.ls) exit
+       na = na + 1
+       if (na.gt.la) then
+! 101       format('affiliaion overflows: ', A, 1x, I0)
+!           write(jfpar, 101) trim(dstr), la
+          ierr = -1
+          return
+       endif
+       j = 0
+       if (js.lt.ls) j = verify(dstr(js+1:ls), '0123456789')
+       if (j.eq.0) then
+          j = ls
+       else
+          j = js + j - 1
+       endif
+       affils(na) = dstr(js:j)
+       js = j + 1
+    enddo
+    return
+  end subroutine affils_legacy
 !!!_ + user interfaces
+!!!_  & get_wcolor - query colors under the world
   subroutine get_wcolor(ncolor, icolor)
     implicit none
     integer,intent(out) :: ncolor, icolor
     ncolor = ncolor_world
     icolor = icolor_world
   end subroutine get_wcolor
+!!!_  & gen_agent_union - create union agent (XMADRV)
+  subroutine gen_agent_union(NEWAGENT, NAME, ALIST, N)
+    use TOUZA_Ppp,only: new_agent_derived, query_agent
+    implicit none
+    integer,         intent(out) :: NEWAGENT
+    character(len=*),intent(in)  :: NAME
+    character(len=*),intent(in)  :: ALIST(*)
+    integer,         intent(in)  :: N
+    integer jerr
+    call new_agent_derived(jerr, NAME, ALIST(1:N))
+    if (jerr.ne.0) then
+       NEWAGENT = -1
+       return
+    endif
+    NEWAGENT = query_agent(NAME)
+    return
+  end subroutine gen_agent_union
+!!!_  & push_agent - push agent on stack (XMAPSH)
+  subroutine push_agent(ierr, iagnt)
+    use TOUZA_Ppp,only: ppp_push_agent=>push_agent
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: iagnt
+    call ppp_push_agent(ierr, iagnt)
+    if (ierr.ne.0) then
+       call terminate(1, 'Fail to push agent', iagnt)
+       return
+    endif
+    return
+  end subroutine push_agent
+!!!_  & pop_agent - pop agent from stack (XMAPOP)
+  subroutine pop_agent(ierr, iagnt)
+    use TOUZA_Ppp,only: ppp_pop_agent=>pop_agent
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: iagnt
+    call ppp_pop_agent(ierr, iagnt)
+    if (ierr.ne.0) then
+       call terminate(1, 'Fail to pop agent', iagnt)
+       return
+    endif
+    return
+  end subroutine pop_agent
+!!!_  & top_agent - get top agent on stack (XMATOP)
+  subroutine top_agent(ierr, iagnt)
+    use TOUZA_Ppp,only: ppp_top_agent=>top_agent
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(out) :: iagnt
+    call ppp_top_agent(ierr, iagnt)
+    if (ierr.ne.0) then
+       call terminate(1, 'Fail to get top agent', ierr)
+       return
+    endif
+    return
+  end subroutine top_agent
+!!!_  & switch_agent - switch agent on stack (XMASWT)
+  subroutine switch_agent(ierr, iagnt)
+    use TOUZA_Ppp,only: ppp_switch_agent=>switch_agent
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: iagnt
+    call ppp_switch_agent(ierr, iagnt)
+    if (ierr.ne.0) then
+       call terminate(1, 'Fail to switch agent', iagnt)
+       return
+    endif
+    return
+  end subroutine switch_agent
+!!!_  & query_handle - get agent handle from agent string (XMCiJA)
+  subroutine query_handle(IAGNT, HCTZ)
+    use TOUZA_Emu,only: get_sysu
+    use TOUZA_Ppp,only: query_agent, msg
+    implicit none
+    integer,         intent(out) :: IAGNT
+    character(len=*),intent(in)  :: HCTZ     ! <CI>
+    integer jfpar
+    IAGNT = query_agent(HCTZ)
+    if (IAGNT.ge.0) return
+    call get_sysu(syso=jfpar)
+101 format(' ### query_handle: INVALID HCTZ: ',  A)
+    write(jfpar, 101) trim(HCTZ)
+    IAGNT = -9
+    return
+  end subroutine query_handle
+!!!_  & query_nprocs - get size and rank from agent (XMjaPr)
+  subroutine query_nprocs(NPRZ, IRKZ, IAGNT)
+    use TOUZA_Emu,only: get_sysu
+    use TOUZA_Ppp,only: inquire_agent
+    implicit none
+    integer,intent(out) :: NPRZ, IRKZ
+    integer,intent(in)  :: IAGNT
+    integer jfpar
+    integer jerr
+    call inquire_agent(jerr, iagent=IAGNT, nrank=NPRZ, irank=IRKZ)
+    if (jerr.eq.0) return
+    call get_sysu(syso=jfpar)
+101 format(' ### query_nprocs: INVALID agent: ',  I0)
+    write(jfpar, 101) IAGNT
+    NPRZ = 0
+    IRKZ = -1
+    return
+  end subroutine query_nprocs
+!!!_  & query_comm - get communicator handle from agent (XMjaCM)
+  subroutine query_comm(ICMZ, IAGNT)
+    use TOUZA_Emu,only: get_sysu
+    use TOUZA_Ppp,only: inquire_agent
+    use MPI, only: MPI_COMM_NULL
+    implicit none
+    integer,intent(out) :: ICMZ
+    integer,intent(in)  :: IAGNT
+    integer jfpar
+    integer jerr
+    call inquire_agent(jerr, iagent=IAGNT, icomm=ICMZ)
+    if (jerr.eq.0) return
+    call get_sysu(syso=jfpar)
+101 format(' ### query_comm: INVALID agent: ',  I0)
+    write(jfpar, 101) IAGNT
+    ICMZ = MPI_COMM_NULL
+    return
+  end subroutine query_comm
+!!!_  & terminate - abort
+  subroutine terminate_core(LEV, MSG)
+    use TOUZA_Emu,only: get_sysu
+    use MPI,only: MPI_Abort
+    implicit none
+    integer,         intent(in)          :: LEV
+    character(len=*),intent(in),optional :: MSG
+    integer ierr
+    integer jfpar
+    if (present(msg)) then
+       call get_sysu(syso=jfpar)
+       write(jfpar, *) trim(msg)
+    endif
+    if (nproc_quit .le. 0) then ! serial run
+       call MSGBOX('Abort Serial Execution.')
+    else
+       call MSGBOX('Abort Parallel Execution.')
+
+       CALL CLCSTR('Comm.')
+#ifdef OPT_MPE
+       CALL MX_Fin_MPI
+#endif
+       CALL MPI_Abort(icomm_quit, LEV, ierr)
+       CALL CLCEND( 'Comm.' )
+    endif
+    if (ierr.eq.0) call finalize(ierr)
+  end subroutine terminate_core
+  subroutine terminate_aa(LEV, STR0, STR1)
+    implicit none
+    integer,         intent(in) :: LEV
+    character(len=*),intent(in) :: STR0, STR1
+    character(len=128) :: msg
+101 format(A, 1x, A)
+    write(msg, 101) trim(STR0), trim(STR1)
+    call terminate_core(LEV, MSG)
+  end subroutine terminate_aa
+  subroutine terminate_ai(LEV, STR, NUM)
+    implicit none
+    integer,         intent(in) :: LEV
+    character(len=*),intent(in) :: STR
+    integer,         intent(in) :: NUM
+    character(len=128) :: msg
+101 format(A, 1x, I0)
+    write(msg, 101) trim(STR), NUM
+    call terminate_core(LEV, MSG)
+  end subroutine terminate_ai
 !!!_ + end module
 end module TOUZA_Ppp_Miroc
 !!!_* /nonmodule/ interfaces
 !!!_ + xmcomm
 !!!_  & XCKINI
-subroutine XCKINI(HDRVR, GREETING)
+subroutine XCKINI(AFFILS, N, GREETING)
   use TOUZA_Ppp_miroc,only: init, diag
+  implicit none
+  character(len=*),intent(in) :: AFFILS(*) ! array of agents I belong to.
+  integer,         intent(in) :: N
+  external :: greeting
+  integer jerr
+  call init(jerr, levv=+9, stdv=+9, affils=AFFILS(1:N), greeting=greeting)
+  call diag(jerr, levv=+1)
+  return
+end subroutine XCKINI
+!!!_  & XCKINI_legacy
+subroutine XCKINI_legacy(HDRVR, GREETING)
+  use TOUZA_Ppp_miroc,only: init, diag, affils_legacy, terminate
+  use TOUZA_Ppp_amng, only: lagent
   implicit none
   character(len=*),intent(in) :: HDRVR         ! sequence of <CI> I belong to.
   external :: greeting
   integer jerr
-  call init(jerr, levv=+9, stdv=+9, dstr=HDRVR, greeting=greeting)
+  integer na
+  integer,parameter :: maff = 16
+  character(len=lagent) :: affils(maff)
+
+  jerr = 0
+  call affils_legacy(jerr, affils, na, HDRVR)
+  if (jerr.ne.0) then
+     call terminate(1, 'XCKINI LEGACY FAILED: ', HDRVR)
+     return
+  endif
+
+  call init(jerr, levv=+9, stdv=+9, affils=affils(1:na), greeting=greeting)
   call diag(jerr, levv=+1)
   return
-end subroutine XCKINI
+end subroutine XCKINI_legacy
 !!!_  & XMSETK (XCKINI entry) - DELETED
 subroutine XMSETK(OKING, HC)
+  use TOUZA_Ppp_miroc,only: terminate
   implicit none
   logical,         intent(out) :: OKING    ! whether or not I am the king
   character(len=*),intent(in)  :: HC       ! <CI>
-  call XMabort_msg('DELETED: XMSETK', HC)
+  call terminate(1, 'DELETED: XMSETK', HC)
 end subroutine XMSETK
 !!!_  & XMGETK (XCKINI entry) - legacy, deprecated
 subroutine XMGETK(HM, HC, IR, HR)
-  use TOUZA_Ppp,only: get_king
+  use TOUZA_Ppp,only: get_king, inquire_agent
   use TOUZA_Ppp_miroc,only: lmod
   implicit none
   integer,         intent(out) :: IR       ! King rank for the input module
@@ -536,14 +763,21 @@ subroutine XMGETK(HM, HC, IR, HR)
   character(len=*),intent(in)  :: HR       ! message text
   integer jerr
   character(len=lmod) :: HA
+  logical ismem
   HA = HM(1:1)
-  call get_king(jerr, IR, HM, ' ', HA)
+  call get_king(jerr, IR, HM, HA)
   if (jerr.eq.0) then
-     if (HC(1:1).eq.'/'.or.HC(1:1).eq.'W') then
-        call get_king(jerr, IR, HM, 'W')
-     else if (HC.ne.' ') then
+     if (HC.ne.' ') then
         call get_king(jerr, IR, HM, HC(1:1))
+     else
+        call inquire_agent(jerr, agent=HA, ismem=ismem)
+        if (.not.ismem) IR = -999
      endif
+     ! if (HC(1:1).eq.'/'.or.HC(1:1).eq.'W') then
+     !    call get_king(jerr, IR, HM, 'W')
+     ! else if (HC.ne.' ') then
+     !    call get_king(jerr, IR, HM, HC(1:1))
+     ! endif
   endif
 end subroutine XMGETK
 !!!_  & XMOKNG
@@ -562,6 +796,7 @@ end subroutine XMOKNG
 subroutine XMProc(NPRZ, IRKZ, HCTZ)
   use MPI,only: MPI_UNDEFINED
   use TOUZA_Ppp,only: inquire_agent
+  use TOUZA_Ppp_miroc,only: terminate
   implicit none
   integer,         intent(out) :: NPRZ     ! # of rank
   integer,         intent(out) :: IRKZ     ! PE number
@@ -576,11 +811,12 @@ subroutine XMProc(NPRZ, IRKZ, HCTZ)
      endif
      return
   endif
-  call XMabort_msg(' ### XMproc: INVALID HCTZ:', HCTZ)
+  call terminate(1, ' ### XMproc: INVALID HCTZ:', HCTZ)
 end subroutine XMProc
 !!!_  & XMComm (XCKINI entry)
 subroutine XMComm(OCMZ, HCTZ)
   use TOUZA_Ppp,only: inquire_agent
+  use TOUZA_Ppp_miroc,only: terminate
   implicit none
   logical,         intent(out) :: OCMZ     ! whether or not I belong to comm.
   character(len=*),intent(in)  :: HCTZ     ! <CI>
@@ -591,18 +827,19 @@ subroutine XMComm(OCMZ, HCTZ)
      OCMZ = (ir.ge.0)
      return
   endif
-  call XMabort_msg(' ### XMcomm: INVALID HCTZ:', HCTZ)
+  call terminate(1, ' ### XMcomm: INVALID HCTZ:', HCTZ)
 end subroutine XMComm
 !!!_  & XMIComm (XCKINI entry)
 subroutine XMIComm(ICMZ, HCTZ)
   use TOUZA_Ppp,only: inquire_agent
+  use TOUZA_Ppp_miroc,only: terminate
   implicit none
   integer,         intent(out) :: ICMZ     ! communicator handle
   character(len=*),intent(in)  :: HCTZ     ! <CI>
   integer jerr
   call inquire_agent(jerr, agent=HCTZ, icomm=ICMZ)
   if (jerr.eq.0) return
-  call XMabort_msg(' ### XMIcomm: INVALID HCTZ:', HCTZ)
+  call terminate(1, ' ### XMIcomm: INVALID HCTZ:', HCTZ)
 end subroutine XMIComm
 !!!_  & XMGetColor
 subroutine XMGetColor(ICLR, NCLR)
@@ -627,42 +864,18 @@ subroutine XMquit(NPR0I, ICOM0I)
   icomm_quit = ICOM0I
   return
 end subroutine XMquit
-!!!_ + XMabort_msg
-subroutine XMabort_msg(a, b)
-  use TOUZA_Emu,only: get_sysu
-  implicit none
-  character(len=*),intent(in) :: a
-  character(len=*),intent(in) :: b
-  integer jfpar
-  call get_sysu(syso=jfpar)
-  write(jfpar, *) trim(a), ' ', trim(b)
-  CALL XMABORT(1)
-end subroutine XMabort_msg
 !!!_  & XMabort (XMquit entry)
 subroutine XMabort(LEV)
-  use MPI,only: MPI_Abort
-  use TOUZA_Ppp_miroc, only: nproc_quit, icomm_quit, finalize
+  use TOUZA_Ppp_miroc,only: terminate
   implicit none
   integer,intent(in) :: LEV
-  integer ierr
-  if (nproc_quit .le. 0) then ! serial run
-     call MSGBOX('Abort Serial Execution.')
-  else
-     call MSGBOX('Abort Parallel Execution.')
-
-     CALL CLCSTR('Comm.')
-#ifdef OPT_MPE
-     CALL MX_Fin_MPI
-#endif
-     CALL MPI_Abort(icomm_quit, LEV, ierr)
-     CALL CLCEND( 'Comm.' )
-  endif
-  if (ierr.eq.0) call finalize(ierr)
+  call terminate(LEV)
 end subroutine XMabort
 !!!_  & XMabort0 (XMquit entry)
 subroutine XMabort0
+  use TOUZA_Ppp_miroc,only: terminate
   implicit none
-  call XMabort(1)
+  call terminate(1)
 end subroutine XMabort0
 !!!_  & XMFinal (XMquit entry)
 subroutine XMFinal()
@@ -709,11 +922,17 @@ program test_ppp_miroc
   integer jfpar
   integer icomma, nra, ira
   integer icommo, nro, iro
+  integer jdmy
   external greeting
   ierr = 0
 
-  call XCKINI(_DRIVER, greeting)
+  call XCKINI_legacy(_DRIVER, greeting)
+
+  call gen_agent_union(jdmy, 'W', (/'A', 'O'/), 2)
+  call gen_agent_union(jdmy, 'H', (/'@'/), 1)
+
   call getjfp(JFPAR)
+  call diag_agent_maps(ierr, JFPAR)
 
   call XMGETK('AM', ' ', kaa, 'a root')
   call XMGETK('AM', 'W', kaw, 'a root')

@@ -1,7 +1,7 @@
 /* touza_ppp.h - touza/ppp common definition */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Jan 26 2022 */
-/* Time-stamp: <2022/01/26 15:28:13 fuyuki touza_ppp.h> */
+/* Time-stamp: <2022/03/02 08:33:33 fuyuki touza_ppp.h> */
 /* Copyright (C) 2022 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -12,15 +12,17 @@
 #  define  _TOUZA_PPP_H 1
 
 #  ifdef TOUZA_TRANSFORM
-#    define TOUZA_Ppp      TOUZA_TRANSFORM(Ppp)
+#    define TOUZA_Ppp       TOUZA_TRANSFORM(Ppp)
 #  endif
 #  ifdef TOUZA_TRANSFORM_MDL
 #    define TOUZA_Ppp_std   TOUZA_TRANSFORM_MDL(Ppp,std)
-#    define TOUZA_Ppp_comm  TOUZA_TRANSFORM_MDL(Ppp,comm)
+#    define TOUZA_Ppp_amng  TOUZA_TRANSFORM_MDL(Ppp,amng)
+#    define TOUZA_Ppp_king  TOUZA_TRANSFORM_MDL(Ppp,king)
+#    define TOUZA_Ppp_ccom  TOUZA_TRANSFORM_MDL(Ppp,ccom)
 #  endif
 
 #  ifndef GROUP_TAG
-#  define GROUP_TAG 'ppp'
+#  define GROUP_TAG 'Ppp'
 #  endif
 #  ifndef __GRP__
 #  define __GRP__ GROUP_TAG

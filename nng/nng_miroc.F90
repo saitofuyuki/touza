@@ -1,7 +1,7 @@
 !!!_! nng_miroc.F90 - TOUZA/Nng MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2022/02/02 08:34:04 fuyuki nng_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/04/14 14:39:36 fuyuki nng_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -59,6 +59,11 @@ module TOUZA_Nng_miroc
 #define __MDL__ 'm'
 !!!_  - interfaces (external)
   interface
+!!!_   . init_common
+     subroutine init_common(u)
+       implicit none
+       integer,intent(in),optional :: u
+     end subroutine init_common
 !!!_   . GTZRDZ
      subroutine GTZRDZ &
           & (DDATA, HEAD,  IEOD,  &
@@ -151,6 +156,9 @@ module TOUZA_Nng_miroc
   public init, diag, finalize
   public put_item_time
   public NCC,  NDC
+  public init_common
+  public nng_tell, nng_seek
+  public GTZRDZ, GFPEEK, GFSKIP, FOPEN, FREWND, FINQUX, FNUINI, FNEWU
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -205,6 +213,7 @@ contains
   end subroutine finalize
 
 !!!_ + user subroutines
+!!!_  - put_item_time
   subroutine put_item_time(ierr, head, time, kentr)
     use TOUZA_Nng_header,only: put_item
     implicit none
@@ -217,9 +226,50 @@ contains
     call css2yh(idate, time)
     call put_item(ierr, head, idate, kentr)
   end subroutine put_item_time
+!!!_  - nng_tell - return file position (ciof_tell emulation)
+  subroutine nng_tell(u, jpos)
+    use TOUZA_Nng_std,only: KI64
+    implicit none
+    integer,           intent(in)  :: u
+    integer(KIND=KI64),intent(out) :: jpos  ! not KIOFS
+    integer jerr
+    inquire(UNIT=u, IOSTAT=jerr, POS=jpos)
+    return
+  end subroutine nng_tell
+!!!_  - nng_seek - set file position (ciof_seek emulation)
+  subroutine nng_seek(ierr, u, jpos)
+    use TOUZA_Nng_std,only: KI64, WHENCE_ABS, sus_rseek, sus_eswap
+    implicit none
+    integer,           intent(out) :: ierr
+    integer,           intent(in)  :: u
+    integer(KIND=KI64),intent(in)  :: jpos  ! not KIOFS
+    call sus_rseek(ierr, u, jpos, whence=WHENCE_ABS)
+    return
+  end subroutine nng_seek
 !!!_ + end module
 end module TOUZA_Nng_Miroc
 !!!_* /nonmodule/ interfaces
+!!!_  - init_common
+subroutine init_common(u)
+  use TOUZA_Std,only: choice
+  use TOUZA_Nng_miroc,only: init, diag
+  implicit none
+  integer,intent(in),optional :: u
+  integer jerr
+  integer jfpar
+  jerr = 0
+#if WITH_MIROC
+  if (present(u)) then
+     jfpar = u
+  else
+     call GETJFP(jfpar)
+  endif
+#else
+  jfpar = choice(0, u)  ! hard-coded
+#endif
+  call init(jerr, jfpar)
+  if (jerr.eq.0) call diag(jerr)
+end subroutine init_common
 !!!_ + io/igtior.F
 !!!_  & GTZRDZ
 subroutine GTZRDZ &
@@ -231,7 +281,7 @@ subroutine GTZRDZ &
        & nng_msg=>msg,    get_item, &
        & nng_read_header, parse_header_size, nng_read_data, &
        & hi_ASTR1, hi_ASTR2, hi_ASTR3, hi_AEND1, hi_AEND2, hi_AEND3
-  use TOUZA_Nng_miroc,only: nm_init=>init, nm_diag=>diag, KMD, NCC, NDC
+  use TOUZA_Nng_miroc,only: KMD, NCC, NDC, init_common
   implicit none
   integer,            intent(in)  :: DSIZE
   real(kind=kmd),     intent(out) :: DDATA(DSIZE)  !! data
@@ -249,18 +299,12 @@ subroutine GTZRDZ &
   integer krect                 ! record type
   integer jerr
   integer n
-  integer,save :: jfpar
+  integer jfpar
 
   jerr = 0
 
   if (ofirst) then
-#if WITH_MIROC
-     call GETJFP(jfpar)
-#else
-     jfpar = 0  ! hard-coded
-#endif
-     call nm_init(jerr, u=jfpar)
-     if (jerr.eq.0) call nm_diag(jerr)
+     call init_common()
      ofirst = .FALSE.
   endif
 
@@ -275,6 +319,7 @@ subroutine GTZRDZ &
   ! check buffer size
   if (n .gt. DSIZE) then
 #if WITH_MIROC
+     call GETJFP(jfpar)
      write(jfpar, *) '### GTZRDZ : AREA TOO SMALL:',  &
           &          ' ITEM: ' // TRIM(HITEM) // ',', &
           &          ' DATA:', n, ',AREA:', DSIZE
@@ -319,7 +364,6 @@ subroutine GFPEEK &
   integer krect                 ! record type
   integer jerr
   integer(KIND=KIOFS) :: jpos
-
   IEOD = 0
 
   inquire(UNIT=IFILE, IOSTAT=jerr, POS=jpos)
@@ -365,8 +409,8 @@ subroutine GTZWRZ &
      &  ISTA,  IEND,  JSTA,  JEND,  KSTA,  KEND, &
      &  DSIZE)
   use TOUZA_Nng_miroc,only:  &
-       & nm_init=>init, nm_diag=>diag, vmiss_def, &
-       & put_item_time
+       & vmiss_def, &
+       & put_item_time, init_common
   use TOUZA_Nng_header,only: litem, nitem, put_item, &
        & hi_DSET,  hi_ITEM,  hi_TITL1, hi_TITL2, &
        & hi_UNIT,  hi_TIME,  hi_TDUR,  hi_DFMT,  &
@@ -403,7 +447,6 @@ subroutine GTZWRZ &
 
   integer jerr
   logical,save :: ofirst = .TRUE.
-  integer,save :: jfpar
   integer :: idtv(8)
   real(kind=KMD),save      :: TIME_PREV = - HUGE(0.0_KMD)
   real(kind=KMD),parameter :: LAZINESS  = 24 * 3600.0_KMD
@@ -418,15 +461,9 @@ subroutine GTZWRZ &
 
   jerr = 0
   if (ofirst) then
-     ofirst = .FALSE.
-#if WITH_MIROC
-     call GETJFP(jfpar)
-#else
-     jfpar = 0  ! hard-coded
-#endif
-     call nm_init(jerr, u=jfpar)
-     if (jerr.eq.0) call nm_diag(jerr)
+     call init_common()
      if (jerr.eq.0) call get_default_header(hdefv)
+     ofirst = .FALSE.
   endif
 
 
@@ -490,11 +527,11 @@ subroutine GTZWRZ &
   ! no adjustment for obsolete formats
   call put_item(jerr, head, HDFMT, hi_DFMT)
 
+  krect = REC_DEFAULT
   call nng_write_header(jerr, head, krect, JFILE)
   ! if (ierr.eq.0) then
   !    if (levv.gt.1) call switch_urt_diag(wfile, jrec, udiag)
   ! endif
-  krect = REC_DEFAULT
   if (jerr.eq.0) call nng_write_data(jerr, DDATA, n, head, krect, JFILE)
 
   return
@@ -565,10 +602,15 @@ end subroutine FINQUX
 subroutine FNUINI &
      & (IFILMN, IFILMX)
   use TOUZA_Std,only: kucat_black, set_category_bound
-  use TOUZA_Nng_miroc,only: categ_nng, categ_normal
+  use TOUZA_Nng_miroc,only: categ_nng, categ_normal, init_common
   implicit none
   integer jerr
   integer,intent(in)  :: IFILMN, IFILMX
+  logical,save :: ofirst = .true.
+  if (ofirst) then
+     call init_common()
+     ofirst = .false.
+  endif
   call set_category_bound(jerr, kucat_black, IFILMN)
   call set_category_bound(jerr, categ_normal, IFILMX+1)
   return

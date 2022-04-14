@@ -1,7 +1,7 @@
 !!!_! ppp_std.F90 - TOUZA/Ppp utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2022/02/10 22:02:05 fuyuki ppp_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/03/01 11:28:55 fuyuki ppp_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -47,7 +47,7 @@ module TOUZA_Ppp_std
 !!!_  - interfaces
   interface msg
      module procedure msg_txt
-     module procedure msg_i, msg_ia
+     module procedure msg_i, msg_ia, msg_aa
   end interface msg
 !!!_  - public procedures
   public init, diag, finalize
@@ -203,6 +203,17 @@ contains
     write(tmsg, fmt) vv(:)
     call msg_txt(tmsg, mdl, u)
   end subroutine msg_ia
+!!!_  & msg_aa - message dispatcher (to override std)
+  subroutine msg_aa &
+       & (fmt, vv, mdl, u)
+    implicit none
+    character(len=*),intent(in)          :: fmt
+    character(len=*),intent(in)          :: vv(:)
+    character(len=*),intent(in),optional :: mdl
+    integer,         intent(in),optional :: u
+    write(tmsg, fmt) vv(:)
+    call msg_txt(tmsg, mdl, u)
+  end subroutine msg_aa
 
 end module TOUZA_Ppp_std
 

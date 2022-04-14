@@ -1,7 +1,7 @@
 dnl Filename:  touza/m4c/mt_fortran_check.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 3 2020
-dnl Time-stamp: <2022/02/16 14:55:53 fuyuki mt_fortran_check.m4>
+dnl Time-stamp: <2022/04/14 12:09:35 fuyuki mt_fortran_check.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -22,7 +22,7 @@ dnl   MT_FORTRAN_BATCH_LDADD
 AC_DEFUN([MT_FORTRAN_CHECK])
 
 # ======================================================================
-# MT_FORTRAN_BATCH_CHECK_FUNCTION(FUNCTION, [ARGUMENTS])
+# MT_FORTRAN_BATCH_CHECK_FUNCTION(FUNCTION, ARGUMENTS)
 # ------------------------------------------------------
 AC_DEFUN([MT_FORTRAN_BATCH_CHECK_FUNCTION],
 [m4_indir([MT_FORTRAN_BATCH_CHECK],
@@ -32,7 +32,7 @@ AC_DEFUN([MT_FORTRAN_BATCH_CHECK_FUNCTION],
           [MT_FORTRAN_CHECK_FUNCTION],
           $@)])# MT_FORTRAN_BATCH_CHECK_FUNCTION
 
-# MT_FORTRAN_BATCH_CHECK_SUBROUTINE(SUBROUTINE, [ARGUMENTS])
+# MT_FORTRAN_BATCH_CHECK_SUBROUTINE(SUBROUTINE, ARGUMENTS, PROLOGUE)
 # ------------------------------------------------------
 AC_DEFUN([MT_FORTRAN_BATCH_CHECK_SUBROUTINE],
 [m4_indir([MT_FORTRAN_BATCH_CHECK],
@@ -92,12 +92,13 @@ AC_DEFUN([MT_FORTRAN_CHECK_FUNCTION],
 [MT_FORTRAN_CHECK_DEFINE([$1],
       [write(*,*) $1($2)], [$3], [$4])])# MT_FORTRAN_CHECK_FUNCTION
 
-# MT_FORTRAN_CHECK_SUBROUTINE(SUBROUTINE, [ARGUMENTS], [ACTION-IF-TRUE], [ACTION-IF-FALSE])
+# MT_FORTRAN_CHECK_SUBROUTINE(SUBROUTINE, [ARGUMENTS], [PROLOGUE], [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # -----------------------------------------------------------------------------------------
 # Check whether SUBROUTINE can be used.
 AC_DEFUN([MT_FORTRAN_CHECK_SUBROUTINE],
 [MT_FORTRAN_CHECK_DEFINE([$1],
-      [call $1($2)], [$3], [$4])])# MT_FORTRAN_CHECK_SUBROUTINE
+      [$3
+       call $1($2)], [$4], [$5])])# MT_FORTRAN_CHECK_SUBROUTINE
 
 # MT_FORTRAN_CHECK_MODULE(MODULE, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # --------------------------------------------------------------------

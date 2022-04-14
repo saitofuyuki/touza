@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/02/15 21:35:08 fuyuki configure.ac>
+# Time-stamp: <2022/03/29 11:31:46 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -101,7 +101,7 @@ MT_SUB_PACKAGE([std], [always])
 MT_SUB_PACKAGE([emu], [],     [std])
 MT_SUB_PACKAGE([cal], [],     [std])
 MT_SUB_PACKAGE([trp], [],     [std])
-MT_SUB_PACKAGE([nng], [],     [std trp])
+MT_SUB_PACKAGE([nng], [],     [std emu trp])
 MT_SUB_PACKAGE([ppp], [],     [std emu])
 dnl MT_SUB_PACKAGE([div], [],     [std])
 
@@ -127,6 +127,15 @@ AS_IF([test "x$with_build_jmz" != xno],
 
 PKG_PROG_PKG_CONFIG()
 PKG_PREREQ([0.29])
+
+AC_ARG_ENABLE([install-switches],
+              [AS_HELP_STRING([--enable-install-switches],
+                              [install switcher sources if applicable @<:@default='${datadir}/PACKAGE'@:>@])],
+              [switchdir="$enableval"],
+              [switchdir='yes'])
+AS_IF([test x"[$]switchdir" = xyes],
+      [switchdir='[$]{datadir}/[$]{PACKAGE}'])
+AC_SUBST([switchdir])
 
 dnl AX_CREATE_PKGCONFIG_INFO()
 AC_SUBST([PACKAGE_REQUIRES], [])

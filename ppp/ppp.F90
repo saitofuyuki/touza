@@ -1,7 +1,7 @@
 !!!_! ppp.F90 - touza/ppp ppp manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2022/02/02 08:50:44 fuyuki ppp.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/03/02 08:19:58 fuyuki ppp.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -19,7 +19,7 @@ module TOUZA_Ppp
 !!!_ = declaration
 !!!_  - modules
   use TOUZA_Ppp_std,  ps_init=>init, ps_diag=>diag, ps_finalize=>finalize
-  use TOUZA_Ppp_comm, pc_init=>init, pc_diag=>diag, pc_finalize=>finalize
+  use TOUZA_Ppp_amng, pa_init=>init, pa_diag=>diag, pa_finalize=>finalize
   use TOUZA_Ppp_king, pk_init=>init, pk_diag=>diag, pk_finalize=>finalize
 !!!_  - default
   implicit none
@@ -60,7 +60,7 @@ contains
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ps_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
-          if (ierr.eq.0) call pc_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pa_init(ierr, u=ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call pk_init(ierr, u=ulog, levv=lv, mode=lmd)
        endif
        init_counts = init_counts + 1
@@ -96,7 +96,7 @@ contains
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ps_diag(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call pc_diag(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pa_diag(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call pk_diag(ierr, ulog, levv=lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -128,7 +128,7 @@ contains
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ps_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call pc_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pa_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call pk_finalize(ierr, utmp, levv=lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1

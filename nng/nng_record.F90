@@ -1,10 +1,10 @@
 !!!_! nng_record.F90 - TOUZA/Nng record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2022/02/07 11:17:33 fuyuki nng_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/04/13 13:57:25 fuyuki nng_record.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -43,6 +43,7 @@ module TOUZA_Nng_record
 
   integer,parameter :: HEADER_LIMIT  = 2**16     ! 00 00 01 00 [l]
   integer,parameter :: HEADER_SPACES = 538976288 ! 20 20 20 20 [l]
+  character(len=*),parameter :: HEADER_FILLS = '    '  ! same as HEADER_SPACES
 
   integer,parameter :: GFMT_ID_LEGACY = 9010
 
@@ -137,6 +138,7 @@ module TOUZA_Nng_record
 #define __MDL__ 'r'
 
   integer,save :: nlhead_std = 0 ! standard gtool header total length in bytes
+  integer,save :: nisep      = 0 ! marker length as character
 
   integer,save :: udiag = -2    ! io unit to diag urt properties
 !!!_  - interfaces
@@ -331,6 +333,8 @@ contains
        endif
        if (init_counts.eq.0) then
           nlhead_std = get_size_bytes(hdummy, nitem)
+          nisep = (get_size_bytes(0_KI32) * litem) / get_size_bytes(hdummy)
+
           if (ierr.eq.0) call set_bodr_wnative(ierr, bodrw, ulog, lv)
           if (ierr.eq.0) call set_default_switch(ierr, krectw, ulog, lv)
           if (ierr.eq.0) then
@@ -372,6 +376,10 @@ contains
              if (is_msglev_normal(lv)) call msg('(''byte-order assumption = '', I0)', bodr_wnative, __MDL__, utmp)
              if (is_msglev_info(lv)) then
                 call show_header(ierr, head_def, ' ', utmp, lv)
+             endif
+             if (is_msglev_info(lv)) then
+                call msg('(''standard heeder length = '', I0, 1x, I0)', &
+                     &   (/nlhead_std, nisep/), __MDL__, utmp)
              endif
           endif
        endif
@@ -580,6 +588,137 @@ contains
     return
   end subroutine get_default_header
 
+!!!_  & nng_read_header_once - read header and set current properties
+  subroutine nng_read_header_once &
+       & (ierr, &
+       &  head,  krect, u)
+    use TOUZA_Nng_std,   only: &
+         & KI32, KI64, KIOFS, is_eof_ss, &
+         & WHENCE_ABS, sus_read_isep, sus_read_lsep, sus_skip_irec, sus_rseek, sus_eswap, &
+         & conv_b2strm
+    use TOUZA_Nng_header,only: nitem, litem
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: head(*)
+    integer,         intent(out) :: krect
+    integer,         intent(in)  :: u
+
+    integer(kind=KIOFS) :: jpos, jposf
+    integer,parameter :: lbuf = 16  ! enough for most case
+    character(len=lbuf) :: bapp
+    integer(kind=KI32)  :: iseph, isepl, isepf
+    integer(kind=KI64)  :: lsepf
+    integer(kind=KIOFS) :: nlh
+    logical swap, lrec
+
+    character(len=litem) :: htop
+    integer ltop
+    integer idfm
+
+    ierr = err_default
+    krect = 0
+    nlh = 0
+    ltop = litem - nisep
+
+    if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+    if (ierr.eq.0) then
+       !! read SEP + HEADERS
+       read(UNIT=u, IOSTAT=ierr) &
+            & iseph, &                     ! isep
+            & isepl, htop(1:ltop), &       ! item 0
+            & head(2:nitem)
+    endif
+    if (is_eof_ss(ierr)) then
+       ierr = ERR_EOF
+       head(1:nitem) = ' '
+       return
+    endif
+
+    if (ierr.eq.0) then
+       if (iseph.eq.0) then
+          ! [00 00 00 00] [00 00 04 00]  long/big
+          if (isepl.lt.HEADER_LIMIT) then
+             KRECT = IOR(KRECT, REC_LSEP) ! long native
+             nlh = isepl
+          else
+             KRECT = IOR(IOR(KRECT, REC_LSEP), REC_SWAP) ! long swap
+             nlh = sus_eswap(isepl)
+          endif
+       else if (isepl.eq.0) then
+          ! [00 04 00 00] [00 00 00 00]  long/little
+          if (iseph.lt.HEADER_LIMIT) then
+             KRECT = IOR(KRECT, REC_LSEP) ! long native
+             nlh = iseph
+          else
+             KRECT = IOR(IOR(KRECT, REC_LSEP), REC_SWAP) ! long swap
+             nlh = sus_eswap(iseph)
+          endif
+       else if (isepl.eq.HEADER_SPACES) then
+          ! [ff ff fc 00] [20 20 20 20] short/big/cont
+          ! [00 fc ff ff] [20 20 20 20] short/little/cont
+          ! [00 00 04 00] [20 20 20 20] short/big
+          ! [00 04 00 00] [20 20 20 20] short/little
+          if (abs(iseph).lt.HEADER_LIMIT) then
+             KRECT = KRECT                ! short native
+             nlh = abs(iseph)
+          else
+             KRECT = IOR(KRECT, REC_SWAP) ! short swap
+             nlh = abs(sus_eswap(iseph))
+          endif
+          head(1) = HEADER_FILLS // htop(1:ltop)
+       else
+          nlh = nlhead_std - 1
+       endif
+       if (nlh.lt.nlhead_std .or. nlh.ge.HEADER_LIMIT) then
+          KRECT = REC_ERROR
+          call sus_rseek(ierr, u, jpos, whence=WHENCE_ABS)
+          if (ierr.eq.0) ierr = ERR_UNKNOWN_FORMAT
+       else
+          swap = IAND(krect, REC_SWAP).ne.0
+          lrec = IAND(krect, REC_LSEP).ne.0
+          if (lrec) then
+             read(UNIT=u, IOSTAT=ierr) bapp(1:nisep)
+             call shift_header(head, litem, nitem, nisep, bapp)
+             ! read foot separator
+             jposf = jpos + conv_b2strm(abs(nlh) + nisep * 2)
+             call sus_read_lsep(ierr, u, lsepf, pos=jposf, swap=swap)
+          else
+             ! read foot separator
+             jposf = jpos + conv_b2strm(abs(nlh) + nisep)
+             call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
+             ! skip the rest
+             if (iseph.lt.0) call sus_skip_irec(ierr, u, 1, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             idfm = check_id_format(head)
+             if (idfm.lt.0) ierr = idfm
+          endif
+       endif
+    endif
+
+    ! if (ierr.eq.0) then
+    !    call sus_rseek(ierr, u, jpos, whence=WHENCE_ABS)
+    ! endif
+    ! ierr = err_default !! TESTING
+    return
+  end subroutine nng_read_header_once
+
+!!!_   . shift_header
+  subroutine shift_header &
+       & (head, litem, nitem, nisep, bapp)
+    implicit none
+    character(len=*),intent(inout) :: head(*)
+    integer,         intent(in)    :: litem, nitem, nisep
+    character(len=*),intent(in)    :: bapp
+    integer j
+    do j = 1, nitem - 1
+       head(j) = head(j)(nisep+1:litem) // head(j+1)(1:nisep)
+    enddo
+    j = nitem
+    head(j) = head(j)(nisep+1:litem) // bapp(1:nisep)
+    return
+  end subroutine shift_header
+
 !!!_  & nng_read_header - read header and set current properties
   subroutine nng_read_header &
        & (ierr, &
@@ -589,6 +728,10 @@ contains
     character(len=*),intent(out) :: head(*)
     integer,         intent(out) :: krect
     integer,         intent(in)  :: u
+
+    ierr = err_default
+    if (ierr.eq.0) call nng_read_header_once(ierr, head, krect, u)
+    return
 
     ierr = err_default
     if (ierr.eq.0) call get_record_prop(ierr, krect, u)
@@ -1318,14 +1461,14 @@ contains
     integer(kind=KISRC),intent(in)  :: imiss
     real(kind=KRMIS),   intent(in)  :: vmiss
     integer,            intent(in)  :: kfmt
-    integer jk
-    integer mh
-    integer(kind=KISRC) :: nd, ne
-    integer(kind=KISRC) :: icom((nh + 1)/2)
-    integer(kind=KISRC) :: idec(nh+1)
-    real(kind=KRSRC)    :: vmin, f1, f2, bs
-    integer,parameter   :: mbits = BIT_SIZE(0_KISRC) / 2
-    integer jdb, jde
+    ! integer jk
+    ! integer mh
+    ! integer(kind=KISRC) :: nd, ne
+    ! integer(kind=KISRC) :: icom((nh + 1)/2)
+    ! integer(kind=KISRC) :: idec(nh+1)
+    ! real(kind=KRSRC)    :: vmin, f1, f2
+    ! integer,parameter   :: mbits = BIT_SIZE(0_KISRC) / 2
+    ! integer jdb, jde
 
     ierr = -1
     return
@@ -1932,10 +2075,9 @@ contains
     integer             :: nbits, mcom
     integer             :: idec(nh)
     integer(kind=KISRC) :: icom(nh * nk)
-    integer(kind=KISRC) :: imiss
     real(kind=KRSRC)    :: dma(2 * nk)
     integer,parameter   :: khld = 0_KISRC
-    integer             :: jk, jdb, jde, jm, jc, jh, jb
+    integer             :: jk, jdb, jm, jc, jh, jb
     integer kpackm, kpackb
 
     ierr = 0
@@ -2054,7 +2196,7 @@ contains
     real(kind=KRSRC)    :: dma(2 * nk)
     real(kind=KRSRC)    :: buf(nh)
     integer,parameter   :: khld = 0_KISRC
-    integer             :: jk, jdb, jde, jm, jc, jh, jb, je
+    integer             :: jk, jdb, jm, jc, jh
     integer             :: nc, ne
     integer kpackm, kpackb
 
@@ -2170,9 +2312,7 @@ contains
     integer,         intent(in)          :: kfmt
     integer,         intent(in),optional :: kopts(:)
 
-    integer(kind=KISRC) :: ibagaz(0:2*n)
     integer mbits, xbits, xtop, xbtm
-    integer nbgz
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
 
     integer(kind=KISRC) :: mb
@@ -2220,9 +2360,7 @@ contains
     integer,         intent(in)          :: kfmt
     integer,         intent(in),optional :: kopts(:)
 
-    integer(kind=KISRC) :: ibagaz(0:2*n)
     integer mbits, xbits, xtop, xbtm
-    integer nbgz
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
 
     integer(kind=KISRC) :: mb
@@ -2271,9 +2409,7 @@ contains
     integer,         intent(in)          :: kfmt
     integer,         intent(in),optional :: kopts(:)
 
-    integer(kind=KISRC) :: ibagaz(0:2*n)
     integer mbits, xbits, xtop, xbtm
-    integer nbgz
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
     integer kcode
 
@@ -2307,9 +2443,7 @@ contains
     integer,         intent(in)          :: kfmt
     integer,         intent(in),optional :: kopts(:)
 
-    integer(kind=KISRC) :: ibagaz(0:2*n)
     integer mbits, xbits, xtop, xbtm
-    integer nbgz
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
     integer kcode
 
@@ -2476,7 +2610,6 @@ contains
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
 
-    integer(kind=KISRC) :: mb
     integer(kind=KISRC) :: icom(n)
     real(kind=KRSRC)    :: buf(n)
     integer(kind=KISRC),parameter :: khld = 0_KISRC
@@ -2524,7 +2657,6 @@ contains
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
 
-    integer(kind=KISRC) :: mb
     integer(kind=KISRC) :: icom(n)
     real(kind=KRSRC)    :: buf(n)
     integer(kind=KISRC),parameter :: khld = 0_KISRC
@@ -3741,7 +3873,6 @@ contains
 
     character(len=litem) :: vp
     integer idfm
-    integer j
 
     ierr = err_default
 
@@ -3947,8 +4078,6 @@ contains
 
     integer :: imsk(n)
     integer(kind=KISRC),parameter :: khld = 0_KISRC
-    integer ncom
-    integer kp
     integer j
 
     ierr = 0
@@ -3987,8 +4116,6 @@ contains
 
     integer :: imsk(n)
     integer(kind=KISRC),parameter :: khld = 0_KISRC
-    integer ncom
-    integer kp
     integer j
 
     ierr = 0
@@ -4028,8 +4155,6 @@ contains
 
     integer :: imsk(n)
     integer(kind=KISRC),parameter :: khld = 0_KISRC
-    integer ncom
-    integer kp
     integer j
     integer(kind=KARG) :: imiss
 
@@ -4124,7 +4249,7 @@ contains
              d(j) = b(jb)
              jb = jb + 1
           else
-             d(j) = vmiss
+             d(j) = real(vmiss, kind=KARG)
           endif
        enddo
     endif
@@ -4185,7 +4310,7 @@ contains
     real(kind=KRMIS),   intent(in)  :: vmiss
 
     real(kind=KRSRC) :: VH, VL, VP, VN
-    real(kind=KRSRC) :: v0, dv, fv
+    real(kind=KRSRC) :: dv, fv
     real(kind=KRSRC),parameter :: zero = 0.0_KRSRC
     real(kind=KRSRC),parameter :: one  = 1.0_KRSRC
     integer :: KP, KN
@@ -4325,7 +4450,7 @@ program test_nng_record
 101 format(A,' = ', I0)
   call init(ierr, stdv=-9)
   ! if (ierr.eq.0) call diag(ierr, u=-1, levv=+99)
-  if (ierr.eq.0) call diag(ierr)
+  if (ierr.eq.0) call diag(ierr, levv=+9)
   if (ierr.eq.0) call arg_init(ierr, levv=-9)
   if (ierr.eq.0) call parse(ierr)
   if (ierr.eq.0) call arg_diag(ierr)
@@ -4426,10 +4551,10 @@ contains
     integer,parameter :: lxh = 4
     character(len=litem) xhd(lxh)
     integer krect
-    integer j
     integer kfmt, kaxs(3)
     real(KIND=KDBL) :: vmiss
     character(len=1024) :: file
+    integer lp
 
     integer jrec
     integer udat
@@ -4454,23 +4579,24 @@ contains
 
     if (ierr.eq.0) then
        call sus_open(ierr, udat, file, ACTION='W', STATUS='R')
-       if (ierr.eq.0) call put_item(ierr, hd, 'def', hi_ITEM)
-       if (ierr.eq.0) call sus_write_irec(ierr, udat, hd, nhi)
-       if (ierr.eq.0) call put_item(ierr, hd, 'swap', hi_ITEM)
-       if (ierr.eq.0) call sus_write_irec(ierr, udat, hd, nhi, swap=.TRUE.)
-       if (ierr.eq.0) call put_item(ierr, hd, 'long', hi_ITEM)
-       if (ierr.eq.0) call sus_write_lrec(ierr, udat, hd, nhi)
-       if (ierr.eq.0) call put_item(ierr, hd, 'long/swap', hi_ITEM)
-       if (ierr.eq.0) call sus_write_lrec(ierr, udat, hd, nhi, swap=.TRUE.)
+       do lp = 0, 1
+          if (ierr.eq.0) call put_item(ierr, hd, 'def', hi_ITEM)
+          if (ierr.eq.0) call sus_write_irec(ierr, udat, hd, nhi)
+          if (ierr.eq.0) call put_item(ierr, hd, 'swap', hi_ITEM)
+          if (ierr.eq.0) call sus_write_irec(ierr, udat, hd, nhi, swap=.TRUE.)
+          if (ierr.eq.0) call put_item(ierr, hd, 'long', hi_ITEM)
+          if (ierr.eq.0) call sus_write_lrec(ierr, udat, hd, nhi)
+          if (ierr.eq.0) call put_item(ierr, hd, 'long:swap', hi_ITEM)
+          if (ierr.eq.0) call sus_write_lrec(ierr, udat, hd, nhi, swap=.TRUE.)
 
-       if (ierr.eq.0) call put_item(ierr, hd, 'cont', hi_ITEM)
-       if (ierr.eq.0) call sus_write_irec(ierr, udat, hd,  nhi, post=.TRUE.)
-       if (ierr.eq.0) call sus_write_irec(ierr, udat, xhd, lxh, pre=.TRUE.)
+          if (ierr.eq.0) call put_item(ierr, hd, 'cont', hi_ITEM)
+          if (ierr.eq.0) call sus_write_irec(ierr, udat, hd,  nhi, post=.TRUE.)
+          if (ierr.eq.0) call sus_write_irec(ierr, udat, xhd, lxh, pre=.TRUE.)
 
-       if (ierr.eq.0) call put_item(ierr, hd, 'cont/swap', hi_ITEM)
-       if (ierr.eq.0) call sus_write_irec(ierr, udat, hd,  nhi, swap=.TRUE., post=.TRUE.)
-       if (ierr.eq.0) call sus_write_irec(ierr, udat, xhd, lxh, swap=.TRUE., pre=.TRUE.)
-
+          if (ierr.eq.0) call put_item(ierr, hd, 'cont:swap', hi_ITEM)
+          if (ierr.eq.0) call sus_write_irec(ierr, udat, hd,  nhi, swap=.TRUE., post=.TRUE.)
+          if (ierr.eq.0) call sus_write_irec(ierr, udat, xhd, lxh, swap=.TRUE., pre=.TRUE.)
+       enddo
        if (ierr.eq.0) call sus_close(ierr, udat, file)
     endif
 301 format('FULL/W:', I0, 1x, I0, 1x, I0)
@@ -4494,10 +4620,7 @@ contains
        endif
        if (ierr.eq.0) then
           call get_item(ierr, hd, hitm, hi_ITEM)
-          if (hd(j).ne.' ') write (*, 411) jrec, TRIM(ADJUSTL(hitm))
-          ! do j = 1, nitem
-          !    if (hd(j).ne.' ') write (*, 411) j, TRIM(ADJUSTL(hd(j)))
-          ! enddo
+          if (hitm.ne.' ') write (*, 411) jrec, TRIM(ADJUSTL(hitm))
        endif
        if (ierr.eq.0) then
           call parse_header_base(ierr, kfmt, kaxs, vmiss, hd)
@@ -4650,7 +4773,6 @@ contains
     real(kind=KBUF),allocatable :: v(:)
     integer krect
     integer ufile
-    integer kendi
     character(len=1024) :: wfile
     character(len=litem) :: hd(nitem)
     character(len=128)  :: tswap

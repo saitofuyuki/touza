@@ -1,7 +1,7 @@
 dnl Filename:   touza/m4c/mt_am_include.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 16 2020
-dnl Time-stamp: <2022/02/15 09:29:07 fuyuki mt_am_include.m4>
+dnl Time-stamp: <2022/03/29 11:41:45 fuyuki mt_am_include.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -26,6 +26,10 @@ AM_CPPFLAGS = -I${AX_DOLLAR}(top_srcdir)
 moddir      = @moddir@
 
 install-exec-hook: install-mod
+install-data-hook: install-switchDATA
+
+switchdir     = @switchdir@
+switch_DATA   =
 
 ])
 

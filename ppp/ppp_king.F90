@@ -1,7 +1,7 @@
 !!!_! ppp_king.F90 - TOUZA/ppp king control (xmcomm/xmking replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2022/02/16 15:29:26 fuyuki ppp_king.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/03/02 08:19:29 fuyuki ppp_king.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -76,7 +76,7 @@ contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
     use TOUZA_Ppp_std,only: choice, ps_init=>init
-    use TOUZA_Ppp_comm,only: pc_init=>init
+    use TOUZA_Ppp_amng,only: pc_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -113,7 +113,7 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Ppp_std,only: choice, msg, ps_diag=>diag, is_msglev_normal
-    use TOUZA_Ppp_comm,only: pc_diag=>diag
+    use TOUZA_Ppp_amng,only: pc_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -150,7 +150,7 @@ contains
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Ppp_std,only: ps_finalize=>finalize, choice
-    use TOUZA_Ppp_comm,only: pc_finalize=>finalize
+    use TOUZA_Ppp_amng,only: pc_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -184,14 +184,14 @@ contains
        & (ierr, u)
     use MPI,only: MPI_Comm_rank, MPI_COMM_WORLD
     use TOUZA_Ppp_std,only: get_wni_safe, msg
-    use TOUZA_Ppp_comm,only: ldrv, inquire_agent
+    use TOUZA_Ppp_amng,only: lagent, inquire_agent
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer utmp
     integer jc
     integer irank
-    character(len=ldrv) :: agent
+    character(len=lagent) :: agent
 
     ierr = 0
     utmp = get_logu(u, ulog)
@@ -222,7 +222,7 @@ contains
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use MPI,only: MPI_Group_translate_ranks
 #  endif
-    use TOUZA_Ppp_comm,only: query_agent, source_agent, inquire_agent
+    use TOUZA_Ppp_amng,only: query_agent, source_agent, inquire_agent
     implicit none
     integer,                  intent(out) :: ierr
     integer,                  intent(out) :: king
@@ -231,7 +231,7 @@ contains
     character(len=*),optional,intent(in)  :: adef   ! KING definition agent  (same as AREF if null)
 
     integer jcache
-    integer jaref,   jasrc
+    integer jaref,   jasrc,  jadef
     integer jgref,   jgsrc
     integer kref(1), ksrc(1)
     character(len=lmdl) :: pat
@@ -254,7 +254,18 @@ contains
     ! bind king (relative to source)
     jasrc = source_agent(jaref)
     if (ierr.eq.0) call inquire_agent(ierr, iagent=jasrc, igroup=jgsrc)
-    if (ierr.eq.0) call bind_king(ierr, ksrc(1), pat, jasrc, jaref, adef)
+    if (ierr.eq.0) then
+       if (present(adef)) then
+          jadef = query_agent(adef, jaref)
+          if (jadef.lt.0) then
+             ierr = -1
+             return
+          endif
+       else
+          jadef = jaref
+       endif
+    endif
+    if (ierr.eq.0) call bind_king(ierr, ksrc(1), pat, jasrc, jadef)
 
     ! get king (relative to AREF)
     if (ierr.eq.0) call inquire_agent(ierr, iagent=jaref, igroup=jgref)
@@ -274,21 +285,20 @@ contains
 
 !!!_  - bind_king
   subroutine bind_king &
-       & (ierr, king, pat, jasrc, jaref, adef)
+       & (ierr, king, pat, jasrc, jadef)
     use MPI,only: MPI_UNDEFINED
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use MPI,only: MPI_Group_translate_ranks
 #  endif
-    use TOUZA_Ppp_comm,only: query_agent, inquire_agent
+    use TOUZA_Ppp_amng,only: query_agent, inquire_agent
     implicit none
-    integer,                  intent(out) :: ierr
-    integer,                  intent(out) :: king
-    character(len=*),         intent(in)  :: pat
-    integer,                  intent(in)  :: jasrc
-    integer,                  intent(in)  :: jaref
-    character(len=*),optional,intent(in)  :: adef
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: king
+    character(len=*),intent(in)  :: pat
+    integer,         intent(in)  :: jasrc
+    integer,         intent(in)  :: jadef
 
-    integer jadef
+    integer jad
     integer jcache
     integer lp, lm
 
@@ -297,29 +307,21 @@ contains
 
     jcache = cache_match(pat, jasrc)
     if (jcache.lt.0) then
-       if (present(adef)) then
-          jadef = query_agent(adef, jaref)
-          if (jadef.lt.0) then
-             ierr = -1
-             return
-          endif
-       else
-          jadef = jaref
-       endif
        lm = 0
        king = 0
+       jad = jadef
     else
        ! find partial or full match
        lm = len_trim(cache_p(jcache))
        king = cache_k(jcache)
        cache_n(jcache) = max(0, cache_n(jcache)) + 1
-       jadef = jasrc
+       jad = jasrc
     endif
 
     do
        lm = lm + 1
        if (lm.gt.lp) exit
-       jcache = cache_register(king, jadef, jasrc, pat(1:lm))
+       jcache = cache_register(king, jad, jasrc, pat(1:lm))
        if (jcache.lt.0) then
           ierr = -1
           return
@@ -338,7 +340,7 @@ contains
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use MPI,only: MPI_Group_translate_ranks
 #  endif
-    use TOUZA_Ppp_comm,only: query_agent, source_agent, inquire_agent
+    use TOUZA_Ppp_amng,only: query_agent, source_agent, inquire_agent
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: king
@@ -376,7 +378,7 @@ contains
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use MPI,only: MPI_Group_translate_ranks
 #  endif
-    use TOUZA_Ppp_comm,only: inquire_agent
+    use TOUZA_Ppp_amng,only: inquire_agent
     implicit none
     integer,         intent(in)  :: king
     integer,         intent(in)  :: iaref
@@ -546,7 +548,7 @@ program test_ppp_king
   stop
 contains
   subroutine batch_test_king (ierr, icomm, ktest)
-    use TOUZA_Ppp_comm,only:&
+    use TOUZA_Ppp_amng,only:&
          & inquire_agent, &
          & new_agent_root,new_agent_family
     implicit none
@@ -560,7 +562,7 @@ contains
     integer irank, nrank
 
     character(len=1) :: refs0(6) = (/'A', 'B', 'C', 'D', '@', '%'/)
-    character(len=1) :: refs1(1) = (/'%'/)
+    character(len=1) :: refs1(2) = (/'%', '/'/)
 
 
     ierr = 0
