@@ -1,7 +1,7 @@
 !!!_! ppp_king.F90 - TOUZA/ppp king control (xmcomm/xmking replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2022/03/02 08:19:29 fuyuki ppp_king.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/04/26 11:30:27 fuyuki ppp_king.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -66,9 +66,15 @@ module TOUZA_Ppp_king
   integer,save :: ulog = unit_global
 #define __MDL__ 'k'
 !!!_ + overload
+  interface get_king
+     module procedure get_king_a, get_king_i
+  end interface get_king
+  interface is_king
+     module procedure is_king_a, is_king_i
+  end interface is_king
 !!!_ + interfaces
   public init, diag, finalize
-  public get_king, set_king
+  public get_king, set_king, is_king
   public diag_cache
   ! public reg_pattern
 !!!_ + common interfaces
@@ -191,6 +197,7 @@ contains
     integer utmp
     integer jc
     integer irank
+    character(len=lmdl) :: mdlk
     character(len=lagent) :: agent
 
     ierr = 0
@@ -205,19 +212,85 @@ contains
        do jc = 0, lctb - 1
           if (cache_n(jc).lt.-1) cycle
           call inquire_agent(ierr, iagent=cache_a(jc), name=agent)
+          mdlk = cache_p(jc)
+          if (mdlk.eq.' ') mdlk = ''''''
           if (utmp.ge.0) then
-             write(utmp, 101) irank, jc, trim(cache_p(jc)), trim(agent), cache_k(jc), cache_n(jc)
+             write(utmp, 101) irank, jc, trim(mdlk), trim(agent), cache_k(jc), cache_n(jc)
           else if (utmp.eq.-1) then
-             write(*,    101) irank, jc, trim(cache_p(jc)), trim(agent), cache_k(jc), cache_n(jc)
+             write(*,    101) irank, jc, trim(mdlk), trim(agent), cache_k(jc), cache_n(jc)
           endif
        enddo
     endif
   end subroutine diag_cache
 
 !!!_ + user interfaces
+!!!_  & is_king - is self-rank eq KING under AREF agent
+  subroutine is_king_a &
+       & (ierr, isking, mdl, aref, adef)
+    use MPI,only: MPI_UNDEFINED
+    use TOUZA_Ppp_amng,only: query_agent, top_agent
+    implicit none
+    integer,                  intent(out) :: ierr
+    logical,                  intent(out) :: isking
+    character(len=*),         intent(in)  :: mdl
+    character(len=*),optional,intent(in)  :: aref   ! KING reference agent (or stack top)
+    character(len=*),optional,intent(in)  :: adef   ! KING definition agent  (same as AREF if null)
+    integer jaref
+
+    ierr = 0
+    if (present(aref)) then
+       jaref = query_agent(aref)   !  need to switch agent if necessary
+    else
+       call top_agent(ierr, jaref)
+    endif
+    if (ierr.eq.0) call is_king_i(ierr, isking, mdl, jaref, adef)
+  end subroutine is_king_a
+
+  subroutine is_king_i &
+       & (ierr, isking, mdl, jaref, adef)
+    use TOUZA_Ppp_amng,only: inquire_agent
+    implicit none
+    integer,                  intent(out) :: ierr
+    logical,                  intent(out) :: isking
+    character(len=*),         intent(in)  :: mdl
+    integer,                  intent(in)  :: jaref  ! KING reference agent
+    character(len=*),optional,intent(in)  :: adef   ! KING definition agent  (same as AREF if null)
+    integer king, irank
+
+    ierr = 0
+    isking = .FALSE.
+    call get_king(ierr, king, mdl, jaref, adef)
+    if (ierr.eq.0) call inquire_agent(ierr, iagent=jaref, irank=irank)
+    if (ierr.eq.0) then
+       isking = (king.ge.0) .and. (irank.eq.king)
+    endif
+    return
+  end subroutine is_king_i
+
 !!!_  & get_king - get KING under AREF agent
-  subroutine get_king &
+  subroutine get_king_a &
        & (ierr, king, mdl, aref, adef)
+    use MPI,only: MPI_UNDEFINED
+    use TOUZA_Ppp_amng,only: query_agent, top_agent
+    implicit none
+    integer,                  intent(out) :: ierr
+    integer,                  intent(out) :: king
+    character(len=*),         intent(in)  :: mdl
+    character(len=*),optional,intent(in)  :: aref   ! KING reference agent (or stack top)
+    character(len=*),optional,intent(in)  :: adef   ! KING definition agent  (same as AREF if null)
+    integer jaref
+
+    ierr = 0
+    if (present(aref)) then
+       jaref = query_agent(aref)   !  need to switch agent if necessary
+    else
+       call top_agent(ierr, jaref)
+    endif
+   if (ierr.eq.0) call get_king_i(ierr, king, mdl, jaref, adef)
+  end subroutine get_king_a
+
+  subroutine get_king_i &
+       & (ierr, king, mdl, jaref, adef)
     use MPI,only: MPI_UNDEFINED
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use MPI,only: MPI_Group_translate_ranks
@@ -227,18 +300,17 @@ contains
     integer,                  intent(out) :: ierr
     integer,                  intent(out) :: king
     character(len=*),         intent(in)  :: mdl
-    character(len=*),         intent(in)  :: aref   ! KING reference agent
+    integer,                  intent(in)  :: jaref  ! KING reference agent
     character(len=*),optional,intent(in)  :: adef   ! KING definition agent  (same as AREF if null)
 
     integer jcache
-    integer jaref,   jasrc,  jadef
-    integer jgref,   jgsrc
+    integer jasrc,  jadef
+    integer jgref,  jgsrc
     integer kref(1), ksrc(1)
     character(len=lmdl) :: pat
 
     ierr = 0
     king = -1
-    jaref = query_agent(aref)   !  need to switch agent if necessary
     if (jaref.lt.0) then
        ierr = -1
        return
@@ -281,7 +353,7 @@ contains
        if (jcache.lt.0) ierr = -1
     endif
 
-  end subroutine get_king
+  end subroutine get_king_i
 
 !!!_  - bind_king
   subroutine bind_king &
@@ -572,6 +644,8 @@ contains
     if (ierr.eq.0) call new_agent_family(ierr, drvs(1:nself))
 
     if (ierr.eq.0) then
+       call test_register(ierr, irank, ' ', '%', min(nrank - 1, 1))
+
        call test_register(ierr, irank, 'qrs', '%', min(nrank - 1, 1))
        call test_register(ierr, irank, 'q',   '%', min(nrank - 1, 3))
        call test_register(ierr, irank, 'qt.', '%', min(nrank - 1, 4))

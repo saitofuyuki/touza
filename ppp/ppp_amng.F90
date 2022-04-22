@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2022/03/07 13:12:18 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/05/23 10:28:06 c0210 ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -40,6 +40,11 @@ module TOUZA_Ppp_amng
 !!!_ + parameter
   integer,parameter,public :: lagent = OPT_AGENT_LEN
   integer,parameter,public :: latbl  = OPT_AGENTS_MAX
+!!!_  - operations
+  integer,parameter,public :: OPR_PLAIN   = 0  ! as it is
+  integer,parameter,public :: OPR_REVERSE = 1  ! reverse rank order
+  integer,parameter,public :: OPR_DSHIFT  = 2  ! shift (decrement)
+  integer,parameter,public :: OPR_FLOAT   = 3  ! float specified ranks
 !!!_ + public
 !!!_  - reserved agent string
   character(len=*),parameter,public :: asp_world = '*'     ! mpi_comm_world
@@ -47,6 +52,7 @@ module TOUZA_Ppp_amng
   character(len=*),parameter,public :: asp_base  = '%'     ! alias of source agent
   character(len=*),parameter,public :: asp_unit  = '@'     ! least mutual exclusive combination
   character(len=*),parameter,public :: asp_pfxa  = '#'     ! prefix for auto-name
+  character(len=*),parameter,public :: asp_top   = ' '     ! top stack
 !!!_ + flags
   integer,parameter :: flag_none    = -1
   integer,parameter :: flag_self    = 0
@@ -112,14 +118,23 @@ module TOUZA_Ppp_amng
      module procedure inquire_agent_a
      module procedure inquire_agent_i
   end interface inquire_agent
+  interface agents_translate
+     module procedure agents_translate_a
+     module procedure agents_translate_i
+  end interface agents_translate
+  interface base_agent
+     module procedure base_agent_i
+  end interface base_agent
 !!!_ + interfaces
   public init, diag, finalize
   public new_agent_root
   public new_agent_color, new_agent_family
   public new_agent_derived
+  public mod_agent_order
+  public agents_translate
   public switch_agent, push_agent, pop_agent, top_agent
   public inquire_agent
-  public query_agent,  source_agent
+  public query_agent,  source_agent, check_agent, base_agent
   public diag_maps_batch
 !!!_ + common interfaces
 contains
@@ -498,7 +513,10 @@ contains
   subroutine diag_map_string &
        & (ierr, map, iagent, iref, irbgn, irend, md, sep)
     use TOUZA_Ppp_std,only: get_gni, choice, choice_a
-    use MPI,only: MPI_Group_translate_ranks, MPI_Group_rank, MPI_GROUP_NULL
+#  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
+    use MPI,only: MPI_Group_translate_ranks
+#  endif
+    use MPI,only: MPI_Group_rank, MPI_GROUP_NULL
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(out)         :: map
@@ -600,7 +618,7 @@ contains
     if (jas.lt.0) return
     if (name.eq.asp_world) then
        n = aworld
-    else if (name.eq.' ') then
+    else if (name.eq.asp_top) then
        jt = astack(jstack)
        if (atblp(jt)%isrc.eq.jas) n = jt
     else
@@ -657,18 +675,18 @@ contains
     ic = MPI_COMM_NULL
     if (ja.lt.0) ierr = -1
 
-    if (ierr.eq.0) ic = atblp(ja)%comm
-    if (ierr.eq.0) ig = atblp(ja)%mgrp
+    if (ja.ge.0) ic = atblp(ja)%comm
+    if (ja.ge.0) ig = atblp(ja)%mgrp
 
     if (present(irank)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           call MPI_Group_rank(ig, irank, ierr)
        else
           irank = -1
        endif
     endif
     if (present(ismem)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           call MPI_Group_rank(ig, ir, ierr)
        else
           ir = -1
@@ -676,34 +694,54 @@ contains
        ismem = ir.ge.0
     endif
     if (present(nrank)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           call MPI_Group_size(ig, nrank, ierr)
        else
           nrank = -1
        endif
     endif
     if (present(icomm)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           icomm = ic
        else
           icomm = MPI_COMM_NULL
        endif
     endif
     if (present(igroup)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           igroup = ig
        else
           igroup = MPI_GROUP_NULL
        endif
     endif
     if (present(name)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           name = atblp(ja)%name
        else
           name = ' '
        endif
     endif
   end subroutine inquire_agent_i
+!!!_  & base_agent() - query base (i.e., alias of source) agent
+  integer function base_agent_i (iagent) result(n)
+    implicit none
+    integer,intent(in),optional :: iagent
+    integer jatmp
+    integer jas
+    jas = source_agent(iagent)
+    if (jas.lt.0) then
+       n = -1
+    else
+       do jatmp = 1, matbl
+          ! usually jas + 1 is the alias
+          n = mod(jas + jatmp, matbl)
+          if (atblp(n)%isrc.eq.jas) then
+             if (atblp(n)%kflg.eq.flag_base) return
+          endif
+       enddo
+       n = -1
+    endif
+  end function base_agent_i
 !!!_  & switch_agent
   subroutine switch_agent_ai (ierr, iagent)
     implicit none
@@ -954,6 +992,159 @@ contains
      return
   end subroutine new_agent_derived
 
+!!!_ + other utilities
+!!!_  & mod_agent_order - reorder rank in agent/group
+  subroutine mod_agent_order &
+       & (ierr, atgt, opr, keys, iagent)
+    use MPI,only: MPI_UNDEFINED
+    use TOUZA_Ppp_std,only: msg
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: atgt      ! target agent
+    integer,         intent(in)  :: opr       ! operation flag
+    integer,optional,intent(in)  :: keys(:)   !
+    integer,optional,intent(in)  :: iagent
+
+    integer ja
+    integer jr, nrank, jshft
+    integer,allocatable :: ranks(:)
+    integer jk
+    integer igtgt, ignew, icnew, icsrc
+    logical b
+
+    ierr = 0
+    b = .FALSE.
+
+    ja = query_agent(atgt, iagent)
+    if (ja.lt.0) ierr = -1
+    if (ierr.eq.0) igtgt = atblp(ja)%mgrp
+    if (ierr.eq.0) call inquire_agent(ierr, iagent=ja, nrank=nrank)
+    if (ierr.eq.0) allocate(ranks(0:nrank-1), STAT=ierr)
+    if (ierr.eq.0) then
+       b = .TRUE.
+       select case(opr)
+       case (OPR_REVERSE)
+          do jr = 0, nrank - 1
+             ranks(nrank-1-jr) = jr
+          enddo
+       case (OPR_DSHIFT)
+          if (present(keys)) then
+             jshft = keys(1)
+          else
+             jshft = 1
+          endif
+          do jr = 0, nrank - 1
+             ranks(jr) = mod(nrank + jshft + jr, nrank)
+          enddo
+       case (OPR_FLOAT)
+          jr = 0
+          do jk = 1, size(keys)
+             if (ANY(keys(jk).eq.ranks(0:jr-1))) then
+                continue
+             else if (keys(jk).ge.0 .and. keys(jk).lt.nrank) then
+                ranks(jr) = keys(jk)
+                jr = jr + 1
+             endif
+          enddo
+          do jk = 0, nrank - 1
+             if (ANY(jk.eq.ranks(0:jr-1))) then
+                continue
+             else
+                ranks(jr) = jk
+                jr = jr + 1
+             endif
+          enddo
+       case default
+          b = .FALSE.
+       end select
+    endif
+    if (b) then
+       if (ierr.eq.0) call MPI_Group_incl(igtgt, nrank, ranks(0:nrank-1), ignew, ierr)
+       if (ierr.eq.0) then
+          icsrc = atblp(ja)%comm
+          if (icsrc.eq.MPI_COMM_NULL) then
+             icnew = icsrc
+          else
+             call MPI_Comm_create(icsrc, ignew, icnew, ierr)
+          endif
+       endif
+       if (ierr.eq.0) then
+          atblp(ja)%comm = icnew
+          atblp(ja)%mgrp = ignew
+       endif
+    endif
+    if (ierr.eq.0) deallocate(ranks, STAT=ierr)
+
+  end subroutine mod_agent_order
+!!!_  & agents_translate - translate ranks between agents
+  subroutine agents_translate_a &
+       & (ierr, irtgt, atgt, irsrc, asrc)
+    use MPI,only: MPI_UNDEFINED
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: irtgt
+    character(len=*),intent(in)          :: atgt    ! target agent
+    integer,         intent(in),optional :: irsrc   ! source rank  (self if not present)
+    character(len=*),intent(in),optional :: asrc    ! source agent (current if not present)
+
+    integer iatgt, iasrc
+    ierr = 0
+    iatgt = query_agent(atgt)
+    if (present(asrc)) then
+       iasrc = query_agent(asrc)
+       call agents_translate_i(ierr, irtgt, iatgt, irsrc, iasrc)
+    else
+       call agents_translate_i(ierr, irtgt, iatgt, irsrc)
+    endif
+    return
+  end subroutine agents_translate_a
+
+  subroutine agents_translate_i &
+       & (ierr, irtgt, iatgt, irsrc, iasrc)
+    use MPI,only: MPI_UNDEFINED
+#  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
+    use MPI,only: MPI_Group_translate_ranks
+#  endif
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(out)         :: irtgt
+    integer,intent(in),optional :: iatgt   ! target agent (current if not present)
+    integer,intent(in),optional :: irsrc   ! source rank  (self if not present)
+    integer,intent(in),optional :: iasrc   ! source agent (current if not present)
+
+    integer jat, jas
+    integer igt, igs
+    integer irs(1), irt(1)
+    integer nrsrc
+
+    ierr = 0
+    irtgt = MPI_UNDEFINED
+
+    jas = check_agent(iasrc)
+    jat = check_agent(iatgt)
+
+    if (jas.lt.0) ierr = -1
+    if (jat.lt.0) ierr = -1
+    if (ierr.eq.0) then
+       if (present(irsrc)) then
+          call inquire_agent(ierr, iagent=jas, nrank=nrsrc)
+          if (irsrc.lt.nrsrc) then
+             irs(1) = irsrc
+          else
+             ierr = -1
+          endif
+       else
+          call inquire_agent(ierr, iagent=jas, irank=irs(1))
+          if (irs(1).lt.0) ierr = -1
+       endif
+    endif
+    if (ierr.eq.0) call inquire_agent(ierr, iagent=jas, igroup=igs)
+    if (ierr.eq.0) call inquire_agent(ierr, iagent=jat, igroup=igt)
+    if (ierr.eq.0) then
+       call MPI_Group_translate_ranks(igs, 1, irs(:), igt, irt(:), ierr)
+    endif
+    if (ierr.eq.0) irtgt = irt(1)
+  end subroutine agents_translate_i
 !!!_ + internal procedures
 !!!_  & check_agent
   integer function check_agent &
@@ -1357,7 +1548,7 @@ contains
     return
   end subroutine recv_affils
 
-!!!_  - batch_group_split
+!!!_  & batch_group_split
   subroutine batch_group_split &
        & (ierr,   ranks,  tbl_gr, &
        &  tbl_ci, ntotal, affils, icomm, igsrc, ir)
@@ -1408,7 +1599,7 @@ contains
 
   end subroutine batch_group_split
 
-!!!_  - gen_comm_unit
+!!!_  & gen_comm_unit
   subroutine gen_comm_unit &
        & (ierr,   icunit, &
        &  tbl_ci, tbl_ui, ntotal, affils, icomm)
@@ -1488,7 +1679,7 @@ contains
     if (ierr.eq.0) igdrv = igtmp
   end subroutine derive_group
 
-!!!_  - get_cnr
+!!!_  & get_cnr
   subroutine get_cnr &
        & (ierr, icomm, irank, nrank)
     use TOUZA_Ppp_std,only: get_comm, get_ni, choice
@@ -1593,6 +1784,19 @@ contains
     endif
     if (ierr.eq.0) then
        call new_agent_derived(ierr, 'H', (/'B', 'C'/))
+       ierr = max(0, ierr)
+    endif
+    if (ierr.eq.0) then
+       call mod_agent_order(ierr, 'Q', OPR_REVERSE)
+    endif
+    if (ierr.eq.0) then
+       call test_translate(ierr, 'A', 'B')
+       call test_translate(ierr, 'A', 'W')
+       call test_translate(ierr, 'A', 'Q')
+       call test_translate(ierr, 'A', '/')
+       call test_translate(ierr, 'A', '%')
+       call test_translate(ierr, 'B', '/')
+       call test_translate(ierr, 'B', '%')
     endif
     return
   end subroutine test_ppp_agent
@@ -1650,6 +1854,32 @@ contains
        write(*, 101) irank, j, trim(drvs(j))
     enddo
   end subroutine set_drivers
+
+  subroutine test_translate (ierr, asrc, atgt)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: asrc
+    character(len=*),intent(in)  :: atgt
+    integer ir, nrsrc
+    integer irtgt
+    ierr = 0
+
+    call inquire_agent(ierr, asrc, nrank=nrsrc)
+101 format('TRANSLATE: ', A, '[', I0, '/', I0, '] >> ', A, '[', I0, ']')
+
+    if (ierr.eq.0) then
+       call agents_translate(ierr, irtgt, atgt, asrc=asrc)
+       write(*, 101) trim(asrc), -1, nrsrc, trim(atgt), irtgt
+       ierr = 0
+    endif
+    if (ierr.eq.0) then
+       do ir = 0, (nrsrc - 1) + 1
+          call agents_translate(ierr, irtgt, atgt, ir, asrc)
+          write(*, 101) trim(asrc), ir, nrsrc, trim(atgt), irtgt
+          ierr = 0
+       enddo
+    endif
+  end subroutine test_translate
 
 end program test_ppp_amng
 #endif /* TEST_PPP_AMNG */
