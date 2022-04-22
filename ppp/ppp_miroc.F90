@@ -1,7 +1,7 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/03/19 22:18:04 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/04/17 22:59:58 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -37,7 +37,7 @@
 module TOUZA_Ppp_miroc
 !!!_ = declaration
   use TOUZA_Ppp_std,only: unit_global
-  use TOUZA_Ppp,only: diag_maps_batch
+  use TOUZA_Ppp,only: diag_maps_batch, barrier_trace
 !!!_  - default
   implicit none
   private
@@ -146,6 +146,8 @@ module TOUZA_Ppp_miroc
   public diag_agent_maps
   public query_handle, query_nprocs, query_comm
   public terminate
+
+  public barrier_trace
 
   public XCKINI, MMGetColor, XMGetColor, XMIComm, XMCOMM, XMGETK, XMProc, XMOKNG
   public XMquit, XMabort,    XMabort0,   XMFinal

@@ -1,7 +1,7 @@
 !!!_! ppp_comm.F90 - TOUZA/ppp communication
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/03/07 18:05:22 fuyuki ppp_comm.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/04/18 08:22:03 fuyuki ppp_comm.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -41,6 +41,7 @@ module TOUZA_Ppp_comm
   end interface broadcast
 !!!_ + interfaces
   public init, diag, finalize
+  public barrier_trace
   public broadcast
 !!!_ + common interfaces
 contains
@@ -151,7 +152,30 @@ contains
 
 !!!_ + init subcontracts
 !!!_ + diag subcontracts
-!!!_ + barrier
+!!!_ + barrier_trace
+  subroutine barrier_trace &
+       & (ierr, iagent, tag, u)
+    use mpi,only: MPI_Barrier
+    use TOUZA_Ppp_amng,only: inquire_agent
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(in),optional :: iagent
+    character(len=*),intent(in),optional :: tag
+    integer,         intent(in),optional :: u
+    integer icomm
+
+    ierr = 0
+    if (ierr.eq.0) call inquire_agent(ierr, icomm=icomm, iagent=iagent)
+#if HAVE_FTRACE_REGION_BEGIN
+    if (present(tag)) call ftrace_region_begin(tag)
+#endif
+    if (ierr.eq.0) call MPI_Barrier(ierr, icomm)
+#if HAVE_FTRACE_REGION_END
+    if (present(tag)) call ftrace_region_end(tag)
+#endif
+    return
+  end subroutine barrier_trace
+
 !!!_ + broadcast
   subroutine broadcast_i &
        & (ierr, buf, iagent, iroot)
