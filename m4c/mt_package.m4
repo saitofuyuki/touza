@@ -1,7 +1,7 @@
 dnl Filename:   touza/m4c/mt_package.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 7 2020
-dnl Time-stamp: <2022/02/15 09:37:09 fuyuki mt_package.m4>
+dnl Time-stamp: <2022/04/18 12:04:49 fuyuki mt_package.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -230,9 +230,13 @@ AC_DEFUN([_MT_PACKAGE_CONFIG],
 AM_CONDITIONAL([BUILD_$1], [test x"@S|@$2" != xno])
 AS_IF([test x"@S|@$2" != xno],
       [AC_DEFINE(AS_TR_CPP(ENABLE_$4_$1), [1], [$1 is enabled])])
-FC_INCLUDE_$4_$1='-I[$](top_srcdir)/$3'
-FC_MODULE_$4_$1='[$](FC_MODINC)[$](top_builddir)/$3'
-FC_LDADD_$4_$1='[$](top_builddir)/$3/lib$4_local.la'
+srcdir_$4_$1='[$](top_srcdir)/$3'
+builddir_$4_$1='[$](top_builddir)/$3'
+FC_INCLUDE_$4_$1='-I[$](srcdir_$4_$1)'
+FC_MODULE_$4_$1='[$](FC_MODINC)[$](builddir_$4_$1)'
+FC_LDADD_$4_$1='[$](builddir_$4_$1)/lib$4_local.la'
+AC_SUBST([srcdir_$4_$1])
+AC_SUBST([builddir_$4_$1])
 AC_SUBST([FC_INCLUDE_$4_$1])
 AC_SUBST([FC_MODULE_$4_$1])
 AC_SUBST([FC_LDADD_$4_$1])
