@@ -1,4 +1,9 @@
 
+Revision 1.03.1 / 2022-04-22
+============================
+
+  * [FATAL] autorevision should be ignored when not on git.
+
 Revision 1.03.0 / 2022-04-14
 ============================
 
