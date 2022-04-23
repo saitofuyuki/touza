@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2022/03/26 16:43:26 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/09/16 17:19:36 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -41,6 +41,9 @@
 ! #endif
 #ifndef    OPT_ENABLE_LONG_RECORD
 #  define  OPT_ENABLE_LONG_RECORD 1 /* 64-bit subrecord markers */
+#endif
+#ifndef   OPT_READ_SWAP_WITH_WORK
+#  define OPT_READ_SWAP_WITH_WORK 1 /* automatic work-array is used for swap */
 #endif
 !!!_@ TOUZA_Std_sus - TOUZA sequential access by stream i/o interfaces
 module TOUZA_Std_sus
@@ -360,14 +363,14 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: utest
     integer,intent(in),optional :: ulog
-    integer ut, ul
+    integer ut
     integer jposa, jposb
 
     ierr = 0
     ut = choice(-1, utest)
     if (ut.lt.0) then
        if (ut.lt.0) ut = new_unit()
-       if (ut.lt.0) ierr = -1
+       if (ut.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_SUS
     endif
     if (ierr.eq.0) then
        open(UNIT=ut, IOSTAT=ierr, &
@@ -381,7 +384,7 @@ contains
        if (jposa.eq.jposb) then
           call msg_mdl('(''positioning/write not works '', I0, 1x, I0)', &
                & (/jposa, jposb/), __MDL__, ulog)
-          ierr = -1
+          ierr = ERR_OPR_DISABLE - ERR_MASK_STD_SUS
        endif
     endif
     if (ierr.eq.0) then
@@ -397,7 +400,7 @@ contains
           call msg_mdl('workaround enabled', __MDL__, ulog)
 #else /* not OPT_STREAM_RPOS_WORKAROUND */
           call msg_mdl('need rebuild with workaround', __MDL__, ulog)
-          ierr = -1
+          ierr = ERR_OPR_DISABLE + ERR_MASK_STD_SUS
 #endif /* not OPT_STREAM_RPOS_WORKAROUND */
        endif
     endif
@@ -418,7 +421,8 @@ contains
     integer,intent(in),optional :: u
     integer,parameter :: KBUF=KI32
     integer utmp
-    integer jposa, jposb
+
+    ierr = 0
 
 201 format('kind:', A, ' = ', I0)
     utmp = choice(ulog, u)
@@ -1301,7 +1305,8 @@ contains
     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
     if (ierr.eq.0) then
        jpos = jpos + conv_b2strm(abs(lseph))
-       m = get_mems_bytes(lseph, V(1))
+       ! to do: check overflow
+       m = int(get_mems_bytes(lseph, V(1)))
        if (n.gt.m) then
           ierr = ERR_INVALID_RECORD_SIZE
        else
@@ -1342,7 +1347,8 @@ contains
     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
     if (ierr.eq.0) then
        jpos = jpos + conv_b2strm(abs(lseph))
-       m = get_mems_bytes(lseph, V(1))
+       ! to do: check overflow
+       m = int(get_mems_bytes(lseph, V(1)))
        if (n.gt.m) then
           ierr = ERR_INVALID_RECORD_SIZE
        else
@@ -1383,7 +1389,8 @@ contains
     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
     if (ierr.eq.0) then
        jpos = jpos + conv_b2strm(abs(lseph))
-       m = get_mems_bytes(lseph, V(1))
+       ! to do: check overflow
+       m = int(get_mems_bytes(lseph, V(1)))
        if (n.gt.m) then
           ierr = ERR_INVALID_RECORD_SIZE
        else
@@ -1424,7 +1431,8 @@ contains
     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
     if (ierr.eq.0) then
        jpos = jpos + conv_b2strm(abs(lseph))
-       m = get_mems_bytes(lseph, V(1))
+       ! to do: check overflow
+       m = int(get_mems_bytes(lseph, V(1)))
        if (n.gt.m) then
           ierr = ERR_INVALID_RECORD_SIZE
        else
@@ -1465,7 +1473,8 @@ contains
     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
     if (ierr.eq.0) then
        jpos = jpos + conv_b2strm(abs(lseph))
-       m = get_mems_bytes(lseph, V(1))
+       ! to do: check overflow
+       m = int(get_mems_bytes(lseph, V(1)))
        if (n.gt.m) then
           ierr = ERR_INVALID_RECORD_SIZE
        else
@@ -1481,80 +1490,6 @@ contains
     endif
     return
   end subroutine sus_read_lrec_a
-! !!!_  - sus_write_begin_irec
-!   subroutine sus_write_begin_irec &
-!        & (ierr, u, jpos, lrec, swap)
-!     use TOUZA_Nng_std,only: choice
-!     implicit none
-!     integer,            intent(out)         :: ierr
-!     integer,            intent(in)          :: u
-!     integer(KIND=KIOFS),intent(out)         :: jpos
-!     integer(KIND=KI32), intent(in),optional :: lrec
-!     logical,            intent(in),optional :: swap
-!     integer(KIND=KI32) :: isep
-!     ierr = 0
-!     inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
-!     if (ierr.eq.0) then
-!        isep = choice(0, lrec)
-!        call sus_write_isep(ierr, u, isep, swap=swap)
-!     endif
-!     return
-!   end subroutine sus_write_begin_irec
-! !!!_  - sus_write_end_irec
-!   subroutine sus_write_end_irec &
-!        & (ierr, u, jposh, sync, swap)
-!     use TOUZA_Std_env,only: nc_strm, get_rlb
-!     use TOUZA_Nng_std,only: choice
-!     implicit none
-!     integer,            intent(out)         :: ierr
-!     integer,            intent(in)          :: u
-!     integer(KIND=KIOFS),intent(in)          :: jposh
-!     logical,            intent(in),optional :: sync
-!     logical,            intent(in),optional :: swap
-!     integer(KIND=KIOFS) :: jposf
-!     integer(KIND=KI32)  :: isep, lbsep
-!     ierr = 0
-!     inquire(UNIT=u, IOSTAT=ierr, POS=jposf)
-!     if (ierr.eq.0) then
-!        lbsep = get_rlb(isep)
-!        isep = (jposf - jposh) * nc_strm - lbsep
-!        if (choice(.true., sync)) then
-!           call sus_write_isep(ierr, u, isep, pos=jposh, swap=swap)
-!        endif
-!        if (ierr.eq.0) then
-!           call sus_write_isep(ierr, u, isep, pos=jposf, swap=swap)
-!        endif
-!     endif
-!     return
-!   end subroutine sus_write_end_irec
-! !!!_  - sus_read_begin_irec
-!   subroutine sus_read_begin_irec &
-!        & (ierr, u, jpos, swap)
-!     use TOUZA_Nng_std,only: nc_strm
-!     implicit none
-!     integer,            intent(out)         :: ierr
-!     integer,            intent(in)          :: u
-!     integer(KIND=KIOFS),intent(out)         :: jpos
-!     logical,            intent(in),optional :: swap
-!     integer(KIND=KI32) :: isep
-!     ierr = 0
-!     if (ierr.eq.0) call sus_read_isep(ierr, u, isep, swap=swap)
-!     if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
-!     if (ierr.eq.0) jpos = jpos + isep / nc_strm
-!     return
-!   end subroutine sus_read_begin_irec
-! !!!_  - sus_read_end_irec
-!   subroutine sus_read_end_irec &
-!        & (ierr, u, jpos, swap)
-!     implicit none
-!     integer,            intent(out)         :: ierr
-!     integer,            intent(in)          :: u
-!     integer(KIND=KIOFS),intent(in)          :: jpos
-!     logical,            intent(in),optional :: swap
-!     integer(KIND=KI32)  :: isep
-!     call sus_read_isep(ierr, u, isep, pos=jpos, swap=swap)
-!     return
-!   end subroutine sus_read_end_irec
 !!!_  - sus_write - write data with optional byte-swapping
   subroutine sus_write_i &
        & (ierr, u, v, n, swap)
@@ -1677,11 +1612,21 @@ contains
     real(KIND=KARG),intent(out)         :: V(*)
     integer,        intent(in)          :: n
     logical,        intent(in),optional :: swap
+#if OPT_READ_SWAP_WITH_WORK
+    integer(KIND=KBUF) :: W(n)
+#endif /* OPT_READ_SWAP_WITH_WORK */
     if (choice(.false.,swap)) then
+#if OPT_READ_SWAP_WITH_WORK
+       read(UNIT=u, IOSTAT=ierr) W(1:n)
+       if (ierr.eq.0) then
+          V(1:n) = TRANSFER(sus_eswap(W(1:n)), 0.0_KARG, n)
+       endif
+#else /* not OPT_READ_SWAP_WITH_WORK */
        read(UNIT=u, IOSTAT=ierr) V(1:n)
        if (ierr.eq.0) then
           V(1:n) = TRANSFER(sus_eswap(TRANSFER(V(1:n), 0_KBUF, n)), 0.0_KARG, n)
        endif
+#endif /* not OPT_READ_SWAP_WITH_WORK */
     else
        read(UNIT=u, IOSTAT=ierr) V(1:n)
     endif
@@ -1696,11 +1641,21 @@ contains
     real(KIND=KARG),intent(out)         :: V(*)
     integer,        intent(in)          :: n
     logical,        intent(in),optional :: swap
+#if OPT_READ_SWAP_WITH_WORK
+    integer(kind=KBUF) :: W(n)
+#endif /* OPT_READ_SWAP_WITH_WORK */
     if (choice(.false.,swap)) then
+#if OPT_READ_SWAP_WITH_WORK
+       read(UNIT=u, IOSTAT=ierr) W(1:n)
+       if (ierr.eq.0) then
+          V(1:n) = TRANSFER(sus_eswap(W(1:n)), 0.0_KARG, n)
+       endif
+#else /* not OPT_READ_SWAP_WITH_WORK */
        read(UNIT=u, IOSTAT=ierr) V(1:n)
        if (ierr.eq.0) then
           V(1:n) = TRANSFER(sus_eswap(TRANSFER(V(1:n), 0_KBUF, n)), 0.0_KARG, n)
        endif
+#endif /* not OPT_READ_SWAP_WITH_WORK */
     else
        read(UNIT=u, IOSTAT=ierr) V(1:n)
     endif
@@ -1868,13 +1823,14 @@ contains
     else
        read(UNIT=u, IOSTAT=ierr) lsep
     endif
+    ! to do: check overflow
     if (choice(.false., swap)) then
        if (ierr.eq.0) then
           lsep = sus_eswap(lsep)
-          sep = lsep
+          sep = int(lsep, KIND=KARG)
        endif
     else
-       if (ierr.eq.0) sep = lsep
+       if (ierr.eq.0) sep = int(lsep, KIND=KARG)
     endif
   end subroutine sus_read_lsep_i
   subroutine sus_read_lsep_l (ierr, u, sep, pos, swap)
@@ -2119,7 +2075,7 @@ program test_std_sus
   real(kind=KDBL)    :: vds(lv), vdd(lv)
   character(len=la)  :: vas(lv), vad(lv)
 
-  character(len=512) :: file = 'out.nng'
+  character(len=512) :: file = 'out.sus'
 
   integer kendi
   integer j
