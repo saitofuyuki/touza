@@ -1,7 +1,7 @@
 !!!_! emu_usi.F90 - touza/emu usysio emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2022/02/09 18:02:53 fuyuki emu_usi.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/04/23 13:55:41 fuyuki emu_usi.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2022
@@ -174,13 +174,17 @@ contains
              if (ierr.eq.0) then
                 call msg_grp(TIME_STAMP, __GRP__, __MDL__, utmp)
                 call msg_grp('(''sysin unit = '', I0)', (/IFILE/), __GRP__, __MDL__, utmp)
-                inquire(NAME=file, UNIT=IFILE, IOSTAT=jerr)
-                if (jerr.eq.0) &
-                     & call msg_grp('(''sysin file = '', A)', (/file/), __GRP__, __MDL__, utmp)
+                if (IFILE.ge.0) then
+                   inquire(NAME=file, UNIT=IFILE, IOSTAT=jerr)
+                   if (jerr.eq.0) &
+                        & call msg_grp('(''sysin file = '', A)', (/file/), __GRP__, __MDL__, utmp)
+                endif
                 call msg_grp('(''sysout unit = '', I0)', (/JFILE/), __GRP__, __MDL__, utmp)
-                inquire(NAME=file, UNIT=JFILE, IOSTAT=jerr)
-                if (jerr.eq.0) &
-                     & call msg_grp('(''sysout file = '', A)', (/file/), __GRP__, __MDL__, utmp)
+                if (JFILE.ge.0) then
+                   inquire(NAME=file, UNIT=JFILE, IOSTAT=jerr)
+                   if (jerr.eq.0) &
+                        & call msg_grp('(''sysout file = '', A)', (/file/), __GRP__, __MDL__, utmp)
+                endif
              endif
           endif
        endif
