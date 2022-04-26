@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/04/22 11:32:13 fuyuki Makefile.am>
+# Time-stamp: <2022/04/26 16:57:20 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -33,14 +33,11 @@ lib@TOUZA_NAME@_la_LIBADD	+= cal/$(local_name)
 AM_FCFLAGS					+= $(FC_MODULE_touza_cal)
 endif
 
-pkgconfigdir	=	$(libdir)/pkgconfig
-pkgconfig_DATA	=	touza.pc
-
-# if BUILD_div
-# SUBDIRS 					+= div
-# lib@TOUZA_NAME@_la_LIBADD	+= div/$(local_name)
-# AM_FCFLAGS					+= $(FC_MODULE_touza_div)
-# endif
+if BUILD_div
+SUBDIRS 					+= div
+lib@TOUZA_NAME@_la_LIBADD	+= div/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_div)
+endif
 
 if BUILD_trp
 SUBDIRS 					+= trp
@@ -59,6 +56,9 @@ SUBDIRS 					+= ppp
 lib@TOUZA_NAME@_la_LIBADD	+= ppp/$(local_name)
 AM_FCFLAGS					+= $(FC_MODULE_touza_ppp)
 endif
+
+pkgconfigdir	=	$(libdir)/pkgconfig
+pkgconfig_DATA	=	touza.pc
 
 SUBDIRS	+=	m4c
 
