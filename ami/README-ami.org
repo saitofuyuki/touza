@@ -1,0 +1,27 @@
+#+title: TOUZA/ami guide
+#+author: SAITO Fuyuki
+#+date: <2022-01-26 Wed>
+
+* Introduction
+*TOUZA/ami* (or ami-da) is a collection of Fortran subroutines for
+`coupling'.  `ami-da' stands for ami(friend) drvies associates.
+
+The original motivation to develop this package is to replace
+legacy =pgcpl.F= in MIROC, with improving the interfaces and
+the algorithms to control the domain decomposition and parallel
+communication.
+
+*TOUZA/ami* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+DOT go DOT jp>.
+
+*TOUZA (楊座)*, MIROC base infrastructure, is a collection of
+Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
+(expected to be in the parent directory) for general instruction of
+*TOUZA* collection.
+
+* Build and installation
+
+* Copyright and license
+Copyright 2022 Japan Agency for Marine-Earth Science and Technology
+Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)

@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/04/26 16:57:20 fuyuki Makefile.am>
+# Time-stamp: <2022/05/02 09:47:44 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -55,6 +55,12 @@ if BUILD_ppp
 SUBDIRS 					+= ppp
 lib@TOUZA_NAME@_la_LIBADD	+= ppp/$(local_name)
 AM_FCFLAGS					+= $(FC_MODULE_touza_ppp)
+endif
+
+if BUILD_ami
+SUBDIRS 					+= ami
+lib@TOUZA_NAME@_la_LIBADD	+= ami/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_ami)
 endif
 
 pkgconfigdir	=	$(libdir)/pkgconfig

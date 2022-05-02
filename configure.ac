@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/04/28 09:31:00 fuyuki configure.ac>
+# Time-stamp: <2022/05/02 09:47:55 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -104,6 +104,7 @@ MT_SUB_PACKAGE([trp], [],     [std])
 MT_SUB_PACKAGE([nng], [],     [std emu trp])
 MT_SUB_PACKAGE([ppp], [],     [std emu])
 MT_SUB_PACKAGE([div], [],     [std])
+MT_SUB_PACKAGE([ami], [],     [std])
 
 AC_MSG_CHECKING([if also build jmz])
 AC_ARG_WITH([build-jmz],
