@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2022/02/16 15:29:56 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/09/20 17:47:00 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2022
@@ -223,6 +223,7 @@ module TOUZA_Std_env
   public init_file_bodr,   check_byte_order, check_bodr_unit
   public init_io_status,   is_eof_ss
   public get_size_bytes,   conv_b2strm,  get_mems_bytes
+  public get_login_name,   get_host_name
 #if DEBUG_PRIVATES
   public check_bodr_mem, check_bodr_files
   public brute_force_stdu
@@ -759,8 +760,8 @@ contains
 !           if IROOT >=0:  rank=IROOT runs, and the result broadcasted
 !!!_  & set_mpi
   subroutine set_mpi &
-       & (ierr, irank, iroot, icomm, tag, iru, icu, u, levv)
-    use TOUZA_Std_mwe,only: get_ni, get_comm
+       & (ierr, irank, nrank, iroot, icomm, tag, iru, icu, u, levv)
+    use TOUZA_Std_mwe,only: get_ni, get_comm, MPI_COMM_NULL
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
 #if OPT_USE_MPI
@@ -768,12 +769,11 @@ contains
 #endif
     implicit none
     integer,         intent(out) :: ierr
-    integer,         intent(out) :: irank, iroot, icomm
+    integer,         intent(out) :: irank, nrank, iroot, icomm
     character(len=*),intent(in)  :: tag
     integer,optional,intent(in)  :: iru, icu
     integer,optional,intent(in)  :: u
     integer,optional,intent(in)  :: levv
-    integer nrank
     integer utmp
     integer lv
 
@@ -801,7 +801,7 @@ contains
     endif
     if (ierr.eq.0) call get_ni(ierr, nrank, irank, icomm)
     if (ierr.eq.0) then
-       if (iroot.ge.nrank) ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       if (nrank.gt.0.and.iroot.ge.nrank) ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
     endif
     if (ierr.eq.0) then
        if (VCHECK_INFO(lv)) then
@@ -809,8 +809,9 @@ contains
        endif
     endif
 #else
-    icomm = 0
+    icomm = MPI_COMM_NULL
     irank = 0
+    nrank = 0
     iroot = 0
 #endif
     return
@@ -873,13 +874,14 @@ contains
     integer,intent(in),optional :: levtry
     integer,intent(in),optional :: iroot, icomm
 
-    integer ir, ic, ik
+    integer ir, ic, ik, nr
     integer,parameter :: mb=5
     integer ibuf(mb)
 
     ierr = ERR_SUCCESS
+    nr = 0
 
-    call set_mpi(ierr, ir, ik, ic, 'recl', iroot, icomm, u, levv)
+    call set_mpi(ierr, ir, nr, ik, ic, 'recl', iroot, icomm, u, levv)
     if (ierr.eq.0) then
        ibuf(1:5) = (/lrecd, lrecf, lreci, lrecl, nb_recl/)
        if (ir.eq.ik .or. ik.lt.0) then
@@ -891,7 +893,7 @@ contains
     endif
     if (ierr.eq.0) then
 #if OPT_USE_MPI
-       call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
+       if (nr.ge.1) call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
 #endif
     endif
     if (ierr.eq.0) then
@@ -908,7 +910,9 @@ contains
        nbytd = (nb_recl * lrecd)
     endif
 #if OPT_USE_MPI
-    if (ierr.ne.0) call MPI_Abort(ic, ERR_PANIC, ierr)
+    if (ierr.ne.0) then
+       if (nr.ge.1) call MPI_Abort(ic, ERR_PANIC, ierr)
+    endif
 #endif
     return
   end subroutine init_unfmtd_recl
@@ -1067,7 +1071,7 @@ contains
     lrec = -1
 
     lu = choice(0, lunit)
-    if (lu.le.0) ierr = -1
+    if (lu.le.0) ierr = ERR_INVALID_PARAMETER + ERR_MASK_STD_ENV
     if (ierr.ne.0) return
 
     ! find good
@@ -1360,7 +1364,7 @@ contains
 
     lu = choice(0, lunit)
     ! if (lu.le.0) call brute_force_storage_unit(ierr, lu, utest, fn, u)
-    if (lu.le.0) ierr = -1
+    if (lu.le.0) ierr = ERR_INVALID_PARAMETER + ERR_MASK_STD_ENV
     if (ierr.ne.0) return
 
     ! find good
@@ -1522,16 +1526,17 @@ contains
     integer,intent(in),optional :: levtry
     integer,intent(in),optional :: iroot, icomm
 
-    integer ir, ic, ik
+    integer ir, nr, ic, ik
     integer,parameter :: mb=1
     integer ibuf(mb)
 
     ierr = ERR_SUCCESS
+    nr = 0
 
     ! needs nbyt*
     if (ierr.eq.0) call init_unfmtd_recl(ierr, u, levv, levtry, iroot, icomm)
 
-    if (ierr.eq.0) call set_mpi(ierr, ir, ik, ic, 'strm', iroot, icomm, u, levv)
+    if (ierr.eq.0) call set_mpi(ierr, ir, nr, ik, ic, 'strm', iroot, icomm, u, levv)
     if (ierr.eq.0) then
        ibuf(1:1) = (/nc_strm/)
        if (ir.eq.ik .or. ik.lt.0) then
@@ -1543,7 +1548,7 @@ contains
     endif
     if (ierr.eq.0) then
 #if OPT_USE_MPI
-       call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
+       if (nr.ge.1) call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
 #endif
     endif
     if (ierr.eq.0) then
@@ -1556,7 +1561,9 @@ contains
        mstrmd = nbytd / max(1, nc_strm)
     endif
 #if OPT_USE_MPI
-    if (ierr.ne.0) call MPI_Abort(ic, ERR_PANIC, ierr)
+    if (ierr.ne.0) then
+       if (nr.ge.1) call MPI_Abort(ic, ERR_PANIC, ierr)
+    endif
 #endif
     return
   end subroutine init_unfmtd_strm
@@ -1643,7 +1650,7 @@ contains
     call msg_mdl('inquire pos disabled', __MDL__, u)
 #   endif /* not HAVE_FORTRAN_INQUIRE_POS */
 #else /* not HAVE_FORTRAN_OPEN_STREAM */
-    ierr = -1
+    ierr = ERR_OPR_DISABLE + ERR_MASK_STD_ENV
     call msg_mdl('stream access unavailable', __MDL__, u)
 #endif /* not HAVE_FORTRAN_OPEN_STREAM */
     return
@@ -1666,12 +1673,13 @@ contains
     integer,intent(in),optional :: ubgn,  uend, ustp
     integer,intent(in),optional :: iroot, icomm
 
-    integer ir, ic, ik
+    integer ir, nr, ic, ik
     integer,parameter :: mb=1
     integer ibuf(mb)
 
     ierr = 0
-    call set_mpi(ierr, ir, ik, ic, 'bodr', iroot, icomm, u, levv)
+    nr = 0
+    call set_mpi(ierr, ir, nr, ik, ic, 'bodr', iroot, icomm, u, levv)
 
     if (ierr.eq.0) then
        ibuf(1:1) = (/kendi_file/)
@@ -1679,14 +1687,16 @@ contains
     endif
     if (ierr.eq.0) then
 #if OPT_USE_MPI
-       call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
+       if (nr.ge.1) call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
 #endif
     endif
     if (ierr.eq.0) then
        call health_check_ufd(ierr, kendi_file, ibuf(1), 'BODR', u, levv)
     endif
 #if OPT_USE_MPI
-    if (ierr.ne.0) call MPI_Abort(ic, ERR_PANIC, ierr)
+    if (ierr.ne.0) then
+       if (nr.ge.1) call MPI_Abort(ic, ERR_PANIC, ierr)
+    endif
 #endif
     return
   end subroutine init_file_bodr
@@ -1938,13 +1948,14 @@ contains
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: iroot, icomm
 
-    integer ir, ic, ik
+    integer ir, nr, ic, ik
     integer,parameter :: mb=1
     integer ibuf(mb)
 
     ierr = ERR_SUCCESS
+    nr = 0
 
-    call set_mpi(ierr, ir, ik, ic, 'ios', iroot, icomm, u, levv)
+    call set_mpi(ierr, ir, nr, ik, ic, 'ios', iroot, icomm, u, levv)
     if (ierr.eq.0) then
        ibuf(1:1) = (/err_eof/)
        if (ir.eq.ik .or. ik.lt.0) then
@@ -1955,12 +1966,14 @@ contains
     endif
     if (ierr.eq.0) then
 #if OPT_USE_MPI
-       call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
+       if (nr.ge.1) call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
 #endif
     endif
     if (ierr.eq.0) err_eof = ibuf(1)
 #if OPT_USE_MPI
-    if (ierr.ne.0) call MPI_Abort(ic, ERR_PANIC, ierr)
+    if (ierr.ne.0) then
+       if (nr.ge.1) call MPI_Abort(ic, ERR_PANIC, ierr)
+    endif
 #endif
     return
   end subroutine init_io_status
@@ -2322,6 +2335,37 @@ contains
     l = lreci + 0 * kind(V)
   end function get_size_ufd_l
 
+!!!_ + system procedures wrapper
+!!!_  & get_login_name
+  subroutine get_login_name &
+       & (ierr, name)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: name
+#if HAVE_FORTRAN_GETLOG
+    ierr = 0
+    call GETLOG(name)
+#else
+    ierr = 0
+    name = ' '
+#endif
+  end subroutine get_login_name
+!!!_  & get_host_name
+  subroutine get_host_name &
+       & (ierr, name)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: name
+#if HAVE_FORTRAN_HOSTNM
+    ierr = 0
+    call HOSTNM(name)
+#else
+    ierr = 0
+    name = ' '
+#endif
+  end subroutine get_host_name
+!!!_  & get_env_var
+!!!_ + end TOUZA_Std_env
 end module TOUZA_Std_env
 
 !!!_@ test_std_env - test program
@@ -2334,6 +2378,7 @@ program test_std_env
   integer ui, uo, ue
   integer ut
   integer kendi
+  character(len=128) :: str
 
   ierr = 0
   ut=10
@@ -2366,6 +2411,11 @@ program test_std_env
         write(*, *) 'ENDIANNESS(unit) = ', ut, kendi, ierr
      enddo
   endif
+
+  if (ierr.eq.0) call get_login_name(ierr, str)
+  if (ierr.eq.0) write(*, *) 'login = ', trim(str)
+  if (ierr.eq.0) call get_host_name(ierr, str)
+  if (ierr.eq.0) write(*, *) 'host = ', trim(str)
 
   if (ierr.eq.0) call diag(ierr, mode=MODE_FORCE+MODE_SHALLOW, levv=+10)
   if (ierr.eq.0) call finalize(ierr, levv=+10)

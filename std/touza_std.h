@@ -100,4 +100,6 @@
 #define ERR_INVALID_RECORD_SIZE         (ERR_MASK_SPECIFIC-1)  /* insufficient sequential record length */
 #define ERR_INCONSISTENT_RECORD_MARKERS (ERR_MASK_SPECIFIC-2)  /* different head/foot markers */
 
+#define ERR_MPI_PANIC                   (ERR_MASK_SPECIFIC-1)  /* panic in mpi procedures */
+
 #endif /* not _TOUZA_STD_H */
