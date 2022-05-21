@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2022/04/04 21:57:23 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/09/20 22:00:39 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -735,7 +735,7 @@ contains
     real   (kind=KRFLD),intent(in)  :: vmiss
     integer,            intent(in)  :: mbits, xbits
     integer,            intent(in)  :: ixtop, ixbtm  ! exponent upper/lower limit (relative to exp(1))
-    integer,            intent(in)  :: kcode        ! encoding scheme
+    integer,            intent(in)  :: kcode         ! encoding scheme
 
     integer(kind=KIBGZ),parameter :: kzero = 0_KIBGZ
 
