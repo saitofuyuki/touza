@@ -1,7 +1,7 @@
 !!!_! ppp_king.F90 - TOUZA/ppp king control (xmcomm/xmking replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2022/04/26 11:30:27 fuyuki ppp_king.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/06/30 15:25:49 fuyuki ppp_king.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -19,7 +19,7 @@
 #  define DEBUG_KING TEST_PPP_KING
 #endif
 #ifndef   OPT_KING_MODULE_LEN
-#  define OPT_KING_MODULE_LEN 9
+#  define OPT_KING_MODULE_LEN 8
 #endif
 #ifndef   OPT_KING_FILTER_LIM
 #  define OPT_KING_FILTER_LIM 256
@@ -29,9 +29,6 @@
 #endif
 #ifndef   OPT_KING_HASH_BASE
 #  define OPT_KING_HASH_BASE 13
-#endif
-#ifndef   OPT_KING_HASH_CARRY
-#  define OPT_KING_HASH_CARRY 1
 #endif
 !!!_@ TOUZA_Ppp_king - MPI king-rank control
 module TOUZA_Ppp_king
@@ -46,8 +43,7 @@ module TOUZA_Ppp_king
   integer,parameter :: lmdl = OPT_KING_MODULE_LEN
   integer,parameter :: lctb = OPT_KING_CACHE_LIM
 
-  integer,parameter :: mbaseh = OPT_KING_HASH_BASE
-  integer,parameter :: mcarrh = OPT_KING_HASH_CARRY
+  integer,parameter :: king_unset = -1
 !!!_ + public
   character,parameter,public :: punct = '.'
 !!!_ + static
@@ -55,7 +51,10 @@ module TOUZA_Ppp_king
   integer,            save :: cache_a(0:lctb-1)  = -1
   character(len=lmdl),save :: cache_p(0:lctb-1)  = ' '
   integer,            save :: cache_n(0:lctb-1)  = -9    ! count of matches (source agent) or -1 (reference agent)
-  integer,            save :: cache_x(0:lctb-1)  = -1    ! hash extends
+  ! integer,            save :: cache_x(0:lctb-1)  = -1    ! hash extends
+
+  integer,save :: mctb = 0
+  integer,save :: hh_king = -1
 !!!_  - private static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -80,7 +79,7 @@ module TOUZA_Ppp_king
 !!!_ + common interfaces
 contains
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, stdv, icomm)
+  subroutine init(ierr, u, levv, mode, stdv, icomm, nking)
     use TOUZA_Ppp_std,only: choice, ps_init=>init
     use TOUZA_Ppp_amng,only: pc_init=>init
     implicit none
@@ -88,6 +87,7 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
     integer,intent(in),optional :: icomm
+    integer,intent(in),optional :: nking
     integer lv, md, lmd
 
     ierr = 0
@@ -108,7 +108,7 @@ contains
           if (ierr.eq.0) call pc_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
        if (is_first_force(init_counts, md)) then
-          continue
+          if (ierr.eq.0) call init_table(ierr, nking)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -184,12 +184,32 @@ contains
     endif
   end subroutine finalize
 
+!!!_ + init subcontracts
+!!!_  - init_table - hash table initialization
+  subroutine init_table &
+       & (ierr, n)
+    use TOUZA_Ppp_std,only: choice, new_htable
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: n
+    integer m
+
+    ierr = 0
+    m = choice(0, n)
+    ! if (m.le.0) m = lctb * 2
+    if (m.le.0) m = lctb
+    if (hh_king.lt.0) then
+       hh_king = new_htable('king', lmdl, m, def=king_unset, base=OPT_KING_HASH_BASE, ntag=1)
+       if (hh_king.lt.0) ierr = -1
+    endif
+    return
+  end subroutine init_table
 !!!_ + diag subcontracts
 !!!_  - diag_cache
   subroutine diag_cache &
        & (ierr, u)
     use MPI,only: MPI_Comm_rank, MPI_COMM_WORLD
-    use TOUZA_Ppp_std,only: get_wni_safe, msg
+    use TOUZA_Ppp_std,only: get_wni_safe, msg, diag_htable
     use TOUZA_Ppp_amng,only: lagent, inquire_agent
     implicit none
     integer,intent(out)         :: ierr
@@ -203,6 +223,7 @@ contains
     ierr = 0
     utmp = get_logu(u, ulog)
 
+    call diag_htable(ierr, hh_king, utmp)
     call get_wni_safe(ierr, irank=irank)
 
 101 format('cache/king:', I0, 1x, I0, 1x, A, 1x, A, ':', I0, 2x, I0)
@@ -480,24 +501,14 @@ contains
   integer function cache_search &
        & (pat, iagent) &
        & result(n)
+    use TOUZA_Ppp_std,only: query_status
     implicit none
     character(len=*),intent(in) :: pat
     integer,         intent(in) :: iagent
-    integer m, jcoff, jc
     n = -1
     if (iagent.lt.0) return
 
-    jcoff = cache_hash(pat, iagent)
-
-    do m = 0, cache_x(jcoff)
-       jc = mod(jcoff + m, lctb)
-       if (cache_p(jc).eq.pat) then
-          if (cache_a(jc).eq.iagent) then
-             n = jc
-             exit
-          endif
-       endif
-    enddo
+    n = query_status(pat, iagent, hh_king)
     return
   end function cache_search
 
@@ -509,23 +520,14 @@ contains
     character(len=*),intent(in) :: pat
     integer,         intent(in) :: iagent
 
-    integer m, jcoff, jc
     integer jp
     n = -1
     if (iagent.lt.0) return
 
-    outer: do jp = len_trim(pat), 1, -1
-       jcoff = cache_hash(pat(1:jp), iagent)
-       do m = 0, cache_x(jcoff)
-          jc = mod(jcoff + m, lctb)
-          if (cache_p(jc).eq.pat(1:jp)) then
-             if (cache_a(jc).eq.iagent) then
-                n = jc
-                exit outer
-             endif
-          endif
-       enddo
-    enddo outer
+    do jp = len_trim(pat), 1, -1
+       n = cache_search(pat(1:jp), iagent)
+       if (n.ge.0) return
+    enddo
     return
   end function cache_match
 
@@ -554,43 +556,32 @@ contains
   integer function cache_store &
        & (pat, iagent, king) &
        & result(n)
+    use TOUZA_Ppp_std,only: reg_entry, query_status
     implicit none
     character(len=*),intent(in) :: pat
     integer,         intent(in) :: iagent
     integer,         intent(in) :: king
 
-    integer m, jcoff, jc
+    integer e
 
-    n = -1
-    jcoff = cache_hash(pat, iagent)
-    do m = 0, lctb - 1
-       jc = mod(jcoff + m, lctb)
-       if (cache_x(jc).ge.0) cycle
-       n = jc
-       cache_a(n) = iagent
-       cache_p(n) = pat
-       cache_k(n) = king
-       cache_n(n) = -1
-       cache_x(jcoff) = max(m, cache_x(jcoff))
+    n = query_status(pat, iagent, hh_king)
+    if (n.ge.0) then
+       n = ERR_DUPLICATE_SET - ERR_MASK_PPP_KING
        return
-    enddo
+    endif
+    n = mctb
+    mctb = mctb + 1
+    if (n.ge.lctb) then
+       n = ERR_INSUFFICIENT_BUFFER - ERR_MASK_PPP_KING
+       return
+    endif
+    e = reg_entry(pat, iagent, hh_king, n)
+    cache_a(n) = iagent
+    cache_p(n) = pat
+    cache_k(n) = king
+    cache_n(n) = -1
+    if (e.lt.0) n = e
   end function cache_store
-
-!!!_  - cache_hash
-  integer function cache_hash &
-       & (pat, iagent) &
-       & result(n)
-    implicit none
-    character(len=*),intent(in) :: pat
-    integer,         intent(in) :: iagent
-    integer j
-    n = iagent
-    do j = 1, len_trim(pat)
-       n = mod(n * mbaseh + ICHAR(pat(j:j)), lctb)
-    enddo
-    n = mod(n * mcarrh, lctb)
-    return
-  end function cache_hash
 
 !!!_ + end TOUZA_Ppp_king
 end module TOUZA_Ppp_king
