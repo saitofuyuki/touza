@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2022/02/16 15:00:43 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/06/16 07:49:00 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -218,7 +218,7 @@ contains
     integer,intent(in)  :: uend
     ierr = 0
     if (jc.lt.kucat_black .or. jc.ge.lucat) then
-       ierr = -1
+       ierr = ERR_INVALID_PARAMETER - ERR_MASK_STD_FUN
        call msg_mdl('(''invalid unit category = '', I0)', (/ jc /), __MDL__)
        return
     endif
@@ -234,7 +234,7 @@ contains
     integer,intent(in)  :: jc
     ierr = 0
     if (jc.lt.kucat_black .or. jc.ge.lucat) then
-       ierr = -1
+       ierr = ERR_INVALID_PARAMETER - ERR_MASK_STD_FUN
        call msg_mdl('(''invalid unit category = '', I0)', (/ jc /), __MDL__)
        return
     endif
