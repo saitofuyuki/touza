@@ -1,7 +1,7 @@
 !!!_! touza.F90 - touza administration
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2022/06/04 11:03:22 fuyuki touza.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/07/20 15:38:38 fuyuki touza.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -41,6 +41,10 @@ module TOUZA
 #if ENABLE_TOUZA_PPP
   use TOUZA_Ppp, ppp_init=>init, ppp_diag=>diag, ppp_finalize=>finalize, ppp_msg=>msg
 #endif /* ENABLE_TOUZA_PPP */
+!!!_  - div(conditional)
+#if ENABLE_TOUZA_DIV
+  use TOUZA_Div, div_init=>init, div_diag=>diag, div_finalize=>finalize
+#endif /* ENABLE_TOUZA_DIV */
 !!!_ + default
   implicit none
   public
@@ -85,6 +89,9 @@ contains
 #if ENABLE_TOUZA_PPP
           if (ierr.eq.0) call ppp_init(ierr, u=ulog, levv=lv, mode=lmd, icomm=icomm)
 #endif /* ENABLE_TOUZA_PPP */
+#if ENABLE_TOUZA_DIV
+          if (ierr.eq.0) call div_init(ierr, u=ulog, levv=lv, mode=lmd)
+#endif /* ENABLE_TOUZA_DIV */
 #if ENABLE_TOUZA_CAL
           if (ierr.eq.0) call cal_init(ierr, u=ulog, levv=lv, mode=lmd)
 #endif /* ENABLE_TOUZA_CAL */
@@ -130,6 +137,11 @@ contains
 #else  /* not ENABLE_TOUZA_PPP */
           if (ierr.eq.0) call msg_grp('ppp disabled', u=utmp)
 #endif /* not ENABLE_TOUZA_PPP */
+#if ENABLE_TOUZA_DIV
+          if (ierr.eq.0) call div_diag(ierr, utmp, levv, mode=lmd)
+#else  /* not ENABLE_TOUZA_DIV */
+          if (ierr.eq.0) call msg_grp('div disabled', u=utmp)
+#endif /* not ENABLE_TOUZA_DIV */
 #if ENABLE_TOUZA_CAL
           if (ierr.eq.0) call cal_diag(ierr, utmp, levv, mode=lmd)
 #else  /* not ENABLE_TOUZA_CAL */
@@ -182,6 +194,9 @@ contains
 #if ENABLE_TOUZA_CAL
           if (ierr.eq.0) call cal_finalize(ierr, utmp, levv, mode=lmd)
 #endif /* ENABLE_TOUZA_CAL */
+#if ENABLE_TOUZA_DIV
+          if (ierr.eq.0) call div_finalize(ierr, utmp, levv, mode=lmd)
+#endif /* ENABLE_TOUZA_DIV */
 #if ENABLE_TOUZA_PPP
           if (ierr.eq.0) call ppp_finalize(ierr, utmp, levv, mode=lmd)
 #endif /* ENABLE_TOUZA_PPP */
