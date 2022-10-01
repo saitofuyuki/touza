@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/05/02 09:47:55 fuyuki configure.ac>
+# Time-stamp: <2022/06/04 10:55:59 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -101,7 +101,7 @@ MT_SUB_PACKAGE([std], [always])
 MT_SUB_PACKAGE([emu], [],     [std])
 MT_SUB_PACKAGE([cal], [],     [std])
 MT_SUB_PACKAGE([trp], [],     [std])
-MT_SUB_PACKAGE([nng], [],     [std emu trp])
+MT_SUB_PACKAGE([nio], [],     [std emu trp])
 MT_SUB_PACKAGE([ppp], [],     [std emu])
 MT_SUB_PACKAGE([div], [],     [std])
 MT_SUB_PACKAGE([ami], [],     [std])
@@ -119,7 +119,7 @@ AS_IF([test "x$with_build_jmz" != xno],
 AS_IF([test "x$with_build_jmz" != xno],
 [AX_SUBDIRS_CONFIGURE([jmz],
     [],
-    [[TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nng ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std],
+    [[TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std],
      [TOUZA_LIBS=${ac_top_build_prefix}lib${with_touza_name}.la]],
     [],
     [--with-build-jmz])])

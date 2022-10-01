@@ -1,10 +1,10 @@
-!!!_! nng_std.F90 - TOUZA/Nng utilities (and bridge to Std)
+!!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2022/02/07 11:17:54 fuyuki nng_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/06/04 11:01:17 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -13,9 +13,9 @@
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"
 #endif
-#include "touza_nng.h"
-!!!_@ TOUZA_Nng_std - Nng utilities
-module TOUZA_Nng_std
+#include "touza_nio.h"
+!!!_@ TOUZA_Nio_std - Nio utilities
+module TOUZA_Nio_std
 !!!_ = declaration
 !!!_  - modules
   use TOUZA_Std_prc,only: KI32, KI64, KDBL, KFLT
@@ -52,8 +52,8 @@ module TOUZA_Nng_std
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
   integer,save :: fine_counts = 0
-  integer,save :: lev_verbose = NNG_MSG_LEVEL
-  integer,save :: lev_stdv    = NNG_MSG_LEVEL - 1
+  integer,save :: lev_verbose = NIO_MSG_LEVEL
+  integer,save :: lev_stdv    = NIO_MSG_LEVEL - 1
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
 
@@ -240,12 +240,12 @@ contains
     call msg_txt(tmsg, mdl, u)
   end subroutine msg_ia
 
-end module TOUZA_Nng_std
+end module TOUZA_Nio_std
 
-!!!_@ test_nng_std - test program
-#ifdef TEST_NNG_STD
-program test_nng_std
-  use TOUZA_Nng_std
+!!!_@ test_nio_std - test program
+#ifdef TEST_NIO_STD
+program test_nio_std
+  use TOUZA_Nio_std
   implicit none
   integer ierr
 
@@ -259,9 +259,9 @@ program test_nng_std
   if (ierr.eq.0) call finalize(ierr)
   write(*, 101) 'FINAL', ierr
   stop
-end program test_nng_std
+end program test_nio_std
 
-#endif /* TEST_NNG_STD */
+#endif /* TEST_NIO_STD */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

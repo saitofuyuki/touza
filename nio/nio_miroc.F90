@@ -1,7 +1,7 @@
-!!!_! nng_miroc.F90 - TOUZA/Nng MIROC compatible interfaces
+!!!_! nio_miroc.F90 - TOUZA/Nio MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2022/04/14 14:39:36 fuyuki nng_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/06/04 11:00:44 fuyuki nio_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -21,7 +21,7 @@
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"
 #endif
-#include "touza_nng.h"
+#include "touza_nio.h"
 !!!_* Macros
 #ifndef    MIROC_INTEGER
 #  define  MIROC_INTEGER 4
@@ -29,8 +29,8 @@
 #ifndef    MIROC_DOUBLE
 #  define  MIROC_DOUBLE 8
 #endif
-!!!_@ TOUZA_Nng_miroc - Nng miroc compatible interfaces
-module TOUZA_Nng_miroc
+!!!_@ TOUZA_Nio_miroc - Nio miroc compatible interfaces
+module TOUZA_Nio_miroc
 !!!_ = declaration
 !!!_  - default
   implicit none
@@ -40,7 +40,7 @@ module TOUZA_Nng_miroc
   character(len=*),parameter,public :: csign_def = 'MIROC'
 
   integer,parameter,public :: categ_normal = 0
-  integer,parameter,public :: categ_nng = 1
+  integer,parameter,public :: categ_nio = 1
 !!!_  - miroc include original
 #if WITH_MIROC
 # include "zhdim.F"  /* NCC NDC (No. of characters) */
@@ -157,13 +157,13 @@ module TOUZA_Nng_miroc
   public put_item_time
   public NCC,  NDC
   public init_common
-  public nng_tell, nng_seek
+  public nio_tell, nio_seek
   public GTZRDZ, GFPEEK, GFSKIP, FOPEN, FREWND, FINQUX, FNUINI, FNEWU
 contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv)
-    use TOUZA_Nng,only: nng_init=>init, set_default_header
+    use TOUZA_Nio,only: nio_init=>init, set_default_header
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -172,7 +172,7 @@ contains
     if (.not.binit) then
        binit = .TRUE.
        if (ierr.eq.0) then
-          call nng_init (ierr, u, levv, mode, stdv)
+          call nio_init (ierr, u, levv, mode, stdv)
        endif
        if (ierr.eq.0) then
           call set_default_header &
@@ -184,7 +184,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Nng,only: nng_diag=>diag, nng_msg=>msg
+    use TOUZA_Nio,only: nio_diag=>diag, nio_msg=>msg
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -193,29 +193,29 @@ contains
     ierr = 0
     if (.not.bdiag) then
        bdiag = .TRUE.
-       if (ierr.eq.0) call nng_diag(ierr, u, levv, mode)
-       if (ierr.eq.0) call nng_msg(TIME_STAMP, __MDL__, u)
-       if (ierr.eq.0) call nng_msg('(''WITH_MIROC = '', I0)', WITH_MIROC, __MDL__, u)
+       if (ierr.eq.0) call nio_diag(ierr, u, levv, mode)
+       if (ierr.eq.0) call nio_msg(TIME_STAMP, __MDL__, u)
+       if (ierr.eq.0) call nio_msg('(''WITH_MIROC = '', I0)', WITH_MIROC, __MDL__, u)
     endif
     return
   end subroutine diag
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Nng,only: nng_finalize=>finalize
+    use TOUZA_Nio,only: nio_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
     ierr = 0
-    if (ierr.eq.0) call nng_finalize(ierr, u, levv, mode)
+    if (ierr.eq.0) call nio_finalize(ierr, u, levv, mode)
     return
   end subroutine finalize
 
 !!!_ + user subroutines
 !!!_  - put_item_time
   subroutine put_item_time(ierr, head, time, kentr)
-    use TOUZA_Nng_header,only: put_item
+    use TOUZA_Nio_header,only: put_item
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: head(*)
@@ -226,33 +226,33 @@ contains
     call css2yh(idate, time)
     call put_item(ierr, head, idate, kentr)
   end subroutine put_item_time
-!!!_  - nng_tell - return file position (ciof_tell emulation)
-  subroutine nng_tell(u, jpos)
-    use TOUZA_Nng_std,only: KI64
+!!!_  - nio_tell - return file position (ciof_tell emulation)
+  subroutine nio_tell(u, jpos)
+    use TOUZA_Nio_std,only: KI64
     implicit none
     integer,           intent(in)  :: u
     integer(KIND=KI64),intent(out) :: jpos  ! not KIOFS
     integer jerr
     inquire(UNIT=u, IOSTAT=jerr, POS=jpos)
     return
-  end subroutine nng_tell
-!!!_  - nng_seek - set file position (ciof_seek emulation)
-  subroutine nng_seek(ierr, u, jpos)
-    use TOUZA_Nng_std,only: KI64, WHENCE_ABS, sus_rseek, sus_eswap
+  end subroutine nio_tell
+!!!_  - nio_seek - set file position (ciof_seek emulation)
+  subroutine nio_seek(ierr, u, jpos)
+    use TOUZA_Nio_std,only: KI64, WHENCE_ABS, sus_rseek, sus_eswap
     implicit none
     integer,           intent(out) :: ierr
     integer,           intent(in)  :: u
     integer(KIND=KI64),intent(in)  :: jpos  ! not KIOFS
     call sus_rseek(ierr, u, jpos, whence=WHENCE_ABS)
     return
-  end subroutine nng_seek
+  end subroutine nio_seek
 !!!_ + end module
-end module TOUZA_Nng_Miroc
+end module TOUZA_Nio_Miroc
 !!!_* /nonmodule/ interfaces
 !!!_  - init_common
 subroutine init_common(u)
   use TOUZA_Std,only: choice
-  use TOUZA_Nng_miroc,only: init, diag
+  use TOUZA_Nio_miroc,only: init, diag
   implicit none
   integer,intent(in),optional :: u
   integer jerr
@@ -277,11 +277,11 @@ subroutine GTZRDZ &
      &  ISTA,  IEND,  JSTA,  JEND,  KSTA, KEND, &
      &  IFILE, HITEM, HDFMT, HCLAS, &
      &  DSIZE)
-  use TOUZA_Nng,only: &
-       & nng_msg=>msg,    get_item, &
-       & nng_read_header, parse_header_size, nng_read_data, &
+  use TOUZA_Nio,only: &
+       & nio_msg=>msg,    get_item, &
+       & nio_read_header, parse_header_size, nio_read_data, &
        & hi_ASTR1, hi_ASTR2, hi_ASTR3, hi_AEND1, hi_AEND2, hi_AEND3
-  use TOUZA_Nng_miroc,only: KMD, NCC, NDC, init_common
+  use TOUZA_Nio_miroc,only: KMD, NCC, NDC, init_common
   implicit none
   integer,            intent(in)  :: DSIZE
   real(kind=kmd),     intent(out) :: DDATA(DSIZE)  !! data
@@ -309,7 +309,7 @@ subroutine GTZRDZ &
   endif
 
   IEOD = 0
-  call nng_read_header(jerr, HEAD, krect, IFILE)
+  call nio_read_header(jerr, HEAD, krect, IFILE)
   if (jerr .ne. 0) then ! error or no data
      IEOD = ABS(jerr)
      return
@@ -325,13 +325,13 @@ subroutine GTZRDZ &
           &          ' DATA:', n, ',AREA:', DSIZE
      call XABORT(1)
 #else  /* not WITH_MIROC */
-     call nng_msg('overflow in GTZRDZ', __MDL__)
+     call nio_msg('overflow in GTZRDZ', __MDL__)
 #endif /* not WITH_MIROC */
      ieod = 1
      RETURN
   endif
 
-  if (jerr.eq.0) call nng_read_data(jerr, DDATA, n, HEAD, krect, IFILE)
+  if (jerr.eq.0) call nio_read_data(jerr, DDATA, n, HEAD, krect, IFILE)
   if (jerr .ne. 0) then ! error in reading data
      IEOD = ABS(jerr)
      return
@@ -349,8 +349,8 @@ end subroutine GTZRDZ
 subroutine GFPEEK &
      & (HEAD, IEOD, IFILE)
   use TOUZA_Std,only: is_error_match
-  use TOUZA_Nng,only: nng_read_header,nitem,KIOFS,WHENCE_ABS,sus_rseek
-  use TOUZA_Nng_miroc,only: NCC, NDC
+  use TOUZA_Nio,only: nio_read_header,nitem,KIOFS,WHENCE_ABS,sus_rseek
+  use TOUZA_Nio_miroc,only: NCC, NDC
   implicit none
 #if WITH_MIROC
 # include "ziopara.F"
@@ -371,7 +371,7 @@ subroutine GFPEEK &
      IEOD = MM_ERR
      return
   endif
-  call nng_read_header(jerr, HEAD, krect, IFILE)
+  call nio_read_header(jerr, HEAD, krect, IFILE)
   if (jerr.ne.0) then
      HEAD(1:nitem) = ' '
      if (is_error_match(jerr, ERR_EOF)) then
@@ -388,13 +388,13 @@ end subroutine GFPEEK
 !!!_  & GFSKIP - skip a GTOOL3 record (header+body)
 subroutine GFSKIP &
      & (IEOD, IFILE)
-  use TOUZA_Nng,only: nng_skip_records
+  use TOUZA_Nio,only: nio_skip_records
   implicit none
   integer,intent(out) :: IEOD
   integer,intent(in)  :: IFILE
   integer jerr
   IEOD = 0
-  call nng_skip_records(jerr, 1, IFILE)
+  call nio_skip_records(jerr, 1, IFILE)
   if (jerr.ne.0) IEOD = -1
   return
 end subroutine GFSKIP
@@ -408,10 +408,10 @@ subroutine GTZWRZ &
      &  HALON, HALAT, HASIG, &
      &  ISTA,  IEND,  JSTA,  JEND,  KSTA,  KEND, &
      &  DSIZE)
-  use TOUZA_Nng_miroc,only:  &
+  use TOUZA_Nio_miroc,only:  &
        & vmiss_def, &
        & put_item_time, init_common
-  use TOUZA_Nng_header,only: litem, nitem, put_item, &
+  use TOUZA_Nio_header,only: litem, nitem, put_item, &
        & hi_DSET,  hi_ITEM,  hi_TITL1, hi_TITL2, &
        & hi_UNIT,  hi_TIME,  hi_TDUR,  hi_DFMT,  &
        & hi_DATE,  hi_DATE1, hi_DATE2, &
@@ -421,8 +421,8 @@ subroutine GTZWRZ &
        & hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL,  &
        & hi_EDIT1, hi_EDIT2, hi_EDIT3, &
        & hi_ETTL1, hi_ETTL2, hi_ETTL3
-  use TOUZA_Nng_record,only: &
-       & get_default_header, nng_write_header, nng_write_data, &
+  use TOUZA_Nio_record,only: &
+       & get_default_header, nio_write_header, nio_write_data, &
        & REC_DEFAULT
   implicit none
   integer,parameter :: KMD = MIROC_DOUBLE
@@ -528,11 +528,11 @@ subroutine GTZWRZ &
   call put_item(jerr, head, HDFMT, hi_DFMT)
 
   krect = REC_DEFAULT
-  call nng_write_header(jerr, head, krect, JFILE)
+  call nio_write_header(jerr, head, krect, JFILE)
   ! if (ierr.eq.0) then
   !    if (levv.gt.1) call switch_urt_diag(wfile, jrec, udiag)
   ! endif
-  if (jerr.eq.0) call nng_write_data(jerr, DDATA, n, head, krect, JFILE)
+  if (jerr.eq.0) call nio_write_data(jerr, DDATA, n, head, krect, JFILE)
 
   return
 end subroutine GTZWRZ
@@ -544,7 +544,7 @@ end subroutine GTZWRZ
 !!!_  - FOPEN
 subroutine FOPEN &
      & (IOS, IFILE, HFILE, HACT, HFORM, HACCSS)
-  use TOUZA_Nng,only: sus_open
+  use TOUZA_Nio,only: sus_open
   implicit none
   integer,         intent(out) :: IOS
   integer,         intent(in)  :: IFILE
@@ -602,7 +602,7 @@ end subroutine FINQUX
 subroutine FNUINI &
      & (IFILMN, IFILMX)
   use TOUZA_Std,only: kucat_black, set_category_bound
-  use TOUZA_Nng_miroc,only: categ_nng, categ_normal, init_common
+  use TOUZA_Nio_miroc,only: categ_nio, categ_normal, init_common
   implicit none
   integer jerr
   integer,intent(in)  :: IFILMN, IFILMX
@@ -619,7 +619,7 @@ end subroutine FNUINI
 subroutine FNEWU &
      & (OFOUND, IFILE,  HFORM, IFILED)
   use TOUZA_Std,only: search_from_last, search_from_head, new_unit
-  use TOUZA_Nng_miroc,only: categ_nng, categ_normal
+  use TOUZA_Nio_miroc,only: categ_nio, categ_normal
   implicit none
   integer,         intent(out) :: IFILE
   logical,         intent(out) :: OFOUND
@@ -628,7 +628,7 @@ subroutine FNEWU &
   integer kc
   integer ubase
   if (HFORM .EQ. 'GTOOL3') THEN
-     kc = categ_nng
+     kc = categ_nio
      if (IFILED.lt.0) then
         ubase = search_from_last
      else
@@ -646,10 +646,10 @@ subroutine FNEWU &
   OFOUND = IFILE.ge.0
   return
 end subroutine FNEWU
-!!!_@ test_nng_miroc - test program
-#ifdef TEST_NNG_MIROC
-program test_nng_miroc
-  use TOUZA_Nng_miroc
+!!!_@ test_nio_miroc - test program
+#ifdef TEST_NIO_MIROC
+program test_nio_miroc
+  use TOUZA_Nio_miroc
   implicit none
   integer ierr
 
@@ -660,9 +660,9 @@ program test_nng_miroc
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop
-end program test_nng_miroc
+end program test_nio_miroc
 
-#endif /* TEST_NNG_MIROC */
+#endif /* TEST_NIO_MIROC */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

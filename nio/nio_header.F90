@@ -1,10 +1,10 @@
-!!!_! nng_header.F90 - TOUZA/Nng header sub records
+!!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2022/04/06 12:47:16 fuyuki nng_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/06/04 11:00:33 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021, 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -13,11 +13,11 @@
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"
 #endif
-#include "touza_nng.h"
-!!!_@ TOUZA_Nng_header - Nng header-record interfaces
-module TOUZA_Nng_header
+#include "touza_nio.h"
+!!!_@ TOUZA_Nio_header - Nio header-record interfaces
+module TOUZA_Nio_header
 !!!_ = declaration
-  use TOUZA_Nng_std,only: &
+  use TOUZA_Nio_std,only: &
        & KFLT, KDBL,   &
        & control_mode, control_deep, is_first_force, &
        & get_logu,     unit_global,  trace_fine,   trace_control
@@ -124,7 +124,7 @@ module TOUZA_Nng_header
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
   integer,save :: fine_counts = 0
-  integer,save :: lev_verbose = NNG_MSG_LEVEL
+  integer,save :: lev_verbose = NIO_MSG_LEVEL
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
 #define __MDL__ 'h'
@@ -174,7 +174,7 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
-    use TOUZA_Nng_std,only: choice, ns_init=>init
+    use TOUZA_Nio_std,only: choice, ns_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -210,7 +210,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Nng_std,only: choice, msg, ns_diag=>diag, is_msglev_normal
+    use TOUZA_Nio_std,only: choice, msg, ns_diag=>diag, is_msglev_normal
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -242,7 +242,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Nng_std,only: ns_finalize=>finalize, choice
+    use TOUZA_Nio_std,only: ns_finalize=>finalize, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -273,7 +273,7 @@ contains
 !!!_  - show_header - diag entries
   subroutine show_header &
        & (ierr, head, fmt, u, lev)
-    use TOUZA_Nng_std,only: choice
+    use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(in)          :: head(*)
@@ -305,7 +305,7 @@ contains
 !!!_  - put_item - set entry (with type check)
   subroutine put_item_a &
        & (ierr, head, v, item, iteme, fmt)
-    use TOUZA_Nng_std,only: choice
+    use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
@@ -341,7 +341,7 @@ contains
   end subroutine put_item_i
   subroutine put_item_f &
        & (ierr, head, v, item, fmt)
-    use TOUZA_Nng_std,only: KFLT
+    use TOUZA_Nio_std,only: KFLT
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
@@ -354,7 +354,7 @@ contains
   end subroutine put_item_f
   subroutine put_item_d &
        & (ierr, head, v, item, fmt)
-    use TOUZA_Nng_std,only: KDBL
+    use TOUZA_Nio_std,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
@@ -381,7 +381,7 @@ contains
 !!!_  - get_item - get entry (with type check)
   subroutine get_item_a &
        & (ierr, head, v, item, iteme, fmt)
-    use TOUZA_Nng_std,only: choice
+    use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(in)          :: head(*)
@@ -418,7 +418,7 @@ contains
   end subroutine get_item_i
   subroutine get_item_f &
        & (ierr, head, v, item, fmt, def)
-    use TOUZA_Nng_std,only: KFLT
+    use TOUZA_Nio_std,only: KFLT
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(in)          :: head(*)
@@ -432,7 +432,7 @@ contains
   end subroutine get_item_f
   subroutine get_item_d &
        & (ierr, head, v, item, fmt, def)
-    use TOUZA_Nng_std,only: KDBL
+    use TOUZA_Nio_std,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(in)          :: head(*)
@@ -520,7 +520,7 @@ contains
   end subroutine store_item_i
   subroutine store_item_f &
        & (ierr, head, v, item, fmt)
-    use TOUZA_Nng_std,only: KFLT
+    use TOUZA_Nio_std,only: KFLT
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
@@ -543,7 +543,7 @@ contains
   end subroutine store_item_f
   subroutine store_item_d &
        & (ierr, head, v, item, fmt)
-    use TOUZA_Nng_std,only: KDBL
+    use TOUZA_Nio_std,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
@@ -565,7 +565,7 @@ contains
   end subroutine store_item_d
   subroutine store_item_date &
        & (ierr, head, dt, item, fmt)
-    use TOUZA_Nng_std,only: choice_a
+    use TOUZA_Nio_std,only: choice_a
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
@@ -725,7 +725,7 @@ contains
   end subroutine restore_item_d
   subroutine restore_item_date &
        & (ierr, head, dt, item, fmt)
-    use TOUZA_Nng_std,only: choice_a
+    use TOUZA_Nio_std,only: choice_a
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(in)          :: head(*)
@@ -919,12 +919,12 @@ contains
     return
   end subroutine set_def_ranges
 
-end module TOUZA_Nng_header
+end module TOUZA_Nio_header
 
-!!!_@ test_nng_header - test program
-#ifdef TEST_NNG_HEADER
-program test_nng_header
-  use TOUZA_Nng_header
+!!!_@ test_nio_header - test program
+#ifdef TEST_NIO_HEADER
+program test_nio_header
+  use TOUZA_Nio_header
   implicit none
   integer ierr
   character(len=litem) ha(nitem)
@@ -939,7 +939,7 @@ program test_nng_header
   ha(:) = ' '
   if (ierr.eq.0) call put_item(ierr, ha, 9253,   hi_IDFM)
   if (ierr.eq.0) call put_item(ierr, ha, 123456, hi_FNUM, '(I8.8)')
-  if (ierr.eq.0) call put_item(ierr, ha, 'NNG test', hi_DSET)
+  if (ierr.eq.0) call put_item(ierr, ha, 'NIO test', hi_DSET)
   if (ierr.eq.0) call put_item(ierr, ha, 'item 1', hi_ITEM)
   if (ierr.eq.0) call put_item(ierr, ha, -999.9d9, hi_MISS)
   if (ierr.eq.0) call store_item(ierr, ha, -999.9d9, hi_DNUM)  ! ignore type
@@ -953,9 +953,9 @@ program test_nng_header
   if (ierr.eq.0) call finalize(ierr)
   write(*, 101) 'FINAL', ierr
   stop
-end program test_nng_header
+end program test_nio_header
 
-#endif /* TEST_NNG_HEADER */
+#endif /* TEST_NIO_HEADER */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

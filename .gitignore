@@ -77,8 +77,8 @@ gmon.out
 /trp/test_trapiche_float
 /trp/miroc.h
 /touza.pc
-/nng/test_nng_stream
-/nng/out.nng
+/nio/test_nio_stream
+/nio/out.nio
 /jmz/config.guess
 /jmz/missing
 /jmz/aclocal.m4

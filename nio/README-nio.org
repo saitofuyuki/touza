@@ -1,13 +1,14 @@
-#+title: TOUZA/Nng (nng is not gtool) guide
+#+title: TOUZA/Nio guide
 #+author: SAITO Fuyuki
 #+date: <2021-10-11 Mon>
 
 * Introduction
-  *TOUZA/Nng* (nng is pronounced as nn-ng) is a collection of Fortran
-  subroutines to read/write legacy gtool-3.5 format as well as
-  its extensions.
+  *TOUZA/Nio (仁王)* is a collection of Fortran subroutines to
+  read/write legacy gtool-3.5 format as well as its extensions.
+  Originally it is named as *TOUZA/Nng* (nng is pronounced as nn-ng,
+  which stands for `nng is not gtool').
 
-  *TOUZA/Nng* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+  *TOUZA/Nio* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
   DOT go DOT jp>.
 
   *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
@@ -17,9 +18,9 @@
 
 * Build and installation
 
-* Brief description of *TOUZA/Nng* modules
+* Brief description of *TOUZA/Nio* modules
 
 * Copyright and license
-Copyright 2021 Japan Agency for Marine-Earth Science and Technology
+Copyright 2021,2022 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)

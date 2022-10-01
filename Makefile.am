@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/05/02 09:47:44 fuyuki Makefile.am>
+# Time-stamp: <2022/06/04 10:55:39 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -45,10 +45,10 @@ lib@TOUZA_NAME@_la_LIBADD	+= trp/$(local_name)
 AM_FCFLAGS					+= $(FC_MODULE_touza_trp)
 endif
 
-if BUILD_nng
-SUBDIRS 					+= nng
-lib@TOUZA_NAME@_la_LIBADD	+= nng/$(local_name)
-AM_FCFLAGS					+= $(FC_MODULE_touza_nng)
+if BUILD_nio
+SUBDIRS 					+= nio
+lib@TOUZA_NAME@_la_LIBADD	+= nio/$(local_name)
+AM_FCFLAGS					+= $(FC_MODULE_touza_nio)
 endif
 
 if BUILD_ppp
