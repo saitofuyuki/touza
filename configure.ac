@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/06/27 11:16:41 fuyuki configure.ac>
+# Time-stamp: <2022/09/16 14:11:22 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -102,10 +102,28 @@ MT_SUB_PACKAGE([std], [always])
 MT_SUB_PACKAGE([emu], [],     [std])
 MT_SUB_PACKAGE([cal], [],     [std])
 MT_SUB_PACKAGE([trp], [],     [std])
-MT_SUB_PACKAGE([nio], [],     [std emu trp])
 MT_SUB_PACKAGE([ppp], [],     [std emu])
 MT_SUB_PACKAGE([div], [],     [std])
+dnl MT_SUB_PACKAGE([nio], [],     [std emu trp div])
+MT_SUB_PACKAGE([nio], [],     [std emu trp])
 MT_SUB_PACKAGE([ami], [],     [std])
+
+AC_ARG_ENABLE([nctcdf],
+[AS_HELP_STRING([--enable-nctcdf], [enable nio/n*c*tcdf features@<:@default=no@:>@])],
+ [use_nctcdf=$enableval],
+ [use_nctcdf=no])
+
+AS_IF([test x"[$]use_nctcdf" != xno],
+[AX_LIB_NETCDF4([serial])
+AS_IF([test x"[$]with_netcdf4_fortran" != xyes],
+[AS_IF([test x"[$]use_nctcdf" = xforce],
+       [AC_MSG_WARN([netcdf4 fortran library disabled (ignored).])],
+       [AC_MSG_ERROR([netcdf4 fortran library disabled.])])])
+use_nctcdf=yes])
+
+AM_CONDITIONAL([with_nctcdf], [test x"[$]use_nctcdf" = xyes])
+AS_IF([test x"[$]use_nctcdf" = xyes],
+      [AC_DEFINE([OPT_WITH_NCTCDF], [1], [build with TOUZA/Nio/nctcdf])])
 
 AC_MSG_CHECKING([if also build jmz])
 AC_ARG_WITH([build-jmz],
@@ -120,8 +138,9 @@ AS_IF([test "x$with_build_jmz" != xno],
 AS_IF([test "x$with_build_jmz" != xno],
 [AX_SUBDIRS_CONFIGURE([jmz],
     [],
-    [[TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std],
-     [TOUZA_LIBS=${ac_top_build_prefix}lib${with_touza_name}.la]],
+    [[TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}],
+     [TOUZA_LIBS=${ac_top_build_prefix}lib${with_touza_name}.la ${NETCDF4_FLIBS} ${NETCDF4_LIBS}],
+     [TOUZA_LDFLAGS=${NETCDF4_LDFLAGS}]],
     [],
     [--with-build-jmz])])
 

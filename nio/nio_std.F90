@@ -1,7 +1,7 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2022/06/04 11:01:17 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/09/20 16:56:23 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -21,7 +21,7 @@ module TOUZA_Nio_std
   use TOUZA_Std_prc,only: KI32, KI64, KDBL, KFLT
   use TOUZA_Std_utl,only: &
        & choice, choice_a, condop, upcase, &
-       & control_deep, control_mode, is_first_force
+       & control_deep, control_mode, is_first_force, parse_number
   use TOUZA_Std_log,only: &
        & is_msglev, &
        & is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail, &
@@ -44,6 +44,11 @@ module TOUZA_Nio_std
        & sus_write_isep,  sus_read_isep,  &
        & sus_write_lsep,  sus_read_lsep,  &
        & sus_rseek,       sus_eswap
+  ! use TOUZA_Std_htb,only: new_htable,   diag_htable
+  ! use TOUZA_Std_htb,only: new_entry,    reg_entry,     settle_entry
+  ! use TOUZA_Std_htb,only: query_entry,  query_status,  query_name,      search_item
+  ! use TOUZA_Std_htb,only: new_wtable,   reg_item,      check_handle,    flag_default
+  ! use TOUZA_Std_htb,only: get_size_items, get_item_keys, check_index,   reg_alias
 !!!_  - default
   implicit none
   private
@@ -72,6 +77,7 @@ module TOUZA_Nio_std
   public KI32, KI64, KDBL, KFLT
   public choice, choice_a, condop, upcase
   public control_deep, control_mode, is_first_force
+  public parse_number
   public is_msglev
   public is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
   public is_msglev_severe, is_msglev_fatal
@@ -91,6 +97,11 @@ module TOUZA_Nio_std
   public sus_write_isep,  sus_read_isep
   public sus_write_lsep,  sus_read_lsep
   public sus_rseek,       sus_eswap
+  ! public new_htable,   diag_htable
+  ! public new_entry,    reg_entry,     settle_entry
+  ! public query_entry,  query_status,  query_name,      search_item
+  ! public new_wtable,   reg_item,      check_handle,    flag_default
+  ! public get_size_items, get_item_keys, check_index,   reg_alias
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -98,6 +109,7 @@ contains
     use TOUZA_Std_env,only: env_init=>init
     use TOUZA_Std_sus,only: sus_init=>init
     use TOUZA_Std_bld,only: bld_init=>init
+    ! use TOUZA_Std_htb,only: htb_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -123,6 +135,7 @@ contains
           if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call sus_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
+          ! if (ierr.eq.0) call htb_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -135,6 +148,7 @@ contains
     use TOUZA_Std_env,only: env_diag=>diag
     use TOUZA_Std_sus,only: sus_diag=>diag
     use TOUZA_Std_bld,only: bld_diag=>diag
+    ! use TOUZA_Std_htb,only: htb_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -161,6 +175,7 @@ contains
           if (ierr.eq.0) call bld_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call sus_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
+          ! if (ierr.eq.0) call htb_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -172,6 +187,7 @@ contains
     use TOUZA_Std_env,only: env_finalize=>finalize
     use TOUZA_Std_sus,only: sus_finalize=>finalize
     use TOUZA_Std_bld,only: bld_finalize=>finalize
+    ! use TOUZA_Std_htb,only: htb_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -195,6 +211,7 @@ contains
           if (ierr.eq.0) call bld_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call sus_finalize(ierr, utmp, lev_stdv, mode=lmd)
+          ! if (ierr.eq.0) call htb_finalize(ierr, utmp, lev_stdv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
     endif

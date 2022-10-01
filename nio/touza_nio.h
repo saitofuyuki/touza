@@ -1,7 +1,7 @@
 /* touza_nio.h - TOUZA/Nio common definition */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Oct 11 2021 */
-/* Time-stamp: <2022/06/04 11:02:02 fuyuki touza_nio.h> */
+/* Time-stamp: <2022/09/08 10:25:25 fuyuki touza_nio.h> */
 /* Copyright (C) 2021, 2022 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -18,7 +18,7 @@
 #  endif
 
 #  ifndef GROUP_TAG
-#  define GROUP_TAG 'nio'
+#  define GROUP_TAG 'Nio'
 #  endif
 #  ifndef __GRP__
 #  define __GRP__ GROUP_TAG
@@ -34,5 +34,8 @@
 
 #define ERR_UNKNOWN_FORMAT              (ERR_MASK_SPECIFIC-11)  /* cannot parse as a gtool format */
 #define ERR_NOT_GTOOL_FORMAT            (ERR_MASK_SPECIFIC-12)  /* cannot parse as a gtool record */
+#define ERR_DEPRECATED_FORMAT           (ERR_MASK_SPECIFIC-13)  /* depreacted gtool format */
+
+#define ERR_SIZE_MISMATCH               (ERR_MASK_SPECIFIC-14)  /* data length mismatch */
 
 #endif /* not _TOUZA_NIO_H */

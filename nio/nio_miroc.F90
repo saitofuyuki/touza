@@ -1,7 +1,7 @@
 !!!_! nio_miroc.F90 - TOUZA/Nio MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2022/06/04 11:00:44 fuyuki nio_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/07/29 09:38:21 fuyuki nio_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -109,12 +109,12 @@ module TOUZA_Nio_miroc
      subroutine FOPEN &
           & (IOS, IFILE, HFILE, HACT, HFORM, HACCSS)
       implicit none
-      integer,         intent(out) :: IOS
-      integer,         intent(in)  :: IFILE
-      character(len=*),intent(in)  :: HFILE
-      character(len=*),intent(in)  :: HACT
-      character(len=*),intent(in)  :: HFORM
-      character(len=*),intent(in)  :: HACCSS
+      integer,         intent(out)   :: IOS
+      integer,         intent(inout) :: IFILE
+      character(len=*),intent(in)    :: HFILE
+      character(len=*),intent(in)    :: HACT
+      character(len=*),intent(in)    :: HFORM
+      character(len=*),intent(in)    :: HACCSS
     end subroutine FOPEN
 !!!_   . FREWND
     subroutine FREWND &
@@ -196,6 +196,7 @@ contains
        if (ierr.eq.0) call nio_diag(ierr, u, levv, mode)
        if (ierr.eq.0) call nio_msg(TIME_STAMP, __MDL__, u)
        if (ierr.eq.0) call nio_msg('(''WITH_MIROC = '', I0)', WITH_MIROC, __MDL__, u)
+       if (ierr.eq.0) call nio_msg('(''OPT_WITH_NCTCDF = '', I0)', OPT_WITH_NCTCDF, __MDL__, u)
     endif
     return
   end subroutine diag
@@ -249,7 +250,7 @@ contains
 !!!_ + end module
 end module TOUZA_Nio_Miroc
 !!!_* /nonmodule/ interfaces
-!!!_  - init_common
+!!!_ + init_common
 subroutine init_common(u)
   use TOUZA_Std,only: choice
   use TOUZA_Nio_miroc,only: init, diag
@@ -270,6 +271,508 @@ subroutine init_common(u)
   call init(jerr, jfpar)
   if (jerr.eq.0) call diag(jerr)
 end subroutine init_common
+!!!_ + io/irwgd.F
+! !!!_  - GTZWRT- write in GTOOL3 format
+! subroutine GTZWRT &
+!      & (GDATA, &
+!      &  HITEM, HTITL,  HUNIT, HDSET, &
+!      &  TIME,  TDUR,   JFILE, HDFMT, HCLAS, &
+!      &  HCORD, IORANK, &
+!      &  TIME1, TIME2,  RMISS, &
+!      &  IXSEL, IYSEL,  IZSEL, &
+!      &  HALON, HALAT,  HASIG, &
+!      &  IMAXD, JMAXD,  &
+!      &  IDIMD, JDIMD,  KDIMD)
+!   use TOUZA_Ppp_miroc,only: top_agent, query_nprocs
+!   use TOUZA_Ppp_miroc,only: get_king, is_king
+!   use TOUZA_Nio_miroc,only: KMD, NCC, NDC
+!   implicit none
+!   INTEGER,         intent(in) :: IDIMD, JDIMD, KDIMD
+!   INTEGER,         intent(in) :: IMAXD, JMAXD
+!   REAL(kind=KMD),  intent(in) :: GDATA(IDIMD, JDIMD, *)       !! local data
+!   CHARACTER(len=*),intent(in) :: HTITL                        !! title
+!   CHARACTER(len=*),intent(in) :: HUNIT                        !! unit
+!   CHARACTER(len=*),intent(in) :: HDSET                        !! name of dataset
+
+!   REAL(kind=KMD),  intent(in) :: TIME                         !! time
+!   REAL(kind=KMD),  intent(in) :: TDUR                         !! representative time
+!   CHARACTER(len=*),intent(in) :: HALON
+!   CHARACTER(len=*),intent(in) :: HALAT
+!   CHARACTER(len=*),intent(in) :: HASIG
+
+!   CHARACTER(len=*),intent(in) :: HITEM                        !! name for identify
+!   CHARACTER(len=*),intent(in) :: HDFMT                        !! data format
+!   CHARACTER(len=*),intent(in) :: HCLAS
+!   CHARACTER(len=*),intent(in) :: HCORD
+
+!   INTEGER,         intent(in) :: JFILE                        !! output file No.
+!   INTEGER,         intent(in) :: IORANK                       !! I/O RANK
+
+!   REAL(KIND=KMD),  intent(in) :: TIME1                        !! time
+!   REAL(KIND=KMD),  intent(in) :: TIME2                        !! time
+!   REAL(KIND=KMD),  intent(in) :: RMISS                        !! missing value
+
+!   INTEGER,         intent(in) :: IXSEL ( 2 )                  !! selected type of X
+!   INTEGER,         intent(in) :: IYSEL ( 2 )                  !! selected type of Y
+!   INTEGER,         intent(in) :: IZSEL ( 2 )                  !! selected type of Z
+
+!   REAL(KIND=KMD),ALLOCATABLE,SAVE :: DDATA(:) ! global data: DDATA( DSIZE )
+!   INTEGER,save :: DSIZE0
+!   INTEGER,save :: JFPAR
+!   INTEGER,save :: MYRANK, NPROCS
+
+!   LOGICAL    OOUT
+!   INTEGER      :: DSIZE                      ! DSIZE = IMAXD*JMAXD*KDIMD
+!   REAL(kinD=KMD) :: DELY (JMAXD)
+!   REAL(KIND=KMD) :: GD
+!   REAL(KIND=KMD) :: TLAT
+!   CHARACTER(len=NCC) :: HITEMX
+!   CHARACTER(len=20)  :: HTIME
+!   INTEGER    I, J, K, IJK, IK
+!   INTEGER    IJMAXD
+!   INTEGER    ISTA, IEND
+!   INTEGER    JSTA, JEND
+!   INTEGER    KSTA, KEND
+!   INTEGER    IORNKX
+!   INTEGER    ISTAT
+!   integer    iacur
+!   integer    jerr
+
+!   call top_agent(jerr, iacur)
+!   call query_nprocs(NPROCS, MYRANK, iacur)
+
+!   CALL CSS2CC(HTIME, TIME)
+!   HITEMX = HITEM
+
+!   IORNKX = IORANK
+!   IF (MYRANK .EQ. IORNKX) THEN
+!      OOUT = .TRUE.
+!   ELSE
+!      OOUT = .FALSE.
+!   ENDIF
+! #ifdef CGCM
+!   IF (HCORD(1:2) .EQ. 'OC') THEN
+! #ifdef OPT_PARALLEL
+!      IF (KDIMD .EQ. 1) THEN
+!         CALL HQCDMX(NXG, NX, 'OCSFC')
+!         CALL HQCDMY(NYG, NY, 'OCSFC')
+!         NZ = 1
+!      ELSE
+!         CALL HQCDMX(NXG, NX, 'OCLV')
+!         CALL HQCDMY(NYG, NY, 'OCLV')
+!         CALL HQCDMZ(NZ,      'OCLV')
+!      ENDIF
+
+!      IF (OOUT) THEN
+!         DSIZE = NXG * NYG * NZ
+!      ELSE
+!         DSIZE = 1
+!      ENDIF
+!      IF (DSIZE .GT. DSIZE0) THEN
+!         IF (ALLOCATED(DDATA)) DEALLOCATE(DDATA)
+!         ALLOCATE(DDATA(DSIZE), STAT=ISTAT)
+!         IF (ISTAT .NE. 0) THEN
+!            WRITE(JFPAR,*) ' ### GTZWRT: ALLOCATION ERROR(DDATA)'
+! #if WITH_MIROC
+!            CALL XABORT(1)
+! #else
+!            return
+! #endif
+!         ENDIF
+!         DSIZE0 = DSIZE
+!      ENDIF
+!      CALL GATHER_OCEAN_ACTIVE &
+!           & (DDATA, &
+!           &  GDATA, KDIMD, IORNKX)
+! #else /* ! ifdef OPT_PARALLEL */
+!      IJK = 0
+!      DO K = 1, KDIMD
+!         DO J = 1, JMAXD
+!            DO I = 1, IMAXD
+!               IJK = IJK + 1
+!               DDATA(IJK) = GDATA(I,J,K)
+!            ENDDO
+!         ENDDO
+!      ENDDO
+! #endif /* OPT_PARALLEL */
+!   ELSE ! IF (HCLAS(1:3) .EQ. 'OCN')
+! #endif /* CGCM */
+!      IF ( OOUT ) THEN
+!         DSIZE = IMAXD * JMAXD * KDIMD
+!      ELSE
+!         DSIZE = 1
+!      ENDIF
+!      IF (DSIZE .GT. DSIZE0) THEN
+!         IF (ALLOCATED(DDATA)) DEALLOCATE(DDATA)
+!         ALLOCATE(DDATA(DSIZE), STAT=ISTAT)
+!         IF (ISTAT .NE. 0) THEN
+!            WRITE(JFPAR,*) ' ### GTZWRT: ALLOCATION ERROR(DDATA)'
+! #if WITH_MIROC
+!            CALL XABORT(1)
+! #else
+!            return
+! #endif
+!         ENDIF
+!         DSIZE0 = DSIZE
+!      ENDIF
+!      CALL MMagBkGathD &
+!           & (DDATA, &
+!           &  GDATA, HCORD, IACUR, IORNKX, &
+!           &  IMAXD, JMAXD, KDIMD, &
+!           &  IDIMD, JDIMD, KDIMD, DSIZE)
+! #ifdef CGCM
+!   ENDIF                     ! IF (OCN)
+! #endif
+!   IF (IYSEL(2).EQ.0 .AND. IYSEL(1).EQ.0) THEN
+!      if (OOUT) CALL HQCGDY(DELY, HCORD, 0, 0)
+!   ENDIF
+
+!   IF (OOUT) THEN
+!      ISTA = 1
+!      JSTA = 1
+!      KSTA = 1
+!      IEND = IMAXD
+!      JEND = JMAXD
+!      KEND = KDIMD
+
+!      IF ((IXSEL(1).NE.0 .AND. IYSEL(1).NE.0)  &
+!           & .AND. (    (IZSEL(1).GT.0 .AND. IZSEL(2).GE.IZSEL(1)) &
+!           &        .OR.(IYSEL(1).GT.0 .AND. IYSEL(2).GE.IYSEL(1)) &
+!           &        .OR.(IXSEL(1).GT.0 .AND. IXSEL(2).GE.IXSEL(1)))) &
+!           &   THEN
+!         ISTA = MAX(IXSEL(1), 1)
+!         JSTA = MAX(IYSEL(1), 1)
+!         KSTA = MAX(IZSEL(1), 1)
+!         IEND = MIN(IXSEL(2), IMAXD)
+!         JEND = MIN(IYSEL(2), JMAXD)
+!         KEND = MIN(IZSEL(2), KDIMD)
+!         IF (IXSEL(2) .LT. 0) IEND = IMAXD
+!         IF (IYSEL(2) .LT. 0) JEND = JMAXD
+!         IF (IZSEL(2) .LT. 0) KEND = KDIMD
+!         IJMAXD = IMAXD*JMAXD
+
+!         IJK = 0
+!         DO K = KSTA, KEND
+!            DO J = JSTA, JEND
+!               DO I = ISTA, IEND
+!                  IJK = IJK + 1
+!                  DDATA(IJK) = DDATA(I + IMAXD * (J - 1) + IJMAXD * (K - 1))
+!               ENDDO
+!            ENDDO
+!         ENDDO
+!      ELSE IF (IYSEL(2).EQ.0 .AND. IYSEL(1).EQ.0) THEN
+!         IJMAXD = IMAXD * JMAXD
+
+!         IK = 0
+!         DO K = KSTA, KEND
+!            DO I = ISTA, IEND
+!               GD   = 0.D0
+!               TLAT = 0.D0
+!               DO J = JSTA, JEND
+!                  IJK = I + IMAXD * (J - 1) + IJMAXD * (K - 1)
+!                  IF (DDATA(IJK) .NE. RMISS) THEN
+!                     GD   = GD   + DDATA(IJK) * DELY(J)
+!                     TLAT = TLAT + DELY(J)
+!                  ENDIF
+!               ENDDO
+!               IK = IK + 1
+!               IF (TLAT .GT. 0.D0) THEN
+!                  DDATA(IK) = GD / TLAT
+!               ELSE
+!                  DDATA(IK) = RMISS
+!               ENDIF
+!            ENDDO
+!         ENDDO
+
+!         JEND = 1
+!      ENDIF
+
+!      CALL GTZWRZ &
+!           & (DDATA, &
+!           &  HITEM, HTITL, HUNIT, HDSET, &
+!           &  TIME,  TDUR,  JFILE, HDFMT, HCLAS, &
+!           &  TIME1, TIME2, RMISS, &
+!           &  HALON, HALAT, HASIG, &
+!           &  ISTA,  IEND,  JSTA,  JEND,  KSTA,  KEND, &
+!           &  DSIZE)
+!       WRITE(JFPAR, *) ' *** OUTPUT ', HITEMX, ' TIME= ', HTIME
+!    ELSE
+!       WRITE(JFPAR, *) ' *** OUTPUT ', HITEMX, ' TIME= ', HTIME, &
+!            &                                  ' AT RANK= ', IORNKX
+!    ENDIF
+
+!    RETURN
+!  END subroutine GTZWRT
+
+! #define IRWGD_KING_MODULE ' '
+! !!!_  & GDREAD - read data & time select
+! subroutine GDREAD &
+!      & (GDATA, IEOD,  TIME,  TDUR,  KLEVS, &
+!      &  IFILE, HITEM, HDFMT, HCLAS, TSEL0, TSEL1, &
+!      &  IMAXD, JMAXD, IDIMD, JDIMD, KDIMD, HCORD)
+!   use TOUZA_Nio_miroc,only: KMD, NCC, NDC
+!   implicit none
+! #if WITH_MIROC
+! #include        "ziopara.F"
+! #else
+!   integer,parameter :: SEARCH_FORWARD = 0           ! dummy
+!   integer,parameter :: MM_EOF = -128, MM_ERR = -256 ! dummy
+! #endif
+!   integer,         intent(in)  :: IDIMD, JDIMD, KDIMD
+!   real(kind=KMD),  intent(out) :: GDATA(IDIMD, JDIMD, KDIMD) !! data
+!   integer,         intent(out) :: IEOD                       !! exist:0,no data:1
+!   REAL(KIND=KMD),  intent(out) :: TIME                       !! time
+!   REAL(KIND=KMD),  intent(out) :: TDUR                       !! representative time
+!   INTEGER,         intent(out) :: KLEVS
+
+!   INTEGER,         intent(in)  :: IFILE                      !! file unit  number
+!   CHARACTER(len=*),intent(in)  :: HITEM                      !! selected value of ITEM
+!   CHARACTER(len=*),intent(in)  :: HDFMT                      !! data format (ignored)
+!   CHARACTER(len=*),intent(in)  :: HCLAS                      !! name of driver
+!                                                              !! 'ALL' 'GA' 'GB' 'LND' 'OCN' 'RIV'
+!   CHARACTER(len=*),intent(in)  :: HCORD                      !! axis coordinates
+!   INTEGER,         intent(in)  :: IMAXD, JMAXD
+!   REAL(KIND=KMD),  intent(in)  :: TSEL0, TSEL1               !! select time
+
+!   call GDREAD2 &
+!        & (GDATA, IEOD, TIME,  TDUR,  KLEVS, &
+!        & IFILE, HITEM, HDFMT, HCLAS, TSEL0, TSEL1, &
+!        & IMAXD, JMAXD, IDIMD, JDIMD, KDIMD, HCORD, SEARCH_FORWARD)
+! end subroutine GDREAD
+! !!!_  & GDREAD2 - read data & time select
+! SUBROUTINE GDREAD2 &
+!      & (GDATA, IEOD,  TIME,  TDUR,  KLEVS, &
+!      &  IFILE, HITEM, HDFMT, HCLAS, TSEL0, TSEL1, &
+!      &  IMAXD, JMAXD, IDIMD, JDIMD, KDIMD, HCORD, MODE)
+!   use TOUZA_Nio_miroc,only: KMD, NCC, NDC
+!   implicit none
+! #if WITH_MIROC
+! #include        "ziopara.F"
+! #else
+!   integer,parameter :: MM_EOF  = -128, MM_ERR = -256 ! dummy
+!   integer,parameter :: MM_TIME = -512                ! dummy
+! #endif
+!   integer,         intent(in)  :: IDIMD, JDIMD, KDIMD
+!   real(kind=KMD),  intent(out) :: GDATA(IDIMD, JDIMD, KDIMD) !! data
+!   integer,         intent(out) :: IEOD                       !! exist:0,no data:1
+!   REAL(KIND=KMD),  intent(out) :: TIME                       !! time
+!   REAL(KIND=KMD),  intent(out) :: TDUR                       !! representative time
+!   INTEGER,         intent(out) :: KLEVS
+
+!   INTEGER,         intent(in)  :: IFILE                      !! file unit  number
+!   CHARACTER(len=*),intent(in)  :: HITEM                      !! selected value of ITEM
+!   CHARACTER(len=*),intent(in)  :: HDFMT                      !! data format (ignored)
+!   CHARACTER(len=*),intent(in)  :: HCLAS                      !! name of driver
+!                                                              !! 'ALL' 'GA' 'GB' 'LND' 'OCN' 'RIV'
+!   CHARACTER(len=*),intent(in)  :: HCORD                      !! axis coordinates
+!   INTEGER,         intent(in)  :: IMAXD, JMAXD
+!   REAL(KIND=KMD),  intent(in)  :: TSEL0, TSEL1               !! select time
+!   INTEGER,         intent(in)  :: MODE                       !! search mode
+
+!   INTEGER    I, J, K
+!   INTEGER    IMAXZ, JMAXZ
+!   INTEGER    MATCH
+
+!   CHARACTER(len=NCC)   ::  HITEMD                !! item read
+!   CHARACTER(len=NCC*2) ::  HTITL                 !! title
+!   CHARACTER(len=NCC)   ::  HUNIT                 !! unit
+!   CHARACTER(len=NCC)   ::  HDSET                 !! name of dataset
+!   CHARACTER(len=NCC)   ::  HAX
+!   CHARACTER(len=NCC)   ::  HAY
+!   CHARACTER(len=NCC)   ::  HAZ
+!   CHARACTER(len=NCC)   ::  HDFMTD                !! data format
+!   INTEGER    JFPAR
+
+!   IEOD = 1
+!   IF ( IFILE .EQ. 0 ) RETURN
+
+!   CALL GDSEARCH &
+!        & (MATCH, &
+!        &  HITEM, HCLAS, TSEL0, TSEL1, IFILE, MODE)
+!   IF (IAND(MATCH, IOR(MM_EOF, MM_ERR)) .NE. 0) RETURN
+!   IF (IAND(MATCH, MM_TIME) .NE. 0) THEN
+!      !! read (GTOOL3)
+!      CALL GTZRED &
+!           & (GDATA,  IEOD,  &
+!           &  IMAXZ,  JMAXZ, KLEVS, &
+!           &  HITEMD, HTITL, HUNIT, HDSET, &
+!           &  TIME,   TDUR,  HDFMTD,&
+!           &  HAX,    HAY,   HAZ,   &
+!           &  IFILE,  HITEM, HDFMT, HCLAS, HCORD, &
+!           &  IMAXD,  JMAXD, IDIMD, JDIMD, KDIMD)
+!   ENDIF
+!   IF ( IEOD .NE. 0 ) RETURN
+
+!   ! Here GDATA contains the data at (1:IMAXZ,1:JMAXZ,1:KLEVS)
+!   !  check dimension
+!   IF (IMAXZ .NE. IMAXD  .OR.  JMAXZ .NE. JMAXD) THEN
+!      CALL GETJFP(JFPAR)
+!      WRITE (JFPAR,*) ' ### GDREAD: RESOLUTION MISMATCH: ', &
+!           &      HITEMD, &
+!           &      ' DATA:',  IMAXZ, JMAXZ, &
+!           &      ' REQ:',   IMAXD, JMAXD
+!      CALL XABORT(1)
+!      IEOD = 1
+!      RETURN
+!   ENDIF
+!   !  extend data
+!   DO K = 1, KLEVS
+!      DO J = 1, JDIMD
+!         DO I = IMAXD+1, IDIMD
+!            GDATA(I,J,K) = GDATA(1,J,K)
+!         ENDDO
+!      ENDDO
+!   ENDDO
+!   DO J = JMAXD+1, JDIMD
+!      DO I = 1, IDIMD
+!         GDATA(I,J,K) = GDATA(I,1,K)
+!      ENDDO
+!   ENDDO
+
+!   RETURN
+! END SUBROUTINE GDREAD2
+! !!!_  - GDWRIT    !! write data
+! SUBROUTINE GDWRIT &
+!      & (GDATA, &
+!      &  HITEM, HTITL, HUNIT, &
+!      &  TIME,  TDUR,  JFILE, HDFMT, HCLAS, &
+!      &  IMAXD, JMAXD, &
+!      &  IDIMD, JDIMD, KDIMD, HCORD          )
+! #if WITH_TOUZA_PPP
+!   use TOUZA_Ppp_miroc,only: get_king, top_agent
+! #endif
+!   use TOUZA_Nio_miroc,only: KMD, NCC, NDC
+! #if WITH_MIROC
+!   use IPCOMM
+! #endif
+!   IMPLICIT NONE
+!   INTEGER,         intent(in) :: IDIMD, JDIMD, KDIMD
+!   REAL(KIND=KMD),  intent(in) :: GDATA(IDIMD, JDIMD, KDIMD) !! data
+!   CHARACTER(len=*),intent(in) :: HITEM                      !! name for identify
+!   CHARACTER(len=*),intent(in) :: HTITL                      !! title
+!   CHARACTER(len=*),intent(in) :: HUNIT                      !! unit
+!   REAL(KIND=KMD),  intent(in) :: TIME                       !! time
+!   REAL(KIND=KMD),  intent(in) :: TDUR                       !! representative time
+!   INTEGER,         intent(in) :: JFILE                      !! output file No.
+!   CHARACTER(len=*),intent(in) :: HDFMT                      !! data format
+!   CHARACTER(len=*),intent(in) :: HCORD                      !! axis coordinates
+!   CHARACTER(len=*),intent(in) :: HCLAS                      !! name of driver
+!   INTEGER,         intent(in) :: IMAXD, JMAXD
+
+!   CHARACTER(len=NCC) :: HAX
+!   CHARACTER(len=NCC) :: HAY
+!   CHARACTER(len=NCC) :: HAZ
+!   CHARACTER(len=NCC) :: HDSET
+
+!   INTEGER    IORANK
+!   REAL(KIND=KMD),save :: RMISS=-999.0_KMD
+!   INTEGER,       save :: IXSEL(2)=-1, IYSEL(2)=-1, IZSEL(2)=-1
+!   LOGICAL,       save :: OFIRST=.TRUE.
+
+!   integer jerr
+!   integer iacur
+
+!   IF ( JFILE .EQ. 0 ) THEN
+!      RETURN
+!   ENDIF
+
+!   call top_agent(jerr, iacur)
+!   call get_king(jerr, IORANK, IRWGD_KING_MODULE, iacur)
+
+!   CALL GETRUN( HDSET )
+
+!   CALL HQCNMX( HAX, HCORD )
+!   CALL HQCNMY( HAY, HCORD )
+!   CALL HQCNMZ( HAZ, HCORD )
+
+!   !! write (GTOOL3)
+!   CALL GTZWRT &
+!        & (GDATA, &
+!        &  HITEM, HTITL,  HUNIT, HDSET, &
+!        &  TIME,  TDUR,   JFILE, HDFMT, HCLAS, &
+!        &  HCORD, IORANK, &
+!        &  TIME,  TIME,   RMISS, &
+!        &  IXSEL, IYSEL,  IZSEL, &
+!        &  HAX,   HAY,    HAZ,   &
+!        &  IMAXD, JMAXD,  &
+!        &  IDIMD, JDIMD,  KDIMD)
+!   RETURN
+! END SUBROUTINE GDWRIT
+! !!!_  - GTZRW - read and write in GTOOL3 data file
+! !!!_  - GTPWRT - write in GTOOL3 parallel format
+! SUBROUTINE GTPWRT &
+!      & (GDATA, &
+!      &  HITEM, HTITL, HUNIT, HDSET, &
+!      &  TIME,  TDUR,  JFILE, HDFMT, HCLAS, &
+!      &  HCORD, &
+!      &  TIME1, TIME2, RMISS, &
+!      &  HALON, HALAT, HASIG, &
+!      &  IMAXD, JMAXD, &
+!      &  IDIMD, JDIMD, KDIMD                  )
+!   use TOUZA_Nio_miroc,only: KMD, NCC, NDC
+! #if WITH_MIROC
+!   use IPCOMM
+! #endif
+!   IMPLICIT NONE
+!   INTEGER,         intent(in) :: IDIMD, JDIMD, KDIMD        !! dim of GDATA
+!   INTEGER,         intent(in) :: IMAXD, JMAXD               !! global domain size
+
+!   REAL(KIND=KMD),  intent(in) :: GDATA(IDIMD, JDIMD, KDIMD) !! local data
+!   CHARACTER(len=*),intent(in) :: HITEM                      !! name for identify
+!   CHARACTER(len=*),intent(in) :: HTITL                      !! title
+!   CHARACTER(len=*),intent(in) :: HUNIT                      !! unit
+!   CHARACTER(len=*),intent(in) :: HDSET                      !! name of dataset
+
+!   REAL(KIND=KMD),  intent(in) :: TIME                       !! time
+!   REAL(KIND=KMD),  intent(in) :: TDUR                       !! representative time
+!   INTEGER,         intent(in) :: JFILE                      !! output file No.
+!   CHARACTER(len=*),intent(in) :: HDFMT                      !! data format
+!   CHARACTER(len=*),intent(in) :: HCORD                      !! name of coordinate
+!   CHARACTER(len=*),intent(in) :: HCLAS
+
+!   REAL(KIND=KMD),  intent(in) :: TIME1                      !! time
+!   REAL(KIND=KMD),  intent(in) :: TIME2                      !! time
+!   REAL(KIND=KMD),  intent(in) :: RMISS                      !! missing value
+
+!   CHARACTER(len=*),intent(in) :: HALON
+!   CHARACTER(len=*),intent(in) :: HALAT
+!   CHARACTER(len=*),intent(in) :: HASIG
+
+!   INTEGER    ISTAZ, IENDZ, JSTAZ, JENDZ
+!   INTEGER    LSIZE               ! LSIZE = ISIZE*JSIZE*KDIMD
+
+!   LOGICAL,save :: OFIRST = .TRUE.
+!   INTEGER,save :: JFPAR
+
+!   CHARACTER(len=20)  :: HTIME
+!   CHARACTER(len=NCC) :: HITEMX
+
+!   IF ( OFIRST ) THEN
+!      CALL GETJFP( JFPAR )
+!      OFIRST = .FALSE.
+!   ENDIF
+
+!   CALL CSS2CC( HTIME, TIME )
+!   HITEMX = HITEM
+
+!   call co2ofs_global(ISTAZ, JSTAZ, HCORD)
+!   IENDZ = ISTAZ + IDIMD - 1
+!   JENDZ = JSTAZ + JDIMD - 1
+!   LSIZE = IDIMD * JDIMD * KDIMD
+
+!   CALL GTZWRZ &
+!        & (GDATA, &
+!        &  HITEM, HTITL, HUNIT, HDSET, &
+!        &  TIME,  TDUR,  JFILE, HDFMT, HCLAS, &
+!        &  TIME1, TIME2, RMISS, &
+!        &  HALON, HALAT, HASIG, &
+!        &  ISTAZ, IENDZ, JSTAZ, JENDZ, 1,     KDIMD, &
+!        &  LSIZE)
+
+!   WRITE (JFPAR,*) ' *** OUTPUT ', HITEMX, ' TIME= ', HTIME
+!   RETURN
+! END SUBROUTINE GTPWRT
+! !!!_  - GDSEARCH       !! search by item-name and time
 !!!_ + io/igtior.F
 !!!_  & GTZRDZ
 subroutine GTZRDZ &
@@ -424,6 +927,9 @@ subroutine GTZWRZ &
   use TOUZA_Nio_record,only: &
        & get_default_header, nio_write_header, nio_write_data, &
        & REC_DEFAULT
+# if OPT_WITH_NCTCDF
+  use TOUZA_Nio_nctcdf,only: nct_define_write, nct_write_data
+# endif
   implicit none
   integer,parameter :: KMD = MIROC_DOUBLE
   integer,         intent(in) :: DSIZE
@@ -465,7 +971,6 @@ subroutine GTZWRZ &
      if (jerr.eq.0) call get_default_header(hdefv)
      ofirst = .FALSE.
   endif
-
 
   if (TIME .ge. TIME_PREV + LAZINESS) then
      call date_and_time(values=idtv(:))
@@ -527,13 +1032,21 @@ subroutine GTZWRZ &
   ! no adjustment for obsolete formats
   call put_item(jerr, head, HDFMT, hi_DFMT)
 
-  krect = REC_DEFAULT
-  call nio_write_header(jerr, head, krect, JFILE)
-  ! if (ierr.eq.0) then
-  !    if (levv.gt.1) call switch_urt_diag(wfile, jrec, udiag)
-  ! endif
-  if (jerr.eq.0) call nio_write_data(jerr, DDATA, n, head, krect, JFILE)
-
+  if (HDFMT(1:1).eq.'C') then
+#   if OPT_WITH_NCTCDF
+     call nct_define_write(jerr, JFILE, head)
+     if (jerr.eq.0) call nct_write_data(jerr, DDATA, n, JFILE, head)
+#   else /* not OPT_WITH_NCTCDF */
+     call nio_msg('NCTCDF disabled', __MDL__)
+#   endif /* not OPT_WITH_NCTCDF */
+  else
+     krect = REC_DEFAULT
+     call nio_write_header(jerr, head, krect, JFILE)
+     ! if (ierr.eq.0) then
+     !    if (levv.gt.1) call switch_urt_diag(wfile, jrec, udiag)
+     ! endif
+     if (jerr.eq.0) call nio_write_data(jerr, DDATA, n, head, krect, JFILE)
+  endif
   return
 end subroutine GTZWRZ
 !!!_ + io/igtmeta.F
@@ -545,14 +1058,18 @@ end subroutine GTZWRZ
 subroutine FOPEN &
      & (IOS, IFILE, HFILE, HACT, HFORM, HACCSS)
   use TOUZA_Nio,only: sus_open
+# if OPT_WITH_NCTCDF
+  use TOUZA_Nio,only: nct_open_write
+# endif
   implicit none
-  integer,         intent(out) :: IOS
-  integer,         intent(in)  :: IFILE
-  character(len=*),intent(in)  :: HFILE
-  character(len=*),intent(in)  :: HACT
-  character(len=*),intent(in)  :: HFORM
-  character(len=*),intent(in)  :: HACCSS
+  integer,         intent(out)   :: IOS
+  integer,         intent(inout) :: IFILE
+  character(len=*),intent(in)    :: HFILE
+  character(len=*),intent(in)    :: HACT
+  character(len=*),intent(in)    :: HFORM
+  character(len=*),intent(in)    :: HACCSS
 
+  integer handle
   character(LEN=9)  :: action
   character(LEN=6)  :: position
 
@@ -568,6 +1085,12 @@ subroutine FOPEN &
      call sus_open(IOS, IFILE, HFILE, ACTION=action, position=position)
      return
   endif
+# if OPT_WITH_NCTCDF
+  if (HFORM == 'NETCDF4') then
+     call nct_open_write(IOS, IFILE, HFILE, action)
+     return
+  endif
+# endif /* OPT_WITH_NCTCDF */
 
   if (HACCSS == 'DIRECT') then
      open(UNIT=IFILE, FILE=HFILE, IOSTAT=IOS, &

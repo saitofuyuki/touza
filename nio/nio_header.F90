@@ -1,7 +1,7 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2022/06/04 11:00:33 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/09/28 13:35:49 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -304,7 +304,7 @@ contains
 
 !!!_  - put_item - set entry (with type check)
   subroutine put_item_a &
-       & (ierr, head, v, item, iteme, fmt)
+       & (ierr, head, v, item, iteme, fmt, tol)
     use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
@@ -313,34 +313,36 @@ contains
     integer,         intent(in)          :: item
     integer,         intent(in),optional :: iteme ! (optional) end entry for long value
     character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: tol   ! tolerance
     integer jend
     if (present(iteme)) then
        jend = check_hitem_range(item, iteme)
        if (jend.gt.0) then
-          call store_item(ierr, head, v, item, jend, fmt)
+          call store_item(ierr, head, v, item, jend, fmt, tol)
        else
           ierr = ERR_HITEM_INVALID_RANGE
        endif
     else
        ierr = check_hitem_type(item, ht_str)
-       if (ierr.eq.0) call store_item(ierr, head, v, item, iteme, fmt)
+       if (ierr.eq.0) call store_item(ierr, head, v, item, iteme, fmt, tol)
     endif
     return
   end subroutine put_item_a
   subroutine put_item_i &
-       & (ierr, head, v, item, fmt)
+       & (ierr, head, v, item, fmt, tol)
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
     integer,         intent(in)          :: v
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: tol   ! tolerance
     ierr = check_hitem_type(item, ht_int)
-    if (ierr.eq.0) call store_item(ierr, head, v, item, fmt)
+    if (ierr.eq.0) call store_item(ierr, head, v, item, fmt, tol)
     return
   end subroutine put_item_i
   subroutine put_item_f &
-       & (ierr, head, v, item, fmt)
+       & (ierr, head, v, item, fmt, tol)
     use TOUZA_Nio_std,only: KFLT
     implicit none
     integer,         intent(out)         :: ierr
@@ -348,12 +350,13 @@ contains
     real(kind=KFLT), intent(in)          :: v
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: tol   ! tolerance
     ierr = check_hitem_type(item, ht_real)
-    if (ierr.eq.0) call store_item(ierr, head, v, item, fmt)
+    if (ierr.eq.0) call store_item(ierr, head, v, item, fmt, tol)
     return
   end subroutine put_item_f
   subroutine put_item_d &
-       & (ierr, head, v, item, fmt)
+       & (ierr, head, v, item, fmt, tol)
     use TOUZA_Nio_std,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
@@ -361,20 +364,22 @@ contains
     real(kind=KDBL), intent(in)          :: v
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: tol   ! tolerance
     ierr = check_hitem_type(item, ht_real)
-    if (ierr.eq.0) call store_item(ierr, head, v, item, fmt)
+    if (ierr.eq.0) call store_item(ierr, head, v, item, fmt, tol)
     return
   end subroutine put_item_d
   subroutine put_item_date &
-       & (ierr, head, dt, item, fmt)
+       & (ierr, head, dt, item, fmt, tol)
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
     integer,         intent(in)          :: dt(:)
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: tol   ! tolerance
     ierr = check_hitem_types(item, (/ht_date, ht_str/))
-    if (ierr.eq.0) call store_item(ierr, head, dt, item, fmt)
+    if (ierr.eq.0) call store_item(ierr, head, dt, item, fmt, tol)
     return
   end subroutine put_item_date
 
@@ -459,7 +464,8 @@ contains
 
 !!!_  - store_item - put entry (no type/range check)
   subroutine store_item_a &
-       & (ierr, head, v, item, iteme, fmt)
+       & (ierr, head, v, item, iteme, fmt, tol)
+    use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
@@ -467,15 +473,16 @@ contains
     integer,         intent(in)          :: item
     integer,         intent(in),optional :: iteme
     character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: tol
     character(len=lhead) BUF
     integer ji, jb, je, l
 
     ierr = 0
     if (present(iteme)) then
        if (present(fmt)) then
-          write(BUF, fmt, IOSTAT=ierr) v
+          write(BUF, fmt, IOSTAT=ierr) trim(v)
        else
-          write(BUF, '(A)', IOSTAT=ierr) v
+          write(BUF, '(A)', IOSTAT=ierr) trim(v)
        endif
        if (ierr.eq.0) then
           l = len_trim(BUF)
@@ -488,22 +495,28 @@ contains
           enddo
        endif
     else
+       l = len_trim(v)
+       if (choice(0, tol).gt.0) then
+          l = min(litem, l)
+       endif
        if (present(fmt)) then
-          write(head(item), fmt, IOSTAT=ierr) v
+          write(head(item), fmt, IOSTAT=ierr) v(1:l)
        else
-          write(head(item), '(A)', IOSTAT=ierr) v
+          write(head(item), '(A)', IOSTAT=ierr) v(1:l)
        endif
     endif
     return
   end subroutine store_item_a
   subroutine store_item_i &
-       & (ierr, head, v, item, fmt)
+       & (ierr, head, v, item, fmt, tol)
+    use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
     integer,         intent(in)          :: v
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: tol   ! tolerance
     ierr = 0
     if (present(fmt)) then
        if (fmt.eq.' ') then
@@ -516,10 +529,12 @@ contains
     else
        write(head(item), def_fmt_I, IOSTAT=ierr) v
     endif
+    if (choice(0, tol).gt.0) ierr = 0
     return
   end subroutine store_item_i
   subroutine store_item_f &
-       & (ierr, head, v, item, fmt)
+       & (ierr, head, v, item, fmt, tol)
+    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_std,only: KFLT
     implicit none
     integer,         intent(out)         :: ierr
@@ -527,6 +542,7 @@ contains
     real(kind=KFLT), intent(in)          :: v
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: tol   ! tolerance
     ierr = 0
     if (present(fmt)) then
        if (fmt.eq.' ') then
@@ -539,10 +555,12 @@ contains
     else
        write(head(item), def_fmt_R, IOSTAT=ierr) v
     endif
+    if (choice(0, tol).gt.0) ierr = 0
     return
   end subroutine store_item_f
   subroutine store_item_d &
-       & (ierr, head, v, item, fmt)
+       & (ierr, head, v, item, fmt, tol)
+    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_std,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
@@ -550,6 +568,7 @@ contains
     real(kind=KDBL), intent(in)          :: v
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: tol   ! tolerance
     if (present(fmt)) then
        if (fmt.eq.' ') then
           write(head(item), def_fmt_R, IOSTAT=ierr) v
@@ -561,17 +580,19 @@ contains
     else
        write(head(item), def_fmt_R, IOSTAT=ierr) v
     endif
+    if (choice(0, tol).gt.0) ierr = 0
     return
   end subroutine store_item_d
   subroutine store_item_date &
-       & (ierr, head, dt, item, fmt)
-    use TOUZA_Nio_std,only: choice_a
+       & (ierr, head, dt, item, fmt, tol)
+    use TOUZA_Nio_std,only: choice_a, choice
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
     integer,         intent(in)          :: dt(:)
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: tol   ! tolerance
     character(len=128) f
     ierr = 0
     call choice_a(f, ' ', fmt)
@@ -588,6 +609,7 @@ contains
     else
        write(head(item), f, IOSTAT=ierr) dt(1:6)
     endif
+    if (choice(0, tol).gt.0) ierr = 0
     return
   end subroutine store_item_date
 
@@ -630,6 +652,7 @@ contains
   end subroutine restore_item_a
   subroutine restore_item_i &
        & (ierr, head, v, item, fmt, def)
+    use TOUZA_Nio_std,only: parse_number
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(in)          :: head(*)
@@ -649,7 +672,8 @@ contains
           if (fmt.eq.' ') then
              read(head(item), def_fmt_I, IOSTAT=ierr) v
           else if (fmt.eq.'*') then
-             read(head(item), *,         IOSTAT=ierr) v
+             ! read(head(item), *,         IOSTAT=ierr) v
+             call parse_number(ierr, v, head(item))
           else
              read(head(item), fmt,       IOSTAT=ierr) v
           endif
@@ -661,6 +685,7 @@ contains
   end subroutine restore_item_i
   subroutine restore_item_f &
        & (ierr, head, v, item, fmt, def)
+    use TOUZA_Nio_std,only: parse_number
     implicit none
     integer,parameter :: KTGT=KFLT
     integer,         intent(out)         :: ierr
@@ -681,7 +706,8 @@ contains
           if (fmt.eq.' ') then
              read(head(item), def_fmt_R, IOSTAT=ierr) v
           else if (fmt.eq.'*') then
-             read(head(item), *,         IOSTAT=ierr) v
+             ! read(head(item), *,         IOSTAT=ierr) v
+             call parse_number(ierr, v, head(item))
           else
              read(head(item), fmt,       IOSTAT=ierr) v
           endif
@@ -693,6 +719,7 @@ contains
   end subroutine restore_item_f
   subroutine restore_item_d &
        & (ierr, head, v, item, fmt, def)
+    use TOUZA_Nio_std,only: parse_number
     implicit none
     integer,parameter :: KTGT=KDBL
     integer,         intent(out)         :: ierr
@@ -713,7 +740,8 @@ contains
           if (fmt.eq.' ') then
              read(head(item), def_fmt_R, IOSTAT=ierr) v
           else if (fmt.eq.'*') then
-             read(head(item), *,         IOSTAT=ierr) v
+             ! read(head(item), *,         IOSTAT=ierr) v
+             call parse_number(ierr, v, head(item))
           else
              read(head(item), fmt,       IOSTAT=ierr) v
           endif
@@ -740,19 +768,19 @@ contains
        je = INDEX(head(item), ' ')
        !! not perfect, though...
        if (je.gt.0) then
-          read(head(item)(je-2:je-1), *) dt(3)
-          read(head(item)(je-4:je-3), *) dt(2)
-          read(head(item)(1:je-5), *)    dt(1)
-          read(head(item)(je+1:je+2), *) dt(4)
-          read(head(item)(je+3:je+4), *) dt(5)
-          read(head(item)(je+5:je+6), *) dt(6)
+          if (ierr.eq.0) read(head(item)(je-2:je-1), *, IOSTAT=ierr) dt(3)
+          if (ierr.eq.0) read(head(item)(je-4:je-3), *, IOSTAT=ierr) dt(2)
+          if (ierr.eq.0) read(head(item)(1:je-5),    *, IOSTAT=ierr) dt(1)
+          if (ierr.eq.0) read(head(item)(je+1:je+2), *, IOSTAT=ierr) dt(4)
+          if (ierr.eq.0) read(head(item)(je+3:je+4), *, IOSTAT=ierr) dt(5)
+          if (ierr.eq.0) read(head(item)(je+5:je+6), *, IOSTAT=ierr) dt(6)
        else
           je=len_trim(head(item))
           do j = 6, 2, -1
-             read(head(item)(je-1:je), *) dt(j)
+             if (ierr.eq.0) read(head(item)(je-1:je), *, IOSTAT=ierr) dt(j)
              je = je - 2
           enddo
-          read(head(item)(1:je), *)    dt(1)
+          if (ierr.eq.0) read(head(item)(1:je), *, IOSTAT=ierr) dt(1)
        endif
     else if (f.eq.'*') then
        read(head(item), def_fmt_date_trad, IOSTAT=ierr) dt(1:6)

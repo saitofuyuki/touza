@@ -17,9 +17,199 @@
   *TOUZA* collection.
 
 * Build and installation
-
 * Brief description of *TOUZA/Nio* modules
-
+** =TOUZA_Nio_header=
+*** =show_header=
+#+begin_src f90
+  subroutine show_header &
+       & (ierr, head, fmt, u, lev)
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(in)          :: head(*)
+    character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: lev
+#+end_src
+*** =put_item=
+#+begin_src f90
+  subroutine put_item &
+       & (ierr, head, v, item, iteme, fmt)
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(inout)       :: head(*)
+    <type>,          intent(in)          :: v
+    integer,         intent(in)          :: item
+    integer,         intent(in),optional :: iteme ! (optional) end entry for long value
+    character(len=*),intent(in),optional :: fmt
+#+end_src
+*** =put_item_date=
+#+begin_src f90
+  subroutine put_item_date &
+       & (ierr, head, dt, item, fmt)
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(inout)       :: head(*)
+    integer,         intent(in)          :: dt(:)
+    integer,         intent(in)          :: item
+    character(len=*),intent(in),optional :: fmt
+#+end_src
+*** =get_item=
+#+begin_src f90
+  subroutine get_item &
+       & (ierr, head, v, item, iteme, fmt)
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(in)          :: head(*)
+    <type>,          intent(out)         :: v
+    integer,         intent(in)          :: item
+    integer,         intent(in),optional :: iteme ! (optional) end entry for long value
+    character(len=*),intent(in),optional :: fmt
+#+end_src
+*** =get_item_date=
+#+begin_src f90
+  subroutine get_item_date &
+       & (ierr, head, dt, item, fmt)
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(in)          :: head(*)
+    integer,         intent(out)         :: dt(*)
+    integer,         intent(in)          :: item
+    character(len=*),intent(in),optional :: fmt
+#+end_src
+*** =store_item=
+#+begin_src f90
+  subroutine store_item &
+       & (ierr, head, v, item, iteme, fmt)
+  subroutine store_item &
+       & (ierr, head, dt, item, fmt)
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(inout)       :: head(*)
+    <type>,          intent(in)          :: v
+    integer,         intent(in)          :: dt(:)
+    integer,         intent(in)          :: item
+    integer,         intent(in),optional :: iteme
+    character(len=*),intent(in),optional :: fmt
+#+end_src
+*** =restore_item=
+#+begin_src f90
+  subroutine restore_item &
+       & (ierr, head, v, item, iteme, fmt)
+  subroutine restore_item &
+       & (ierr, head, dt, item, fmt)
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(in)          :: head(*)
+    <type>,          intent(out)         :: v
+    integer,         intent(out)         :: dt(*)
+    integer,         intent(in)          :: item
+    integer,         intent(in),optional :: iteme
+    character(len=*),intent(in),optional :: fmt
+#+end_src
+** =TOUZA_Nio_record=
+*** =get_default_header=
+#+begin_src f90
+  subroutine get_default_header &
+       & (head)
+    character(len=*),intent(out) :: head(*)
+#+end_src
+*** =nio_read_header=
+#+begin_src f90
+  subroutine nio_read_header &
+       & (ierr, &
+       &  head,  krect, u)
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: head(*)
+    integer,         intent(out) :: krect
+    integer,         intent(in)  :: u
+#+end_src
+*** =nio_write_header=
+#+begin_src f90
+  subroutine nio_write_header &
+       & (ierr, &
+       &  head,  krect, u)
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(in)    :: head(*)
+    integer,         intent(inout) :: krect
+    integer,         intent(in)    :: u
+#+end_src
+*** =nio_read_data=
+#+begin_src f90
+  subroutine nio_read_data &
+       & (ierr, &
+       &  d,    ld, head, krect, u)
+    integer,         intent(out) :: ierr
+    <type>,          intent(out) :: d(*)
+    integer,         intent(in)  :: ld
+    character(len=*),intent(in)  :: head(*)
+    integer,         intent(in)  :: krect
+    integer,         intent(in)  :: u
+#+end_src
+*** =nio_write_data=
+#+begin_src f90
+  subroutine nio_write_data &
+       & (ierr, &
+       &  d,    ld, head, krect, u, kopts)
+    integer,         intent(out)         :: ierr
+    <type>,          intent(in)          :: d(*)
+    integer,         intent(in)          :: ld
+    character(len=*),intent(in)          :: head(*)
+    integer,         intent(in)          :: krect
+    integer,         intent(in)          :: u
+    integer,         intent(in),optional :: kopts(:)
+#+end_src
+*** =nio_skip_records=
+#+begin_src f90
+  subroutine nio_skip_records &
+       & (ierr, n, u)
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: n
+    integer,intent(in)  :: u
+#+end_src
+*** =parse_header_base=
+#+begin_src f90
+  subroutine parse_header_base &
+       & (ierr, kfmt, kaxs, vmiss, head)
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: kfmt
+    integer,         intent(out) :: kaxs(*)
+    real(kind=KRMIS),intent(out) :: vmiss
+    character(len=*),intent(in)  :: head(*)
+#+end_src
+*** =parse_record_fmt=
+#+begin_src f90
+  subroutine parse_record_fmt &
+       & (ierr, kfmt, str)
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: kfmt
+    character(len=*),intent(in)  :: str
+#+end_src
+*** =parse_header_size=
+#+begin_src f90
+  integer function parse_header_size &
+       & (head, kidx, lazy) &
+       & result (n)
+  integer(kind=KI32) function parse_header_size &
+       & (head, kidx, lazy, khld) &
+       & result (n)
+    character(len=*),  intent(in)  :: head(*)
+    integer,           intent(in)  :: kidx
+    integer,optional,  intent(in)  :: lazy
+    integer(kind=KARG),intent(in)  :: khld
+#+end_src
+*** =get_switch=
+#+begin_src f90
+  subroutine get_switch (krect, kendi, kcfg)
+    integer,intent(out)         :: krect
+    integer,intent(in)          :: kendi  ! estimated file byte-order
+    integer,intent(in),optional :: kcfg   ! user setting to overwrite default
+#+end_src
+*** =set_urt_defs=
+#+begin_src f90
+  subroutine set_urt_defs (kopts)
+    integer,intent(out) :: kopts(:)
+#+end_src
+*** =switch_urt_diag=
+#+begin_src f90
+  subroutine switch_urt_diag &
+       & (atag, itag, u)
+    character(len=*),intent(in),optional :: atag
+    integer,         intent(in),optional :: itag
+    integer,         intent(in),optional :: u
+#+end_src
 * Copyright and license
 Copyright 2021,2022 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
