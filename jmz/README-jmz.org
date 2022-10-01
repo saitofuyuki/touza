@@ -15,6 +15,160 @@ Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
 *TOUZA* collection.
 * Build and installation
 * Brief description of *TOUZA/Jmz* commands
+** chak - swiss army knife
+*** unary operators
+: A OP
+| NEG   | - A                                    |
+| INV   | 1 / A                                  |
+| ABS   | abs(A)                                 |
+| SQR   | A*A                                    |
+| SQRT  | sqr(A)                                 |
+| SIGN  | SIGN(1, A)                             |
+| ZSIGN | -1 if negative, +1 if positive, else 0 |
+| FLOOR |                                        |
+| CEIL  |                                        |
+| ROUND |                                        |
+| EXP   | exp(A)                                 |
+| LOG   | log(A)                                 |
+| SIN   | sin(A)                                 |
+| COS   | cos(A)                                 |
+| TAN   | tan(A)                                 |
+| ASIN  | arcsin(A)                              |
+| ACOS  | arccos(A)                              |
+| NOT   | 1 if A==UNDEF, else UNDEF              |
+| BOOL  | 1 if A!=UNDEF, else UNDEF              |
+
+*** binary operators (on intersect domain)
+: A B OP
+Return at cells outside of either A or B domain is always UNDEF.
+ | A       | B       | return |
+ | def     | def     | A OP B |
+ |         | undef   | UNDEF  |
+ |         | outside | UNDEF  |
+ | undef   | def     | UNDEF  |
+ |         | undef   | UNDEF  |
+ |         | outside | UNDEF  |
+ | outside | def     | UNDEF  |
+ |         | undef   | UNDEF  |
+ |         | outside | UNDEF  |
+
+|-------+----------------------------|
+| ADD   | A+B                        |
+| SUB   | A-B                        |
+| MUL   | A*B                        |
+| DIV   | A/B                        |
+| MOD   | MOD(A,B)                   |
+| POW   | POW(A,B)  or A**B          |
+|-------+----------------------------|
+| EQ    | A if A==B else UNDEF       |
+| NE    | A if A!=B else UNDEF       |
+| LE    | A if A<=B else UNDEF       |
+| LT    | A if A<B else UNDEF        |
+| GE    | A if A>=B else UNDEF       |
+| GT    | A if A>B else UNDEF        |
+|-------+----------------------------|
+| AND   | B if A!= UNDEF, else UNDEF |
+| MASK  | A if B!= UNDEF, else UNDEF |
+|-------+----------------------------|
+| MIN   | MIN(A,B)                   |
+| MAX   | MAX(A,B)                   |
+| ATAN2 | ATAN2(A,B)                 |
+
+*** binary operators (on inclusive domain)
+: A B OP
+
+Return at cells outside of either A or B domain is also the result of
+operation, with setting NULL as default.
+Actual value of NULL depends on the operator.
+
+ | A       | B       | return         |
+ | def     | def     | A OP B         |
+ |         | undef   | A OP undef     |
+ |         | outside | A op NULL      |
+ | undef   | def     | NULL op B      |
+ |         | undef   | UNDEF op UNDEF |
+ |         | outside | UNDEF op NULL  |
+ | outside | def     | NULL op B      |
+ |         | undef   | NULL op UNDEF  |
+ |         | outside | NULL op NULL   |
+
+|       |  NULL |                                                       |
+|-------+-------+-------------------------------------------------------|
+| OR    | UNDEF | return leftmost non-undef                             |
+| XOR   | UNDEF | return non-undef if the opposite is UNDEF, else UNDEF |
+| LMASK | UNDEF | A if B!= UNDEF, else UNDEF                            |
+|-------+-------+-------------------------------------------------------|
+| LADD  |     0 | A + B                                                 |
+| LSUB  |     0 | A - B                                                 |
+| LMUL  |     1 | A * B                                                 |
+| LDIV  |     1 | A / B                                                 |
+
+*** logical binary operators cheet sheet
+| A     | B     | OR    | XOR   | AND   | MASK  |
+|-------+-------+-------+-------+-------+-------|
+| a     | b     | a     | UNDEF | b     | a     |
+| a     | UNDEF | a     | a     | UNDEF | UNDEF |
+| UNDEF | b     | b     | b     | UNDEF | UNDEF |
+| UNDEF | UNDEF | UNDEF | UNDEF | UNDEF | UNDEF |
+
+*** stack marker manipulation
+| MARK |
+| STOP |
+| GO   |
+
+*** buffer stack manipulation
+| DUP            | 1 | 2 | duplicate                    | A DUP               | A A         |
+| EXCH           | 2 | 2 | exchange                     | A B EXCH            | B A         |
+| POP            | 1 | 0 | pop                          | A POP               |             |
+| DIST           |   |   |                              | STOP A B C X DIST   | A X B X C X |
+| INSERT         |   |   |                              | STOP A B C X INSERT | X A B C     |
+| REPEAT         |   |   |                              | STOP A B C REPEAT   | A B C A B C |
+|----------------+---+---+------------------------------+---------------------+-------------|
+| Ln (integer n) | 0 | 1 | reuse literal with tag Ln    |                     |             |
+| Bn             | 0 | 1 | reuse buffer with tag Bn     |                     |             |
+| Fn             | 0 | 1 | reuse read file with tag Fn  |                     |             |
+| Wn             | 0 | 1 | reuse write file with tag Wn |                     |             |
+*** operation queue manipulation
+| ITER | STOP A B C D OPR ITER | A OPR B OPR C OPR D OPR | if unary    |
+|      | STOP A B C D OPR ITER | A B OPR C D OPR         | if binary   |
+| CUM  | STOP A B C D OPR CUM  | A B OPR C OPR D OPR     | only binary |
+*** special cases for successive operation
+A DUP                       A A
+A DUP DUP                   A A A
+STOP A B C DUP ITER         A A B B C C
+STOP A B C DUP DUP ITER     A A A B B B C C C
+*** file properties
+*** buffer properties
+| TAG=name | lock last buffer using name as buffer tag |
+
+*** typical recipes
+
+*** command equivalence table
+| gtool                        | chak                                 |   |
+|------------------------------+--------------------------------------+---|
+| gtadd A B                    | chak A B ADD = gtool.out             |   |
+| gtadd A B fact1=F1 ofs1=O1 \ | chak A F1 MUL O1 ADD \               |   |
+| fact2=F2 ofs2=F2             | B F2 MUL O2 ADD ADD = gtool.out      |   |
+| gtsub A B                    | chak A B SUB = gtool.out             |   |
+| gtmlt A B                    | chak A B MUL = gtool.out             |   |
+| gtdiv A B                    | chak A B DIV = gtool.out             |   |
+| gtset A fact=F ofs=O         | chak A F MUL O ADD = gtool.out       |   |
+| gtset A rmin=L               | chak A L GE = gtool.out              |   |
+| gtset A rmin=L vmin=L        | chak A L MAX = gtool.out             |   |
+| gtset A rmin=L vmin=V        | chak A DUP L GE V OR AND = gtool.out | 1 |
+| gtset A rset=O vmin=V        | chak A DUP O NE V OR AND = gtool.out |   |
+| gtlog A                      | chak A LOG = gtool.out               |   |
+| gtsqrt A                     | chak A SQRT = gtool.out              |   |
+| gtcon A val=C                | chak C A OR = gtool.out              |   |
+| gtmask A B                   | chak A B MASK = gtool.out            |   |
+| gtmask A B rmin=L            | chak A B L GE MASK = gtool.out       |   |
+
+(1)
+A      L GE   V OR  AND
+undef  undef  V     undef
+a<L    undef  V     V
+a>=L   a      a     a
+
 * Copyright and license
 Copyright 2022 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
