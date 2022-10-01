@@ -1,7 +1,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2022/06/04 10:59:47 fuyuki Makefile.am>
+# Time-stamp: <2022/06/27 11:20:55 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -9,7 +9,6 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 EXTRA_DIST		=	README-nio.org
-MOSTLYCLEANFILES=
 SUBDIRS	=	.
 
 include $(top_srcdir)/aminclude_static.am
@@ -25,7 +24,7 @@ EXTRA_libtouza_local_la_SOURCES	= nio_miroc.F90
 libtouza_local_la_SOURCES	+=	$(libtouza_APPENDS)
 libtouza_APPENDS =
 
-AM_FCFLAGS += $(FC_MODULE_touza_std) $(FC_MODULE_touza_trp)
+AM_FCFLAGS_MODULE += $(FC_MODULE_touza_std) $(FC_MODULE_touza_trp)
 AM_CPPFLAGS += $(FC_INCLUDE_touza_std) $(FC_INCLUDE_touza_trp)
 
 TEST_COMMON_LIBS	= $(noinst_LTLIBRARIES)
@@ -46,7 +45,7 @@ test_nio_LDADD		= $(TEST_COMMON_LIBS)
 test_nio_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_NIO=1
 
 CAL_SWITCH	=	calendar_miroc.F90
-CLEANFILES	=	$(CAL_SWITCH)
+CLEANFILES	+=	$(CAL_SWITCH)
 
 test_nio_miroc_SOURCES			= $(TEST_COMMON_SOURCES) nio_miroc.F90
 nodist_test_nio_miroc_SOURCES	= $(CAL_SWITCH)
@@ -68,6 +67,8 @@ link-bin:
 	elif test -e $${bin}; then \
 	  ln -sf $${bin} .; \
 	fi
+
+include Makedep.inc
 
 ### Local Variables:
 ### mode: makefile-automake

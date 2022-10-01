@@ -5,6 +5,7 @@
 .libs
 Makefile
 Makefile.in
+Makedep.inc.old
 a.out
 libtool
 libtouza.la

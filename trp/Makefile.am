@@ -1,7 +1,7 @@
 # TOUZA/Trp Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Feb 26 2021
-# Time-stamp: <2022/05/21 10:47:00 fuyuki Makefile.am>
+# Time-stamp: <2022/09/16 14:53:23 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -9,7 +9,6 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 EXTRA_DIST		=	README-trp.org
-MOSTLYCLEANFILES=
 SUBDIRS	=	.
 
 include $(top_srcdir)/aminclude_static.am
@@ -18,11 +17,13 @@ include_HEADERS	=	touza_trp.h
 
 noinst_LTLIBRARIES = libtouza_local.la
 libtouza_local_la_SOURCES = trapiche_std.F90 \
-		trapiche_pack.F90 trapiche_float.F90 trapiche_ctl.F90 \
-		trapiche_transfer.F90 \
-		trapiche.F90 $(include_HEADERS)
+		trapiche_pack.F90 trapiche_float.F90 trapiche_ctl.F90
+if with_mpi
+libtouza_local_la_SOURCES += trapiche_transfer.F90
+endif
+libtouza_local_la_SOURCES += trapiche.F90 $(include_HEADERS)
 
-AM_FCFLAGS += $(FC_MODULE_touza_std)
+AM_FCFLAGS_MODULE += $(FC_MODULE_touza_std)
 AM_CPPFLAGS += $(FC_INCLUDE_touza_std)
 
 TEST_COMMON_LIBS	= $(noinst_LTLIBRARIES)
@@ -33,7 +34,7 @@ test_helpd	=	bin
 
 UINTPACK	=	uintpack.F
 MIROCH		=	miroc.h
-CLEANFILES	=	$(MIROCH)
+CLEANFILES	+=	$(MIROCH)
 
 $(UINTPACK): $(MIROCH)
 	@if test -f $(builddir)/$(UINTPACK); then :; else \
@@ -97,6 +98,8 @@ link-bin:
 	elif test -e $${bin}; then \
 	  ln -sf $${bin} .; \
 	fi
+
+include Makedep.inc
 
 ### Local Variables:
 ### mode: makefile-automake

@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/06/04 10:55:59 fuyuki configure.ac>
+# Time-stamp: <2022/06/27 11:16:41 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -29,8 +29,9 @@ AC_CANONICAL_TARGET
 
 AC_LANG_PUSH([Fortran])
 MT_PROG_FC_MPI
+AX_PROG_F77_MPI([test x"$with_mpi" != xno], [use_f77_mpi=yes], [use_f77_mpi=no])
 dnl AC_PROG_FC
-AC_PROG_F77
+dnl AC_PROG_F77
 
 AC_FC_PP_SRCEXT([F90])
 AC_FC_PP_DEFINE
@@ -141,6 +142,26 @@ switch_DATA   =
 
 AC_PATH_PROGS([AUTOREVISION], [autorevision], [:])
 AC_PATH_PROGS([REALPATH], [realpath], [false])
+
+dnl dependency hack
+dnl _AM_DEPENDENCIES(FC)
+AC_ARG_ENABLE([diag-dependencies],
+[AS_HELP_STRING([--enable-diag-dependencies], [diagnose dependencies using gcc features@<:@default=no@:>@])],
+ [use_gcc_dependencies=$enableval],
+ [use_gcc_dependencies=no])
+AM_CONDITIONAL([gcc_dependencies], [
+  test "x$enable_dependency_tracking" != xno \
+  && test "$use_gcc_dependencies" = yes])
+
+AC_ARG_ENABLE([mod-dependencies],
+[AS_HELP_STRING([--enable-mod-dependencies], [enable generated dependencies @<:@default=yes@:>@])],
+ [use_mod_dependencies=$enableval],
+ [use_mod_dependencies=yes])
+AM_CONDITIONAL([enable_module_dependencies], [
+  test "x$use_mod_dependencies" != xno \
+  && test x"$ax_f90_modext" != xunknown])
+
+dnl AM_CONDITIONAL([am__fastdepFC], [false])
 
 dnl AX_CREATE_PKGCONFIG_INFO()
 MT_PARSE_PACKAGES()

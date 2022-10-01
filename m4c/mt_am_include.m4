@@ -1,7 +1,7 @@
 dnl Filename:   touza/m4c/mt_am_include.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 16 2020
-dnl Time-stamp: <2022/04/28 11:16:57 fuyuki mt_am_include.m4>
+dnl Time-stamp: <2022/07/19 17:40:56 fuyuki mt_am_include.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -15,18 +15,42 @@ AC_DEFUN([MT_AM_INCLUDE],
 [
 AX_ADD_AM_MACRO_STATIC([BUILD_AUX  =    ${AX_DOLLAR}(top_srcdir)/build-aux])
 
+AX_NULL=''
 AX_ADD_AM_MACRO_STATIC([
+CLEANFILES =
+MOSTLYCLEANFILES =
+
 if CLEAN_FCMOD
 MOSTLYCLEANFILES += *.${AX_DOLLAR}(FC_MODEXT)
 endif
 
 DEBUG   =
-AM_FCFLAGS  = @AM_FCFLAGS@ ${AX_DOLLAR}(DEBUG)
-AM_CPPFLAGS = -I${AX_DOLLAR}(top_srcdir)
+${AX_NULL}AM_FCFLAGS=@AM_FCFLAGS@ ${AX_DOLLAR}(DEBUG)
+${AX_NULL}AM_CPPFLAGS=-I${AX_DOLLAR}(top_srcdir)
+
+# no blank between -MT and NAME
+${AX_NULL}AM_FCFLAGS_DEP='-MT${AX_DOLLAR}@' -MD -MP -MF ${AX_DOLLAR}*.dep
+# AM_FCFLAGS_DEP = -MD -MP -MF ${AX_DOLLAR}*.dep
+if gcc_dependencies
+${AX_NULL}AM_FCFLAGS+=${AX_DOLLAR}(AM_FCFLAGS_DEP)
+MOSTLYCLEANFILES += *.dep
+endif
+
+${AX_NULL}AM_FCFLAGS_MODULE=
+${AX_NULL}AM_FCFLAGS+=${AX_DOLLAR}(AM_FCFLAGS_MODULE)
 
 moddir      = @moddir@
-
 install-exec-hook: install-mod
+
+echo-srcdir:
+	@echo ${AX_DOLLAR}(srcdir)
+echo-builddir:
+	@echo ${AX_DOLLAR}(builddir)
+echo-top_srcdir:
+	@echo ${AX_DOLLAR}(top_srcdir)
+echo-top_builddir:
+	@echo ${AX_DOLLAR}(top_builddir)
+
 ])
 
 AX_ADD_AM_MACRO_STATIC([

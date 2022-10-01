@@ -1,7 +1,7 @@
 # touza/calendar Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2022/03/29 11:42:13 fuyuki Makefile.am>
+# Time-stamp: <2022/06/27 11:21:30 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -9,7 +9,6 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 EXTRA_DIST		=	README-cal.org
-MOSTLYCLEANFILES=
 SUBDIRS	=	.
 
 include $(top_srcdir)/aminclude_static.am
@@ -26,14 +25,14 @@ libtouza_local_la_SOURCES = $(cal_SOURCES) \
 switch_DATA += calendar_miroc.F90 calendar_coco.F90
 EXTRA_DIST += $(switch_DATA)
 
-AM_FCFLAGS += $(FC_MODULE_touza_std)
+AM_FCFLAGS_MODULE += $(FC_MODULE_touza_std)
 AM_CPPFLAGS += $(FC_INCLUDE_touza_std)
 
 LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(BUILD_AUX)/tap-driver.sh
 LOG_DRIVER_FLAGS='--comments'
 
 noinst_SCRIPTS	=	$(WTC)
-CLEANFILES		=	$(noinst_SCRIPTS) $(MIROCH)
+CLEANFILES		+=	$(noinst_SCRIPTS) $(MIROCH)
 
 WTC_LOGDIR	=	log
 WTC		=	wtc.sh
@@ -103,7 +102,7 @@ check_PROGRAMS	=	test_calendar test_calendar_core \
 					test_calendar_matsiro test_calendar_ils \
 					test_calendar_coco
 
-test_calendar_SOURCES	= calendar.F90
+test_calendar_SOURCES	= calendar_miroc.F90 calendar.F90
 test_calendar_LDADD		= $(TEST_COMMON_LIBS)
 test_calendar_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR=1
 
@@ -111,7 +110,7 @@ test_calendar_core_SOURCES	= calendar_core.F90
 test_calendar_core_LDADD	= $(TEST_COMMON_LIBS)
 test_calendar_core_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR_CORE=1
 
-test_calendar_comp_SOURCES	= $(TEST_COMMON_SRCS)
+test_calendar_comp_SOURCES	= calendar_miroc.F90 $(TEST_COMMON_SRCS)
 test_calendar_comp_LDADD	= $(TEST_COMMON_LIBS)
 
 test_calendar_trad_SOURCES			= $(TEST_COMMON_SRCS)
@@ -131,15 +130,7 @@ test_calendar_coco_SOURCES	= $(cal_SOURCES) calendar_coco.F90
 test_calendar_coco_LDADD	= $(TEST_COMMON_LIBS)
 test_calendar_coco_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR_COCO=1 -DOPT_KIND_REAL=8
 
-# generate by makedepf90, with manual edits
-calendar.lo:           $(srcdir)/calendar.F90         	$(srcdir)/touza_cal.h calendar_core.lo calendar_primitive.lo
-calendar_core.lo:      $(srcdir)/calendar_core.F90    	$(srcdir)/touza_cal.h calendar_primitive.lo
-calendar_primitive.lo: $(srcdir)/calendar_primitive.F90 $(srcdir)/touza_cal.h
-calendar_coco.lo:      $(srcdir)/calendar_coco.F90      $(srcdir)/touza_cal.h calendar.lo
-calendar_ils.lo:       $(srcdir)/calendar_ils.F90     	$(srcdir)/touza_cal.h calendar.lo
-calendar_matsiro.lo:   $(srcdir)/calendar_matsiro.F90 	$(srcdir)/touza_cal.h calendar.lo
-calendar_miroc.lo:     $(srcdir)/calendar_miroc.F90     $(srcdir)/touza_cal.h calendar_core.lo calendar_primitive.lo calendar.lo
-test_calendar.lo:      $(srcdir)/test_calendar.F90      $(srcdir)/touza_cal.h calendar_miroc.lo
+include Makedep.inc
 
 ### Local Variables:
 ### mode: makefile-automake
