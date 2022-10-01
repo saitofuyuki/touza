@@ -1,7 +1,7 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2022/01/28 09:03:36 fuyuki Makefile.am>
+# Time-stamp: <2022/05/26 08:10:03 fuyuki Makefile.am>
 #
 # Copyright (C) 2020, 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -22,9 +22,8 @@ noinst_LTLIBRARIES	=	libtouza_local.la
 
 libtouza_local_la_SOURCES = std_prc.F90 std_utl.F90 std_log.F90 std_wsh.F90 \
 							std_bld.F90 std_mwe.F90 std_fun.F90 std_env.F90 \
-							std_sus.F90 std_arg.F90 \
+							std_sus.F90 std_arg.F90 std_htb.F90 \
 							std.F90 $(include_HEADERS)
-# (reserved) std_htb.F90
 
 MOSTLYCLEANFILES	+=	fort.*
 
