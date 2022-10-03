@@ -1,5 +1,5 @@
 #!@ZSH@
-# Time-stamp: <2022/09/28 15:37:27 fuyuki genx.sh.in>
+# Time-stamp: <2022/10/07 10:09:51 fuyuki genx.sh.in>
 
 main ()
 {
@@ -28,8 +28,10 @@ main ()
   XX+=(r lon,$NI,11,+4) YY+=(r lat,$NJ,5,+3) ZZ+=(r lev,$NK,7,+3)
   XX+=(n     $NI,2,+8)  YY+=(n     $NJ,3,+3) ZZ+=(n     $NK,1,+7)
   XX+=(u     $NI,0,-1)  YY+=(u     $NJ,0,-1) ZZ+=(u     $NK,0,-1)
+  XX+=(t -,$NI,0,0)     YY+=(t -,$NJ,0,0)    ZZ+=(t -,$NK,0,0)
 
   XX+=(e lon,$NI,1,-5)  YY+=(e lat,$NJ,1,-3) ZZ+=(e lev,$NK,2,-4)
+  XX+=(c xs,$NI)        YY+=(c ys,$NJ)       ZZ+=(c zs,$NK)
 
   local SSET=(e p q r)
   local SKIP=() i= j=
@@ -39,6 +41,10 @@ main ()
     do
       SKIP+=("$i$j")
     done
+  done
+  for j in p q r e n
+  do
+    SKIP+=("c$j" "${j}c")
   done
   # print - $SKIP
   # exit 0

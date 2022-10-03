@@ -10,166 +10,832 @@
 DOT go DOT jp>.
 
 *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
-Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
+FORTRAN procedures mainly adopted in MIROC.  See *TOUZA* README
 (expected to be in the parent directory) for general instruction of
 *TOUZA* collection.
 * Build and installation
 * Brief description of *TOUZA/Jmz* commands
-** chak - swiss army knife
-*** unary operators
-: A OP
-| NEG   | - A                                    |
-| INV   | 1 / A                                  |
-| ABS   | abs(A)                                 |
-| SQR   | A*A                                    |
-| SQRT  | sqr(A)                                 |
-| SIGN  | SIGN(1, A)                             |
-| ZSIGN | -1 if negative, +1 if positive, else 0 |
-| FLOOR |                                        |
-| CEIL  |                                        |
-| ROUND |                                        |
-| EXP   | exp(A)                                 |
-| LOG   | log(A)                                 |
-| SIN   | sin(A)                                 |
-| COS   | cos(A)                                 |
-| TAN   | tan(A)                                 |
-| ASIN  | arcsin(A)                              |
-| ACOS  | arccos(A)                              |
-| NOT   | 1 if A==UNDEF, else UNDEF              |
-| BOOL  | 1 if A!=UNDEF, else UNDEF              |
+** chak - Swiss(CH) Army Knife for gtool-3.5 format files
+*** introduction
+chak is a Reverse Polish Notation (RPN) calculator for gtool-3.5
+format data files.
 
-*** binary operators (on intersect domain)
-: A B OP
-Return at cells outside of either A or B domain is always UNDEF.
- | A       | B       | return |
- | def     | def     | A OP B |
- |         | undef   | UNDEF  |
- |         | outside | UNDEF  |
- | undef   | def     | UNDEF  |
- |         | undef   | UNDEF  |
- |         | outside | UNDEF  |
- | outside | def     | UNDEF  |
- |         | undef   | UNDEF  |
- |         | outside | UNDEF  |
+The goal of chak development is to replace all the filter commands of
+gtool-3.5 commands.
 
-|-------+----------------------------|
-| ADD   | A+B                        |
-| SUB   | A-B                        |
-| MUL   | A*B                        |
-| DIV   | A/B                        |
-| MOD   | MOD(A,B)                   |
-| POW   | POW(A,B)  or A**B          |
-|-------+----------------------------|
-| EQ    | A if A==B else UNDEF       |
-| NE    | A if A!=B else UNDEF       |
-| LE    | A if A<=B else UNDEF       |
-| LT    | A if A<B else UNDEF        |
-| GE    | A if A>=B else UNDEF       |
-| GT    | A if A>B else UNDEF        |
-|-------+----------------------------|
-| AND   | B if A!= UNDEF, else UNDEF |
-| MASK  | A if B!= UNDEF, else UNDEF |
-|-------+----------------------------|
-| MIN   | MIN(A,B)                   |
-| MAX   | MAX(A,B)                   |
-| ATAN2 | ATAN2(A,B)                 |
+chak is not a complete replacement of gtool commands.  At the moment
+on this alpha version, it can emulate some of the original commands
+partially.
 
-*** binary operators (on inclusive domain)
-: A B OP
+Unary operator filters:
+- gtabs --- absolute value of data
+- gtatan --- arctangent value of data
+- gtcos --- cosine of data
+- gtexp --- exponent of data
+- gtinv --- inverse of data
+- gtlog --- logarithm of data
+- gtlog10 --- base-10 logarithm of data
+- gtsin --- sine of data
+- gtsqr --- square of data
+- gtsqrt --- square root of data
+- gttan --- tangent of data
+- gttanh --- hyperbolic tangent of data
 
-Return at cells outside of either A or B domain is also the result of
-operation, with setting NULL as default.
-Actual value of NULL depends on the operator.
+Binary operator filters:
+- gtadd --- addition of two files
+- gtsub --- subtraction of two files
+- gtmlt --- multiplication of two files
+- gtdiv --- division of two files
+- gtpow --- power (exponent)
+- gtmod --- remainder
 
- | A       | B       | return         |
- | def     | def     | A OP B         |
- |         | undef   | A OP undef     |
- |         | outside | A op NULL      |
- | undef   | def     | NULL op B      |
- |         | undef   | UNDEF op UNDEF |
- |         | outside | UNDEF op NULL  |
- | outside | def     | NULL op B      |
- |         | undef   | NULL op UNDEF  |
- |         | outside | NULL op NULL   |
+Other general filters:
+- gtext --- spreading
+- gtmask --- masking of missing value
+- gtset --- several tweaking of data file
 
-|       |  NULL |                                                       |
-|-------+-------+-------------------------------------------------------|
-| OR    | UNDEF | return leftmost non-undef                             |
-| XOR   | UNDEF | return non-undef if the opposite is UNDEF, else UNDEF |
-| LMASK | UNDEF | A if B!= UNDEF, else UNDEF                            |
-|-------+-------+-------------------------------------------------------|
-| LADD  |     0 | A + B                                                 |
-| LSUB  |     0 | A - B                                                 |
-| LMUL  |     1 | A * B                                                 |
-| LDIV  |     1 | A / B                                                 |
+The following are not implemented but reserved for future extensions:
+- gtshift --- spatial shift of data
+- gtintrp --- spatial interpolation (i)
+- gtintrp2 --- spatial interpolation (ii)
+- gtimis --- spatial interpolation on missing values
 
-*** logical binary operators cheet sheet
-| A     | B     | OR    | XOR   | AND   | MASK  |
-|-------+-------+-------+-------+-------+-------|
-| a     | b     | a     | UNDEF | b     | a     |
-| a     | UNDEF | a     | a     | UNDEF | UNDEF |
-| UNDEF | b     | b     | b     | UNDEF | UNDEF |
-| UNDEF | UNDEF | UNDEF | UNDEF | UNDEF | UNDEF |
+The following are out of the scope of chak development, because ngt
+series do much better job:
+
+- gtsel --- extraction of subregion
+- gtavr --- averaging
+- gthead --- edit header (metadata)
+
+Other general filters (gtseq, gtedy, etc) are under consideration.
+
+Following Some special filters are reserved for next developments:
+
+- gts2p --- sigma to p transformation
+- gtz2p --- z to p transformation
+- gthdiv --- divergence computation on spherical domain
+- gthvor --- vorticity computation on spherical domain
+- gtxdf --- flux differential along longitude
+- gtxdv --- differential along longitude
+- gtydf --- flux differential along latitude
+- gtydv --- differential along latitude
+
+*** usage
+: chak [OPTION]... [OPERAND|OPERATOR|OPTION]... [{=|:=} OUTPUT] ....
+
+Arguments:
+
+: = OUTPUT
+Write the *top* stack result on the file OUTPUT and pops it off the stack.
+
+: := OUTPUT
+Write the *top* stack result on the file OUTPUT and leave it.
+
+OPERATOR
+There are two kinds of operators: stack operator and queue operator.
+The former works on the stack --- Pop required number of operands from
+the stack, which depends on the operator; operate; and push the result
+on the top stack.
+The latter works on the queue (typically last operator) to change
+the behavior of the operator.
+
+OPERAND
+Any items other than the operators and output symbols.  Operands include
+gtool-format files, the literal (integer or float number), and the symbols.
+A filename to conflict with a defined operator cannot be parsed as a
+file.  You can avoid the feature with specifying relative or absolute
+path  (e.g., file ADD can be accessed with ./ADD).
+*** gtool command equivalence table --- for impatients
+Note i: chak operators are case DEPENDENT.
+
+Note ii: the order of chak arguments is important.  Changing the
+argument order may cause undesired results.
+
+| gtool                                       | chak                                                 |
+|---------------------------------------------+------------------------------------------------------|
+| gtadd a b out:c                             | chak a b ADD = c                                     |
+| gtadd a b                                   | chak a b ADD = gtool.out                             |
+| gtadd a b fact1=f1 ofs1=o1 fact2=f2 ofs2=f2 | chak a f1 MUL o1 ADD b f2 MUL o2 ADD ADD = gtool.out |
+| gtadd a b out:c title:'foobar'              | chak a b ADD = c TITLE='foobar'                      |
+|---------------------------------------------+------------------------------------------------------|
+| gtsub a b                                   | chak a b SUB = gtool.out                             |
+| gtmlt a b                                   | chak a b MUL = gtool.out                             |
+| gtdiv a b                                   | chak a b DIV = gtool.out                             |
+| gtpow a b                                   | chak a b POW = gtool.out                             |
+| gtmod a b                                   | chak a b MOD = gtool.out                             |
+|---------------------------------------------+------------------------------------------------------|
+| gtset a fact=f ofs=o                        | chak a f MUL o ADD = gtool.out                       |
+| gtset a rmin=l                              | chak a l GEF = gtool.out                             |
+| gtset a rmin=l vmin=l                       | chak a l MAX = gtool.out                             |
+| gtset a rmin=l vmin=v                       | chak a DUP l GEF v OR AND = gtool.out                |
+| gtset a rset=o vmin=v                       | chak a DUP o NEF v OR AND = gtool.out                |
+|---------------------------------------------+------------------------------------------------------|
+| gtmask a b                                  | chak a b MASK = gtool.out                            |
+| gtmask a b rmin=L                           | chak a b L GEF MASK = gtool.out                      |
+|---------------------------------------------+------------------------------------------------------|
+| gtcon a val=c                               | chak c a OR = gtool.out                              |
+|                                             | chak a c ROR = gtool.out                             |
+|---------------------------------------------+------------------------------------------------------|
+| gtlog a                                     | chak a LOG = gtool.out                               |
+| gtsqrt a                                    | chak a SQRT = gtool.out                              |
+| gtcos a                                     | chak a COS = gtool.out                               |
+| gtsin a                                     | chak a SIN = gtool.out                               |
+| gttan a                                     | chak a TAN = gtool.out                               |
+
+*** Tutorial --- for (less) impatients
+Longer examples are append later.  These are minimum examples.
+In the following, a, b ,... are example gtool files.
+**** index flag
+Default coordinate (or range, dimension, etc) counting follows python
+style: the beginning is counted from 0, and the ending is not included.
+You can change this behaviour with global -F option, to follow FORTRAN style.
+
+: % ./chak a         # count from 0
+: record: 0
+:   read:F0 ggg T = 0 DATE = -1/-1/-1 **:**:**
+: record: 1
+:   read:F0 ggg T = 1 DATE = -1/-1/-1 **:**:**
+: record: 2
+:   read:F0 ggg T = 2 DATE = -1/-1/-1 **:**:**
+
+: % ./chak -F a      # count from 1
+: record: 1
+:   read:F1 ggg T = 0 DATE = -1/-1/-1 **:**:**
+: record: 2
+:   read:F1 ggg T = 1 DATE = -1/-1/-1 **:**:**
+: record: 3
+:   read:F1 ggg T = 2 DATE = -1/-1/-1 **:**:**
+
+**** Add two gtool files
+: % chak a b ADD = x       # write a+b on new file x, which must not exist.
+: % chak -f a b ADD = x    # force overwrite x even if exists
+: % chak -a a b ADD = x    # append the result on the file x
+**** The other arithmetic operations
+: % chak a b SUB = x       # a - b
+: % chak a b MUL = x       # a * b
+: % chak a b DIV = x       # a / b
+**** Arithmetic operations with literal (number)
+: % chak a 10.0 ADD = x       # x = a + 10.0
+: % chak 20.0 b SUB = x       # x = 20.0 - b
+**** Multiple operations at once
+: % chak a 100 MUL 10 ADD = x   # x = a * 100 + 10
+: % chak a b c ADD MUL    = x   # x = a * (b + c)
+
+The latter example is somewhat confusing for those who are not
+familiar with the reverse Polish notation.  It can be decomposed step
+by step.
+
+: % chak a                # push a on stack         {(a)}
+: % chak a b              # push b on stack         {(a)  (b)}
+: % chak a b c            # push c on stack         {(a)  (b)  (c)}
+: % chak a b c ADD        # pop top two, ADD, push  {(a)  (b+c)}
+: % chak a b c ADD MUL    # pop top two, MUL, push  {(a*(b+c))}
+**** Multiple output files
+Normal output is done for the top stack.  Multiple outputs can be
+performed for each top stack.
+
+: % chak a b ADD c d SUB = x = y    #  x = c - d   (c - d on the top stack at = x)
+:                                   #  y = a + b
+: % chak a b ADD = x c d SUB = y    #  x = a + b
+:                                   #  y = c - d
+
+You can use ':=' instead of '=' to keep the top stack at write:
+
+: % chak a b ADD := x c ADD = y    #  x = a + b
+:                                  #  y = (a + b) + c   (a + b is not popped)
+**** Stack manipulation
+Operator DUP duplicates the top stack:
+
+: chak a DUP b ADD MUL = x         #  x = (a + b) * a
+
+Operator EXCH exchanges the top two stacks:
+
+: chak a b EXCH DIV = x            #  x = b / a
+
+Operator POP throws away the top stack:
+
+: chak a b c POP ADD = x           # x = a + b  (c is discarded)
+
+Operator POP can name the top stack (buffer) for later recall, using
+an optional argument.  The named buffer can be reused even if thrown
+by POP.  Name is specified by POP=NAME operation, (no space before and
+after equal).
+
+: chak a b ADD POP=sum c sum ADD = x   #   x = c + sum = c + (a + b)
+
+**** Frequently used operators
+: % chak a NEG = x        # x = -a
+: % chak a INV = x        # x = 1/a
+: % chak a SQRT = x       # x = a ** (1/2)
+: % chak a b POW = x      # x = a ** b   (of course a or b can be literal)
+: % chak a b MIN = x      # x = min(a,b)
+: % chak a b MAX = x      # x = max(a,b)
+**** Conditional operators
+: % chak a 20 EQ  = x      # (normal) set x = 1, 0, MISS where a == 20, not, MISS.
+: % chak a 20 GTF = x      # (filter) set x = 20, MISS where a > 20, otherwise
+: % chak a 20 LEB = x      # (binary) set x = 1, 0 where a <= 20, otherwise
+**** logical operators
+: % chak a b OR  = x       # a if defined, b if defined, else MISS
+: % chak a b ROR = x       # b if defined, a if defined, else MISS
+: % chak a b AND = x       # b if both defined, else MISS
+: % chak a b MASK = x      # a if both defined, else MISS
+
+: % chak a b 10 NEF MASK = x    # extract a where b != 10
+
+**** flushing to stdout
+Omitting the file after equal symbol emits the top stack on terminal.
+
+: % chak a =                       # ascii output of file a
+: % chak a NEG b ADD 10 DIV SQRT = # ascii output of sqrt((-a+b)/10)
+
+A special operator FLUSH emits all the stack on terminal, and pop them:
+
+: % chak a b FLUSH     # ascii output of file a and b sequentially
+: % chak a b FLUSH -i  # ascii output of file a and b horizontally, on inclusive domain
+: % chak a b FLUSH -x  # ascii output of file a and b horizontally, on intersect domain
+: % chak a b FLUSH -l  # ascii output of file a and b horizontally, on first (a) domain
+
+As commented above, indexing follows python style by default.
+
+: % ./chak a FLUSH   # record, stack, coordinate counts from 0
+: record: 0
+:   read:F0 aa T = 0 DATE = -1/-1/-1 **:**:**
+: # stack[0] aa
+: #   [xx,0:2 yy,0:3 -] > [:]
+: 0 0 _
+: 1 0  0.110000000E+02
+: 0 1 _
+: 1 1  0.110000000E+02
+: 0 2 _
+: 1 2  0.110000000E+02
+
+: % ./chak -F a FLUSH   # record, stack, coordinate counts from 1
+: record: 1
+:   read:F1 aa T = 0 DATE = -1/-1/-1 **:**:**
+: # stack[1] aa
+: #   [xx,1:2 yy,1:3 -] > [:]
+: 1 1 _
+: 2 1  0.110000000E+02
+: 1 2 _
+: 2 2  0.110000000E+02
+: 1 3 _
+: 2 3  0.110000000E+02
+
+*** operators summary
+Operators are case dependent.
+Files to conflict with operators cannot be accessed as they are.  You
+can force to access such files by using relative or absolute path.
+**** operators on stacks
+| operator   | pop |   push | description                                                       |
+|------------+-----+--------+-------------------------------------------------------------------|
+| ABS        |   1 |      1 | abs(A)                                                            |
+| ACOS       |   1 |      1 | arccos(A)                                                         |
+| ADD        |   2 |      1 | A+B                                                               |
+| AND        |   2 |      1 | logical and; B if both A and B are defined, else UNDEF            |
+| ASIN       |   1 |      1 | arcsin(A)                                                         |
+| ATAN2      |   2 |      1 | arctan(A/B)                                                       |
+| BIN        |   1 |      1 | binary; 1 if defined, else 0                                      |
+| BOOL       |   1 |      1 | boolean; 1 if defined, else UNDEF                                 |
+| CEIL       |   1 |      1 | smallest integer >=A                                              |
+| COPY       |   1 |      2 | copy top stack on new buffer                                      |
+| COS        |   1 |      1 | cos(A)                                                            |
+| DIST       |   m | 2(m-1) | distribute top stack for every stack from last anchor             |
+| DIV        |   2 |      1 | A/B                                                               |
+| DUP        |   1 |      2 | duplicate top stack                                               |
+| EQ EQU     |   2 |      1 | 1, 0, UNDEF for A==B, not, either UNDEF                           |
+| EQB        |   2 |      1 | 1 if A==B, else 0                                                 |
+| EQF        |   2 |      1 | A if A==B, else UNDEF                                             |
+| EXCH       |   2 |      2 | B A; exchange two top stacks                                      |
+| EXP        |   1 |      1 | exp(A)                                                            |
+| EXPONENT   |   1 |      1 | exponent(A)                                                       |
+| FLOOR      |   1 |      1 | largest integer <= A                                              |
+| FLUSH      |   m |      0 | flush-out from last anchor                                        |
+| FRACTION   |   1 |      1 | fraction(A)                                                       |
+| GE GEU     |   2 |      1 | 1, 0, UNDEF for A>=B, not, either UNDEF                           |
+| GEB        |   2 |      1 | 1 if A>=B, else 0                                                 |
+| GEF        |   2 |      1 | A if A>=B, else UNDEF                                             |
+| GT GTU     |   2 |      1 | 1, 0, UNDEF for A>B, not, either UNDEF                            |
+| GTB        |   2 |      1 | 1 if A>B, else 0                                                  |
+| GTF        |   2 |      1 | A if A>B, else UNDEF                                              |
+| IDIV       |   2 |      1 | A//B                                                              |
+| INSERT     |   m |      m | move top stack after last anchor                                  |
+| INT        |   1 |      1 | truncate toward 0 and convert                                     |
+| INV        |   1 |      1 | 1/A                                                               |
+| LADD       |   2 |      1 | lazy ADD                                                          |
+| LAND       |   2 |      1 | lazy AND                                                          |
+| LDIV       |   2 |      1 | lazy DIV                                                          |
+| LE LEU     |   2 |      1 | 1, 0, UNDEF for A<=B, not, either UNDEF                           |
+| LEB        |   2 |      1 | 1 if A<=B, else 0                                                 |
+| LEF        |   2 |      1 | A if A<=B, else UNDEF                                             |
+| LMASK      |   2 |      1 | lazy MASK                                                         |
+| LMAX       |   2 |      1 | lazy MAX                                                          |
+| LMIN       |   2 |      1 | lazy MIN                                                          |
+| LMUL       |   2 |      1 | lazy MUL                                                          |
+| LOG        |   1 |      1 | log(A)                                                            |
+| LOG10      |   1 |      1 | log10(A)                                                          |
+| LSUB       |   2 |      1 | lazy SUB                                                          |
+| LT LTU     |   2 |      1 | 1, 0, UNDEF for A<B, not, either UNDEF                            |
+| LTB        |   2 |      1 | 1 if A<B, else 0                                                  |
+| LTF        |   2 |      1 | A if A<B, else UNDEF                                              |
+| MASK       |   2 |      1 | A if both A and B are defined, else UNDEF                         |
+| MAX        |   2 |      1 | max(A,B)                                                          |
+| MIN        |   2 |      1 | min(A,B)                                                          |
+| MOD        |   2 |      1 | mod(A,B)                                                          |
+| MUL        |   2 |      1 | A*B                                                               |
+| NE NEU     |   2 |      1 | 1, 0, UNDEF for A!=B, not, either UNDEF                           |
+| NEB        |   2 |      1 | 1 if A!=B, else 0                                                 |
+| NEF        |   2 |      1 | A if not A==B, else UNDEF                                         |
+| NEG        |   1 |      1 | -A                                                                |
+| NOP        |   0 |      0 | no operation; do nothing                                          |
+| NOT        |   1 |      1 | logical not; 1 if undefined, else UNDEF                           |
+| OR LOR     |   2 |      1 | logical or; A if defined, else B if defined, else UNDEF           |
+| POP[=NAME] |   1 |      0 | discard top stack and optionally tag                               |
+| POW        |   2 |      1 | pow(A,B)                                                          |
+| REPEAT     |   m |     2m | repeat from last non-adjacent anchor                              |
+| ROR        |   2 |      1 | logical or (reverse); B if defined, else A if defined, else UNDEF |
+| ROUND      |   1 |      1 | nearest integer of A                                              |
+| SCALE      |   2 |      1 | scale(A,B)                                                        |
+| SIGN       |   1 |      1 | copy A sign on 1                                                  |
+| SIN        |   1 |      1 | sin(A)                                                            |
+| SQR        |   1 |      1 | A*A                                                               |
+| SQRT       |   1 |      1 | square root                                                       |
+| SUB        |   2 |      1 | A-B                                                               |
+| TAN        |   1 |      1 | tan(A)                                                            |
+| TANH       |   1 |      1 | tanh(A)                                                           |
+| TRUNC      |   1 |      1 | truncate toward 0                                                 |
+| XOR        |   2 |      1 | logical exclusive-or; A or B if B or A undefined, else UNDEF      |
+| ZSIGN      |   1 |      1 | -1,0,+1 if negative,zero,positive                                 |
+
+**** operators on stack anchors
+| operator | description                             |
+|----------+-----------------------------------------+
+| GO       | remove last anchor                      |
+| MARK     | fragile anchor (removed by first touch) |
+| STOP     | robust anchor (removed by GO)           |
+**** operators on queues
+| operator | description                                               |
+|----------+-----------------------------------------------------------|
+| CUM      | apply last queue non-unary operator from last anchor      |
+| ITER     | iterate last queue operator for each set from last anchor |
+| MAP      | reserved; DIST ITER                                       |
+
+**** operators on buffers
+| operator  | argument           | description           |
+|-----------+--------------------+-----------------------|
+| C0[=ARG]  | NAME/REPL,LOW:HIGH |                       |
+| C1[=ARG]  | NAME/REPL,LOW:HIGH |                       |
+| C2[=ARG]  | NAME/REPL,LOW:HIGH |                       |
+| C3[=ARG]  | NAME/REPL,LOW:HIGH |                       |
+| MISS=ARG  | VALUE              | replace missing value |
+| TAG=ARG   | NAME               |                       |
+| X[=ARG]   | NAME/REPL,LOW:HIGH |                       |
+| Y[=ARG]   | NAME/REPL,LOW:HIGH |                       |
+| Z[=ARG]   | NAME/REPL,LOW:HIGH |                       |
+
+**** operators on files
+| operator    | argument | description            |
+|-------------+----------+------------------------|
+| DFMT=ARG    | FORMAT   | set output data format |
+| EDIT=ARG    | STRING   |                        |
+| ITEM=ARG    | STRING   | replace item name      |
+| TITLE=ARG   | STRING   |                        |
+| T=ARG       | LIST     |                        |
+| UNIT=ARG    | STRING   |                        |
+
+*** logical operators cheat sheet
+**** unary operators
+|        | defined | undefined | outside |
+|--------+---------+-----------+---------|
+| a NOT  |    MISS |         1 | MISS    |
+| a BOOL |       1 |      MISS | MISS    |
+| a BIN  |       1 |         0 | 0       |
+**** binary operators
+Symbols d, u and x correspond to defined, undefined, and outside,
+respectively.
+
+|           | d d  | d u  | d x  | u d  | u u  | u x  | x d  | x u  | x x  |
+|-----------+------+------+------+------+------+------+------+------+------|
+| a b AND   | b    | MISS | MISS | MISS | MISS | MISS | MISS | MISS | MISS |
+| a b MASK  | a    | MISS | MISS | MISS | MISS | MISS | MISS | MISS | MISS |
+|-----------+------+------+------+------+------+------+------+------+------|
+| a b OR    | a    | a    | a    | b    | MISS | MISS | b    | MISS | MISS |
+| a b ROR   | b    | a    | a    | b    | MISS | MISS | b    | MISS | MISS |
+| a b XOR   | MISS | a    | a    | b    | MISS | MISS | b    | MISS | MISS |
+
+AND operator evaluates the operands sequentially, stop when undefined,
+return the last evaluation.
+
+OR operator evaluates the operands sequentially, stop when defined,
+return the last evaluation.
+*** conditional operators cheat sheet
+There are three kinds of conditional operators: normal, filter-like,
+and binary.  They have a suffix U, F, and B respectively, so for
+example, EQU, EQF, EQB are normal, filter-like and binary
+conditionals, respectively.  Also no-suffix operators like EQ are
+prepared which are alias of normal operators.
+
+ |                  | EQU EQ | EQF  | EQB |
+ |------------------+--------+------+-----|
+ | a==b defined     | 1      | a    |   1 |
+ | a!=b defined     | 0      | MISS |   0 |
+ | either undefined | MISS   | MISS |   0 |
+
+*** buffer recalls
+| TAG=NAME       | tag the top stack as NAME for later recall          |
+| POP[=NAME]     | tag the top stack as NAME for later recall, and pop |
+| Ln (integer n) | reuse literal with tag Ln                           |
+| Fn             | reuse read file with tag Fn                         |
+| Wn             | reuse write file with tag Wn                        |
 
 *** stack marker manipulation
-| MARK |
-| STOP |
-| GO   |
-
 *** buffer stack manipulation
-| DUP            | 1 | 2 | duplicate                    | A DUP               | A A         |
-| EXCH           | 2 | 2 | exchange                     | A B EXCH            | B A         |
-| POP            | 1 | 0 | pop                          | A POP               |             |
-| DIST           |   |   |                              | STOP A B C X DIST   | A X B X C X |
-| INSERT         |   |   |                              | STOP A B C X INSERT | X A B C     |
-| REPEAT         |   |   |                              | STOP A B C REPEAT   | A B C A B C |
-|----------------+---+---+------------------------------+---------------------+-------------|
-| Ln (integer n) | 0 | 1 | reuse literal with tag Ln    |                     |             |
-| Bn             | 0 | 1 | reuse buffer with tag Bn     |                     |             |
-| Fn             | 0 | 1 | reuse read file with tag Fn  |                     |             |
-| Wn             | 0 | 1 | reuse write file with tag Wn |                     |             |
+| operator | example             | stack image |
+|----------+---------------------+-------------|
+| DIST     | STOP a b c x DIST   | a x b x c x |
+| INSERT   | STOP a b c x INSERT | x a b c     |
+| REPEAT   | STOP a b c REPEAT   | a b c a b c |
+
 *** operation queue manipulation
-| ITER | STOP A B C D OPR ITER | A OPR B OPR C OPR D OPR | if unary    |
-|      | STOP A B C D OPR ITER | A B OPR C D OPR         | if binary   |
-| CUM  | STOP A B C D OPR CUM  | A B OPR C OPR D OPR     | only binary |
+| operator | example               | queue image             |             |
+|----------+-----------------------+-------------------------+-------------|
+| ITER     | STOP a b c d OPR ITER | a OPR b OPR c OPR d OPR | if unary    |
+|          | STOP a b c d OPR ITER | a b OPR c d OPR         | if binary   |
+| CUM      | STOP a b c d OPR CUM  | a b OPR c OPR d OPR     | only binary |
+
+examples
+|                       | interpreted as          | stack       |
+| STOP 1 2 3 4 NEG ITER | 1 NEG 2 NEG 3 NEG 4 NEG | -1 -2 -3 -4 |
+| STOP 1 2 3 4 ADD ITER | 1 2 ADD  3 4 ADD        | 3     7     |
+| STOP 1 2 3 4 ADD CUM  | 1 2 ADD 3 ADD 4 ADD     | 10          |
+
 *** special cases for successive operation
-A DUP                       A A
-A DUP DUP                   A A A
-STOP A B C DUP ITER         A A B B C C
-STOP A B C DUP DUP ITER     A A A B B B C C C
+| arguments                     | stack image               |                                     |
+|-------------------------------+---------------------------+-------------------------------------|
+| a DUP                         | a a                       |                                     |
+| a DUP DUP                     | a a a                     |                                     |
+| STOP a b c DUP ITER           | a a b b c c               |                                     |
+| STOP a b c DUP DUP ITER       | a a a b b b c c c         | iterate DUP-DUP on each stack       |
+|-------------------------------+---------------------------+-------------------------------------|
+| STOP a b c d e DIST           | a e  b e  c e  d e        | distribute top stack                |
+| STOP a b c d e DIST DIST      | a d e  b d e  c d e       | distribute top two stacks           |
+| STOP a b c d e DIST DIST DIST | a c d e   b c d e         | distribute top tree stacks          |
+|-------------------------------+---------------------------+-------------------------------------|
+| STOP a b c REPEAT             | STOP  a b c  a b c        |                                     |
+| STOP a b c REPEAT REPEAT      | STOP  a b c  a b c  a b c |                                     |
+| STOP a b c STOP REPEAT        | STOP  a b c STOP  a b c   | marker is inserted before repeating |
+
 *** file properties
+**** record selection
+Specific record extraction can be operated by T=LIST.
+
+: chak FILE T=2    # extract record 2 only
+: chak FILE T=:3   # extract 0,1,2
+: chak FILE T=4:   # extract 4,5,...
+: chak FILE T=1:4  # extract 1,2,3
+
+With -F option, index can be FORTRAN style:
+
+: chak -F FILE T=2    # extract record 2 only
+: chak -F FILE T=1,5  # extract record 1,5 only
+: chak -F FILE T=:3   # extract 1,2,3
+: chak -F FILE T=4:   # extract 4,5,...
+: chak -F FILE T=1:4  # extract 1,2,3,4
+
+T operator apply adjacent file argument.
+
+: chak a T=2   b T=3 ADD =   # a[2]+b[3]
+: chak a T=2,3 b T=0 ADD =   # output a[2]+b[0], a[3]+b[0]
+
 *** buffer properties
-| TAG=name | lock last buffer using name as buffer tag |
+**** COMMENT (sub)region selection
+Operators C0, C1, C2 act on 0th, 1st, 2nd coordinate.
+In FORTRAN-style (-F) mode, C1, C2, C3 are used instead.
+Operators X, Y, Z are alias of the three, ignoring the style.
 
-*** typical recipes
+*WARNING: spatial averaging is NOT IMPLEMENTED.*
+Only cutting and spreading can be executed.
 
-*** command equivalence table
-| gtool                        | chak                                 |   |
-|------------------------------+--------------------------------------+---|
-| gtadd A B                    | chak A B ADD = gtool.out             |   |
-| gtadd A B fact1=F1 ofs1=O1 \ | chak A F1 MUL O1 ADD \               |   |
-| fact2=F2 ofs2=F2             | B F2 MUL O2 ADD ADD = gtool.out      |   |
-| gtsub A B                    | chak A B SUB = gtool.out             |   |
-| gtmlt A B                    | chak A B MUL = gtool.out             |   |
-| gtdiv A B                    | chak A B DIV = gtool.out             |   |
-| gtset A fact=F ofs=O         | chak A F MUL O ADD = gtool.out       |   |
-| gtset A rmin=L               | chak A L GE = gtool.out              |   |
-| gtset A rmin=L vmin=L        | chak A L MAX = gtool.out             |   |
-| gtset A rmin=L vmin=V        | chak A DUP L GE V OR AND = gtool.out | 1 |
-| gtset A rset=O vmin=V        | chak A DUP O NE V OR AND = gtool.out |   |
-| gtlog A                      | chak A LOG = gtool.out               |   |
-| gtsqrt A                     | chak A SQRT = gtool.out              |   |
-| gtcon A val=C                | chak C A OR = gtool.out              |   |
-| gtmask A B                   | chak A B MASK = gtool.out            |   |
-| gtmask A B rmin=L            | chak A B L GE MASK = gtool.out       |   |
+Subregion can be specified with Cn=[LOW]:[HIGH] argument:
 
-(1)
-A      L GE   V OR  AND
-undef  undef  V     undef
-a<L    undef  V     V
-a>=L   a      a     a
+: % chak ex2/aa =
+: # stack[0] aa
+: #   [lon,0:8 - -] > [:]
+: 0  0.000000000E+00
+: 1  0.100000000E+01
+: 2  0.200000000E+01
+: 3  0.300000000E+01
+: 4  0.400000000E+01
+: 5  0.500000000E+01
+: 6  0.600000000E+01
+: 7  0.700000000E+01
+
+: % chak ex2/aa X=2:5 =
+: # stack[0] aa
+: #   [lon,0:8 - -] > [2:5]
+: 2  0.200000000E+01
+: 3  0.300000000E+01
+: 4  0.400000000E+01
+
+: % chak -F ex2/aa X=2:5 =    # with FORTRAN style counting
+: # stack[1] aa
+: #   [lon,1:8 - -] > [2:5]
+: 2  0.100000000E+01
+: 3  0.200000000E+01
+: 4  0.300000000E+01
+: 5  0.400000000E+01
+
+Outside of the source domain is filled with missing value.
+: % chak  ex2/aa X=4:10 =
+: # stack[0] aa
+: #   [lon,0:8 - -] > [4:10]
+: 4  0.400000000E+01
+: 5  0.500000000E+01
+: 6  0.600000000E+01
+: 7  0.700000000E+01
+: 8 .
+: 9 .
+
+Coordinate permutation can be also specified.
+: % chak ex2/dd Y=lon FLUSH -i
+: ## 0 {F0} [lon,0:8 lat,0:4 -] > [: lon,:] dd
+: #lat lon {F0}
+: 0 0  0.000000000E+00
+: 1 0  0.000000000E+00
+: 2 0  0.000000000E+00
+: 3 0  0.000000000E+00
+: 0 1  0.100000000E+01
+: 1 1  0.100000000E+01
+: 2 1  0.100000000E+01
+: 3 1  0.100000000E+01
+: :
+A basic of coordinate permutation of chak is to rotate between source
+and destination coordinates.  In the above example, lon and lat order
+is exchanged.  If Z=lon is specified, coordinate is rotated as follows:
+: % chak ex2/dd Z=lon FLUSH -i
+: ## 0 {F0} [lon,0:8 lat,0:4 -] > [: : lon,:] dd
+: #lat - lon {F0}
+: 0 0 0  0.000000000E+00
+: 1 0 0  0.000000000E+00
+: 2 0 0  0.000000000E+00
+: 3 0 0  0.000000000E+00
+: 0 0 1  0.100000000E+01
+
+At the moment, to insert blank coordinate at beginning needs two
+explicit transformation:
+: % chak ex2/dd Y=lon Z=lat FLUSH -i
+: ## 0 {F0} [lon,0:8 lat,0:4 -] > [: lon,: lat,:] dd
+: #- lon lat {F0}
+: 0 0 0  0.000000000E+00
+: 0 1 0  0.100000000E+01
+: 0 2 0  0.200000000E+01
+: 0 3 0  0.300000000E+01
+: 0 4 0  0.400000000E+01
+: 0 5 0  0.500000000E+01
+: 0 6 0  0.600000000E+01
+: 0 7 0  0.700000000E+01
+: 0 0 1  0.000000000E+00
+: 0 1 1  0.100000000E+01
+: 0 2 1  0.200000000E+01
+: 0 3 1  0.300000000E+01
+: :
+In the above example, lon, lat order are shifted by 1.
+Vacant coordinate is automatically filled with blank name, null range.
+
+*** avant-garde solution for automatic coordinate matching
+*Disclaimer*
+Automatic coordinate matching is, unfortunately, still buggy,
+in particular when a coordinate with definite range has a blank name.
+Please do not depend on this function too much.
+It is always better idea to name all of such coordinates.
+
+For binary operation, array shapes of two inputs are significant.
+chak tries its best to guess how to match them under a rule.
+It is non unusual to fail the matching.  For such case, users need to
+edit the gtool headers manually before chak execution.
+The primitive rule is `the coordinate name is significant.'
+
+If the coordinate names match, then different array range can be adjusted.
+: % chak aa bb ADD
+: ## 0 {aa} [lon,0:8 - -]
+: ## 1 {bb} [lon,1:4 - -]
+: ## 2 {aa+bb} [lon,0:8]
+: record:  0
+: #lon     {aa}             {bb}             {aa+bb}
+: 0        0.000000000E+00  .                _
+: 1        0.100000000E+01  0.100000000E+01  0.200000000E+01
+: 2        0.200000000E+01  0.200000000E+01  0.400000000E+01
+: 3        0.300000000E+01  0.300000000E+01  0.600000000E+01
+: 4        0.400000000E+01  .                _
+: 5        0.500000000E+01  .                _
+: 6        0.600000000E+01  .                _
+: 7        0.700000000E+01  .                _
+
+If the coordinate match on different rank, one of them are shifted.
+: % chak aa bb ADD
+: ## 0 {aa}    [lon,0:8 -       -]
+: ## 1 {cc}    [-       lon,1:4 -]
+: ## 2 {aa+cc} [lon,0:8]
+: #lon     {aa}             {cc}             {aa+cc}
+: 0        0.000000000E+00  .                _
+: 1        0.100000000E+01  0.100000000E+01  0.200000000E+01
+: 2        0.200000000E+01  0.200000000E+01  0.400000000E+01
+: 3        0.300000000E+01  0.300000000E+01  0.600000000E+01
+: 4        0.400000000E+01  .                _
+: 5        0.500000000E+01  .                _
+: 6        0.600000000E+01  .                _
+: 7        0.700000000E+01  .                _
+
+If the same rank has different coordinate name, then either of them
+must have different rank candidate for automatic tweaking.
+: ## 0 {dd}    [lon,0:8 lat,0:4 -]
+: ## 1 {ee}    [lat,1:3 -       -]
+: ## 2 {dd+ee} [lon,0:8 lat,0:4]
+: #lon     lat  {dd}             {ee}             {dd+ee}
+: 0        0    0.000000000E+00  .                _
+: :
+: 7        0    0.700000000E+01  .                _
+: 0        1    0.000000000E+00  0.100000000E+01  0.100000000E+01
+: 1        1    0.100000000E+01  0.100000000E+01  0.200000000E+01
+: 2        1    0.200000000E+01  0.100000000E+01  0.300000000E+01
+: 3        1    0.300000000E+01  0.100000000E+01  0.400000000E+01
+: 4        1    0.400000000E+01  0.100000000E+01  0.500000000E+01
+: 5        1    0.500000000E+01  0.100000000E+01  0.600000000E+01
+: 6        1    0.600000000E+01  0.100000000E+01  0.700000000E+01
+: 7        1    0.700000000E+01  0.100000000E+01  0.800000000E+01
+: 0        2    0.000000000E+00  0.200000000E+01  0.200000000E+01
+: :
+: 7        2    0.700000000E+01  0.200000000E+01  0.900000000E+01
+: 0        3    0.000000000E+00  .                _
+: :
+: 7        3    0.700000000E+01  .                _
+
+On the above case, ee spread the data on a missing dimension lon.
+
+If the same rank has different coordinate name with no additional
+information, matching is failed.
+: % chak aa ee ADD
+: ## 0 {aa} [lon,0:8 - -]
+: ## 1 {ee} [lat,1:3 - -]
+: error:-39: ambiguous fragile coordinates at (0)
+: error:-39: coordinate lon
+: error:-39: coordinate lat
+: exit = -39
+Since lon and lat shares the same rank, chak has never chance to
+determine which comes earlier.
+
+On the other hand, if different coordinate do not share the same rank,
+and each opposite is blank, then they succeed to match.
+: % chak aa ff ADD
+: ## 0 {bb}    [lon,1:4 -       -] > [:] bb
+: ## 1 {ff}    [-       lat,1:3 -] > [:] ff
+: ## 2 {bb+ff} [lon,1:4 lat,1:3]   > [:] bb ff ADD
+: #lon     lat  {bb}             {ff}             {bb+ff}
+: 1        1    0.100000000E+01  0.100000000E+01  0.200000000E+01
+: 2        1    0.200000000E+01  0.100000000E+01  0.300000000E+01
+: 3        1    0.300000000E+01  0.100000000E+01  0.400000000E+01
+: 1        2    0.100000000E+01  0.200000000E+01  0.300000000E+01
+: 2        2    0.200000000E+01  0.200000000E+01  0.400000000E+01
+: 3        2    0.300000000E+01  0.200000000E+01  0.500000000E+01
+Both bb and ff file spread the blank coordinates.
+
+*** flushing
+: % chak a b FLUSH   # ascii output of file a and b sequentially
+: record: 0
+:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
+:   read:F1 pss T = 0 DATE = -1/-1/-1 **:**:**
+: # stack[0] qss
+: #   [lon,4:8 - -] > [:]
+: 4  0.636000000E+03
+: 5  0.637000000E+03
+: 6  0.638000000E+03
+: 7  0.639000000E+03
+: # stack[1] pss
+: #   [lon,1:6 - -] > [:]
+: 1  0.633000000E+03
+: 2  0.634000000E+03
+: 3  0.635000000E+03
+: 4  0.636000000E+03
+: 5  0.637000000E+03
+
+Default coordinate index follows python style: the beginning is counted
+from 0, and the ending is not included.  You can change this behaviour
+with global -F option, to follow FORTRAN style:
+
+: % chak -F a b FLUSH   # ascii output of file a and b sequentially
+: record: 1
+:   read:F1 qss T = 0 DATE = -1/-1/-1 **:**:**
+:   read:F2 pss T = 0 DATE = -1/-1/-1 **:**:**
+: # stack[1] qss
+: #   [lon,5:8 - -] > [:]
+: 5  0.636000000E+03
+: 6  0.637000000E+03
+: 7  0.638000000E+03
+: 8  0.639000000E+03
+: # stack[2] pss
+: #   [lon,2:6 - -] > [:]
+: 2  0.633000000E+03
+: 3  0.634000000E+03
+: 4  0.635000000E+03
+: 5  0.636000000E+03
+: 6  0.637000000E+03
+
+Appending -i option to FLUSH operator changes the behavior to
+horizontal pasting of all the stack.  Inclusive domain of all the
+stack is adopted.
+Automatic coordinates matching is examined.  You may need to adjust
+them manually.  In the following example all the files share the same
+shape and coordinates.
+
+: % chak a b FLUSH -i  # ascii output of file a and b horizontally (inclusive)
+: record: 0
+:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
+:   read:F1 pss T = 0 DATE = -1/-1/-1 **:**:**
+: # 0 {F0} qss
+: # 1 {F1} pss
+: 1 .  0.633000000E+03
+: 2 .  0.634000000E+03
+: 3 .  0.635000000E+03
+: 4  0.636000000E+03  0.636000000E+03
+: 5  0.637000000E+03  0.637000000E+03
+: 6  0.638000000E+03 .
+: 7  0.639000000E+03 .
+
+In the following example, the former file has shape {lon,,} while the
+latter shape {lat,,} so fails in matching (note that logical
+meaning of the coordinate names is never considered).
+
+: % chak ex/ex00-1_qss ex/ex00-1_sps FLUSH -i
+: record: 0
+:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
+:   read:F1 sps T = 0 DATE = -1/-1/-1 **:**:**
+: error:-39: ambiguous fragile coordinates at (0)
+: error:-39: coordinate lon
+: error:-39: coordinate lat
+:  exit =          -39
+
+In the following example, the former file has shape {lon,,} while the
+latter shape {,lat,}.  In this case automatic matching succeeds.
+The coordinates are spread to adjust the output domain {lon,lat,}
+: % chak ex/ex00-1_qss ex/ex00-1_tps FLUSH -i
+: record: 0
+:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
+:   read:F1 tps T = 0 DATE = -1/-1/-1 **:**:**
+: # 0 {F0} qss
+: # 1 {F1} tps
+: 4 1  0.636000000E+03  0.599500000E+03
+: 5 1  0.637000000E+03  0.599500000E+03
+: 6 1  0.638000000E+03  0.599500000E+03
+: 7 1  0.639000000E+03  0.599500000E+03
+: 4 2  0.636000000E+03  0.615500000E+03
+: 5 2  0.637000000E+03  0.615500000E+03
+: 6 2  0.638000000E+03  0.615500000E+03
+: 7 2  0.639000000E+03  0.615500000E+03
+: 4 3  0.636000000E+03  0.631500000E+03
+: 5 3  0.637000000E+03  0.631500000E+03
+: 6 3  0.638000000E+03  0.631500000E+03
+: 7 3  0.639000000E+03  0.631500000E+03
+: ## first file {lon,,}  spreads the second dimension
+: ## second file {,lat,}  spreads the first dimension
+
+The option -x changes the output domain as the intersects.
+: % chak a b FLUSH -x  # ascii output of file a and b horizontally (intersects)
+: record: 0
+:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
+:   read:F1 pss T = 0 DATE = -1/-1/-1 **:**:**
+: # 0 {F0} qss
+: # 1 {F1} pss
+: 4  0.636000000E+03  0.636000000E+03
+: 5  0.637000000E+03  0.637000000E+03
+
+The option -l changes the output domain as the first stack.
+: record: 0
+:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
+:   read:F1 pss T = 0 DATE = -1/-1/-1 **:**:**
+: # 0 {F0} qss
+: # 1 {F1} pss
+: 4  0.636000000E+03  0.636000000E+03
+: 5  0.637000000E+03  0.637000000E+03
+: 6  0.638000000E+03 .
+: 7  0.639000000E+03 .
+
+** Recipes
 
 * Copyright and license
 Copyright 2022 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)
+
+#  LocalWords:  TOUZA Jmz SAITO Fuyuki saitofuyuki jamstec jp MIROC
+#  LocalWords:  README chak gtool RPN Unary gtabs gtatan arctangent
+#  LocalWords:  gtcos gtexp gtinv gtlog gtsin gtsqr gtsqrt gttan ngt
+#  LocalWords:  gttanh gtadd gtsub gtmlt gtdiv gtpow gtmod gtext gts
+#  LocalWords:  gtmask gtset gtshift gtintrp gtimis gtsel subregion
+#  LocalWords:  gtavr gthead gtseq gtedy gtz gthdiv gthvor vorticity
+#  LocalWords:  gtxdf gtxdv gtydf gtydv impatients ofs MUL rmin GEF
+#  LocalWords:  vmin DUP rset NEF gtcon ROR SQRT ggg EXCH INV EQ GTF
+#  LocalWords:  LEB stdout ascii sqrt aa yy ACOS arccos UNDEF ASIN Bn
+#  LocalWords:  arcsin ATAN arctan BOOL boolean CEIL EQU EQB EQF GEU
+#  LocalWords:  GEB GTU GTB IDIV LADD LDIV LEU LEF LMASK LMAX LMIN Fn
+#  LocalWords:  LMUL LSUB LTU LTB LTF NEU NOP LOR SQR TANH tanh TRUNC
+#  LocalWords:  ZSIGN unary Wn ITER OPR qss pss lon sps tps avant bb
+#  LocalWords:  garde ee ARG REPL DFMT th nd Cn

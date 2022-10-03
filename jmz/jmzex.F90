@@ -1,7 +1,7 @@
 !!!_! jmzex.F90 - TOUZA/Jmz example GTOOL3 file creation
 ! Maintainer: SAITO Fuyuki
 ! Created: Sep 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/09/28 15:25:36 fuyuki jmzex.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/07 10:12:27 fuyuki jmzex.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -208,7 +208,11 @@ contains
           if (cname(jcsrc).eq.' '.and.hrange(2, jcsrc).eq.0) then
              continue
           else
-             call put_header_cprop(ierr, head, cname(jcsrc), hrange(:, jcsrc), jctgt)
+             if (cname(jcsrc).eq.'-') then
+                call put_header_cprop(ierr, head, ' ', hrange(:, jcsrc), jctgt)
+             else
+                call put_header_cprop(ierr, head, cname(jcsrc), hrange(:, jcsrc), jctgt)
+             endif
              if (ierr.eq.0) jctgt = jctgt + 1
           endif
        endif
