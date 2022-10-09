@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2022/09/29 11:10:19 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/09 16:05:42 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -93,6 +93,14 @@ module TOUZA_Std_utl
      module procedure find_first_i, find_first_a
   end interface find_first
 
+  interface find_first_range
+     module procedure find_first_range_i
+  end interface find_first_range
+
+  interface inrange
+     module procedure inrange_i
+  end interface inrange
+
 !!!_  - public
   public init, diag, finalize
   public choice, choice_a
@@ -106,8 +114,10 @@ module TOUZA_Std_utl
   public set_defu
   public parse_number
   public compact_format
-  public join_list, split_list
-  public find_first
+  public join_list,  split_list
+  public find_first, find_first_range
+  public jot
+  public inrange
 !!!_  - static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -1077,6 +1087,47 @@ contains
     return
   end subroutine split_list_i
 
+!!!_  & find_first_range - find first occurence of array within range (inclusive)
+  integer function find_first_range_i &
+       & (list, low, high, start, back, offset) &
+       & result(n)
+    implicit none
+    integer,intent(in)          :: list(0:)
+    integer,intent(in),optional :: low
+    integer,intent(in),optional :: high
+    integer,intent(in),optional :: start
+    logical,intent(in),optional :: back
+    integer,intent(in),optional :: offset
+    integer j, jb, ll, ofs
+    integer vl, vh
+    ofs = choice(find_offset, offset)
+    jb  = choice(ofs, start) - ofs
+    ll  = size(list)
+    vl = choice((- HUGE(0)) - 1, low)
+    vh = choice((+ HUGE(0)) + 0, high)
+    n = -1
+    if (choice(.false., back)) then
+       do j = ll - 1, jb, -1
+          if (vl.le.list(j).and.list(j).le.vh) then
+             n = j
+             exit
+          endif
+       enddo
+    else
+       do j = jb, ll - 1
+          if (vl.le.list(j).and.list(j).le.vh) then
+             n = j
+             exit
+          endif
+       enddo
+    endif
+    if (n.ge.0) then
+       n = n + ofs
+    else
+       n = min(-1, ofs - 1)
+    endif
+  end function find_first_range_i
+
 !!!_  & find_first - find first occurence of array
   integer function find_first_i &
        & (list, val, start, back, offset) &
@@ -1152,6 +1203,61 @@ contains
     endif
   end function find_first_a
 
+!!!_  - jot
+  subroutine jot(v, n, b, e, s)
+    implicit none
+    integer,intent(out)         :: v(0:*)
+    integer,intent(in),optional :: n, b, e, s
+    integer nn, bb, ee, ss
+    integer j,  k
+    ss = choice(1, s)
+    if (present(n)) then
+       nn = n
+       if (present(b)) then
+          bb = b
+          if (present(e)) then
+             ee = e
+          else
+             ee = bb + nn * ss
+          endif
+       else if (present(e)) then
+          ee = e
+          bb = ee - nn * ss
+       else
+          bb = 0
+          ee = bb + nn * ss
+       endif
+    else if (ss.eq.0) then
+       ! s must be non-zero if n not present
+       return
+    else
+       bb = choice(0, b)
+       if (present(e)) then
+          ee = e
+          nn = (ee - bb - 1) / ss + 1
+          ee = bb + nn * ss
+       else
+          return
+       endif
+    endif
+    nn = max(0, nn)
+    k = bb
+    j = 0
+    do
+       if (k.eq.ee) exit
+       if (j.eq.nn) exit
+       v(j) = k
+       k = k + ss
+       j = j + 1
+    enddo
+  end subroutine jot
+
+!!!_  - inrange - return true if l<=v<=h
+  ELEMENTAL logical function inrange_i (v, l, h) result (b)
+    implicit none
+    integer,intent(in) :: v, l, h
+    b = (l.le.v .and. v.le.h)
+  end function inrange_i
 !!!_ + (system) control procedures
 !!!_  - is_first_force () - check if first time or force
   logical function is_first_force(n, mode) result(b)
@@ -1298,6 +1404,14 @@ program test_std_utl
 
   call test_find((/0/))
   call test_find((/0,1,2,0,3,4/))
+
+  call test_jot(n=10)
+  call test_jot(      b=1)
+  call test_jot(n=10, b=1)
+  call test_jot(           e=8)
+  call test_jot(n=10,      e=8)
+  call test_jot(      b=1, e=8)
+  call test_jot(n=10, b=1, e=8)
 
   stop
 contains
@@ -1484,6 +1598,64 @@ contains
 
     return
   end subroutine test_nparser
+
+  subroutine test_jot(n, b, e)
+    implicit none
+    integer,intent(in),optional :: n
+    integer,intent(in),optional :: b
+    integer,intent(in),optional :: e
+
+    call test_jot_sub(n, b, e)
+    call test_jot_sub(n, b, e, -3)
+    call test_jot_sub(n, b, e, -2)
+    call test_jot_sub(n, b, e, -1)
+    call test_jot_sub(n, b, e, 0)
+    call test_jot_sub(n, b, e, +1)
+    call test_jot_sub(n, b, e, +2)
+    call test_jot_sub(n, b, e, +3)
+
+  end subroutine test_jot
+
+  subroutine test_jot_sub(n, b, e, s)
+    implicit none
+    integer,intent(in),optional :: n
+    integer,intent(in),optional :: b
+    integer,intent(in),optional :: e
+    integer,intent(in),optional :: s
+
+    integer v(0:100)
+    integer d
+    integer j
+    character(len=4)  :: tag(4)
+    character(len=64) :: args
+    integer jerr
+
+    d = -9999
+    v(:) = d
+
+    call jot(v, n, b, e, s)
+    j = find_first(v, d, offset=0)
+    call fmt_or_null(tag(1), n)
+    call fmt_or_null(tag(2), b)
+    call fmt_or_null(tag(3), e)
+    call fmt_or_null(tag(4), s)
+
+    call join_list(jerr, args, tag)
+
+101 format('jot: ', A, ' (', I0, ') ', 100(1x, I0))
+    write(*, 101) trim(args), j, v(0:j-1)
+  end subroutine test_jot_sub
+
+  subroutine fmt_or_null(str, n)
+    implicit none
+    character(len=*),intent(out)         :: str
+    integer,         intent(in),optional :: n
+    if (present(n)) then
+       write(str, '(I0)') n
+    else
+       str = '-'
+    endif
+  end subroutine fmt_or_null
 
 end program test_std_utl
 #endif /* TEST_STD_UTL */
