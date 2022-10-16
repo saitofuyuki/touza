@@ -1,7 +1,7 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2022/09/28 13:35:49 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/16 21:00:02 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -165,6 +165,7 @@ module TOUZA_Nio_header
   public init, diag, finalize
   public put_item,   put_item_date, store_item
   public get_item,   get_item_date, restore_item
+  public fill_header
   public show_header
 
 !!!_  - todo notes
@@ -319,6 +320,8 @@ contains
        jend = check_hitem_range(item, iteme)
        if (jend.gt.0) then
           call store_item(ierr, head, v, item, jend, fmt, tol)
+       else if (jend.eq.0) then
+          call store_item(ierr, head, v, item, fmt=fmt, tol=tol)
        else
           ierr = ERR_HITEM_INVALID_RANGE
        endif
@@ -399,6 +402,8 @@ contains
        jend = check_hitem_range(item, iteme)
        if (jend.gt.0) then
           call restore_item(ierr, head, v, item, jend, fmt)
+       else if (jend.eq.0) then
+          call restore_item(ierr, head, v, item, fmt=fmt)
        else
           ierr = ERR_HITEM_INVALID_RANGE
        endif
@@ -790,6 +795,51 @@ contains
     return
   end subroutine restore_item_date
 
+!!!_  - fill_header
+  subroutine fill_header &
+       & (ierr, head, refh, pref)
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(inout) :: head(*)
+    character(len=*),intent(in)    :: refh(*)
+    integer,         intent(in)    :: pref     ! 0 or 1 to prefer head or refh
+    integer ji, je
+    ierr = 0
+    if (pref.eq.0) then
+       do ji = 1, nitem
+          if (hiends(ji).lt.0) then
+             if (head(ji).eq.' ') head(ji) = refh(ji)
+          endif
+       enddo
+       ji = 1
+       do
+          if (ji.gt.nitem) exit
+          je = hiends(ji)
+          if (je.gt.0) then
+             if (ALL(head(ji:je).eq.' ')) head(ji:je) = refh(ji:je)
+             ji = je
+          endif
+          ji = ji + 1
+       enddo
+    else
+       do ji = 1, nitem
+          if (hiends(ji).lt.0) then
+             if (refh(ji).ne.' ') head(ji) = refh(ji)
+          endif
+       enddo
+       ji = 1
+       do
+          if (ji.gt.nitem) exit
+          je = hiends(ji)
+          if (je.gt.0) then
+             if (ANY(refh(ji:je).ne.' ')) head(ji:je) = refh(ji:je)
+             ji = je
+          endif
+          ji = ji + 1
+       enddo
+    endif
+  end subroutine fill_header
+
 !!!_ + private interfaces
 !!!_  & check_hitem_type - check against header-item default type
   integer function check_hitem_type(item, t) result (ierr)
@@ -834,10 +884,12 @@ contains
     ierr = check_hitem_type(item, ht_str)
     if (ierr.eq.0) then
        jend = hiends(item)
-       if (jend.lt.0) then
-          ierr = ERR_HITEM_INVALID_RANGE
-       else if (iteme.eq.0) then
-          ierr = jend
+       if (iteme.eq.0) then
+          if (jend.lt.0) then
+             ierr = 0
+          else
+             ierr = jend
+          endif
        else if (iteme.ge.item.and.iteme.le.jend) then
           ierr = iteme
        else
@@ -931,6 +983,7 @@ contains
 
   end subroutine set_def_types
 
+!!!_  - set_def_ranges
   subroutine set_def_ranges &
        & (ierr, he)
     integer,intent(out) :: ierr
@@ -939,14 +992,14 @@ contains
     ierr = 0
     he(1:nitem) = -1
 
-    he(hi_EDIT1:hi_EDIT2)  = hi_EDIT8
+    he(hi_EDIT1:hi_EDIT8)  = hi_EDIT8
     he(hi_TITL1:hi_TITL2)  = hi_TITL2
     he(hi_ETTL1:hi_ETTL8)  = hi_ETTL8
     he(hi_MEMO1:hi_MEMO10) = hi_MEMO10
 
     return
   end subroutine set_def_ranges
-
+!!!_ + end TOUZA_Nio_header
 end module TOUZA_Nio_header
 
 !!!_@ test_nio_header - test program
