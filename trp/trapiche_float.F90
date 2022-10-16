@@ -3696,8 +3696,8 @@ contains
        vl = set_exponent(vone, max(ml, ixlbd + ixone))
        vh = set_exponent(vfil, min(mh, ixubd + ixone))
 
-       dl = set_exponent(vone, max(ml, ixlbd - mbits + ixone))
-       dh = set_exponent(vone, min(mh, ixubd - mbits + ixone))
+       dl = set_exponent(vone, max(ml, ixdnm - mbits + ixone))
+       dh = set_exponent(vfil, min(mh, ixdnm + ixone))
 
 211    format(A, ':X: ', I2, 1x, 2x, 1x, I12, 1x, A2, 2x, I0, ':', I0, ' / ', I0)
 202    format(A, ':H: ', I2, 1x, A2, 1x, I12, 1x, A2, 2x, I0, 1x, '+', I0, ':', I0)
