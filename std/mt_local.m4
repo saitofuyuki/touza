@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2022/04/14 12:33:13 fuyuki mt_local.m4>
+dnl Time-stamp: <2022/09/20 17:22:55 fuyuki mt_local.m4>
 
 dnl Copyright: 2020-2022 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -61,6 +61,24 @@ inquire(10, POS=L)])
 MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [convert],[
 character T*(30)
 inquire(10, CONVERT=T)])
+
+dnl system procedures
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_environment_variable], ['A'])
+dnl GNU extensions
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getlog], [T], [
+character T*30])
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getenv], ['A', T], [
+character T*30])
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([hostnm], [T], [
+character T*30])
+dnl intel IFPORT module
+MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [getenv])
+MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [getlog])
+MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [hostnam])
+dnl SX F90_UNIX_ENV module
+MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [getenv])
+MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [getlogin])
+MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [gethostname])
 
 AC_ARG_VAR([OPT_STDIN_UNIT],    [fortran i/o unit for stdin])
 AC_ARG_VAR([OPT_STDOUT_UNIT],   [fortran i/o unit for stdout])

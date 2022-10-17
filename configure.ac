@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/03/29 11:31:46 fuyuki configure.ac>
+# Time-stamp: <2022/10/17 15:15:22 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -19,10 +19,19 @@ Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/L
 ])
 
 AC_CONFIG_SRCDIR([touza.F90])
+
+AC_CONFIG_MACRO_DIRS([m4c])
+AC_CONFIG_AUX_DIR([build-aux])
+
+AC_CANONICAL_HOST
+AC_CANONICAL_BUILD
+AC_CANONICAL_TARGET
+
 AC_LANG_PUSH([Fortran])
 MT_PROG_FC_MPI
+AX_PROG_F77_MPI([test x"$with_mpi" != xno], [use_f77_mpi=yes], [use_f77_mpi=no])
 dnl AC_PROG_FC
-AC_PROG_F77
+dnl AC_PROG_F77
 
 AC_FC_PP_SRCEXT([F90])
 AC_FC_PP_DEFINE
@@ -34,10 +43,6 @@ AC_FC_MODULE_OUTPUT_FLAG([], [AC_MSG_WARN])
 AX_COMPILER_VENDOR
 AC_LANG_POP([Fortran])
 
-AC_CANONICAL_HOST
-AC_CANONICAL_BUILD
-AC_CANONICAL_TARGET
-
 AC_ARG_ENABLE([warn-max],
 [AS_HELP_STRING([--enable-warn-max], [compile with maximum warning option if found @<:@default=no@:>@])],
  [use_warn_max=$enableval],
@@ -47,20 +52,7 @@ AC_SUBST([AM_FCFLAGS])
 
 dnl common procedures
 MT_PACKAGE_INIT()
-MT_AM_INCLUDE()
-
-AC_ARG_PROGRAM
-AC_CONFIG_MACRO_DIRS([m4c])
-AC_CONFIG_AUX_DIR([build-aux])
-
-AM_INIT_AUTOMAKE([-Wall foreign])
-AM_MAINTAINER_MODE
-AM_CONDITIONAL([NEVER], [false])
-
-AC_PROG_MAKE_SET
-
-MT_FORTRAN_DEFINE([PACKAGE_TAG], m4_quote(m4_toupper(AC_PACKAGE_NAME)), [package name])
-
+MT_AM_INCLUDE([lib@TOUZA_NAME@_la_SOURCES])
 AC_MSG_CHECKING([if transform library name])
 AC_ARG_WITH([touza-name],
 [AS_HELP_STRING([--with-touza-name=STRING],
@@ -68,11 +60,20 @@ AC_ARG_WITH([touza-name],
 AS_IF([test "$with_touza_name" = "no"],
 [AC_MSG_RESULT([Error])
  AC_MSG_ERROR([Invalid to specify --without-touza-name])])
-
 AS_IF([test "$with_touza_name" = "" || test "$with_touza_name" = "yes"],
       [with_touza_name="$PACKAGE_NAME"])
 AC_MSG_RESULT([$with_touza_name])
 AC_SUBST([TOUZA_NAME], $with_touza_name)
+
+AC_ARG_PROGRAM
+
+AM_INIT_AUTOMAKE([foreign -Wall])
+AM_MAINTAINER_MODE
+AM_CONDITIONAL([NEVER], [false])
+
+AC_PROG_MAKE_SET
+
+MT_FORTRAN_DEFINE([PACKAGE_TAG], m4_quote(m4_toupper(AC_PACKAGE_NAME)), [package name])
 
 AM_PROG_AR
 LT_PREREQ([2.4.2])
@@ -101,9 +102,28 @@ MT_SUB_PACKAGE([std], [always])
 MT_SUB_PACKAGE([emu], [],     [std])
 MT_SUB_PACKAGE([cal], [],     [std])
 MT_SUB_PACKAGE([trp], [],     [std])
-MT_SUB_PACKAGE([nng], [],     [std emu trp])
 MT_SUB_PACKAGE([ppp], [],     [std emu])
-dnl MT_SUB_PACKAGE([div], [],     [std])
+MT_SUB_PACKAGE([div], [],     [std])
+dnl MT_SUB_PACKAGE([nio], [],     [std emu trp div])
+MT_SUB_PACKAGE([nio], [],     [std emu trp])
+MT_SUB_PACKAGE([ami], [],     [std])
+
+AC_ARG_ENABLE([nctcdf],
+[AS_HELP_STRING([--enable-nctcdf], [enable nio/n*c*tcdf features@<:@default=no@:>@])],
+ [use_nctcdf=$enableval],
+ [use_nctcdf=no])
+
+AS_IF([test x"[$]use_nctcdf" != xno],
+[AX_LIB_NETCDF4([serial])
+AS_IF([test x"[$]with_netcdf4_fortran" != xyes],
+[AS_IF([test x"[$]use_nctcdf" = xforce],
+       [AC_MSG_WARN([netcdf4 fortran library disabled (ignored).])],
+       [AC_MSG_ERROR([netcdf4 fortran library disabled.])])])
+use_nctcdf=yes])
+
+AM_CONDITIONAL([with_nctcdf], [test x"[$]use_nctcdf" = xyes])
+AS_IF([test x"[$]use_nctcdf" = xyes],
+      [AC_DEFINE([OPT_WITH_NCTCDF], [1], [build with TOUZA/Nio/nctcdf])])
 
 AC_MSG_CHECKING([if also build jmz])
 AC_ARG_WITH([build-jmz],
@@ -115,18 +135,14 @@ AS_IF([test "x$with_build_jmz" != xno],
        enable_sub_all=yes],
       [AC_MSG_RESULT([no])])
 
-MT_PARSE_PACKAGES()
-
 AS_IF([test "x$with_build_jmz" != xno],
 [AX_SUBDIRS_CONFIGURE([jmz],
     [],
-    [[TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nng ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std],
-     [TOUZA_LIBS=${ac_top_build_prefix}lib${with_touza_name}.la]],
+    [[TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}],
+     [TOUZA_LIBS=${ac_top_build_prefix}lib${with_touza_name}.la ${NETCDF4_FLIBS} ${NETCDF4_LIBS}],
+     [TOUZA_LDFLAGS=${NETCDF4_LDFLAGS}]],
     [],
     [--with-build-jmz])])
-
-PKG_PROG_PKG_CONFIG()
-PKG_PREREQ([0.29])
 
 AC_ARG_ENABLE([install-switches],
               [AS_HELP_STRING([--enable-install-switches],
@@ -137,12 +153,41 @@ AS_IF([test x"[$]switchdir" = xyes],
       [switchdir='[$]{datadir}/[$]{PACKAGE}'])
 AC_SUBST([switchdir])
 
-dnl AX_CREATE_PKGCONFIG_INFO()
-AC_SUBST([PACKAGE_REQUIRES], [])
-AC_CONFIG_FILES([touza.pc])
+AX_ADD_AM_MACRO_STATIC([
+install-data-hook: install-switchDATA
+switchdir     = @switchdir@
+switch_DATA   =
+])
 
 AC_PATH_PROGS([AUTOREVISION], [autorevision], [:])
 AC_PATH_PROGS([REALPATH], [realpath], [false])
 
+dnl dependency hack
+dnl _AM_DEPENDENCIES(FC)
+AC_ARG_ENABLE([diag-dependencies],
+[AS_HELP_STRING([--enable-diag-dependencies], [diagnose dependencies using gcc features@<:@default=no@:>@])],
+ [use_gcc_dependencies=$enableval],
+ [use_gcc_dependencies=no])
+AM_CONDITIONAL([gcc_dependencies], [
+  test "x$enable_dependency_tracking" != xno \
+  && test "$use_gcc_dependencies" = yes])
+
+AC_ARG_ENABLE([mod-dependencies],
+[AS_HELP_STRING([--enable-mod-dependencies], [enable generated dependencies @<:@default=yes@:>@])],
+ [use_mod_dependencies=$enableval],
+ [use_mod_dependencies=yes])
+AM_CONDITIONAL([enable_module_dependencies], [
+  test "x$use_mod_dependencies" != xno \
+  && test x"$ax_f90_modext" != xunknown])
+
+dnl AM_CONDITIONAL([am__fastdepFC], [false])
+
+dnl AX_CREATE_PKGCONFIG_INFO()
+MT_PARSE_PACKAGES()
+
+PKG_PROG_PKG_CONFIG()
+PKG_PREREQ([0.29])
+AC_SUBST([PACKAGE_REQUIRES], [])
+AC_CONFIG_FILES([touza.pc])
 
 AC_OUTPUT

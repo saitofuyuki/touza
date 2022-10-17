@@ -1,7 +1,7 @@
 # touza.pc
 # Maintainer: SAITO Fuyuki
 # Created: Oct 10 2021
-# Time-stamp: <2022/02/15 09:36:53 fuyuki touza.pc.in>
+# Time-stamp: <2022/07/29 10:51:16 fuyuki touza.pc.in>
 #
 # manually modified after automatic generation with AX_CREATE_PKGCONFIG_INFO
 prefix=@prefix@
@@ -27,5 +27,5 @@ Name: @PACKAGE_NAME@
 Description: @TOUZA_NAME@ library
 Version: @PACKAGE_VERSION@
 Requires: @PACKAGE_REQUIRES@
-Libs: -L${libdir} ${touza_lib} @LDFLAGS@ @LIBS@
-Cflags: -I${includedir}  -I${pkgincludedir} ${fc_modinc}${moddir} @CPPFLAGS@
+Libs: -L${libdir} ${touza_lib} @LDFLAGS@ @LIBS@ @NETCDF4_LDFLAGS@ @NETCDF4_FLIBS@ @NETCDF4_LIBS@
+Cflags: -I${includedir}  -I${pkgincludedir} ${fc_modinc}${moddir} @CPPFLAGS@ @NETCDF4_FFLAGS@

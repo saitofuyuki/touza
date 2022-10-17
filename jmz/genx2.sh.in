@@ -1,0 +1,59 @@
+#!@ZSH@
+# Time-stamp: <2022/10/17 14:39:15 fuyuki genx2.sh.in>
+
+main ()
+{
+  local NI=8 NJ=4 NK=3
+  local outd=ex2
+  mkdir -p $outd
+
+  gen_files aa  0 X=/lon,0:$NI X ROR
+  gen_files bb  0 X=/lon,1:4   X ROR
+  gen_files cc  0 Y=/lon,1:4   Y
+  gen_files dd  0 X=/lon,0:$NI Y=/lat,0:$NJ X ROR
+  gen_files ee  0 X=/lat,1:3 X ROR
+  gen_files ff  0 Y=/lat,1:3   Y
+
+  xadd aa bb
+  xadd aa cc
+  xadd dd ee
+  xadd aa ee
+  xadd bb ff
+}
+
+xadd ()
+{
+  local x=$1 y=$2
+  local chak=./chak
+  local copts=(-vvvv -f)
+
+  local z="$x+$y"
+
+  local cmd=($outd/$x TAG="$x"
+             $outd/$y TAG="$y"
+             REPEAT ADD TAG="$z" FLUSH -i)
+
+  $chak $copts $cmd | sed -n -e '/^##/p'
+  $chak -q $cmd | sed -e '/^##/d' | column -t 
+}
+
+
+gen_files ()
+{
+  local fname=$1; shift
+  local chak=./chak
+  local copts=(-vvvv -f)
+  local post=(MISS=-999)
+  local of=$outd/$fname
+  
+  [[ ! -e $of ]] && $chak $copts "$@" $post = $of ITEM=$fname
+}
+
+
+main "$@"; err=$?
+exit $?
+
+# Local Variables:
+# mode: sh-mode
+# sh-shell: zsh
+# End:

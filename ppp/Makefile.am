@@ -1,7 +1,7 @@
 # touza/ppp Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jan 26 2022
-# Time-stamp: <2022/03/29 11:42:06 fuyuki Makefile.am>
+# Time-stamp: <2022/06/27 11:20:26 fuyuki Makefile.am>
 
 # Copyright (C) 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -9,7 +9,6 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 EXTRA_DIST		=	README-ppp.org
-MOSTLYCLEANFILES=
 SUBDIRS	= .
 
 include $(top_srcdir)/aminclude_static.am
@@ -28,8 +27,8 @@ libtouza_APPENDS =
 TEST_COMMON_LIBS	= $(noinst_LTLIBRARIES)
 TEST_COMMON_LIBS	+= $(FC_LDADD_touza_emu) $(FC_LDADD_touza_std)
 
-AM_FCFLAGS += $(FC_MODULE_touza_std)
-AM_FCFLAGS += $(FC_MODULE_touza_emu)
+AM_FCFLAGS_MODULE += $(FC_MODULE_touza_std)
+AM_FCFLAGS_MODULE += $(FC_MODULE_touza_emu)
 
 check_PROGRAMS		= test_ppp test_ppp_std test_ppp_amng test_ppp_king \
                       test_ppp_comm \
@@ -66,6 +65,8 @@ test_ppp_miroc_o_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_PPP_MIROC=2
 test_ppp_miroc_s_SOURCES	= $(test_ppp_miroc_a_SOURCES)
 test_ppp_miroc_s_LDADD		= $(test_ppp_miroc_a_LDADD)
 test_ppp_miroc_s_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_PPP_MIROC=3
+
+include Makedep.inc
 
 ### Local Variables:
 ### mode: makefile-automake

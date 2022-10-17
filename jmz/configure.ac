@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Nov 24 2021
-# Time-stamp: <2022/02/25 15:30:20 fuyuki configure.ac>
+# Time-stamp: <2022/10/13 16:21:56 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -31,6 +31,11 @@ AC_FC_MODULE_EXTENSION
 AC_FC_MODULE_FLAG
 AC_FC_MODULE_OUTPUT_FLAG([], [AC_MSG_WARN])
 AX_COMPILER_VENDOR
+
+MT_FORTRAN_BATCH_CHECK_STATEMENT([error], [stop],[
+error stop 1])
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([exit], [1], [])
+
 AC_LANG_POP([Fortran])
 
 AC_ARG_ENABLE([warn-max],
@@ -59,6 +64,7 @@ AC_CONFIG_FILES([Makefile])
 PKG_PROG_PKG_CONFIG()
 PKG_PREREQ([0.29])
 PKG_CHECK_MODULES_STATIC([TOUZA], [touza])
+AC_SUBST([TOUZA_LDFLAGS])
 
 dnl AX_CREATE_PKGCONFIG_INFO()
 AC_SUBST([PACKAGE_REQUIRES], [])
@@ -67,5 +73,7 @@ AM_PATH_PYTHON([3.9], , [:])
 AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
 AX_PYTHON()
 AX_PYTHON_MODULE([pyparsing], , [python3])
+
+AC_PATH_PROGS([ZSH], [zsh], [:])
 
 AC_OUTPUT

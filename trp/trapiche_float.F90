@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2022/04/04 21:57:23 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/09/20 22:00:39 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -735,7 +735,7 @@ contains
     real   (kind=KRFLD),intent(in)  :: vmiss
     integer,            intent(in)  :: mbits, xbits
     integer,            intent(in)  :: ixtop, ixbtm  ! exponent upper/lower limit (relative to exp(1))
-    integer,            intent(in)  :: kcode        ! encoding scheme
+    integer,            intent(in)  :: kcode         ! encoding scheme
 
     integer(kind=KIBGZ),parameter :: kzero = 0_KIBGZ
 
@@ -3696,8 +3696,8 @@ contains
        vl = set_exponent(vone, max(ml, ixlbd + ixone))
        vh = set_exponent(vfil, min(mh, ixubd + ixone))
 
-       dl = set_exponent(vone, max(ml, ixlbd - mbits + ixone))
-       dh = set_exponent(vone, min(mh, ixubd - mbits + ixone))
+       dl = set_exponent(vone, max(ml, ixdnm - mbits + ixone))
+       dh = set_exponent(vfil, min(mh, ixdnm + ixone))
 
 211    format(A, ':X: ', I2, 1x, 2x, 1x, I12, 1x, A2, 2x, I0, ':', I0, ' / ', I0)
 202    format(A, ':H: ', I2, 1x, A2, 1x, I12, 1x, A2, 2x, I0, 1x, '+', I0, ':', I0)

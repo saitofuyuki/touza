@@ -1,3 +1,15 @@
+Revision 1.05.0 / 2022-10-17
+============================
+
+  * Version 1.05.0, to publish chak (alpha version).
+  * various bug fixes to publish new command chak.
+    (ppp) [severe] some bugs fixed around communication.
+    (cal) [critical] correct cal::CALNDR arguments for MIROC with-t.
+    (emu) [severe] skip message for unbound units.
+  * note about ifort -heap-arrays option.
+  * (nio) nio_nctcdf introduced.  nio_divison is reserved.
+  * (nio,nng) [IMPORTANT] nng renamed into nio.
+  * (std) std_htb implemented for hash-table management, used in ppp.
 
 Revision 1.03.1 / 2022-04-22
 ============================

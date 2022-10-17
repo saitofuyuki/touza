@@ -1,7 +1,7 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2022/02/16 15:00:30 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/07/25 18:52:11 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2022
@@ -675,7 +675,7 @@ contains
 
 !!!_  & banner - output banner
   subroutine banner_core &
-       & (ierr, txt, u, ch, ww)
+       & (ierr, txt, u, ch, ww, pat, indent)
     use TOUZA_Std_utl,only: choice, choice_a
     implicit none
     integer,         intent(out)         :: ierr
@@ -683,16 +683,24 @@ contains
     integer,         intent(in),optional :: u
     character(len=*),intent(in),optional :: ch
     integer,         intent(in),optional :: ww
+    integer,         intent(in),optional :: pat  ! pattern
+    integer,         intent(in),optional :: indent
     integer ut
     integer wi
     integer ll
     integer rl, rw
     integer,parameter :: lc = 1 ! fixed
     character(len=lc) :: ci
+    integer ind
+    integer p
+    character(len=64) :: fmt0, fmt1
     ierr = 0
 
     ut = choice(unit_global, u)
     if (ut.eq.unit_global) ut = default_unit
+
+    p = choice(0, pat)
+    ind = max(0, choice(1, indent))
 
     call choice_a(ci, '+', ch)
     wi = max(choice(3, ww), lc)
@@ -702,17 +710,34 @@ contains
     rl = (ll - 1) / lc + 1
     ll = rl * lc
 
-101 format(1x, A)
-102 format(1x, A, 1x, A, 1x, A)
-    if (ut.ge.0) then
-       write(ut, 101) repeat(trim(ci), rl)
-       write(ut, 102) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
-       write(ut, 101) repeat(trim(ci), rl)
-    else if (ut.eq.-1) then
-       write(*, 101) repeat(trim(ci), rl)
-       write(*, 102) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
-       write(*, 101) repeat(trim(ci), rl)
+    if (ind.le.0) then
+       fmt0 = '(A)'
+       fmt1 = '(A, 1x, A, 1x, A)'
+    else
+111    format('(', I0, 'x, A)')
+112    format('(', I0, 'x, A, 1x, A, 1x, A)')
+       write(fmt0, 111) ind
+       write(fmt1, 112) ind
     endif
+
+    select case (p)
+    case(-1)
+       if (ut.ge.0) then
+          write(ut, fmt1) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
+       else if (ut.eq.-1) then
+          write(*, fmt1) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
+       endif
+    case default
+       if (ut.ge.0) then
+          write(ut, fmt0) repeat(trim(ci), rl)
+          write(ut, fmt1) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
+          write(ut, fmt0) repeat(trim(ci), rl)
+       else if (ut.eq.-1) then
+          write(*, fmt0) repeat(trim(ci), rl)
+          write(*, fmt1) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
+          write(*, fmt0) repeat(trim(ci), rl)
+       endif
+    end select
     return
   end subroutine banner_core
 
@@ -813,7 +838,7 @@ program test_std_log
      call test_error(-je - ERR_MASK_CAL, ERR_EOF, ERR_MASK_CAL)
   enddo
   do je = 0, ERR_MASK_MODULE-1
-     call test_error(-je - ERR_MASK_NNG, ERR_EOF, ERR_MASK_CAL)
+     call test_error(-je - ERR_MASK_NIO, ERR_EOF, ERR_MASK_CAL)
   enddo
 
   call finalize(ierr, levv=+10)

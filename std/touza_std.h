@@ -1,7 +1,7 @@
 /* touza_std.h - touza/std common definition */
 /* Maintainer: SAITO Fuyuki */
 /* Created: May 30 2020 */
-/* Time-stamp: <2022/01/28 08:50:29 fuyuki touza_std.h> */
+/* Time-stamp: <2022/06/16 08:02:43 fuyuki touza_std.h> */
 /* Copyright (C) 2020, 2021 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -99,5 +99,7 @@
 
 #define ERR_INVALID_RECORD_SIZE         (ERR_MASK_SPECIFIC-1)  /* insufficient sequential record length */
 #define ERR_INCONSISTENT_RECORD_MARKERS (ERR_MASK_SPECIFIC-2)  /* different head/foot markers */
+
+#define ERR_MPI_PANIC                   (ERR_MASK_SPECIFIC-1)  /* panic in mpi procedures */
 
 #endif /* not _TOUZA_STD_H */

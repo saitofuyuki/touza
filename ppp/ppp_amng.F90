@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2022/03/07 13:12:18 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/09/29 17:10:48 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -40,6 +40,12 @@ module TOUZA_Ppp_amng
 !!!_ + parameter
   integer,parameter,public :: lagent = OPT_AGENT_LEN
   integer,parameter,public :: latbl  = OPT_AGENTS_MAX
+!!!_  - operations
+  integer,parameter,public :: OPR_PLAIN   = 0  ! as it is
+  integer,parameter,public :: OPR_REVERSE = 1  ! reverse rank order
+  integer,parameter,public :: OPR_SHIFT   = 2  ! shift (increment)
+  integer,parameter,public :: OPR_FLOAT   = 3  ! float specified ranks
+  integer,parameter,public :: OPR_IMPORT  = 4  ! import specific agent order
 !!!_ + public
 !!!_  - reserved agent string
   character(len=*),parameter,public :: asp_world = '*'     ! mpi_comm_world
@@ -47,6 +53,9 @@ module TOUZA_Ppp_amng
   character(len=*),parameter,public :: asp_base  = '%'     ! alias of source agent
   character(len=*),parameter,public :: asp_unit  = '@'     ! least mutual exclusive combination
   character(len=*),parameter,public :: asp_pfxa  = '#'     ! prefix for auto-name
+  character(len=*),parameter,public :: asp_top   = ' '     ! top stack
+  character(len=*),parameter,public :: asp_parent = '<'    ! parent(source) agent
+  character(len=*),parameter,public :: asp_child  = '>'    ! base of children agent
 !!!_ + flags
   integer,parameter :: flag_none    = -1
   integer,parameter :: flag_self    = 0
@@ -56,8 +65,9 @@ module TOUZA_Ppp_amng
   integer,parameter :: flag_root    = 4
   integer,parameter :: flag_base    = 5
   integer,parameter :: flag_unit    = 6
-  character(len=*),parameter :: flagch(flag_none:flag_unit) = &
-       & (/'N', 'S', 'F', 'O', 'D', 'R', 'B', 'U' /)
+  integer,parameter :: flag_xunit   = 7 ! other unit
+  character(len=*),parameter :: flagch(flag_none:flag_xunit) = &
+       & (/'N', 'S', 'F', 'O', 'D', 'R', 'B', 'U', 'X' /)
 
   integer,parameter :: map_div = 80
   integer,parameter :: map_mod = 8
@@ -69,6 +79,8 @@ module TOUZA_Ppp_amng
   character,parameter :: map_other = '.'
   character,parameter :: map_rule  = '|'
 
+  integer,parameter :: agent_unset = -2
+  integer,parameter :: agent_stack = -1
 !!!_ + type
   type aprop_t
      character(len=lagent) :: name = ' '            ! agent string (aka communicator indicator)
@@ -79,6 +91,7 @@ module TOUZA_Ppp_amng
   end type aprop_t
   type(aprop_t),save :: atblp(-1:latbl)
 !!!_ + static
+  integer,save :: hh_agent = -1
 !!!_  - agent table
   integer,save :: matbl = 0
   integer,save :: aworld = -1
@@ -97,34 +110,47 @@ module TOUZA_Ppp_amng
 #define __MDL__ 'a'
 !!!_ + overload
   interface switch_agent
-     module procedure switch_agent_ai
+     module procedure switch_agent_ai, switch_agent_ni
   end interface switch_agent
   interface push_agent
-     module procedure push_agent_ai
+     module procedure push_agent_ai, push_agent_ni
   end interface push_agent
   interface pop_agent
-     module procedure pop_agent_ai
+     module procedure pop_agent_ai,  pop_agent_ni
   end interface pop_agent
   interface top_agent
      module procedure top_agent_ai
   end interface top_agent
   interface inquire_agent
-     module procedure inquire_agent_a
-     module procedure inquire_agent_i
+     module procedure inquire_agent_a, inquire_agent_i
   end interface inquire_agent
+  interface is_member
+     module procedure is_member_a, is_member_i
+  end interface is_member
+  interface agents_translate
+     module procedure agents_translate_a, agents_translate_i
+  end interface agents_translate
+  interface base_agent
+     module procedure base_agent_i
+  end interface base_agent
+  interface clone_agent
+     module procedure clone_agent_i
+  end interface clone_agent
 !!!_ + interfaces
   public init, diag, finalize
-  public new_agent_root
-  public new_agent_color, new_agent_family
-  public new_agent_derived
-  public switch_agent, push_agent, pop_agent, top_agent
-  public inquire_agent
-  public query_agent,  source_agent
+  public new_agent_root,    new_agent_color,  new_agent_family
+  public new_agent_derived, new_agent_spinoff
+  public mod_agent_order
+  public agents_translate
+  public switch_agent,  push_agent, pop_agent, top_agent
+  public inquire_agent, is_member
+  public query_agent,   source_agent, check_agent, base_agent, clone_agent
+  public is_child_agent
   public diag_maps_batch
 !!!_ + common interfaces
 contains
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, stdv, icomm, nstack)
+  subroutine init(ierr, u, levv, mode, stdv, icomm, nstack, nagent)
     use TOUZA_Ppp_std,only: choice, ps_init=>init
     implicit none
     integer,intent(out)         :: ierr
@@ -132,6 +158,7 @@ contains
     integer,intent(in),optional :: levv, mode, stdv
     integer,intent(in),optional :: icomm
     integer,intent(in),optional :: nstack
+    integer,intent(in),optional :: nagent
     integer lv, md, lmd
 
     ierr = 0
@@ -151,6 +178,7 @@ contains
           if (ierr.eq.0) call ps_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
        if (is_first_force(init_counts, md)) then
+          if (ierr.eq.0) call init_table(ierr, nagent)
           if (ierr.eq.0) call init_stack(ierr, nstack)
           if (ierr.eq.0) call init_world(ierr, u=ulog)
        endif
@@ -263,6 +291,25 @@ contains
     endif
     return
   end subroutine init_stack
+!!!_  - init_table - hash table initialization
+  subroutine init_table &
+       & (ierr, n)
+    use TOUZA_Ppp_std,only: choice, new_htable
+    ! use TOUZA_Ppp_std,only: reg_entry
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: n
+    integer m
+
+    ierr = 0
+    m = choice(0, n)
+    if (m.le.0) m = latbl * 2
+    if (hh_agent.lt.0) then
+       hh_agent = new_htable('agents', lagent, m, def=agent_unset, ntag=1)
+       if (hh_agent.lt.0) ierr = -1
+    endif
+    return
+  end subroutine init_table
 !!!_ + diag subcontracts
 !!!_  - diag_batch
   subroutine diag_batch &
@@ -284,7 +331,7 @@ contains
     use MPI,only: &
          & MPI_COMM_WORLD, MPI_Comm_rank, &
          & MPI_Group_rank, MPI_Group_size
-    use TOUZA_Ppp_std,only: get_wni_safe, get_ni, get_gni, msg
+    use TOUZA_Ppp_std,only: get_wni_safe, get_ni, get_gni, msg, diag_htable
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -299,6 +346,8 @@ contains
 
     ierr = 0
     utmp = get_logu(u, ulog)
+
+    call diag_htable(ierr, hh_agent, utmp)
 
     call get_wni_safe(ierr, irank=irw)
 
@@ -498,7 +547,10 @@ contains
   subroutine diag_map_string &
        & (ierr, map, iagent, iref, irbgn, irend, md, sep)
     use TOUZA_Ppp_std,only: get_gni, choice, choice_a
-    use MPI,only: MPI_Group_translate_ranks, MPI_Group_rank, MPI_GROUP_NULL
+#  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
+    use MPI,only: MPI_Group_translate_ranks
+#  endif
+    use MPI,only: MPI_Group_rank, MPI_GROUP_NULL
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(out)         :: map
@@ -584,35 +636,69 @@ contains
     endif
 
   end subroutine diag_map_string
+!!!_  & show_stack
+  subroutine show_stack(ierr, iagent, dir, levv, u)
+    use TOUZA_Ppp_std,only: choice, msg
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: iagent
+    integer,intent(in)  :: dir
+    integer,intent(in),optional  :: u
+    integer,intent(in),optional  :: levv
+    integer lv, utmp
+    character(len=256) :: buf, b
+    integer js, jt
+
+    ierr = 0
+    lv = choice(lev_verbose, levv)
+    utmp = get_logu(u, ulog)
+    buf = 'stack:'
+
+101 format('[', I0, ':', A, ']')
+    do js = 0, jstack - max(0, dir)
+       jt = astack(js)
+       write(b, 101) jt, trim(atblp(jt)%name)
+       buf = trim(buf) // trim(b)
+    enddo
+    if (dir.lt.0) then
+       jt = astack(jstack + 1)
+       write(b, 101) jt, trim(atblp(jt)%name)
+       buf = trim(buf) // ' << ' // trim(b)
+    else if (dir.eq.0) then
+       jt = iagent
+       write(b, 101) jt, trim(atblp(jt)%name)
+       buf = trim(buf) // ' <> ' // trim(b)
+    else
+       jt = iagent
+       write(b, 101) jt, trim(atblp(jt)%name)
+       buf = trim(buf) // ' >> ' // trim(b)
+    endif
+    call msg(buf, __MDL__, utmp)
+  end subroutine show_stack
+
 !!!_ + manipulation
 !!!_  & query_agent() - return agent id from NAME
   integer function query_agent &
-       & (name, iagent) &
+       & (name, iaref) &
        & result(n)
     implicit none
     character(len=*),intent(in) :: name
-    integer,optional,intent(in) :: iagent ! current agent if null
+    integer,optional,intent(in) :: iaref ! current agent if null
     integer jas
     integer jt
 
     n = -1
-    jas = source_agent(iagent)
+    jas = source_agent(iaref)
     if (jas.lt.0) return
-    if (name.eq.asp_world) then
-       n = aworld
-    else if (name.eq.' ') then
+    if (name.eq.asp_top) then
        jt = astack(jstack)
        if (atblp(jt)%isrc.eq.jas) n = jt
+    else if (name.eq.asp_child) then
+       n = clone_agent(iaref)
+    else if (name.eq.asp_parent) then
+       n = source_agent(iaref)
     else
-       do jt = 0, matbl - 1
-          ! search agents with the same source
-          if (atblp(jt)%isrc.eq.jas) then
-             if (atblp(jt)%name.eq.name) then
-                n = jt
-                exit
-             endif
-          endif
-       enddo
+       n = query_agent_core(name, jas)
     endif
     return
   end function query_agent
@@ -657,18 +743,18 @@ contains
     ic = MPI_COMM_NULL
     if (ja.lt.0) ierr = -1
 
-    if (ierr.eq.0) ic = atblp(ja)%comm
-    if (ierr.eq.0) ig = atblp(ja)%mgrp
+    if (ja.ge.0) ic = atblp(ja)%comm
+    if (ja.ge.0) ig = atblp(ja)%mgrp
 
     if (present(irank)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           call MPI_Group_rank(ig, irank, ierr)
        else
           irank = -1
        endif
     endif
     if (present(ismem)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           call MPI_Group_rank(ig, ir, ierr)
        else
           ir = -1
@@ -676,57 +762,130 @@ contains
        ismem = ir.ge.0
     endif
     if (present(nrank)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           call MPI_Group_size(ig, nrank, ierr)
        else
           nrank = -1
        endif
     endif
     if (present(icomm)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           icomm = ic
        else
           icomm = MPI_COMM_NULL
        endif
     endif
     if (present(igroup)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           igroup = ig
        else
           igroup = MPI_GROUP_NULL
        endif
     endif
     if (present(name)) then
-       if (ierr.eq.0) then
+       if (ja.ge.0) then
           name = atblp(ja)%name
        else
           name = ' '
        endif
     endif
   end subroutine inquire_agent_i
-!!!_  & switch_agent
-  subroutine switch_agent_ai (ierr, iagent)
+!!!_  & base_agent() - query base (i.e., alias of source) agent
+  integer function base_agent_i (iagent) result(n)
     implicit none
-    integer,intent(out) :: ierr
-    integer,intent(in)  :: iagent
+    integer,intent(in),optional :: iagent
+    integer jatmp
+    integer jas
+    jas = source_agent(iagent)
+    if (jas.lt.0) then
+       n = -1
+    else
+       do jatmp = 1, matbl
+          ! usually jas + 1 is the alias
+          n = mod(jas + jatmp, matbl)
+          if (atblp(n)%isrc.eq.jas) then
+             if (atblp(n)%kflg.eq.flag_base) return
+          endif
+       enddo
+       n = -1
+    endif
+  end function base_agent_i
+!!!_  & clone_agent - query self-copy in childlen agent
+  integer function clone_agent_i (iagent) result(n)
+    implicit none
+    integer,intent(in),optional :: iagent
+    integer jatmp
+    integer jas
+    jas = check_agent(iagent)
+    if (jas.lt.0) then
+       n = -1
+    else
+       do jatmp = 1, matbl
+          n = mod(jas + jatmp, matbl)
+          if (atblp(n)%isrc.eq.jas) then
+             if (atblp(n)%kflg.eq.flag_base) return
+          endif
+       enddo
+       n = -1
+    endif
+  end function clone_agent_i
+!!!_  & switch_agent
+  subroutine switch_agent_ai (ierr, iagent, lev)
+    use TOUZA_Ppp_std,only: choice
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: iagent
+    integer,intent(in),optional :: lev      ! 0 to switch, positive to push, negative to pop
+    integer a
     ierr = 0
-    if (iagent.lt.0.or.iagent.ge.matbl) ierr = -1
+    a = min(+1, max(-1, choice(0, lev)))
+    jstack = jstack + a
     if (jstack.lt.0.or.jstack.ge.lstack) ierr = -1
-    if (ierr.eq.0) astack(jstack) = iagent
+    if (ierr.eq.0) call show_stack(ierr, iagent, a)
+    if (a.ge.0) then
+       if (iagent.lt.0.or.iagent.ge.matbl) ierr = -1
+       if (ierr.eq.0) astack(jstack) = iagent
+    endif
   end subroutine switch_agent_ai
+  subroutine switch_agent_ni (ierr, name, iaref, lev, iagent)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: name
+    integer,optional,intent(in)  :: iaref
+    integer,optional,intent(in)  :: lev
+    integer,optional,intent(out) :: iagent  ! new agent handle
+    integer ja
+    ierr = 0
+    ja = query_agent(name, iaref)
+    call switch_agent(ierr, ja, lev)
+    if (present(iagent)) then
+       iagent = ja
+    endif
+    return
+  end subroutine switch_agent_ni
 !!!_  & push_agent
   subroutine push_agent_ai (ierr, iagent)
     implicit none
     integer,intent(out) :: ierr
     integer,intent(in)  :: iagent
-    ierr = 0
-    jstack = jstack + 1
-    if (jstack.ge.lstack) ierr = -1
-    if (ierr.eq.0) then
-       call switch_agent(ierr, iagent)
-    endif
+    call switch_agent(ierr, iagent, +1)
     return
   end subroutine push_agent_ai
+  subroutine push_agent_ni (ierr, name, iaref, iagent)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: name
+    integer,optional,intent(in)  :: iaref
+    integer,optional,intent(out) :: iagent  ! new agent handle
+    integer ja
+    ierr = 0
+    ja = query_agent(name, iaref)
+    call push_agent(ierr, ja)
+    if (present(iagent)) then
+       iagent = ja
+    endif
+    return
+  end subroutine push_agent_ni
 !!!_  & pop_agent
   subroutine pop_agent_ai (ierr, iagent)
     implicit none
@@ -736,12 +895,20 @@ contains
     if (present(iagent)) then
        if (astack(jstack).ne.iagent) ierr = -1
     endif
-    if (ierr.eq.0) then
-       jstack = jstack - 1
-       if (jstack.lt.0) ierr = -1
-    endif
+    if (ierr.eq.0) call switch_agent(ierr, -1, -1)
     return
   end subroutine pop_agent_ai
+  subroutine pop_agent_ni (ierr, name, iaref)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: name
+    integer,optional,intent(in)  :: iaref
+    integer ja
+    ierr = 0
+    ja = query_agent(name, iaref)
+    call pop_agent(ierr, ja)
+    return
+  end subroutine pop_agent_ni
 !!!_  & top_agent
   subroutine top_agent_ai (ierr, iagent)
     implicit none
@@ -751,19 +918,47 @@ contains
     iagent = astack(jstack)
     return
   end subroutine top_agent_ai
+!!!_  & is_member () - check if self rank is member of agent
+  logical function is_member_i (iagent) result(b)
+    integer,intent(in) :: iagent
+    integer jerr
+    call inquire_agent(jerr, iagent, ismem=b)
+    if (jerr.ne.0) b = .false.
+  end function is_member_i
+  logical function is_member_a (agent) result(b)
+    character(len=*),intent(in) :: agent
+    integer ja
+    integer jerr
+    ja = query_agent(agent)
+    call inquire_agent(jerr, ja, ismem=b)
+    if (jerr.ne.0) b = .false.
+  end function is_member_a
+
+!!!_  & is_child_agent - check if matches children
+  logical function is_child_agent (name, iagent) result(b)
+    implicit none
+    character(len=*),intent(in) :: name
+    integer,optional,intent(in) :: iagent
+    integer jac
+    jac = clone_agent(iagent)
+    if (jac.ge.0) jac = query_agent(name, jac)
+    b = (jac.ge.0)
+  end function is_child_agent
 !!!_ + registration
 !!!_  & new_agent_root
   subroutine new_agent_root &
-       & (ierr, icomm, name)
-    use TOUZA_Ppp_std,only: get_ni, get_comm, choice_a
+       & (ierr, icomm, name, switch)
+    use TOUZA_Ppp_std,only: get_ni, get_comm, choice, choice_a
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in),optional :: icomm
     character(len=*),intent(in),optional :: name
+    integer,         intent(in),optional :: switch
 
     integer icsrc
     integer jagent
     character(len=lagent) :: ctmp
+    integer sw
 
     ierr = 0
     if (present(icomm)) then
@@ -780,24 +975,29 @@ contains
        endif
     endif
     if (ierr.eq.0) call add_entry_comm(ierr, jagent, ctmp, icsrc)
-    if (ierr.eq.0) call switch_agent(ierr, jagent)
+    sw = choice(0, switch)
+    if (ierr.eq.0) then
+       if (sw.ge.0) call switch_agent(ierr, jagent, sw)
+    endif
     return
   end subroutine new_agent_root
 
 !!!_  & new_agent_color
   subroutine new_agent_color &
-       & (ierr, color, name, src)
+       & (ierr, color, name, src, switch)
     use MPI,only: MPI_Comm_split
-    use TOUZA_Ppp_std,only: get_ni
+    use TOUZA_Ppp_std,only: get_ni, choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: color
     character(len=*),intent(in),optional :: name
     integer,         intent(in),optional :: src
+    integer,         intent(in),optional :: switch
 
     integer jas,   jau
     integer icsrc, icunit, icroot
     integer irank, nrank
+    integer sw
 
     ! no group control except for local color
     jas = check_agent(src)
@@ -809,20 +1009,11 @@ contains
     endif
     if (ierr.eq.0) then
        call MPI_Comm_split(icsrc, color, irank, icunit, ierr)
+       ! communcator name
     endif
     if (ierr.eq.0) then
        ! jau is dummy
-       ! clone base agent from source
-       call add_entry_comm(ierr, jau, asp_base, src=jas, flag=flag_base)
-    endif
-    if (ierr.eq.0) then
-       ! jau is dummy
-       ! clone root agent
-       jau = root_agent(jas)
-       if (jau.ge.0) then
-          icroot = atblp(jau)%comm
-          call add_entry_comm(ierr, jau, asp_root, icroot, src=jas, flag=flag_root)
-       endif
+       call add_entries_base(ierr, jau, jas)
     endif
     if (ierr.eq.0) then
        ! add unit agent
@@ -834,19 +1025,25 @@ contains
           call add_entry_comm(ierr, jau, NAME, icunit, src=jas, flag=flag_derived)
        endif
     endif
-    if (ierr.eq.0) call switch_agent(ierr, jau)
+    sw = choice(0, switch)
+    if (ierr.eq.0) then
+       if (sw.ge.0) call switch_agent(ierr, jau, sw)
+    endif
     return
   end subroutine new_agent_color
 !!!_  & new_agent_family
   subroutine new_agent_family &
-       & (ierr, affils, src)
-    use TOUZA_Ppp_std,only: get_ni, msg, is_msglev_debug
+       & (ierr, affils, src, switch)
+    use TOUZA_Ppp_std,only: choice, get_ni, msg, is_msglev_debug
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: affils(:)  ! (affiliaion) array of agents to belong to
     integer,optional,intent(in)  :: src
+    integer,optional,intent(in)  :: switch
+    ! integer,optional,intent(in)  :: opr   ! operation on unit agents
+    ! integer,optional,intent(in)  :: keys(:)   !
 
-    integer icsrc, icunit, icroot
+    integer icsrc, icroot
     integer igsrc
     integer jas,   jau
     ! integer jt
@@ -856,7 +1053,10 @@ contains
     character(len=lagent) :: tci(lttbl)
     integer               :: tui(lttbl)
     integer               :: tgr(lttbl)
+    integer               :: tgu(lttbl)
     integer,allocatable   :: rgw(:)
+    integer sw
+
     ierr = 0
 
     jas = check_agent(src)
@@ -866,15 +1066,10 @@ contains
        icsrc = atblp(jas)%comm
        igsrc = atblp(jas)%mgrp
        call merge_comm_table(ierr, nt, tci, tui, affils(:), icsrc)
-       ! if (is_msglev_debug(lev_verbose)) then
-       !    do jt = 1, nt
-       !       call msg(tci(jt), __MDL__, ulog)
-       !       call msg('(I0)', tui(jt), __MDL__, ulog)
-       !    enddo
-       ! endif
     endif
 
     if (ierr.eq.0) call get_ni(ierr, nrsrc, irsrc, icsrc)
+    ! write(*, *) 'ni', nrsrc, irsrc, icsrc
     if (ierr.eq.0) allocate(rgw(0:nrsrc-1), STAT=ierr)
     if (ierr.eq.0) then
        call batch_group_split(ierr, rgw, tgr, tci, nt, affils(:), icsrc, igsrc, irsrc)
@@ -882,36 +1077,30 @@ contains
     if (ierr.eq.0) deallocate(rgw, STAT=ierr)
 
     if (ierr.eq.0) then
-       call gen_comm_unit(ierr, icunit, tci, tui, nt, affils(:), icsrc)
+       call gen_comm_unit(ierr, tgu, tui, tgr, nt, icsrc)
     endif
+
     if (ierr.eq.0) then
        ! jau is dummy
-       ! clone base agent from source
-       call add_entry_comm(ierr, jau, asp_base, src=jas, flag=flag_base)
+       call add_entries_base(ierr, jau, jas)
     endif
     if (ierr.eq.0) then
-       ! jau is dummy
-       ! clone root agent
-       jau = root_agent(jas)
-       if (jau.ge.0) then
-          icroot = atblp(jau)%comm
-          call add_entry_comm(ierr, jau, asp_root, icroot, src=jas, flag=flag_root)
-       endif
-    endif
-    if (ierr.eq.0) then
-       ! add unit agent
-       call add_entry_comm(ierr, jau, asp_unit, icunit, src=jas, flag=flag_unit)
+       call add_agent_units(ierr, jau, tgu, tui, nt, jas)
     endif
     if (ierr.eq.0) then
        call add_agent_family(ierr, tgr, tci, tui, nt, affils(:), jas)
     endif
-    if (ierr.eq.0) call switch_agent(ierr, jau)
+
+    sw = choice(0, switch)
+    if (ierr.eq.0) then
+       if (sw.ge.0) call switch_agent(ierr, jau, sw)
+    endif
   end subroutine new_agent_family
 
 !!!_  & new_agent_derived
   subroutine new_agent_derived &
        & (ierr, name, alist, iagent)
-    use MPI,only: MPI_UNDEFINED
+    use MPI,only: MPI_UNDEFINED, MPI_Group_rank
     use TOUZA_Ppp_std,only: msg
     implicit none
     integer,         intent(out) :: ierr
@@ -940,7 +1129,7 @@ contains
     if (ierr.eq.0) then
        call derive_group &
             & (ierr,  igdrv, &
-            &  atblp, matbl, jas, alist)
+            &  atblp, jas, alist)
     endif
     if (ierr.eq.0) call MPI_Group_rank(igdrv, ird, ierr)
     if (ierr.eq.0) then
@@ -951,9 +1140,249 @@ contains
        endif
        call add_entry_group(ierr, jad, name, igdrv, jas, flg)
     endif
-     return
+    return
   end subroutine new_agent_derived
 
+!!!_  & new_agent_spinoff
+  subroutine new_agent_spinoff &
+       & (ierr, name, iagent, switch)
+    use MPI,only: MPI_UNDEFINED, MPI_Group_rank
+    use TOUZA_Ppp_std,only: msg, choice
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: name      ! new name
+    integer,optional,intent(in)  :: iagent    ! current agent-id if null
+    integer,optional,intent(in)  :: switch
+
+    integer jas, jac, jax
+    integer sw
+
+    ierr = 0
+
+    jac = clone_agent(iagent)
+    ! to implement later
+    if (jac.lt.0) then
+       jas = check_agent(iagent)
+       call add_entries_base(ierr, jac, jas)
+       if (ierr.eq.0) then
+          jas = source_agent(jac)
+          call add_entry_copy(ierr, jax, asp_unit, jac, jas, flag=flag_unit)
+       endif
+    endif
+    if (ierr.eq.0) then
+       jas = source_agent(jac)
+       call add_entry_copy &
+            & (ierr, jax, name, jac, jas, flag_derived)
+    endif
+    if (ierr.eq.0) then
+       sw = choice(0, switch)
+       if (sw.ge.0) call switch_agent(ierr, jax, sw)
+    endif
+  end subroutine new_agent_spinoff
+!!!_ + other utilities
+!!!_  & mod_agent_order - reorder rank in agent/group
+  subroutine mod_agent_order &
+       & (ierr, atgt, opr, keys, iagent)
+    use MPI,only: MPI_UNDEFINED
+#  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
+    use MPI,only: MPI_Group_translate_ranks
+#  endif
+    use TOUZA_Ppp_std,only: msg
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: atgt      ! target agent
+    integer,         intent(in)  :: opr       ! operation flag
+    integer,optional,intent(in)  :: keys(:)   !
+    integer,optional,intent(in)  :: iagent
+
+    integer ja
+    integer jr, nrank, jshft
+    integer,allocatable :: ranks(:)
+    integer jk
+    integer igtgt, ignew, icnew, icsrc
+    logical b
+
+    integer jaref, jgref, nrref
+    integer,allocatable :: rref(:)
+    integer,allocatable :: rdst(:)
+
+    ierr = 0
+    b = .FALSE.
+
+    ja = query_agent(atgt, iagent)
+    if (ja.lt.0) ierr = -1
+    if (ierr.eq.0) igtgt = atblp(ja)%mgrp
+    if (ierr.eq.0) call inquire_agent(ierr, iagent=ja, nrank=nrank)
+    if (ierr.eq.0) allocate(ranks(0:nrank-1), STAT=ierr)
+    if (ierr.eq.0) then
+       b = .TRUE.
+       select case(opr)
+       case (OPR_REVERSE)
+          do jr = 0, nrank - 1
+             ranks(nrank-1-jr) = jr
+          enddo
+       case (OPR_SHIFT)
+          if (present(keys)) then
+             jshft = keys(1)
+          else
+             jshft = 1
+          endif
+          do jr = 0, nrank - 1
+             ranks(jr) = mod(nrank + jshft + jr, nrank)
+          enddo
+       case (OPR_FLOAT)
+          jr = 0
+          do jk = 1, size(keys)
+             if (ANY(keys(jk).eq.ranks(0:jr-1))) then
+                continue
+             else if (keys(jk).ge.0 .and. keys(jk).lt.nrank) then
+                ranks(jr) = keys(jk)
+                jr = jr + 1
+             endif
+          enddo
+          do jk = 0, nrank - 1
+             if (ANY(jk.eq.ranks(0:jr-1))) then
+                continue
+             else
+                ranks(jr) = jk
+                jr = jr + 1
+             endif
+          enddo
+       case (OPR_IMPORT)
+          if (present(keys)) then
+             jaref = keys(1)
+          else
+             ierr = -1
+          endif
+          ! todo: check on reference agent
+          if (ierr.eq.0) jgref = atblp(jaref)%mgrp
+          if (ierr.eq.0) call MPI_Group_size(jgref, nrref, ierr)
+          if (ierr.eq.0) allocate(rref(0:max(nrank,nrref)-1), rdst(0:nrref-1), STAT=ierr)
+          if (ierr.eq.0) then
+             do jk = 0, nrref - 1
+                rref(jk) = jk
+             enddo
+             call MPI_Group_translate_ranks(jgref, nrref, rref, igtgt, rdst, ierr)
+          endif
+          if (ierr.eq.0) then
+             ! write(*, *) 'rref', rref
+             ! write(*, *) 'rdst', rdst
+             rref(0:nrank-1) = -1
+             jr = 0
+             do jk = 0, nrref - 1
+                if (rdst(jk).ne.MPI_UNDEFINED) then
+                   rref(rdst(jk)) = jr
+                   jr = jr + 1
+                endif
+             enddo
+             do jk = 0, nrank - 1
+                if (rref(jk).lt.0) then
+                   rref(jk) = jr
+                   jr = jr + 1
+                endif
+             enddo
+             do jk = 0, nrank - 1
+                ranks(rref(jk)) = jk
+             enddo
+             ! write(*, *) 'rank', ranks
+          endif
+          if (ierr.eq.0) deallocate(rref, rdst, STAT=ierr)
+          ! b = .FALSE.
+       case default
+          b = .FALSE.
+       end select
+    endif
+
+    if (b) then
+       ! write(*, *) 'order', igtgt, ranks(0:nrank-1)
+       return
+       if (ierr.eq.0) call MPI_Group_incl(igtgt, nrank, ranks(0:nrank-1), ignew, ierr)
+       if (ierr.eq.0) then
+          icsrc = atblp(ja)%comm
+          if (icsrc.eq.MPI_COMM_NULL) then
+             icnew = icsrc
+          else
+             call MPI_Comm_create(icsrc, ignew, icnew, ierr)
+             ! communicator name
+          endif
+       endif
+       if (ierr.eq.0) then
+          atblp(ja)%comm = icnew
+          atblp(ja)%mgrp = ignew
+       endif
+    endif
+    if (ierr.eq.0) deallocate(ranks, STAT=ierr)
+
+  end subroutine mod_agent_order
+!!!_  & agents_translate - translate ranks between agents
+  subroutine agents_translate_a &
+       & (ierr, irtgt, atgt, irsrc, asrc)
+    use MPI,only: MPI_UNDEFINED
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: irtgt
+    character(len=*),intent(in)          :: atgt    ! target agent
+    integer,         intent(in),optional :: irsrc   ! source rank  (self if not present)
+    character(len=*),intent(in),optional :: asrc    ! source agent (current if not present)
+
+    integer iatgt, iasrc
+    ierr = 0
+    iatgt = query_agent(atgt)
+    if (present(asrc)) then
+       iasrc = query_agent(asrc)
+       call agents_translate_i(ierr, irtgt, iatgt, irsrc, iasrc)
+    else
+       call agents_translate_i(ierr, irtgt, iatgt, irsrc)
+    endif
+    return
+  end subroutine agents_translate_a
+
+  subroutine agents_translate_i &
+       & (ierr, irtgt, iatgt, irsrc, iasrc)
+    use MPI,only: MPI_UNDEFINED
+#  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
+    use MPI,only: MPI_Group_translate_ranks
+#  endif
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(out)         :: irtgt
+    integer,intent(in),optional :: iatgt   ! target agent (current if not present)
+    integer,intent(in),optional :: irsrc   ! source rank  (self if not present)
+    integer,intent(in),optional :: iasrc   ! source agent (current if not present)
+
+    integer jat, jas
+    integer igt, igs
+    integer irs(1), irt(1)
+    integer nrsrc
+
+    ierr = 0
+    irtgt = MPI_UNDEFINED
+
+    jas = check_agent(iasrc)
+    jat = check_agent(iatgt)
+
+    if (jas.lt.0) ierr = -1
+    if (jat.lt.0) ierr = -1
+    if (ierr.eq.0) then
+       if (present(irsrc)) then
+          call inquire_agent(ierr, iagent=jas, nrank=nrsrc)
+          if (irsrc.lt.nrsrc) then
+             irs(1) = irsrc
+          else
+             ierr = -1
+          endif
+       else
+          call inquire_agent(ierr, iagent=jas, irank=irs(1))
+          if (irs(1).lt.0) ierr = -1
+       endif
+    endif
+    if (ierr.eq.0) call inquire_agent(ierr, iagent=jas, igroup=igs)
+    if (ierr.eq.0) call inquire_agent(ierr, iagent=jat, igroup=igt)
+    if (ierr.eq.0) then
+       call MPI_Group_translate_ranks(igs, 1, irs(:), igt, irt(:), ierr)
+    endif
+    if (ierr.eq.0) irtgt = irt(1)
+  end subroutine agents_translate_i
 !!!_ + internal procedures
 !!!_  & check_agent
   integer function check_agent &
@@ -998,6 +1427,56 @@ contains
     return
   end function root_agent
 
+!!!_  & add_agent_units
+  subroutine add_agent_units &
+       & (ierr, &
+       &  jau,  &
+       &  tgu,  &
+       &  tui,  nt, src)
+    use MPI,only: MPI_UNDEFINED
+    use MPI,only: MPI_Comm_create, MPI_Group_rank
+    use TOUZA_Ppp_std,only: choice
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(out) :: jau
+    integer,intent(in)  :: tgu(0:*)
+    integer,intent(in)  :: tui(:)
+    integer,intent(in)  :: nt
+    integer,intent(in)  :: src
+
+    character(len=lagent) :: buf
+    integer munit
+    integer ju
+    integer ja
+    integer ird
+    integer igdrv
+
+    ierr = 0
+    munit = maxval(tui(1:nt))
+101 format(A, I0)
+    jau = -1
+    do ju = 0, munit
+       igdrv = tgu(ju)
+       if (ierr.eq.0) call MPI_Group_rank(igdrv, ird, ierr)
+       if (ierr.eq.0) then
+          write(buf, 101) trim(asp_unit), ju
+          if (ird.eq.MPI_UNDEFINED) then
+             call add_entry_group(ierr, ja, buf, igdrv, src, flag_xunit)
+          else
+             ! set jau to return
+             call add_entry_group(ierr, jau, buf, igdrv, src, flag_unit)
+             ! call add_entry_group(ierr, jau, asp_unit, igdrv, src, flag_unit)
+          endif
+       endif
+    enddo
+
+    if (ierr.eq.0) then
+       ierr = add_agent_alias(asp_unit, src, jau)
+       ierr = min(0, ierr)
+    endif
+    ! write(*, *) 'add_agent_units', ierr, jau
+  end subroutine add_agent_units
+
 !!!_  & add_agent_family
   subroutine add_agent_family &
        & (ierr, &
@@ -1017,25 +1496,23 @@ contains
     integer ja, je, jt
     integer icsrc, icnew
     integer uself
+
     ierr = 0
 
-    ja = matbl
-    matbl = matbl + nt
-    if (matbl.gt.latbl) then
-       ierr = -1
-       return
-    endif
+    call add_agent(ierr, ja, tci(1:nt), src)
+    if (ierr.lt.0) return
 
     je = ja + nt - 1
 
     atblp(ja:je)%name = tci(1:nt)
     atblp(ja:je)%mgrp = tgr(1:nt)
-    atblp(ja:je)%isrc = src
+    ! atblp(ja:je)%isrc = src
     icsrc = atblp(src)%comm
 
     do jt = 1, nt
        if (ierr.eq.0) then
           call MPI_Comm_create(icsrc, tgr(jt), icnew, ierr)
+          ! communicator name
        endif
        if (ierr.eq.0) atblp(ja + jt - 1)%comm = icnew
     enddo
@@ -1064,6 +1541,34 @@ contains
     enddo
 
   end subroutine add_agent_family
+!!!_  & add_entries_base
+  subroutine add_entries_base &
+       & (ierr, iagent, source)
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: iagent
+    integer,         intent(in)  :: source
+    integer jau
+    integer icroot
+
+    ierr = 0
+    if (ierr.eq.0) then
+       ! jau is dummy
+       ! clone base agent from source
+       call add_entry_comm(ierr, iagent, asp_base, src=source, flag=flag_base)
+    endif
+    if (ierr.eq.0) then
+       ! jau is dummy
+       ! clone root agent
+       jau = root_agent(source)
+       if (jau.ge.0) then
+          icroot = atblp(jau)%comm
+          call add_entry_comm(ierr, jau, asp_root, icroot, src=source, flag=flag_root)
+       endif
+    endif
+
+  end subroutine add_entries_base
+
 !!!_  & add_entry_comm
   subroutine add_entry_comm &
        & (ierr, iagent, name, icomm, src, flag)
@@ -1078,20 +1583,19 @@ contains
     integer,optional,intent(in)  :: flag
 
     integer jgrp
+    integer isrc
 
     ierr = 0
-    iagent = matbl
-    matbl = matbl + 1
-    if (matbl.gt.latbl) then
-       ierr = -1
-       return
-    endif
+    isrc = choice(-1, src)
+
+    call add_agent(ierr, iagent, (/name/), isrc)
+    if (ierr.lt.0) return
 
     atblp(iagent)%name = name
     atblp(iagent)%kflg = choice(flag_root, flag)
     if (present(icomm)) then
        atblp(iagent)%comm = icomm
-       atblp(iagent)%isrc = choice(-1, src)
+       ! atblp(iagent)%isrc = isrc
        call MPI_Comm_group(icomm, jgrp, ierr)
        if (ierr.eq.0) then
           atblp(iagent)%mgrp = jgrp
@@ -1100,7 +1604,7 @@ contains
           ierr = -1
        endif
     else if (present(src)) then
-       atblp(iagent)%isrc = choice(-1, src)
+       ! atblp(iagent)%isrc = isrc
        if (src.lt.0.or.src.ge.matbl) then
           ierr = -1
        else
@@ -1130,24 +1634,48 @@ contains
     integer icsrc, icnew
 
     ierr = 0
-    iagent = matbl
-    matbl = matbl + 1
-    if (matbl.gt.latbl) then
-       ierr = -1
-       return
-    endif
+    call add_agent(ierr, iagent, (/name/), src)
+    if (ierr.lt.0) return
 
     atblp(iagent)%name = name
     atblp(iagent)%kflg = flag
-    atblp(iagent)%isrc = src
+    ! atblp(iagent)%isrc = src
     atblp(iagent)%mgrp = igroup
     icsrc = atblp(src)%comm
 
     call MPI_Comm_create(icsrc, igroup, icnew, ierr)
+    ! communicator name
     if (ierr.eq.0) atblp(iagent)%comm = icnew
 
     return
   end subroutine add_entry_group
+
+!!!_  & add_entry_copy
+  subroutine add_entry_copy &
+       & (ierr, iagent, name, iaref, src, flag)
+    use MPI,only: MPI_Comm_create
+    use TOUZA_Ppp_std,only: choice
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: iagent
+    character(len=*),intent(in)  :: name
+    integer,         intent(in)  :: iaref
+    integer,         intent(in)  :: src
+    integer,         intent(in)  :: flag
+
+    integer icsrc, icnew
+
+    ierr = 0
+    call add_agent(ierr, iagent, (/name/), src)
+    if (ierr.lt.0) return
+
+    atblp(iagent)%name = name
+    atblp(iagent)%kflg = flag
+    atblp(iagent)%mgrp = atblp(iaref)%mgrp
+    atblp(iagent)%comm = atblp(iaref)%comm
+
+    return
+  end subroutine add_entry_copy
 
 !!!_  & merge_comm_table - merge agent table
   subroutine merge_comm_table &
@@ -1357,7 +1885,7 @@ contains
     return
   end subroutine recv_affils
 
-!!!_  - batch_group_split
+!!!_  & batch_group_split
   subroutine batch_group_split &
        & (ierr,   ranks,  tbl_gr, &
        &  tbl_ci, ntotal, affils, icomm, igsrc, ir)
@@ -1402,57 +1930,48 @@ contains
              call MPI_Bcast(ranks(0:m-1), m, MPI_INTEGER, iroot, icomm, ierr)
           endif
           if (ierr.eq.0) call MPI_Group_incl(igsrc, m, ranks(0:m-1), jgnew, ierr)
+          ! write(*, *) 'incl', j, jgnew, m, ranks(0:m-1)
           if (ierr.eq.0) tbl_gr(j) = jgnew
        enddo
     endif
-
   end subroutine batch_group_split
 
-!!!_  - gen_comm_unit
+!!!_  & gen_comm_unit
   subroutine gen_comm_unit &
-       & (ierr,   icunit, &
-       &  tbl_ci, tbl_ui, ntotal, affils, icomm)
+       & (ierr,   tbl_gu, &
+       &  tbl_ui, tbl_gr, ntotal, icomm)
+    use TOUZA_Ppp_std,only: choice
     use MPI,only: &
-         & MPI_UNDEFINED, MPI_COMM_NULL, &
-         & MPI_Comm_split
+         & MPI_UNDEFINED,  MPI_COMM_NULL, MPI_GROUP_EMPTY, &
+         & MPI_Comm_split, MPI_Group_union
     implicit none
     integer,         intent(out) :: ierr
-    integer,         intent(out) :: icunit
-    character(len=*),intent(in)  :: tbl_ci(*)
+    integer,         intent(out) :: tbl_gu(0:*)
     integer,         intent(in)  :: tbl_ui(*)
+    integer,         intent(in)  :: tbl_gr(*)
     integer,         intent(in)  :: ntotal
-    character(len=*),intent(in)  :: affils(*)
     integer,         intent(in)  :: icomm
 
     integer irank
     integer ju, munit
     integer js
-    integer newc
-    logical inc
+    integer key
+    integer igtmp, igdrv
 
     ierr = 0
     call get_cnr(ierr, icomm, irank)
-
     if (ierr.eq.0) then
        munit = maxval(tbl_ui(1:ntotal))
-       ! write(*, *) irank, munit, tbl_ui(1:ntotal)
        do ju = 0, munit
-          inc = .FALSE.
+          igdrv = MPI_GROUP_EMPTY
           do js = 1, ntotal
-             ! only affils(1) is used
-             if (tbl_ci(js).eq.affils(1)) then
-                inc = (tbl_ui(js).eq.ju)
-                exit
+             if (tbl_ui(js).eq.ju) then
+                call MPI_Group_size(tbl_gr(js), key, ierr)
+                if (ierr.eq.0) call MPI_Group_union(igdrv, tbl_gr(js), igtmp, ierr)
+                if (ierr.eq.0) igdrv = igtmp
              endif
           enddo
-          if (inc) then
-             CALL MPI_Comm_split &
-                  & (icomm,  ju,  irank, newc, ierr)
-             icunit = newc
-          else
-             CALL MPI_Comm_split &
-                  & (icomm,  MPI_UNDEFINED, -999, newc, ierr)
-          endif
+          if (ierr.eq.0) tbl_gu(ju) = igdrv
        enddo
     endif
   end subroutine gen_comm_unit
@@ -1460,7 +1979,7 @@ contains
 !!!_  & derive_group
   subroutine derive_group &
        & (ierr, igdrv, &
-       &  tbl,  nt,    src, alist)
+       &  tbl,  src, alist)
     use MPI,only: &
          & MPI_GROUP_EMPTY, &
          & MPI_Group_union
@@ -1468,27 +1987,29 @@ contains
     integer,         intent(out) :: ierr
     integer,         intent(out) :: igdrv
     type(aprop_t),   intent(in)  :: tbl(-1:*)
-    integer,         intent(in)  :: nt
     character(len=*),intent(in)  :: alist(:)
     integer,         intent(in)  :: src
 
     integer jt
     integer igdst, igtmp
+    integer ja
 
     ierr = 0
     igtmp = MPI_GROUP_EMPTY
     igdrv = igtmp
-    do jt = 0, nt - 1
-       if (tbl(jt)%isrc.ne.src) cycle
-       if (ANY(alist(:).eq.tbl(jt)%name)) then
-          if (ierr.eq.0) call MPI_Group_union(igtmp, tbl(jt)%mgrp, igdst, ierr)
-          if (ierr.eq.0) igtmp = igdst
+    do jt = 1, size(alist(:), 1)
+       ja = query_agent_core(alist(jt), src)
+       if (ja.lt.0) then
+          ierr = ja
+          exit
        endif
+       if (ierr.eq.0) call MPI_Group_union(igtmp, tbl(ja)%mgrp, igdst, ierr)
+       if (ierr.eq.0) igtmp = igdst
     enddo
     if (ierr.eq.0) igdrv = igtmp
   end subroutine derive_group
 
-!!!_  - get_cnr
+!!!_  & get_cnr
   subroutine get_cnr &
        & (ierr, icomm, irank, nrank)
     use TOUZA_Ppp_std,only: get_comm, get_ni, choice
@@ -1508,6 +2029,87 @@ contains
        endif
     endif
   end subroutine get_cnr
+
+!!!_  - add_agent
+  subroutine add_agent &
+       & (ierr, iagent, names, source)
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: iagent
+    character(len=*),intent(in)  :: names(0:)
+    integer,         intent(in)  :: source
+    integer j, m, e
+    ierr = 0
+    iagent = matbl
+    m = size(names, 1)
+    do j = 0, m - 1
+       e = add_agent_core(names(j), source)
+       if (e.lt.0) then
+          ierr = e
+          return
+       endif
+    enddo
+    if (matbl.ge.latbl) ierr = -1
+    return
+  end subroutine add_agent
+
+!!!_  - add_agent_core
+  integer function add_agent_core &
+       & (name, source) &
+       & result(n)
+    use TOUZA_Ppp_std,only: query_status, reg_entry, choice
+    implicit none
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: source
+    integer e
+
+    n = query_status(name, source, hh_agent)
+    if (n.ge.0) then
+       n = ERR_DUPLICATE_SET - ERR_MASK_PPP_AMNG
+       return
+    endif
+    n = matbl
+    matbl = matbl + 1
+    if (n.ge.latbl) then
+       n = ERR_INSUFFICIENT_BUFFER - ERR_MASK_PPP_AMNG
+       return
+    endif
+    e = reg_entry(name, source, hh_agent, n)
+    atblp(n)%isrc = source
+    if (e.lt.0) n = e
+  end function add_agent_core
+
+!!!_  - add_agent_alias
+  integer function add_agent_alias &
+       & (name, source, iagent) &
+       & result(n)
+    use TOUZA_Ppp_std,only: query_status, reg_entry
+    implicit none
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: source
+    integer,         intent(in) :: iagent
+    integer e
+
+    n = query_status(name, source, hh_agent)
+    if (n.ge.0) then
+       n = ERR_DUPLICATE_SET - ERR_MASK_PPP_AMNG
+       return
+    endif
+    e = reg_entry(name, source, hh_agent, iagent)
+    n = min(0, e)
+  end function add_agent_alias
+
+!!!_  - query_agent_core
+  integer function query_agent_core &
+       & (name, source) &
+       & result(n)
+    use TOUZA_Ppp_std,only: query_status
+    implicit none
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: source
+
+    n = query_status(name, source, hh_agent)
+  end function query_agent_core
 
 !!!_ + end TOUZA_Ppp_amng
 end module TOUZA_Ppp_amng
@@ -1570,20 +2172,23 @@ contains
     integer nself
     character(len=lagent) :: drvs(ltest)
     integer irank, nrank
+    integer iaref
 
     ierr = 0
 
     if (ierr.eq.0) then
        call new_agent_root(ierr, icomm)
     endif
-    if (ierr.eq.0) call new_agent_color(ierr, color)
+    ! write(*, *) 'root', ierr
+    if (ierr.eq.0) call new_agent_color(ierr, color, switch=+1)
+    ! write(*, *) 'color', ierr
 
     if (ierr.eq.0) call inquire_agent(ierr, irank=irank, nrank=nrank)
     if (ierr.eq.0) then
        call set_drivers(nself, drvs, irank, nrank, ktest)
     endif
     if (ierr.eq.0) then
-       call new_agent_family(ierr, drvs(1:nself))
+       call new_agent_family(ierr, drvs(1:nself), switch=+1)
     endif
     if (ierr.eq.0) then
        call new_agent_derived(ierr, 'W', (/'A', 'X'/))
@@ -1593,6 +2198,65 @@ contains
     endif
     if (ierr.eq.0) then
        call new_agent_derived(ierr, 'H', (/'B', 'C'/))
+       ierr = max(0, ierr)
+    endif
+    if (ierr.eq.0) then
+       call mod_agent_order(ierr, 'Q', OPR_REVERSE)
+       ierr = 0
+    endif
+    if (ierr.eq.0) then
+       if (mod(color,2).eq.1) then
+          iaref = query_agent('@')
+          call mod_agent_order(ierr, '@', OPR_SHIFT, (/1/))
+          call mod_agent_order(ierr, 'H', OPR_IMPORT, (/iaref/))
+          call mod_agent_order(ierr, 'A', OPR_IMPORT, (/iaref/))
+       endif
+       ! write(*, *) 'import = ', ierr
+    endif
+    if (ierr.eq.0) then
+       call test_translate(ierr, 'A', 'B')
+       call test_translate(ierr, 'A', 'W')
+       call test_translate(ierr, 'A', 'Q')
+       call test_translate(ierr, 'A', '/')
+       call test_translate(ierr, 'A', '%')
+       call test_translate(ierr, 'B', '/')
+       call test_translate(ierr, 'B', '%')
+       call test_translate(ierr, 'Q', '/')
+       call test_translate(ierr, 'Q', '@')
+    endif
+
+    if (ierr.eq.0) then
+       iaref = query_agent('A')
+       if (is_member(iaref)) then
+          call new_agent_family(ierr, (/'I'/), iaref, switch=+1)
+          call pop_agent(ierr)
+       endif
+    endif
+102 format('is_child:', A, 1x, L1)
+    if (ierr.eq.0) then
+       iaref = query_agent('B')
+       if (is_member(iaref)) then
+          write(*, 102) 'I', is_child_agent('I', iaref)
+          call new_agent_family(ierr, (/'I'/), iaref, switch=-1)
+          call push_agent(ierr, iaref)
+          call switch_agent(ierr, '>')
+          call push_agent(ierr, 'I')
+          call switch_agent(ierr, '<')
+          write(*, 102) 'I', is_child_agent('I', iaref)
+       endif
+    endif
+    if (ierr.eq.0) then
+       iaref = query_agent('X')
+       if (is_member(iaref)) then
+          call new_agent_spinoff(ierr, 'J', iaref, switch=-1)
+          if (is_child_agent('I', iaref)) then
+             write(*, 102) 'I', .TRUE.
+          else
+             write(*, 102) 'I', .FALSE.
+             call new_agent_spinoff(ierr, 'I', iaref)
+          endif
+          write(*, 102) 'I', is_child_agent('I', iaref)
+       endif
     endif
     return
   end subroutine test_ppp_agent
@@ -1650,6 +2314,32 @@ contains
        write(*, 101) irank, j, trim(drvs(j))
     enddo
   end subroutine set_drivers
+
+  subroutine test_translate (ierr, asrc, atgt)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: asrc
+    character(len=*),intent(in)  :: atgt
+    integer ir, nrsrc
+    integer irtgt
+    ierr = 0
+
+    call inquire_agent(ierr, asrc, nrank=nrsrc)
+101 format('TRANSLATE: ', A, '[', I0, '/', I0, '] >> ', A, '[', I0, ']')
+
+    if (ierr.eq.0) then
+       call agents_translate(ierr, irtgt, atgt, asrc=asrc)
+       write(*, 101) trim(asrc), -1, nrsrc, trim(atgt), irtgt
+       ierr = 0
+    endif
+    if (ierr.eq.0) then
+       do ir = 0, (nrsrc - 1) + 1
+          call agents_translate(ierr, irtgt, atgt, ir, asrc)
+          write(*, 101) trim(asrc), ir, nrsrc, trim(atgt), irtgt
+          ierr = 0
+       enddo
+    endif
+  end subroutine test_translate
 
 end program test_ppp_amng
 #endif /* TEST_PPP_AMNG */

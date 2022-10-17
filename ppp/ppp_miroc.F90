@@ -1,7 +1,7 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/04/17 22:59:58 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/07/15 10:33:11 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -38,6 +38,7 @@ module TOUZA_Ppp_miroc
 !!!_ = declaration
   use TOUZA_Ppp_std,only: unit_global
   use TOUZA_Ppp,only: diag_maps_batch, barrier_trace
+  use TOUZA_Ppp,only: set_king, get_king, is_king
 !!!_  - default
   implicit none
   private
@@ -142,13 +143,14 @@ module TOUZA_Ppp_miroc
   public get_wcolor
   public affils_legacy
   public gen_agent_union
-  public push_agent, pop_agent, top_agent, switch_agent
+  public push_agent, pop_agent, top_agent, switch_agent, spinoff_agent
   public diag_agent_maps
   public query_handle, query_nprocs, query_comm
   public terminate
-
+!!!_   . export
   public barrier_trace
-
+  public set_king, get_king, is_king
+!!!_   . legacy
   public XCKINI, MMGetColor, XMGetColor, XMIComm, XMCOMM, XMGETK, XMProc, XMOKNG
   public XMquit, XMabort,    XMabort0,   XMFinal
   public XCKINI_legacy
@@ -609,6 +611,30 @@ contains
     endif
     return
   end subroutine switch_agent
+!!!_  & spinoff_agent - create spinoff agent if not exists
+  subroutine spinoff_agent &
+       & (ierr, iaspin, name, iagnt)
+    use TOUZA_Ppp,only: is_child_agent, new_agent_spinoff, &
+         &              top_agent, pop_agent, clone_agent, query_agent
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: iaspin
+    character(len=*),intent(in)  :: name
+    integer,         intent(in)  :: iagnt
+    integer jac
+    ierr = 0
+    iaspin = -1
+    if (is_child_agent(name, iagnt)) then
+       jac = clone_agent(iagnt)
+       if (jac.ge.0) iaspin = query_agent(name, jac)
+    else
+       ! to do: improve amng
+       call new_agent_spinoff(ierr, name, iagnt, switch=+1)
+       if (ierr.eq.0) call top_agent(ierr, iaspin)
+       if (ierr.eq.0) call pop_agent(ierr)
+    endif
+  end subroutine spinoff_agent
+
 !!!_  & query_handle - get agent handle from agent string (XMCiJA)
   subroutine query_handle(IAGNT, HCTZ)
     use TOUZA_Emu,only: get_sysu

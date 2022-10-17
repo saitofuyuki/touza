@@ -1,7 +1,7 @@
 !!!_! ppp_std.F90 - TOUZA/Ppp utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2022/03/01 11:28:55 fuyuki ppp_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/06/10 12:54:44 fuyuki ppp_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -29,6 +29,9 @@ module TOUZA_Ppp_std
   use TOUZA_Std_mwe,only: &
        & get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
   use TOUZA_Std_env,only: is_eof_ss
+  use TOUZA_Std_htb,only: &
+       & new_htable,  new_entry, settle_entry, &
+       & diag_htable, reg_entry, query_status
 !!!_  - default
   implicit none
   private
@@ -61,12 +64,15 @@ module TOUZA_Ppp_std
   public get_logu,         unit_global,      trace_fine,       trace_control
   public get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
   public is_eof_ss
+  public new_htable,  new_entry, settle_entry
+  public diag_htable, reg_entry, query_status
 contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
     use TOUZA_Std_mwe,only: mwe_init=>init
     use TOUZA_Std_env,only: env_init=>init
+    use TOUZA_Std_htb,only: htb_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -91,6 +97,7 @@ contains
           lev_stdv = choice(lev_stdv, stdv)
           if (ierr.eq.0) call mwe_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
+          if (ierr.eq.0) call htb_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -102,6 +109,7 @@ contains
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std_mwe,only: mwe_diag=>diag
     use TOUZA_Std_env,only: env_diag=>diag
+    use TOUZA_Std_htb,only: htb_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -127,6 +135,7 @@ contains
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call mwe_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
+          if (ierr.eq.0) call htb_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -137,6 +146,7 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_mwe,only: mwe_finalize=>finalize
     use TOUZA_Std_env,only: env_finalize=>finalize
+    use TOUZA_Std_htb,only: htb_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -159,6 +169,7 @@ contains
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call mwe_finalize(ierr, utmp, lev_stdv, mode=lmd)
+          if (ierr.eq.0) call htb_finalize(ierr, utmp, lev_stdv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
     endif

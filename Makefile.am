@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/04/22 11:32:13 fuyuki Makefile.am>
+# Time-stamp: <2022/06/27 11:21:30 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -10,55 +10,60 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 ACLOCAL_AMFLAGS	=	-I m4c
-MOSTLYCLEANFILES	=
 EXTRA_DIST	=	autogen.sh README-touza.org LICENSE NOTICE
 include $(top_srcdir)/aminclude_static.am
 
 nodist_bin_SCRIPTS 	= makeshift
-CLEANFILES			= $(nodist_bin_SCRIPTS)
+CLEANFILES			+= $(nodist_bin_SCRIPTS)
 
-SUBDIRS 					= std
-lib@TOUZA_NAME@_la_LIBADD	= std/$(local_name)
-AM_FCFLAGS					+= $(FC_MODULE_touza_std)
+SUBDIRS 				  = std
+lib@TOUZA_NAME@_la_LIBADD = std/$(local_name)
+AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_std)
 
 if BUILD_emu
-SUBDIRS 					+= emu
-lib@TOUZA_NAME@_la_LIBADD	+= emu/$(local_name)
-AM_FCFLAGS					+= $(FC_MODULE_touza_emu)
+SUBDIRS 				  += emu
+lib@TOUZA_NAME@_la_LIBADD += emu/$(local_name)
+AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_emu)
 endif
 
 if BUILD_cal
-SUBDIRS 					+= cal
-lib@TOUZA_NAME@_la_LIBADD	+= cal/$(local_name)
-AM_FCFLAGS					+= $(FC_MODULE_touza_cal)
+SUBDIRS 				  += cal
+lib@TOUZA_NAME@_la_LIBADD += cal/$(local_name)
+AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_cal)
+endif
+
+if BUILD_div
+SUBDIRS 				  += div
+lib@TOUZA_NAME@_la_LIBADD += div/$(local_name)
+AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_div)
+endif
+
+if BUILD_trp
+SUBDIRS 				  += trp
+lib@TOUZA_NAME@_la_LIBADD += trp/$(local_name)
+AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_trp)
+endif
+
+if BUILD_nio
+SUBDIRS 				  += nio
+lib@TOUZA_NAME@_la_LIBADD += nio/$(local_name)
+AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_nio)
+endif
+
+if BUILD_ppp
+SUBDIRS 				  += ppp
+lib@TOUZA_NAME@_la_LIBADD += ppp/$(local_name)
+AM_FCFLAGS_MODULE         += $(FC_MODULE_touza_ppp)
+endif
+
+if BUILD_ami
+SUBDIRS 				  += ami
+lib@TOUZA_NAME@_la_LIBADD += ami/$(local_name)
+AM_FCFLAGS_MODULE         += $(FC_MODULE_touza_ami)
 endif
 
 pkgconfigdir	=	$(libdir)/pkgconfig
 pkgconfig_DATA	=	touza.pc
-
-# if BUILD_div
-# SUBDIRS 					+= div
-# lib@TOUZA_NAME@_la_LIBADD	+= div/$(local_name)
-# AM_FCFLAGS					+= $(FC_MODULE_touza_div)
-# endif
-
-if BUILD_trp
-SUBDIRS 					+= trp
-lib@TOUZA_NAME@_la_LIBADD	+= trp/$(local_name)
-AM_FCFLAGS					+= $(FC_MODULE_touza_trp)
-endif
-
-if BUILD_nng
-SUBDIRS 					+= nng
-lib@TOUZA_NAME@_la_LIBADD	+= nng/$(local_name)
-AM_FCFLAGS					+= $(FC_MODULE_touza_nng)
-endif
-
-if BUILD_ppp
-SUBDIRS 					+= ppp
-lib@TOUZA_NAME@_la_LIBADD	+= ppp/$(local_name)
-AM_FCFLAGS					+= $(FC_MODULE_touza_ppp)
-endif
 
 SUBDIRS	+=	m4c
 
@@ -114,6 +119,8 @@ export: $(AUTOREVISION_h)
 		export=`$(REALPATH) --relative-to=$(top_builddir) $(EXPORT)` || exit $$?; \
 		$(MAKE) distdir=$${export} distdir; \
 	fi
+
+include Makedep.inc
 
 ### Local Variables:
 ### mode: makefile-automake

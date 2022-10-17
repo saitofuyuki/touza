@@ -1,7 +1,7 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
 # Created: Jun 7 2020
-# Time-stamp: <2021/12/24 11:06:50 fuyuki autogen.sh>
+# Time-stamp: <2022/10/17 15:22:20 fuyuki autogen.sh>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -81,6 +81,15 @@ do
   run autoheader || exit $?
 
   # All we need is the file INSTALL
+  alibd="$(automake --print-libdir)"
+  for t in INSTALL
+  do
+    t=$alibd/$t
+    if test -f "$t"; then
+      run cp "$t" . || exit $?
+    fi
+  done
+
   run automake --add-missing --gnu || exit $?
   echo "# automake rerun"
   # shellcheck disable=SC2086

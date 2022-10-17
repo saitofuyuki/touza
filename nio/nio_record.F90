@@ -1,7 +1,7 @@
-!!!_! nng_record.F90 - TOUZA/Nng record interfaces
+!!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2022/04/13 13:57:25 fuyuki nng_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/09/29 13:39:57 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -13,15 +13,15 @@
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"
 #endif
-#include "touza_nng.h"
-!!!_@ TOUZA_Nng_record - nng record interfaces
-module TOUZA_Nng_record
+#include "touza_nio.h"
+!!!_@ TOUZA_Nio_record - nio record interfaces
+module TOUZA_Nio_record
 !!!_ = declaration
-  use TOUZA_Nng_std,only: &
+  use TOUZA_Nio_std,only: &
        & KI32, KI64, KDBL, KFLT, &
        & control_mode, control_deep, is_first_force, &
        & get_logu,     unit_global,  trace_fine,   trace_control
-  use TOUZA_Nng_header,only: litem, nitem
+  use TOUZA_Nio_header,only: litem, nitem
   use TOUZA_Trp, only: &
        & KCODE_CLIPPING,  KCODE_ROUND,      &
        & KCODE_TRANSPOSE, KCODE_SEQUENTIAL, KCODE_INCREMENTAL, &
@@ -103,8 +103,8 @@ module TOUZA_Nng_record
 
   integer,parameter,public :: XID_URT = 1632916053 ! 'URTa'
   ! integer,parameter,public :: XID_MRT = 1632916045 ! 'MRTa'
-  integer,parameter,public :: XTRP_ID = 0  ! index to store nng/urt i
-  integer,parameter,public :: XTRP_NX = 1  ! index to store nng/urt number of extra properties
+  integer,parameter,public :: XTRP_ID = 0  ! index to store nio/urt i
+  integer,parameter,public :: XTRP_NX = 1  ! index to store nio/urt number of extra properties
 
 !!!_  - private parameter
   integer,parameter :: GPROP_NUMX  = 1
@@ -127,12 +127,14 @@ module TOUZA_Nng_record
   character(len=litem),save :: head_def(nitem) = ' '
 
   integer,save :: bodr_wnative = BODR_ASSUME_SYSTEM
+
+  integer,save :: def_lazy_size = -1   ! lazy level for size parser
 !!!_  - private static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
   integer,save :: fine_counts = 0
-  integer,save :: lev_verbose = NNG_MSG_LEVEL
+  integer,save :: lev_verbose = NIO_MSG_LEVEL
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
 #define __MDL__ 'r'
@@ -142,19 +144,19 @@ module TOUZA_Nng_record
 
   integer,save :: udiag = -2    ! io unit to diag urt properties
 !!!_  - interfaces
-  interface nng_read_data
-     module procedure nng_read_data_f, nng_read_data_d, nng_read_data_i
-  end interface nng_read_data
-  interface nng_write_data
-     module procedure nng_write_data_f, nng_write_data_d, nng_write_data_i
-  end interface nng_write_data
+  interface nio_read_data
+     module procedure nio_read_data_f, nio_read_data_d, nio_read_data_i
+  end interface nio_read_data
+  interface nio_write_data
+     module procedure nio_write_data_f, nio_write_data_d, nio_write_data_i
+  end interface nio_write_data
 
-  interface nng_read_data_core
-     module procedure nng_read_data_core_f, nng_read_data_core_d, nng_read_data_core_i
-  end interface nng_read_data_core
-  interface nng_write_data_core
-     module procedure nng_write_data_core_f, nng_write_data_core_d, nng_write_data_core_i
-  end interface nng_write_data_core
+  interface nio_read_data_core
+     module procedure nio_read_data_core_f, nio_read_data_core_d, nio_read_data_core_i
+  end interface nio_read_data_core
+  interface nio_write_data_core
+     module procedure nio_write_data_core_f, nio_write_data_core_d, nio_write_data_core_i
+  end interface nio_write_data_core
 
   interface get_data_record
      module procedure get_data_record_i,  get_data_record_f,  get_data_record_d
@@ -271,11 +273,12 @@ module TOUZA_Nng_record
   public init, diag, finalize
   public set_default_switch
   public set_default_header, get_default_header
-  public nng_read_header,    nng_write_header
-  public nng_read_data,      nng_write_data
-  public nng_skip_records
+  public nio_read_header,    nio_write_header
+  public nio_read_data,      nio_write_data
+  public nio_skip_records
   public parse_header_base,  parse_record_fmt
   public parse_header_size
+  public get_header_cprop,   put_header_cprop
   public get_switch
   public set_urt_defs
   public switch_urt_diag
@@ -291,10 +294,10 @@ contains
 !!!_  & init
   subroutine init &
        & (ierr,   u,      levv,  mode,  stdv,  &
-       &  bodrw,  krectw, klenc, kldec, knenc, kndec, &
+       &  bodrw,  krectw, klenc, kldec, knenc, kndec, lazy, &
        &  vmiss,  utime,  csign, msign, icomm)
-    use TOUZA_Nng_std,   only: ns_init=>init, choice, get_size_bytes, KDBL
-    use TOUZA_Nng_header,only: nh_init=>init, litem, nitem
+    use TOUZA_Nio_std,   only: ns_init=>init, choice, get_size_bytes, KDBL
+    use TOUZA_Nio_header,only: nh_init=>init, litem, nitem
     use TOUZA_Trp,       only: trp_init=>init
     implicit none
     integer,         intent(out)         :: ierr
@@ -304,6 +307,7 @@ contains
     integer,         intent(in),optional :: krectw      ! default record switch (write)
     integer,         intent(in),optional :: klenc,kldec ! packing method for legacy-format (ury)
     integer,         intent(in),optional :: knenc,kndec ! packing method for new format (urt)
+    integer,         intent(in),optional :: lazy        ! lazy level for size parse
     real(kind=KDBL), intent(in),optional :: vmiss       ! default header properties
     character(len=*),intent(in),optional :: utime
     character(len=*),intent(in),optional :: csign, msign
@@ -344,6 +348,7 @@ contains
              call set_default_header(ierr, vmiss, utime, csign, msign)
           endif
        endif
+       def_lazy_size = max(-1, min(+1, choice(def_lazy_size, lazy)))
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
     endif
@@ -352,8 +357,8 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Nng_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
-    use TOUZA_Nng_header,only: nh_diag=>diag, show_header
+    use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
+    use TOUZA_Nio_header,only: nh_diag=>diag, show_header
     use TOUZA_Trp,       only: trp_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
@@ -374,6 +379,7 @@ contains
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
              if (is_msglev_normal(lv)) call msg('(''byte-order assumption = '', I0)', bodr_wnative, __MDL__, utmp)
+             if (is_msglev_normal(lv)) call msg('(''lazy-level = '', I0)', def_lazy_size, __MDL__, utmp)
              if (is_msglev_info(lv)) then
                 call show_header(ierr, head_def, ' ', utmp, lv)
              endif
@@ -398,8 +404,8 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Nng_std,   only: ns_finalize=>finalize, choice
-    use TOUZA_Nng_header,only: nh_finalize=>finalize
+    use TOUZA_Nio_std,   only: ns_finalize=>finalize, choice
+    use TOUZA_Nio_header,only: nh_finalize=>finalize
     use TOUZA_Trp,       only: trp_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -435,7 +441,7 @@ contains
 !!!_  - init subcontracts
 !!!_   & set_bodr_wnative
   subroutine set_bodr_wnative(ierr, bodrw, u, levv)
-    use TOUZA_Nng_std,only: &
+    use TOUZA_Nio_std,only: &
          & choice, msg, is_msglev_info, is_msglev_fatal, &
          & kendi_mem, kendi_file
     implicit none
@@ -470,7 +476,7 @@ contains
 !!!_   . set_default_switch
   subroutine set_default_switch &
        & (ierr, krectw, u, levv)
-    use TOUZA_Nng_std,only: choice, msg, is_msglev_fatal
+    use TOUZA_Nio_std,only: choice, msg, is_msglev_fatal
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: krectw        ! default record switch (write)
@@ -497,7 +503,7 @@ contains
 !!!_   . init_batch
   subroutine init_batch &
        & (ierr, klenc, kldec, knenc, kndec, u, levv)
-    use TOUZA_Nng_std,only: choice
+    use TOUZA_Nio_std,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: klenc,kldec ! packing method for legacy-format (ury)
@@ -521,13 +527,13 @@ contains
        &  vmiss, &
        &  utime, &
        &  csign, msign)
-    use TOUZA_Nng_header,only: &
+    use TOUZA_Nio_header,only: &
          & put_item, &
          & hi_IDFM,  hi_UTIM,  hi_FNUM,  hi_DNUM,  &
          & hi_ASTR1, hi_AEND1, hi_ASTR2, hi_AEND2, hi_ASTR3, hi_AEND3,  &
          & hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL,  &
          & hi_STYP,  hi_IOPTN, hi_ROPTN, hi_CSIGN, hi_MSIGN
-    use TOUZA_Nng_std,only: KDBL
+    use TOUZA_Nio_std,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
     real(kind=KDBL), intent(in),optional :: vmiss
@@ -581,22 +587,22 @@ contains
 !!!_  - get_default_header - get default header
   subroutine get_default_header &
        & (head)
-    use TOUZA_Nng_header,only: litem, nitem
+    use TOUZA_Nio_header,only: litem, nitem
     implicit none
     character(len=*),intent(out) :: head(*)
     head(1:nitem) = head_def(1:nitem)
     return
   end subroutine get_default_header
 
-!!!_  & nng_read_header_once - read header and set current properties
-  subroutine nng_read_header_once &
+!!!_  & nio_read_header_once - read header and set current properties
+  subroutine nio_read_header_once &
        & (ierr, &
        &  head,  krect, u)
-    use TOUZA_Nng_std,   only: &
+    use TOUZA_Nio_std,   only: &
          & KI32, KI64, KIOFS, is_eof_ss, &
          & WHENCE_ABS, sus_read_isep, sus_read_lsep, sus_skip_irec, sus_rseek, sus_eswap, &
          & conv_b2strm
-    use TOUZA_Nng_header,only: nitem, litem
+    use TOUZA_Nio_header,only: nitem, litem
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: head(*)
@@ -701,7 +707,7 @@ contains
     ! endif
     ! ierr = err_default !! TESTING
     return
-  end subroutine nng_read_header_once
+  end subroutine nio_read_header_once
 
 !!!_   . shift_header
   subroutine shift_header &
@@ -719,8 +725,8 @@ contains
     return
   end subroutine shift_header
 
-!!!_  & nng_read_header - read header and set current properties
-  subroutine nng_read_header &
+!!!_  & nio_read_header - read header and set current properties
+  subroutine nio_read_header &
        & (ierr, &
        &  head,  krect, u)
     implicit none
@@ -730,17 +736,17 @@ contains
     integer,         intent(in)  :: u
 
     ierr = err_default
-    if (ierr.eq.0) call nng_read_header_once(ierr, head, krect, u)
+    if (ierr.eq.0) call nio_read_header_once(ierr, head, krect, u)
     return
 
     ierr = err_default
     if (ierr.eq.0) call get_record_prop(ierr, krect, u)
     if (ierr.eq.0) call get_header(ierr, head, u, krect)
     return
-  end subroutine nng_read_header
+  end subroutine nio_read_header
 
-!!!_  & nng_write_header - write header and set current properties (if necessary)
-  subroutine nng_write_header &
+!!!_  & nio_write_header - write header and set current properties (if necessary)
+  subroutine nio_write_header &
        & (ierr, &
        &  head,  krect, u)
     implicit none
@@ -753,12 +759,12 @@ contains
     if (ierr.eq.0) call set_wrecord_prop(ierr, krect, u)
     if (ierr.eq.0) call put_header(ierr, head, u, krect)
 
-  end subroutine nng_write_header
+  end subroutine nio_write_header
 
-!!!_  & nng_read_data - read data block
-  subroutine nng_read_data_d &
+!!!_  & nio_read_data - read data block
+  subroutine nio_read_data_d &
        & (ierr, &
-       &  d,    ld, head, krect, u)
+       &  d,    ld, head, krect, u, kopts)
     implicit none
     integer,parameter :: KARG=KDBL
     integer,         intent(out) :: ierr
@@ -767,6 +773,7 @@ contains
     character(len=*),intent(in)  :: head(*)
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
+    integer,optional,intent(out) :: kopts(:)
 
     integer kfmt
     integer kaxs(3)
@@ -775,15 +782,15 @@ contains
     ierr = err_default
     if (ierr.eq.0) call parse_header_base(ierr, kfmt, kaxs, vmiss, head)
     if (ierr.eq.0) then
-       call nng_read_data_core &
+       call nio_read_data_core &
             & (ierr, &
-            &  d,    ld, kfmt, kaxs, vmiss, krect, u)
+            &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     endif
     return
-  end subroutine nng_read_data_d
-  subroutine nng_read_data_f &
+  end subroutine nio_read_data_d
+  subroutine nio_read_data_f &
        & (ierr, &
-       &  d,    ld, head, krect, u)
+       &  d,    ld, head, krect, u, kopts)
     implicit none
     integer,parameter :: KARG=KFLT
     integer,         intent(out) :: ierr
@@ -792,6 +799,7 @@ contains
     character(len=*),intent(in)  :: head(*)
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
+    integer,optional,intent(out) :: kopts(:)
 
     integer kfmt
     integer kaxs(3)
@@ -800,15 +808,15 @@ contains
     ierr = err_default
     if (ierr.eq.0) call parse_header_base(ierr, kfmt, kaxs, vmiss, head)
     if (ierr.eq.0) then
-       call nng_read_data_core &
+       call nio_read_data_core &
             & (ierr, &
-            &  d,    ld, kfmt, kaxs, vmiss, krect, u)
+            &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     endif
     return
-  end subroutine nng_read_data_f
-  subroutine nng_read_data_i &
+  end subroutine nio_read_data_f
+  subroutine nio_read_data_i &
        & (ierr, &
-       &  d,    ld, head, krect, u)
+       &  d,    ld, head, krect, u, kopts)
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out) :: ierr
@@ -817,6 +825,7 @@ contains
     character(len=*),  intent(in)  :: head(*)
     integer,           intent(in)  :: krect
     integer,           intent(in)  :: u
+    integer,optional,  intent(out) :: kopts(:)
 
     integer kfmt
     integer kaxs(3)
@@ -825,26 +834,26 @@ contains
     ierr = err_default
     if (ierr.eq.0) call parse_header_base(ierr, kfmt, kaxs, vmiss, head)
     if (ierr.eq.0) then
-       call nng_read_data_core &
+       call nio_read_data_core &
             & (ierr, &
-            &  d,    ld, kfmt, kaxs, vmiss, krect, u)
+            &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     endif
     return
-  end subroutine nng_read_data_i
+  end subroutine nio_read_data_i
 
-!!!_  & nng_write_data - write data block
-  subroutine nng_write_data_d &
+!!!_  & nio_write_data - write data block
+  subroutine nio_write_data_d &
        & (ierr, &
        &  d,    ld, head, krect, u, kopts)
     implicit none
     integer,parameter :: KARG=KDBL
-    integer,         intent(out)         :: ierr
-    real(kind=KARG), intent(in)          :: d(*)
-    integer,         intent(in)          :: ld
-    character(len=*),intent(in)          :: head(*)
-    integer,         intent(in)          :: krect
-    integer,         intent(in)          :: u
-    integer,         intent(in),optional :: kopts(:)
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(in)  :: d(*)
+    integer,         intent(in)  :: ld
+    character(len=*),intent(in)  :: head(*)
+    integer,         intent(in)  :: krect
+    integer,         intent(in)  :: u
+    integer,optional,intent(in)  :: kopts(:)
 
     integer kfmt
     integer kaxs(3)
@@ -852,25 +861,26 @@ contains
 
     ierr = err_default
     if (ierr.eq.0) call parse_header_base(ierr, kfmt, kaxs, vmiss, head)
+    ! write(*, *) kaxs
     if (ierr.eq.0) then
-       call nng_write_data_core &
+       call nio_write_data_core &
             & (ierr, &
             &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     endif
     return
-  end subroutine nng_write_data_d
-  subroutine nng_write_data_f &
+  end subroutine nio_write_data_d
+  subroutine nio_write_data_f &
        & (ierr, &
        &  d,    ld, head, krect, u, kopts)
     implicit none
     integer,parameter :: KARG=KFLT
-    integer,         intent(out)         :: ierr
-    real(kind=KARG), intent(in)          :: d(*)
-    integer,         intent(in)          :: ld
-    character(len=*),intent(in)          :: head(*)
-    integer,         intent(in)          :: krect
-    integer,         intent(in)          :: u
-    integer,         intent(in),optional :: kopts(:)
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(in)  :: d(*)
+    integer,         intent(in)  :: ld
+    character(len=*),intent(in)  :: head(*)
+    integer,         intent(in)  :: krect
+    integer,         intent(in)  :: u
+    integer,optional,intent(in)  :: kopts(:)
 
     integer kfmt
     integer kaxs(3)
@@ -879,24 +889,24 @@ contains
     ierr = err_default
     if (ierr.eq.0) call parse_header_base(ierr, kfmt, kaxs, vmiss, head)
     if (ierr.eq.0) then
-       call nng_write_data_core &
+       call nio_write_data_core &
             & (ierr, &
             &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     endif
     return
-  end subroutine nng_write_data_f
-  subroutine nng_write_data_i &
+  end subroutine nio_write_data_f
+  subroutine nio_write_data_i &
        & (ierr, &
        &  d,    ld, head, krect, u, kopts)
     implicit none
     integer,parameter :: KARG=KI32
-    integer,           intent(out)         :: ierr
-    integer(kind=KARG),intent(in)          :: d(*)
-    integer,           intent(in)          :: ld
-    character(len=*),  intent(in)          :: head(*)
-    integer,           intent(in)          :: krect
-    integer,           intent(in)          :: u
-    integer,           intent(in),optional :: kopts(:)
+    integer,           intent(out) :: ierr
+    integer(kind=KARG),intent(in)  :: d(*)
+    integer,           intent(in)  :: ld
+    character(len=*),  intent(in)  :: head(*)
+    integer,           intent(in)  :: krect
+    integer,           intent(in)  :: u
+    integer,optional,  intent(in)  :: kopts(:)
 
     integer kfmt
     integer kaxs(3)
@@ -904,18 +914,20 @@ contains
 
     ierr = err_default
     if (ierr.eq.0) call parse_header_base(ierr, kfmt, kaxs, vmiss, head)
+    ! write(*, *) 'parse', ierr
     if (ierr.eq.0) then
-       call nng_write_data_core &
+       call nio_write_data_core &
             & (ierr, &
             &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     endif
+    ! write(*, *) 'write_core', ierr
     return
-  end subroutine nng_write_data_i
+  end subroutine nio_write_data_i
 
-!!!_  & nng_read_data_core - read data block
-  subroutine nng_read_data_core_d &
+!!!_  & nio_read_data_core - read data block
+  subroutine nio_read_data_core_d &
        & (ierr, &
-       &  d,    ld, kfmt, kaxs, vmiss, krect, u)
+       &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     implicit none
     integer,parameter :: KARG=KDBL
     integer,         intent(out) :: ierr
@@ -926,6 +938,7 @@ contains
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
+    integer,optional,intent(out) :: kopts(:)
 
     integer n, nh, nk
 
@@ -933,7 +946,7 @@ contains
 
     n = kaxs(1) * kaxs(2) * kaxs(3)
     if (n.gt.ld) then
-       ierr = -1
+       ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
     endif
 
@@ -967,19 +980,19 @@ contains
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case (GFMT_URT:GFMT_URTend)
        call get_data_urt &
-            & (ierr, d, n, kaxs, u, krect, vmiss, kfmt)
+            & (ierr, d, n, kaxs, u, krect, vmiss, kfmt, kopts)
     case (GFMT_MRT:GFMT_MRTend)
        call get_data_mrt &
-            & (ierr, d, n, kaxs, u, krect, vmiss, kfmt)
+            & (ierr, d, n, kaxs, u, krect, vmiss, kfmt, kopts)
     case default
-       ierr = -1
+       ierr = ERR_INVALID_SWITCH - ERR_MASK_NIO_RECORD
     end select
 
     return
-  end subroutine nng_read_data_core_d
-  subroutine nng_read_data_core_f &
+  end subroutine nio_read_data_core_d
+  subroutine nio_read_data_core_f &
        & (ierr, &
-       &  d,    ld, kfmt, kaxs, vmiss, krect, u)
+       &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     implicit none
     integer,parameter :: KARG=KFLT
     integer,         intent(out) :: ierr
@@ -990,13 +1003,14 @@ contains
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
+    integer,optional,intent(out) :: kopts(:)
 
     integer n, nh, nk
 
     ierr = 0
     n = kaxs(1) * kaxs(2) * kaxs(3)
     if (n.gt.ld) then
-       ierr = -1
+       ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
     endif
 
@@ -1029,14 +1043,14 @@ contains
        call get_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case default
-       ierr = -1
+       ierr = ERR_INVALID_SWITCH - ERR_MASK_NIO_RECORD
     end select
 
     return
-  end subroutine nng_read_data_core_f
-  subroutine nng_read_data_core_i &
+  end subroutine nio_read_data_core_f
+  subroutine nio_read_data_core_i &
        & (ierr, &
-       &  d,    ld, kfmt, kaxs, vmiss, krect, u)
+       &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out) :: ierr
@@ -1047,13 +1061,14 @@ contains
     real(kind=KRMIS),  intent(in)  :: vmiss
     integer,           intent(in)  :: krect
     integer,           intent(in)  :: u
+    integer,optional,  intent(out) :: kopts(:)
 
     integer n, nh, nk
 
     ierr = 0
     n = kaxs(1) * kaxs(2) * kaxs(3)
     if (n.gt.ld) then
-       ierr = -1
+       ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
     endif
 
@@ -1086,14 +1101,14 @@ contains
        call get_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case default
-       ierr = -1
+       ierr = ERR_INVALID_SWITCH - ERR_MASK_NIO_RECORD
     end select
 
     return
-  end subroutine nng_read_data_core_i
+  end subroutine nio_read_data_core_i
 
-!!!_  & nng_write_data_core - write data block
-  subroutine nng_write_data_core_d &
+!!!_  & nio_write_data_core - write data block
+  subroutine nio_write_data_core_d &
        & (ierr, &
        &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     implicit none
@@ -1113,7 +1128,7 @@ contains
     ierr = 0
     n = kaxs(1) * kaxs(2) * kaxs(3)
     if (n.gt.ld) then
-       ierr = -1
+       ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
     endif
 
@@ -1131,7 +1146,7 @@ contains
     case (GFMT_MI4)
        call put_data_mi4(ierr, d, n, u, krect, vmiss)
     case (GFMT_URC, GFMT_URC2)
-       ierr = -1
+       ierr = ERR_DEPRECATED_FORMAT - ERR_MASK_NIO_RECORD
     case (GFMT_URY:GFMT_URYend)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
@@ -1149,12 +1164,12 @@ contains
        call put_data_mrt_plain &
             & (ierr, d, n, u, krect, vmiss, kfmt, kopts)
     case default
-       ierr = -1
+       ierr = ERR_INVALID_SWITCH - ERR_MASK_NIO_RECORD
     end select
 
     return
-  end subroutine nng_write_data_core_d
-  subroutine nng_write_data_core_f &
+  end subroutine nio_write_data_core_d
+  subroutine nio_write_data_core_f &
        & (ierr, &
        &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     implicit none
@@ -1174,7 +1189,7 @@ contains
     ierr = 0
     n = kaxs(1) * kaxs(2) * kaxs(3)
     if (n.gt.ld) then
-       ierr = -1
+       ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
     endif
 
@@ -1192,7 +1207,7 @@ contains
     case (GFMT_MI4)
        call put_data_mi4(ierr, d, n, u, krect, vmiss)
     case (GFMT_URC, GFMT_URC2)
-       ierr = -1
+       ierr = ERR_DEPRECATED_FORMAT - ERR_MASK_NIO_RECORD
     case (GFMT_URY:GFMT_URYend)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
@@ -1204,12 +1219,12 @@ contains
        call put_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case default
-       ierr = -1
+       ierr = ERR_INVALID_SWITCH - ERR_MASK_NIO_RECORD
     end select
 
     return
-  end subroutine nng_write_data_core_f
-  subroutine nng_write_data_core_i &
+  end subroutine nio_write_data_core_f
+  subroutine nio_write_data_core_i &
        & (ierr, &
        &  d,    ld, kfmt, kaxs, vmiss, krect, u, kopts)
     implicit none
@@ -1229,7 +1244,7 @@ contains
     ierr = 0
     n = kaxs(1) * kaxs(2) * kaxs(3)
     if (n.gt.ld) then
-       ierr = -1
+       ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
     endif
 
@@ -1247,7 +1262,7 @@ contains
     case (GFMT_MI4)
        call put_data_mi4(ierr, d, n, u, krect, vmiss)
     case (GFMT_URC, GFMT_URC2)
-       ierr = -1
+       ierr = ERR_DEPRECATED_FORMAT - ERR_MASK_NIO_RECORD
     case (GFMT_URY:GFMT_URYend)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
@@ -1259,77 +1274,126 @@ contains
        call put_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case default
-       ierr = -1
+       ierr = ERR_INVALID_SWITCH - ERR_MASK_NIO_RECORD
     end select
 
     return
-  end subroutine nng_write_data_core_i
+  end subroutine nio_write_data_core_i
 
-!!!_  & nng_skip_records - forward record skip
-  subroutine nng_skip_records &
-       & (ierr, n, u)
-    use TOUZA_Nng_std,   only: WHENCE_CURRENT, sus_skip_irec, sus_skip_lrec
-    use TOUZA_Nng_header,only: &
+!!!_  & nio_skip_records - forward record skip
+  subroutine nio_skip_records &
+       & (ierr, n, u, nskip, head, krect)
+    use TOUZA_Nio_std,   only: WHENCE_CURRENT, sus_skip_irec, sus_skip_lrec
+    use TOUZA_Nio_header,only: &
          & nitem, litem, hi_DFMT, get_item
     implicit none
-    integer,intent(out) :: ierr
-    integer,intent(in)  :: n
-    integer,intent(in)  :: u
+    integer,         intent(out)          :: ierr
+    integer,         intent(in)           :: n
+    integer,         intent(in)           :: u
+    integer,         intent(out),optional :: nskip    ! number of skipped recored
+    character(len=*),intent(in), optional :: head(*)  ! current record header
+    integer,         intent(in), optional :: krect    ! current record header type
 
-    integer j, krect
-    character(len=litem) :: head(nitem)
-    character(len=litem) :: vp
-    integer kfmt
-    integer nrec
-    logical swap, lrec
-
+    integer j, ns
+    integer kri
+    character(len=litem) :: hi(nitem)
+!!!_   . note
+    ! When hcur is present
+    !   File position must be at the header end (data begin)
+    !   Hcur is used as the first header instead to read next
+    !   Usual header/data reading is performed from the second block
+!!!_   . body
+    ierr = 0
+    ns = 0
     if (n .lt. 0) then
        ierr = ERR_NOT_IMPLEMENTED
        return
     endif
+    if (present(head).NEQV.present(krect)) then
+       ierr = ERR_PANIC - ERR_MASK_NIO_RECORD
+       return
+    endif
 
-    ierr = 0
-    do j = 0, n - 1
-       if (ierr.eq.0) call nng_read_header(ierr, head, krect, u)
-       if (ierr.eq.0) call get_item(ierr, head, vp, hi_DFMT)
-       if (ierr.eq.0) call parse_record_fmt(ierr, kfmt, vp)
-       if (ierr.eq.0) then
-          select case (kfmt)
-          case (GFMT_UR4, GFMT_UR8, GFMT_UI4)
-             nrec = 1
-          case (GFMT_MR4, GFMT_MR8, GFMT_MI4)
-             nrec = 3
-          case (GFMT_URC, GFMT_URC2)
-             nrec = parse_header_size(head, 3)
-             if (nrec.le.0) then
-                ierr = -1
-             else
-                nrec = nrec * 4
-             endif
-          case (GFMT_URY:GFMT_URYend)
-             nrec = 2
-          case (GFMT_MRY:GFMT_MRYend)
-             nrec = 6
-          case (GFMT_URT:GFMT_URTend)
-             nrec = 1
-          case (GFMT_MRT:GFMT_MRTend)
-             nrec = 1
-          case default
-             ierr = -1
-          end select
-       endif
-       if (ierr.eq.0) then
-          swap = IAND(krect, REC_SWAP).ne.0
-          lrec = IAND(krect, REC_LSEP).ne.0
-          if (lrec) then
-             call sus_skip_lrec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
-          else
-             call sus_skip_irec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
-          endif
-       endif
-    enddo
+    if (present(head)) then
+       if (ierr.eq.0) call nio_skip_data(ierr, u, head, krect)
+       if (ierr.eq.0) ns = ns + 1
+       do j = 1, n - 1
+          if (ierr.ne.0) exit
+          if (ierr.eq.0) call nio_read_header(ierr, hi, kri, u)
+          if (ierr.eq.0) call nio_skip_data(ierr, u, hi, kri)
+          if (ierr.eq.0) ns = ns + 1
+       enddo
+    else
+       do j = 0, n - 1
+          if (ierr.ne.0) exit
+          if (ierr.eq.0) call nio_read_header(ierr, hi, kri, u)
+          if (ierr.eq.0) call nio_skip_data(ierr, u, hi, kri)
+          if (ierr.eq.0) ns = ns + 1
+       enddo
+    endif
+    if (present(nskip)) then
+       nskip = ns
+    endif
     return
-  end subroutine nng_skip_records
+  end subroutine nio_skip_records
+
+!!!_  & nio_skip_data - forward one data record
+  subroutine nio_skip_data &
+       & (ierr, u, head, krect)
+    use TOUZA_Nio_std,   only: WHENCE_CURRENT, sus_skip_irec, sus_skip_lrec
+    use TOUZA_Nio_header,only: &
+         & nitem, litem, hi_DFMT, get_item
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: u
+    character(len=*),intent(in)  :: head(*)
+    integer,         intent(in)  :: krect
+
+    character(len=litem) :: vp
+    integer kfmt
+    integer nrec
+    logical swap, lrec
+!!!_   . body
+    ierr = 0
+
+    if (ierr.eq.0) call get_item(ierr, head, vp, hi_DFMT)
+    if (ierr.eq.0) call parse_record_fmt(ierr, kfmt, vp)
+    if (ierr.eq.0) then
+       select case (kfmt)
+       case (GFMT_UR4, GFMT_UR8, GFMT_UI4)
+          nrec = 1
+       case (GFMT_MR4, GFMT_MR8, GFMT_MI4)
+          nrec = 3
+       case (GFMT_URC, GFMT_URC2)
+          nrec = parse_header_size(head, 3)
+          if (nrec.le.0) then
+             ierr = -1
+          else
+             nrec = nrec * 4
+          endif
+       case (GFMT_URY:GFMT_URYend)
+          nrec = 2
+       case (GFMT_MRY:GFMT_MRYend)
+          nrec = 6
+       case (GFMT_URT:GFMT_URTend)
+          nrec = 1
+       case (GFMT_MRT:GFMT_MRTend)
+          nrec = 1
+       case default
+          ierr = -1
+       end select
+    endif
+    if (ierr.eq.0) then
+       swap = IAND(krect, REC_SWAP).ne.0
+       lrec = IAND(krect, REC_LSEP).ne.0
+       if (lrec) then
+          call sus_skip_lrec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
+       else
+          call sus_skip_irec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
+       endif
+    endif
+    return
+  end subroutine nio_skip_data
 
 !!!_ + gtool-3 standard formats
 !!!_  - get_data_urc - URC
@@ -2303,14 +2367,14 @@ contains
     use TOUZA_Trp,only: suggest_filling
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
-    integer,         intent(out)         :: ierr
-    real(kind=KARG), intent(in)          :: d(*)
-    integer,         intent(in)          :: n
-    integer,         intent(in)          :: krect
-    integer,         intent(in)          :: u
-    real(kind=KRMIS),intent(in)          :: vmiss
-    integer,         intent(in)          :: kfmt
-    integer,         intent(in),optional :: kopts(:)
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(in)  :: d(*)
+    integer,         intent(in)  :: n
+    integer,         intent(in)  :: krect
+    integer,         intent(in)  :: u
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: kfmt
+    integer,optional,intent(in)  :: kopts(:)
 
     integer mbits, xbits, xtop, xbtm
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
@@ -2340,8 +2404,8 @@ contains
     if (ierr.eq.0) then
        call put_data_urt_core &
             & (ierr,  &
-            &  buf,   mb,    u,     krect,  .true., .false., &
-            &  vmiss, mbits, xbits, xtop, xbtm,   kcode)
+            &  buf,   mb,    u,     krect, .true., .false., &
+            &  vmiss, mbits, xbits, xtop,  xbtm,   kcode)
     endif
     return
   end subroutine put_data_mrt_plain_d
@@ -2351,14 +2415,14 @@ contains
     use TOUZA_Trp,only: suggest_filling
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
-    integer,         intent(out)         :: ierr
-    real(kind=KARG), intent(in)          :: d(*)
-    integer,         intent(in)          :: n
-    integer,         intent(in)          :: krect
-    integer,         intent(in)          :: u
-    real(kind=KRMIS),intent(in)          :: vmiss
-    integer,         intent(in)          :: kfmt
-    integer,         intent(in),optional :: kopts(:)
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(in)  :: d(*)
+    integer,         intent(in)  :: n
+    integer,         intent(in)  :: krect
+    integer,         intent(in)  :: u
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: kfmt
+    integer,optional,intent(in)  :: kopts(:)
 
     integer mbits, xbits, xtop, xbtm
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
@@ -2388,8 +2452,8 @@ contains
     if (ierr.eq.0) then
        call put_data_urt_core &
             & (ierr,  &
-            &  buf,   mb,    u,     krect,  .true., .false., &
-            &  vmiss, mbits, xbits, xtop, xbtm,   kcode)
+            &  buf,   mb,    u,     krect, .true., .false., &
+            &  vmiss, mbits, xbits, xtop,  xbtm,   kcode)
     endif
     return
   end subroutine put_data_mrt_plain_f
@@ -2400,14 +2464,14 @@ contains
        &  d, n, u, krect, vmiss, kfmt, kopts)
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
-    integer,         intent(out)         :: ierr
-    real(kind=KARG), intent(in)          :: d(*)
-    integer,         intent(in)          :: n
-    integer,         intent(in)          :: krect
-    integer,         intent(in)          :: u
-    real(kind=KRMIS),intent(in)          :: vmiss
-    integer,         intent(in)          :: kfmt
-    integer,         intent(in),optional :: kopts(:)
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(in)  :: d(*)
+    integer,         intent(in)  :: n
+    integer,         intent(in)  :: krect
+    integer,         intent(in)  :: u
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: kfmt
+    integer,optional,intent(in)  :: kopts(:)
 
     integer mbits, xbits, xtop, xbtm
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
@@ -2424,8 +2488,8 @@ contains
     if (ierr.eq.0) then
        call put_data_urt_core &
             & (ierr,  &
-            &  d,     n,     u,     krect,  .false., .false., &
-            &  vmiss, mbits, xbits, xtop, xbtm,    kcode)
+            &  d,     n,     u,     krect, .false., .false., &
+            &  vmiss, mbits, xbits, xtop,  xbtm,    kcode)
     endif
     return
   end subroutine put_data_urt_plain_d
@@ -2434,14 +2498,14 @@ contains
        &  d, n, u, krect, vmiss, kfmt, kopts)
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
-    integer,         intent(out)         :: ierr
-    real(kind=KARG), intent(in)          :: d(*)
-    integer,         intent(in)          :: n
-    integer,         intent(in)          :: krect
-    integer,         intent(in)          :: u
-    real(kind=KRMIS),intent(in)          :: vmiss
-    integer,         intent(in)          :: kfmt
-    integer,         intent(in),optional :: kopts(:)
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(in)  :: d(*)
+    integer,         intent(in)  :: n
+    integer,         intent(in)  :: krect
+    integer,         intent(in)  :: u
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: kfmt
+    integer,optional,intent(in)  :: kopts(:)
 
     integer mbits, xbits, xtop, xbtm
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
@@ -2458,34 +2522,34 @@ contains
     if (ierr.eq.0) then
        call put_data_urt_core &
             & (ierr,  &
-            &  d,     n,     u,     krect,  .false., .false., &
-            &  vmiss, mbits, xbits, xtop, xbtm,    kcode)
+            &  d,     n,     u,     krect, .false., .false., &
+            &  vmiss, mbits, xbits, xtop,  xbtm,    kcode)
     endif
     return
   end subroutine put_data_urt_plain_f
 
 !!!_  - put_data_urt_core
   subroutine put_data_urt_core_d &
-       & (ierr, &
-       &  d,     n,     u,     krect,  pre,  post,  &
-       &  vmiss, mbits, xbits, xtop, xbtm, kcode, kapp)
+       & (ierr,  &
+       &  d,     n,     u,     krect, pre,  post,  &
+       &  vmiss, mbits, xbits, xtop,  xbtm, kcode, kapp)
     use TOUZA_Trp,only: &
          & count_packed, encode_alloc, retrieve_nbgz, &
          & KB_HEAD, guardar_extra
     use TOUZA_Trp,only: show_bagazo_props
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
-    integer,         intent(out)         :: ierr
-    real(kind=KARG), intent(in)          :: d(*)
-    integer,         intent(in)          :: n     ! d size
-    integer,         intent(in)          :: u
-    integer,         intent(in)          :: krect
-    logical,         intent(in)          :: pre, post
-    real(kind=KRMIS),intent(in)          :: vmiss
-    integer,         intent(in)          :: mbits
-    integer,         intent(in)          :: xbits, xtop, xbtm
-    integer,         intent(in)          :: kcode
-    integer,         intent(in),optional :: kapp(0:)
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(in)  :: d(*)
+    integer,         intent(in)  :: n     ! d size
+    integer,         intent(in)  :: u
+    integer,         intent(in)  :: krect
+    logical,         intent(in)  :: pre, post
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: mbits
+    integer,         intent(in)  :: xbits, xtop, xbtm
+    integer,         intent(in)  :: kcode
+    integer,optional,intent(in)  :: kapp(0:)
 
     integer(kind=KISRC) :: ibagaz(0:2*n)
     integer nbgz, napp, jp
@@ -2529,26 +2593,26 @@ contains
     return
   end subroutine put_data_urt_core_d
   subroutine put_data_urt_core_f &
-       & (ierr, &
-       &  d,     n,     u,     krect,  pre,  post,  &
-       &  vmiss, mbits, xbits, xtop, xbtm, kcode, kapp)
+       & (ierr,  &
+       &  d,     n,     u,     krect, pre,  post,  &
+       &  vmiss, mbits, xbits, xtop,  xbtm, kcode, kapp)
     use TOUZA_Trp,only: &
          & count_packed, encode_alloc, retrieve_nbgz, &
          & KB_HEAD, guardar_extra
     use TOUZA_Trp,only: show_bagazo_props
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
-    integer,         intent(out)         :: ierr
-    real(kind=KARG), intent(in)          :: d(*)
-    integer,         intent(in)          :: n     ! d size
-    integer,         intent(in)          :: u
-    integer,         intent(in)          :: krect
-    logical,         intent(in)          :: pre, post
-    real(kind=KRMIS),intent(in)          :: vmiss
-    integer,         intent(in)          :: mbits
-    integer,         intent(in)          :: xbits, xtop, xbtm
-    integer,         intent(in)          :: kcode
-    integer,         intent(in),optional :: kapp(0:)
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(in)  :: d(*)
+    integer,         intent(in)  :: n     ! d size
+    integer,         intent(in)  :: u
+    integer,         intent(in)  :: krect
+    logical,         intent(in)  :: pre, post
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: mbits
+    integer,         intent(in)  :: xbits, xtop, xbtm
+    integer,         intent(in)  :: kcode
+    integer,optional,intent(in)  :: kapp(0:)
 
     integer(kind=KISRC) :: ibagaz(0:2*n)
     integer nbgz, napp, jp
@@ -2596,7 +2660,7 @@ contains
 !!!_  - get_data_mrt - MRT
   subroutine get_data_mrt_d &
        & (ierr, &
-       &  d, n, kaxs, u, krect, vmiss, kfmt)
+       &  d, n, kaxs, u, krect, vmiss, kfmt, kopts)
     use TOUZA_Trp,only: &
          & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
          & count_packed, suggest_filling
@@ -2609,6 +2673,7 @@ contains
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
+    integer,optional,intent(out) :: kopts(:)
 
     integer(kind=KISRC) :: icom(n)
     real(kind=KRSRC)    :: buf(n)
@@ -2630,8 +2695,8 @@ contains
        sub = .FALSE.
        call get_data_urt_core &
             & (ierr, &
-            &  buf,   n,  u, krect,  sub, &
-            &  vmiss, def_decode_trapiche)
+            &  buf,   n,  u, krect,  sub,  &
+            &  vmiss, def_decode_trapiche, kopts)
     endif
     if (ierr.eq.0) then
        kpack = icom(ncom + 1)
@@ -2643,7 +2708,7 @@ contains
   end subroutine get_data_mrt_d
   subroutine get_data_mrt_f &
        & (ierr, &
-       &  d, n, kaxs, u, krect, vmiss, kfmt)
+       &  d, n, kaxs, u, krect, vmiss, kfmt, kopts)
     use TOUZA_Trp,only: &
          & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
          & count_packed, suggest_filling
@@ -2656,6 +2721,7 @@ contains
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
+    integer,optional,intent(out) :: kopts(:)
 
     integer(kind=KISRC) :: icom(n)
     real(kind=KRSRC)    :: buf(n)
@@ -2677,8 +2743,8 @@ contains
        sub = .FALSE.
        call get_data_urt_core &
             & (ierr, &
-            &  buf,   n,  u, krect,  sub, &
-            &  vmiss, def_decode_trapiche)
+            &  buf,   n,  u, krect,  sub,  &
+            &  vmiss, def_decode_trapiche, kopts)
     endif
     if (ierr.eq.0) then
        kpack = icom(ncom + 1)
@@ -2692,19 +2758,20 @@ contains
 !!!_  - get_data_urt - URY:TOUZA/Trapiche
   subroutine get_data_urt_d &
        & (ierr, &
-       &  d, n, kaxs, u, krect, vmiss, kfmt, &
-       &  napp, kapp)
+       &  d, n,  kaxs, u, krect, vmiss, kfmt, &
+       &  kopts, napp, kapp)
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
-    integer,         intent(out)          :: ierr
-    real(kind=KARG), intent(out)          :: d(*)
-    integer,         intent(in)           :: n, kaxs(*)
-    integer,         intent(in)           :: krect
-    integer,         intent(in)           :: u
-    real(kind=KRMIS),intent(in)           :: vmiss
-    integer,         intent(in)           :: kfmt
-    integer,         intent(out),optional :: napp
-    integer,         intent(out),optional :: kapp(0:)
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(out) :: d(*)
+    integer,         intent(in)  :: n, kaxs(*)
+    integer,         intent(in)  :: krect
+    integer,         intent(in)  :: u
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: kfmt
+    integer,optional,intent(out) :: kopts(:)
+    integer,optional,intent(out) :: napp
+    integer,optional,intent(out) :: kapp(0:)
 
     logical sub
 
@@ -2717,25 +2784,26 @@ contains
             & (ierr, &
             &  d,     n,      u,    krect,  sub, &
             &  vmiss, def_decode_trapiche,     &
-            &  napp,  kapp)
+            &  kopts, napp,   kapp)
     endif
     return
   end subroutine get_data_urt_d
   subroutine get_data_urt_f &
        & (ierr, &
        &  d, n, kaxs, u, krect, vmiss, kfmt, &
-       &  napp, kapp)
+       &  kopts,napp, kapp)
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
-    integer,         intent(out)          :: ierr
-    real(kind=KARG), intent(out)          :: d(*)
-    integer,         intent(in)           :: n, kaxs(*)
-    integer,         intent(in)           :: krect
-    integer,         intent(in)           :: u
-    real(kind=KRMIS),intent(in)           :: vmiss
-    integer,         intent(in)           :: kfmt
-    integer,         intent(out),optional :: napp
-    integer,         intent(out),optional :: kapp(0:)
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(out) :: d(*)
+    integer,         intent(in)  :: n, kaxs(*)
+    integer,         intent(in)  :: krect
+    integer,         intent(in)  :: u
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: kfmt
+    integer,optional,intent(out) :: kopts(:)
+    integer,optional,intent(out) :: napp
+    integer,optional,intent(out) :: kapp(0:)
 
     logical sub
 
@@ -2748,7 +2816,7 @@ contains
             & (ierr, &
             &  d,     n,      u,    krect,  sub, &
             &  vmiss, def_decode_trapiche,     &
-            &  napp,  kapp)
+            &  kopts, napp,   kapp)
     endif
     return
   end subroutine get_data_urt_f
@@ -2757,22 +2825,23 @@ contains
   subroutine get_data_urt_core_d &
        & (ierr, &
        &  d,     n,     u,    krect,  sub, &
-       &  vmiss, kcode, napp, kapp)
+       &  vmiss, kcode, kopts,napp, kapp)
     use TOUZA_Trp,only: &
          & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
          & KB_HEAD,      show_bagazo_props
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
-    integer,         intent(out)          :: ierr
-    real(kind=KARG), intent(out)          :: d(*)
-    integer,         intent(in)           :: n
-    integer,         intent(in)           :: krect
-    integer,         intent(in)           :: u
-    logical,         intent(inout)        :: sub
-    real(kind=KRMIS),intent(in)           :: vmiss
-    integer,         intent(in)           :: kcode
-    integer,         intent(out),optional :: napp
-    integer,         intent(out),optional :: kapp(0:)
+    integer,         intent(out)   :: ierr
+    real(kind=KARG), intent(out)   :: d(*)
+    integer,         intent(in)    :: n
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: u
+    logical,         intent(inout) :: sub
+    real(kind=KRMIS),intent(in)    :: vmiss
+    integer,         intent(in)    :: kcode
+    integer,optional,intent(out)   :: kopts(:)
+    integer,optional,intent(out)   :: napp
+    integer,optional,intent(out)   :: kapp(0:)
 
     integer(kind=KISRC) :: ibagaz(0:2*n)
     integer nbgz, ncnz, nall
@@ -2827,22 +2896,23 @@ contains
   subroutine get_data_urt_core_f &
        & (ierr, &
        &  d,     n,     u,    krect,  sub, &
-       &  vmiss, kcode, napp, kapp)
+       &  vmiss, kcode, kopts,napp, kapp)
     use TOUZA_Trp,only: &
          & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
          & KB_HEAD,      show_bagazo_props
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
-    integer,         intent(out)          :: ierr
-    real(kind=KARG), intent(out)          :: d(*)
-    integer,         intent(in)           :: n
-    integer,         intent(in)           :: krect
-    integer,         intent(in)           :: u
-    logical,         intent(inout)        :: sub
-    real(kind=KRMIS),intent(in)           :: vmiss
-    integer,         intent(in)           :: kcode
-    integer,         intent(out),optional :: napp
-    integer,         intent(out),optional :: kapp(0:)
+    integer,         intent(out)   :: ierr
+    real(kind=KARG), intent(out)   :: d(*)
+    integer,         intent(in)    :: n
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: u
+    logical,         intent(inout) :: sub
+    real(kind=KRMIS),intent(in)    :: vmiss
+    integer,         intent(in)    :: kcode
+    integer,optional,intent(out)   :: kopts(:)
+    integer,optional,intent(out)   :: napp
+    integer,optional,intent(out)   :: kapp(0:)
 
     integer(kind=KISRC) :: ibagaz(0:2*n)
     integer nbgz, ncnz, nall
@@ -3114,10 +3184,10 @@ contains
 !!!_  & get_record_prop - get sequential record properties (byte-order and separator size)
   subroutine get_record_prop &
        & (ierr, krect, u)
-    use TOUZA_Nng_std,   only: &
+    use TOUZA_Nio_std,   only: &
          & KI32, KI64, KIOFS, is_eof_ss, &
          & WHENCE_ABS, sus_read_isep, sus_rseek, sus_eswap
-    use TOUZA_Nng_header,only: nitem, litem
+    use TOUZA_Nio_header,only: nitem, litem
     implicit none
     integer,intent(out) :: ierr
     integer,intent(out) :: krect
@@ -3192,8 +3262,8 @@ contains
   subroutine get_header &
        & (ierr, &
        &  head,  u, krect)
-    use TOUZA_Nng_std,   only: KIOFS, sus_read_lrec, sus_read_irec
-    use TOUZA_Nng_header,only: nitem
+    use TOUZA_Nio_std,   only: KIOFS, sus_read_lrec, sus_read_irec
+    use TOUZA_Nio_header,only: nitem
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: head(*)
@@ -3229,7 +3299,7 @@ contains
 !!!_  & set_wrecord_prop - set sequential record properties to write (byte-order and separator size)
   subroutine set_wrecord_prop &
        & (ierr, krect, u, kendi)
-    use TOUZA_Nng_std,only: &
+    use TOUZA_Nio_std,only: &
          & choice, check_bodr_unit, KIOFS, kendi_mem, kendi_file, endian_OTHER
     implicit none
     integer,intent(out)         :: ierr
@@ -3270,7 +3340,7 @@ contains
 
 !!!_  & get_switch - get record-format switch to write
   subroutine get_switch (krect, kendi, kcfg)
-    use TOUZA_Nng_std,only: choice, endian_BIG, endian_LITTLE
+    use TOUZA_Nio_std,only: choice, endian_BIG, endian_LITTLE
     implicit none
     integer,intent(out)         :: krect
     integer,intent(in)          :: kendi  ! estimated file byte-order
@@ -3299,8 +3369,8 @@ contains
   subroutine put_header &
        & (ierr, &
        &  head, u, krect)
-    use TOUZA_Nng_std,   only: KIOFS, sus_write_lrec, sus_write_irec
-    use TOUZA_Nng_header,only: nitem
+    use TOUZA_Nio_std,   only: KIOFS, sus_write_lrec, sus_write_irec
+    use TOUZA_Nio_header,only: nitem
     implicit none
     integer,            intent(out) :: ierr
     character(len=*),   intent(in)  :: head(*)
@@ -3323,7 +3393,7 @@ contains
   subroutine get_data_record_i &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
+    use TOUZA_Nio_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)            :: ierr
@@ -3348,7 +3418,7 @@ contains
   subroutine get_data_record_f &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
+    use TOUZA_Nio_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KFLT
     integer,        intent(out)            :: ierr
@@ -3373,7 +3443,7 @@ contains
   subroutine get_data_record_d &
        & (ierr, &
        &  d,  n, u, krect, sub)
-    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
+    use TOUZA_Nio_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KDBL
     integer,        intent(out)            :: ierr
@@ -3399,7 +3469,7 @@ contains
   subroutine get_data_record_i1 &
        & (ierr, &
        &  d,  u, krect, sub)
-    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
+    use TOUZA_Nio_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)            :: ierr
@@ -3425,7 +3495,7 @@ contains
   subroutine get_data_record_f1 &
        & (ierr, &
        &  d,  u, krect, sub)
-    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
+    use TOUZA_Nio_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KFLT
     integer,        intent(out)            :: ierr
@@ -3451,7 +3521,7 @@ contains
   subroutine get_data_record_d1 &
        & (ierr, &
        &  d, u, krect, sub)
-    use TOUZA_Nng_std,only: sus_read_lrec, sus_read_irec
+    use TOUZA_Nio_std,only: sus_read_lrec, sus_read_irec
     implicit none
     integer,parameter :: KARG=KDBL
     integer,        intent(out)            :: ierr
@@ -3596,7 +3666,7 @@ contains
   subroutine put_data_record_i &
        & (ierr, &
        &  d,  n, u, krect, pre, post)
-    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
+    use TOUZA_Nio_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)         :: ierr
@@ -3621,7 +3691,7 @@ contains
   subroutine put_data_record_f &
        & (ierr, &
        &  d,  n, u, krect, pre, post)
-    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
+    use TOUZA_Nio_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KFLT
     integer,        intent(out)         :: ierr
@@ -3646,7 +3716,7 @@ contains
   subroutine put_data_record_d &
        & (ierr, &
        &  d,  n, u, krect, pre, post)
-    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
+    use TOUZA_Nio_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KDBL
     integer,        intent(out)         :: ierr
@@ -3672,7 +3742,7 @@ contains
   subroutine put_data_record_i1 &
        & (ierr, &
        &  d,  u, krect, pre, post)
-    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
+    use TOUZA_Nio_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)         :: ierr
@@ -3698,7 +3768,7 @@ contains
   subroutine put_data_record_f1 &
        & (ierr, &
        &  d,  u, krect, pre, post)
-    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
+    use TOUZA_Nio_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KFLT
     integer,        intent(out)         :: ierr
@@ -3724,7 +3794,7 @@ contains
   subroutine put_data_record_d1 &
        & (ierr, &
        &  d, u, krect, pre, post)
-    use TOUZA_Nng_std,only: sus_write_lrec, sus_write_irec
+    use TOUZA_Nio_std,only: sus_write_lrec, sus_write_irec
     implicit none
     integer,parameter :: KARG=KDBL
     integer,        intent(out)         :: ierr
@@ -3858,12 +3928,12 @@ contains
 !!!_  & parse_header_base - parse minimum properties
   subroutine parse_header_base &
        & (ierr, kfmt, kaxs, vmiss, head)
-    use TOUZA_Nng_header,only: litem, &
+    use TOUZA_Nio_header,only: litem, &
          & hi_DFMT,  hi_MISS,  &
          & hi_ASTR1, hi_ASTR2, hi_ASTR3, &
          & hi_AEND1, hi_AEND2, hi_AEND3, &
          & get_item
-    use TOUZA_Nng_std,only: KDBL, KFLT, KI32, KI64
+    use TOUZA_Nio_std,only: KDBL, KFLT, KI32, KI64
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: kfmt
@@ -3873,6 +3943,7 @@ contains
 
     character(len=litem) :: vp
     integer idfm
+    integer jc
 
     ierr = err_default
 
@@ -3884,82 +3955,109 @@ contains
     if (ierr.eq.0) call get_item(ierr, head, vp, hi_DFMT)
     if (ierr.eq.0) call parse_record_fmt(ierr, kfmt, vp)
 
-    if (ierr.eq.0) call parse_record_cmem(ierr, kaxs(1), head, hi_ASTR1, hi_AEND1)
-    if (ierr.eq.0) call parse_record_cmem(ierr, kaxs(2), head, hi_ASTR2, hi_AEND2)
-    if (ierr.eq.0) call parse_record_cmem(ierr, kaxs(3), head, hi_ASTR3, hi_AEND3)
-
+    ! if (ierr.eq.0) then
+    !    call parse_record_cmem(kaxs(1), head, hi_ASTR1, hi_AEND1)
+    !    call parse_record_cmem(kaxs(2), head, hi_ASTR2, hi_AEND2)
+    !    call parse_record_cmem(kaxs(3), head, hi_ASTR3, hi_AEND3)
+    ! endif
+    if (ierr.eq.0) then
+       do jc = 1, 3
+          kaxs(jc) = parse_header_size(head, jc)
+       enddo
+    endif
     if (ierr.eq.0) call get_item(ierr, head, vmiss, hi_MISS, def=def_VMISS)
 
   end subroutine parse_header_base
 
 !!!_  & parse_header_size - parse size properties
   integer function parse_header_size_n &
-       & (head, kidx) &
+       & (head, kidx, lazy) &
        & result (n)
-    use TOUZA_Nng_header,only: &
+    use TOUZA_Nio_std,only: choice
+    use TOUZA_Nio_header,only: &
          & hi_ASTR1, hi_ASTR2, hi_ASTR3, &
          & hi_AEND1, hi_AEND2, hi_AEND3
     implicit none
     character(len=*),intent(in)  :: head(*)
     integer,         intent(in)  :: kidx
-    integer jerr
+    integer,optional,intent(in)  :: lazy    ! lazy level (default = strict)
     integer kaxs(3)
-    jerr = 0
+    integer lz
+
+    lz = choice(def_lazy_size, lazy)
     select case (kidx)
     case (1)
-       call parse_record_cmem(jerr, n, head, hi_ASTR1, hi_AEND1)
+       call parse_record_cmem(n, head, hi_ASTR1, hi_AEND1)
+       if (lz.ge.0) n = max(lz, n)
     case (2)
-       call parse_record_cmem(jerr, n, head, hi_ASTR2, hi_AEND2)
+       call parse_record_cmem(n, head, hi_ASTR2, hi_AEND2)
+       if (lz.ge.0) n = max(lz, n)
     case (3)
-       call parse_record_cmem(jerr, n, head, hi_ASTR3, hi_AEND3)
+       call parse_record_cmem(n, head, hi_ASTR3, hi_AEND3)
+       if (lz.ge.0) n = max(lz, n)
     case default
-       jerr = 0
-       if (jerr.eq.0) call parse_record_cmem(jerr, kaxs(1), head, hi_ASTR1, hi_AEND1)
-       if (jerr.eq.0) call parse_record_cmem(jerr, kaxs(2), head, hi_ASTR2, hi_AEND2)
-       if (jerr.eq.0) call parse_record_cmem(jerr, kaxs(3), head, hi_ASTR3, hi_AEND3)
-       if (jerr.eq.0) n = kaxs(1) * kaxs(2) * kaxs(3)
+       call parse_record_cmem(kaxs(1), head, hi_ASTR1, hi_AEND1)
+       call parse_record_cmem(kaxs(2), head, hi_ASTR2, hi_AEND2)
+       call parse_record_cmem(kaxs(3), head, hi_ASTR3, hi_AEND3)
+       if (lz.ge.0) kaxs(:) = max(lz, kaxs(:))
+       ! write(*, *) kaxs(:)
+       if (ANY(kaxs(:).lt.0)) then
+          n = kaxs(1)
+          if (n.ge.0) n = kaxs(2)
+          if (n.ge.0) n = kaxs(3)
+       else
+          n = kaxs(1) * kaxs(2) * kaxs(3)
+       endif
     end select
 
-    if (jerr.ne.0) n = -1
     return
   end function parse_header_size_n
   integer(kind=KI32) function parse_header_size_i &
-       & (head, kidx, khld) &
+       & (head, kidx, lazy, khld) &
        & result (n)
-    use TOUZA_Nng_header,only: &
+    use TOUZA_Nio_std,only: choice
+    use TOUZA_Nio_header,only: &
          & hi_ASTR1, hi_ASTR2, hi_ASTR3, &
          & hi_AEND1, hi_AEND2, hi_AEND3
     implicit none
     integer,parameter :: KARG=KI32
     character(len=*),  intent(in)  :: head(*)
     integer,           intent(in)  :: kidx
+    integer,optional,  intent(in)  :: lazy
     integer(kind=KARG),intent(in)  :: khld
-    integer jerr
     integer kaxs(3)
-    jerr = 0
+    integer lz
+    lz = choice(def_lazy_size, lazy) + (0 * khld)
     select case (kidx)
     case (1)
-       call parse_record_cmem(jerr, n, head, hi_ASTR1, hi_AEND1)
+       call parse_record_cmem(n, head, hi_ASTR1, hi_AEND1)
+       if (lz.ge.0) n = max(lz, n)
     case (2)
-       call parse_record_cmem(jerr, n, head, hi_ASTR2, hi_AEND2)
+       call parse_record_cmem(n, head, hi_ASTR2, hi_AEND2)
+       if (lz.ge.0) n = max(lz, n)
     case (3)
-       call parse_record_cmem(jerr, n, head, hi_ASTR3, hi_AEND3)
+       call parse_record_cmem(n, head, hi_ASTR3, hi_AEND3)
+       if (lz.ge.0) n = max(lz, n)
     case default
-       jerr = 0
-       if (jerr.eq.0) call parse_record_cmem(jerr, kaxs(1), head, hi_ASTR1, hi_AEND1)
-       if (jerr.eq.0) call parse_record_cmem(jerr, kaxs(2), head, hi_ASTR2, hi_AEND2)
-       if (jerr.eq.0) call parse_record_cmem(jerr, kaxs(3), head, hi_ASTR3, hi_AEND3)
-       if (jerr.eq.0) n = kaxs(1) * kaxs(2) * kaxs(3)
+       call parse_record_cmem(kaxs(1), head, hi_ASTR1, hi_AEND1)
+       call parse_record_cmem(kaxs(2), head, hi_ASTR2, hi_AEND2)
+       call parse_record_cmem(kaxs(3), head, hi_ASTR3, hi_AEND3)
+       if (lz.ge.0) kaxs(:) = max(lz, kaxs(:))
+       if (ANY(kaxs(:).lt.0)) then
+          n = kaxs(1)
+          if (n.ge.0) n = kaxs(2)
+          if (n.ge.0) n = kaxs(3)
+       else
+          n = kaxs(1) * kaxs(2) * kaxs(3)
+       endif
     end select
-
-    if (jerr.ne.0) n = -1
     return
   end function parse_header_size_i
 
 !!!_  & parse_record_fmt - parse format
   subroutine parse_record_fmt &
        & (ierr, kfmt, str)
-    use TOUZA_Nng_std,only: KDBL, KFLT, KI32, KI64
+    use TOUZA_Nio_std,only: KDBL, KFLT, KI32, KI64
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: kfmt
@@ -3975,7 +4073,7 @@ contains
     case ('M')
        kfmt = GFMT_MASK
     case default
-       ierr = -1
+       ierr = ERR_UNKNOWN_FORMAT - ERR_MASK_NIO_RECORD
     end select
 
     if (ierr.eq.0) then
@@ -3993,7 +4091,7 @@ contains
              read(str(4:), *, IOSTAT=ierr) kk
              if (ierr.eq.0) then
                 if (kk.gt.(GFMT_URYend - GFMT_URY)) ierr = -1
-                if (kk.lt.1) ierr = -1
+                if (kk.lt.1) ierr = ERR_UNKNOWN_FORMAT - ERR_MASK_NIO_RECORD
              endif
              if (ierr.eq.0) kfmt = kfmt + kk
           case ('T')
@@ -4012,7 +4110,7 @@ contains
                 else if (kk.eq.8) then
                    kfmt = kfmt + GFMT_UR8
                 else
-                   ierr = -1
+                   ierr = ERR_UNKNOWN_FORMAT - ERR_MASK_NIO_RECORD
                 endif
              endif
           end select
@@ -4026,11 +4124,11 @@ contains
              else if (kk.eq.8) then
                 kfmt = kfmt + GFMT_UI8
              else
-                ierr = -1
+                ierr = ERR_UNKNOWN_FORMAT - ERR_MASK_NIO_RECORD
              endif
           endif
        case default
-          ierr = -1
+          ierr = ERR_UNKNOWN_FORMAT - ERR_MASK_NIO_RECORD
        end select
     endif
     if (ierr.ne.0) kfmt = GFMT_ERR
@@ -4039,25 +4137,94 @@ contains
 
 !!!_  & parse_record_cmem - parse coordinate members
   subroutine parse_record_cmem &
-       & (ierr, nmem, head, ibgn, iend)
-    use TOUZA_Nng_header,only: get_item
+       & (nmem, head, ibgn, iend)
+    use TOUZA_Nio_header,only: get_item
     implicit none
-    integer,         intent(out) :: ierr
     integer,         intent(out) :: nmem
     character(len=*),intent(in)  :: head(*)
     integer,         intent(in)  :: ibgn, iend
 
     integer nmin, nmax
+    integer jerr
 
-    ierr = 0
-    if (ierr.eq.0) call get_item(ierr, head, nmin, ibgn)
-    if (ierr.eq.0) call get_item(ierr, head, nmax, iend)
-    if (ierr.eq.0) then
-       nmem = nmax - nmin + 1
+    jerr = 0
+    if (jerr.eq.0) call get_item(jerr, head, nmin, ibgn)
+    if (jerr.eq.0) call get_item(jerr, head, nmax, iend)
+    if (jerr.eq.0) then
+       nmem = max(0, nmax - nmin + 1)
     else
-       nmem = -1
+       nmem = jerr
     endif
   end subroutine parse_record_cmem
+
+!!!_  & get_header_cprop - get coordinate properties
+  subroutine get_header_cprop &
+       & (name, irange, head, kidx)
+    use TOUZA_Nio_header,only: &
+         & get_item, &
+         & hi_AITM1, hi_AITM2, hi_AITM3, &
+         & hi_ASTR1, hi_ASTR2, hi_ASTR3, &
+         & hi_AEND1, hi_AEND2, hi_AEND3
+    implicit none
+    character(len=*),intent(out) :: name
+    integer,         intent(out) :: irange(*)
+    character(len=*),intent(in)  :: head(*)
+    integer,         intent(in)  :: kidx
+    integer jerr
+    select case (kidx)
+    case (1)
+       call get_item(jerr, head, name, hi_AITM1)
+       if (jerr.eq.0) call get_item(jerr, head, irange(1), hi_ASTR1)
+       if (jerr.eq.0) call get_item(jerr, head, irange(2), hi_AEND1)
+    case (2)
+       call get_item(jerr, head, name, hi_AITM2)
+       if (jerr.eq.0) call get_item(jerr, head, irange(1), hi_ASTR2)
+       if (jerr.eq.0) call get_item(jerr, head, irange(2), hi_AEND2)
+    case (3)
+       call get_item(jerr, head, name, hi_AITM3)
+       if (jerr.eq.0) call get_item(jerr, head, irange(1), hi_ASTR3)
+       if (jerr.eq.0) call get_item(jerr, head, irange(2), hi_AEND3)
+    case default
+       jerr = -1
+    end select
+    if (jerr.ne.0) then
+       name = ' '
+       irange(1) = -1
+       irange(2) = 0
+    endif
+  end subroutine get_header_cprop
+!!!_  & put_header_cprop - put coordinate properties
+  subroutine put_header_cprop &
+       & (ierr, head, name, irange, kidx)
+    use TOUZA_Nio_header,only: &
+         & put_item, &
+         & hi_AITM1, hi_AITM2, hi_AITM3, &
+         & hi_ASTR1, hi_ASTR2, hi_ASTR3, &
+         & hi_AEND1, hi_AEND2, hi_AEND3
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(inout) :: head(*)
+    character(len=*),intent(in)    :: name
+    integer,         intent(in)    :: irange(*)
+    integer,         intent(in)    :: kidx
+    ierr = 0
+    select case (kidx)
+    case (1)
+       call put_item(ierr, head, name, hi_AITM1)
+       if (ierr.eq.0) call put_item(ierr, head, irange(1), hi_ASTR1)
+       if (ierr.eq.0) call put_item(ierr, head, irange(2), hi_AEND1)
+    case (2)
+       call put_item(ierr, head, name, hi_AITM2)
+       if (ierr.eq.0) call put_item(ierr, head, irange(1), hi_ASTR2)
+       if (ierr.eq.0) call put_item(ierr, head, irange(2), hi_AEND2)
+    case (3)
+       call put_item(ierr, head, name, hi_AITM3)
+       if (ierr.eq.0) call put_item(ierr, head, irange(1), hi_ASTR3)
+       if (ierr.eq.0) call put_item(ierr, head, irange(2), hi_AEND3)
+    case default
+       ierr = ERR_INVALID_SWITCH - ERR_MASK_NIO_RECORD
+    end select
+  end subroutine put_header_cprop
 
 !!!_  & mask_encode - mask encoding
   subroutine mask_encode_di &
@@ -4418,7 +4585,7 @@ contains
   integer function check_id_format &
        & (head) &
        & result(n)
-    use TOUZA_Nng_header,only: hi_IDFM, get_item
+    use TOUZA_Nio_header,only: hi_IDFM, get_item
     implicit none
     character(len=*),intent(in) :: head(*)
     integer jerr
@@ -4431,15 +4598,15 @@ contains
     return
   end function check_id_format
 
-end module TOUZA_Nng_record
+end module TOUZA_Nio_record
 
-!!!_@ test_nng_record - test program
-#ifdef TEST_NNG_RECORD
-program test_nng_record
+!!!_@ test_nio_record - test program
+#ifdef TEST_NIO_RECORD
+program test_nio_record
   use TOUZA_Std,       only: parse, get_param, arg_diag, arg_init
-  use TOUZA_Nng_std,   only: KDBL,  KIOFS, sus_write_irec, sus_write_lrec
-  use TOUZA_Nng_header,only: nitem, litem
-  use TOUZA_Nng_record
+  use TOUZA_Nio_std,   only: KDBL,  KIOFS, sus_write_irec, sus_write_lrec
+  use TOUZA_Nio_header,only: nitem, litem
+  use TOUZA_Nio_record
   implicit none
   integer ierr
   integer jarg
@@ -4537,10 +4704,10 @@ contains
 !!!_ + test_auto_record - auto record parser tests
   subroutine test_auto_record &
        & (ierr, jarg)
-    use TOUZA_Nng_std,   only: KDBL,  KIOFS, &
+    use TOUZA_Nio_std,   only: KDBL,  KIOFS, &
          & sus_open, sus_close, sus_write_irec, sus_write_lrec
-    use TOUZA_Nng_header,only: nitem, litem, hi_ITEM, put_item, get_item
-    use TOUZA_Nng_record
+    use TOUZA_Nio_header,only: nitem, litem, hi_ITEM, put_item, get_item
+    use TOUZA_Nio_record
     implicit none
     integer,intent(out)   :: ierr
     integer,intent(inout) :: jarg
@@ -4611,7 +4778,7 @@ contains
     do
        if (ierr.eq.0) then
           hd(:) = ' '
-          call nng_read_header(ierr, hd, krect, udat)
+          call nio_read_header(ierr, hd, krect, udat)
           write (*, 401) ierr, jrec, krect
        endif
        if (ierr.ne.0) then
@@ -4634,7 +4801,7 @@ contains
 !!!_  - set_test_header - set dummy header
   subroutine set_test_header &
        & (ierr, hd)
-    use TOUZA_Nng_header
+    use TOUZA_Nio_header
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: hd(*)
@@ -4660,8 +4827,8 @@ contains
   subroutine test_read_write_ext &
        & (ierr, jarg)
     use TOUZA_Std,    only: get_param, upcase
-    use TOUZA_Nng_std,only: KBUF=>KDBL
-    use TOUZA_Nng_header
+    use TOUZA_Nio_std,only: KBUF=>KDBL
+    use TOUZA_Nio_header
     use TOUZA_Std_sus,only: sus_open, sus_close
     implicit none
     integer,intent(out)   :: ierr
@@ -4720,9 +4887,9 @@ contains
 
     jrec = 0
     do
-       if (ierr.eq.0) call nng_read_header(ierr, hd, krect, uread)
+       if (ierr.eq.0) call nio_read_header(ierr, hd, krect, uread)
        write (*, 401) ierr, jrec, krect
-       if (ierr.eq.0) call nng_read_data(ierr, v, lmax, hd, krect, uread)
+       if (ierr.eq.0) call nio_read_data(ierr, v, lmax, hd, krect, uread)
        write (*, 402) ierr, jrec
        if (ierr.eq.0) then
           n = parse_header_size(hd, 0)
@@ -4733,14 +4900,14 @@ contains
           else
              krectw = krect
              if (ierr.eq.0) call put_item(ierr, hd, trim(fmt), hi_DFMT)
-             if (ierr.eq.0) call nng_write_header(ierr, hd, krectw, uwrite)
+             if (ierr.eq.0) call nio_write_header(ierr, hd, krectw, uwrite)
              write(*, 501) ierr, jrec, l
-             if (ierr.eq.0) call nng_write_data(ierr, v, lmax, hd, krectw, uwrite)
+             if (ierr.eq.0) call nio_write_data(ierr, v, lmax, hd, krectw, uwrite)
              write(*, 502) ierr, jrec, l
              if (ierr.eq.0) inquire(unit=uwrite, IOSTAT=ierr, pos=JPOS)
              do l = 0, nloop - 1
-                if (ierr.eq.0) call nng_write_header(ierr, hd, krectw, uwrite)
-                if (ierr.eq.0) call nng_write_data(ierr, v, lmax, hd, krectw, uwrite)
+                if (ierr.eq.0) call nio_write_header(ierr, hd, krectw, uwrite)
+                if (ierr.eq.0) call nio_write_data(ierr, v, lmax, hd, krectw, uwrite)
                 if (ierr.eq.0) write(unit=uwrite, IOSTAT=ierr, pos=JPOS)
              enddo
              if (ierr.ne.0) exit
@@ -4762,9 +4929,9 @@ contains
   subroutine test_encoding &
        & (ierr, jarg)
     use TOUZA_Std,only: endian_LITTLE, endian_BIG
-    use TOUZA_Nng_std,only: KBUF=>KDBL
+    use TOUZA_Nio_std,only: KBUF=>KDBL
     use TOUZA_Std_sus,only: sus_open,  sus_close
-    use TOUZA_Nng_header
+    use TOUZA_Nio_header
     implicit none
     integer,intent(out)   :: ierr
     integer,intent(inout) :: jarg
@@ -4878,8 +5045,8 @@ contains
 !!!_  - test_encoding_sub
   subroutine test_encoding_sub &
        & (ierr, hd, v, n, nz, vmiss, ufile, tag)
-    use TOUZA_Nng_std,only: KBUF=>KDBL
-    use TOUZA_Nng_header
+    use TOUZA_Nio_std,only: KBUF=>KDBL
+    use TOUZA_Nio_header
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(inout) :: hd(*)
@@ -4931,8 +5098,8 @@ contains
 !!!_  - test_encoding_check
   subroutine test_encoding_check &
        & (ierr, hd, v, n, nz, vmiss, ufile, tag, tmod)
-    use TOUZA_Nng_std,only: KBUF=>KDBL
-    use TOUZA_Nng_header
+    use TOUZA_Nio_std,only: KBUF=>KDBL
+    use TOUZA_Nio_header
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(inout) :: hd(*)
@@ -4953,7 +5120,7 @@ contains
     integer jpos
 
     ierr = 0
-
+    jpos = 0
     nh = n / nz
 
 101 format('############ ', A, 1x, A)
@@ -4981,12 +5148,12 @@ contains
 301 format('extreme:check:', I0, 1x, A, 1x, I0, 1x, E16.9, 1x, '[', 2E9.1, '] [', 2E9.1, ']')
     do
        w(1:n) = 123.4e5_KBUF
-       if (ierr.eq.0) call nng_read_header(ierr, hdi, krecti, ufile)
+       if (ierr.eq.0) call nio_read_header(ierr, hdi, krecti, ufile)
        if (ierr.ne.0) then
           ierr = 0
           exit
        endif
-       if (ierr.eq.0) call nng_read_data(ierr, w, n, hdi, krecti, ufile)
+       if (ierr.eq.0) call nio_read_data(ierr, w, n, hdi, krecti, ufile)
        if (ierr.eq.0) call get_item(ierr, hdi, fmti, hi_DFMT)
        if (ierr.eq.0) then
           do jz = 0, nz - 1
@@ -5009,8 +5176,8 @@ contains
 
   subroutine test_encoding_write &
        & (ierr, hd, v, n, u, fmt)
-    use TOUZA_Nng_std,only: KBUF=>KDBL
-    use TOUZA_Nng_header
+    use TOUZA_Nio_std,only: KBUF=>KDBL
+    use TOUZA_Nio_header
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(inout) :: hd(*)
@@ -5024,16 +5191,16 @@ contains
     ierr = 0
     krectw = REC_DEFAULT
     if (ierr.eq.0) call put_item(ierr, hd, trim(fmt), hi_DFMT)
-    if (ierr.eq.0) call nng_write_header(ierr, hd, krectw, u)
-    if (ierr.eq.0) call nng_write_data(ierr, v, n, hd, krectw, u)
+    if (ierr.eq.0) call nio_write_header(ierr, hd, krectw, u)
+    if (ierr.eq.0) call nio_write_data(ierr, v, n, hd, krectw, u)
 101 format('extreme:', A, ': ', I0)
     write(*, 101) trim(fmt), ierr
     return
   end subroutine test_encoding_write
 
-end program test_nng_record
+end program test_nio_record
 
-#endif /* TEST_NNG_RECORD */
+#endif /* TEST_NIO_RECORD */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

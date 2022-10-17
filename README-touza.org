@@ -69,6 +69,14 @@ which are necessary to be installed somewhere the compiler can
 find (e.g., gfortran).  If configure is successful, =*.mod= files
 are installed into =$(includedir)= (default is =PREFIX/include/touza=).
 
+** system-dependent features
+*** ifort
+Need =-heap-arrays= option in =FCFLAGS= and =FFLAGS=, which must be
+set at configure.  An example follows:
+
+: % ./configure FCFLAGS='-g -O2 -heap-arrays' FFLAGS='-g -O2 -heap-arrays'
+
+
 * Copyright and license
 Copyright 2020-2022 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
