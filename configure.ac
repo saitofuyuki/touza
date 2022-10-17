@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/09/16 14:11:22 fuyuki configure.ac>
+# Time-stamp: <2022/10/17 15:15:22 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -67,7 +67,7 @@ AC_SUBST([TOUZA_NAME], $with_touza_name)
 
 AC_ARG_PROGRAM
 
-AM_INIT_AUTOMAKE([-Wall foreign])
+AM_INIT_AUTOMAKE([foreign -Wall])
 AM_MAINTAINER_MODE
 AM_CONDITIONAL([NEVER], [false])
 
