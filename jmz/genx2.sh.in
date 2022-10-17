@@ -1,5 +1,5 @@
 #!@ZSH@
-# Time-stamp: <2022/10/17 14:39:15 fuyuki genx2.sh.in>
+# Time-stamp: <2022/10/17 21:56:55 fuyuki genx2.sh.in>
 
 main ()
 {
@@ -7,7 +7,8 @@ main ()
   local outd=ex2
   mkdir -p $outd
 
-  gen_files aa  0 X=/lon,0:$NI X ROR
+  # gen_files aa  0 X=/lon,0:$NI X ROR
+  gen_files aa  0 X=/lon,0:$NI X
   gen_files bb  0 X=/lon,1:4   X ROR
   gen_files cc  0 Y=/lon,1:4   Y
   gen_files dd  0 X=/lon,0:$NI Y=/lat,0:$NJ X ROR
