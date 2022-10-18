@@ -1,3 +1,13 @@
+Revision 1.05.1 / 2022-10-19
+==================
+
+  * Version 1.05.1, to fix chak (alpha version)
+  * various bug fixes on chak
+  * [FATAL] skip deallocation on in-house operation
+  * [FATAL] avoid buffer reuse even unary operation
+  * [CRITICAL] correct binary iteration to search free buffer
+  * queue/stack structure improved
+
 Revision 1.05.0 / 2022-10-17
 ============================
 
