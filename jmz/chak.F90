@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/19 17:48:55 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/19 20:56:27 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -3711,33 +3711,6 @@ contains
     endif
 
     if (ierr.eq.0) then
-       if (file%u.lt.0) then
-          file%u = new_unit()
-          ierr = min(0, file%u)
-          if (ierr.eq.0) then
-             select case (file%mode)
-             case (mode_new)
-                stt = 'N'
-             case (mode_write)
-                stt = 'R'
-                pos = ' '
-             case (mode_append)
-                stt = 'U'
-                pos = 'AP'
-             case default
-                stt = ' '
-                pos = ' '
-             end select
-             call sus_open(ierr, file%u, file%name, ACTION='W', STATUS=stt, POSITION=pos)
-             if (ierr.ne.0) then
-                write(*, *) 'failed to write open:', trim(file%name)
-                return
-             endif
-          endif
-          file%irec = 0
-       endif
-    endif
-    if (ierr.eq.0) then
        undef = obuffer(jb)%undef
        if (ABS(undef).eq.ULIMIT) then
           call store_item(ierr, head, ' ', hi_MISS)
@@ -3787,6 +3760,34 @@ contains
     if (ierr.eq.0) call fill_header(ierr, head, file%h, 1)
 
     call message(ierr, 'put_item', levm=-9)
+
+    if (ierr.eq.0) then
+       if (file%u.lt.0) then
+          file%u = new_unit()
+          ierr = min(0, file%u)
+          if (ierr.eq.0) then
+             select case (file%mode)
+             case (mode_new)
+                stt = 'N'
+             case (mode_write)
+                stt = 'R'
+                pos = ' '
+             case (mode_append)
+                stt = 'U'
+                pos = 'AP'
+             case default
+                stt = ' '
+                pos = ' '
+             end select
+             call sus_open(ierr, file%u, file%name, ACTION='W', STATUS=stt, POSITION=pos)
+             if (ierr.ne.0) then
+                write(*, *) 'failed to write open:', trim(file%name)
+                return
+             endif
+          endif
+          file%irec = 0
+       endif
+    endif
 
     if (ierr.eq.0) then
        ! file%t = REC_DEFAULT
