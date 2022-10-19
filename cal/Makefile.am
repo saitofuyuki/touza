@@ -1,7 +1,7 @@
 # touza/calendar Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2022/06/27 11:21:30 fuyuki Makefile.am>
+# Time-stamp: <2022/10/20 08:08:51 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -55,7 +55,11 @@ AM_LOG_FLAGS	=	-l $(WTC_LOGDIR) -t $(TEST_NUM)
 TESTS_miroc		=	auto auto.p grego_i grego_i.p grego_l grego_l.p ideal ideal.p
 TESTS_matsiro	=	matsiro.grego matsiro.365
 TESTS_ils		=	ils.grego     ils.noleap  ils.30360
-TESTS			=	$(TESTS_miroc) $(TESTS_matsiro) $(TESTS_ils)
+TESTS =
+if MAINTAINER_MODE
+TESTS += $(TESTS_miroc)
+endif
+TESTS += $(TESTS_matsiro) $(TESTS_ils)
 $(TESTS):
 
 check_targets_miroc	=	check-auto check-auto.p check-grego_i check-grego_i.p \
@@ -97,10 +101,11 @@ $(UCALN): $(MIROCH)
 $(MIROCH):
 	touch $@
 
-check_PROGRAMS	=	test_calendar test_calendar_core \
-					test_calendar_comp test_calendar_trad \
-					test_calendar_matsiro test_calendar_ils \
-					test_calendar_coco
+check_PROGRAMS = test_calendar test_calendar_core test_calendar_comp
+if MAINTAINER_MODE
+check_PROGRAMS += test_calendar_trad
+endif
+check_PROGRAMS += test_calendar_matsiro test_calendar_ils test_calendar_coco
 
 test_calendar_SOURCES	= calendar_miroc.F90 calendar.F90
 test_calendar_LDADD		= $(TEST_COMMON_LIBS)
