@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2022/09/16 14:15:37 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 07:43:44 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -34,9 +34,20 @@ module TOUZA_Std_mwe
   integer,parameter :: switch_excluded = -1    /* MPI excluded */
 #if OPT_USE_MPI
 #else  /* not OPT_USE_MPI */
+  ! dummy parameters
   integer,parameter :: MPI_COMM_NULL  = 2
   integer,parameter :: MPI_COMM_SELF  = 1
   integer,parameter :: MPI_COMM_WORLD = 0
+  integer,parameter :: MPI_UNDEFINED = -32766
+  integer,parameter :: MPI_DATATYPE_NULL = 0
+  integer,parameter :: MPI_GROUP_NULL = 0
+  integer,parameter :: MPI_GROUP_EMPTY = 1
+  integer,parameter :: MPI_ANY_TAG = -1
+  integer,parameter :: MPI_ANY_SOURCE = -1
+  integer,parameter :: MPI_INTEGER = 7
+  integer,parameter :: MPI_CHARACTER = 5
+  integer,parameter :: MPI_DOUBLE_PRECISION = 17
+  integer,parameter :: MPI_STATUS_SIZE = 6
 #endif /* not OPT_USE_MPI */
 !!!_  - static
 #define __MDL__ 'mwe'
@@ -59,6 +70,11 @@ module TOUZA_Std_mwe
   public is_mpi_activated
   public show_mpi_type
   public MPI_COMM_WORLD, MPI_COMM_SELF, MPI_COMM_NULL
+  public MPI_DATATYPE_NULL, MPI_GROUP_NULL, MPI_UNDEFINED
+  public MPI_STATUS_SIZE,   MPI_GROUP_EMPTY
+  public MPI_INTEGER,       MPI_CHARACTER
+  public MPI_ANY_TAG,       MPI_ANY_SOURCE
+  public MPI_DOUBLE_PRECISION
 !!!_  - misc
   character(len=128) tmsg
 contains
