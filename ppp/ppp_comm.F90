@@ -1,7 +1,7 @@
 !!!_! ppp_comm.F90 - TOUZA/ppp communication
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/05/23 10:22:40 c0210 ppp_comm.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 07:00:15 fuyuki ppp_comm.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -160,7 +160,9 @@ contains
 !!!_ + barrier_trace
   subroutine barrier_trace &
        & (ierr, iagent, tag, u)
-    use mpi,only: MPI_Barrier
+#if OPT_USE_MPI
+    use MPI,only: MPI_Barrier
+#endif /* OPT_USE_MPI */
     use TOUZA_Ppp_amng,only: inquire_agent
     implicit none
     integer,         intent(out)         :: ierr
@@ -198,8 +200,8 @@ contains
   subroutine broadcast_ia &
        & (ierr, buf, iagent, iroot)
     use TOUZA_Ppp_std,only: choice
+    use TOUZA_Ppp_std,only: MPI_INTEGER
     use TOUZA_Ppp_amng,only: inquire_agent
-    use mpi,only: MPI_INTEGER
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use mpi,only: MPI_Bcast
 #  endif
@@ -228,8 +230,10 @@ contains
   subroutine transfer_ia &
        & (ierr,   buf,    &
        &  irsend, irrecv, iagent, iarecv, ktag)
-    use MPI,only: MPI_STATUS_SIZE, MPI_ANY_TAG, MPI_INTEGER
+    use TOUZA_Ppp_std,only: MPI_STATUS_SIZE, MPI_ANY_TAG, MPI_INTEGER
+#if OPT_USE_MPI
     use MPI,only: MPI_Wait
+#endif /* OPT_USE_MPI */
 #  if HAVE_FORTRAN_MPI_MPI_ISEND
     use MPI,only: MPI_Isend
 #  endif

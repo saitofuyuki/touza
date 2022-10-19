@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2022/09/29 17:10:48 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 06:57:02 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -30,7 +30,7 @@
 !!!_@ TOUZA_Ppp_amng - MPI communicator control
 module TOUZA_Ppp_amng
 !!!_ + modules
-  use MPI,only: MPI_COMM_NULL, MPI_GROUP_NULL
+  use TOUZA_Ppp_std,only: MPI_COMM_NULL, MPI_GROUP_NULL
   use TOUZA_Ppp_std,only: &
        & control_mode, control_deep, is_first_force, &
        & get_logu,     unit_global,  trace_fine,   trace_control
@@ -256,10 +256,7 @@ contains
 !!!_  - init_world - add special agent (world)
   subroutine init_world &
        & (ierr, u)
-    use MPI,only: &
-         & MPI_COMM_WORLD, MPI_Comm_rank, &
-         & MPI_Group_rank, MPI_Group_size
-    use TOUZA_Ppp_std,only: get_wni_safe, get_ni, get_gni, msg
+    use TOUZA_Ppp_std,only: MPI_COMM_WORLD
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -328,9 +325,6 @@ contains
 !!!_  - diag_table
   subroutine diag_table &
        & (ierr, u)
-    use MPI,only: &
-         & MPI_COMM_WORLD, MPI_Comm_rank, &
-         & MPI_Group_rank, MPI_Group_size
     use TOUZA_Ppp_std,only: get_wni_safe, get_ni, get_gni, msg, diag_htable
     implicit none
     integer,intent(out)         :: ierr
@@ -480,8 +474,7 @@ contains
 !!!_  - diag_map_family
   subroutine diag_map_family &
        & (ierr, iasrc, iaref, nrref, irref, u, fmt_rr)
-    use MPI,only: MPI_UNDEFINED
-    use TOUZA_Ppp_std,only: msg
+    use TOUZA_Ppp_std,only: msg, MPI_UNDEFINED
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: iasrc
@@ -550,7 +543,6 @@ contains
 #  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
     use MPI,only: MPI_Group_translate_ranks
 #  endif
-    use MPI,only: MPI_Group_rank, MPI_GROUP_NULL
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(out)         :: map
@@ -985,7 +977,9 @@ contains
 !!!_  & new_agent_color
   subroutine new_agent_color &
        & (ierr, color, name, src, switch)
+#if OPT_USE_MPI
     use MPI,only: MPI_Comm_split
+#endif /* OPT_USE_MPI */
     use TOUZA_Ppp_std,only: get_ni, choice
     implicit none
     integer,         intent(out)         :: ierr
@@ -1100,8 +1094,10 @@ contains
 !!!_  & new_agent_derived
   subroutine new_agent_derived &
        & (ierr, name, alist, iagent)
-    use MPI,only: MPI_UNDEFINED, MPI_Group_rank
-    use TOUZA_Ppp_std,only: msg
+#if OPT_USE_MPI
+    use MPI,only: MPI_Group_rank
+#endif
+    use TOUZA_Ppp_std,only: msg, MPI_UNDEFINED
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: name      ! new name
@@ -1146,7 +1142,6 @@ contains
 !!!_  & new_agent_spinoff
   subroutine new_agent_spinoff &
        & (ierr, name, iagent, switch)
-    use MPI,only: MPI_UNDEFINED, MPI_Group_rank
     use TOUZA_Ppp_std,only: msg, choice
     implicit none
     integer,         intent(out) :: ierr
@@ -1183,11 +1178,10 @@ contains
 !!!_  & mod_agent_order - reorder rank in agent/group
   subroutine mod_agent_order &
        & (ierr, atgt, opr, keys, iagent)
-    use MPI,only: MPI_UNDEFINED
 #  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
     use MPI,only: MPI_Group_translate_ranks
 #  endif
-    use TOUZA_Ppp_std,only: msg
+    use TOUZA_Ppp_std,only: msg, MPI_UNDEFINED
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: atgt      ! target agent
@@ -1317,7 +1311,6 @@ contains
 !!!_  & agents_translate - translate ranks between agents
   subroutine agents_translate_a &
        & (ierr, irtgt, atgt, irsrc, asrc)
-    use MPI,only: MPI_UNDEFINED
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(out)         :: irtgt
@@ -1339,7 +1332,7 @@ contains
 
   subroutine agents_translate_i &
        & (ierr, irtgt, iatgt, irsrc, iasrc)
-    use MPI,only: MPI_UNDEFINED
+    use TOUZA_Std_mwe,only: MPI_UNDEFINED
 #  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
     use MPI,only: MPI_Group_translate_ranks
 #  endif
@@ -1433,9 +1426,10 @@ contains
        &  jau,  &
        &  tgu,  &
        &  tui,  nt, src)
-    use MPI,only: MPI_UNDEFINED
+#if OPT_USE_MPI
     use MPI,only: MPI_Comm_create, MPI_Group_rank
-    use TOUZA_Ppp_std,only: choice
+#endif
+    use TOUZA_Ppp_std,only: choice, MPI_UNDEFINED
     implicit none
     integer,intent(out) :: ierr
     integer,intent(out) :: jau
@@ -1482,7 +1476,9 @@ contains
        & (ierr, &
        &  tgr,  &
        &  tci,  tui,  nt, affils, src)
+#if OPT_USE_MPI
     use MPI,only: MPI_Comm_create
+#endif
     use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out) :: ierr
@@ -1572,7 +1568,9 @@ contains
 !!!_  & add_entry_comm
   subroutine add_entry_comm &
        & (ierr, iagent, name, icomm, src, flag)
+#if OPT_USE_MPI
     use MPI,only: MPI_Comm_group
+#endif
     use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out) :: ierr
@@ -1621,7 +1619,9 @@ contains
 !!!_  & add_entry_group
   subroutine add_entry_group &
        & (ierr, iagent, name, igroup, src, flag)
+#if OPT_USE_MPI
     use MPI,only: MPI_Comm_create
+#endif
     use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out) :: ierr
@@ -1653,7 +1653,6 @@ contains
 !!!_  & add_entry_copy
   subroutine add_entry_copy &
        & (ierr, iagent, name, iaref, src, flag)
-    use MPI,only: MPI_Comm_create
     use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out) :: ierr
@@ -1682,8 +1681,7 @@ contains
        & (ierr, &
        &  ntotal, tbl_ci, tbl_ui, &
        &  affils, icomm)
-    use MPI,only: &
-         & MPI_STATUS_SIZE, MPI_CHARACTER, MPI_INTEGER
+    use TOUZA_Ppp_std,only: MPI_CHARACTER, MPI_INTEGER
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use MPI,only: MPI_Send, MPI_Bcast
 #  endif
@@ -1750,6 +1748,7 @@ contains
                 ipdst = (irank / mstp) * mstp
                 ktag  = (irank - ipdst) / (mstp / ndiv)
                 msend = ntotal * lagent
+#if OPT_USE_MPI
                 if (ierr.eq.0) then
                    call MPI_Send &
                         & (ubuf(1:ntotal), ntotal, MPI_INTEGER, &
@@ -1760,6 +1759,7 @@ contains
                         & (dbuf(1:ntotal), msend, MPI_CHARACTER, &
                         &  ipdst, ktag,    icomm, ierr)
                 endif
+#endif /* OPT_USE_MPI */
                 exit
              else
                 ! recieve and continue
@@ -1779,6 +1779,7 @@ contains
           enddo
        endif
     endif
+#if OPT_USE_MPI
     if (ierr.eq.0) then
        call MPI_Bcast(ntotal, 1, MPI_INTEGER, iroot, icomm, ierr)
     endif
@@ -1789,6 +1790,7 @@ contains
        msend = ntotal * lagent
        call MPI_Bcast(dbuf(1:ntotal), msend, MPI_CHARACTER, iroot, icomm, ierr)
     endif
+#endif /* OPT_USE_MPI */
     if (ierr.eq.0) then
        tbl_ci(1:ntotal) = dbuf(1:ntotal)
        tbl_ui(1:ntotal) = ubuf(1:ntotal)
@@ -1799,9 +1801,11 @@ contains
   subroutine recv_affils &
        & (ierr,  ntotal, dbuf,  ubuf, &
        &  icomm, ipsrc,  ktag)
-    use MPI,only: &
-         & MPI_STATUS_SIZE, MPI_CHARACTER, MPI_INTEGER, &
-         & MPI_Probe, MPI_Get_count
+    use TOUZA_Ppp_std,only: MPI_STATUS_SIZE
+    use TOUZA_Ppp_std,only: MPI_CHARACTER, MPI_INTEGER
+#if OPT_USE_MPI
+    use MPI,only: MPI_Probe, MPI_Get_count
+#endif
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use MPI,only: MPI_Recv
 #  endif
@@ -1830,6 +1834,7 @@ contains
     norg = ntotal
     mold = maxval(ubuf(1:norg)) + 1
 
+#if OPT_USE_MPI
     call MPI_Probe(ipsrc, ktag, icomm, istts, ierr)
     if (ierr.eq.0) call MPI_Get_count(istts, MPI_INTEGER, nrcv, ierr)
     if (ierr.eq.0) then
@@ -1842,6 +1847,7 @@ contains
             & (drcv(1:nrcv), (nrcv * lagent), MPI_CHARACTER, &
             &  ipsrc, ktag,  icomm, istts, ierr)
     endif
+#endif /* OPT_USE_MPI */
     if (ierr.eq.0) then
        ! merge
        urcv(1:nrcv) = urcv(1:nrcv) + mold
@@ -1889,8 +1895,8 @@ contains
   subroutine batch_group_split &
        & (ierr,   ranks,  tbl_gr, &
        &  tbl_ci, ntotal, affils, icomm, igsrc, ir)
-    use MPI,only: &
-         & MPI_UNDEFINED, MPI_COMM_NULL, MPI_INTEGER
+    use TOUZA_Ppp_std,only: MPI_UNDEFINED, MPI_COMM_NULL
+    use TOUZA_Ppp_std,only: MPI_INTEGER
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use MPI,only: MPI_Gather, MPI_Bcast
 #  endif
@@ -1919,17 +1925,21 @@ contains
           else
              ibuf(1) = -1
           endif
+#if OPT_USE_MPI
           call MPI_Gather(ibuf, 1, MPI_INTEGER, ranks, 1, MPI_INTEGER, iroot, icomm, ierr)
           if (ierr.ne.0) exit
+#endif /* OPT_USE_MPI */
           if (ir.eq.iroot) then
              m = COUNT(ranks(:).ge.0)
              ranks(0:m-1) = PACK(ranks(:), ranks(:).ge.0)
           endif
+#if OPT_USE_MPI
           call MPI_Bcast(m, 1, MPI_INTEGER, iroot, icomm, ierr)
           if (ierr.eq.0) then
              call MPI_Bcast(ranks(0:m-1), m, MPI_INTEGER, iroot, icomm, ierr)
           endif
           if (ierr.eq.0) call MPI_Group_incl(igsrc, m, ranks(0:m-1), jgnew, ierr)
+#endif /* OPT_USE_MPI */
           ! write(*, *) 'incl', j, jgnew, m, ranks(0:m-1)
           if (ierr.eq.0) tbl_gr(j) = jgnew
        enddo
@@ -1940,10 +1950,10 @@ contains
   subroutine gen_comm_unit &
        & (ierr,   tbl_gu, &
        &  tbl_ui, tbl_gr, ntotal, icomm)
-    use TOUZA_Ppp_std,only: choice
-    use MPI,only: &
-         & MPI_UNDEFINED,  MPI_COMM_NULL, MPI_GROUP_EMPTY, &
-         & MPI_Comm_split, MPI_Group_union
+    use TOUZA_Ppp_std,only: choice, MPI_UNDEFINED,  MPI_COMM_NULL, MPI_GROUP_EMPTY
+#if OPT_USE_MPI
+    use MPI,only: MPI_Comm_split, MPI_Group_union
+#endif
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: tbl_gu(0:*)
@@ -1980,9 +1990,10 @@ contains
   subroutine derive_group &
        & (ierr, igdrv, &
        &  tbl,  src, alist)
-    use MPI,only: &
-         & MPI_GROUP_EMPTY, &
-         & MPI_Group_union
+    use TOUZA_Ppp_std,only: MPI_GROUP_EMPTY
+#if OPT_USE_MPI
+    use MPI,only: MPI_Group_union
+#endif
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: igdrv
