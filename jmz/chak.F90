@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/19 07:22:15 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/19 16:29:17 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -78,6 +78,14 @@ program chak
   integer,parameter :: ERR_FINISHED = 2
 
   character(len=*),parameter :: paramd = '='
+
+  integer,parameter :: hedit_unset = -9
+  integer,parameter :: hedit_sign = 0
+  integer,parameter :: hedit_edit = 1
+  integer,parameter :: hedit_title = 2
+  integer,parameter :: hedit_item = 3
+  integer,parameter :: hedit_all = 9
+
 !!!_  - operators
   integer,parameter :: lopr = 512
 
@@ -114,6 +122,7 @@ program chak
      integer              :: jrf = -1  ! current record filter
      type(loop_t),pointer :: recf(:)   ! record filter
      character(len=lfmt)  :: fmt
+     integer              :: hedit     ! header edit level
   end type file_t
   type(file_t),target :: ofile(0:lfile-1)
   type(file_t),target :: def_read
@@ -874,6 +883,7 @@ contains
 !!!_   . parse_option
   subroutine parse_option &
        & (ierr, japos, arg)
+    use TOUZA_Std,only: parse_number, get_param
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(inout) :: japos
@@ -882,10 +892,12 @@ contains
     integer n
     integer jval, jvar
 
-    integer md, cmd
+    integer md, cmd, hmd
+    integer ntmp
 
     md = mode_unset
     cmd = mode_unset
+    hmd = hedit_unset
     ierr = 0
     abuf = arg
 
@@ -933,7 +945,7 @@ contains
           md = mode_write
        else if (abuf.eq.'-a') then
           md = mode_append
-       else if (abuf.eq.'-n') then
+       else if (abuf.eq.'-k') then
           md = mode_new
        else if (abuf.eq.'-c') then   ! read-mode
           md = mode_cycle
@@ -959,14 +971,26 @@ contains
              global_offset_bgn = 1
              global_offset_end = 0
           endif
+       else if (abuf.eq.'-H') then
+          japos = japos + 1
+          call get_param(ierr, abuf, japos)
+          if (ierr.eq.0) call parse_number(ierr, ntmp, abuf)
+          if (ierr.eq.0) hmd = ntmp
+       else if (abuf(1:2).eq.'-H') then
+          call parse_number(ierr, ntmp, abuf(3:))
+          if (ierr.eq.0) hmd = ntmp
        else
           ierr = ERR_INVALID_ITEM
        endif
        if (ierr.eq.ERR_INVALID_ITEM) then
           call message(ierr, 'invalid option ' // trim(abuf), (/japos/))
+       else if (ierr.ne.0) then
+          call message(ierr, 'argument parser fails ' // trim(abuf), (/japos/))
        endif
        if (md.ne.mode_unset) then
           if (ierr.eq.0) call parse_file_option(ierr, md)
+       else if (hmd.ne.hedit_unset) then
+          if (ierr.eq.0) call parse_hedit_option(ierr, hmd)
        else if (cmd.ne.mode_unset) then
           if (ierr.eq.0) call parse_operator_option(ierr, cmd)
        endif
@@ -1023,6 +1047,26 @@ contains
     endif
   end subroutine parse_file_option
 
+!!!_   . parse_hedit_option
+  subroutine parse_hedit_option(ierr, mode)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: mode
+
+    type(file_t),pointer :: pfile
+    character(len=128) :: msg
+
+    ierr = 0
+    if (mfile.gt.lfile) then
+       ierr = ERR_INSUFFICIENT_BUFFER
+       return
+    endif
+    pfile => ofile(mfile-1)
+    if (mfile.eq.0) pfile => def_write
+    if (.not.is_read_mode(pfile%mode)) then
+       pfile%hedit = mode
+    endif
+  end subroutine parse_hedit_option
 !!!_   . parse_operator_option
   subroutine parse_operator_option(ierr, mode)
     implicit none
@@ -1061,7 +1105,8 @@ contains
           ! file to write
           ! call show_stack(ierr)
           call pop_queue(ierr)
-          ofile(jf)%mode = def_write%mode
+          ofile(jf)%mode  = def_write%mode
+          ofile(jf)%hedit = def_write%hedit
           call append_queue(ierr, hfile, pop=1, push=0)
           if (ierr.eq.0) call pop_stack(ierr, hbuf)
           if (ierr.eq.0) then
@@ -3317,6 +3362,7 @@ contains
     file%h = ' '
     file%fmt = ' '
     file%mode = choice(mode_unset, mode)
+    file%hedit = hedit_all
     if (present(name)) then
        file%name = name
     else
@@ -3545,12 +3591,13 @@ contains
 !!!_   . write_file
   subroutine write_file(ierr, file, jstk, levv)
     use TOUZA_Std,only: new_unit, sus_open, is_error_match
+    use TOUZA_Std,only: get_login_name
     use TOUZA_Nio,only: nio_write_header, parse_header_size, nio_write_data
     use TOUZA_Nio,only: get_default_header, show_header, parse_record_fmt
     use TOUZA_Nio,only: REC_DEFAULT, REC_BIG
     use TOUZA_Nio,only: put_item, get_item, restore_item, store_item
-    use TOUZA_Nio,only: hi_MISS, hi_ITEM, hi_DFMT, hi_EDIT1
-    use TOUZA_Nio,only: hi_DATE, hi_TIME
+    use TOUZA_Nio,only: hi_MISS, hi_ITEM, hi_DFMT,  hi_EDIT1
+    use TOUZA_Nio,only: hi_DATE, hi_TIME, hi_MSIGN, hi_MDATE
     use TOUZA_Nio,only: GFMT_UR4, GFMT_MR4, GFMT_UI4, GFMT_MI4
     use TOUZA_Nio,only: fill_header
     implicit none
@@ -3568,6 +3615,7 @@ contains
     logical :: is_tweak
     type(buffer_t) :: btmp
     integer kfmt
+    integer idt(8)
     real(kind=KBUF) :: undef
     character(len=litem) :: head(nitem)
 
@@ -3638,8 +3686,22 @@ contains
        endif
     endif
 
-    if (ierr.eq.0) call put_item(ierr, head, obuffer(jb)%desc,  hi_ITEM, tol=1)
-    if (ierr.eq.0) call put_item(ierr, head, obuffer(jb)%desc,  hi_EDIT1, 0, tol=1)
+    if (ierr.eq.0) then
+       if (file%hedit.ge.hedit_sign) then
+          call get_login_name(jerr, tstr)
+          if (jerr.eq.0) call put_item(ierr, head, tstr, hi_MSIGN)
+          call date_and_time(values=idt(:))
+          idt(4:6) = idt(5:7)
+          call put_item(jerr, head, idt(1:6), hi_MDATE)
+       endif
+    endif
+
+    if (file%hedit.ge.hedit_item) then
+       if (ierr.eq.0) call put_item(ierr, head, obuffer(jb)%desc,  hi_ITEM, tol=1)
+    endif
+    if (file%hedit.ge.hedit_edit) then
+       if (ierr.eq.0) call put_item(ierr, head, obuffer(jb)%desc,  hi_EDIT1, 0, tol=1)
+    endif
     if (ierr.eq.0) then
        call restore_item(jerr, head, tstr, hi_TIME)
        if (jerr.ne.0) tstr = ' '
