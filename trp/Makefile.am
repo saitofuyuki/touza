@@ -1,7 +1,7 @@
 # TOUZA/Trp Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Feb 26 2021
-# Time-stamp: <2022/09/16 14:53:23 fuyuki Makefile.am>
+# Time-stamp: <2022/10/20 07:47:55 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -18,7 +18,7 @@ include_HEADERS	=	touza_trp.h
 noinst_LTLIBRARIES = libtouza_local.la
 libtouza_local_la_SOURCES = trapiche_std.F90 \
 		trapiche_pack.F90 trapiche_float.F90 trapiche_ctl.F90
-if with_mpi
+if BUILD_WITH_MPI
 libtouza_local_la_SOURCES += trapiche_transfer.F90
 endif
 libtouza_local_la_SOURCES += trapiche.F90 $(include_HEADERS)
@@ -50,8 +50,11 @@ $(MIROCH):
 
 check_PROGRAMS	=	test_trapiche_std \
 					test_trapiche_pack_32 test_trapiche_pack_64 \
-					test_trapiche_float test_trapiche_ctl test_trapiche_transfer \
+					test_trapiche_float test_trapiche_ctl \
 					test_trapiche
+if BUILD_WITH_MPI
+check_PROGRAMS += test_trapiche_transfer
+endif
 if MAINTAINER_MODE
 check_PROGRAMS	+=	test_trapiche_pack_uip
 endif
