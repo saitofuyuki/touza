@@ -281,6 +281,83 @@ As commented above, indexing follows python style by default.
 : 1 3 _
 : 2 3  0.110000000E+02
 
+*** options summary
+**** Global options
+- =-v= :: verbose
+- =-vv= :: more verbose
+- =-vvv= :: even more verbose
+- =-q= :: quiet
+- =-qq= :: more quiet
+- =-qqq= :: even more quiet
+- =-n= :: (Reserved) dry-run
+**** Indexing style
+- =-P= :: Python-like indexing mode (default)
+- =-F= :: Fortran-like indexing mode
+
+In default python-like mode, coordinate, record etc index is counted
+from 0.  When to specify range, the second index corresponds to the
+one to stop (exclusive).   Thus range 2:5 corresponds to 2,3,4.
+Unlike python, at the moment the negative index cannot be used.
+
+In fortran-like mode index counted from 1 and the second index
+corresponds to the one to stop (inclusive).  Thus range 3:5
+corresponds to 3,4,5, which is equivalent to 2:5 in python-like mode.
+
+**** File write access
+- =-k= :: Keep mode (write).  Raise an error if output file exists (default)
+- =-f= :: Overwrite mode (write).  Force overwrite even the output file exists
+- =-a= :: Append mode (write).  Output is appended to the file
+
+- =-Hn=, =-H n= :: Set header edit level to integer /n/ (default=9)
+
+Header edit levels
+|    n |                 | default        |
+|------+-----------------+----------------|
+|   -1 | keep reference  |                |
+|    0 | set MDATE MSIGN | date and user  |
+|    1 | set 0 + EDIT    | operator queue |
+|    2 | set 1 + TITLE   | (reserved)     |
+|    3 | set 2 + ITEM    | operator queue |
+| more | set 3           |                |
+
+Options ITEM=STRING, EDIT=STRING etc precede the above editing level,
+to explicitly set the header items.
+
+**** File read access
+- =-s= :: Terminate mode (read).  Stop if eof reached (default)
+- =-c= :: Cyclic mode (read).   Rewind input file if eof reached
+- =-p= :: Persistent mode (read).  Keep final record if eof reached
+
+In default terminate mode, the chak operation stops when one or more
+shortest input file reaches eof.  If some files still remains records,
+an error is raised.
+
+In the other two modes, the chak operation stops when one or more
+longest input file reaches eof.  If some files reach eof during
+operation, rewind to the first record when cyclic mode, while keep the
+final record when persistent mode.
+
+Read access option can be set either globally or per each file.
+The option is set to the last input file argument, or globally if no
+input file before the option.
+
+(ex) globally cyclic mode except for file2 with persistent mode.
+
+: chak -c file0 file1 file2 -p file3 ...
+
+Specially, if single record selection is used for an input, it is
+automatically set as persistent mode (otherwise it is useless).
+
+(ex) globally cyclic mode except for file2 (record 3 only) with
+persistent mode.
+
+: chak -c file0 file1 file2 T=3 file3 ...
+
+**** Compromise domain policy
+- =-i= :: Inclusive domain mode for operation (default)
+- =-x= :: Intersect domain mode for operation
+- =-l= :: First domain mode for operation
+
 *** operators summary
 Operators are case dependent.
 Files to conflict with operators cannot be accessed as they are.  You
@@ -838,4 +915,5 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  GEB GTU GTB IDIV LADD LDIV LEU LEF LMASK LMAX LMIN Fn
 #  LocalWords:  LMUL LSUB LTU LTB LTF NEU NOP LOR SQR TANH tanh TRUNC
 #  LocalWords:  ZSIGN unary Wn ITER OPR qss pss lon sps tps avant bb
-#  LocalWords:  garde ee ARG REPL DFMT th nd Cn
+#  LocalWords:  garde ee ARG REPL DFMT th nd Cn vv vvv qq qqq Fortran
+#  LocalWords:  fortran eof
