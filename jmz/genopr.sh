@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/10/17 11:45:56 fuyuki genopr.sh>
+# Time-stamp: <2022/10/19 16:55:04 fuyuki genopr.sh>
 
 main ()
 {
@@ -103,7 +103,7 @@ register_all ()
   register -g lazy -n 2,1 -i mul,'/'  -f DIV,ONE  LDIV    'lazy DIV'
 
   # primitive unary
-  register -n 1,1 -i neg,-    NEG     '-A'
+  register -n 1,1 -i neg,'-'  NEG     '-A'
   register -n 1,1 -i call     INV     '1/A'
   register -n 1,1 -i call     ABS     'abs(A)'
   register -n 1,1 -i call     SQR     'A*A'
@@ -229,7 +229,7 @@ register ()
     (-s) sym=$2; shift;;
     (-o) opt=$2; shift;;
     (-p) param=$2; shift;;
-    (-i) infix=$2; shift;;
+    (-i) infix=(${(s:,:)2}); shift;;
     (-f) func=$2; shift;;
     (--) shift; break;;
     (-*) print -u2 - "unknown option $1"; exit 1;;
@@ -320,6 +320,7 @@ output_register ()
   local grp= key=
   local iv= av=
   local nstack=()
+  local infix=() rarg=()
   # symbol
   for grp in "$@"
   do
@@ -328,11 +329,17 @@ output_register ()
       av=$AVAR[$key]
       iv=$IVAR[$key]
       nstack=(${=NSTACK[$key]})
-      if [[ -z $nstack ]]; then
-        fout -t 4 "if (ierr.eq.0) call reg_opr_prop(ierr, $iv, $av)"
-      else
-        fout -t 4 "if (ierr.eq.0) call reg_opr_prop(ierr, $iv, $av, $nstack[1], $nstack[2])"
-      fi
+      infix=(${=INFIX[$key]})
+      rarg=(ierr "$iv" "$av")
+      [[ -n $nstack ]] && rarg+=($nstack[1] $nstack[2])
+      [[ -n $infix[1] ]] && rarg+=("ilev=ilev_$infix[1]")
+      [[ -n $infix[2] ]] && rarg+=("istr='$infix[2]'")
+      fout -t 4 "if (ierr.eq.0) call reg_opr_prop(${(j:, :)rarg})"
+      # if [[ -z $nstack ]]; then
+      #   fout -t 4 "if (ierr.eq.0) call reg_opr_prop(ierr, $iv, $av)"
+      # else
+      #   fout -t 4 "if (ierr.eq.0) call reg_opr_prop(ierr, $iv, $av, $nstack[1], $nstack[2])"
+      # fi
     done
   done
   return 0

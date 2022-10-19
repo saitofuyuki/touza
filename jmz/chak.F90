@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/19 16:29:17 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/19 17:48:55 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -92,10 +92,21 @@ program chak
   !! operation symbols
 #include "chak_decl.F90"
 
+  integer,parameter :: ilev_unset = 0
+  integer,parameter :: ilev_term = 1
+  integer,parameter :: ilev_call = 2
+  integer,parameter :: ilev_neg = 3
+  integer,parameter :: ilev_exp = 4
+  integer,parameter :: ilev_mul = 5
+  integer,parameter :: ilev_add = 6
+  integer,parameter :: ilev_logical = 7
+
   type opr_t
      integer :: push = -1
      integer :: pop = -1
      integer :: entr = -1
+     integer :: ilev = ilev_unset
+     character(len=8) :: istr = ' '
   end type opr_t
   type(opr_t) :: oprop(0:lopr-1)
   integer :: mopr = 0
@@ -165,6 +176,8 @@ program chak
   type buffer_t
      character(len=lname)    :: name              ! buffer name
      character(len=ldesc)    :: desc              ! description
+     character(len=ldesc)    :: desc2             ! description (infix notation)
+     integer                 :: ilev              ! infix notation level
      integer                 :: m = -1            ! m=0 as free
      integer                 :: k = kv_null
      integer                 :: stt
@@ -698,7 +711,7 @@ contains
   end subroutine register_operators
 !!!_   . reg_opr_prop
   subroutine reg_opr_prop &
-       & (ierr, idopr, str, pop, push)
+       & (ierr, idopr, str, pop, push, ilev, istr)
     use TOUZA_Std,only: choice, reg_entry, store_xstatus
     implicit none
     integer,         intent(out)         :: ierr
@@ -706,6 +719,8 @@ contains
     character(len=*),intent(in)          :: str
     integer,         intent(in),optional :: pop
     integer,         intent(in),optional :: push
+    integer,         intent(in),optional :: ilev
+    character(len=*),intent(in),optional :: istr
     integer entr
     if (idopr.ge.lopr.or.idopr.lt.0) then
        ierr = ERR_PANIC
@@ -719,6 +734,12 @@ contains
           oprop(idopr)%entr = entr
           oprop(idopr)%push = choice(-1, push)
           oprop(idopr)%pop = choice(-1, pop)
+          oprop(idopr)%ilev = choice(ilev_unset, ilev)
+          if (present(istr)) then
+             oprop(idopr)%istr = istr
+          else
+             oprop(idopr)%istr = ' '
+          endif
        else
           ! alias
           continue
@@ -783,6 +804,29 @@ contains
        push = oprop(handle)%push
     endif
   end subroutine inquire_opr_nstack
+
+!!!_   . inquire_opr_infix
+  subroutine inquire_opr_infix(ierr, ilev, istr, handle)
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: ilev
+    character(len=*),intent(out) :: istr
+    integer,         intent(in)  :: handle
+    ierr = 0
+
+    if (handle.lt.0.or.handle.ge.mopr) then
+       ierr = ERR_INVALID_ITEM
+       call message(ierr, 'invalid operator handle to inquire', (/handle/))
+       ilev = ilev_unset
+       istr = ' '
+    else
+       ilev = oprop(handle)%ilev
+       istr = oprop(handle)%istr
+       if (istr.eq.' ') then
+          call query_opr_name(ierr, istr, handle)
+       endif
+    endif
+  end subroutine inquire_opr_infix
 
 !!!_   . is_operator_modify()
   logical function is_operator_modify(handle) result(b)
@@ -1229,6 +1273,8 @@ contains
           obuffer(jb)%k     = kv
           obuffer(jb)%vd(:) = v
           obuffer(jb)%desc  = repr
+          obuffer(jb)%desc2 = repr
+          obuffer(jb)%ilev  = ilev_term
           obuffer(jb)%pcp(:)%bgn = 0
           obuffer(jb)%pcp(:)%end = 0
           obuffer(jb)%pcp(:)%stp = -1
@@ -3188,6 +3234,8 @@ contains
        endif
        obuffer(jb)%reff = -1
        obuffer(jb)%desc = ' '
+       obuffer(jb)%desc2 = ' '
+       obuffer(jb)%ilev = ilev_unset
 
        obuffer(jb)%ci(:) = -1
        obuffer(jb)%pcp(:) = def_loop
@@ -3372,7 +3420,7 @@ contains
 
 !!!_   . read_file
   subroutine read_file(ierr, neof, nterm, file, handle)
-    use TOUZA_Std,only: new_unit, sus_open, is_error_match
+    use TOUZA_Std,only: new_unit, sus_open, is_error_match, upcase
     use TOUZA_Nio,only: nio_read_header, parse_header_size, nio_read_data, nio_skip_records
     use TOUZA_Nio,only: show_header, get_item, restore_item
     use TOUZA_Nio,only: hi_MISS, hi_ITEM, hi_DATE, hi_TIME
@@ -3387,6 +3435,7 @@ contains
     integer jb
     character(len=128) :: txt
     character(len=litem) :: tstr
+    character(len=ldesc) :: tdesc
     integer :: dt(6)
     integer jerr
     integer xrec
@@ -3443,7 +3492,18 @@ contains
        call get_item(ierr, file%h, obuffer(jb)%desc, hi_ITEM)
        if (obuffer(jb)%desc.eq.' ') then
           obuffer(jb)%desc = obuffer(jb)%name
+          obuffer(jb)%desc2 = obuffer(jb)%name
+       else
+          tdesc = adjustl(obuffer(jb)%desc)
+          call upcase(tdesc)
+          if (verify(trim(tdesc), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789').eq.0) then
+             obuffer(jb)%desc2 = adjustl(trim(obuffer(jb)%desc))
+          else
+             obuffer(jb)%desc2 = '[' // adjustl(trim(obuffer(jb)%desc)) // ']'
+          endif
        endif
+       obuffer(jb)%ilev = ilev_term
+
        obuffer(jb)%reff = handle
     endif
     if (ierr.eq.0) call get_header_lprops(ierr, obuffer(jb)%pcp, file%h)
@@ -3596,7 +3656,7 @@ contains
     use TOUZA_Nio,only: get_default_header, show_header, parse_record_fmt
     use TOUZA_Nio,only: REC_DEFAULT, REC_BIG
     use TOUZA_Nio,only: put_item, get_item, restore_item, store_item
-    use TOUZA_Nio,only: hi_MISS, hi_ITEM, hi_DFMT,  hi_EDIT1
+    use TOUZA_Nio,only: hi_MISS, hi_ITEM, hi_DFMT,  hi_EDIT1, hi_TITL1, hi_ETTL1
     use TOUZA_Nio,only: hi_DATE, hi_TIME, hi_MSIGN, hi_MDATE
     use TOUZA_Nio,only: GFMT_UR4, GFMT_MR4, GFMT_UI4, GFMT_MI4
     use TOUZA_Nio,only: fill_header
@@ -3696,11 +3756,15 @@ contains
        endif
     endif
 
-    if (file%hedit.ge.hedit_item) then
-       if (ierr.eq.0) call put_item(ierr, head, obuffer(jb)%desc,  hi_ITEM, tol=1)
+    if (ierr.eq.0) then
+       if (file%hedit.ge.hedit_item) call put_item(ierr, head, obuffer(jb)%desc,  hi_ITEM, tol=1)
+    endif
+    if (ierr.eq.0) then
+       if (file%hedit.ge.hedit_title) call put_item(ierr, head, obuffer(jb)%desc2, hi_TITL1, 0, tol=1)
     endif
     if (file%hedit.ge.hedit_edit) then
        if (ierr.eq.0) call put_item(ierr, head, obuffer(jb)%desc,  hi_EDIT1, 0, tol=1)
+       if (ierr.eq.0) call put_item(ierr, head, obuffer(jb)%desc2, hi_ETTL1, 0, tol=1)
     endif
     if (ierr.eq.0) then
        call restore_item(jerr, head, tstr, hi_TIME)
@@ -5175,7 +5239,9 @@ contains
     integer,intent(in)  :: righth
     integer,intent(in)  :: oprh
     integer jbl,  jbr
+    integer ilevi, ilevo
     character(len=64) :: opr
+    character(len=64) :: istr
 
     ierr = 0
     if (ierr.eq.0) call query_opr_name(ierr, opr, oprh)
@@ -5183,6 +5249,29 @@ contains
     jbl = buf_h2item(lefth)
     jbr = buf_h2item(righth)
     obuffer(jbl)%desc = trim(obuffer(jbr)%desc) // ' ' // trim(opr)
+
+    if (ierr.eq.0) then
+       ilevi = obuffer(jbr)%ilev
+       call inquire_opr_infix(ierr, ilevo, istr, oprh)
+       if (ierr.eq.0) then
+101       format(A, '(', A, ')')
+111       format(A, A)
+112       format(A, '(', A, ')')
+121       format(A, '[', A, ']')
+          if (ilevo.eq.ilev_call) then
+             write(obuffer(jbl)%desc2, 101) trim(istr), trim(obuffer(jbr)%desc2)
+          else if (ilevo.eq.ilev_neg) then
+             if (ilevi.ge.ilevo) then
+                write(obuffer(jbl)%desc2, 112) trim(istr), trim(obuffer(jbr)%desc2)
+             else
+                write(obuffer(jbl)%desc2, 111) trim(istr), trim(obuffer(jbr)%desc2)
+             endif
+          else
+             write(obuffer(jbl)%desc2, 121) trim(istr), trim(obuffer(jbr)%desc2)
+          endif
+          obuffer(jbl)%ilev = ilevo
+       endif
+    endif
 
   end subroutine set_unary_descr
 
@@ -5197,6 +5286,10 @@ contains
     integer jinp, ninp
     integer jbl,  jbr, hbr
     character(len=64) :: opr
+    integer ilevi, ilevo
+    character(len=64) :: istr
+    character :: lsep, rsep
+
     ierr = 0
     ninp = size(bufi)
     jbl = buf_h2item(bufo)
@@ -5215,6 +5308,52 @@ contains
        obuffer(jbl)%desc = trim(obuffer(jbl)%desc) // ' ' // trim(opr)
        if (ninp.gt.2) then
           obuffer(jbl)%desc = str_MARK // ' ' // trim(obuffer(jbl)%desc) // ' ' // str_CUM
+       endif
+    endif
+
+    if (ierr.eq.0) then
+       call inquire_opr_infix(ierr, ilevo, istr, oprh)
+       if (ierr.eq.0) then
+          if (ANY(ilevo.eq.(/ilev_add, ilev_exp, ilev_logical, ilev_mul/))) then
+             jinp = 1
+             hbr = bufi(jinp)
+             jbr = buf_h2item(hbr)
+             if (obuffer(jbr)%ilev.gt.ilevo) then
+                obuffer(jbl)%desc2 = '(' // trim(obuffer(jbr)%desc2) // ')'
+             else
+                obuffer(jbl)%desc2 = trim(obuffer(jbr)%desc2)
+             endif
+             do jinp = 2, ninp
+                hbr = bufi(jinp)
+                jbr = buf_h2item(hbr)
+                if (obuffer(jbr)%ilev.gt.ilevo) then
+                   obuffer(jbl)%desc2 = trim(obuffer(jbl)%desc2) // trim(istr) // &
+                        & '(' // trim(obuffer(jbr)%desc2) // ')'
+                else
+                   obuffer(jbl)%desc2 = trim(obuffer(jbl)%desc2) // trim(istr) // &
+                        & trim(obuffer(jbr)%desc2)
+                endif
+             enddo
+          else
+             if (ilevo.eq.ilev_call) then
+                lsep = '('
+                rsep = ')'
+             else
+                lsep = '['
+                rsep = ']'
+             endif
+             jinp = 1
+             hbr = bufi(jinp)
+             jbr = buf_h2item(hbr)
+             obuffer(jbl)%desc2 = trim(istr) // lsep // trim(obuffer(jbr)%desc2)
+             do jinp = 2, ninp
+                hbr = bufi(jinp)
+                jbr = buf_h2item(hbr)
+                obuffer(jbl)%desc2 = trim(obuffer(jbl)%desc2) // ',' // trim(obuffer(jbr)%desc2)
+             enddo
+             obuffer(jbl)%desc2 = trim(obuffer(jbl)%desc2) // rsep
+          endif
+          obuffer(jbl)%ilev = ilevo
        endif
     endif
   end subroutine set_binary_descr
