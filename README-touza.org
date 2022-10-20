@@ -30,6 +30,10 @@ You need following tools to generate the autotool scripts.
 - GNU autoconf (2.71 or later)
 - GNU automake (1.16.5 or later)
 - GNU libtool (2.4.6 or later)
+- GNU autoconv archive (2022-09-03 or later)
+  - Small changes in ax_lib_netcdf4.m4 is necessary, which is
+    included in this package, and waiting to be included in the vendor
+    package
 
 ** build
 For generic installation instructions please see the =INSTALL= file.
