@@ -1,7 +1,7 @@
 # touza/calendar Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2022/10/20 08:08:51 fuyuki Makefile.am>
+# Time-stamp: <2022/10/20 10:41:22 fuyuki Makefile.am>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -39,6 +39,11 @@ WTC		=	wtc.sh
 WTCin 	=	$(WTC).in
 
 EXTRA_DIST+=$(WTCin)
+
+distclean-local: distclean-logdir
+
+distclean-logdir:
+	@if test -d $(WTC_LOGDIR); then rm -rf $(WTC_LOGDIR); else :; fi
 
 $(WTC): $(srcdir)/$(WTCin)
 	if sed -e 's!@XNEW@!$(builddir)/test_calendar_comp!g' \
