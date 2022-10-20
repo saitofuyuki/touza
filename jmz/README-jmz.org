@@ -311,14 +311,14 @@ corresponds to 3,4,5, which is equivalent to 2:5 in python-like mode.
 - =-Hn=, =-H n= :: Set header edit level to integer /n/ (default=9)
 
 Header edit levels
-|    n |                   | default              |
-|------+-------------------+----------------------|
-|   -1 | keep reference    |                      |
-|    0 | set MDATE MSIGN   | date and user        |
-|    1 | set 0 + EDIT,ETTL | RPN, infix notations |
-|    2 | set 1 + TITLE     | infix notation       |
-|    3 | set 2 + ITEM      | RPN                  |
-| more | set 3             |                      |
+|    n |                       | default              |
+|------+-----------------------+----------------------|
+|   -1 | keep reference        |                      |
+|    0 | set [CM]DATE,[CM]SIGN | date and user        |
+|    1 | set 0 + EDIT,ETTL     | RPN, infix notations |
+|    2 | set 1 + TITLE         | infix notation       |
+|    3 | set 2 + ITEM          | RPN                  |
+| more | set 3                 |                      |
 
 Options ITEM=STRING, EDIT=STRING etc precede the above editing level,
 to explicitly set the header items.
