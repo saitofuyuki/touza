@@ -1,7 +1,7 @@
 dnl Filename:   touza/m4c/mt_am_include.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 16 2020
-dnl Time-stamp: <2022/07/19 17:40:56 fuyuki mt_am_include.m4>
+dnl Time-stamp: <2022/10/20 09:52:26 fuyuki mt_am_include.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -20,8 +20,10 @@ AX_ADD_AM_MACRO_STATIC([
 CLEANFILES =
 MOSTLYCLEANFILES =
 
+LIST_MODFILES = .modfiles
+
 if CLEAN_FCMOD
-MOSTLYCLEANFILES += *.${AX_DOLLAR}(FC_MODEXT)
+MOSTLYCLEANFILES += *.${AX_DOLLAR}(FC_MODEXT) ${AX_DOLLAR}(LIST_MODFILES)
 endif
 
 DEBUG   =
@@ -41,6 +43,7 @@ ${AX_NULL}AM_FCFLAGS+=${AX_DOLLAR}(AM_FCFLAGS_MODULE)
 
 moddir      = @moddir@
 install-exec-hook: install-mod
+uninstall-hook: uninstall-mod
 
 echo-srcdir:
 	@echo ${AX_DOLLAR}(srcdir)
@@ -73,14 +76,30 @@ MT_ADD_RECURSIVE_AM_MACRO_STATIC([install-mod],
 [if INSTALL_MODULES
 	if test -z '${AX_DOLLAR}(moddir)'; then false; \\
 	else \\
+		rm -f ${AX_DOLLAR}(LIST_MODFILES); touch ${AX_DOLLAR}(LIST_MODFILES);\\
 		${AX_DOLLAR}(MKDIR_P) ${AX_DOLLAR}(moddir); \\
 		for modfile in *.${AX_DOLLAR}(FC_MODEXT); \\
 		do test -e ${AX_DOLLAR}${AX_DOLLAR}modfile || continue; \\
-		${AX_DOLLAR}(install_sh_DATA) -t ${AX_DOLLAR}(moddir) ${AX_DOLLAR}${AX_DOLLAR}modfile; done; \\
+		${AX_DOLLAR}(install_sh_DATA) -t ${AX_DOLLAR}(moddir) ${AX_DOLLAR}${AX_DOLLAR}modfile; \\
+		echo "${AX_DOLLAR}${AX_DOLLAR}modfile" >> ${AX_DOLLAR}(LIST_MODFILES); \\
+		done; \\
 	fi
 endif
 
 ])
+
+MT_ADD_RECURSIVE_AM_MACRO_STATIC([uninstall-mod],
+[if INSTALL_MODULES
+	if test -z '${AX_DOLLAR}(moddir)'; then false; \\
+	else \\
+		list=\`test -e ${AX_DOLLAR}(LIST_MODFILES) && cat ${AX_DOLLAR}(LIST_MODFILES)\`; \\
+		files=\`for p in ${AX_DOLLAR}${AX_DOLLAR}list; do echo ${AX_DOLLAR}${AX_DOLLAR}p; done | sed -e 's|^.*/||'\`; \\
+		dir='${AX_DOLLAR}(DESTDIR)${AX_DOLLAR}(moddir)'; ${AX_DOLLAR}(am__uninstall_files_from_dir); \\
+	fi
+endif
+
+])
+
 MT_ADD_RECURSIVE_AM_MACRO_STATIC([check-bin],[], [${AX_DOLLAR}(check_PROGRAMS)])
 
 ])
