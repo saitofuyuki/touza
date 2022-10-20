@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz swiss(CH) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2022/10/20 12:46:02 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/24 12:24:05 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -29,9 +29,10 @@ module chak_lib
 !!!_  - modules
   use TOUZA_Std,only: KFLT,  KDBL
   use TOUZA_Std,only: is_msglev
-  use TOUZA_Std,only: msglev_normal, msglev_info, msglev_debug
+  use TOUZA_Std,only: msglev_NORMAL, msglev_INFO, msglev_DEBUG
+  use TOUZA_Std,only: msglev_WARNING
   use TOUZA_Std,only: is_msglev_DETAIL, is_msglev_NORMAL, is_msglev_INFO, is_msglev_DEBUG
-  use TOUZA_Nio,only: litem, nitem
+  use TOUZA_Nio,only: litem, nitem, GFMT_END
   implicit none
   public
 !!!_  - parameters
@@ -47,9 +48,25 @@ module chak_lib
   real(kind=KBUF),parameter :: ULIMIT = + HUGE(ZERO)
   real(kind=KBUF),parameter :: LLIMIT = - HUGE(ZERO)
 
-  real(kind=KBUF),parameter :: UNDEF  = LLIMIT
-!!!_  - types
-!!!_   . domain property
+  real(kind=KBUF),parameter :: UNDEF  = -999.0_KBUF
+  ! real(kind=KBUF),parameter :: UNDEF  = LLIMIT
+
+  integer,parameter :: cfmt_org = GFMT_END
+  integer,parameter :: cfmt_ascii  = 1 + cfmt_org
+  integer,parameter :: cfmt_binary = 2 + cfmt_org
+  integer,parameter :: cfmt_flag_native = 0
+  integer,parameter :: cfmt_flag_swap = 1
+  integer,parameter :: cfmt_flag_big = 2
+  integer,parameter :: cfmt_flag_little = 3
+  integer,parameter :: cfmt_flags_bo = 4
+
+  integer,parameter :: cfmt_binary_i4 = cfmt_binary
+  integer,parameter :: cfmt_binary_r4 = cfmt_binary + cfmt_flags_bo
+  integer,parameter :: cfmt_binary_r8 = cfmt_binary + cfmt_flags_bo * 2
+
+!!!_  - common values
+  real(kind=KBUF),save :: PI = ZERO
+!!!_  - domain property
   type domain_t
      integer :: n                   ! total size
      integer :: mco                 ! coordinate size
@@ -61,6 +78,13 @@ module chak_lib
      integer :: cidx(0:lcoor-1)
   end type domain_t
 contains
+!!!_  - initialization
+  subroutine init(ierr)
+    implicit none
+    integer,intent(out) :: ierr
+    ierr = 0
+    if (PI.eq.ZERO) PI = ATAN2(ZERO, -ONE)
+  end subroutine init
 !!!_  - common utilities
 !!!_   . conv_physical_index
   PURE &
@@ -74,7 +98,6 @@ contains
     ncur = jlog
     !NEC$ novector
     do jc = 0, domL%mco - 1
-       ! jcur = mod(jlog, domL%strd(jc + 1)) / domL%strd(jc)
        jcur = mod(ncur, domL%iter(jc))
        ncur = ncur / domL%iter(jc)
        if (domR%bgn(jc).le.jcur.and.jcur.lt.domR%end(jc)) then
@@ -85,32 +108,6 @@ contains
        endif
     enddo
   end function conv_physical_index
-! !!!_   . copy_buffer_fill
-!   subroutine copy_buffer_fill &
-!        & (ierr, &
-!        &  vL,   domL, &
-!        &  vR,   domR, fill)
-!     implicit none
-!     integer,        intent(out) :: ierr
-!     real(kind=KBUF),intent(out) :: vL(0:*)
-!     real(kind=KBUF),intent(in)  :: vR(0:*)
-!     type(domain_t), intent(in)  :: domL
-!     type(domain_t), intent(in)  :: domR
-!     real(kind=KBUF),intent(in)  :: fill
-
-!     integer jlog, jphy
-
-!     ierr = 0
-
-!     do jlog = 0, domL%n - 1
-!        jphy = conv_physical_index(jlog, domL, domR)
-!        if (jphy.ge.0) then
-!           vL(jlog) = vR(jphy)
-!        else
-!           vL(jlog) = fill
-!        endif
-!     enddo
-!   end subroutine copy_buffer_fill
 
 !!!_  - unary operations
 !!!_   . apply_UNARY_template
@@ -515,26 +512,6 @@ contains
        endif
     enddo
   end subroutine apply_UNARY_TAN
-!!!_   . apply_UNARY_TANH
-  subroutine apply_UNARY_TANH &
-       & (ierr, Z, domZ, X, domX, F)
-    implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: F
-    integer jz, jx
-    ierr = 0
-    do jz = 0, domZ%n - 1
-       jx = conv_physical_index(jz, domZ, domX)
-       if (jx.ge.0) then
-          Z(jz) = elem_TANH(X(jx), F)
-       else
-          Z(jz) = F
-       endif
-    enddo
-  end subroutine apply_UNARY_TANH
 !!!_   . apply_UNARY_ASIN
   subroutine apply_UNARY_ASIN &
        & (ierr, Z, domZ, X, domX, F)
@@ -575,6 +552,126 @@ contains
        endif
     enddo
   end subroutine apply_UNARY_ACOS
+!!!_   . apply_UNARY_SINH
+  subroutine apply_UNARY_SINH &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_SINH(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_SINH
+!!!_   . apply_UNARY_COSH
+  subroutine apply_UNARY_COSH &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_COSH(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_COSH
+!!!_   . apply_UNARY_TANH
+  subroutine apply_UNARY_TANH &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_TANH(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_TANH
+!!!_   . apply_UNARY_R2D
+  subroutine apply_UNARY_R2D &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_R2D(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_R2D
+!!!_   . apply_UNARY_D2R
+  subroutine apply_UNARY_D2R &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_D2R(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_D2R
+!!!_   . apply_BINARY_HYPOT
+  subroutine apply_BINARY_HYPOT &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_HYPOT(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_HYPOT
 !!!_   . apply_UNARY_EXPONENT
   subroutine apply_UNARY_EXPONENT &
        & (ierr, Z, domZ, X, domX, F)
@@ -1542,6 +1639,127 @@ contains
     enddo
   end subroutine apply_BINARY_lazy_LMAX
 
+!!!_   . apply_UNARY_BITNOT
+  subroutine apply_UNARY_BITNOT &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_BITNOT(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_BITNOT
+!!!_   . apply_BINARY_BITAND
+  subroutine apply_BINARY_BITAND &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_BITAND(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_BITAND
+!!!_   . apply_BINARY_BITOR
+  subroutine apply_BINARY_BITOR &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_BITOR(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_BITOR
+!!!_   . apply_BINARY_BITXOR
+  subroutine apply_BINARY_BITXOR &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_BITXOR(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_BITXOR
+!!!_   . apply_BINARY_LSHIFT
+  subroutine apply_BINARY_LSHIFT &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_LSHIFT(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_LSHIFT
+!!!_   . apply_BINARY_RSHIFT
+  subroutine apply_BINARY_RSHIFT &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_RSHIFT(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_RSHIFT
+
 !!!_  - elemental operations
 !!!_   . templates
 !!!_    * elem_UNARY_template()
@@ -2455,6 +2673,143 @@ contains
        Z = SCALE(X, INT(Y))
     endif
   end function elem_SCALE
+
+!!!_    * elem_BITNOT () - (integer only) bitwise not
+  ELEMENTAL &
+  real(kind=KBUF) function elem_BITNOT (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = REAL(NOT(INT(X)), kind=KBUF)
+    endif
+  end function elem_BITNOT
+!!!_    * elem_BITAND()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_BITAND (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else
+       Z = REAL(IAND(INT(X), INT(Y)), kind=KBUF)
+    endif
+  end function elem_BITAND
+!!!_    * elem_BITOR()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_BITOR (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else
+       Z = REAL(IOR(INT(X), INT(Y)), kind=KBUF)
+    endif
+  end function elem_BITOR
+!!!_    * elem_BITXOR()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_BITXOR (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else
+       Z = REAL(IEOR(INT(X), INT(Y)), kind=KBUF)
+    endif
+  end function elem_BITXOR
+!!!_    * elem_LSHIFT()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_LSHIFT (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else
+       Z = REAL(ISHFT(INT(X), INT(Y)), kind=KBUF)
+    endif
+  end function elem_LSHIFT
+!!!_    * elem_RSHIFT()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_RSHIFT (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else
+       Z = REAL(ISHFT(INT(X), -INT(Y)), kind=KBUF)
+    endif
+  end function elem_RSHIFT
+!!!_    * elem_SINH ()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_SINH (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = SINH(X)
+    endif
+  end function elem_SINH
+!!!_    * elem_COSH ()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_COSH (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = COSH(X)
+    endif
+  end function elem_COSH
+!!!_    * elem_R2D ()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_R2D (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = (X / PI) * 180.0_KBUF
+    endif
+  end function elem_R2D
+!!!_    * elem_D2R ()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_D2R (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = (X / 180.0_KBUF) * PI
+    endif
+  end function elem_D2R
+!!!_    * elem_HYPOT()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_HYPOT (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else if (ABS(X).gt.ABS(Y)) then
+       Z = ABS(X) * SQRT(ONE + (Y / X) ** 2)
+    else if (Y.ne.ZERO) then
+       Z = ABS(Y) * SQRT(ONE + (X / Y) ** 2)
+    else
+       Z = ZERO
+    endif
+  end function elem_HYPOT
 
 !!!_ + end chak
 end module chak_lib

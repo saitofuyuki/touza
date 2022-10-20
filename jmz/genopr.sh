@@ -1,13 +1,13 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/10/19 16:55:04 fuyuki genopr.sh>
+# Time-stamp: <2022/10/23 11:03:37 fuyuki genopr.sh>
 
 main ()
 {
   local call=("$@")
   [[ -z $call ]] && call=(decl reg call sub elem)
 
-  local -A GRP=() 
-  local -A NSTACK=() ALIAS=() SYM=() 
+  local -A GRP=() SUBG=()
+  local -A NSTACK=() ALIAS=() SYM=()
   local -A DSTACK=() # stack properties for description
   local -A OPT=() PARAM=() INFIX=()
   local -A FUNC=()
@@ -17,13 +17,13 @@ main ()
 
   register_all || return $?
 
-  local GODR=(system output anchor stack queue unary ubool bool binary lazy other)
+  local GODR=(system output anchor stack queue unary ubool bool binary lazy float other)
   GODR=($GODR ${(k)GRP})
   GODR=(${(u)GODR})
   local grp=
   for grp in $GODR
   do
-    GRANGE[$grp]="grp_${grp}_bgn grp_${grp}_end" 
+    GRANGE[$grp]="grp_${grp}_bgn grp_${grp}_end"
   done
 
   [[ -z ${(M)call:#d*} ]] || output_decl $GODR || return $?
@@ -57,6 +57,7 @@ register_all ()
   # stack manipulation
   register -g stack -n 1,2         DUP      'duplicate top stack'
   register -g stack -n 1,2         COPY     'copy top stack on new buffer'
+  register -g stack -n 1,1         CLONE    'copy top stack on new buffer and discard the original'
   register -g stack -n 1,0 -o NAME POP      'discard top stack and optionally tag'
   register -g stack -n 2,2         EXCH     'B A; exchange two top stacks'
   register -g stack -n 0,0         NOP      'no operation; do nothing'
@@ -71,19 +72,19 @@ register_all ()
   register -g queue MAP    'reserved; DIST ITER'
 
   # logical operation
-  register -n 2,1 -i logical,'&&'  AND   'logical and; B if both A and B are defined, else UNDEF'
-  register -n 2,1 -i call          MASK  'A if both A and B are defined, else UNDEF'
+  register -n 2,1 -i logical,'&&'  AND   'logical and; B if both A and B are defined, else MISS'
+  register -n 2,1 -i call          MASK  'A if both A and B are defined, else MISS'
 
   # logical unary
-  register -g ubool -n 1,1            -i neg,'!'  NOT   'logical not; 1 if undefined, else UNDEF'
-  register -g ubool -n 1,1            -i call     BOOL  'boolean; 1 if defined, else UNDEF'
+  register -g ubool -n 1,1            -i neg,'!'  NOT   'logical not; 1 if undefined, else MISS'
+  register -g ubool -n 1,1            -i call     BOOL  'boolean; 1 if defined, else MISS'
   register -g ubool -n 1,1 -f -,FALSE -i call     BIN   'binary; 1 if defined, else 0'
 
   # logical operation, inclusive
-  register -g lazy -n 2,1         -i logical,'||'  OR      'logical or; A if defined, else B if defined, else UNDEF'
+  register -g lazy -n 2,1         -i logical,'||'  OR      'logical or; A if defined, else B if defined, else MISS'
   register -a OR                                   LOR
-  register -g lazy -n 2,1         -i call          ROR     'logical or (reverse); B if defined, else A if defined, else UNDEF'
-  register -g lazy -n 2,1         -i call          XOR     'logical exclusive-or; A or B if B or A undefined, else UNDEF'
+  register -g lazy -n 2,1         -i call          ROR     'logical or (reverse); B if defined, else A if defined, else MISS'
+  register -g lazy -n 2,1         -i call          XOR     'logical exclusive-or; A or B if B or A undefined, else MISS'
   register -g lazy -n 2,1 -f AND  -i call          LAND    'lazy AND'
   register -g lazy -n 2,1 -f MASK -i call          LMASK   'lazy MASK'
 
@@ -103,13 +104,13 @@ register_all ()
   register -g lazy -n 2,1 -i mul,'/'  -f DIV,ONE  LDIV    'lazy DIV'
 
   # primitive unary
-  register -n 1,1 -i neg,'-'  NEG     '-A'
-  register -n 1,1 -i call     INV     '1/A'
-  register -n 1,1 -i call     ABS     'abs(A)'
-  register -n 1,1 -i call     SQR     'A*A'
-  register -n 1,1 -i call     SQRT    'square root'
-  register -n 1,1 -i call     SIGN    'copy A sign on 1'
-  register -n 1,1 -i call     ZSIGN   '-1,0,+1 if negative,zero,positive'
+  register          -n 1,1 -i neg,'-'  NEG     '-A'
+  register          -n 1,1 -i call     INV     '1/A'
+  register          -n 1,1 -i call     ABS     'abs(A)'
+  register          -n 1,1 -i call     SQR     'A*A'
+  register -g float -n 1,1 -i call     SQRT    'square root'
+  register          -n 1,1 -i call     SIGN    'copy A sign on 1'
+  register          -n 1,1 -i call     ZSIGN   '-1,0,+1 if negative,zero,positive'
 
   # integer opration
   register -n 1,1 -i call          FLOOR   'largest integer <= A'
@@ -119,21 +120,36 @@ register_all ()
   register -n 1,1 -i call -f TRUNC INT     'truncate toward 0 and convert'
 
   # math operation
-  register -n 1,1 -i call EXP      'exp(A)'
-  register -n 1,1 -i call LOG      'log(A)'
-  register -n 1,1 -i call LOG10    'log10(A)'
-  register -n 1,1 -i call SIN      'sin(A)'
-  register -n 1,1 -i call COS      'cos(A)'
-  register -n 1,1 -i call TAN      'tan(A)'
-  register -n 1,1 -i call TANH     'tanh(A)'
-  register -n 1,1 -i call ASIN     'arcsin(A)'
-  register -n 1,1 -i call ACOS     'arccos(A)'
-  register -n 2,1 -i call ATAN2    'arctan(A/B)'
+  register -g float -n 1,1 -i call EXP      'exp(A)'
+  register -g float -n 1,1 -i call LOG      'log(A)'
+  register -g float -n 1,1 -i call LOG10    'log10(A)'
+  register -g float -n 1,1 -i call SIN      'sin(A)'
+  register -g float -n 1,1 -i call COS      'cos(A)'
+  register -g float -n 1,1 -i call TAN      'tan(A)'
+  register -g float -n 1,1 -i call ASIN     'arcsin(A)'
+  register -g float -n 1,1 -i call ACOS     'arccos(A)'
+  register -g float -n 2,1 -i call ATAN2    'arctan(A/B)'
+  register -g float -n 1,1 -i call SINH     'sinh(A)'
+  register -g float -n 1,1 -i call COSH     'cosh(A)'
+  register -g float -n 1,1 -i call TANH     'tanh(A)'
+
+  register -g float -n 1,1 -i call R2D      'Convert radian to degree'
+  register -g float -n 1,1 -i call D2R      'Convert degree to radian'
+
+  register -g float -n 2,1 -i call HYPOT    'sqrt(A * A + B * B)'
+
+  # bitwise operation
+  register -n 2,1 -i and,'&'    BITAND   'bitwise AND'
+  register -n 2,1 -i or,'|'     BITOR    'bitwise OR'
+  register -n 2,1 -i xor,'^'    BITXOR   'bitwise XOR'
+  register -n 1,1 -i neg,'~'    BITNOT   'bitwise NOT'
+  register -n 2,1 -i shift,'<<' LSHIFT   'bitwise left shift'
+  register -n 2,1 -i shift,'>>' RSHIFT   'bitwise right shift'
 
   # floating-point operation
-  register -n 1,1 -i call EXPONENT 'exponent(A)'
-  register -n 1,1 -i call FRACTION 'fraction(A)'
-  register -n 2,1 -i call SCALE    'scale(A,B)'
+  register -g float -n 1,1 -i call EXPONENT 'exponent(A)'
+  register -g float -n 1,1 -i call FRACTION 'fraction(A)'
+  register -g float -n 2,1 -i call SCALE    'scale(A,B)'
 
   # other operation
   register         -n 2,1 -i call             MIN    'min(A,B)'
@@ -149,13 +165,13 @@ register_all ()
   register -g bool -n 2,1 -f -,FALSE -i call LEB       '1 if A<=B, else 0'
   register -g bool -n 2,1 -f -,FALSE -i call GEB       '1 if A>=B, else 0'
 
-  # conditional operation (binary or undef)
-  register -g bool -n 2,1 -i call EQ      '1, 0, UNDEF for A==B, not, either UNDEF'
-  register -g bool -n 2,1 -i call NE      '1, 0, UNDEF for A!=B, not, either UNDEF'
-  register -g bool -n 2,1 -i call LT      '1, 0, UNDEF for A<B, not, either UNDEF'
-  register -g bool -n 2,1 -i call GT      '1, 0, UNDEF for A>B, not, either UNDEF'
-  register -g bool -n 2,1 -i call LE      '1, 0, UNDEF for A<=B, not, either UNDEF'
-  register -g bool -n 2,1 -i call GE      '1, 0, UNDEF for A>=B, not, either UNDEF'
+  # conditional operation (binary or MISS)
+  register -g bool -n 2,1 -i call EQ      '1, 0, MISS for A==B, not, either MISS'
+  register -g bool -n 2,1 -i call NE      '1, 0, MISS for A!=B, not, either MISS'
+  register -g bool -n 2,1 -i call LT      '1, 0, MISS for A<B, not, either MISS'
+  register -g bool -n 2,1 -i call GT      '1, 0, MISS for A>B, not, either MISS'
+  register -g bool -n 2,1 -i call LE      '1, 0, MISS for A<=B, not, either MISS'
+  register -g bool -n 2,1 -i call GE      '1, 0, MISS for A>=B, not, either MISS'
 
   register -a EQ EQU
   register -a NE NEU
@@ -165,19 +181,18 @@ register_all ()
   register -a GE GEU
 
   # conditional operation (filter)
-  register -n 2,1 -i call EQF      'A if A==B, else UNDEF'
-  register -n 2,1 -i call NEF      'A if not A==B, else UNDEF'
-  register -n 2,1 -i call LTF      'A if A<B, else UNDEF'
-  register -n 2,1 -i call GTF      'A if A>B, else UNDEF'
-  register -n 2,1 -i call LEF      'A if A<=B, else UNDEF'
-  register -n 2,1 -i call GEF      'A if A>=B, else UNDEF'
+  register -n 2,1 -i call EQF      'A if A==B, else MISS'
+  register -n 2,1 -i call NEF      'A if not A==B, else MISS'
+  register -n 2,1 -i call LTF      'A if A<B, else MISS'
+  register -n 2,1 -i call GTF      'A if A>B, else MISS'
+  register -n 2,1 -i call LEF      'A if A<=B, else MISS'
+  register -n 2,1 -i call GEF      'A if A>=B, else MISS'
 
   # reduction operation
   register -g reduction -i call AVR     'arithmetic mean from the anchor to the top stack'
   register -g reduction -i call COUNT   'count defined elements from the anchor to the top stack'
 
   # transform operation
-  # register UNDEF transf,1,1   'UNDEF value on top stack (scalar)'
   #### coor=0,1,2,name,alias for coodinate, -1 or s for stack
   # register COUNT=COOR
   # register AVR=COOR
@@ -198,31 +213,32 @@ register_all ()
   register -g buffer -o NAME/REPL,LOW:HIGH    LON
   register -g buffer -o NAME/REPL,LOW:HIGH    LAT
   register -g buffer -o NAME/REPL,LOW:HIGH    LEV
-  register -g buffer -p VALUE                 MISS    "replace missing value"
+  # register -g buffer -p VALUE                 MISS    "replace missing value"
 
-  register -g header -p FORMAT      DFMT    "set output data format"
-  register -g header -p STRING      ITEM    "replace item name"
-  register -g header -p STRING      UNIT
-  register -g header -p STRING      TITLE
-  register -g header -p STRING      EDIT
-  register -g header -p LIST   -s T TSEL
+  register -g header        -p FORMAT      FMT     "set output data format"
+  register -g header        -p STRING      ITEM    "replace item name"
+  register -g header        -p STRING      UNIT
+  register -g header        -p STRING      TITLE
+  register -g header        -p STRING      EDIT
+  register -g header        -p LIST   -s T TSEL
+  register -g header,buffer -p VALUE       MISS    "replace missing value"
 
   return 0
 }
 
-# register [-g GROUP][-n POP,PUSH][-a ALIAS][-s SYMBOL]
+# register [-g GROUP[,SUBGROUP]][-n POP,PUSH][-a ALIAS][-s SYMBOL]
 #          [-o OPTION][-p PARAM][-i INFIX][-f FUNC]
 #          OPERATOR [DESCRIPTION]
 
 register ()
 {
-  local grp= nstack= alias= sym=
+  local grp= subg= nstack= alias= sym=
   local opt= param= infix= func=
   local opr= descr= dstack=
   while [[ $# -gt 0 ]]
   do
     case $1 in
-    (-g) grp=$2; shift;;
+    (-g) subg=(${(s:,:)2}); grp=$subg[1]; shift subg; shift;;
     (-n) nstack=(${(s:,:)2}); shift;;
     (+n) dstack=(${(s:,:)2}); shift;;
     (-a) alias=$2; shift;;
@@ -234,7 +250,7 @@ register ()
     (--) shift; break;;
     (-*) print -u2 - "unknown option $1"; exit 1;;
     (*)  break;;
-    esac    
+    esac
     shift
   done
   local key=$1; shift
@@ -260,6 +276,8 @@ register ()
     fi
   fi
   GRP[$grp]+=" $key"
+
+  SUBG[$key]="$subg"
   OPT[$key]="$opt"
   PARAM[$key]="$param"
   FUNC[$key]="$func"
@@ -363,12 +381,13 @@ output_call ()
     (lazy) apply=apply_opr_BINARY_lazy;;
     (ubool) apply=apply_opr_UNARY;;
     (bool)  apply=apply_opr_BINARY;;
+    (float) apply=;;
     (*)    continue;;
     esac
     for key in ${=GRP[$grp]}
     do
       [[ -n $ALIAS[$key] ]] && continue
-      args=('ierr' 'handle' 'lefth(1:push)' 'righth(1:pop)')
+      args=('ierr' 'handle' 'lefts(1:push)' 'righth(1:pop)')
       iv=$IVAR[$key]
       if [[ -n $ALIAS[$key] ]]; then
         fout "!! $key == $ALIAS[$key]"
@@ -383,10 +402,21 @@ output_call ()
         # ignore post (used in sub template)
         post=('.TRUE.')
       fi
+      afunc=$apply
+      if [[ -z $afunc ]]; then
+        if [[ $pop -eq 1 && $push -eq 1 ]]; then
+          afunc=apply_opr_UNARY
+        elif [[ $pop -eq 2 && $push -eq 1 ]]; then
+          afunc=apply_opr_BINARY
+        else
+          print -u2 - "Cannot determine apply function for $key"
+          return 1
+        fi
+      fi
       get_sub_name sub $key $pop
       args+=($sub $post)
       fout "else if (handle.eq.$iv) then"
-      fout "  call ${apply}(${(j:, :)args})"
+      fout "  call ${afunc}(${(j:, :)args})"
     done
   done
 }
@@ -396,7 +426,7 @@ output_sub ()
   local grp= key=
   local nstack=() push= pop=
   local sub= stype=
-  local candi=(unary binary lazy ubool bool)
+  local candi=(unary binary lazy ubool bool float)
   local elem=
   local DONE=()
   local extval=
@@ -423,6 +453,16 @@ fout -t 0 "!!!_  - $grp operations"
       fi
       [[ $stype == ubool ]] && stype=unary
       [[ $stype == bool ]] && stype=binary
+      if [[ $stype == float ]]; then
+        if [[ $pop -eq 1 && $push -eq 1 ]]; then
+          stype=unary
+        elif [[ $pop -eq 2 && $push -eq 1 ]]; then
+          stype=binary
+        else
+          print -u2 - "Cannot determine subroutine for $key"
+          return 1
+        fi
+      fi
       case $stype in
       (unary)
           cat <<UNARY
@@ -506,7 +546,7 @@ output_elem ()
   local grp= key=
   local nstack=() push= pop=
   local sub= stype=
-  local candi=(unary binary lazy ubool bool)
+  local candi=(unary binary lazy ubool bool float)
   local elem=
   local DONE=()
   for grp in "$@"
@@ -523,6 +563,16 @@ output_elem ()
       stype=$grp
       [[ $stype == ubool ]] && stype=unary
       [[ $stype == bool ]] && stype=binary
+      if [[ $stype == float ]]; then
+        if [[ $pop -eq 1 && $push -eq 1 ]]; then
+          stype=unary
+        elif [[ $pop -eq 2 && $push -eq 1 ]]; then
+          stype=binary
+        else
+          print -u2 - "Cannot determine elemental for $key"
+          return 1
+        fi
+      fi
       case $stype in
       (unary)
           cat <<UNARY
