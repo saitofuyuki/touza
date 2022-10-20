@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2022/10/17 10:20:52 fuyuki Makefile.am>
+# Time-stamp: <2022/10/20 09:47:18 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -59,8 +59,10 @@ MOSTLYCLEANFILES =
 CLEANFILES = $(bin_SCRIPTS) $(noinst_SCRIPTS)
 SUBDIRS = .
 
+uninstall-mod:
+	@:
 install-mod:
-	:
+	@:
 
 ### Local Variables:
 ### mode: makefile-automake
