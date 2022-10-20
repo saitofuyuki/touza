@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/19 20:56:27 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 12:35:25 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -3657,7 +3657,7 @@ contains
     use TOUZA_Nio,only: REC_DEFAULT, REC_BIG
     use TOUZA_Nio,only: put_item, get_item, restore_item, store_item
     use TOUZA_Nio,only: hi_MISS, hi_ITEM, hi_DFMT,  hi_EDIT1, hi_TITL1, hi_ETTL1
-    use TOUZA_Nio,only: hi_DATE, hi_TIME, hi_MSIGN, hi_MDATE
+    use TOUZA_Nio,only: hi_DATE, hi_TIME, hi_CSIGN, hi_CDATE, hi_MSIGN, hi_MDATE
     use TOUZA_Nio,only: GFMT_UR4, GFMT_MR4, GFMT_UI4, GFMT_MI4
     use TOUZA_Nio,only: fill_header
     implicit none
@@ -3678,6 +3678,7 @@ contains
     integer idt(8)
     real(kind=KBUF) :: undef
     character(len=litem) :: head(nitem)
+    integer jsi, jdi
 
     ierr = 0
     jb = 0
@@ -3721,11 +3722,24 @@ contains
 
     if (ierr.eq.0) then
        if (file%hedit.ge.hedit_sign) then
+          call get_item(jerr, head, tstr, hi_CSIGN)
+          if (jerr.ne.0) tstr = 'x'
+          if (tstr.eq.' ') then
+             call get_item(jerr, head, tstr, hi_CDATE)
+             if (jerr.ne.0) tstr = 'x'
+          endif
+          if (tstr.eq.' ') then
+             jsi = hi_CSIGN
+             jdi = hi_CDATE
+          else
+             jsi = hi_MSIGN
+             jdi = hi_MDATE
+          endif
           call get_login_name(jerr, tstr)
-          if (jerr.eq.0) call put_item(ierr, head, tstr, hi_MSIGN)
+          if (jerr.eq.0) call put_item(ierr, head, tstr, jsi)
           call date_and_time(values=idt(:))
           idt(4:6) = idt(5:7)
-          call put_item(jerr, head, idt(1:6), hi_MDATE)
+          call put_item(jerr, head, idt(1:6), jdi)
        endif
     endif
 
