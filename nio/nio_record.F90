@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2022/09/29 13:39:57 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 13:03:23 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -620,6 +620,7 @@ contains
     character(len=litem) :: htop
     integer ltop
     integer idfm
+    integer jerr
 
     ierr = err_default
     krect = 0
@@ -634,9 +635,15 @@ contains
             & isepl, htop(1:ltop), &       ! item 0
             & head(2:nitem)
     endif
+    ! write(*, *) ierr, is_eof_ss(ierr)
     if (is_eof_ss(ierr)) then
-       ierr = ERR_EOF
-       head(1:nitem) = ' '
+       inquire(UNIT=u, IOSTAT=jerr, POS=jposf)
+       if (jpos.eq.jposf) then
+          ierr = ERR_EOF
+          head(1:nitem) = ' '
+       else
+          ierr = ERR_BROKEN_RECORD
+       endif
        return
     endif
 
