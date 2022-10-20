@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz swiss(CH) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2022/10/15 21:28:20 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 12:46:02 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -29,7 +29,7 @@ module chak_lib
 !!!_  - modules
   use TOUZA_Std,only: KFLT,  KDBL
   use TOUZA_Std,only: is_msglev
-  use TOUZA_Std,only: msglev_normal, msglev_info
+  use TOUZA_Std,only: msglev_normal, msglev_info, msglev_debug
   use TOUZA_Std,only: is_msglev_DETAIL, is_msglev_NORMAL, is_msglev_INFO, is_msglev_DEBUG
   use TOUZA_Nio,only: litem, nitem
   implicit none
