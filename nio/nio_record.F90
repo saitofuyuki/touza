@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/20 13:03:23 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 13:37:36 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -86,6 +86,7 @@ module TOUZA_Nio_record
   integer,parameter,public :: GFMT_MRT     = GFMT_URT    + GFMT_MASK
   integer,parameter,public :: GFMT_MRTend  = GFMT_URTend + GFMT_MASK
 
+  integer,parameter,public :: GFMT_END     = GFMT_MASK * 2
 !!!_    * URT details
   integer,parameter,public :: PROP_DEFAULT = (- HUGE(0)) - 1
 
