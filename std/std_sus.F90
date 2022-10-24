@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2022/09/16 17:19:36 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/24 13:22:07 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -180,8 +180,8 @@ module TOUZA_Std_sus
   ! public sus_write_begin_irec, sus_write_end_irec
   ! public sus_read_begin_irec,  sus_read_end_irec
 
-  public sus_write_isep,  sus_read_isep
-  public sus_write_lsep,  sus_read_lsep
+  public sus_write_isep,  sus_read_isep, sus_read
+  public sus_write_lsep,  sus_read_lsep, sus_write
 
   public sus_rseek
   public sus_eswap
