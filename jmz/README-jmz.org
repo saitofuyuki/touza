@@ -426,13 +426,13 @@ can be set, which enable multiple record contents in the file.
 
 *** output-file formats
 **** gtool-3.5 format (default)
-**** (reserved) ascii output
+**** ascii output
 : chak ... = <file> FMT=a[<format>]
 
 : chak ... = x FMT=a        # write with default(*) format
 : chak ... = x FMT=aG10.3   # write with G10.3 format
 
-**** (reserved) binary output
+**** binary output
 : chak ... = <file> FMT=b<type>[:<byte-order>]
 
 *** operators summary
