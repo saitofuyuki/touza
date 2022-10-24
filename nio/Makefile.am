@@ -1,7 +1,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2022/10/17 17:03:53 fuyuki Makefile.am>
+# Time-stamp: <2022/10/24 15:14:06 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -18,8 +18,10 @@ include_HEADERS = touza_nio.h
 noinst_LTLIBRARIES = libtouza_local.la
 libtouza_local_la_SOURCES = nio_std.F90 nio_header.F90
 libtouza_local_la_SOURCES += nio_record.F90
+if BUILD_div
 if with_mpi
 # libtouza_local_la_SOURCES += nio_division.F90
+endif
 endif
 if with_nctcdf
 libtouza_local_la_SOURCES += nio_nctcdf.F90
@@ -32,9 +34,13 @@ EXTRA_libtouza_local_la_SOURCES	= nio_miroc.F90
 libtouza_local_la_SOURCES +=$(libtouza_APPENDS)
 libtouza_APPENDS =
 
+if BUILD_div
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_div)
+endif
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_std) $(FC_MODULE_touza_trp)
+if BUILD_div
 AM_CPPFLAGS += $(FC_INCLUDE_touza_div)
+endif
 AM_CPPFLAGS += $(FC_INCLUDE_touza_std) $(FC_INCLUDE_touza_trp)
 
 if with_nctcdf
@@ -46,10 +52,16 @@ AM_FCFLAGS_MODULE += $(NETCDF4_FFLAGS)
 endif
 
 TEST_COMMON_LIBS = $(noinst_LTLIBRARIES)
+if BUILD_div
 TEST_COMMON_LIBS += $(FC_LDADD_touza_div)
+endif
 TEST_COMMON_LIBS += $(FC_LDADD_touza_std) $(FC_LDADD_touza_trp)
 
-check_PROGRAMS = test_nio_header test_nio_record test_nio_division test_nio test_nio_miroc
+check_PROGRAMS = test_nio_header test_nio_record
+if BUILD_div
+check_PROGRAMS += test_nio_division
+endif
+check_PROGRAMS += test_nio test_nio_miroc
 if with_nctcdf
 check_PROGRAMS+= test_nio_nctcdf
 TEST_COMMON_LIBS += $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
@@ -63,9 +75,11 @@ test_nio_record_SOURCES = $(TEST_COMMON_SOURCES) nio_record.F90
 test_nio_record_LDADD = $(TEST_COMMON_LIBS)
 test_nio_record_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_RECORD=1
 
+if BUILD_div
 test_nio_division_SOURCES = $(TEST_COMMON_SOURCES) nio_division.F90
 test_nio_division_LDADD = $(TEST_COMMON_LIBS)
 test_nio_division_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_DIVISION=1
+endif
 
 test_nio_SOURCES = $(TEST_COMMON_SOURCES) nio.F90
 test_nio_LDADD = $(TEST_COMMON_LIBS)

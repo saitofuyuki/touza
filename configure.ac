@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/10/23 10:36:59 fuyuki configure.ac>
+# Time-stamp: <2022/10/24 15:25:48 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -111,6 +111,7 @@ MT_SUB_PACKAGE([cal], [],     [std])
 MT_SUB_PACKAGE([trp], [],     [std])
 MT_SUB_PACKAGE([ppp], [],     [std emu])
 dnl MT_SUB_PACKAGE([div], [[$]enable_sub_div_default],     [std])
+AM_CONDITIONAL([BUILD_div], [false])
 dnl MT_SUB_PACKAGE([nio], [],     [std emu trp div])
 MT_SUB_PACKAGE([nio], [],     [std emu trp])
 MT_SUB_PACKAGE([ami], [],     [std])
