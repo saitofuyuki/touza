@@ -1,7 +1,7 @@
 !!!_! trapiche_std.F90 - TOUZA/Trapiche utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 30 2021
-#define TIME_STAMP 'Time-stamp: <2021/11/30 08:13:40 fuyuki trapiche_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 07:44:43 fuyuki trapiche_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -26,6 +26,7 @@ module TOUZA_Trp_std
        & is_msglev, &
        & is_msglev_severe, is_msglev_debug, is_msglev_normal, is_msglev_detail, &
        & unit_global,      trace_fine,      trace_control
+  use TOUZA_Std_mwe,only: MPI_INTEGER, MPI_STATUS_SIZE, MPI_DOUBLE_PRECISION
   implicit none
   private
 !!!_  - static
@@ -87,7 +88,8 @@ module TOUZA_Trp_std
   public is_msglev_detail
   public trace_control, trace_fine
   public unit_global
-
+!!!_   . TOUZA_Std_mwe
+  public MPI_INTEGER, MPI_STATUS_SIZE, MPI_DOUBLE_PRECISION
 !!!_ + common interfaces
 contains
 !!!_  & init

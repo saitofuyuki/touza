@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/10/17 17:01:08 fuyuki configure.ac>
+# Time-stamp: <2022/10/23 10:36:59 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -30,6 +30,9 @@ AC_CANONICAL_TARGET
 AC_LANG_PUSH([Fortran])
 MT_PROG_FC_MPI
 AX_PROG_F77_MPI([test x"$with_mpi" != xno], [use_f77_mpi=yes], [use_f77_mpi=no])
+
+AM_CONDITIONAL([BUILD_WITH_MPI], [test x"[$]with_mpi" != xno])
+
 dnl AC_PROG_FC
 dnl AC_PROG_F77
 
@@ -98,12 +101,16 @@ AS_IF([test x"$enableval" = x"no"],
        AC_MSG_RESULT([enable])])
 AC_DEFINE_UNQUOTED([OPT_ENABLE_FORTRAN_ELEMENTAL], [$enable_elemental], [prefer elemental function])
 
+AS_IF([test x"$use_warn_max" = xyes], [AX_FCFLAGS_WARN_ALL([AM_FCFLAGS])])
+
+AS_IF([test x"$with_mpi" != xno], [enable_sub_div_default=yes], [enable_sub_div_default=no])
+
 MT_SUB_PACKAGE([std], [always])
 MT_SUB_PACKAGE([emu], [],     [std])
 MT_SUB_PACKAGE([cal], [],     [std])
 MT_SUB_PACKAGE([trp], [],     [std])
 MT_SUB_PACKAGE([ppp], [],     [std emu])
-dnl MT_SUB_PACKAGE([div], [],     [std])
+dnl MT_SUB_PACKAGE([div], [[$]enable_sub_div_default],     [std])
 dnl MT_SUB_PACKAGE([nio], [],     [std emu trp div])
 MT_SUB_PACKAGE([nio], [],     [std emu trp])
 MT_SUB_PACKAGE([ami], [],     [std])
@@ -132,13 +139,14 @@ AC_ARG_WITH([build-jmz],
    [], [with_build_jmz=no])
 AS_IF([test "x$with_build_jmz" != xno],
       [AC_MSG_RESULT([yes])
-       enable_sub_all=yes],
+       enable_sub_nio=yes],
       [AC_MSG_RESULT([no])])
 
 AS_IF([test "x$with_build_jmz" != xno],
 [AX_SUBDIRS_CONFIGURE([jmz],
     [],
-    [[TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}],
+    [[TOUZA_top_builddir=${ac_top_build_prefix}],
+     [TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}],
      [TOUZA_LIBS=${ac_top_build_prefix}lib${with_touza_name}.la ${NETCDF4_FLIBS} ${NETCDF4_LIBS}],
      [TOUZA_LDFLAGS=${NETCDF4_LDFLAGS}]],
     [],

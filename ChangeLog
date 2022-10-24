@@ -1,5 +1,14 @@
+Revision 1.05.2 / 2022-10-24
+============================
+
+  * Version 1.05.2, with some improvement, still alpha.
+  * (chak) [CRITICAL] modify default MISS to follow the legacy magic number
+  * (chak) ascii/binary input/output hacked
+  * (chak) some operation introduced and restructured
+  * (nio) more arguments for get_default_header().
+
 Revision 1.05.1 / 2022-10-19
-==================
+============================
 
   * Version 1.05.1, to fix chak (alpha version)
   * various bug fixes on chak

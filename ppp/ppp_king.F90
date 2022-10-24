@@ -1,7 +1,7 @@
 !!!_! ppp_king.F90 - TOUZA/ppp king control (xmcomm/xmking replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2022/06/30 15:25:49 fuyuki ppp_king.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 06:59:09 fuyuki ppp_king.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -208,7 +208,7 @@ contains
 !!!_  - diag_cache
   subroutine diag_cache &
        & (ierr, u)
-    use MPI,only: MPI_Comm_rank, MPI_COMM_WORLD
+    use TOUZA_Ppp_std,only: MPI_COMM_WORLD
     use TOUZA_Ppp_std,only: get_wni_safe, msg, diag_htable
     use TOUZA_Ppp_amng,only: lagent, inquire_agent
     implicit none
@@ -248,7 +248,6 @@ contains
 !!!_  & is_king - is self-rank eq KING under AREF agent
   subroutine is_king_a &
        & (ierr, isking, mdl, aref, adef)
-    use MPI,only: MPI_UNDEFINED
     use TOUZA_Ppp_amng,only: query_agent, top_agent
     implicit none
     integer,                  intent(out) :: ierr
@@ -291,7 +290,6 @@ contains
 !!!_  & get_king - get KING under AREF agent
   subroutine get_king_a &
        & (ierr, king, mdl, aref, adef)
-    use MPI,only: MPI_UNDEFINED
     use TOUZA_Ppp_amng,only: query_agent, top_agent
     implicit none
     integer,                  intent(out) :: ierr
@@ -312,7 +310,7 @@ contains
 
   subroutine get_king_i &
        & (ierr, king, mdl, jaref, adef)
-    use MPI,only: MPI_UNDEFINED
+    use TOUZA_Ppp_std,only: MPI_UNDEFINED
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use MPI,only: MPI_Group_translate_ranks
 #  endif
@@ -379,7 +377,6 @@ contains
 !!!_  - bind_king
   subroutine bind_king &
        & (ierr, king, pat, jasrc, jadef)
-    use MPI,only: MPI_UNDEFINED
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use MPI,only: MPI_Group_translate_ranks
 #  endif
@@ -429,7 +426,6 @@ contains
 !!!_  - set_king
   subroutine set_king &
        & (ierr, king, pat, adef)
-    use MPI,only: MPI_UNDEFINED
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use MPI,only: MPI_Group_translate_ranks
 #  endif

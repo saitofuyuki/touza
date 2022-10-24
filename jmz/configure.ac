@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Nov 24 2021
-# Time-stamp: <2022/10/13 16:21:56 fuyuki configure.ac>
+# Time-stamp: <2022/10/23 10:38:50 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -65,6 +65,7 @@ PKG_PROG_PKG_CONFIG()
 PKG_PREREQ([0.29])
 PKG_CHECK_MODULES_STATIC([TOUZA], [touza])
 AC_SUBST([TOUZA_LDFLAGS])
+AC_SUBST([TOUZA_top_builddir])
 
 dnl AX_CREATE_PKGCONFIG_INFO()
 AC_SUBST([PACKAGE_REQUIRES], [])

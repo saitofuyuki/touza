@@ -1,7 +1,7 @@
 !!!_! trapiche_transfer.F90 - TOUZA/Trapiche(trapiche) communication
 ! Maintainer: SAITO Fuyuki
 ! Created: May 21 2022
-#define TIME_STAMP 'Time-stamp: <2022/05/23 11:18:57 c0210 trapiche_transfer.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 07:45:06 fuyuki trapiche_transfer.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -161,7 +161,7 @@ contains
        & (ierr, &
        &  v,     n,     irank, icomm, ktag,  ireq, &
        &  vmiss, mbits, xbits, xtop,  xbtm,  kcode)
-    use MPI,only: MPI_INTEGER
+    use TOUZA_Trp_std,only: MPI_INTEGER
 #  if HAVE_FORTRAN_MPI_MPI_ISEND
     use MPI,only: MPI_Isend
 #  endif
@@ -214,7 +214,10 @@ contains
        & (ierr, &
        &  v,     n,     irank, icomm, ktag,  ireq, &
        &  vmiss)
-    use MPI,only: MPI_INTEGER, MPI_Probe, MPI_STATUS_SIZE
+    use TOUZA_Trp_std,only: MPI_INTEGER, MPI_STATUS_SIZE
+#if OPT_USE_MPI
+    use MPI,only: MPI_Probe
+#endif /* OPT_USE_MPI */
 #  if HAVE_FORTRAN_MPI_MPI_IRECV
     use MPI,only: MPI_Irecv
 #  endif
@@ -266,12 +269,11 @@ end module TOUZA_Trp_transfer
 !!!_@ test_trapiche_transfer - test program
 #ifdef TEST_TRAPICHE_TRANSFER
 program test_trapiche_transfer
-  use MPI,only: MPI_STATUS_SIZE, MPI_DOUBLE_PRECISION
   use TOUZA_Std,only: get_ni, get_comm, diag_real_props, &
        & std_init=>init, std_diag=>diag, std_finalize=>finalize, &
        & KDBL
   use TOUZA_Trp_pack,only: RELLENO_TRANSPOSE
-  use TOUZA_Trp_std, only: binstr
+  use TOUZA_Trp_std, only: binstr, MPI_STATUS_SIZE, MPI_DOUBLE_PRECISION
   use TOUZA_Trp_transfer
   implicit none
 
@@ -329,7 +331,9 @@ program test_trapiche_transfer
 contains
   subroutine test_sub_ends &
        & (ierr, v2, v1, v0, n, itr, scheme, ir, nr, icomm)
+#if OPT_USE_MPI
     use MPI,only: MPI_Wait, MPI_Barrier
+#endif /* OPT_USE_MPI */
 #  if HAVE_FORTRAN_MPI_MPI_ISEND
     use MPI,only: MPI_Isend
 #  endif

@@ -1,7 +1,7 @@
 !!!_! ppp_std.F90 - TOUZA/Ppp utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2022/06/10 12:54:44 fuyuki ppp_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 07:01:36 fuyuki ppp_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -27,7 +27,11 @@ module TOUZA_Ppp_std
        & is_msglev_severe, is_msglev_fatal,  &
        & get_logu,         unit_global,      trace_fine,       trace_control
   use TOUZA_Std_mwe,only: &
-       & get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
+       & get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated, &
+       & MPI_COMM_NULL, MPI_GROUP_NULL, MPI_COMM_WORLD, MPI_UNDEFINED, &
+       & MPI_STATUS_SIZE, MPI_GROUP_EMPTY, MPI_INTEGER, MPI_CHARACTER, &
+       & MPI_ANY_TAG,     MPI_ANY_SOURCE
+
   use TOUZA_Std_env,only: is_eof_ss
   use TOUZA_Std_htb,only: &
        & new_htable,  new_entry, settle_entry, &
@@ -66,6 +70,10 @@ module TOUZA_Ppp_std
   public is_eof_ss
   public new_htable,  new_entry, settle_entry
   public diag_htable, reg_entry, query_status
+  public MPI_COMM_NULL, MPI_GROUP_NULL, MPI_COMM_WORLD, MPI_UNDEFINED
+  public MPI_STATUS_SIZE, MPI_GROUP_EMPTY
+  public MPI_INTEGER, MPI_CHARACTER
+  public MPI_ANY_TAG, MPI_ANY_SOURCE
 contains
 !!!_ + common interfaces
 !!!_  & init

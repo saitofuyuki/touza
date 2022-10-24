@@ -1,7 +1,7 @@
 !!!_! nio_miroc.F90 - TOUZA/Nio MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2022/07/29 09:38:21 fuyuki nio_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 08:22:12 fuyuki nio_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -22,6 +22,9 @@
 #  include "touza_config.h"
 #endif
 #include "touza_nio.h"
+#ifndef  OPT_WITH_NCTCDF
+# define OPT_WITH_NCTCDF 0
+#endif
 !!!_* Macros
 #ifndef    MIROC_INTEGER
 #  define  MIROC_INTEGER 4
@@ -911,6 +914,7 @@ subroutine GTZWRZ &
      &  HALON, HALAT, HASIG, &
      &  ISTA,  IEND,  JSTA,  JEND,  KSTA,  KEND, &
      &  DSIZE)
+  use TOUZA_Nio,only: nio_msg=>msg
   use TOUZA_Nio_miroc,only:  &
        & vmiss_def, &
        & put_item_time, init_common

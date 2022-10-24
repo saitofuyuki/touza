@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2022/09/29 13:39:57 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/23 10:44:37 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -86,6 +86,7 @@ module TOUZA_Nio_record
   integer,parameter,public :: GFMT_MRT     = GFMT_URT    + GFMT_MASK
   integer,parameter,public :: GFMT_MRTend  = GFMT_URTend + GFMT_MASK
 
+  integer,parameter,public :: GFMT_END     = GFMT_MASK * 2
 !!!_    * URT details
   integer,parameter,public :: PROP_DEFAULT = (- HUGE(0)) - 1
 
@@ -586,11 +587,38 @@ contains
 !!!_ + user interfaces
 !!!_  - get_default_header - get default header
   subroutine get_default_header &
-       & (head)
-    use TOUZA_Nio_header,only: litem, nitem
+       & (head,  &
+       &  vmiss, utime, csign, msign)
+    use TOUZA_Nio_header,only: &
+         & put_item, &
+         & hi_UTIM,  hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL,  &
+         & hi_CSIGN, hi_MSIGN
     implicit none
-    character(len=*),intent(out) :: head(*)
+    character(len=*),intent(out)         :: head(*)
+    real(kind=KDBL), intent(in),optional :: vmiss
+    character(len=*),intent(in),optional :: utime
+    character(len=*),intent(in),optional :: csign, msign
+    integer jerr
+
+    jerr = 0
     head(1:nitem) = head_def(1:nitem)
+    if (present(utime)) then
+       if (jerr.eq.0) call put_item(jerr, head, utime, hi_UTIM)
+    endif
+    if (present(vmiss)) then
+       if (jerr.eq.0) call put_item(jerr, head, vmiss, hi_MISS)
+       if (jerr.eq.0) call put_item(jerr, head, vmiss, hi_DMIN)
+       if (jerr.eq.0) call put_item(jerr, head, vmiss, hi_DMAX)
+       if (jerr.eq.0) call put_item(jerr, head, vmiss, hi_DIVS)
+       if (jerr.eq.0) call put_item(jerr, head, vmiss, hi_DIVL)
+    endif
+    if (present(csign)) then
+       if (jerr.eq.0) call put_item(jerr, head, csign, hi_CSIGN)
+    endif
+    if (present(msign)) then
+       if (jerr.eq.0) call put_item(jerr, head, msign, hi_MSIGN)
+    endif
+
     return
   end subroutine get_default_header
 
@@ -620,6 +648,7 @@ contains
     character(len=litem) :: htop
     integer ltop
     integer idfm
+    integer jerr
 
     ierr = err_default
     krect = 0
@@ -634,9 +663,15 @@ contains
             & isepl, htop(1:ltop), &       ! item 0
             & head(2:nitem)
     endif
+    ! write(*, *) ierr, is_eof_ss(ierr)
     if (is_eof_ss(ierr)) then
-       ierr = ERR_EOF
-       head(1:nitem) = ' '
+       inquire(UNIT=u, IOSTAT=jerr, POS=jposf)
+       if (jpos.eq.jposf) then
+          ierr = ERR_EOF
+          head(1:nitem) = ' '
+       else
+          ierr = ERR_BROKEN_RECORD
+       endif
        return
     endif
 

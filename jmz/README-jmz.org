@@ -81,17 +81,18 @@ Following Some special filters are reserved for next developments:
 - gtydv --- differential along latitude
 
 *** usage
-: chak [OPTION]... [OPERAND|OPERATOR|OPTION]... [{=|:=} OUTPUT] ....
+: chak [<option>]... [<operand>|<operator>|<option>]... [{=|:=} <output>] ....
 
 Arguments:
 
-: = OUTPUT
-Write the *top* stack result on the file OUTPUT and pops it off the stack.
+: = <output>
+Write the *top* stack result on the file =<output>= and pops it off the stack.
 
-: := OUTPUT
-Write the *top* stack result on the file OUTPUT and leave it.
+: := <output>
+Write the *top* stack result on the file =<output>= and leave it.
 
-OPERATOR
+=<operator>=
+
 There are two kinds of operators: stack operator and queue operator.
 The former works on the stack --- Pop required number of operands from
 the stack, which depends on the operator; operate; and push the result
@@ -99,7 +100,8 @@ on the top stack.
 The latter works on the queue (typically last operator) to change
 the behavior of the operator.
 
-OPERAND
+=<operand>=
+
 Any items other than the operators and output symbols.  Operands include
 gtool-format files, the literal (integer or float number), and the symbols.
 A filename to conflict with a defined operator cannot be parsed as a
@@ -138,9 +140,9 @@ argument order may cause undesired results.
 |---------------------------------------------+------------------------------------------------------|
 | gtlog a                                     | chak a LOG = gtool.out                               |
 | gtsqrt a                                    | chak a SQRT = gtool.out                              |
-| gtcos a                                     | chak a COS = gtool.out                               |
-| gtsin a                                     | chak a SIN = gtool.out                               |
-| gttan a                                     | chak a TAN = gtool.out                               |
+| gtcos a deg=F                               | chak a COS = gtool.out                               |
+| gtsin a deg=F                               | chak a SIN = gtool.out                               |
+| gttan a deg=F                               | chak a TAN = gtool.out                               |
 
 *** Tutorial --- for (less) impatients
 Longer examples are append later.  These are minimum examples.
@@ -281,10 +283,168 @@ As commented above, indexing follows python style by default.
 : 1 3 _
 : 2 3  0.110000000E+02
 
+*** Terminology
+**** queue, stack, buffer
+**** coordinate, dimension, logical/physical index
+*** options summary
+**** Global options
+- =-v= :: verbose
+- =-vv= :: more verbose
+- =-vvv= :: even more verbose
+- =-q= :: quiet
+- =-qq= :: more quiet
+- =-qqq= :: even more quiet
+- =-n= :: (Reserved) dry-run
+**** Indexing style
+- =-P= :: Python-like indexing mode (default)
+- =-F= :: Fortran-like indexing mode
+
+In default python-like mode, coordinate, record etc index is counted
+from 0.  When to specify range, the second index corresponds to the
+one to stop (exclusive).   Thus range 2:5 corresponds to 2,3,4.
+Unlike python, at the moment the negative index cannot be used.
+
+In fortran-like mode index counted from 1 and the second index
+corresponds to the one to stop (inclusive).  Thus range 3:5
+corresponds to 3,4,5, which is equivalent to 2:5 in python-like mode.
+
+**** File write access
+- =-k= :: Keep mode (write).  Raise an error if output file exists (default)
+- =-f= :: Overwrite mode (write).  Force overwrite even the output file exists
+- =-a= :: Append mode (write).  Output is appended to the file
+
+- =-Hn=, =-H n= :: Set header edit level to integer /n/ (default=9)
+
+Header edit levels
+|    n |                       | default              |
+|------+-----------------------+----------------------|
+|   -1 | keep reference        |                      |
+|    0 | set [CM]DATE,[CM]SIGN | date and user        |
+|    1 | set 0 + EDIT,ETTL     | RPN, infix notations |
+|    2 | set 1 + TITLE         | infix notation       |
+|    3 | set 2 + ITEM          | RPN                  |
+| more | set 3                 |                      |
+
+Options ITEM=STRING, EDIT=STRING etc precede the above editing level,
+to explicitly set the header items.
+
+**** File read access
+- =-s= :: Terminate mode (read).  Stop if eof reached (default)
+- =-c= :: Cyclic mode (read).   Rewind input file if eof reached
+- =-p= :: Persistent mode (read).  Keep final record if eof reached
+
+In default terminate mode, the chak operation stops when one or more
+shortest input file reaches eof.  If some files still remains records,
+an error is raised.
+
+In the other two modes, the chak operation stops when one or more
+longest input file reaches eof.  If some files reach eof during
+operation, rewind to the first record when cyclic mode, while keep the
+final record when persistent mode.
+
+Read access option can be set either globally or per each file.
+The option is set to the last input file argument, or globally if no
+input file before the option.
+
+(ex) globally cyclic mode except for file2 with persistent mode.
+
+: chak -c file0 file1 file2 -p file3 ...
+
+Specially, if single record selection is used for an input, it is
+automatically set as persistent mode (otherwise it is useless).
+
+(ex) globally cyclic mode except for file2 (record 3 only) with
+persistent mode.
+
+: chak -c file0 file1 file2 T=3 file3 ...
+
+**** Compromise domain policy
+- =-i= :: Inclusive domain mode for operation (default)
+- =-x= :: Intersect domain mode for operation
+- =-l= :: First domain mode for operation
+*** number type
+Internally all the numbers are stored as so-called double precision.
+All the operation are performed as floating-point values.
+One exeption may occur at the final output: if all the operatnds are
+integer-like, and if the operation is integer-preserving type, then
+the output is treated as integer.
+
+*** symbols and literals
+Numbers are usually stored as floating-point numbers,
+but when without decimal point), they are regarded as integer-like
+type.
+In order to avoid unexpected behavior, at least decimal point must be
+added for normal mathematics operations, or truncate to integer by INT
+operator.
+
+: % chak 1 =        # treated as integer
+: 1
+: % chak 1. =      # treated as floating-point number
+:  0.100000000E+01
+
+: % chak 1 2 DIV 2 MUL =
+: 1
+: % chak 1 2. DIV 2 MUL =
+:  0.100000000E+01
+: % chak 1 2 DIV INT 2 MUL =
+: 0
+
+Some numbers are prepared with special symbols.
+| symbols |           value | definition     |
+|---------+-----------------+----------------|
+| PI      |      3.14159265 | ATAN2(0,-1.D0) |
+| E       |      2.71828183 | EXP(1.D0)      |
+| HUGE    | 1.79769313E+308 | HUGE(0.D0)     |
+| TINY    | 2.22507386E-308 | TINY(0.D0)     |
+
+*** input-file formats
+**** gtool-3.5 format (default)
+Default input is gtool-3.5 format.  If not =FMT= properties set after
+the input file, then it is accessed as the gtool-3.5 format.
+
+**** ascii input
+Input file can be one-column ascii file.  Optionally the array shape
+can be set, which enable multiple record contents in the file.
+
+: chak ... <file> FMT=a[,<shape>]
+
+=<shape>= =[[LOW:]HIGH],[[LOW:]HIGH],....=
+
+: chak x FMT=a        # input x, auto-shaped; one-record, total lines = total elements
+: chak x FMT=a,7      # input x with shape (0:7); possibly multiple records
+: chak x FMT=a,3:8    # input x with shape (3:8)
+: chak x FMT=a,5,,7   # input x with shape (0:5, -, 0:7), null second coordinate.
+
+**** binary input
+: chak ... <file> FMT=b<type>[:<byte-order>][,<shape>]
+
+=<type>=         ={i4|r4|r8}=
+=<byte-order>=  ={n|s|b|l}=     native, swap, big, little
+
+: chak x FMT=br4      # input x, float, native byte-order, auto-shaped; one-record, total size = total elements
+: chak x FMT=br8:s,7  # input x, double, swap byte-order, with shape (0:7); possibly multiple records
+
+*** output-file formats
+**** gtool-3.5 format (default)
+**** (reserved) ascii output
+: chak ... = <file> FMT=a[<format>]
+
+: chak ... = x FMT=a        # write with default(*) format
+: chak ... = x FMT=aG10.3   # write with G10.3 format
+
+**** (reserved) binary output
+: chak ... = <file> FMT=b<type>[:<byte-order>]
+
 *** operators summary
 Operators are case dependent.
 Files to conflict with operators cannot be accessed as they are.  You
 can force to access such files by using relative or absolute path.
+
+The operators of =chak= follows partially those of gmtmath and grdmath
+in GMT (General Mapping Tools) package, but not all the operators are
+equivalent.  For example, operators =AND= and =OR= operations are
+completely different between =chak= and GMT implementation.
+
 **** operators on stacks
 | operator   | pop |   push | description                                                       |
 |------------+-----+--------+-------------------------------------------------------------------|
@@ -293,7 +453,7 @@ can force to access such files by using relative or absolute path.
 | ADD        |   2 |      1 | A+B                                                               |
 | AND        |   2 |      1 | logical and; B if both A and B are defined, else UNDEF            |
 | ASIN       |   1 |      1 | arcsin(A)                                                         |
-| ATAN2      |   2 |      1 | arctan(A/B)                                                       |
+| ATAN2      |   2 |      1 | arctan(B/A)                                                       |
 | BIN        |   1 |      1 | binary; 1 if defined, else 0                                      |
 | BOOL       |   1 |      1 | boolean; 1 if defined, else UNDEF                                 |
 | CEIL       |   1 |      1 | smallest integer >=A                                              |
@@ -485,15 +645,66 @@ examples
 | STOP a b c STOP REPEAT        | STOP  a b c STOP  a b c   | marker is inserted before repeating |
 
 *** file properties
+**** gtool format header
+A gtool-format header in new file to write follows that of the first
+input file on the stack, *just at the operation*.  The entries =ITEM=,
+=TITLE=, =CDATE=, =MDATE=, =CSIGN=, =MSIGN=, =EDIT=, and =ETTL= are
+set for new files, and the other entries such as DATE, TIME, MISS are
+copied from the reference file.
+
+: chak a  b      ADD = x   #  ref=a   (x=a+b)
+: chak 10 b      ADD = x   #  ref=b   (x=10+b)
+: chak a  b EXCH ADD = x   #  ref=b   (x=b+a)
+: chak a  b c    ADD = x   #  ref=b   (x=b+c)
+
+If there is no input gtool files (created from literal only), a set of
+minimum default entries is adopted.
+
+You can control by command line argument -Hn what to keep the
+entries of the reference file.
+**** header entries of new output file
+| entries     | new property   | example   |
+|-------------+----------------+-----------|
+| ITEM EDITn  | RPN            | aa bb ADD |
+| TITLn ETTLn | infix notation | aa+bb     |
+
+=ITEM= entries are used as operands in the notation (not filenames).
+
+The entries =EDITn= =TITLn= =ETTLn= are regarded as concatenated long
+entries.  Longer notation is truncated.
+
+: chak a b c d f ADD MUL ADD CUM SQRT = x
+
+:  3 ITEM    (MARK aa bb cc dd)       # truncated
+:  4 EDIT1   (MARK aa bb cc dd)       # EDIT[1-3] contains full notation
+:  5 EDIT2   ( ff ADD MUL ADD )
+:  6 EDIT3   (CUM SQRT        )
+: 14 TITL1   (SQRT(aa+bb+cc*(d)       # TITL[1-2] contains full notation
+: 15 TITL2   (d+ff))          )       # SQRT(aa+bb+cc*(dd+ff))
+: 17 ETTL1   (SQRT(aa+bb+cc*(d)
+: 18 ETTL2   (d+ff))          )
+
+To build infix notation from RPN queue is much easier than the opposite......
+
+You can force overwrite the =ITEM=, =TITLn= entries by special
+operators =ITEM=, =TITLE=, respectively.
+
+: chak .. = x ITEM='xx'
+: chak .. = x TITLE='new title for xx'
+: chak .. = x ITEM='xx' TITLE='new title for xx'
+
+=ITEM=, =TITLE= operators apply on the adjacent file argument before the operator.
+
 **** record selection
-Specific record extraction can be operated by T=LIST.
+Specific record extraction can be operated by =T=LIST=.
 
 : chak FILE T=2    # extract record 2 only
+: chak FILE T=1,5  # extract record 1,5 only
 : chak FILE T=:3   # extract 0,1,2
 : chak FILE T=4:   # extract 4,5,...
 : chak FILE T=1:4  # extract 1,2,3
 
-With -F option, index can be FORTRAN style:
+With =-F= option, index can be FORTRAN style:
 
 : chak -F FILE T=2    # extract record 2 only
 : chak -F FILE T=1,5  # extract record 1,5 only
@@ -501,13 +712,13 @@ With -F option, index can be FORTRAN style:
 : chak -F FILE T=4:   # extract 4,5,...
 : chak -F FILE T=1:4  # extract 1,2,3,4
 
-T operator apply adjacent file argument.
+=T= operator applies on the adjacent file argument.
 
 : chak a T=2   b T=3 ADD =   # a[2]+b[3]
 : chak a T=2,3 b T=0 ADD =   # output a[2]+b[0], a[3]+b[0]
 
 *** buffer properties
-**** COMMENT (sub)region selection
+**** (sub)region selection
 Operators C0, C1, C2 act on 0th, 1st, 2nd coordinate.
 In FORTRAN-style (-F) mode, C1, C2, C3 are used instead.
 Operators X, Y, Z are alias of the three, ignoring the style.
@@ -838,4 +1049,6 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  GEB GTU GTB IDIV LADD LDIV LEU LEF LMASK LMAX LMIN Fn
 #  LocalWords:  LMUL LSUB LTU LTB LTF NEU NOP LOR SQR TANH tanh TRUNC
 #  LocalWords:  ZSIGN unary Wn ITER OPR qss pss lon sps tps avant bb
-#  LocalWords:  garde ee ARG REPL DFMT th nd Cn
+#  LocalWords:  garde ee ARG REPL DFMT th nd Cn vv vvv qq qqq Fortran
+#  LocalWords:  fortran eof Hn ETTL CDATE MDATE CSIGN MSIGN gmtmath
+#  LocalWords:  grdmath EDITn TITLn ETTLn TITL

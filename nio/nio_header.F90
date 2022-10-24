@@ -1,7 +1,7 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/16 21:00:02 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/24 12:18:20 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -647,7 +647,9 @@ contains
           read(BUF, '(A)', IOSTAT=ierr) v
        endif
     else
-       if (present(fmt)) then
+       if (head(item).eq.' ') then
+          v = ' '
+       else if (present(fmt)) then
           read(head(item), fmt, IOSTAT=ierr) v
        else
           read(head(item), '(A)', IOSTAT=ierr) v
