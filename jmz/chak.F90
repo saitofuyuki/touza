@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/24 14:24:29 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/26 08:20:10 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -11,20 +11,10 @@
 !   (https://www.apache.org/licenses/LICENSE-2.0)
 !
 #ifdef HAVE_CONFIG_H
-! #  include "touza_config.h"
-! #  undef PACKAGE
-! #  undef PACKAGE_NAME
-! #  undef PACKAGE_STRING
-! #  undef PACKAGE_TARNAME
-! #  undef PACKAGE_VERSION
-! #  undef VERSION
 #  include "jmz_config.h"
 #endif
 #include "jmz.h"
 !!!_* macros
-#ifndef   TEST_CHAK
-#  define TEST_CHAK 0
-#endif
 !!!_ + sizes
 #ifndef    OPT_CHAK_FILES
 #  define  OPT_CHAK_FILES    128
@@ -126,6 +116,11 @@ program chak
   integer,parameter :: lname=litem*4
   integer,parameter :: ldesc=OPT_DESC_LEN
   integer,parameter :: lfmt =litem*4
+
+  integer,parameter :: hflag_unset = -1
+  integer,parameter :: hflag_default = 0
+  integer,parameter :: hflag_nulld   = 1  ! strict null-coordinate mode
+
   type file_t
      character(len=lpath) :: name
      integer              :: u
@@ -139,6 +134,7 @@ program chak
      character(len=lfmt)  :: fmt
      integer              :: kfmt
      integer              :: hedit     ! header edit level
+     integer              :: hflag = hflag_unset ! header parser flag
   end type file_t
   type(file_t),target :: ofile(0:lfile-1)
   type(file_t),target :: def_read
@@ -257,10 +253,11 @@ program chak
   character,parameter :: rename_sep = '/'
 
   type(loop_t),save :: def_loop  = loop_t(null_range, null_range, -1, ' ')
-  type(loop_t),save :: zero_loop = loop_t(0, 0, 0, ' ')
 
   character(len=*),parameter :: amiss = '_'  ! character for missing value
   character(len=*),parameter :: aext  = '.'  ! character for external
+
+  integer,parameter :: stat_help = 1
 !!!_ + Body
   ierr = 0
 
@@ -270,7 +267,6 @@ program chak
   mqueue = 0
 
   if (ierr.eq.0) call init(ierr, stdv, dbgv)
-  if (ierr.eq.0) call lib_init(ierr)
   if (ierr.eq.0) call parse_args(ierr)
 
   irecw = 0
@@ -313,14 +309,15 @@ contains
     if (ierr.eq.0) call env_init(ierr, levv=stdv, icomm=MPI_COMM_NULL)
     if (ierr.eq.0) ulog = stdout
     if (ierr.eq.0) uerr = stderr
+    if (ierr.eq.0) call lib_init(ierr)
     if (ierr.eq.0) call register_operators(ierr)
     if (ierr.eq.0) call register_predefined(ierr)
     if (ierr.eq.0) call init_sub(ierr)
     if (ierr.eq.0) call nio_init(ierr, levv=dbgv, stdv=stdv)
     if (ierr.eq.0) call nr_init(ierr, lazy=+1)
 
-    if (ierr.eq.0) call reset_file(ierr, def_read,  ' ', mode_terminate)
-    if (ierr.eq.0) call reset_file(ierr, def_write, ' ', mode_new)
+    if (ierr.eq.0) call reset_file(ierr, def_read,  ' ', mode_terminate, hflag_default)
+    if (ierr.eq.0) call reset_file(ierr, def_write, ' ', mode_new,       hflag_default)
 ! #if HAVE_FORTRAN_IEEE_ARITHMETIC
 !     UNDEF = IEEE_VALUE(ZERO, IEEE_QUIET_NAN)
 ! #endif
@@ -407,6 +404,29 @@ contains
        endif
     endif
   end subroutine message
+
+!!!_   . show_usage
+  subroutine show_usage (ierr, u, levv)
+    use TOUZA_Std,only: choice
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer utmp
+    integer lv
+
+    ierr = 0
+    utmp = choice(ulog, u)
+    lv = choice(0, levv)
+
+101 format('chak - Swiss(CH) Army Knife for gtool-3.5 format files')
+102 format(2x, 'with ', A, 1x, A, '; ', A, 1x, A)
+    write(utmp, 101)
+    write(utmp, 102) PACKAGE_NAME, PACKAGE_VERSION, &
+         & TOUZA_NAME, TOUZA_VERSION
+    return
+  end subroutine show_usage
+
 !!!_  - log arrays
 !!!_   . show_queue
   subroutine show_queue(ierr, u)
@@ -698,6 +718,7 @@ contains
 111    format('{', A, '}=', I0)
 112    format('{', A, '}=*')
 113    format('{', A, '}=', I0)
+       ! write(*, *) jc, order(jc), name(jc)
        if (order(jc).ge.0) then
           if (name(jc).eq.' ') then
              write(cprop(jc), 111) '*', order(jc)
@@ -904,6 +925,7 @@ contains
     integer japos
     character(len=lpath) :: arg
     integer jerr
+    integer stat
 
     ierr = 0
 
@@ -913,6 +935,7 @@ contains
     consts = mbuffer  ! save number of predefined constants here
 
     mstack = 0
+    stat = 0
 
     if (ierr.eq.0) call arg_init(ierr, cha=' = ')   ! disable assignment
     if (ierr.eq.0) call parse(ierr)
@@ -923,6 +946,7 @@ contains
           japos = japos + 1
           call get_param(jerr, arg, japos)
           if (jerr.ne.0) exit
+          if (stat.ne.0) exit
           do
              if (ierr.eq.0) then
                 call parse_arg_operator(ierr, arg)
@@ -935,7 +959,7 @@ contains
                 ierr = min(0, ierr)
              endif
              if (ierr.eq.0) then
-                call parse_option(ierr, japos, arg)
+                call parse_option(ierr, stat, japos, arg)
                 if (ierr.eq.0) exit
                 ierr = min(0, ierr)
              endif
@@ -952,16 +976,22 @@ contains
        enddo
        ! call show_buffers(ierr)
     endif
+    select case (stat)
+    case (stat_help)
+       call show_usage(ierr, levv=lev_verbose)
+       return
+    end select
     if (ierr.eq.0) call set_rec_filter(ierr)
     if (ierr.eq.0) call set_write_format(ierr)
   end subroutine parse_args
 
 !!!_   . parse_option
   subroutine parse_option &
-       & (ierr, japos, arg)
+       & (ierr, stat, japos, arg)
     use TOUZA_Std,only: parse_number, get_param
     implicit none
     integer,         intent(out)   :: ierr
+    integer,         intent(out)   :: stat
     integer,         intent(inout) :: japos
     character(len=*),intent(in)    :: arg
     character(len=lpath) :: abuf
@@ -970,12 +1000,16 @@ contains
 
     integer md, cmd, hmd
     integer ntmp
+    integer hflag, hsub
 
     md = mode_unset
     cmd = mode_unset
     hmd = hedit_unset
     ierr = 0
     abuf = arg
+    stat = 0
+    hflag = hflag_unset
+    hsub = 0
 
     jvar = index(abuf, paramd)
     if (jvar.eq.1) then
@@ -1017,6 +1051,8 @@ contains
           endif
        else if (abuf.eq.'+d') then
           dbgv = +999
+       else if (abuf.eq.'-h') then
+          stat = stat_help
        else if (abuf.eq.'-f') then   ! write-mode
           md = mode_write
        else if (abuf.eq.'-a') then
@@ -1035,6 +1071,12 @@ contains
           cmd = cmode_intersect
        else if (abuf.eq.'-l') then
           cmd = cmode_first
+       else if (abuf.eq.'-N') then
+          hflag = hflag_nulld        ! file or default read
+          hsub = -1
+       else if (abuf.eq.'+N') then
+          hflag = hflag_nulld        ! special for default write
+          hsub = +1
        else if (abuf.eq.'-P') then
           call check_only_global(ierr, abuf)
           if (ierr.eq.0) then
@@ -1067,6 +1109,8 @@ contains
           if (ierr.eq.0) call parse_file_option(ierr, md)
        else if (hmd.ne.hedit_unset) then
           if (ierr.eq.0) call parse_hedit_option(ierr, hmd)
+       else if (hflag.ne.hflag_unset) then
+          if (ierr.eq.0) call parse_hflag_option(ierr, hflag, hsub)
        else if (cmd.ne.mode_unset) then
           if (ierr.eq.0) call parse_operator_option(ierr, cmd)
        endif
@@ -1143,6 +1187,32 @@ contains
        pfile%hedit = mode
     endif
   end subroutine parse_hedit_option
+
+!!!_   . parse_hflag_option
+  subroutine parse_hflag_option(ierr, flag, sub)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: flag
+    integer,intent(in)  :: sub
+
+    type(file_t),pointer :: pfile
+
+    ierr = 0
+    if (mfile.gt.lfile) then
+       ierr = ERR_INSUFFICIENT_BUFFER
+       return
+    endif
+    pfile => ofile(mfile-1)
+    if (mfile.eq.0) then
+       if (sub.gt.0) then
+          pfile => def_write
+       else
+          pfile => def_read
+       endif
+    endif
+    pfile%hflag = flag
+  end subroutine parse_hflag_option
+
 !!!_   . parse_operator_option
   subroutine parse_operator_option(ierr, mode)
     implicit none
@@ -1183,6 +1253,7 @@ contains
           call pop_queue(ierr)
           ofile(jf)%mode  = def_write%mode
           ofile(jf)%hedit = def_write%hedit
+          ofile(jf)%hflag = def_write%hflag
           call append_queue(ierr, hfile, pop=1, push=0)
           if (ierr.eq.0) call pop_stack(ierr, hbuf)
           if (ierr.eq.0) then
@@ -1479,8 +1550,10 @@ contains
        endif
        if (jp.eq.1) then
           aqueue(jq)%lefts(:)%lcp(cidx)%name = ' '
+          bstack(mstack-pop:mstack-1)%lcp(cidx)%name = ' '
        else if (jp.gt.1) then
           aqueue(jq)%lefts(:)%lcp(cidx)%name = adjustl(arg(1:jp-1))
+          bstack(mstack-pop:mstack-1)%lcp(cidx)%name = adjustl(arg(1:jp-1))
        endif
        jp = jp + 1
        rpos(1) = system_index_bgn(null_range)
@@ -1542,8 +1615,7 @@ contains
     integer,         intent(in)  :: hopr
     character(len=*),intent(in)  :: arg
     integer jpar,  jend
-    integer lasth, toph, jf
-    integer jb
+    integer lasth, jf
     integer jerr
     integer jitem
     real(kind=KBUF) :: undef
@@ -3547,7 +3619,7 @@ contains
   end subroutine new_file
 
 !!!_   . reset_file
-  subroutine reset_file(ierr, file, name, mode)
+  subroutine reset_file(ierr, file, name, mode, flag)
     use TOUZA_Std,only: choice
     use TOUZA_Nio,only: GFMT_ERR
     implicit none
@@ -3555,6 +3627,7 @@ contains
     type(file_t),    intent(inout)       :: file
     character(len=*),intent(in),optional :: name
     integer,         intent(in),optional :: mode
+    integer,         intent(in),optional :: flag
 
     ierr = 0
 
@@ -3564,8 +3637,10 @@ contains
     file%h = ' '
     file%fmt = ' '
     file%kfmt = GFMT_ERR
-    file%mode = choice(mode_unset, mode)
     file%hedit = hedit_all
+    file%mode  = choice(mode_unset, mode)
+    file%hflag = choice(hflag_unset, flag)
+
     if (present(name)) then
        file%name = name
     else
@@ -3602,6 +3677,8 @@ contains
        if (file%bh.lt.0) call new_buffer(ierr, file%bh)
     endif
     if (ierr.eq.0) jb = buf_h2item(file%bh)
+
+    if (file%hflag.eq.hflag_unset) file%hflag = def_read%hflag
 
     if (ierr.eq.0) call open_cue_read_file(ierr, xrec, head, file)
     if (ierr.eq.ERR_EXHAUST) then
@@ -3658,7 +3735,7 @@ contains
 
        obuffer(jb)%reff = handle
     endif
-    if (ierr.eq.0) call get_header_lprops(ierr, obuffer(jb)%pcp, file%h)
+    if (ierr.eq.0) call get_header_lprops(ierr, obuffer(jb)%pcp, file%h, file%hflag)
 
     if (ierr.eq.0) then
        call get_item(jerr, file%h, dt(:), hi_DATE)
@@ -3968,9 +4045,9 @@ contains
 
     type(loop_t),pointer :: recf
     integer nrf
-    integer nfwd, nsuc
+    integer nfwd
     integer xrec
-    integer j, n
+    integer n
     integer irange(2, mcoor)
     integer nco, jc
     integer(kind=KIOFS) :: fsize
@@ -4219,7 +4296,6 @@ contains
     integer,     intent(in),optional :: levv
     integer n
     integer jb, jrefh
-    character(len=2) stt, pos
     character(len=128) :: txt
     character(len=litem) :: tstr
     integer :: dt(6)
@@ -4303,9 +4379,9 @@ contains
        endif
        if (is_tweak) then
           call tweak_buffer(ierr, btmp, file%bh, jstk)
-          if (ierr.eq.0) call put_header_lprops(ierr, head, btmp%pcp)
+          if (ierr.eq.0) call put_header_lprops(ierr, head, btmp%pcp, file%hflag)
        else
-          call put_header_lprops(ierr, head, obuffer(jb)%pcp)
+          call put_header_lprops(ierr, head, obuffer(jb)%pcp, file%hflag)
        endif
     endif
     if (ierr.eq.0) then
@@ -4342,9 +4418,9 @@ contains
     endif
     if (ierr.eq.0) then
        if (is_tweak) then
-          call write_file_data(ierr, btmp%vd,        n, head, file)
+          call write_file_data(ierr, btmp%vd,        n, head, file, obuffer(jb)%k)
        else
-          call write_file_data(ierr, obuffer(jb)%vd, n, head, file)
+          call write_file_data(ierr, obuffer(jb)%vd, n, head, file, obuffer(jb)%k)
        endif
        if (ierr.eq.0) file%irec = file%irec + 1
        call message(ierr, 'write_data', levm=-9)
@@ -4427,7 +4503,8 @@ contains
   end subroutine open_write_file
 
 !!!_   . write_file_data
-  subroutine write_file_data(ierr, v, n, head, file)
+  subroutine write_file_data &
+       & (ierr, v, n, head, file, kv)
     use TOUZA_Std,only: is_error_match, KIOFS, get_size_strm, sus_write
     use TOUZA_Nio,only: nio_write_data
     implicit none
@@ -4436,32 +4513,18 @@ contains
     integer,         intent(in)    :: n
     character(len=*),intent(in)    :: head(*)
     type(file_t),    intent(inout) :: file
-    integer j
+    integer,         intent(in)    :: kv
+
     integer,        allocatable,save :: bufi(:)
     real(kind=KFLT),allocatable,save :: buff(:)
     real(kind=KDBL),allocatable,save :: bufd(:)
-    integer(kind=KIOFS) :: jposb, jpose
-    integer usize
     logical swap
-    character(len=lfmt) :: fmt
 
     ierr = 0
     if (ierr.eq.0) then
        select case(file%kfmt)
        case(cfmt_ascii)
-          fmt = file%fmt
-          if (fmt.ne.' ') then
-             if (fmt(1:1).ne.'(') fmt = '(' // trim(fmt) // ')'
-          endif
-          if (fmt.eq.' ') then
-             do j = 0, n - 1
-                write(unit=file%u, fmt=*, IOSTAT=ierr) v(j)
-             enddo
-          else
-             do j = 0, n - 1
-                write(unit=file%u, fmt=fmt, IOSTAT=ierr) v(j)
-             enddo
-          endif
+          call write_file_ascii(ierr, v, n, head, file, kv)
        case(cfmt_binary_i4:cfmt_binary_i4+cfmt_flags_bo-1)
           swap = get_swap_switch(file%kfmt - cfmt_binary_i4)
           if (ierr.eq.0) then
@@ -4514,6 +4577,58 @@ contains
     endif
   end subroutine write_file_data
 
+!!!_   . write_file_ascii
+  subroutine write_file_ascii &
+       & (ierr, v, n, head, file, kv)
+    implicit none
+    integer,         intent(out)   :: ierr
+    real(kind=KBUF), intent(in)    :: v(0:*)
+    integer,         intent(in)    :: n
+    character(len=*),intent(in)    :: head(*)
+    type(file_t),    intent(inout) :: file
+    integer,         intent(in)    :: kv
+    integer j
+    character(len=lfmt) :: fmt
+
+    ierr = 0
+    fmt = file%fmt
+    if (fmt.ne.' ') then
+       if (fmt(1:1).ne.'(') fmt = '(' // trim(fmt) // ')'
+    endif
+    select case(kv)
+    case(kv_int)
+       if (fmt.eq.' ') then
+          do j = 0, n - 1
+             write(unit=file%u, fmt=*, IOSTAT=ierr) int(v(j))
+          enddo
+       else
+          do j = 0, n - 1
+             write(unit=file%u, fmt=fmt, IOSTAT=ierr) int(v(j))
+          enddo
+       endif
+    case(kv_flt)
+       if (fmt.eq.' ') then
+          do j = 0, n - 1
+             write(unit=file%u, fmt=*, IOSTAT=ierr) real(v(j), kind=KFLT)
+          enddo
+       else
+          do j = 0, n - 1
+             write(unit=file%u, fmt=fmt, IOSTAT=ierr) real(v(j), kind=KFLT)
+          enddo
+       endif
+    case(kv_dbl)
+       if (fmt.eq.' ') then
+          do j = 0, n - 1
+             write(unit=file%u, fmt=*, IOSTAT=ierr) real(v(j), kind=KDBL)
+          enddo
+       else
+          do j = 0, n - 1
+             write(unit=file%u, fmt=fmt, IOSTAT=ierr) real(v(j), kind=KDBL)
+          enddo
+       endif
+    end select
+  end subroutine write_file_ascii
+
 !!!_   . parse_format_shape
   subroutine parse_format_shape &
        & (nco, irange, mco, fmt)
@@ -4525,7 +4640,7 @@ contains
     character(len=*),intent(in)  :: fmt
     character(len=*),parameter :: csep = ','
     character(len=*),parameter :: rsep = ':'
-    integer jc, jp, je, jr
+    integer jp, je, jr
     integer k
     integer lf
 
@@ -4646,18 +4761,23 @@ contains
   end function suggest_type
 
 !!!_   . get_header_lprops
-  subroutine get_header_lprops(ierr, lpp, head)
+  subroutine get_header_lprops(ierr, lpp, head, flag)
+    use TOUZA_Std,only: choice
     use TOUZA_Nio,only: get_item, hi_AITM1, hi_AITM2, hi_AITM3
     use TOUZA_Nio,only: get_header_cprop
     implicit none
     integer,         intent(out)   :: ierr
     type(loop_t),    intent(inout) :: lpp(0:*)
     character(len=*),intent(in)    :: head(*)
+    integer,optional,intent(in)    :: flag
 
     integer jc
     integer irange(2, 0:mcoor-1)
+    integer hf
 
     ierr = 0
+    hf = choice(hflag_nulld, flag)
+
     irange = 0
     do jc = 0, mcoor - 1
        call get_header_cprop(lpp(jc)%name, irange(1, jc), head, 1+jc)
@@ -4672,6 +4792,12 @@ contains
           lpp(jc)%end = irange(2, jc)
           lpp(jc)%stp = 1
        endif
+       if (IAND(hf, hflag_nulld).eq.0) then
+          if (lpp(jc)%name.eq.' ' &
+               .and. (lpp(jc)%end - lpp(jc)%bgn).eq.1) then
+             lpp(jc)%stp = 0
+          endif
+       endif
     enddo
     do jc = mcoor, lcoor - 1
        lpp(jc)%name = ' '
@@ -4682,12 +4808,13 @@ contains
   end subroutine get_header_lprops
 
 !!!_   . put_header_lprops
-  subroutine put_header_lprops(ierr, head, lpp)
+  subroutine put_header_lprops(ierr, head, lpp, flag)
     use TOUZA_Nio,only: put_header_cprop
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: head(*)
     type(loop_t),    intent(in)  :: lpp(0:*)
+    integer,         intent(in)  :: flag
 
     integer jc
     integer irange(2)
@@ -4707,6 +4834,13 @@ contains
           ierr = ERR_PANIC
           call message(ierr, 'invalid coordinate ranges ', (/jc/))
           return
+       endif
+       if (IAND(flag, hflag_nulld).eq.0) then
+          if (lpp(jc)%name.eq.' ' &
+               .and.irange(2).eq.0) then
+             if (irange(1).le.0) irange(1) = 1
+             irange(2) = irange(1)
+          endif
        endif
        if (ierr.eq.0) call put_header_cprop(ierr, head, lpp(jc)%name, irange, 1+jc)
     enddo
@@ -5032,7 +5166,7 @@ contains
        brec = irecw
     else if (brec.ge.0) then
        call message &
-            & (ierr, 'record:', (/user_index_bgn(brec)/), &
+            & (ierr, '## record:', (/user_index_bgn(brec)/), &
             &  fmt='(I0)', levm=msglev_normal+1)
        brec = -1
     endif
@@ -5658,7 +5792,9 @@ contains
                 obuffer(jb)%vd(jc - b) = REAL(user_index_bgn(jc), kind=KDBL)
              enddo
           endif
-          obuffer(jb)%desc = trim(opr)
+          obuffer(jb)%ilev  = ilev_term
+          obuffer(jb)%desc  = trim(opr)
+          obuffer(jb)%desc2 = trim(opr)
        enddo
     endif
   end subroutine apply_INDEX
@@ -6052,7 +6188,7 @@ contains
     integer jinp, ninp
     integer jbl,  jbr, hbr
     character(len=64) :: opr
-    integer ilevi, ilevo
+    integer ilevo
     character(len=64) :: istr
     character :: lsep, rsep
 
@@ -6145,11 +6281,7 @@ contains
 
     ierr = 0
 
-    if (present(bufo)) then
-       call tweak_coordinates(ierr, domL, domR, bufh, pstk, nbuf, bufo)
-    else
-       call tweak_coordinates(ierr, domL, domR, bufh, pstk, nbuf)
-    endif
+    if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, bufh, pstk, nbuf, bufo)
     if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, bufh, pstk, nbuf)
     if (ierr.eq.0) then
        nceff = domL%mco
@@ -6200,9 +6332,8 @@ contains
           enddo
        end select
     endif
-    if (ierr.eq.0) then
-       call settle_output_domain(ierr, domL)
-    endif
+    if (ierr.eq.0) call settle_output_domain(ierr, domL)
+
     do j = 0, nbuf - 1
        if (ierr.eq.0) call settle_input_domain(ierr, domR(j), bufh(j), pstk(j), domL)
     enddo
@@ -6212,12 +6343,12 @@ contains
        endif
     endif
 
-    ! if (is_msglev_DEBUG(lev_verbose)) then
-    !    if (ierr.eq.0) call show_domain(ierr, domL, 'compromise/L')
-    !    do j = 0, nbuf - 1
-    !       if (ierr.eq.0) call show_domain(ierr, domR(j), 'compromise/R')
-    !    enddo
-    ! endif
+    if (is_msglev_DEBUG(lev_verbose)) then
+       if (ierr.eq.0) call show_domain(ierr, domL, 'compromise/L')
+       do j = 0, nbuf - 1
+          if (ierr.eq.0) call show_domain(ierr, domR(j), 'compromise/R')
+       enddo
+    endif
   end subroutine get_compromise_domain
 
 !!!_   . tweak_coordinates
@@ -6254,9 +6385,6 @@ contains
           call message(ierr, 'overflow in tweaking ', (/nceff/))
           return
        endif
-       ! write(*, *) nceff
-       ! write(*, *) order
-       ! write(*, *) newc
     endif
     if (ierr.eq.0) then
        domL%mco = nceff
@@ -6499,13 +6627,6 @@ contains
           if (name(jc).eq.' ') name(jc) = bufn(jc)
        enddo
     endif
-    ! do jc = 0, mco - 1
-    !    write(*, *) 'order/result', jc, '[' // trim(pcp(jc)%name) // ']',  &
-    !         & pcp(jc)%stp, lcp(jc)%stp, &
-    !         & ' ', sym(bufo(jc))  // ':', trim(bufn(jc)), &
-    !         & ' >> ', sym(order(jc)) // ':', trim(name(jc))
-    ! enddo
-    ! ierr = 0
   end subroutine order_coordinates
 
 !!!_   . coordinate_flexibility
@@ -6546,14 +6667,11 @@ contains
     integer                 newo(0:mco*2-1)
     character(len=lname) :: newc(0:mco*2-1)
     integer jbufa, jcoa
-    integer jbufb, jcob
-    integer jchk,  nb
-    character(len=lname) :: nchk(0:nbuf-1)
-    integer              :: ochk(0:nbuf-1)
     integer kta
     integer jx
     integer jcrob
     integer jtmp
+    integer jerr
 
     ierr = 0
     nceff = -1
@@ -6598,10 +6716,12 @@ contains
           endif
        enddo
     enddo loop_robust
-    ! call show_order(ierr, newc, newo, mco, tag='match/0')
-    ! do jbufa = 0, nbuf - 1
-    !    call show_order(ierr, nadd(:, jbufa), oadd(:, jbufa), mco, tag='match/0', idx=jbufa)
-    ! enddo
+    if (ierr.ne.0.or.is_msglev_DEBUG(lev_verbose)) then
+       call show_order(jerr, newc, newo, mco, tag='robust')
+       do jbufa = 0, nbuf - 1
+          call show_order(jerr, nadd(:, jbufa), oadd(:, jbufa), mco, tag='robust', idx=jbufa)
+       enddo
+    endif
 !!!_    * assign fragile and wild-card coordinates (twice)
     if (ierr.eq.0) then
        loop_wild: do jtmp = 0, 1
@@ -6633,67 +6753,23 @@ contains
              enddo
           enddo
        enddo loop_wild
+       if (ierr.ne.0.or.is_msglev_DEBUG(lev_verbose)) then
+          call show_order(jerr, newc, newo, mco, tag='wild')
+          do jbufa = 0, nbuf - 1
+             call show_order(jerr, nadd(:, jbufa), oadd(:, jbufa), mco, tag='wild', idx=jbufa)
+          enddo
+       endif
     endif
-    ! call show_order(ierr, newc, newo, mco, tag='match/1')
-    ! do jbufa = 0, nbuf - 1
-    !    call show_order(ierr, nadd(:, jbufa), oadd(:, jbufa), mco, tag='match/1', idx=jbufa)
-    ! enddo
 !!!_    * adjust fragiles
     if (ierr.eq.0) then
-       nchk(0:nbuf-1) = ' '
-       jcrob = find_first_range(newo(0:limtry-1), high=-1)
-       loop_fragile: do jcoa = 0, mco - 1
-          jchk = 0
+       call topological_ordering &
+            & (ierr, newc, newo, limtry, nadd, oadd, mco, nbuf)
+       if (ierr.ne.0.or.is_msglev_DEBUG(lev_verbose)) then
+          call show_order(jerr, newc, newo, mco, tag='fragile')
           do jbufa = 0, nbuf - 1
-             if (oadd(jcoa, jbufa).eq.co_float) then
-                jx = find_first(newc(0:limtry-1), nadd(jcoa, jbufa), offset=0)
-                if (jx.ge.0) then
-                   oadd(jcoa, jbufa) = jx
-                   cycle
-                endif
-                jx = find_first(nchk(0:jchk-1), nadd(jcoa, jbufa), offset=0)
-                if (jx.lt.0) then
-                   jx = jchk
-                   jchk = jchk + 1
-                   nchk(jx) = nadd(jcoa, jbufa)
-                   ochk(jx) = jcoa
-                endif
-                do jbufb = 0, nbuf - 1
-                   do jcob = jcoa, mco - 1
-                      if (nadd(jcob, jbufb).eq.nchk(jx)) then
-                         ochk(jx) = max(jcob, ochk(jx))
-                         exit
-                      endif
-                   enddo
-                enddo
-             endif
+             call show_order(jerr, nadd(:, jbufa), oadd(:, jbufa), mco, tag='fragile', idx=jbufa)
           enddo
-          if (jchk.gt.0) then
-             jtmp = -1
-             nb = HUGE(0)
-             do jx = 0, jchk - 1
-                if (nb.eq.ochk(jx)) then
-                   jtmp = -1
-                   exit
-                else if (ochk(jx).lt.nb) then
-                   nb = ochk(jx)
-                   jtmp = jx
-                endif
-             enddo
-             if (jtmp.lt.0) then
-                ierr = ERR_INVALID_PARAMETER
-                call message(ierr, 'ambiguous fragile coordinates at ', (/jcoa/))
-                do jx = 0, jchk - 1
-                   call message(ierr, 'coordinate ' // trim(nchk(jx)))
-                enddo
-                exit loop_fragile
-             else
-                newc(jcrob) = nchk(jtmp)
-                newo(jcrob) = jcrob
-                jcrob = find_first_range(newo(jcrob+1:limtry-1), high=-1, offset=jcrob+1)
-             endif
-          endif
-       enddo loop_fragile
+       endif
     endif
 !!!_    * final
     if (ierr.eq.0) then
@@ -6705,20 +6781,218 @@ contains
              endif
           enddo
        enddo
-    endif
-    if (ierr.eq.0) then
        nceff = find_first_range(newo(0:limtry-1), low=0, offset=0, back=.TRUE.) + 1
        order(0:nceff) = newo(0:nceff)
        name(0:nceff) = newc(0:nceff)
+       if (is_msglev_DEBUG(lev_verbose)) then
+          call show_order(jerr, newc, newo, nceff, tag='match')
+          do jbufa = 0, nbuf - 1
+             call show_order(jerr, nadd(:, jbufa), oadd(:, jbufa), mco, tag='match', idx=jbufa)
+          enddo
+       endif
     endif
 
-    ! if (ierr.ne.0.or.is_msglev_DEBUG(lev_verbose)) then
-    !    do jbufa = 0, nbuf - 1
-    !       call diag_order(jerr, nadd(:, jbufa), oadd(:, jbufa), mco, tag='debug', idx=jbufa)
-    !    enddo
-    !    call diag_order(jerr, newc, newo, nceff, tag='debug')
-    ! endif
   end subroutine match_coordinates
+
+!!!_   . topological_ordering
+  subroutine topological_ordering &
+       & (ierr, newc, newo, lco, nadd, oadd, mco, nbuf)
+    use TOUZA_Std,only: find_first
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(inout) :: newc(0:*)
+    integer,         intent(inout) :: newo(0:*)
+    integer,         intent(in)    :: lco
+    integer,         intent(in)    :: mco, nbuf
+    character(len=*),intent(inout) :: nadd(0:mco-1, 0:*)
+    integer,         intent(in)    :: oadd(0:mco-1, 0:*)
+
+    character(len=lname) :: ctmp
+    character(len=lname) :: cbuf(0:lco-1)
+    integer nin(0:lco-1)
+    integer cout(0:lco-1, 0:lco-1)
+    integer nlevl(0:lco-1), nlevh(0:lco-1)
+
+    integer jc, nc
+    integer jb, jp, jt, jp2
+    integer jdest, jdiv, jtgt
+    integer jsafe
+    logical nflag
+    character(len=*),parameter :: fmt_wild='(1x, ''$$'', I0)'
+
+    ierr = 0
+
+    cout(:, :) = -1
+    nc = 0
+    cbuf(:) = ' '
+    nlevl(:) = -1
+    nlevh(:) = -1
+    co_scan: do jb = 0, nbuf - 1
+       nflag = .TRUE.
+       do jc = 0, mco - 1
+          ctmp = nadd(jc, jb)
+          if (ctmp.eq.' '.and. oadd(jc, jb).ge.0) then
+             write(ctmp, fmt_wild) jc
+             nadd(jc, jb) = ctmp
+          endif
+          if (ctmp.eq.' ') cycle
+          jp = find_first(cbuf(0:nc-1), ctmp, offset=0)
+          if (jp.lt.0) then
+             jp = nc
+             nc = nc + 1
+             if (nc.ge.lco) exit co_scan
+             cbuf(jp) = ctmp
+          endif
+          nlevh(jp) = max(jc, nlevh(jp))
+          if (nflag) nlevl(jp) = max(jc, nlevl(jp))
+          nflag = .FALSE.
+       enddo
+    enddo co_scan
+    ! set tree
+    if (nc.lt.lco) then
+       do jb = 0, nbuf - 1
+          do jc = 0, mco - 1
+             jdest = oadd(jc, jb)
+             ! ctmp = nadd(jc, jb)
+             ! if (ctmp.eq.' '.and. oadd(jc, jb).ge.0) then
+             !    write(ctmp, fmt_wild), jc
+             ! endif
+             if (nadd(jc, jb).eq.' ') cycle
+             if (jdest.eq.co_float) then
+                jp = find_first(cbuf(0:nc-1), nadd(jc, jb), offset=0)
+                do jt = jc + 1, mco - 1
+                   if (oadd(jt, jb).eq.co_float) then
+                      jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
+                      cout(jp2, jp) = 1
+                      exit
+                   endif
+                enddo
+             else if (jdest.ge.0) then
+                jdiv = jdest + 1
+                if (jdest.le.jc) jdiv = jdiv - 1
+                jp = find_first(cbuf(0:nc-1), nadd(jc, jb), offset=0)
+                jt = -1
+                do jtgt = jdest + 1, mco - 1
+                   jt = find_first(oadd(0:mco-1, jb), jtgt, offset=0)
+                   if (jt.ge.0) then
+                      jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
+                      if (jp2.ge.0) cout(jp2, jp) = 1
+                      exit
+                   endif
+                enddo
+                if (jt.lt.0) then
+                   do jt = jdiv, mco - 1
+                      if (oadd(jt, jb).eq.co_float) then
+                         jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
+                         if (jp2.ge.0) cout(jp2, jp) = 1
+                         exit
+                      endif
+                   enddo
+                endif
+                jt = -1
+                do jtgt = jdest - 1, 0, -1
+                   jt = find_first(oadd(0:mco-1, jb), jtgt, offset=0)
+                   if (jt.ge.0) then
+                      jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
+                      if (jp2.ge.0) cout(jp, jp2) = 1
+                      exit
+                   endif
+                enddo
+                ! if (jdest.gt.0) then
+                !    jt = find_first(oadd(0:mco-1, jb), jdest - 1, offset=0)
+                ! else
+                !    jt = -1
+                ! endif
+                ! if (jt.ge.0) then
+                !    jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
+                !    if (jp2.ge.0) cout(jp, jp2) = 1
+                ! else
+                if (jt.lt.0) then
+                   do jt = jdiv - 1, 0, -1
+                      if (oadd(jt, jb).eq.co_float) then
+                         jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
+                         if (jp2.ge.0) cout(jp, jp2) = 1
+                         exit
+                      endif
+                   enddo
+                endif
+             endif
+          enddo
+       enddo
+       ! ! adjust natural ordering
+       do jp = 0, nc - 1
+          if (nlevl(jp).ge.0) then
+             do jp2 = 0, nc - 1
+                if (nlevh(jp2).lt.nlevl(jp)) cout(jp, jp2) = 1
+             enddo
+          endif
+       enddo
+       do jp = 0, nc - 1
+          nin(jp) = count(cout(jp, 0:nc-1).ge.0)
+       enddo
+       ! do jp = 0, nc - 1
+       !    write(*, *) 'topo:', trim(cbuf(jp)), nlevl(jp), nlevh(jp), ' / ', nin(jp), ' ', cout(0:nc-1, jp)
+       ! enddo
+    endif
+    ! sort
+    jc = 0
+    if (nc.ge.lco) then
+       ierr = ERR_INSUFFICIENT_BUFFER
+       call message(ierr, 'overflow to match fragile coordinates')
+       return
+    else
+       jsafe = 0
+       sort: do
+          if (COUNT(nin(0:nc-1).eq.0).gt.1) then
+             ierr = ERR_INVALID_PARAMETER
+             call message(ierr, 'ambiguous fragile coordinates')
+             return
+          endif
+          jp = find_first(nin(0:nc-1), 0, offset=0)
+          if (jp.lt.0) exit sort
+          ! write(*, *) trim(cbuf(jp)), nlevl(jp), nlevh(jp)
+          jt = find_first(newc(jc:lco-1), cbuf(jp), offset=jc)
+          if (jt.ge.jc) jc = jt
+          newo(jc) = jc
+          newc(jc) = cbuf(jp)
+          jc = jc + 1
+          nin(jp) = -1
+          do jt = 0, nc - 1
+             if (cout(jt, jp).gt.0) then
+                nin(jt) = max(0, nin(jt) - 1)
+             endif
+          enddo
+          jsafe = jsafe + 1
+          ! safety guard
+          if (jsafe.gt.nc * nc * 2) then
+             ierr = ERR_PANIC
+             exit
+          endif
+       enddo sort
+       if (ierr.ne.0) then
+          call message(ierr, 'PANIC in topological_ordering')
+          return
+       endif
+       if (jc.lt.nc) then
+          ierr = ERR_INVALID_PARAMETER
+          call message(ierr, 'cycle in fragile coordinates')
+          return
+       endif
+    endif
+    if (ierr.eq.0) then
+       ! revert wildcard
+       do jc = 0, lco - 1
+          if (newc(jc)(1:1).eq.' '.and.newc(jc).ne.' ') newc(jc) = ' '
+       enddo
+       do jb = 0, nbuf - 1
+          do jc = 0, mco - 1
+             if (nadd(jc,jb)(1:1).eq.' '.and.nadd(jc,jb).ne.' ') nadd(jc,jb) = ' '
+          enddo
+       enddo
+    endif
+
+  end subroutine topological_ordering
+
 
 !!!_   . set_inclusive_domain
   subroutine set_inclusive_domain &
@@ -6752,17 +7026,16 @@ contains
              jb = buf_h2item(bufh(j))
              jc = domR(j)%cidx(jo)
              js = pstk(j)
+             call set_logical_range(b, e, jo, bstack(js)%lcp, domR(j))
              if (jc.ge.0) then
-                b = bstack(js)%lcp(jo)%bgn
-                e = bstack(js)%lcp(jo)%end
                 if (obuffer(jb)%pcp(jc)%stp.gt.0) then
                    if (b.eq.null_range) b = obuffer(jb)%pcp(jc)%bgn
                    if (e.eq.null_range) e = obuffer(jb)%pcp(jc)%end
                 endif
-                if (b.ne.null_range) low = min(low, b)
-                if (e.ne.null_range) high = max(high, e)
                 stp = max(stp, obuffer(jb)%pcp(jc)%stp)
              endif
+             if (b.ne.null_range) low = min(low, b)
+             if (e.ne.null_range) high = max(high, e)
           enddo
           if (low.eq.lini) low = 0
           if (high.eq.hini) high = low + max(0, stp)
@@ -6812,8 +7085,7 @@ contains
     integer,       intent(in)    :: jstk
     type(domain_t),intent(in)    :: ref
 
-    integer jo,  jc
-    integer low, high
+    integer jo
     integer b,   e
     integer jb
 
@@ -6821,17 +7093,7 @@ contains
     jb = buf_h2item(hbuf)
 
     do jo = 0, ref%mco - 1
-       low  = ref%bgn(jo)
-       high = ref%end(jo)
-
-       jc = dom%cidx(jo)
-       if (jc.ge.0) then
-          b = logical_index(bstack(jstk)%lcp(jo)%bgn, low)
-          e = logical_index(bstack(jstk)%lcp(jo)%end, high)
-       else
-          b = low
-          e = high
-       endif
+       call set_logical_range(b, e, jo, bstack(jstk)%lcp, dom, ref)
        dom%bgn(jo) = b
        dom%end(jo) = max(e, 1+b)
        dom%iter(jo) = max(1, e - b)
@@ -6840,34 +7102,72 @@ contains
        call settle_domain_stride(ierr, dom, obuffer(jb)%pcp)
     endif
     if (ierr.eq.0) then
-       call settle_domain_loop_h(ierr, dom, hbuf, ref, ref%mco)
+       call settle_domain_loop_h(ierr, dom, hbuf, ref)
     endif
 
   end subroutine settle_input_domain
 
+!!!_   . set_logical_range
+  subroutine set_logical_range &
+       & (b, e, jodr, lcp, dom, ref)
+    integer,       intent(out)         :: b, e
+    integer,       intent(in)          :: jodr
+    type(loop_t),  intent(in)          :: lcp(0:*)
+    type(domain_t),intent(in)          :: dom
+    type(domain_t),intent(in),optional :: ref
+
+    integer low, high
+    integer jc
+
+    if (present(ref)) then
+       low  = ref%bgn(jodr)
+       high = ref%end(jodr)
+    else
+       low = null_range
+       high = null_range
+    endif
+
+    jc = dom%cidx(jodr)
+
+    if (jc.ge.0) then
+       if (lcp(jodr)%name.ne.' ') then
+          b = logical_index(lcp(jodr)%bgn, low)
+          e = logical_index(lcp(jodr)%end, high)
+       else if (jodr.ne.jc &
+            & .and. lcp(jc)%name.ne.' ') then
+          b = logical_index(null_range, low)
+          e = logical_index(null_range, high)
+       else
+          b = logical_index(lcp(jc)%bgn, low)
+          e = logical_index(lcp(jc)%end, high)
+       endif
+    else
+       b = low
+       e = high
+    endif
+
+  end subroutine set_logical_range
 !!!_   . settle_domain_loop_h
-  subroutine settle_domain_loop_h(ierr, dom, handle, refd, maxco)
+  subroutine settle_domain_loop_h(ierr, dom, handle, refd)
     implicit none
-    integer,       intent(out)         :: ierr
-    type(domain_t),intent(inout)       :: dom
-    integer,       intent(in)          :: handle
-    type(domain_t),intent(in)          :: refd
-    integer,       intent(in),optional :: maxco
+    integer,       intent(out)   :: ierr
+    type(domain_t),intent(inout) :: dom
+    integer,       intent(in)    :: handle
+    type(domain_t),intent(in)    :: refd
     integer jb
     jb = buf_h2item(handle)
     ierr = min(0, jb)
-    if (ierr.eq.0) call settle_domain_loop(ierr, dom, obuffer(jb), refd, maxco)
+    if (ierr.eq.0) call settle_domain_loop(ierr, dom, obuffer(jb), refd)
     return
   end subroutine settle_domain_loop_h
 !!!_   . settle_domain_loop
-  subroutine settle_domain_loop(ierr, dom, buf, refd, maxco)
+  subroutine settle_domain_loop(ierr, dom, buf, refd)
     use TOUZA_std,only: choice
     implicit none
-    integer,       intent(out)         :: ierr
-    type(domain_t),intent(inout)       :: dom
-    type(buffer_t),intent(in)          :: buf
-    type(domain_t),intent(in)          :: refd
-    integer,       intent(in),optional :: maxco
+    integer,       intent(out)   :: ierr
+    type(domain_t),intent(inout) :: dom
+    type(buffer_t),intent(in)    :: buf
+    type(domain_t),intent(in)    :: refd
     integer jc, kc
 
     ierr = 0

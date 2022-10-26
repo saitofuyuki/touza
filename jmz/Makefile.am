@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2022/10/23 10:41:43 fuyuki Makefile.am>
+# Time-stamp: <2022/10/25 18:37:06 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -18,7 +18,7 @@ LDADD = $(TOUZA_LIBS) libjmz_local.la
 bin_PROGRAMS = chak jmzconv jmzcmp
 bin_SCRIPTS = jmzdepf90
 noinst_PROGRAMS = jmzex
-noinst_SCRIPTS = genx.sh genx2.sh
+noinst_SCRIPTS = demo-chak.sh
 
 noinst_LTLIBRARIES	=	libjmz_local.la
 
@@ -45,15 +45,23 @@ jmzdepf90: jmzdepf90.sh.in
 	sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@
 	chmod +x $@
 
-genx.sh: genx.sh.in
+demo-chak.sh: demo-chak.sh.in
 	sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@
 	chmod +x $@
+
+genx.sh: genx.sh.in
+	if test -e $<; then \
+		sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@; \
+		chmod +x $@; \
+	fi
 
 genx2.sh: genx2.sh.in
-	sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@
-	chmod +x $@
+	if test -e $<; then \
+		sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@; \
+		chmod +x $@; \
+	fi
 
-EXTRA_DIST = jmzdepf90.sh.in genx.sh.in genx2.sh.in $(chak_to_include)
+EXTRA_DIST = jmzdepf90.sh.in demo-chak.sh.in $(chak_to_include)
 
 MOSTLYCLEANFILES =
 CLEANFILES = $(bin_SCRIPTS) $(noinst_SCRIPTS)

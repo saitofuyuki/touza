@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz swiss(CH) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2022/10/24 12:24:05 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/24 18:23:05 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -2063,9 +2063,9 @@ contains
     real(kind=KBUF),intent(in) :: X
     real(kind=KBUF),intent(in) :: F
     if (X.eq.F) then
-       Z = TRUE
-    else
        Z = FALSE
+    else
+       Z = TRUE
     endif
   end function elem_BIN
 
