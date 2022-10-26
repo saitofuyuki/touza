@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/26 08:20:10 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/26 11:59:31 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -237,8 +237,8 @@ program chak
   integer lev_verbose, dbgv, stdv
 
   character(len=lfmt),save :: afmt_int = '(I0)'
-  character(len=lfmt),save :: afmt_flt = '(es0.12)'
-  character(len=lfmt),save :: afmt_dbl = '(es0.12)'
+  character(len=lfmt),save :: afmt_flt = '(es16.12)'
+  character(len=lfmt),save :: afmt_dbl = '(es16.12)'
 !!!_  - coordinate matching
   integer,parameter :: co_unset = -4
   integer,parameter :: co_null  = -3
@@ -324,15 +324,21 @@ contains
   end subroutine init
 !!!_    * init_sub
   subroutine init_sub(ierr)
+    ! use TOUZA_Std,only: ndigits
     implicit none
     integer,intent(out)         :: ierr
-    integer p
+    integer p, r
+    real(kind=KDBL),parameter :: ZD = 0.0_KDBL
+    real(kind=KFLT),parameter :: ZF = 0.0_KFLT
+
     ierr = 0
-101 format('(es0.', I0, ')')
-    p = PRECISION(REAL(0, kind=KDBL))
-    write(afmt_dbl, 101) p
-    p = PRECISION(REAL(0, kind=KFLT))
-    write(afmt_flt, 101) p
+101 format('(es', I0, '.', I0, ')')
+    p = PRECISION(ZD)
+    r = 2
+    write(afmt_dbl, 101) p+5+r, p
+    p = PRECISION(ZF)
+    r = 2
+    write(afmt_flt, 101) p+5+r, p
     return
   end subroutine init_sub
 
