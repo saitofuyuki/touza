@@ -1,14 +1,21 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2022/10/24 14:31:31 fuyuki NEWS>
+# Time-stamp: <2022/10/26 09:50:12 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
+* Changes in 1.05.3 from 1.05.2
+  * (chak) Improve automatic coordinate matching
+  * (chak) -N flag introduced to controll null-coordinate parsing
+  * (chak) some bug fixes.
+
 * Changes in 1.05.2 from 1.05.1
 - (chak) [CRITICAL] modify default MISS to follow the legacy magic number
 - (chak) ascii/binary input/output hacked
+- (chak) header editing improved
+- (div) exclude div subdirectory to build for release
 
 * Changes in 1.05.1 from 1.03.0
 - various bug fix in jmz/chak alpha
