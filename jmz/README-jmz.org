@@ -113,7 +113,7 @@ Note i: chak operators are case DEPENDENT.
 Note ii: the order of chak arguments is important.  Changing the
 argument order may cause undesired results.
 
-| gtool                                       | chak                                                 |
+| gtool-3.5 commands                          | chak commands                                        |
 |---------------------------------------------+------------------------------------------------------|
 | gtadd a b out:c                             | chak a b ADD = c                                     |
 | gtadd a b                                   | chak a b ADD = gtool.out                             |
@@ -140,6 +140,7 @@ argument order may cause undesired results.
 |---------------------------------------------+------------------------------------------------------|
 | gtlog a                                     | chak a LOG = gtool.out                               |
 | gtsqrt a                                    | chak a SQRT = gtool.out                              |
+| gtcos a                                     | chak a D2R COS = gtool.out                           |
 | gtcos a deg=F                               | chak a COS = gtool.out                               |
 | gtsin a deg=F                               | chak a SIN = gtool.out                               |
 | gttan a deg=F                               | chak a TAN = gtool.out                               |
@@ -152,21 +153,26 @@ Default coordinate (or range, dimension, etc) counting follows python
 style: the beginning is counted from 0, and the ending is not included.
 You can change this behaviour with global -F option, to follow FORTRAN style.
 
-: % ./chak a         # count from 0
-: record: 0
-:   read:F0 ggg T = 0 DATE = -1/-1/-1 **:**:**
-: record: 1
-:   read:F0 ggg T = 1 DATE = -1/-1/-1 **:**:**
-: record: 2
-:   read:F0 ggg T = 2 DATE = -1/-1/-1 **:**:**
+: % chak demo/base POP   # default, count from 0
+: ## record: 0
+:   read:F0 bs T = 100 DATE = 1973/1/30 00:00:00
+: ## record: 1
+:   read:F0 bs T = 101 DATE = 1973/1/30 01:00:00
+: ## record: 2
+:   read:F0 bs T = 102 DATE = 1973/1/30 02:00:00
+: :
 
-: % ./chak -F a      # count from 1
-: record: 1
-:   read:F1 ggg T = 0 DATE = -1/-1/-1 **:**:**
-: record: 2
-:   read:F1 ggg T = 1 DATE = -1/-1/-1 **:**:**
-: record: 3
-:   read:F1 ggg T = 2 DATE = -1/-1/-1 **:**:**
+: % chak -F demo/base POP   # count from 1
+: ## record: 1
+:   read:F1 bs T = 100 DATE = 1973/1/30 00:00:00
+: ## record: 2
+:   read:F1 bs T = 101 DATE = 1973/1/30 01:00:00
+: ## record: 3
+:   read:F1 bs T = 102 DATE = 1973/1/30 02:00:00
+: :
+
+As shown above, record counting and file tag index (=F0= or =F1=) are
+affected.
 
 **** Add two gtool files
 : % chak a b ADD = x       # write a+b on new file x, which must not exist.
@@ -180,8 +186,8 @@ You can change this behaviour with global -F option, to follow FORTRAN style.
 : % chak a 10.0 ADD = x       # x = a + 10.0
 : % chak 20.0 b SUB = x       # x = 20.0 - b
 **** Multiple operations at once
-: % chak a 100 MUL 10 ADD = x   # x = a * 100 + 10
-: % chak a b c ADD MUL    = x   # x = a * (b + c)
+: % chak a 100. MUL 10. ADD = x   # x = a * 100. + 10.
+: % chak a b c ADD MUL      = x   # x = a * (b + c)
 
 The latter example is somewhat confusing for those who are not
 familiar with the reverse Polish notation.  It can be decomposed step
@@ -208,7 +214,7 @@ You can use ':=' instead of '=' to keep the top stack at write:
 **** Stack manipulation
 Operator DUP duplicates the top stack:
 
-: chak a DUP b ADD MUL = x         #  x = (a + b) * a
+: chak a DUP b ADD MUL = x         #  x = a * (a + b)
 
 Operator EXCH exchanges the top two stacks:
 
@@ -233,22 +239,22 @@ after equal).
 : % chak a b MIN = x      # x = min(a,b)
 : % chak a b MAX = x      # x = max(a,b)
 **** Conditional operators
-: % chak a 20 EQ  = x      # (normal) set x = 1, 0, MISS where a == 20, not, MISS.
-: % chak a 20 GTF = x      # (filter) set x = 20, MISS where a > 20, otherwise
-: % chak a 20 LEB = x      # (binary) set x = 1, 0 where a <= 20, otherwise
+: % chak a 20. EQ  = x      # (normal) set x = 1, 0, MISS where a == 20., not, MISS.
+: % chak a 20. GTF = x      # (filter) set x = 20.f, MISS where a > 20., otherwise
+: % chak a 20. LEB = x      # (binary) set x = 1, 0 where a <= 20., otherwise
 **** logical operators
 : % chak a b OR  = x       # a if defined, b if defined, else MISS
 : % chak a b ROR = x       # b if defined, a if defined, else MISS
 : % chak a b AND = x       # b if both defined, else MISS
 : % chak a b MASK = x      # a if both defined, else MISS
 
-: % chak a b 10 NEF MASK = x    # extract a where b != 10
+: % chak a b 10. NEF MASK = x    # extract a where b != 10.
 
 **** flushing to stdout
 Omitting the file after equal symbol emits the top stack on terminal.
 
-: % chak a =                       # ascii output of file a
-: % chak a NEG b ADD 10 DIV SQRT = # ascii output of sqrt((-a+b)/10)
+: % chak a =                        # ascii output of file a
+: % chak a NEG b ADD 10. DIV SQRT = # ascii output of sqrt((-a+b)/10.)
 
 A special operator FLUSH emits all the stack on terminal, and pop them:
 
@@ -259,29 +265,45 @@ A special operator FLUSH emits all the stack on terminal, and pop them:
 
 As commented above, indexing follows python style by default.
 
-: % ./chak a FLUSH   # record, stack, coordinate counts from 0
-: record: 0
-:   read:F0 aa T = 0 DATE = -1/-1/-1 **:**:**
-: # stack[0] aa
-: #   [xx,0:2 yy,0:3 -] > [:]
-: 0 0 _
-: 1 0  0.110000000E+02
-: 0 1 _
-: 1 1  0.110000000E+02
-: 0 2 _
-: 1 2  0.110000000E+02
+: % chak demo/base FLUSH    # record, stack, coordinate count from 0
+: ## record: 0
+:   read:F0 bs T = 100 DATE = 1973/1/30 00:00:00
+: # stack[0] bs
+: #   [lon,0:8 lat,0:4 lev,0:3] > [:]
+: 0 0 0  0.000000E+00
+: 1 0 0  1.000000E+00
+: 2 0 0  2.000000E+00
+: 3 0 0  3.000000E+00
+: :
+: ## record: 1
+:   read:F0 bs T = 101 DATE = 1973/1/30 01:00:00
+: # stack[0] bs
+: #   [lon,0:8 lat,0:4 lev,0:3] > [:]
+: 0 0 0  1.000000E+03
+: 1 0 0  1.001000E+03
+: 2 0 0  1.002000E+03
+: 3 0 0  1.003000E+03
+: :
 
-: % ./chak -F a FLUSH   # record, stack, coordinate counts from 1
-: record: 1
-:   read:F1 aa T = 0 DATE = -1/-1/-1 **:**:**
-: # stack[1] aa
-: #   [xx,1:2 yy,1:3 -] > [:]
-: 1 1 _
-: 2 1  0.110000000E+02
-: 1 2 _
-: 2 2  0.110000000E+02
-: 1 3 _
-: 2 3  0.110000000E+02
+: % chak -F demo/base FLUSH    # record, stack, coordinate count from 1
+: ## record: 1
+:   read:F1 bs T = 100 DATE = 1973/1/30 00:00:00
+: # stack[1] bs
+: #   [lon,1:8 lat,1:4 lev,1:3] > [:]
+: 1 1 1  0.000000E+00
+: 2 1 1  1.000000E+00
+: 3 1 1  2.000000E+00
+: 4 1 1  3.000000E+00
+: :
+: ## record: 2
+:   read:F1 bs T = 101 DATE = 1973/1/30 01:00:00
+: # stack[1] bs
+: #   [lon,1:8 lat,1:4 lev,1:3] > [:]
+: 1 1 1  1.000000E+03
+: 2 1 1  1.001000E+03
+: 3 1 1  1.002000E+03
+: 4 1 1  1.003000E+03
+: :
 
 *** Terminology
 **** queue, stack, buffer
@@ -436,25 +458,31 @@ In order to avoid unexpected behavior, at least decimal point must be
 added for normal mathematics operations, or truncate to integer by INT
 operator.
 
-: % chak 1 =        # treated as integer
+: % chak -qq 1 =        # treated as integer
 : 1
-: % chak 1. =      # treated as floating-point number
-:  0.100000000E+01
+: % chak -qq 1. =      # treated as floating-point number
+:  1.000000000000000E+00
 
-: % chak 1 2 DIV 2 MUL =
+: % chak -qq 1 2 DIV 2 MUL =
 : 1
-: % chak 1 2. DIV 2 MUL =
-:  0.100000000E+01
-: % chak 1 2 DIV INT 2 MUL =
+: % chak -qq 1 2. DIV 2 MUL =
+:  1.000000000000000E+00
+: % chak -qq 1 2 DIV INT 2 MUL =
 : 0
 
 Some numbers are prepared with special symbols.
-| symbols |           value | definition     |
-|---------+-----------------+----------------|
-| PI      |      3.14159265 | ATAN2(0,-1.D0) |
-| E       |      2.71828183 | EXP(1.D0)      |
-| HUGE    | 1.79769313E+308 | HUGE(0.D0)     |
-| TINY    | 2.22507386E-308 | TINY(0.D0)     |
+| symbols | definition     |
+|---------+----------------|
+| PI      | ATAN2(0,-1.D0) |
+| E       | EXP(1.D0)      |
+| TINY    | TINY(0.D0)     |
+| HUGE    | HUGE(0.D0)     |
+
+: % chak -qq PI E TINY HUGE FLUSH
+:  3.141592653589793E+00
+:  2.718281828459045E+00
+:  2.225073858507201-308
+:  1.797693134862316+308
 
 *** input-file formats
 **** gtool-3.5 format (default)
@@ -785,90 +813,129 @@ Operators X, Y, Z are alias of the three, ignoring the style.
 *WARNING: spatial averaging is NOT IMPLEMENTED.*
 Only cutting and spreading can be executed.
 
+The following is an example source file, whose shape is {8}.
+: % chak T=3 demo/yz.base INT =     # T=3 and INT operator are merely to get simple result
+: ## record: 0
+:   read:F0 yz:bs T = 100 DATE = 1973/1/30 00:00:00
+: # stack[0] yz:bs INT
+: #   [lon,0:8] > [:]
+: 0 115
+: 1 116
+: 2 117
+: 3 118
+: 4 119
+: 5 120
+: 6 121
+: 7 122
+
 Subregion can be specified with Cn=[LOW]:[HIGH] argument:
+: % chak T=3 demo/yz.base INT X=2:5 =
+: ## record: 0
+:   read:F0 yz:bs T = 100 DATE = 1973/1/30 00:00:00
+: # stack[0] yz:bs INT
+: #   [lon,0:8] > [2:5]
+: 2 117
+: 3 118
+: 4 119
 
-: % chak ex2/aa =
-: # stack[0] aa
-: #   [lon,0:8 - -] > [:]
-: 0  0.000000000E+00
-: 1  0.100000000E+01
-: 2  0.200000000E+01
-: 3  0.300000000E+01
-: 4  0.400000000E+01
-: 5  0.500000000E+01
-: 6  0.600000000E+01
-: 7  0.700000000E+01
-
-: % chak ex2/aa X=2:5 =
-: # stack[0] aa
-: #   [lon,0:8 - -] > [2:5]
-: 2  0.200000000E+01
-: 3  0.300000000E+01
-: 4  0.400000000E+01
-
-: % chak -F ex2/aa X=2:5 =    # with FORTRAN style counting
-: # stack[1] aa
-: #   [lon,1:8 - -] > [2:5]
-: 2  0.100000000E+01
-: 3  0.200000000E+01
-: 4  0.300000000E+01
-: 5  0.400000000E+01
+: % chak -F T=4 demo/yz.base X=3:5 INT =  # with FORTRAN style counting
+: ## record: 1
+:   read:F1 yz:bs T = 100 DATE = 1973/1/30 00:00:00
+: # stack[1] yz:bs INT
+: #   [lon,1:8] > [3:5]
+: 3 117
+: 4 118
+: 5 119
 
 Outside of the source domain is filled with missing value.
-: % chak  ex2/aa X=4:10 =
-: # stack[0] aa
-: #   [lon,0:8 - -] > [4:10]
-: 4  0.400000000E+01
-: 5  0.500000000E+01
-: 6  0.600000000E+01
-: 7  0.700000000E+01
+: chak T=3 demo/yz.base INT X=6:10 =
+: ## record: 0
+:   read:F0 yz:bs T = 100 DATE = 1973/1/30 00:00:00
+: # stack[0] yz:bs INT
+: #   [lon,0:8] > [6:10]
+: 6 121
+: 7 122
 : 8 .
 : 9 .
 
 Coordinate permutation can be also specified.
-: % chak ex2/dd Y=lon FLUSH -i
-: ## 0 {F0} [lon,0:8 lat,0:4 -] > [: lon,:] dd
-: #lat lon {F0}
-: 0 0  0.000000000E+00
-: 1 0  0.000000000E+00
-: 2 0  0.000000000E+00
-: 3 0  0.000000000E+00
-: 0 1  0.100000000E+01
-: 1 1  0.100000000E+01
-: 2 1  0.100000000E+01
-: 3 1  0.100000000E+01
-: :
-A basic of coordinate permutation of chak is to rotate between source
-and destination coordinates.  In the above example, lon and lat order
-is exchanged.  If Z=lon is specified, coordinate is rotated as follows:
-: % chak ex2/dd Z=lon FLUSH -i
-: ## 0 {F0} [lon,0:8 lat,0:4 -] > [: : lon,:] dd
-: #lat - lon {F0}
-: 0 0 0  0.000000000E+00
-: 1 0 0  0.000000000E+00
-: 2 0 0  0.000000000E+00
-: 3 0 0  0.000000000E+00
-: 0 0 1  0.100000000E+01
+: % chak T=3 demo/x.base INT =
+: ## record: 0
+:   read:F0 x:bs T = 100 DATE = 1973/1/30 00:00:00
+: # stack[0] x:bs INT
+: #   [lat,0:4 lev,0:3] > [:]
+: 0 0 3
+: 1 0 13
+: 2 0 23
+: 3 0 33
+: 0 1 103
+: 1 1 113
+: 2 1 123
+: 3 1 133
+: 0 2 203
+: 1 2 213
+: 2 2 223
+: 3 2 233
 
-At the moment, to insert blank coordinate at beginning needs two
+: % chak T=3 demo/x.base INT X=lev =
+: ## record: 0
+:   read:F0 x:bs T = 100 DATE = 1973/1/30 00:00:00
+: # stack[0] x:bs INT
+: #   [lat,0:4 lev,0:3] > [lev,:]
+: 0 0 3
+: 1 0 103
+: 2 0 203
+: 0 1 13
+: 1 1 113
+: 2 1 213
+: 0 2 23
+: 1 2 123
+: 2 2 223
+: 0 3 33
+: 1 3 133
+: 2 3 233
+
+A basic of coordinate permutation of chak is to rotate between source
+and destination coordinates.  In the above example, =lat= and =lev= order
+is exchanged.  If =Z=lat= is specified, coordinate is rotated as follows:
+: % chak T=3 demo/x.base INT Z=lat =
+: ## record: 0
+:   read:F0 x:bs T = 100 DATE = 1973/1/30 00:00:00
+: # stack[0] x:bs INT
+: #   [lat,0:4 lev,0:3] > [: : lat,:]
+: 0 0 0 3
+: 1 0 0 103
+: 2 0 0 203
+: 0 0 1 13
+: 1 0 1 113
+: 2 0 1 213
+: 0 0 2 23
+: 1 0 2 123
+: 2 0 2 223
+: 0 0 3 33
+: 1 0 3 133
+: 2 0 3 233
+
+In order to insert blank coordinate at beginning needs two
 explicit transformation:
-: % chak ex2/dd Y=lon Z=lat FLUSH -i
-: ## 0 {F0} [lon,0:8 lat,0:4 -] > [: lon,: lat,:] dd
-: #- lon lat {F0}
-: 0 0 0  0.000000000E+00
-: 0 1 0  0.100000000E+01
-: 0 2 0  0.200000000E+01
-: 0 3 0  0.300000000E+01
-: 0 4 0  0.400000000E+01
-: 0 5 0  0.500000000E+01
-: 0 6 0  0.600000000E+01
-: 0 7 0  0.700000000E+01
-: 0 0 1  0.000000000E+00
-: 0 1 1  0.100000000E+01
-: 0 2 1  0.200000000E+01
-: 0 3 1  0.300000000E+01
-: :
-In the above example, lon, lat order are shifted by 1.
+: % chak T=3 demo/x.base INT Y=lat Z=lev =
+: ## record: 0
+:   read:F0 x:bs T = 100 DATE = 1973/1/30 00:00:00
+: # stack[0] x:bs INT
+: #   [lat,0:4 lev,0:3] > [: lat,: lev,:]
+: 0 0 0 3
+: 0 1 0 13
+: 0 2 0 23
+: 0 3 0 33
+: 0 0 1 103
+: 0 1 1 113
+: 0 2 1 123
+: 0 3 1 133
+: 0 0 2 203
+: 0 1 2 213
+: 0 2 2 223
+: 0 3 2 233
+In the above example, =lat=, =lev= order are shifted by 1.
 Vacant coordinate is automatically filled with blank name, null range.
 
 *** avant-garde solution for automatic coordinate matching
@@ -885,129 +952,201 @@ edit the gtool headers manually before chak execution.
 The primitive rule is `the coordinate name is significant.'
 
 If the coordinate names match, then different array range can be adjusted.
-: % chak aa bb ADD
-: ## 0 {aa} [lon,0:8 - -]
-: ## 1 {bb} [lon,1:4 - -]
-: ## 2 {aa+bb} [lon,0:8]
-: record:  0
-: #lon     {aa}             {bb}             {aa+bb}
-: 0        0.000000000E+00  .                _
-: 1        0.100000000E+01  0.100000000E+01  0.200000000E+01
-: 2        0.200000000E+01  0.200000000E+01  0.400000000E+01
-: 3        0.300000000E+01  0.300000000E+01  0.600000000E+01
-: 4        0.400000000E+01  .                _
-: 5        0.500000000E+01  .                _
-: 6        0.600000000E+01  .                _
-: 7        0.700000000E+01  .                _
+
+In the following demostration, a special operation sequence is
+examined to present the results.
+Operator =REPEAT= push the two operands again, operators =INT ITER=
+convert all the stack to integer.  At the operator =FLUSH -i=, there
+are three stacks remaining, integer conversion of the first file, the
+second file, and the result of operator =ADD=.
+: % chak T=3 demo/yz.base demo/sub3.yz.base REPEAT ADD INT ITER FLUSH -i
+: ## record: 0
+:   read:F0 yz:bs T = 100 DATE = 1973/1/30 00:00:00
+:   read:F1 subx:bs T = 100 DATE = 1973/1/30 00:00:00
+: ## 0 {2056} [lon,0:8] > [:] yz:bs INT
+: ## 1 {2054} [lon,3:6] > [:] subx:bs INT
+: ## 2 {2055} [lon,0:8] > [:] yz:bs subx:bs ADD INT
+: #lon {2056} {2054} {2055}
+: 0 115 . _
+: 1 116 . _
+: 2 117 . _
+: 3 118 118 236
+: 4 119 119 238
+: 5 120 120 240
+: 6 121 . _
+: 7 122 . _
 
 If the coordinate match on different rank, one of them are shifted.
-: % chak aa bb ADD
-: ## 0 {aa}    [lon,0:8 -       -]
-: ## 1 {cc}    [-       lon,1:4 -]
-: ## 2 {aa+cc} [lon,0:8]
-: #lon     {aa}             {cc}             {aa+cc}
-: 0        0.000000000E+00  .                _
-: 1        0.100000000E+01  0.100000000E+01  0.200000000E+01
-: 2        0.200000000E+01  0.200000000E+01  0.400000000E+01
-: 3        0.300000000E+01  0.300000000E+01  0.600000000E+01
-: 4        0.400000000E+01  .                _
-: 5        0.500000000E+01  .                _
-: 6        0.600000000E+01  .                _
-: 7        0.700000000E+01  .                _
+: % chak demo/zx.base T=3 demo/sub2.zx.base T=5 REPEAT ADD FLUSH -i
+: ## record: 0
+:   read:F0 zx:bs T = 100 DATE = 1973/1/30 00:00:00
+:   read:F1 suby:bs T = 100 DATE = 1973/1/30 00:00:00
+: ## 0 {F0} [lat,0:4 - -] > [:] zx:bs
+: ## 1 {F1} [- lat,1:3 -] > [:] suby:bs
+: ## 2 {2054} [lat,0:4] > [:] zx:bs suby:bs ADD
+: #lat {F0} {F1} {2054}
+: 0  1.035000E+02 . _
+: 1  1.135000E+02  1.135000E+02  2.270000E+02
+: 2  1.235000E+02  1.235000E+02  2.470000E+02
+: 3  1.335000E+02 . _
+: ## ITER INT affect the second stack shape, so removed from this demonstration
 
 If the same rank has different coordinate name, then either of them
 must have different rank candidate for automatic tweaking.
-: ## 0 {dd}    [lon,0:8 lat,0:4 -]
-: ## 1 {ee}    [lat,1:3 -       -]
-: ## 2 {dd+ee} [lon,0:8 lat,0:4]
-: #lon     lat  {dd}             {ee}             {dd+ee}
-: 0        0    0.000000000E+00  .                _
-: :
-: 7        0    0.700000000E+01  .                _
-: 0        1    0.000000000E+00  0.100000000E+01  0.100000000E+01
-: 1        1    0.100000000E+01  0.100000000E+01  0.200000000E+01
-: 2        1    0.200000000E+01  0.100000000E+01  0.300000000E+01
-: 3        1    0.300000000E+01  0.100000000E+01  0.400000000E+01
-: 4        1    0.400000000E+01  0.100000000E+01  0.500000000E+01
-: 5        1    0.500000000E+01  0.100000000E+01  0.600000000E+01
-: 6        1    0.600000000E+01  0.100000000E+01  0.700000000E+01
-: 7        1    0.700000000E+01  0.100000000E+01  0.800000000E+01
-: 0        2    0.000000000E+00  0.200000000E+01  0.200000000E+01
-: :
-: 7        2    0.700000000E+01  0.200000000E+01  0.900000000E+01
-: 0        3    0.000000000E+00  .                _
-: :
-: 7        3    0.700000000E+01  .                _
-
-On the above case, ee spread the data on a missing dimension lon.
+: % chak demo/z.base T=3 demo/sub2.zx.base T=0 REPEAT ADD INT ITER FLUSH -i
+: ## record: 0
+:   read:F0 z:bs T = 100 DATE = 1973/1/30 00:00:00
+:   read:F1 suby:bs T = 100 DATE = 1973/1/30 00:00:00
+: ## 0 {2056} [lon,0:8 lat,0:4] > [:] z:bs INT
+: ## 1 {2054} [lat,1:3] > [:] suby:bs INT
+: ## 2 {2055} [lon,0:8 lat,0:4] > [:] z:bs suby:bs ADD INT
+: #lon lat {2056} {2054} {2055}
+: 0 0 100 . _
+: 1 0 101 . _
+: 2 0 102 . _
+: 3 0 103 . _
+: 4 0 104 . _
+: 5 0 105 . _
+: 6 0 106 . _
+: 7 0 107 . _
+: 0 1 110 113 223
+: 1 1 111 113 224
+: 2 1 112 113 225
+: 3 1 113 113 226
+: 4 1 114 113 227
+: 5 1 115 113 228
+: 6 1 116 113 229
+: 7 1 117 113 230
+: 0 2 120 123 243
+: 1 2 121 123 244
+: 2 2 122 123 245
+: 3 2 123 123 246
+: 4 2 124 123 247
+: 5 2 125 123 248
+: 6 2 126 123 249
+: 7 2 127 123 250
+: 0 3 130 . _
+: 1 3 131 . _
+: 2 3 132 . _
+: 3 3 133 . _
+: 4 3 134 . _
+: 5 3 135 . _
+: 6 3 136 . _
+: 7 3 137 . _
+On the above case, the latter spread the data on a missing dimension lon.
 
 If the same rank has different coordinate name with no additional
 information, matching is failed.
-: % chak aa ee ADD
-: ## 0 {aa} [lon,0:8 - -]
-: ## 1 {ee} [lat,1:3 - -]
-: error:-39: ambiguous fragile coordinates at (0)
-: error:-39: coordinate lon
-: error:-39: coordinate lat
-: exit = -39
-Since lon and lat shares the same rank, chak has never chance to
+: % chak T=3 demo/zx.base  demo/yz.base FLUSH
+: ## record: 0
+:   read:F0 zx:bs T = 100 DATE = 1973/1/30 00:00:00
+:   read:F1 yz:bs T = 100 DATE = 1973/1/30 00:00:00
+: # stack[0] zx:bs
+: #   [lat,0:4 - -] > [:]
+: 0  1.035000E+02
+: 1  1.135000E+02
+: 2  1.235000E+02
+: 3  1.335000E+02
+: # stack[1] yz:bs
+: #   [lon,0:8 - -] > [:]
+: 0  1.150000E+02
+: 1  1.160000E+02
+: 2  1.170000E+02
+: 3  1.180000E+02
+: 4  1.190000E+02
+: 5  1.200000E+02
+: 6  1.210000E+02
+: 7  1.220000E+02
+
+: % chak T=3 demo/zx.base  demo/yz.base ADD =
+: ## record: 0
+:   read:F0 zx:bs T = 100 DATE = 1973/1/30 00:00:00
+:   read:F1 yz:bs T = 100 DATE = 1973/1/30 00:00:00
+: error:-39: ambiguous fragile coordinates
+: order[fragile] {}=-4 {}=-4 {}=-4 {}=-4 {}=-4 {}=-4
+: order[fragile/0] {lat}=* {-} {-} {-} {-} {-}
+: order[fragile/1] {lon}=* {-} {-} {-} {-} {-}
+:  exit =          -39
+Since =lon= and =lat= share the same rank, chak has never chance to
 determine which comes earlier.
 
-On the other hand, if different coordinate do not share the same rank,
+On the other hand, if different coordinates do not share the same rank,
 and each opposite is blank, then they succeed to match.
-: % chak aa ff ADD
-: ## 0 {bb}    [lon,1:4 -       -] > [:] bb
-: ## 1 {ff}    [-       lat,1:3 -] > [:] ff
-: ## 2 {bb+ff} [lon,1:4 lat,1:3]   > [:] bb ff ADD
-: #lon     lat  {bb}             {ff}             {bb+ff}
-: 1        1    0.100000000E+01  0.100000000E+01  0.200000000E+01
-: 2        1    0.200000000E+01  0.100000000E+01  0.300000000E+01
-: 3        1    0.300000000E+01  0.100000000E+01  0.400000000E+01
-: 1        2    0.100000000E+01  0.200000000E+01  0.300000000E+01
-: 2        2    0.200000000E+01  0.200000000E+01  0.400000000E+01
-: 3        2    0.300000000E+01  0.200000000E+01  0.500000000E+01
-Both bb and ff file spread the blank coordinates.
+: % chak demo/zx.base T=5 demo/yz.base T=3 REPEAT ADD FLUSH -i
+: ## record: 0
+:   read:F0 zx:bs T = 100 DATE = 1973/1/30 00:00:00
+:   read:F1 yz:bs T = 100 DATE = 1973/1/30 00:00:00
+: ## 0 {F0} [- lat,0:4 -] > [:] zx:bs
+: ## 1 {F1} [lon,0:8 - -] > [:] yz:bs
+: ## 2 {2054} [lon,0:8 lat,0:4] > [:] zx:bs yz:bs ADD
+: #lon lat {F0} {F1} {2054}
+: 0 0  1.035000E+02  1.150000E+02  2.185000E+02
+: 1 0  1.035000E+02  1.160000E+02  2.195000E+02
+: 2 0  1.035000E+02  1.170000E+02  2.205000E+02
+: 3 0  1.035000E+02  1.180000E+02  2.215000E+02
+: 4 0  1.035000E+02  1.190000E+02  2.225000E+02
+: 5 0  1.035000E+02  1.200000E+02  2.235000E+02
+: 6 0  1.035000E+02  1.210000E+02  2.245000E+02
+: 7 0  1.035000E+02  1.220000E+02  2.255000E+02
+: 0 1  1.135000E+02  1.150000E+02  2.285000E+02
+: 1 1  1.135000E+02  1.160000E+02  2.295000E+02
+: 2 1  1.135000E+02  1.170000E+02  2.305000E+02
+: 3 1  1.135000E+02  1.180000E+02  2.315000E+02
+: 4 1  1.135000E+02  1.190000E+02  2.325000E+02
+: :
+: 7 3  1.335000E+02  1.220000E+02  2.555000E+02
+: ## ITER INT affect the stack shape, so removed from this demonstration
+Both files spread the blank coordinates.
+
+You can overcome the former failed operation by tweaking the explict
+coordinates:
+: % chak T=3 demo/zx.base Y=lat demo/yz.base REPEAT ADD FLUSH -i
+: ## record: 0
+: ## 0 {F0} [lat,0:4 - -] > [: lat,:] zx:bs
+: ## 1 {F1} [lon,0:8 - -] > [:] yz:bs
+: ## 2 {2054} [lon,0:8 lat,0:4] > [:] zx:bs yz:bs ADD
+: #lon lat {F0} {F1} {2054}
+: 0  0  1.035000E+02  1.150000E+02  2.185000E+02
+: 1  0  1.035000E+02  1.160000E+02  2.195000E+02
+: 2  0  1.035000E+02  1.170000E+02  2.205000E+02
+: 3  0  1.035000E+02  1.180000E+02  2.215000E+02
+: 4  0  1.035000E+02  1.190000E+02  2.225000E+02
+: 5  0  1.035000E+02  1.200000E+02  2.235000E+02
+: 6  0  1.035000E+02  1.210000E+02  2.245000E+02
+: 7  0  1.035000E+02  1.220000E+02  2.255000E+02
+: 0  1  1.135000E+02  1.150000E+02  2.285000E+02
+: 1  1  1.135000E+02  1.160000E+02  2.295000E+02
+: :
+: 7  3  1.335000E+02  1.220000E+02  2.555000E+02
 
 *** flushing
-: % chak a b FLUSH   # ascii output of file a and b sequentially
-: record: 0
-:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
-:   read:F1 pss T = 0 DATE = -1/-1/-1 **:**:**
-: # stack[0] qss
-: #   [lon,4:8 - -] > [:]
-: 4  0.636000000E+03
-: 5  0.637000000E+03
-: 6  0.638000000E+03
-: 7  0.639000000E+03
-: # stack[1] pss
-: #   [lon,1:6 - -] > [:]
-: 1  0.633000000E+03
-: 2  0.634000000E+03
-: 3  0.635000000E+03
-: 4  0.636000000E+03
-: 5  0.637000000E+03
+: % chak T=3 demo/sub2.yz.base demo/sub3.yz.base FLUSH
+: ## record: 0
+: # stack[0] subx:bs
+: #   [lon,0:2 - -] > [:]
+: 0  1.150000E+02
+: 1  1.160000E+02
+: # stack[1] subx:bs
+: #   [lon,3:6 - -] > [:]
+: 3  1.180000E+02
+: 4  1.190000E+02
+: 5  1.200000E+02
 
 Default coordinate index follows python style: the beginning is counted
 from 0, and the ending is not included.  You can change this behaviour
 with global -F option, to follow FORTRAN style:
 
-: % chak -F a b FLUSH   # ascii output of file a and b sequentially
-: record: 1
-:   read:F1 qss T = 0 DATE = -1/-1/-1 **:**:**
-:   read:F2 pss T = 0 DATE = -1/-1/-1 **:**:**
-: # stack[1] qss
-: #   [lon,5:8 - -] > [:]
-: 5  0.636000000E+03
-: 6  0.637000000E+03
-: 7  0.638000000E+03
-: 8  0.639000000E+03
-: # stack[2] pss
-: #   [lon,2:6 - -] > [:]
-: 2  0.633000000E+03
-: 3  0.634000000E+03
-: 4  0.635000000E+03
-: 5  0.636000000E+03
-: 6  0.637000000E+03
+: % chak -F T=3 demo/sub2.yz.base demo/sub3.yz.base FLUSH
+: ## record: 1
+: # stack[1] subx:bs
+: #   [lon,1:2 1:1 1:1] > [:]
+: 1  1.150000E+02
+: 2  1.160000E+02
+: # stack[2] subx:bs
+: #   [lon,4:6 1:1 1:1] > [:]
+: 4  1.180000E+02
+: 5  1.190000E+02
+: 6  1.200000E+02
 
 Appending -i option to FLUSH operator changes the behavior to
 horizontal pasting of all the stack.  Inclusive domain of all the
@@ -1016,77 +1155,38 @@ Automatic coordinates matching is examined.  You may need to adjust
 them manually.  In the following example all the files share the same
 shape and coordinates.
 
-: % chak a b FLUSH -i  # ascii output of file a and b horizontally (inclusive)
-: record: 0
-:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
-:   read:F1 pss T = 0 DATE = -1/-1/-1 **:**:**
-: # 0 {F0} qss
-: # 1 {F1} pss
-: 1 .  0.633000000E+03
-: 2 .  0.634000000E+03
-: 3 .  0.635000000E+03
-: 4  0.636000000E+03  0.636000000E+03
-: 5  0.637000000E+03  0.637000000E+03
-: 6  0.638000000E+03 .
-: 7  0.639000000E+03 .
-
-In the following example, the former file has shape {lon,,} while the
-latter shape {lat,,} so fails in matching (note that logical
-meaning of the coordinate names is never considered).
-
-: % chak ex/ex00-1_qss ex/ex00-1_sps FLUSH -i
-: record: 0
-:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
-:   read:F1 sps T = 0 DATE = -1/-1/-1 **:**:**
-: error:-39: ambiguous fragile coordinates at (0)
-: error:-39: coordinate lon
-: error:-39: coordinate lat
-:  exit =          -39
-
-In the following example, the former file has shape {lon,,} while the
-latter shape {,lat,}.  In this case automatic matching succeeds.
-The coordinates are spread to adjust the output domain {lon,lat,}
-: % chak ex/ex00-1_qss ex/ex00-1_tps FLUSH -i
-: record: 0
-:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
-:   read:F1 tps T = 0 DATE = -1/-1/-1 **:**:**
-: # 0 {F0} qss
-: # 1 {F1} tps
-: 4 1  0.636000000E+03  0.599500000E+03
-: 5 1  0.637000000E+03  0.599500000E+03
-: 6 1  0.638000000E+03  0.599500000E+03
-: 7 1  0.639000000E+03  0.599500000E+03
-: 4 2  0.636000000E+03  0.615500000E+03
-: 5 2  0.637000000E+03  0.615500000E+03
-: 6 2  0.638000000E+03  0.615500000E+03
-: 7 2  0.639000000E+03  0.615500000E+03
-: 4 3  0.636000000E+03  0.631500000E+03
-: 5 3  0.637000000E+03  0.631500000E+03
-: 6 3  0.638000000E+03  0.631500000E+03
-: 7 3  0.639000000E+03  0.631500000E+03
-: ## first file {lon,,}  spreads the second dimension
-: ## second file {,lat,}  spreads the first dimension
+: % chak T=3 demo/sub2.yz.base demo/sub3.yz.base FLUSH -i # horizontal output (inclusive)
+: ## record: 0
+: ## 0 {F0} [lon,0:5 - -] > [:] subx:bs
+: ## 1 {F1} [lon,3:6 - -] > [:] subx:bs
+: #lon {F0} {F1}
+: 0  1.150000E+02  .
+: 1  1.160000E+02  .
+: 2  1.170000E+02  .
+: 3  1.180000E+02  1.180000E+02
+: 4  1.190000E+02  1.190000E+02
+: 5  .             1.200000E+02
 
 The option -x changes the output domain as the intersects.
-: % chak a b FLUSH -x  # ascii output of file a and b horizontally (intersects)
-: record: 0
-:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
-:   read:F1 pss T = 0 DATE = -1/-1/-1 **:**:**
-: # 0 {F0} qss
-: # 1 {F1} pss
-: 4  0.636000000E+03  0.636000000E+03
-: 5  0.637000000E+03  0.637000000E+03
+: % chak T=3 demo/sub5.yz.base demo/sub3.yz.base FLUSH -x
+: ## record: 0
+: ## 0 {F0} [lon,0:5 - -] > [:] subx:bs
+: ## 1 {F1} [lon,3:6 - -] > [:] subx:bs
+: #lon {F0} {F1}
+: 3  1.180000E+02  1.180000E+02
+: 4  1.190000E+02  1.190000E+02
 
 The option -l changes the output domain as the first stack.
-: record: 0
-:   read:F0 qss T = 0 DATE = -1/-1/-1 **:**:**
-:   read:F1 pss T = 0 DATE = -1/-1/-1 **:**:**
-: # 0 {F0} qss
-: # 1 {F1} pss
-: 4  0.636000000E+03  0.636000000E+03
-: 5  0.637000000E+03  0.637000000E+03
-: 6  0.638000000E+03 .
-: 7  0.639000000E+03 .
+: % chak T=3 demo/sub5.yz.base demo/sub3.yz.base FLUSH -l
+: ## record: 0
+: ## 0 {F0} [lon,0:5 - -] > [:] subx:bs
+: ## 1 {F1} [lon,3:6 - -] > [:] subx:bs
+: #lon {F0} {F1}
+: 0  1.150000E+02  .
+: 1  1.160000E+02  .
+: 2  1.170000E+02  .
+: 3  1.180000E+02  1.180000E+02
+: 4  1.190000E+02  1.190000E+02
 
 ** Recipes
 
