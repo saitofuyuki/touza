@@ -1,15 +1,19 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2022/10/26 09:50:12 fuyuki NEWS>
+# Time-stamp: <2022/10/26 20:07:48 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
+* Changes in 1.05.4 from 1.05.3
+- (chak) [critical] default ascii format modified
+- (chak) [SEVERE] coordinate ordering may fail at explicit ordering
+
 * Changes in 1.05.3 from 1.05.2
-  * (chak) Improve automatic coordinate matching
-  * (chak) -N flag introduced to controll null-coordinate parsing
-  * (chak) some bug fixes.
+- (chak) Improve automatic coordinate matching
+- (chak) -N flag introduced to controll null-coordinate parsing
+- (chak) some bug fixes.
 
 * Changes in 1.05.2 from 1.05.1
 - (chak) [CRITICAL] modify default MISS to follow the legacy magic number

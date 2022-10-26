@@ -1,3 +1,10 @@
+Revision 1.05.4 / 2022-10-26
+===========================
+
+  * (chak) [critical] default ascii format modified
+    * old fortran may refuse es0.m format (0 width)
+  * (chak) [SEVERE] coordinate ordering may fail at explicit ordering
+
 Revision 1.05.3 / 2022-10-25
 ============================
 

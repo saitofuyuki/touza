@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/26 11:59:31 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/26 17:06:49 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -6849,8 +6849,10 @@ contains
              if (nc.ge.lco) exit co_scan
              cbuf(jp) = ctmp
           endif
-          nlevh(jp) = max(jc, nlevh(jp))
-          if (nflag) nlevl(jp) = max(jc, nlevl(jp))
+          jt = oadd(jc, jb)
+          if (jt.lt.0) jt = jc
+          nlevh(jp) = max(jt, nlevh(jp))
+          if (nflag) nlevl(jp) = max(jt, nlevl(jp))
           nflag = .FALSE.
        enddo
     enddo co_scan
@@ -6952,6 +6954,9 @@ contains
           if (COUNT(nin(0:nc-1).eq.0).gt.1) then
              ierr = ERR_INVALID_PARAMETER
              call message(ierr, 'ambiguous fragile coordinates')
+             do jp = 0, nc - 1
+                write(*, *) 'topo:', trim(cbuf(jp)), nlevl(jp), nlevh(jp), ' / ', nin(jp), ' ', cout(0:nc-1, jp)
+             enddo
              return
           endif
           jp = find_first(nin(0:nc-1), 0, offset=0)
