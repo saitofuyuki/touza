@@ -1,0 +1,63 @@
+#!/usr/bin/zsh -f
+# Time-stamp: <2022/10/25 22:16:26 fuyuki demo-chak.sh.in>
+
+main ()
+{
+  local demod=demo
+  local chak=./chak
+  local ngted=ngted
+
+  demo_inputs $demod || return $?
+  return 0
+}
+
+demo_inputs ()
+{
+  local outd=$1
+  local nx=8 ny=4 nz=3 nt=3
+  [[ -z $outd ]] && outd=.
+  mkdir -p $outd || return $?
+  local base=$outd/base
+  gen_source bs $base $nt :$nx :$ny :$nz || return $?
+  return 0
+}
+
+gen_source ()
+{
+  local item=$1 ofile=$2; shift 2
+  local nt=$1 nx=$2 ny=$3 nz=$4
+  local jt=
+
+  local E=()
+  local C=()
+  [[ x${nx:--} != x- ]] && C+=(X=$nx) E+=(-e"aitm1:clon")
+  [[ x${ny:--} != x- ]] && C+=(Y=$ny) E+=(-e"aitm2:clat")
+  [[ x${nz:--} != x- ]] && C+=(Z=$nz) E+=(-e"aitm3:clev")
+
+  $chak -H0 -f 0 $C X AND Y 10 MUL ADD Z 100 MUL ADD INT = $ofile || return $?
+  jt=1
+  while [[ $jt -lt $nt ]]
+  do
+    $chak -a -H0 0 $C X AND Y 10 MUL ADD Z 100 MUL ADD $jt 1000 MUL ADD INT = $ofile || return $?
+    let jt++
+  done
+
+  jt=0 
+  local tm=
+  while [[ $jt -lt $nt ]]
+  do
+    tm="$(printf '%02d' $jt)0000"
+    $ngted -t $((jt+1)) \
+           -e "dset:ctouza-jmz" \
+           -e "title:cdemonstration source" \
+           -e "unit:cshaku" \
+           -e "item:c$item" \
+           -e "time:c$jt" \
+           -e "date:c19730130 $tm" $E $ofile
+    let jt++
+  done
+  return 0
+}
+
+main "$@"; err=$?
+exit $err
