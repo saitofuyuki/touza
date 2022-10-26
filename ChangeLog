@@ -1,3 +1,14 @@
+Revision 1.05.3 / 2022-10-25
+============================
+
+  * Version 1.05.3 yet alpha
+  * Improve automatic coordinate matching
+    * Fix bugs at matching with slicing, to tweak wrong coordinates
+    * Use topological sorting to detect coordinate priorities.
+  * (chak) -N flag introduced to controll null-coordinate parsing
+  * [FATAL] opposite BIN operation.
+  * [FATAL] predefined constants not defined as expected.
+
 Revision 1.05.2 / 2022-10-24
 ============================
 
@@ -5,6 +16,9 @@ Revision 1.05.2 / 2022-10-24
   * (chak) [CRITICAL] modify default MISS to follow the legacy magic number
   * (chak) ascii/binary input/output hacked
   * (chak) some operation introduced and restructured
+  * (chak) header edit level introduced
+  * (chak) infix notation is additionaly recorded in header
+  * (div) exclude div subdirectory to build for release.
   * (nio) more arguments for get_default_header().
 
 Revision 1.05.1 / 2022-10-19

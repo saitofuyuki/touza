@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Nov 24 2021
-# Time-stamp: <2022/10/23 10:38:50 fuyuki configure.ac>
+# Time-stamp: <2022/10/25 21:47:08 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -64,11 +64,19 @@ AC_CONFIG_FILES([Makefile])
 PKG_PROG_PKG_CONFIG()
 PKG_PREREQ([0.29])
 PKG_CHECK_MODULES_STATIC([TOUZA], [touza])
+
+AC_ARG_VAR([TOUZA_NAME], [touza package name])
+AC_ARG_VAR([TOUZA_VERSION], [touza package version])
+PKG_CHECK_VAR([TOUZA_NAME], [touza], [touza_name])
+_PKG_CONFIG([TOUZA_VERSION], [modversion], [touza])
+
 AC_SUBST([TOUZA_LDFLAGS])
 AC_SUBST([TOUZA_top_builddir])
 
 dnl AX_CREATE_PKGCONFIG_INFO()
 AC_SUBST([PACKAGE_REQUIRES], [])
+AC_DEFINE_UNQUOTED([TOUZA_NAME], ['${TOUZA_NAME}'], [touza package name])
+AC_DEFINE_UNQUOTED([TOUZA_VERSION], ['${TOUZA_VERSION}'], [touza package version])
 
 AM_PATH_PYTHON([3.9], , [:])
 AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])

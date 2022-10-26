@@ -358,6 +358,65 @@ persistent mode.
 
 : chak -c file0 file1 file2 T=3 file3 ...
 
+**** Coordinate parser flag
+- =-N=, =+N= :: turn on strict null-dimension mode
+
+Original idea of the array in gtool-3.5 format is a fixed
+3 rank (or dimension) design. Arrays with one or two ranks are stored
+with dummy rank(s) of size 1 inserted at any rank (typically append at
+the final rank, and less typically inserted at the first rank).
+However, the property for such dummy rank is not well-defined.
+
+Often such dummy rank is expressed with blank name and range 1 to 1
+(Fortran style notation):
+: # {AITM1, ASTR1, AEND1} = {(blank), 1, 1}
+: % ngtls sample
+:   1 sample          0H     0   UR4 19730130 000000 ,lat,lev
+: % ngtls -n sample
+:   1 sample          0H     0   UR4 19730130 000000  1:1      1:4      1:3
+Averaging along a rank may also introduce dummy rank with different style:
+: # {AITM1, ASTR1, AEND1} = {lon, 0, 0}
+: % ngtls sample
+:   1 sample          0H     0   UR4 19730130 000000  lon,lat,lev
+: % ngtls -n sample
+:   1 sample          0H     0   UR4 19730130 000000  0:0      1:4      1:3
+: # sample created with gtsel x=0 -n
+
+Internally, =chak= distinguish the range =1:1= and =0:0=
+(Fortran-style).  They are parsed as the range =0:1= and =0:0=
+(Python-style), respectively.  The former has definite range of size
+1, while the latter size 0.  In other words, the original range =1:1=
+is regarded similarly as =1:3=, =4:7= etc.
+This difference influences at binary operations, for example, to
+compute compromise (result) domain.
+
+:   A[lon,0:3]   B[lon,0:1]    ADD
+: 0 a0           b0            a0+b0
+: 1 a1           undef         undef
+: 2 a2           undef         undef
+
+:   A[lon,0:3]   B[lon,0:0]    ADD
+: 0 a0           b0            a0+b0
+: 1 a1           b0            a1+b0
+: 2 a2           b0            a2+b0
+
+The former operations are performed only at the definite range, whit
+the latter spread along the null rank value.
+
+In order to avoid confusing, chak parser style is *TOGGLED OFF* at
+read/write of gtool-3.5 format files by default.
+At read, if a coordinate name is blank and its corresponding size is 1
+or less, then the coordinate is parsed as a dummy rank internally.
+At write, if a coordinate is blank dummy rank internally,
+then the coordinate is recorded as blank name with range =1:1=.
+
+You can revert this feature to =chak= parser mode using '-N' or '+N'
+option, either globally or per each file.
+If there are no input/output file before the options, '-N' set strict
+=chak= mode on read, and '+N' set on write.  If there is an input or
+output file, the both options work identically, to set strict =chak=
+mode on the file.
+
 **** Compromise domain policy
 - =-i= :: Inclusive domain mode for operation (default)
 - =-x= :: Intersect domain mode for operation
@@ -365,7 +424,7 @@ persistent mode.
 *** number type
 Internally all the numbers are stored as so-called double precision.
 All the operation are performed as floating-point values.
-One exeption may occur at the final output: if all the operatnds are
+One exception may occur at the final output: if all the operands are
 integer-like, and if the operation is integer-preserving type, then
 the output is treated as integer.
 
@@ -555,7 +614,7 @@ completely different between =chak= and GMT implementation.
 **** operators on files
 | operator    | argument | description            |
 |-------------+----------+------------------------|
-| DFMT=ARG    | FORMAT   | set output data format |
+| FMT=ARG     | FORMAT   | set output data format |
 | EDIT=ARG    | STRING   |                        |
 | ITEM=ARG    | STRING   | replace item name      |
 | TITLE=ARG   | STRING   |                        |
@@ -1049,6 +1108,7 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  GEB GTU GTB IDIV LADD LDIV LEU LEF LMASK LMAX LMIN Fn
 #  LocalWords:  LMUL LSUB LTU LTB LTF NEU NOP LOR SQR TANH tanh TRUNC
 #  LocalWords:  ZSIGN unary Wn ITER OPR qss pss lon sps tps avant bb
-#  LocalWords:  garde ee ARG REPL DFMT th nd Cn vv vvv qq qqq Fortran
+#  LocalWords:  garde ee ARG REPL FMT th nd Cn vv vvv qq qqq Fortran
 #  LocalWords:  fortran eof Hn ETTL CDATE MDATE CSIGN MSIGN gmtmath
-#  LocalWords:  grdmath EDITn TITLn ETTLn TITL
+#  LocalWords:  grdmath EDITn TITLn ETTLn TITL AITM ASTR AEND ngtls
+#  LocalWords:  lev undef br aG
