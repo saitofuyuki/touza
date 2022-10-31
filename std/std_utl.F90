@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2022/10/09 16:05:42 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/31 08:08:15 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -1089,7 +1089,7 @@ contains
 
 !!!_  & find_first_range - find first occurence of array within range (inclusive)
   integer function find_first_range_i &
-       & (list, low, high, start, back, offset) &
+       & (list, low, high, start, back, offset, no) &
        & result(n)
     implicit none
     integer,intent(in)          :: list(0:)
@@ -1098,6 +1098,7 @@ contains
     integer,intent(in),optional :: start
     logical,intent(in),optional :: back
     integer,intent(in),optional :: offset
+    integer,intent(in),optional :: no
     integer j, jb, ll, ofs
     integer vl, vh
     ofs = choice(find_offset, offset)
@@ -1123,6 +1124,8 @@ contains
     endif
     if (n.ge.0) then
        n = n + ofs
+    else if (present(no)) then
+       n = no
     else
        n = min(-1, ofs - 1)
     endif
@@ -1130,7 +1133,7 @@ contains
 
 !!!_  & find_first - find first occurence of array
   integer function find_first_i &
-       & (list, val, start, back, offset) &
+       & (list, val, start, back, offset, no) &
        & result(n)
     implicit none
     integer,intent(in)          :: list(0:)
@@ -1138,6 +1141,7 @@ contains
     integer,intent(in),optional :: start
     logical,intent(in),optional :: back
     integer,intent(in),optional :: offset
+    integer,intent(in),optional :: no
 
     integer j, jb, ll, ofs
     ofs = choice(find_offset, offset)
@@ -1161,13 +1165,15 @@ contains
     endif
     if (n.ge.0) then
        n = n + ofs
+    else if (present(no)) then
+       n = no
     else
        n = min(-1, ofs - 1)
     endif
   end function find_first_i
 
   integer function find_first_a &
-       & (list, val, start, back, offset) &
+       & (list, val, start, back, offset, no) &
        & result(n)
     implicit none
     character(len=*),intent(in) :: list(0:)
@@ -1175,6 +1181,7 @@ contains
     integer,intent(in),optional :: start
     logical,intent(in),optional :: back
     integer,intent(in),optional :: offset
+    integer,intent(in),optional :: no
 
     integer j, jb, ll, ofs
     ofs = choice(0, offset)
@@ -1198,6 +1205,8 @@ contains
     endif
     if (n.ge.0) then
        n = n + ofs
+    else if (present(no)) then
+       n = no
     else
        n = min(-1, ofs - 1)
     endif
