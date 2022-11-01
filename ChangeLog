@@ -1,5 +1,15 @@
+Revision 1.05.5 / 2022-11-01
+============================
+
+  * (chak) Reshaping redesigned
+    * permutation, spreading, transforming is greatly improved.
+    * topological sorting introduced to set priority, with preserving
+      natural orders as much as possible.
+    * document on reshaping added, but need improvement.
+  * (std) additional argument on find_first.
+
 Revision 1.05.4 / 2022-10-26
-===========================
+============================
 
   * (chak) [critical] default ascii format modified
     * old fortran may refuse es0.m format (0 width)
@@ -12,7 +22,7 @@ Revision 1.05.3 / 2022-10-25
   * Improve automatic coordinate matching
     * Fix bugs at matching with slicing, to tweak wrong coordinates
     * Use topological sorting to detect coordinate priorities.
-  * (chak) -N flag introduced to controll null-coordinate parsing
+  * (chak) -N flag introduced to control null-coordinate parsing
   * [FATAL] opposite BIN operation.
   * [FATAL] predefined constants not defined as expected.
 
@@ -24,7 +34,7 @@ Revision 1.05.2 / 2022-10-24
   * (chak) ascii/binary input/output hacked
   * (chak) some operation introduced and restructured
   * (chak) header edit level introduced
-  * (chak) infix notation is additionaly recorded in header
+  * (chak) infix notation is additionally recorded in header
   * (div) exclude div subdirectory to build for release.
   * (nio) more arguments for get_default_header().
 
@@ -47,7 +57,7 @@ Revision 1.05.0 / 2022-10-17
     (cal) [critical] correct cal::CALNDR arguments for MIROC with-t.
     (emu) [severe] skip message for unbound units.
   * note about ifort -heap-arrays option.
-  * (nio) nio_nctcdf introduced.  nio_divison is reserved.
+  * (nio) nio_nctcdf introduced.  nio_division is reserved.
   * (nio,nng) [IMPORTANT] nng renamed into nio.
   * (std) std_htb implemented for hash-table management, used in ppp.
 
@@ -75,7 +85,7 @@ Revision 1.02.0 / 2022-02-16
   * HAVE_* macros are renamed to HAVE_FORTRAN_*
   * (ppp) parallel processing procedures, to replace xmcomm/xmking in
     MIROC.
-  * (emu) emulate miroc utilitly
+  * (emu) emulate miroc utility
   * (std/env) [important] on-demand checker introduced.
   * (std/mwe) MPI group procedures
   * (std/sus) replaces (original) nng_io.
@@ -114,10 +124,10 @@ Revision 1.00.3 / 2021-03-06
 Revision 1.00.2 / 2021-02-16
 ============================
 
-  * (cal) coco compatible interfaces introuced.
+  * (cal) coco compatible interfaces introduced.
   * (cal) inim argument added to control TOUZA/Std initialization.
   * (std/env) byte-order diagnostics implemented.
-  * (std/arg) [CRITCAL] the very first argument was skipped.
+  * (std/arg) [CRITICAL] the very first argument was skipped.
 
 Revision 1.00.1 / 2021-02-03
 ============================

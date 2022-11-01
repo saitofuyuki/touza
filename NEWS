@@ -1,10 +1,13 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2022/10/26 20:07:48 fuyuki NEWS>
+# Time-stamp: <2022/11/01 12:51:17 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.05.5 from 1.05.4
+- (chak) Reshaping redesigned and improved.
 
 * Changes in 1.05.4 from 1.05.3
 - (chak) [critical] default ascii format modified
@@ -12,7 +15,7 @@ Please refer ChangeLog and git log for more information.
 
 * Changes in 1.05.3 from 1.05.2
 - (chak) Improve automatic coordinate matching
-- (chak) -N flag introduced to controll null-coordinate parsing
+- (chak) -N flag introduced to control null-coordinate parsing
 - (chak) some bug fixes.
 
 * Changes in 1.05.2 from 1.05.1
@@ -42,7 +45,7 @@ Please refer ChangeLog and git log for more information.
 * Changes in 1.02.0 from 1.01.0
 - MIROC with-T pilot (xmcomm replacement)
 - (ppp) parallel processing procedures, to replace xmcomm/xmking
-- (emu) emulate miroc utilitly
+- (emu) emulate miroc utility
 
 * Changes in 1.01.0 from 1.00.4
 - Alpha release to provide URT-format trials
@@ -94,7 +97,7 @@ Please refer ChangeLog and git log for more information.
   alone.
 - Module naming modified.  Hard-coded module names are form of
   `TOUZA_<Sub>' or `TOUZA_<Sub>_<member>'.   Transformation of
-  module names are redisigned and reserved for future development.
+  module names are redesigned and reserved for future development.
 - Header files are renamed into `touza_<sub>.h'
 - Default installation paths are changed.  Module files are under
   $(pkgincludedir);  Header file are under $(includedir).
@@ -105,3 +108,10 @@ Please refer ChangeLog and git log for more information.
 # Local Variables:
 # mode: org
 # End:
+
+#  LocalWords:  TOUZA SAITO Fuyuki fuyuki ChangeLog chak ascii jmz YH
+#  LocalWords:  subdirectory nio nctcdf NetCDF nng htb MIROC ppp URT
+#  LocalWords:  xmcomm xmking miroc gtool trp trapiche pkgconf init
+#  LocalWords:  ILS MATSIRO inim env iso fortran formatter ucaln CCC
+#  LocalWords:  pre diag autoconf args arg submodule Subpackages
+#  LocalWords:  touza pkgincludedir includedir
