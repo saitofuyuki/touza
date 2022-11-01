@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/26 17:06:49 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/01 08:54:32 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -242,15 +242,19 @@ program chak
 !!!_  - coordinate matching
   integer,parameter :: co_unset = -4
   integer,parameter :: co_null  = -3
+  integer,parameter :: co_ins   = -2
   integer,parameter :: co_float = -2
   integer,parameter :: co_wild  = -1
+  integer,parameter :: co_normal = 0
 
 !!!_  - misc
   integer :: ulog = -1
   integer :: uerr = -1
   integer irecw
 
-  character,parameter :: rename_sep = '/'
+  character(len=*),parameter :: null_coor = '-'
+  character(len=*),parameter :: rename_sep = '/'
+  character(len=*),parameter :: range_sep = ':'
 
   type(loop_t),save :: def_loop  = loop_t(null_range, null_range, -1, ' ')
 
@@ -688,70 +692,47 @@ contains
     enddo
   end subroutine show_domain
 
-!!!_   . show_order
-  subroutine show_order(ierr, name, order, maxco, tag, idx, u)
-    use TOUZA_Std,only: choice, join_list
+!!!_   . show_stack_perms
+  subroutine show_stack_perms &
+       & (ierr, dom, cname, ctype, cpidx, bufh, pstk, mco, nbuf, u, levv)
+    use TOUZA_Std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
-    character(len=*),intent(in)          :: name(0:*)
-    integer,         intent(in)          :: order(0:*)
-    integer,         intent(in)          :: maxco
-    character(len=*),intent(in),optional :: tag
-    integer,         intent(in),optional :: idx
+    integer,         intent(in)          :: mco, nbuf
+    type(domain_t),  intent(in)          :: dom(0:*)
+    character(len=*),intent(in)          :: cname(0:mco-1, 0:*)
+    integer,         intent(in)          :: ctype(0:mco-1, 0:*)
+    integer,         intent(in)          :: cpidx(0:mco-1, 0:*)
+    integer,         intent(in)          :: bufh(0:*)
+    integer,         intent(in)          :: pstk(0:*)
     integer,         intent(in),optional :: u
-    character(len=32) :: pfx
-    character(len=256) :: txt
-    character(len=32) :: cprop(0:maxco-1)
-    integer jc
-    integer utmp
+    integer,         intent(in),optional :: levv
+    integer utmp, lv
+    integer j
+    integer hb, jb, js
+    character(len=128) :: pstr, dstr
 
     ierr = 0
-    if (present(idx)) then
-101    format('order[', A, '/', I0, ']')
-102    format('order[', I0, ']')
-103    format('order[', A, ']')
-       if (present(tag)) then
-          write(pfx, 101) trim(tag), idx
-       else
-          write(pfx, 102) idx
-       endif
-    else if (present(tag)) then
-       write(pfx, 103) trim(tag)
-    else
-       pfx = 'order'
-    endif
-    do jc = 0, maxco - 1
-111    format('{', A, '}=', I0)
-112    format('{', A, '}=*')
-113    format('{', A, '}=', I0)
-       ! write(*, *) jc, order(jc), name(jc)
-       if (order(jc).ge.0) then
-          if (name(jc).eq.' ') then
-             write(cprop(jc), 111) '*', order(jc)
-          else
-             write(cprop(jc), 111) trim(name(jc)), order(jc)
-          endif
-       else if (order(jc).eq.co_float) then
-          if (name(jc).eq.' ') then
-             write(cprop(jc), 112) '*'
-          else
-             write(cprop(jc), 112) trim(name(jc))
-          endif
-       else if (order(jc).eq.co_null) then
-          if (name(jc).eq.' ') then
-             cprop(jc) = '{-}'
-          else
-             write(cprop(jc), 113) trim(name(jc)), order(jc)
-          endif
-       else
-          write(cprop(jc), 113) trim(name(jc)), order(jc)
-       endif
-    enddo
-    call join_list(ierr, txt, cprop(0:maxco-1))
     utmp = choice(ulog, u)
-201 format(A, 1x, A)
-    write(utmp, 201) trim(pfx), trim(txt)
-  end subroutine show_order
+    lv = choice(lev_verbose, levv)
+
+    do j = 0, nbuf - 1
+       hb = bufh(j)
+       jb = buf_h2item(hb)
+       js = pstk(j)
+       if (ierr.eq.0) then
+          call get_perm_string &
+               & (ierr, pstr, cname(:,j), ctype(:,j), cpidx(:,j), obuffer(jb)%pcp, bstack(js)%lcp, mco)
+       endif
+       if (ierr.eq.0) then
+          call get_domain_perm &
+               & (ierr, dstr, dom(j), cname(:,j), ctype(:,j))
+       endif
+101    format(4x, A, ' >> ', A)
+       write(utmp, 101) trim(pstr), trim(dstr)
+    enddo
+
+  end subroutine show_stack_perms
 
 !!!_  - operator table
 !!!_   . register_operators
@@ -1467,6 +1448,8 @@ contains
              obuffer(jb)%stt  = stt_locked
              call reg_fake_opr(ierr, hbuf, obuffer(jb)%name)
           endif
+       case(opr_PERM)
+          call parse_buffer_shape(ierr, arg(jpar:), hopr)
        case(opr_MISS)
           if (jpar.lt.jend) then
              call parse_number(ierr, undef, arg(jpar:jend-1))
@@ -1504,6 +1487,80 @@ contains
     return
   end subroutine parse_buffer_opr
 
+!!!_   . parse_buffer_shape
+  subroutine parse_buffer_shape (ierr, arg, hopr)
+    use TOUZA_Std,only: split_list
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: arg
+    integer,         intent(in)  :: hopr
+
+    integer lasth, pop, push
+
+    integer jc
+    integer jpb, jpe, larg
+    character,parameter :: csep=','       ! coordinate separaor
+
+    integer jq
+    integer jsbgn, jsend
+    integer b, e, s, jrep
+
+    ierr = 0
+
+    if (ierr.eq.0) call last_queue(ierr, lasth, pop, push)
+    if (ierr.eq.0) then
+       if (lasth.ne.hopr) then
+          call inquire_opr_nstack(ierr, pop, push, hopr)
+          if (ierr.eq.0) then
+             if (pop.ne.push) then
+                ierr = ERR_PANIC
+                call message(ierr, 'panic in transformation property')
+                return
+             endif
+          endif
+          if (ierr.eq.0) then
+             call append_queue_stack(ierr, hopr, pop, push)
+          endif
+       endif
+    endif
+
+    jq = mqueue - 1
+    jsbgn = mstack - pop
+    jsend = mstack
+
+    jc = 0
+    larg = len_trim(arg)
+    jpb = 0
+    do
+       if (jpb.ge.larg) exit
+       jpe = index(arg(jpb+1:), csep) + jpb
+       if (jpe.eq.jpb) jpe = larg + 1
+       if (jpb+1.gt.jpe-1) then
+          continue
+       else if (jc.ge.lcoor) then
+          ierr = ERR_INSUFFICIENT_BUFFER
+          call message(ierr, 'too many ranks to SHAPE:' // trim(arg))
+       else
+          call decompose_coordinate_mod(ierr, jrep, b, e, s, arg(jpb+1:jpe-1))
+          if (ierr.eq.0) then
+             aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
+             aqueue(jq)%lefts(:)%lcp(jc)%bgn  = b
+             aqueue(jq)%lefts(:)%lcp(jc)%end  = e
+             aqueue(jq)%lefts(:)%lcp(jc)%stp  = s
+             bstack(jsbgn:jsend-1)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
+             bstack(jsbgn:jsend-1)%lcp(jc)%bgn = b
+             bstack(jsbgn:jsend-1)%lcp(jc)%end = e
+             bstack(jsbgn:jsend-1)%lcp(jc)%stp = s
+          endif
+          ! aqueue(jq)%lefts(:)%lcp(jc)%name   = adjustl(arg(jpb+1:jpe-1))
+          ! bstack(jsbgn:jsend-1)%lcp(jc)%name = adjustl(arg(jpb+1:jpe-1))
+       endif
+       jc = jc + 1
+       jpb = jpe
+    enddo
+    return
+  end subroutine parse_buffer_shape
+
 !!!_   . parse_coordinate_opr
   subroutine parse_coordinate_opr (ierr, cidx, arg, hopr)
     use TOUZA_Std,only: split_list
@@ -1513,15 +1570,9 @@ contains
     character(len=*),intent(in)  :: arg
     integer,         intent(in)  :: hopr
     integer lasth
-    character,parameter :: nsep=','
-    character,parameter :: rsep=':'
     integer jq
-    integer jp, larg
-    integer rpos(2)
-    integer,parameter :: rdef(2) = (/null_range, null_range/)
-    integer nc
     integer pop, push
-    integer stp
+    integer b, e, s, jrep
 
     ierr = 0
 
@@ -1542,59 +1593,105 @@ contains
           endif
        endif
     endif
-    ! OPR=NAME[/RENAME]
-    ! OPR=RANGE
-    ! OPR=NAME[/RENAME],[RANGE]
-    larg = len_trim(arg)
-
+    if (ierr.eq.0) then
+       call decompose_coordinate_mod(ierr, jrep, b, e, s, arg)
+       ! write(*, *) ierr, b, e, s, arg(1:jrep)
+    endif
     if (ierr.eq.0) then
        jq = mqueue - 1
-       jp = index(arg, nsep)
-       if (jp.eq.0) then
-          call split_list(nc, rpos, arg, rsep, 2, rdef(:))
-          if (nc.lt.0) jp = larg + 1
-       endif
-       if (jp.eq.1) then
-          aqueue(jq)%lefts(:)%lcp(cidx)%name = ' '
-          bstack(mstack-pop:mstack-1)%lcp(cidx)%name = ' '
-       else if (jp.gt.1) then
-          aqueue(jq)%lefts(:)%lcp(cidx)%name = adjustl(arg(1:jp-1))
-          bstack(mstack-pop:mstack-1)%lcp(cidx)%name = adjustl(arg(1:jp-1))
-       endif
-       jp = jp + 1
-       rpos(1) = system_index_bgn(null_range)
-       rpos(2) = system_index_end(null_range)
-       stp = -1
-       if (jp.le.larg) then
-          call split_list(nc, rpos, arg(jp:), rsep, 2, rdef)
-          if (nc.lt.0) then
-             ierr = nc
-             call message(ierr, 'cannot parse coordinate operation (forget comma?): ' // trim(arg))
-          else if (nc.eq.0) then
-             continue
-          else if (nc.eq.1) then
-             rpos(1) = system_index_bgn(rpos(1))
-             rpos(2) = rpos(1) + 1
-             stp = 0
-          else if (nc.eq.2) then
-             stp = 0
-          else if (nc.gt.2) then
-             ierr = ERR_INVALID_PARAMETER
-             call message(ierr, 'fail to extract coordinate ' // trim(arg))
-          endif
-       endif
-       if (ierr.eq.0) then
-          aqueue(jq)%lefts(:)%lcp(cidx)%bgn = system_index_bgn(rpos(1))
-          aqueue(jq)%lefts(:)%lcp(cidx)%end = system_index_end(rpos(2))
-          aqueue(jq)%lefts(:)%lcp(cidx)%stp = stp
-       endif
-       if (ierr.eq.0) then
-          bstack(mstack-pop:mstack-1)%lcp(cidx)%bgn = system_index_bgn(rpos(1))
-          bstack(mstack-pop:mstack-1)%lcp(cidx)%end = system_index_end(rpos(2))
-          bstack(mstack-pop:mstack-1)%lcp(cidx)%stp = stp
-       endif
+       aqueue(jq)%lefts(:)%lcp(cidx)%name = arg(1:jrep)
+       aqueue(jq)%lefts(:)%lcp(cidx)%bgn = b
+       aqueue(jq)%lefts(:)%lcp(cidx)%end = e
+       aqueue(jq)%lefts(:)%lcp(cidx)%stp = s
+
+       bstack(mstack-pop:mstack-1)%lcp(cidx)%name = arg(1:jrep)
+       bstack(mstack-pop:mstack-1)%lcp(cidx)%bgn = b
+       bstack(mstack-pop:mstack-1)%lcp(cidx)%end = e
+       bstack(mstack-pop:mstack-1)%lcp(cidx)%stp = s
     endif
   end subroutine parse_coordinate_opr
+
+!!!_   . decompose_coordinate_mod
+  subroutine decompose_coordinate_mod &
+       & (ierr, jrep, b, e, s, arg)
+    use TOUZA_Std,only: split_list
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: jrep     ! name/rename as (1:jrep)
+    integer,         intent(out) :: b, e, s
+    character(len=*),intent(in)  :: arg
+    integer larg, lsep
+    integer js0, js1
+    integer rpos(2)
+    integer,parameter :: rdef(2) = (/null_range, null_range/)
+    integer nc
+    integer jran
+
+    ! NAME/REPL//RANGE   == NAME/REPL/  RANGE      / before RANGE is absorbed
+    ! NAME/REPL/RANGE    == NAME/REPL   RANGE
+    ! NAME//RANGE        == NAME/       RANGE
+    ! NAME/RANGE         == NAME        RANGE
+    ! NAME/REPL/                                   no / absorption
+    ! NAME/REPL
+    !  NAME REPL  alpha+alnum
+    !  RANGE      [num][:[num]]
+
+    ierr = 0
+    larg = len_trim(arg)
+    lsep = len(rename_sep)
+    js0 = index(arg, rename_sep)
+    jran = -1
+    if (js0.gt.0) then
+       js0 = js0 + lsep
+       js1 = index(arg(js0:), rename_sep)
+       if (js1.gt.0) then
+          jran = js0 - 1 + js1 + lsep
+          jrep = jran - lsep
+          if (jran.le.larg) then
+             if (arg(jran:jran+lsep-1).eq.rename_sep) then
+                jran = jran + lsep
+             else
+                jrep = jrep - lsep
+             endif
+          endif
+       endif
+    else
+       js0 = 1
+    endif
+    if (jran.lt.0) then
+       if (index(('0123456789' // range_sep), arg(js0:js0)).eq.0) then
+          jran = larg + 1
+          jrep = larg
+       else
+          jran = js0
+          jrep = jran - lsep - lsep
+       endif
+    endif
+
+    rpos(1) = system_index_bgn(null_range)
+    rpos(2) = system_index_end(null_range)
+    s = -1
+    call split_list(nc, rpos, arg(jran:larg), range_sep, 2, rdef(:))
+    if (nc.lt.0) then
+       ierr = nc
+       call message(ierr, 'cannot parse range: ' // trim(arg(jran:larg)))
+    else if (nc.eq.0) then
+       continue
+    else if (nc.eq.1) then
+       rpos(1) = system_index_bgn(rpos(1))
+       rpos(2) = rpos(1) + 1
+       s = 0
+    else if (nc.eq.2) then
+       s = 0
+    else if (nc.gt.2) then
+       ierr = ERR_INVALID_PARAMETER
+       call message(ierr, 'fail to extract range ' // trim(arg(jran:larg)))
+    endif
+    b = system_index_bgn(rpos(1))
+    e = system_index_end(rpos(2))
+
+    ! write(*, *) jrep, jran, '{' // arg(1:jrep) // '}{' // arg(jran:larg) // '} ', b, e, s
+  end subroutine decompose_coordinate_mod
 
 !!!_   . stack_buffer_opr
   subroutine stack_buffer_opr (ierr, hopr)
@@ -3088,7 +3185,7 @@ contains
 
 !!!_   . trace_file_access
   subroutine trace_file_access (ierr, fileh, levv, u)
-    use TOUZA_Std,only: join_list, choice
+    use TOUZA_Std,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in)          :: fileh
@@ -3143,7 +3240,7 @@ contains
   end subroutine trace_file_access
 
   subroutine trace_buffer_access (ierr, bufh, u)
-    use TOUZA_Std,only: join_list, choice
+    use TOUZA_Std,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in)          :: bufh
@@ -3160,7 +3257,7 @@ contains
 
 !!!_   . trace_operation
   subroutine trace_operation (ierr, aq, u)
-    use TOUZA_Std,only: join_list, choice
+    use TOUZA_Std,only: choice
     implicit none
     integer,      intent(out)         :: ierr
     type(queue_t),intent(in)          :: aq
@@ -5031,17 +5128,25 @@ contains
 
     integer jc, nc
     integer mc
+    integer jp, ls
 
     ierr = 0
     nc = 0
     mc = choice(lcoor, maxco)
     do jc = 0, mc - 1
        call get_range_string(ierr, cran, lpp(jc)%bgn, lpp(jc)%end, lpp(jc)%stp)
-102    format(A, ',', A)
+102    format(A, A, A)
+103    format(A, A)
        if (lpp(jc)%name.eq.' ') then
           cstr(jc) = trim(cran)
        else
-          write(cstr(jc), 102) trim(lpp(jc)%name), trim(cran)
+          ls = len_trim(lpp(jc)%name)
+          jp = index(lpp(jc)%name(1:ls), rename_sep, back=.TRUE.)
+          if (jp.lt.ls-len(rename_sep)+1) then
+             write(cstr(jc), 102) trim(lpp(jc)%name), rename_sep, trim(cran)
+          else
+             write(cstr(jc), 103) trim(lpp(jc)%name), trim(cran)
+          endif
        endif
        if (lpp(jc)%stp.ge.0) nc = jc
        if (lpp(jc)%name.ne.' ') nc = jc
@@ -5083,6 +5188,207 @@ contains
     endif
 
   end subroutine get_range_string
+
+!!!_   . get_perm_string
+  subroutine get_perm_string &
+       & (ierr, str, cname, ctype, cpidx, pcp, lcp, mco)
+    use TOUZA_Std,only: join_list
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: str
+    character(len=*),intent(in)  :: cname(0:*)
+    integer,         intent(in)  :: ctype(0:*)
+    integer,         intent(in)  :: cpidx(0:*)
+    type(loop_t),    intent(in)  :: pcp(0:*)
+    type(loop_t),    intent(in)  :: lcp(0:*)
+    integer,         intent(in)  :: mco
+
+    character(len=128)   :: pdom, ldom, ndom
+    character(len=lname) :: co(0:mco-1)
+    integer jodr, jco
+    integer meff
+
+    ierr = 0
+
+    if (ierr.eq.0) call get_domain_string(ierr, pdom, pcp, mco)
+    if (ierr.eq.0) call get_domain_string(ierr, ldom, lcp, mco)
+    if (ierr.eq.0) then
+       meff = -1
+111    format(A, '=', A)
+112    format('<', A, '>')
+113    format('<', I0, '>')
+114    format('<', I0, '=', A, '>')
+       do jodr = 0, mco - 1
+          jco = cpidx(jodr)
+          select case(ctype(jodr))
+          case(co_wild)
+             if (jco.ge.0) then
+                if (pcp(jco)%name.ne.' ') then
+                   write(co(jodr), 111) trim(pcp(jco)%name), '*'
+                else
+                   write(co(jodr), 114) jco, '*'
+                endif
+             else
+                write(co(jodr), 112) '*'
+             endif
+          case(co_null)
+             if (jco.ge.0) then
+                if (pcp(jco)%name.ne.' ') then
+                   write(co(jodr), 111) trim(pcp(jco)%name), '-'
+                else
+                   write(co(jodr), 114) jco, '-'
+                endif
+             else
+                write(co(jodr), 112) '-'
+             endif
+          case(co_normal)
+             if (jco.ge.0) then
+                if (pcp(jco)%name.eq.cname(jodr)) then
+                   co(jodr) = cname(jodr)
+                else
+                   write(co(jodr), 111) trim(pcp(jco)%name), trim(cname(jodr))
+                endif
+             else
+                write(co(jodr), 112) trim(cname(jodr))
+             endif
+          case default
+             write(co(jodr), 113) jodr
+          end select
+          if (jco.ge.0 .or. ctype(jodr).ne.co_null) meff = jodr
+       enddo
+       call join_list(ierr, ndom, co(0:meff), ldelim='[', rdelim=']')
+    endif
+    if (ierr.eq.0) then
+101    format(A, 1x, A, ' > ', A)
+       write(str, 101) trim(pdom), trim(ldom), trim(ndom)
+    endif
+  end subroutine get_perm_string
+
+!!!_   . get_domain_perm
+  subroutine get_domain_perm &
+       & (ierr, str, dom, cname, ctype)
+    use TOUZA_Std,only: join_list
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: str
+    type(domain_t),  intent(in)  :: dom
+    character(len=*),intent(in)  :: cname(0:*)
+    integer,         intent(in)  :: ctype(0:*)
+
+    integer jodr, jco
+    character(len=lname*2) :: cbuf(0:lcoor-1)
+
+411 format(A, '/', I0)
+    do jodr = 0, dom%mco - 1
+       jco = dom%lidx(jodr)
+       if (jco.lt.0) then
+          cbuf(jodr) = '.'
+       else if (ctype(jco).eq.co_null) then
+          write(cbuf(jodr), 411) '-', jco
+       else if (ctype(jco).eq.co_wild) then
+          write(cbuf(jodr), 411) '*', jco
+       else
+          write(cbuf(jodr), 411) trim(cname(jco)), jco
+       endif
+    enddo
+    call join_list(ierr, str, cbuf(0:dom%mco-1), ldelim='[', rdelim=']')
+  end subroutine get_domain_perm
+
+!!!_   . get_domain_result
+  subroutine get_domain_result &
+       & (ierr, str, dom, pcp)
+    use TOUZA_Std,only: join_list
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: str
+    type(domain_t),  intent(in)  :: dom
+    type(loop_t),    intent(in)  :: pcp(0:*)
+
+    integer jodr, jphyc
+    character(len=lname)   :: cran
+    character(len=lname*2) :: cbuf(0:lcoor-1)
+    integer b, e, s
+
+    ierr = 0
+    str = ' '
+    do jodr = 0, dom%mco - 1
+       b = dom%bgn(jodr)
+       e = dom%end(jodr)
+       s = pcp(jodr)%stp
+       if (ierr.eq.0) call get_range_string(ierr, cran, b, e, s)
+       if (ierr.eq.0) then
+          jphyc = dom%cidx(jodr)
+101       format(A, '/', A)
+102       format('/', A)
+! 103       format('<', A, '>/', A)
+          select case(jphyc)
+          case(co_wild)
+             write(cbuf(jodr), 101) '*', trim(cran)
+          case(co_null)
+             write(cbuf(jodr), 101) '-', trim(cran)
+          case(0:)
+             if (pcp(jodr)%name.eq.' ') then
+                write(cbuf(jodr), 102) trim(cran)
+             else
+                write(cbuf(jodr), 101) trim(pcp(jodr)%name), trim(cran)
+             endif
+          case default
+             cbuf(jodr) = trim(cran)
+          end select
+       endif
+    enddo
+    if (ierr.eq.0) call join_list(ierr, str, cbuf(0:dom%mco-1))
+  end subroutine get_domain_result
+!!!_   . get_domain_shape
+  subroutine get_domain_shape &
+       & (ierr, str, dom, pcp, lcp, ref)
+    use TOUZA_Std,only: join_list
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: str
+    type(domain_t),  intent(in)  :: dom
+    type(loop_t),    intent(in)  :: pcp(0:*), lcp(0:*)
+    type(domain_t),  intent(in)  :: ref
+
+    integer jodr, jphyc, jlogc
+    character(len=lname)   :: cran
+    character(len=lname*2) :: cbuf(0:lcoor-1)
+    integer b, e, s
+
+    ierr = 0
+    str = ' '
+    do jodr = 0, dom%mco - 1
+       ! call get_logical_range(b, e, s, jodr, lcp, pcp, dom, ref)
+       if (ierr.eq.0) call get_logical_range(b, e, s, jodr, lcp, pcp, dom)
+       if (ierr.eq.0) call get_range_string(ierr, cran, b, e, s)
+       if (ierr.eq.0) then
+          jphyc = dom%cidx(jodr)
+          jlogc = dom%lidx(jodr)
+101       format(A, '/', A)
+102       format('/', A)
+103       format('<', A, '>/', A)
+          select case(jphyc)
+          case(co_wild)
+             write(cbuf(jodr), 101) '*', trim(cran)
+          case(co_null)
+             write(cbuf(jodr), 101) '-', trim(cran)
+          case(0:)
+             if (pcp(jphyc)%name.eq.' ') then
+                write(cbuf(jodr), 102) trim(cran)
+             else
+                write(cbuf(jodr), 101) trim(pcp(jphyc)%name), trim(cran)
+             endif
+          case default
+             if (jlogc.ge.0) then
+                write(cbuf(jodr), 103) trim(lcp(jlogc)%name), trim(cran)
+             else
+                cbuf(jodr) = trim(cran)
+             endif
+          end select
+       endif
+    enddo
+    if (ierr.eq.0) call join_list(ierr, str, cbuf(0:dom%mco-1), ldelim='[', rdelim=']')
+  end subroutine get_domain_shape
 
 !!!_  - operation queue dispatcher
 !!!_   . batch_operation
@@ -5239,6 +5545,8 @@ contains
           call flush_stack(ierr, pop, cmode)
 !!!_    * transformation
        else if (handle.eq.opr_TRANSF) then
+          continue
+       else if (handle.eq.opr_PERM) then
           continue
 !!!_    * index
        else if (handle.ge.opr_C0.and.handle.lt.opr_C3) then
@@ -5441,7 +5749,7 @@ contains
 
 !!!_   . flush_stack
   subroutine flush_stack(ierr, pop, cmode, u)
-    use TOUZA_Std,only: choice, join_list
+    use TOUZA_Std,only: choice
     use TOUZA_Nio,only: show_header, parse_header_size
     implicit none
     integer,intent(out)         :: ierr
@@ -5483,7 +5791,7 @@ contains
 
 !!!_   . flush_buffer_each - flush out buffers for each
   subroutine flush_buffer_each(ierr, nbuf, bufh, bufj, pstk, u)
-    use TOUZA_Std,only: choice, join_list
+    use TOUZA_Std,only: choice
     use TOUZA_Nio,only: show_header, parse_header_size
     implicit none
     integer,intent(out)         :: ierr
@@ -5498,7 +5806,7 @@ contains
     integer js
 
     integer jbuf
-    character(len=64) :: lcstr, pcstr
+    character(len=64) :: lcstr, pcstr, dstr
     character(len=64) :: fmt_nline
     character(len=64) :: fmt_uline
     character(len=64) :: fmt_xline
@@ -5514,7 +5822,11 @@ contains
     utmp = choice(ulog, u)
 
 212 format('# stack[', I0, '] ', A)
-211 format('#   ', A, ' > ', A)
+
+231 format('#      ', A)
+232 format('#   >  ', A)
+233 format('#   >> ', A)
+
 201 format('(', I0, '(I0, 1x), ', A, ')')
 202 format('(', I0, '(I0, 1x), ''.'')')
 203 format('(', I0, '(I0, 1x), ''_'')')
@@ -5531,17 +5843,23 @@ contains
        nb = 1
        btmp(1) = hb
        ptmp(1) = js
-       if (is_msglev(lev_verbose, msglev_normal+1)) then
-          write(utmp, 212) user_index_bgn(jbuf), trim(obuffer(jb)%desc)
-          if (ierr.eq.0) call get_domain_string(ierr, lcstr, bstack(js)%lcp)
-          if (ierr.eq.0) call get_domain_string(ierr, pcstr, obuffer(jb)%pcp)
-          if (ierr.eq.0) write(utmp, 211) trim(pcstr), trim(lcstr)
-       endif
 
        if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, ptmp, nb)
        if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, ptmp, nb)
        if (ierr.eq.0) call settle_output_domain(ierr, domL)
        if (ierr.eq.0) call settle_input_domain(ierr, domR(1), btmp(1), ptmp(1), domL)
+
+       if (is_msglev(lev_verbose, msglev_normal+1)) then
+          write(utmp, 212) user_index_bgn(jbuf), trim(obuffer(jb)%desc)
+          if (ierr.eq.0) call get_domain_string(ierr, lcstr, bstack(js)%lcp)
+          if (ierr.eq.0) call get_domain_string(ierr, pcstr, obuffer(jb)%pcp)
+          if (ierr.eq.0) then
+             call get_domain_shape(ierr, dstr, domR(1), obuffer(jb)%pcp, bstack(js)%lcp, domL)
+          endif
+          if (ierr.eq.0) write(utmp, 231) trim(pcstr)
+          if (ierr.eq.0) write(utmp, 232) trim(lcstr)
+          if (ierr.eq.0) write(utmp, 233) trim(dstr)
+       endif
 
        ! if (is_msglev_DEBUG(lev_verbose)) then
        !    if (ierr.eq.0) call show_domain(ierr, doml, 'left')
@@ -5640,13 +5958,12 @@ contains
     integer j, jb, hb
     integer js
     integer mco
-    integer jl, jp, jc
+    integer jl, jp
     integer lidx(0:lcoor-1), pidx(0:lcoor-1)
-    character(len=64) :: cname(0:lcoor-1)
     character(len=64) :: vals(0:nbuf-1)
     character(len=64) :: fmt_xline
     character(len=64) :: name
-    character(len=64) :: lcstr, pcstr
+    character(len=256) :: dstr
     character(len=256) :: cjoin, vjoin
     type(buffer_t) :: htmp
 
@@ -5659,17 +5976,20 @@ contains
        jb = bufj(j)
        hb = bufh(j)
        js = pstk(j)
-202    format('## ', I0, 1x, A, 1x, A, ' > ', A, 1x, A)
+202    format('## ', I0, 1x, A, 1x, A, 1x, A)
        if (ierr.eq.0) call get_obj_string(ierr, name, hb)
+       if (ierr.eq.0) then
+          call get_domain_shape(ierr, dstr, domr(j), obuffer(jb)%pcp, bstack(js)%lcp, doml)
+       endif
        if (ierr.eq.0) vals(j) = name
-       if (ierr.eq.0) call get_domain_string(ierr, lcstr, bstack(js)%lcp)
-       if (ierr.eq.0) call get_domain_string(ierr, pcstr, obuffer(jb)%pcp)
        if (ierr.eq.0) then
           write(utmp, 202) user_index_bgn(j), trim(name), &
-               & trim(pcstr), trim(lcstr), &
-               & trim(obuffer(jb)%desc)
+               & trim(dstr), trim(obuffer(jb)%desc)
        endif
+
     enddo
+    if (ierr.eq.0) call get_domain_result(ierr, cjoin, doml, htmp%pcp)
+
     if (ierr.eq.0) then
        mco = doml%mco
 201    format('(', I0, '(I0, 1x), ', I0, '(A, 1x))')
@@ -5681,11 +6001,6 @@ contains
        endif
        lidx(0:mco-1) = 0
        doml%bgn(0:mco-1) = user_index_bgn(doml%bgn(0:mco-1))
-       do jc = 0, mco - 1
-          cname(jc) = htmp%pcp(jc)%name
-          if (cname(jc).eq.' ') cname(jc) = '-'
-       enddo
-       if (ierr.eq.0) call join_list(ierr, cjoin, cname(0:mco-1))
        if (ierr.eq.0) call join_list(ierr, vjoin, vals(0:nbuf-1))
 211    format('#', A, 1x, A)
        write(utmp, 211) trim(cjoin), trim(vjoin)
@@ -5751,12 +6066,13 @@ contains
     integer,      intent(out)   :: ierr
     integer,      intent(in)    :: handle
     type(stack_t),intent(inout) :: lefts(0:)
-    integer jctgt, jotgt
+    integer jotgt
+    integer jlogc, jphyc
     integer lasth, jbref
     integer j, jb
     integer js
     integer b, e,  n, jc
-    integer order(0:lcoor-1)
+    integer cpidx(0:lcoor-1), ctype(0:lcoor-1)
     character(len=litem) cname(0:lcoor-1)
     character(len=64) :: opr
 
@@ -5771,25 +6087,25 @@ contains
     endif
     if (ierr.eq.0) then
        js = mstack - 1
-       call order_coordinates &
-            & (ierr, order, cname, bstack(js)%lcp, obuffer(jbref)%pcp, lcoor)
+       call get_logical_shape &
+            & (ierr, cname, ctype, cpidx, bstack(js)%lcp, obuffer(jbref)%pcp, lcoor)
        if (ierr.eq.0) then
-          jctgt = find_first(order(0:lcoor-1), jotgt, offset=0)
-          if (jctgt.lt.0) jctgt = jotgt
+          jlogc = jotgt
+          jphyc = cpidx(jotgt)
        endif
     endif
     if (ierr.eq.0) then
-       b = logical_index(bstack(js)%lcp(jctgt)%bgn, obuffer(jbref)%pcp(jctgt)%bgn)
-       e = logical_index(bstack(js)%lcp(jctgt)%end, obuffer(jbref)%pcp(jctgt)%end)
+       b = logical_index(bstack(js)%lcp(jlogc)%bgn, obuffer(jbref)%pcp(jphyc)%bgn)
+       e = logical_index(bstack(js)%lcp(jlogc)%end, obuffer(jbref)%pcp(jphyc)%end)
        e = max(1 + b, e)
        n = max(1, e - b)
        do j = 0, size(lefts) - 1
           jb = buf_h2item(lefts(j)%bh)
           obuffer(jb)%pcp(:) = def_loop
-          obuffer(jb)%pcp(jctgt)%bgn = b
-          obuffer(jb)%pcp(jctgt)%end = e
-          obuffer(jb)%pcp(jctgt)%stp = 1
-          obuffer(jb)%pcp(jctgt)%name = cname(jctgt)
+          obuffer(jb)%pcp(jotgt)%bgn = b
+          obuffer(jb)%pcp(jotgt)%end = e
+          obuffer(jb)%pcp(jotgt)%stp = 1
+          obuffer(jb)%pcp(jotgt)%name = cname(jotgt)
           obuffer(jb)%undef = UNDEF
           if (ierr.eq.0) call alloc_buffer_t(ierr, obuffer(jb), n)
           if (ierr.eq.0) then
@@ -6280,9 +6596,6 @@ contains
     integer,       intent(in)             :: cmode
     type(buffer_t),intent(inout),optional :: bufo
     integer j
-    integer jb,  jc, jo, js
-    integer b,   e
-    integer low, high
     integer nceff
 
     ierr = 0
@@ -6293,49 +6606,9 @@ contains
        nceff = domL%mco
        select case(cmode)
        case (cmode_first)
-          do j = 0, 0
-             do jo = 0, nceff - 1
-                low  = domL%bgn(jo)
-                high = domL%end(jo)
-                jb = buf_h2item(bufh(j))
-                js = pstk(j)
-                jc = domR(j)%cidx(jo)
-                if (jc.ge.0) then
-                   b = bstack(js)%lcp(jo)%bgn
-                   e = bstack(js)%lcp(jo)%end
-                   if (obuffer(jb)%pcp(jc)%stp.gt.0) then
-                      if (b.eq.null_range) b = obuffer(jb)%pcp(jc)%bgn
-                      if (e.eq.null_range) e = obuffer(jb)%pcp(jc)%end
-                   endif
-                   b = logical_index(b, low)
-                   e = logical_index(e, high)
-                   domL%bgn(jo) = b
-                   domL%end(jo) = e
-                endif
-             enddo
-          enddo
+          call set_inclusive_domain(ierr, domL, domR, bufh, pstk, 1, intersect=.TRUE.)
        case (cmode_intersect)
-          do jo = 0, nceff - 1
-             low  = domL%bgn(jo)
-             high = domL%end(jo)
-             do j = 0, nbuf - 1
-                jb = buf_h2item(bufh(j))
-                jc = domR(j)%cidx(jo)
-                js = pstk(j)
-                if (jc.ge.0) then
-                   b = bstack(js)%lcp(jo)%bgn
-                   e = bstack(js)%lcp(jo)%end
-                   if (obuffer(jb)%pcp(jc)%stp.gt.0) then
-                      if (b.eq.null_range) b = obuffer(jb)%pcp(jc)%bgn
-                      if (e.eq.null_range) e = obuffer(jb)%pcp(jc)%end
-                   endif
-                   low  = max(low,  logical_index(b, low))
-                   high = min(high, logical_index(e, high))
-                endif
-             enddo
-             domL%bgn(jo) = low
-             domL%end(jo) = high
-          enddo
+          call set_inclusive_domain(ierr, domL, domR, bufh, pstk, nbuf, intersect=.TRUE.)
        end select
     endif
     if (ierr.eq.0) call settle_output_domain(ierr, domL)
@@ -6371,682 +6644,714 @@ contains
     type(buffer_t),intent(inout),optional :: bufo
 
     integer nceff
-    character(len=lname) :: newc(0:lcoor-1),   nameR(0:lcoor-1, 0:nbuf-1)
-    integer                 order(0:lcoor-1),  orderR(0:lcoor-1, 0:nbuf-1)
+    character(len=lname) :: nameL(0:lcoor-1),  nameR(0:lcoor-1, 0:nbuf-1)
     integer j, jb, jc, jo, js
+    integer jerr
+
+    integer clidx(0:lcoor-1, 0:nbuf-1)
+    integer cpidx(0:lcoor-1, 0:nbuf-1)
+    integer ctype(0:lcoor-1, 0:nbuf-1)
 
     ierr = 0
     do j = 0, nbuf - 1
        jb = buf_h2item(bufh(j))
        js = pstk(j)
        if (ierr.eq.0) then
-          call order_coordinates &
-               & (ierr, orderR(:,j), nameR(:,j), bstack(js)%lcp, obuffer(jb)%pcp, lcoor)
+          call get_logical_shape &
+               & (ierr, nameR(:,j), ctype(:,j), cpidx(:,j), bstack(js)%lcp, obuffer(jb)%pcp, lcoor)
        endif
     enddo
     if (ierr.eq.0) then
-       call match_coordinates(ierr, nceff, order, newc, orderR, nameR, lcoor, nbuf)
-       if (nceff.gt.lcoor) then
-          ierr = ERR_INSUFFICIENT_BUFFER
-          call message(ierr, 'overflow in tweaking ', (/nceff/))
-          return
-       endif
+       call match_perms(ierr, nceff, nameL, clidx, ctype, nameR, lcoor, nbuf)
     endif
-    if (ierr.eq.0) then
-       domL%mco = nceff
-       domL%ofs(0:nceff-1) = null_range
-       domL%cidx(0:nceff-1) = -1
-       domL%strd(0:nceff) = -1
-       do jc = 0, nceff - 1
-          jo = order(jc)
-          if (jo.ge.0) domL%cidx(jo) = jc
-       enddo
-       if (present(bufo)) then
-          bufo%pcp(:)%name = ' '
-          bufo%pcp(0:nceff-1)%name = newc(0:nceff-1)
-       endif
-    endif
+
     if (ierr.eq.0) then
        do j = 0, nbuf - 1
           domR(j)%mco = nceff
           domR(j)%cidx(0:nceff-1) = -1
           domR(j)%strd(0:nceff) = -1
-          do jc = 0, lcoor - 1
-             jo = orderR(jc, j)
-             if (jo.ge.0) then
-                domR(j)%cidx(jo) = jc
-             else if (nameR(jc, j).ne.' ') then
-                jo = find_first(newc(0:nceff-1), nameR(jc, j), offset=0)
-                if (jo.ge.0) domR(j)%cidx(jo) = jc
-             else if (jo.eq.co_wild) then
-                domR(j)%cidx(jo) = jc
+          do jo = 0, nceff - 1
+             jc = clidx(jo, j)
+             domR(j)%lidx(jo) = jc
+             if (jc.ge.0) then
+                domR(j)%cidx(jo) = cpidx(jc, j)
              endif
           enddo
        enddo
+       domL%mco = nceff
+       domL%ofs(0:nceff-1) = null_range
+       domL%cidx(0:nceff-1) = -1
+       domL%strd(0:nceff) = -1
+       do jc = 0, nceff - 1
+          domL%cidx(jc) = jc
+          ! if (ALL(domR(0:nbuf-1)%cidx(jc).lt.0)) then
+          !    domL%cidx(jc) = co_wild
+          ! else
+          !    domL%cidx(jc) = jc
+          ! endif
+       enddo
+       if (present(bufo)) then
+          bufo%pcp(:)%name = ' '
+          bufo%pcp(0:nceff-1)%name = nameL(0:nceff-1)
+       endif
     endif
+
+    if (ierr.eq.0) then
+       if (is_msglev(lev_verbose, msglev_DETAIL-1)) then
+          call show_stack_perms &
+               & (jerr, domR, nameR, ctype, cpidx, bufh, pstk, lcoor, nbuf)
+       endif
+    endif
+
   end subroutine tweak_coordinates
 
-!!!_   . order_coordinates
-  subroutine order_coordinates(ierr, order, name, lcp, pcp, mco)
-    use TOUZA_Std,only: find_first, parse_number, jot, inrange
+!!!_   . get_logical_shape
+  subroutine get_logical_shape &
+       & (ierr, cname, ctype, cpidx, lcp, pcp, mco)
+    use TOUZA_Std,only: find_first, parse_number
     implicit none
     integer,         intent(out) :: ierr
-    integer,         intent(out) :: order(0:*)
-    character(len=*),intent(out) :: name(0:*)
+    character(len=*),intent(out) :: cname(0:*)   ! coordinate name
+    integer,         intent(out) :: ctype(0:*)   ! coordinate type (unset null wild normal)
+    integer,         intent(out) :: cpidx(0:*)   ! corresponding (physical) index
     type(loop_t),    intent(in)  :: lcp(0:*), pcp(0:*)
     integer,         intent(in)  :: mco
-    integer jc, jt, jo
-    integer larg
-    integer jpold, jpnew
-    integer jctgt
-    integer jcfrm, jcto
-    integer jofrm, joto
-    integer jcnew, jcold
-    integer lsep
-    integer bufo(0:mco-1)
-    integer jerr
-    character(len=lname) :: bufn(0:mco-1)
 
-    character(len=2) :: csyms(0:2) = (/str_X, str_Y, str_Z/)
-    integer tblc2o(0:mco-1), tblo2c(0:mco-1)
-    integer oflg(0:mco-1)
+    ! RANGE is parsed at decompose_coordinate_mod()
+
+    ! NAME/REPL//RANGE   == NAME/REPL/  RANGE      / before RANGE is absorbed
+    ! NAME/REPL/RANGE    == NAME/REPL   RANGE
+    ! NAME//RANGE        == NAME/       RANGE
+    ! NAME/RANGE         == NAME        RANGE
+    !  NAME REPL  alpha+alnum
+    !  RANGE      [num][:[num]]
+
+    ! NAME        order NAME (insert if new)
+    ! NAME/       order NAME (error if new)
+    ! NAME/REPL   order NAME and rename to REPL
+    ! NAME//      order NAME and rename to blank (==wildcard)
+    ! (idx)       not parsed (interpreted as bgn)
+    ! idx/        idx coordinate (error if new)
+    ! idx/REPL    idx coordinate and rename to REPL
+    ! idx//       order NAME and rename to blank
+    ! -           insert null(dummy) rank
+    ! /           keep the order, same name
+    ! //          keep the order and rename to blank
+    ! (null)      no touch
+    ! bgn[:[end]]
+    integer jco
+    integer nranks, nins, nskp
+    integer jodr, jnull
+    character(len=lname) :: cold, crep
+    logical xold, xrep
+    integer jerr
+    integer tblp2l(0:mco-1)
 
     ierr = 0
-    order(0:mco-1) = co_unset
-    name(0:mco-1) = ' '
-    lsep = len(rename_sep)
-    bufo(:) = co_unset
-    bufn(:) = ' '
-    do jc = 0, mco - 1
-       larg = len_trim(lcp(jc)%name)
-       jctgt = -2
-       if (larg.eq.0) then
-          jpold = 0
-          jpnew = -1
-       else
-          jpold = index(lcp(jc)%name, rename_sep)
-          if (jpold.gt.0) then
-             jpnew = index(lcp(jc)%name(jpold+lsep:), rename_sep)
-             if (jpnew.gt.0) then
-                jpnew = jpnew + jpold + lsep - 2
-             else
-                jpnew = larg
-                if (jpold + lsep.gt.jpnew) jpnew = -1
-             endif
-             jpold = jpold - 1
-          else
-             jpold = larg
-             jpnew = -1
-          endif
+    tblp2l(:) = -1
+    cpidx(0:mco-1) = co_unset
+    cname(0:mco-1) = ' '
+    ctype(0:mco-1) = co_unset
+    ! count ranks
+    nranks = 1
+    do jco = mco - 1, 0, -1
+       if (pcp(jco)%stp.ge.0.or.pcp(jco)%name.ne.' ') then
+          nranks = jco + 1
+          exit
        endif
-       if (jpold.gt.0) then
-          ! if force ordering
-          call parse_number(jerr, jctgt, lcp(jc)%name(1:jpold))
-          if (jerr.eq.0) then
-             jctgt = system_index_bgn(jctgt)
-             if (jctgt.lt.0.or.jctgt.ge.mco) jctgt = -1
+    enddo
+    ! parse argument
+    nins = 0
+    do jodr = 0, mco - 1
+       if (ierr.eq.0) then
+          call parse_coordinate_repl(ierr, cold, xold, crep, xrep, lcp(jodr)%name)
+          if (cold.eq.null_coor) then
+             jco = co_ins
+             cold = ' '
+          else if (cold.eq.' ') then
+             if (xold) then
+                jco = jodr
+             else
+                jco = co_null
+             endif
           else
-             jt = find_first(csyms, lcp(jc)%name(1:jpold), offset=0)
-             jctgt = find_first(pcp(0:mco-1)%name, lcp(jc)%name(1:jpold), offset=0)
-             if (jctgt.ge.0) then
-                if (jt.ge.0) then
-                   call message(ierr, 'ignore conflict of coordinate ' // lcp(jc)%name(1:jpold), levm=msglev_info)
+             call parse_number(jerr, jco, cold)
+             if (jerr.eq.0) then
+                jco = system_index_bgn(jco)
+                if (jco.lt.0.or.jco.ge.nranks) then
+                   jco = -1
+                else
+                   cold = pcp(jco)%name
                 endif
              else
-                jctgt = jt
+                jco = find_first(pcp(0:nranks-1)%name, cold, offset=0)
+             endif
+             if (jco.lt.0) then
+                if (xold) then
+                   ierr = ERR_INVALID_PARAMETER
+                   call message(ierr, 'no coordinate ' // cold)
+                   exit
+                else
+                   jco = co_ins
+                   nins = nins + 1
+                endif
              endif
           endif
-          if (jctgt.lt.0) then
-             ierr = ERR_INVALID_PARAMETER
-             call message(ierr, 'fail to search coordinate ' // lcp(jc)%name(1:jpold))
-             exit
+          if (jco.ge.0) then
+             tblp2l(jco) = jodr
+             cpidx(jodr) = jco
+             cname(jodr) = pcp(jco)%name
+          else if (jco.eq.co_ins) then
+             cpidx(jodr) = co_ins
+             cname(jodr) = cold
           endif
-       endif
-       if (jctgt.ge.0) then
-          if (order(jctgt).ge.0) then
-             ierr = ERR_INVALID_PARAMETER
-             call message(ierr, 'duplicate tweak in coordinate extraction/c', (/jctgt/))
-             exit
+          if (xrep) then
+             cname(jodr) = crep
           endif
-          if (jpnew.gt.0) then
-             if (jpold+lsep+1.gt.jpnew) then
-                name(jctgt) = ' '
-             else
-                name(jctgt) = lcp(jc)%name(jpold+lsep+1:jpnew)
-             endif
-          else
-             name(jctgt) = pcp(jctgt)%name
-          endif
-          ! change status only rename to empty
-          order(jctgt) = jc
-       else
-          if (jpnew.gt.0) then
-             if (jpold+lsep+1.gt.jpnew) then
-                bufn(jc) = ' '
-             else
-                bufn(jc) = lcp(jc)%name(jpold+lsep+1:jpnew)
-             endif
-             bufo(jc) = coordinate_flexibility(lcp(jc), pcp(jc), jc, bufn(jc))
-          else if (lcp(jc)%stp.ge.0) then
-             bufn(jc) = pcp(jc)%name
-             bufo(jc) = coordinate_flexibility(lcp(jc), pcp(jc), jc, bufn(jc))
-          endif
+! 101       format('parse_shape:', I0, 1x, I0, ' [', A, '] > ', '[', A, ',', L1,'][', A, ',', L1, ']')
+!           write(*, 101) jodr, jco, trim(lcp(jodr)%name), trim(cold), xold, trim(crep), xrep
        endif
     enddo
     if (ierr.eq.0) then
-       do jc = 0, mco - 1
-          if (order(jc).ne.co_unset .and. bufo(jc).ne.co_unset) then
-             ierr = ERR_INVALID_PARAMETER
-             call message(ierr, 'duplicate tweak in coordinate extraction/a', (/jc/))
-             exit
-          endif
-       enddo
-    endif
-
-    ! automatic coordinate shifts
-    if (ierr.eq.0) then
-       call jot(tblc2o, mco)
-       call jot(tblo2c, mco)
-       do jc = 0, mco - 1
-          if (bufo(jc).eq.co_unset) then
-             bufn(jc) = pcp(jc)%name
-             bufo(jc) = coordinate_flexibility(lcp(jc), pcp(jc), jc, bufn(jc))
-          endif
-       enddo
-       oflg(0:mco-1) = co_unset
-       do jc = 0, mco - 1
-          if (order(jc).lt.0.and.bufo(jc).eq.co_null) oflg(jc) = co_null
-       enddo
-       do jcfrm = 0, mco - 1
-          jofrm = tblc2o(jcfrm)
-          joto = order(jcfrm)
-          jcto = tblo2c(joto)
-          if (joto.lt.0) cycle
-          if (jofrm.lt.joto) then
-             ! F<<<T (-1)
-             jo = joto
-             jcnew = jcfrm
-             do
-                if (jo.le.jofrm) exit
-                jcold = tblo2c(jo)
-                if (oflg(jo).lt.0) then
-                   tblo2c(jo) = jcnew
-                   tblc2o(jcnew) = jo
-                   jcnew = jcold
-                   if (oflg(jo).eq.co_null) then
-                      oflg(jo) = co_unset
-                      oflg(jofrm) = co_null
-                      exit
+       ! adjust unset
+       jnull = 0
+       nskp = 0
+       jodr = 0
+       do jco = 0, nranks - 1
+          if (tblp2l(jco).lt.0) then
+             ! write(*, *) 'shape/unset', jodr, jco, trim(pcp(jco)%name)
+             if (pcp(jco)%stp.le.0.and.pcp(jco)%name.eq.' ') then
+                nskp = nskp + 1
+                ! write(*, *) 'shape/unset/null', jodr, jco, nskp, nins
+                if (nskp.le.nins) then
+                   jnull = find_first(cpidx(jnull:mco-1), co_null, offset=jnull, no=mco)
+                   if (jnull.lt.mco) then
+                      tblp2l(jco) = jnull
+                      cpidx(jnull) = jco
+                      jnull = jnull + 1
                    endif
-                endif
-                jo = jo - 1
-             enddo
-             tblo2c(jofrm) = jcnew
-             tblc2o(jcnew) = jofrm
-             oflg(joto) = jcfrm
-          else
-             ! T>>>F (+1)
-             jo = joto
-             jcnew = jcfrm
-             do
-                if (jo.ge.jofrm) exit
-                jcold = tblo2c(jo)
-                if (oflg(jo).lt.0) then
-                   tblo2c(jo) = jcnew
-                   tblc2o(jcnew) = jo
-                   jcnew = jcold
-                   if (oflg(jo).eq.co_null) then
-                      oflg(jo) = co_unset
-                      oflg(jofrm) = co_null
-                      exit
-                   endif
-                endif
-                jo = jo + 1
-             enddo
-             tblo2c(jofrm) = jcnew
-             tblc2o(jcnew) = jofrm
-             oflg(joto) = jcfrm
-          endif
-       enddo
-    endif
-    ! final adjustment for wildcard coordinates
-    if (ierr.eq.0) then
-       do jc = 0, mco - 1
-          if (bufo(jc).eq.co_wild.and.order(jc).lt.0) then
-             jo = tblc2o(jc)
-             if (jc.ne.jo) then
-                jt = tblo2c(jc)
-                if (bufo(jt).eq.co_float .and. order(jt).lt.0) then
-                   tblc2o(jc) = jc
-                   tblo2c(jc) = jc
-                   tblo2c(jo) = jt
-                   tblc2o(jt) = jo
+                   cycle
                 endif
              endif
+             jodr = find_first(cpidx(jodr:mco-1), co_unset, offset=jodr)
+             if (jodr.lt.0) then
+                ierr = ERR_INSUFFICIENT_BUFFER
+                call message(ierr, 'overflow in permutation:' // trim(pcp(jco)%name))
+                exit
+             endif
+             tblp2l(jco) = jodr
+             cpidx(jodr) = jco
+             cname(jodr) = pcp(jco)%name
+             jodr = jodr + 1
           endif
        enddo
-       do jc = 0, mco - 1
-          if (bufo(jc).eq.co_wild.and.order(jc).lt.0) order(jc) = tblc2o(jc)
-       enddo
-       do jc = 0, mco - 1
-          if (order(jc).lt.0) order(jc) = bufo(jc)
-          if (name(jc).eq.' ') name(jc) = bufn(jc)
+    endif
+    ! nranks = find_first(cpidx(0:mco-1), co_unset, offset=0, no=mco)
+    ! nranks = max(nranks, jodr)
+
+    if (ierr.eq.0) then
+       nranks = 0
+       ! adjust coordinate types
+       do jodr = 0, mco - 1
+          ! write(*, *) 'shape/pcp', jodr, pcp(jodr)
+          ! write(*, *) 'shape/lcp', jodr, lcp(jodr)
+          if (cpidx(jodr).ge.0) then
+             ctype(jodr) = coordinate_type(cname(jodr), lcp(jodr), pcp(cpidx(jodr)))
+          else
+             ctype(jodr) = coordinate_type(cname(jodr), lcp(jodr))
+          endif
+          if (cpidx(jodr).ge.0.or.ctype(jodr).ne.co_null) nranks = jodr + 1
        enddo
     endif
-  end subroutine order_coordinates
 
-!!!_   . coordinate_flexibility
-  integer function coordinate_flexibility (lcp, pcp, org, name) result(k)
+    if (ierr.eq.0) then
+       ! do jodr = 0, nranks - 1
+       !    if (ctype(jodr).ne.co_unset) then
+       !       write(*, *) 'shape/perm:', jodr, cpidx(jodr), ctype(jodr), ' ', trim(cname(jodr))
+       !    endif
+       ! enddo
+    endif
+
+  end subroutine get_logical_shape
+
+!!!_   . parse_coordinate_repl
+  subroutine parse_coordinate_repl &
+       & (ierr, cold, xold, crep, xrep, str)
     implicit none
-    type(loop_t),    intent(in) :: lcp
-    type(loop_t),    intent(in) :: pcp
-    integer,         intent(in) :: org
-    character(len=*),intent(in) :: name
-    if (name.ne.' ') then
-       k = co_float
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: cold, crep
+    logical,         intent(out) :: xold, xrep
+    character(len=*),intent(in)  :: str
+
+    integer lstr,  lsep
+    integer jsep0, jsep1
+    ierr = 0
+
+    lstr = len_trim(str)
+    if (lstr.eq.0) then
+       ! (null)
+       xold = .FALSE.
+       xrep = .FALSE.
+       cold = ' '
+       crep = ' '
+       return
+    endif
+    jsep0 = index(str, rename_sep)
+    if (jsep0.eq.0) then
+       ! NAME
+       xold = .FALSE.
+       xrep = .FALSE.
+       cold = str(1:lstr)
+       crep = ' '
+       return
+    endif
+
+    ! [NAME]/[REPL[/]]
+    xold = .TRUE.
+    cold = str(1:jsep0-1)
+    lsep = len(rename_sep)
+    jsep1 = index(str(jsep0+lsep:), rename_sep)
+    if (jsep1.eq.0) then
+       ! [NAME]/REPL
+       crep = str(jsep0+lsep:lstr)
+       xrep = (jsep0+lsep) .le. lstr
     else
-       if (pcp%stp.gt.0) then
-          ! k = org
-          k = co_wild
-       else if (lcp%bgn.eq.null_range.and.lcp%end.eq.null_range) then
-          k = co_null
+       ! [NAME]/REPL/
+       jsep1 = jsep0 + lsep + jsep1 - 2
+       crep = str(jsep0+lsep:jsep1)
+       xrep = .TRUE.
+    endif
+
+  end subroutine parse_coordinate_repl
+
+!!!_   . coordinate_type
+  integer function coordinate_type(name, lcp, pcp) result(n)
+    implicit none
+    character(len=*),intent(in)          :: name
+    type(loop_t),    intent(in)          :: lcp
+    type(loop_t),    intent(in),optional :: pcp
+    integer b,e
+
+    if (name.ne.' ') then
+       n = co_normal
+       return
+    endif
+    n = co_unset
+    if (present(pcp)) then
+       if (lcp%stp.lt.0) then
+          if (pcp%stp.gt.0) then
+             n = co_wild
+          else
+             n = co_null
+          endif
        else
-          ! k = org
-          k = co_wild
+          b = logical_index(lcp%bgn, pcp%bgn)
+          e = logical_index(lcp%end, pcp%end)
+          if (b.eq.null_range .eqv. e.eq.null_range) then
+             if (b.eq.null_range) then
+                n = co_null
+             else if (b.lt.e) then
+                n = co_wild
+             else
+                n = co_null
+             endif
+          else
+             n = co_wild
+          endif
+       endif
+    else
+       if (lcp%stp.lt.0) then
+          n = co_null
+       else
+          b = lcp%bgn
+          e = lcp%end
+          if (b.eq.null_range .eqv. e.eq.null_range) then
+             if (b.eq.null_range) then
+                n = co_null
+             else if (b.lt.e) then
+                n = co_wild
+             else
+                n = co_null
+             endif
+          else
+             n = co_wild
+          endif
        endif
     endif
-  end function coordinate_flexibility
 
-!!!_   . match_coordinates
-  subroutine match_coordinates(ierr, nceff, order, name, oadd, nadd, mco, nbuf)
-    use TOUZA_Std,only: choice, find_first, find_first_range
+  end function coordinate_type
+
+!!!_   . match_perms
+  subroutine match_perms(ierr, nceff, cnameL, clidxR, ctypeR,  cnameR, mco, nbuf, ltbl)
+    use TOUZA_Std,only: choice, find_first, find_first_range, join_list
     implicit none
-    integer,         intent(out)         :: ierr
-    integer,         intent(in)          :: mco
-    integer,         intent(out)         :: nceff
-    integer,         intent(inout)       :: order(0:*)
-    character(len=*),intent(inout)       :: name(0:*)
-    integer,         intent(inout)       :: oadd(0:mco-1, 0:*)
-    character(len=*),intent(inout)       :: nadd(0:mco-1, 0:*)
-    integer,         intent(in)          :: nbuf
-    integer limtry
-    integer                 newo(0:mco*2-1)
-    character(len=lname) :: newc(0:mco*2-1)
-    integer jbufa, jcoa
-    integer kta
-    integer jx
-    integer jcrob
-    integer jtmp
-    integer jerr
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: mco
+    integer,         intent(out) :: nceff
+    character(len=*),intent(out) :: cnameL(0:*)
+    integer,         intent(out) :: clidxR(0:mco-1, 0:*)
+    integer,         intent(in)  :: ctypeR(0:mco-1, 0:*)
+    character(len=*),intent(in)  :: cnameR(0:mco-1, 0:*)
+    integer,         intent(in)  :: nbuf
+    integer,optional,intent(in)  :: ltbl
+
+    integer jbref
+    integer jodr, jco, jt
+    integer jb
+    integer mref, meff(0:nbuf-1)
+    integer gidx(0:mco-1, 0:nbuf-1)
+    integer jup, jcur, jlast, joref
+    integer ctref(0:mco-1)
+    integer nlim, nmem
+    ! integer jerr
+    ! character(len=256) :: str
+
+    integer nt
+    integer,save :: mtbl = -1
+    integer,             allocatable,save :: cout(:, :), nin(:), jbuf(:), jpack(:)
+    character(len=lname),allocatable,save :: cbuf(:)
 
     ierr = 0
     nceff = -1
-    limtry = mco * 2
-    order(0:mco-1) = co_unset
-    name(0:mco-1)  = ' '
-
-    newo(0:limtry-1) = co_unset
-    newc(0:limtry-1) = ' '
-!!!_    * assign robust coordinates
-    ! do jbufa = 0, nbuf - 1
-    !    call diag_order(ierr, nadd(:, jbufa), oadd(:, jbufa), mco, idx=jbufa)
-    ! enddo
-    loop_robust: do jbufa = 0, nbuf - 1
-       do jcoa = 0, mco - 1
-          kta = oadd(jcoa, jbufa)
-          if (kta.ge.0) then
-             if (nadd(jcoa, jbufa).ne.' ') then
-                jx = find_first(newc(0:limtry-1), nadd(jcoa, jbufa), offset=0)
-                if (jx.ge.0 .and. jx.ne.kta) then
-                   ierr = ERR_INVALID_PARAMETER
-                   call message(ierr, 'dispersed robust coordinate:' // trim(nadd(jcoa, jbufa)), (/jx, kta/))
-                   exit loop_robust
-                endif
-             endif
-             if (newo(kta).eq.co_unset) then
-                newo(kta) = kta
-                newc(kta) = nadd(jcoa, jbufa)
-             else if (newc(kta).eq.' ') then
-                newc(kta) = nadd(jcoa, jbufa)
-             else if (nadd(jcoa, jbufa).eq.' ') then
-                continue
-             else if (newc(kta).eq.nadd(jcoa, jbufa)) then
-                continue
-             else
-                ierr = ERR_INVALID_PARAMETER
-                call message(ierr, 'conflict robust coordinates: ' &
-                     & // trim(newc(kta)) // ' ' // trim(nadd(jcoa, jbufa)), &
-                     & (/kta/))
-                exit loop_robust
-             endif
-          endif
-       enddo
-    enddo loop_robust
-    if (ierr.ne.0.or.is_msglev_DEBUG(lev_verbose)) then
-       call show_order(jerr, newc, newo, mco, tag='robust')
-       do jbufa = 0, nbuf - 1
-          call show_order(jerr, nadd(:, jbufa), oadd(:, jbufa), mco, tag='robust', idx=jbufa)
-       enddo
-    endif
-!!!_    * assign fragile and wild-card coordinates (twice)
-    if (ierr.eq.0) then
-       loop_wild: do jtmp = 0, 1
-          do jbufa = 0, nbuf - 1
-             do jcoa = 0, mco - 1
-                if (oadd(jcoa, jbufa).eq.co_float) then
-                   jcrob = find_first(newc(0:limtry-1), nadd(jcoa, jbufa), offset=0)
-                   ! write(*, *) 'rob', jcoa, jbufa, jcrob, newo(jcoa), newc(jcoa)
-                   if (jcrob.ge.0) then
-                      if (oadd(jcrob, jbufa).eq.jcrob) then
-                         ierr = ERR_INVALID_PARAMETER
-                         call message(ierr, 'ambiguous wildcard coordinates ', (/jbufa, jcoa, jcrob/))
-                         exit loop_wild
-                      else
-                         oadd(jcoa, jbufa) = jcrob
-                      endif
-                   else if (newo(jcoa).ge.0) then
-                      jcrob = find_first(oadd(:, jbufa), jcoa, offset=0)
-                      if (jcrob.ge.0) then
-                         continue
-                      else if (newc(jcoa).eq.' ') then
-                         newc(jcoa) = nadd(jcoa, jbufa)
-                         oadd(jcoa, jbufa) = jcoa
-                      else if (newc(jcoa).eq.nadd(jcoa, jbufa)) then
-                         oadd(jcoa, jbufa) = jcoa
-                      endif
-                   endif
-                endif
-             enddo
-          enddo
-       enddo loop_wild
-       if (ierr.ne.0.or.is_msglev_DEBUG(lev_verbose)) then
-          call show_order(jerr, newc, newo, mco, tag='wild')
-          do jbufa = 0, nbuf - 1
-             call show_order(jerr, nadd(:, jbufa), oadd(:, jbufa), mco, tag='wild', idx=jbufa)
-          enddo
-       endif
-    endif
-!!!_    * adjust fragiles
-    if (ierr.eq.0) then
-       call topological_ordering &
-            & (ierr, newc, newo, limtry, nadd, oadd, mco, nbuf)
-       if (ierr.ne.0.or.is_msglev_DEBUG(lev_verbose)) then
-          call show_order(jerr, newc, newo, mco, tag='fragile')
-          do jbufa = 0, nbuf - 1
-             call show_order(jerr, nadd(:, jbufa), oadd(:, jbufa), mco, tag='fragile', idx=jbufa)
-          enddo
-       endif
-    endif
-!!!_    * final
-    if (ierr.eq.0) then
-       do jbufa = 0, nbuf - 1
-          do jcoa = 0, mco - 1
-             if (nadd(jcoa, jbufa).eq.' ') then
-                jcrob = oadd(jcoa, jbufa)
-                if (jcrob.ge.0) nadd(jcoa, jbufa) = newc(jcrob)
-             endif
-          enddo
-       enddo
-       nceff = find_first_range(newo(0:limtry-1), low=0, offset=0, back=.TRUE.) + 1
-       order(0:nceff) = newo(0:nceff)
-       name(0:nceff) = newc(0:nceff)
-       if (is_msglev_DEBUG(lev_verbose)) then
-          call show_order(jerr, newc, newo, nceff, tag='match')
-          do jbufa = 0, nbuf - 1
-             call show_order(jerr, nadd(:, jbufa), oadd(:, jbufa), mco, tag='match', idx=jbufa)
-          enddo
-       endif
-    endif
-
-  end subroutine match_coordinates
-
-!!!_   . topological_ordering
-  subroutine topological_ordering &
-       & (ierr, newc, newo, lco, nadd, oadd, mco, nbuf)
-    use TOUZA_Std,only: find_first
-    implicit none
-    integer,         intent(out)   :: ierr
-    character(len=*),intent(inout) :: newc(0:*)
-    integer,         intent(inout) :: newo(0:*)
-    integer,         intent(in)    :: lco
-    integer,         intent(in)    :: mco, nbuf
-    character(len=*),intent(inout) :: nadd(0:mco-1, 0:*)
-    integer,         intent(in)    :: oadd(0:mco-1, 0:*)
-
-    character(len=lname) :: ctmp
-    character(len=lname) :: cbuf(0:lco-1)
-    integer nin(0:lco-1)
-    integer cout(0:lco-1, 0:lco-1)
-    integer nlevl(0:lco-1), nlevh(0:lco-1)
-
-    integer jc, nc
-    integer jb, jp, jt, jp2
-    integer jdest, jdiv, jtgt
-    integer jsafe
-    logical nflag
-    character(len=*),parameter :: fmt_wild='(1x, ''$$'', I0)'
-
-    ierr = 0
-
-    cout(:, :) = -1
-    nc = 0
-    cbuf(:) = ' '
-    nlevl(:) = -1
-    nlevh(:) = -1
-    co_scan: do jb = 0, nbuf - 1
-       nflag = .TRUE.
-       do jc = 0, mco - 1
-          ctmp = nadd(jc, jb)
-          if (ctmp.eq.' '.and. oadd(jc, jb).ge.0) then
-             write(ctmp, fmt_wild) jc
-             nadd(jc, jb) = ctmp
-          endif
-          if (ctmp.eq.' ') cycle
-          jp = find_first(cbuf(0:nc-1), ctmp, offset=0)
-          if (jp.lt.0) then
-             jp = nc
-             nc = nc + 1
-             if (nc.ge.lco) exit co_scan
-             cbuf(jp) = ctmp
-          endif
-          jt = oadd(jc, jb)
-          if (jt.lt.0) jt = jc
-          nlevh(jp) = max(jt, nlevh(jp))
-          if (nflag) nlevl(jp) = max(jt, nlevl(jp))
-          nflag = .FALSE.
-       enddo
-    enddo co_scan
-    ! set tree
-    if (nc.lt.lco) then
-       do jb = 0, nbuf - 1
-          do jc = 0, mco - 1
-             jdest = oadd(jc, jb)
-             ! ctmp = nadd(jc, jb)
-             ! if (ctmp.eq.' '.and. oadd(jc, jb).ge.0) then
-             !    write(ctmp, fmt_wild), jc
-             ! endif
-             if (nadd(jc, jb).eq.' ') cycle
-             if (jdest.eq.co_float) then
-                jp = find_first(cbuf(0:nc-1), nadd(jc, jb), offset=0)
-                do jt = jc + 1, mco - 1
-                   if (oadd(jt, jb).eq.co_float) then
-                      jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
-                      cout(jp2, jp) = 1
-                      exit
-                   endif
-                enddo
-             else if (jdest.ge.0) then
-                jdiv = jdest + 1
-                if (jdest.le.jc) jdiv = jdiv - 1
-                jp = find_first(cbuf(0:nc-1), nadd(jc, jb), offset=0)
-                jt = -1
-                do jtgt = jdest + 1, mco - 1
-                   jt = find_first(oadd(0:mco-1, jb), jtgt, offset=0)
-                   if (jt.ge.0) then
-                      jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
-                      if (jp2.ge.0) cout(jp2, jp) = 1
-                      exit
-                   endif
-                enddo
-                if (jt.lt.0) then
-                   do jt = jdiv, mco - 1
-                      if (oadd(jt, jb).eq.co_float) then
-                         jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
-                         if (jp2.ge.0) cout(jp2, jp) = 1
-                         exit
-                      endif
-                   enddo
-                endif
-                jt = -1
-                do jtgt = jdest - 1, 0, -1
-                   jt = find_first(oadd(0:mco-1, jb), jtgt, offset=0)
-                   if (jt.ge.0) then
-                      jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
-                      if (jp2.ge.0) cout(jp, jp2) = 1
-                      exit
-                   endif
-                enddo
-                ! if (jdest.gt.0) then
-                !    jt = find_first(oadd(0:mco-1, jb), jdest - 1, offset=0)
-                ! else
-                !    jt = -1
-                ! endif
-                ! if (jt.ge.0) then
-                !    jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
-                !    if (jp2.ge.0) cout(jp, jp2) = 1
-                ! else
-                if (jt.lt.0) then
-                   do jt = jdiv - 1, 0, -1
-                      if (oadd(jt, jb).eq.co_float) then
-                         jp2 = find_first(cbuf(0:nc-1), nadd(jt, jb), offset=0)
-                         if (jp2.ge.0) cout(jp, jp2) = 1
-                         exit
-                      endif
-                   enddo
-                endif
-             endif
-          enddo
-       enddo
-       ! ! adjust natural ordering
-       do jp = 0, nc - 1
-          if (nlevl(jp).ge.0) then
-             do jp2 = 0, nc - 1
-                if (nlevh(jp2).lt.nlevl(jp)) cout(jp, jp2) = 1
-             enddo
-          endif
-       enddo
-       do jp = 0, nc - 1
-          nin(jp) = count(cout(jp, 0:nc-1).ge.0)
-       enddo
-       ! do jp = 0, nc - 1
-       !    write(*, *) 'topo:', trim(cbuf(jp)), nlevl(jp), nlevh(jp), ' / ', nin(jp), ' ', cout(0:nc-1, jp)
-       ! enddo
-    endif
-    ! sort
-    jc = 0
-    if (nc.ge.lco) then
-       ierr = ERR_INSUFFICIENT_BUFFER
-       call message(ierr, 'overflow to match fragile coordinates')
+    if (nbuf.lt.1) then
+       ierr = ERR_PANIC
+       call message(ierr, 'empty buffers in permutation matching')
        return
-    else
-       jsafe = 0
+    endif
+    nt = choice(0, ltbl)
+    if (nt.lt.mco) nt = mco * 3
+    if (mtbl.lt.nt) then
+       if (mtbl.ge.0) then
+          deallocate(cout, nin, cbuf, jbuf, jpack, STAT=ierr)
+          if (ierr.ne.0) return
+       endif
+       mtbl = nt
+       allocate(cout(0:mtbl-1,0:mtbl-1), nin(0:mtbl-1), cbuf(0:mtbl-1), &
+            &   jbuf(0:mtbl-1),          jpack(0:mtbl-1), &
+            & STAT=ierr)
+       if (ierr.ne.0) then
+          ierr = ERR_ALLOCATION
+          call message(ierr, 'allocation failed.')
+          return
+       endif
+    endif
+    cout(:,:) = -1
+    nin(:) = -1
+    cbuf(:) = ' '
+
+    jbref = 0
+    do jb = 0, nbuf - 1
+       meff(jb) = count_coordinates(ctypeR(:, jb), cnameR(:, jb), mco)
+    enddo
+    mref = maxval(meff(0:nbuf-1))
+    ! write(*, *) 'perm', mref, '/', meff(0:nbuf-1)
+    ! set reference priority table
+    jb = jbref
+    nt = 0
+    jup = -1
+    do jodr = 0, meff(jb) - 1
+       cbuf(nt) = cnameR(jodr, jb)
+       if (jup.ge.0) cout(nt, jup) = nt
+       gidx(jodr, jb) = nt
+       jup = nt
+       nt = nt + 1
+    enddo
+    do jodr = meff(jb), mref - 1
+       cbuf(nt) = ' '
+       if (jup.ge.0) cout(nt, jup) = nt
+       gidx(jodr, jb) = nt
+       jup = nt
+       nt = nt + 1
+    enddo
+    ctref(0:mco-1) = ctypeR(0:mco-1, jb)
+    do jb = 1, nbuf - 1
+       do jodr = 0, meff(jb) - 1
+          if (ctypeR(jodr, jb).eq.co_wild.and.ctref(jodr).eq.co_null) ctref(jodr) = co_wild
+       enddo
+    enddo
+    ! set other priority table
+    other: do jb = 1, nbuf - 1
+       do jodr = 0, meff(jb) - 1
+          select case(ctypeR(jodr, jb))
+          case(co_normal)
+             if (ctref(jodr).eq.co_wild) then
+                jcur = jodr
+             else
+                jcur = find_first(cbuf(0:nt-1), cnameR(jodr, jb), offset=0)
+                if (jcur.lt.0) then
+                   jcur = nt
+                   nt = nt + 1
+                   if (nt.gt.mtbl) then
+                      ierr = ERR_INSUFFICIENT_BUFFER
+                      exit other
+                   endif
+                   cbuf(jcur) = cnameR(jodr, jb)
+                endif
+             endif
+          case(co_wild)
+             jcur = jodr
+          case(co_null)
+             jcur = -1
+          case default
+             jcur = -1
+          end select
+          gidx(jodr, jb) = jcur
+       enddo
+    enddo other
+    if (ierr.eq.0) then
+       ! duplication check
+       do jb = 0, nbuf - 1
+          do jodr = 0, meff(jb) - 1
+             jco = gidx(jodr, jb)
+             if (jco.lt.0) cycle
+             if (count(gidx(jodr + 1:meff(jb) - 1, jb).eq.jco).gt.0) then
+                ierr = ERR_INVALID_PARAMETER
+                call message(ierr, 'duplicate tweaking ', (/jb, jco/))
+301             format('duplicate:', I0, 1x, I0, 1x, A)
+                do jt = jodr, meff(jb) - 1
+                   if (gidx(jt, jb).eq.jco) write(*, 301) jb, jt, trim(cnameR(jt, jb))
+                enddo
+             endif
+          enddo
+       enddo
+    endif
+    if (ierr.eq.0) then
+       ! adjust topology table
+       do jb = 0, nbuf - 1
+          jup = -1
+          jlast = -1
+          joref = -1
+          do jodr = 0, meff(jb) - 1
+             jcur = gidx(jodr, jb)
+             if (jcur.ge.mref) then
+                ! new coordinate
+                if (jup.ge.0) cout(jcur, jup) = jcur
+                if (joref.ge.0) cout(jcur, joref) = jcur
+                jup = jcur
+                jlast = jcur
+                if (ctref(jodr).eq.co_null) cout(jcur, jodr) = jcur
+                if (jodr.lt.mref-1) cout(jodr+1, jcur) = jodr+1
+             else if (jcur.ge.0) then
+                ! reference coordinate
+                if (jlast.ge.0) cout(jcur, jlast) = jcur
+                if (jcur.ge.joref) joref = jcur
+             endif
+          enddo
+       enddo
+    endif
+    if (ierr.eq.0) then
+       do jt = 0, nt - 1
+          nin(jt) = count(cout(jt, 0:nt-1).ge.0)
+          ! write(*, *) 'perm/topo', jt, nin(jt), '/', cout(0:nt-1, jt)
+       enddo
+    endif
+    if (ierr.eq.0) then
+       jodr = 0
        sort: do
-          if (COUNT(nin(0:nc-1).eq.0).gt.1) then
+          if (COUNT(nin(0:nt-1).eq.0).gt.1) then
              ierr = ERR_INVALID_PARAMETER
-             call message(ierr, 'ambiguous fragile coordinates')
-             do jp = 0, nc - 1
-                write(*, *) 'topo:', trim(cbuf(jp)), nlevl(jp), nlevh(jp), ' / ', nin(jp), ' ', cout(0:nc-1, jp)
+             call message(ierr, 'ambiguous fragile coordinates ', (/jodr/))
+             do jt = 0, nt - 1
+311             format('perm:collision: ', I0, 1x, I0, 1x, A)
+                if (nin(jt).eq.0) write(*, 311) jodr, jt, cbuf(jt)
              enddo
-             return
           endif
-          jp = find_first(nin(0:nc-1), 0, offset=0)
-          if (jp.lt.0) exit sort
-          ! write(*, *) trim(cbuf(jp)), nlevl(jp), nlevh(jp)
-          jt = find_first(newc(jc:lco-1), cbuf(jp), offset=jc)
-          if (jt.ge.jc) jc = jt
-          newo(jc) = jc
-          newc(jc) = cbuf(jp)
-          jc = jc + 1
-          nin(jp) = -1
-          do jt = 0, nc - 1
-             if (cout(jt, jp).gt.0) then
+          jco = find_first(nin(0:nt-1), 0, offset=0)
+          if (jco.lt.0) exit sort
+          jbuf(jodr) = jco
+          jodr = jodr + 1
+          nin(jco) = -1
+          do jt = 0, nt - 1
+             if (cout(jt, jco).ge.0) then
                 nin(jt) = max(0, nin(jt) - 1)
              endif
           enddo
-          jsafe = jsafe + 1
-          ! safety guard
-          if (jsafe.gt.nc * nc * 2) then
-             ierr = ERR_PANIC
-             exit
-          endif
        enddo sort
-       if (ierr.ne.0) then
-          call message(ierr, 'PANIC in topological_ordering')
-          return
-       endif
-       if (jc.lt.nc) then
-          ierr = ERR_INVALID_PARAMETER
-          call message(ierr, 'cycle in fragile coordinates')
-          return
+       if (ierr.eq.0) then
+          if (jodr.lt.nt) then
+             ierr = ERR_INVALID_PARAMETER
+             call message(ierr, 'cycle in fragile coordinates')
+             do jt = 0, nt - 1
+312             format('perm:cycle: ', I0, 1x, I0, 1x, A)
+                if (nin(jt).ge.0) write(*, 312) jodr, jt, cbuf(jt)
+             enddo
+          endif
        endif
     endif
     if (ierr.eq.0) then
-       ! revert wildcard
-       do jc = 0, lco - 1
-          if (newc(jc)(1:1).eq.' '.and.newc(jc).ne.' ') newc(jc) = ' '
+       ! write(*, *) jbuf(0:nt-1)
+       ! packing
+       jpack(0:nt-1) = -1
+       nceff = 0
+       jodr = 0
+       joref = 0
+       jlast = 0
+       do
+          if (jodr.ge.nt) exit
+          nlim = 0
+          do jcur = jlast, mref - 1
+             if (ctref(jcur).ne.co_null) exit
+             nlim = nlim + 1
+          enddo
+          joref = jlast + nlim
+          if (joref.ge.mref) exit
+          nmem = 0
+          do jcur = jodr, nt - 1
+             if (jbuf(jcur).eq.joref) exit
+             if (jbuf(jcur).ge.mref) nmem = nmem + 1
+          enddo
+          nlim = max(0, nlim - nmem)
+          ! write(*, *) nceff, jodr, jlast, joref, nlim, nmem
+          do
+             if (jbuf(jodr).ge.joref.or.nlim.gt.0) then
+                jpack(jbuf(jodr)) = nceff
+                if (nceff.lt.mco) cnameL(nceff) = cbuf(jbuf(jodr))
+                nceff = nceff + 1
+                if (jbuf(jodr).lt.joref) nlim = nlim - 1
+             endif
+             if (jbuf(jodr).eq.joref) exit
+             jodr = jodr + 1
+          enddo
+          jodr = jodr + 1
+          jlast = joref + 1
        enddo
+       ! write(*, *) 'pack', jodr, nceff
+    endif
+    ! packing leftover
+    if (ierr.eq.0) then
+       nmem = count(jbuf(jodr:nt-1).ge.mref)
+       if (nmem.gt.0) then
+          nlim = (mref - nceff) - nmem
+       else
+          nlim = (meff(jbref) - nceff) - nmem
+       endif
+       ! write(*, *) nmem, nlim, nceff
+       do
+          if (jodr.ge.nt) exit
+          if (jbuf(jodr).lt.mref) nlim = nlim - 1
+          if (jbuf(jodr).ge.mref.or.nlim.ge.0) then
+             jco = jbuf(jodr)
+             jpack(jco) = nceff
+             if (nceff.lt.mco) cnameL(nceff) = cbuf(jco)
+             nceff = nceff + 1
+          endif
+          jodr = jodr + 1
+       enddo
+       if (nceff.gt.mco) then
+          ierr = ERR_INSUFFICIENT_BUFFER
+          call message(ierr, 'overflow in permutation matching', (/nceff/))
+       endif
+    endif
+
+    ! set correspondence table
+    if (ierr.eq.0) then
+       clidxR(0:mco-1, 0:nbuf-1) = -1
        do jb = 0, nbuf - 1
-          do jc = 0, mco - 1
-             if (nadd(jc,jb)(1:1).eq.' '.and.nadd(jc,jb).ne.' ') nadd(jc,jb) = ' '
+          do jco = 0, meff(jb) - 1
+             jt = gidx(jco, jb)
+             if (jt.ge.0) then
+                jodr = jpack(jt)
+                if (jodr.ge.0) clidxR(jodr, jb) = jco
+             endif
           enddo
        enddo
     endif
 
-  end subroutine topological_ordering
+    if (ierr.ne.0.or.is_msglev_DEBUG(lev_verbose)) then
+       call debug_topo_table(cbuf, cout, nt, mtbl, 'final', nin)
+    endif
+  end subroutine match_perms
 
+!!!_    * debug_topo_table
+  subroutine debug_topo_table &
+       & (cbuf, cout, nt, lt, tag, nin)
+    implicit none
+    integer,         intent(in) :: nt, lt
+    integer,         intent(in) :: cout(0:lt-1, 0:*)
+    character(len=*),intent(in) :: cbuf(0:*)
+    character(len=*),intent(in) :: tag
+    integer,optional,intent(in) :: nin(0:*)
+    integer jt
+    integer ni(0:lt-1)
+
+    if (present(nin)) then
+       ni(0:nt-1) = nin(0:nt-1)
+    else
+       do jt = 0, nt - 1
+          ni(jt) = count(cout(jt, 0:nt-1).ge.0)
+       enddo
+    endif
+
+302 format('topo:', A, ':', I0, 1x, A8, 1x, I0, ' >', 12(1x, I3))
+    do jt = 0, nt - 1
+       write(*, 302) trim(tag), jt, trim(cbuf(jt)), ni(jt), cout(0:nt-1, jt)
+    enddo
+
+  end subroutine debug_topo_table
+!!!_    * count_coordinates
+  integer function count_coordinates &
+       & (cidx, cname, mco) &
+       & result(n)
+    implicit none
+    integer,         intent(in) :: cidx(0:*)
+    character(len=*),intent(in) :: cname(0:*)
+    integer,         intent(in) :: mco
+    integer jo
+    n = 0
+    do jo = 0, mco - 1
+       if (cname(jo).ne.' ' .or. cidx(jo).ge.co_wild) n = jo + 1
+    enddo
+  end function count_coordinates
 
 !!!_   . set_inclusive_domain
   subroutine set_inclusive_domain &
-       & (ierr, domL, domR, bufh, pstk, nbuf)
+       & (ierr, domL, domR, bufh, pstk, nbuf, intersect)
     use TOUZA_Std,only: choice, find_first
     implicit none
-    integer,       intent(out)   :: ierr
-    type(domain_t),intent(inout) :: domL
-    type(domain_t),intent(in)    :: domR(0:*)
-    integer,       intent(in)    :: bufh(0:*)
-    integer,       intent(in)    :: pstk(0:*)
-    integer,       intent(in)    :: nbuf
+    integer,         intent(out)   :: ierr
+    type(domain_t),  intent(inout) :: domL
+    type(domain_t),  intent(in)    :: domR(0:*)
+    integer,         intent(in)    :: bufh(0:*)
+    integer,         intent(in)    :: pstk(0:*)
+    integer,         intent(in)    :: nbuf
+    logical,optional,intent(in)    :: intersect
 
     integer nceff
     integer j
-    integer jb, jc, jo, js
-    integer b,   e
+    integer jb,    jo, js
+    ! integer jphyc, jlogc
+    integer b,   e,    s
     integer low, high, stp
     integer,parameter :: lini = HUGE(0)
     integer,parameter :: hini = (- HUGE(0)) - 1
+    logical isi
 
     ierr = 0
+    isi = choice(.FALSE., intersect)
 
     if (ierr.eq.0) then
        nceff = domL%mco
        do jo = 0, nceff - 1
-          low = lini
-          high = hini
+          if (isi) then
+             low  = domL%bgn(jo)
+             high = domL%end(jo)
+          else
+             low = lini
+             high = hini
+          endif
           stp = -1
           do j = 0, nbuf - 1
              jb = buf_h2item(bufh(j))
-             jc = domR(j)%cidx(jo)
              js = pstk(j)
-             call set_logical_range(b, e, jo, bstack(js)%lcp, domR(j))
-             if (jc.ge.0) then
-                if (obuffer(jb)%pcp(jc)%stp.gt.0) then
-                   if (b.eq.null_range) b = obuffer(jb)%pcp(jc)%bgn
-                   if (e.eq.null_range) e = obuffer(jb)%pcp(jc)%end
-                endif
-                stp = max(stp, obuffer(jb)%pcp(jc)%stp)
+             call get_logical_range(b, e, s, jo, bstack(js)%lcp, obuffer(jb)%pcp, domR(j))
+             stp = max(stp, s)
+             if (isi) then
+                if (b.ne.null_range) low = max(low, b)
+                if (e.ne.null_range) high = min(high, e)
+             else
+                if (b.ne.null_range) low = min(low, b)
+                if (e.ne.null_range) high = max(high, e)
              endif
-             if (b.ne.null_range) low = min(low, b)
-             if (e.ne.null_range) high = max(high, e)
           enddo
           if (low.eq.lini) low = 0
           if (high.eq.hini) high = low + max(0, stp)
@@ -7097,14 +7402,16 @@ contains
     type(domain_t),intent(in)    :: ref
 
     integer jo
-    integer b,   e
+    integer b,  e, s
     integer jb
 
     ierr = 0
     jb = buf_h2item(hbuf)
 
     do jo = 0, ref%mco - 1
-       call set_logical_range(b, e, jo, bstack(jstk)%lcp, dom, ref)
+       ! call set_logical_range(b, e, jo, bstack(jstk)%lcp, dom, ref)
+       call get_logical_range &
+            & (b, e, s, jo, bstack(jstk)%lcp, obuffer(jb)%pcp, dom, ref)
        dom%bgn(jo) = b
        dom%end(jo) = max(e, 1+b)
        dom%iter(jo) = max(1, e - b)
@@ -7118,17 +7425,18 @@ contains
 
   end subroutine settle_input_domain
 
-!!!_   . set_logical_range
-  subroutine set_logical_range &
-       & (b, e, jodr, lcp, dom, ref)
-    integer,       intent(out)         :: b, e
+!!!_   . get_logical_range
+  subroutine get_logical_range &
+       & (b, e, s, jodr, lcp, pcp, dom, ref)
+    integer,       intent(out)         :: b, e, s
     integer,       intent(in)          :: jodr
     type(loop_t),  intent(in)          :: lcp(0:*)
+    type(loop_t),  intent(in)          :: pcp(0:*)
     type(domain_t),intent(in)          :: dom
     type(domain_t),intent(in),optional :: ref
 
     integer low, high
-    integer jc
+    integer jlogc, jphyc
 
     if (present(ref)) then
        low  = ref%bgn(jodr)
@@ -7138,26 +7446,26 @@ contains
        high = null_range
     endif
 
-    jc = dom%cidx(jodr)
-
-    if (jc.ge.0) then
-       if (lcp(jodr)%name.ne.' ') then
-          b = logical_index(lcp(jodr)%bgn, low)
-          e = logical_index(lcp(jodr)%end, high)
-       else if (jodr.ne.jc &
-            & .and. lcp(jc)%name.ne.' ') then
-          b = logical_index(null_range, low)
-          e = logical_index(null_range, high)
-       else
-          b = logical_index(lcp(jc)%bgn, low)
-          e = logical_index(lcp(jc)%end, high)
-       endif
+    jlogc = dom%lidx(jodr)
+    jphyc = dom%cidx(jodr)
+    if (jlogc.ge.0) then
+       b = logical_index(lcp(jlogc)%bgn, low)
+       e = logical_index(lcp(jlogc)%end, high)
     else
        b = low
        e = high
     endif
+    s = -1
+    if (jphyc.ge.0) then
+       if (pcp(jphyc)%stp.gt.0) then
+          if (b.eq.null_range) b = pcp(jphyc)%bgn
+          if (e.eq.null_range) e = pcp(jphyc)%end
+       endif
+       s = pcp(jphyc)%stp
+    endif
 
-  end subroutine set_logical_range
+  end subroutine get_logical_range
+
 !!!_   . settle_domain_loop_h
   subroutine settle_domain_loop_h(ierr, dom, handle, refd)
     implicit none

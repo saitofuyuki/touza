@@ -805,140 +805,295 @@ With =-F= option, index can be FORTRAN style:
 : chak a T=2,3 b T=0 ADD =   # output a[2]+b[0], a[3]+b[0]
 
 *** buffer properties
-**** (sub)region selection
-Operators C0, C1, C2 act on 0th, 1st, 2nd coordinate.
-In FORTRAN-style (-F) mode, C1, C2, C3 are used instead.
-Operators X, Y, Z are alias of the three, ignoring the style.
+**** reshaping
+There are several kinds of array transformation: slicing, permutation,
+spreading, etc:
+All the related operations are collectedly called as `reshaping' hereinafter.
 
+Reshaping can be set by operator =PERM= or its alias =SHAPE= for one
+or more coordinates at once by comma-separated list.
+In addition, separate configuration for each coordinate can be done by
+a different way.  Operators =C0=, =C1=, =C2= act on 0th, 1st, 2nd
+coordinate.  In FORTRAN-style (=-F=) mode, =C1=, =C2=, =C3= are used
+instead. Operators =X=, =Y=, =Z= are alias of the three, ignoring the style.
+The following examples are identical:
+
+: chak ...    SHAPE=<xset>,<yset>,<zset>
+: chak ...    X=<xset> Y=<yset> Z=<zset>
+: chak ...    C0=<xset> C1=<yset> C2=<zset>
+: chak -F ... C1=<xset> C2=<yset> C3=<zset>
+
+Any of them can be left as they are.  If only the second coordinate
+needs to be edited, the following operations work.
+: chak ...    SHAPE=,<yset>
+: chak ...    Y=<yset>
+: chak ...    C1=<yset>
+: chak -F ... C2=<yset>
+
+Reshaping configuration is relatively complex.
+The full syntax is documented here, however, some simple cases,
+subregion extracting and coordinate permutation are
+documented in the following sections.
+
+As noted, the argument of operator =SHAPE= is comma separated list of
+sets of coordinate property modifiers.
+: SHAPE=<set-0>[,[<set-1>][,[]...]]
+A set is a compound of old coordinate name or index, new name, and the new
+range or element separated by slashes:
+: <name|index>[/[<replace>][/]][/<range|element>]
+Empty set means to leave as it is.
+Concrete examples are helpful rather than to provide the abstract rule.
+
+- ~<name>~ :: move =<name>= coordinate to the specific
+  rank.  If =<name>= coordinate is not found, a new coordinate <name> is
+  inserted.  For example, the argument ~SHAPE=,lon~ (or ~Y=lon~) moves
+  the coordinate =lon= to the second rank if found, or insert =lon= if
+  not found.
+
+- ~<name>/~ (e.g., ~lon/~) ::  move =<name>= coordinate to the specific
+  rank.  An error is raised if =<name>= coordinate is not found.
+  The slash after =<name>= is a symbol to mean to force the existence
+  (slash after =<name>= policy).
+
+- ~<index>/~ (e.g., ~2/~) :: move =<index>=-th coordinate to the
+  specific rank.  The slash after index is mandatory, otherwise it is
+  parsed as an element extraction below.  For example, ~SHAPE=,,1~ moves the
+  first coordinate to the second.
+
+- ~<name|index>/<replace>[​/]~ :: move =<name>= or =<index>=-th
+  coordinate to the specific rank, with renaming as =<replace>=, which
+  must be non-empty.  The final slash is optional to be neglected.
+  If =<replace>= is empty and no bottom slash, the set is interpreted
+  as =~<name>/~ as already noted above
+  (e.g., ~SHAPE=,lon/glon~; ~Z=1/lev/~).
+  An error is raised if =<name>= coordinate is not found (slash after
+  =<name>= policy).
+
+- ~<name|index>//~ :: move =<name>= or =<index>=-th coordinate to the
+  specific rank, with renaming as empty.
+  (e.g., ~lon//~, ~1//~).
+  An error is raised if =<name>= coordinate is not found (slash after
+  =<name>= policy).
+
+- ~/~ :: keep the specific rank as it is.
+
+- ~/<replace>[​/]~ :: keep the specific rank, with renaming to
+  =<replace>=.  For example, ~SHAPE=,/glon~ change the name of the
+  second coordinate to =glon=.
+
+- ~//~ :: keep the specific rank, with renaming to empty.
+
+- ~-~ :: insert the new empty-name coordinate to the specific rank.
+  ~SHAPE=-~ insert the null coordinate at the first, and shift all the
+  old coordinate by 1.
+
+- ~-/<replace>[​/]~ :: insert the new coordinate with name =<replace>=
+  to the specific rank.
+  ~SHAPE=-/lon~ insert the =<lon>= coordinate at the first, and shift
+  all the old coordinate by 1.
+  This means to increase the number of rank.
+  This set may have different behaviour with ~<name>~ set above,
+  which may not increase the ranks.
+
+- ~<element>~ :: Extract =<element>=-th value along the specific
+  coordinate (e.g., ~5~, non-negative integer).
+
+- ~<range>~  :: Extract =<range>= values along the specific coordinate
+  (e.g., ~3:5~, ~:7~, ~2:~).
+
+- ~<name|index>/<range|element>~ ::
+  move =<name>= or =<index>=-th coordinate to the specific rank, with
+  extracting subregion =<range>= or =<element>=.
+  A special rule is applied that, if =<name|index>= and
+  =<range|element>= are both set at the same time, the slash before
+  =<range>= is absorbed (slash before range policy).
+  By this rule, the slash in between disappears, and slash after
+  =<name>= policy is ineffective.
+  In other word, the argument is decomposed into ~<name|index>~ and
+  ~<range|element>~.
+  Thus =<name>= is created if not
+  found. (e.g., ~SHAPE=,lev/3:5~; ~Y=0/:2~)
+
+- ~<name|index>//<range|element>~ ::
+  move =<name>= or =<index>=-th coordinate to the specific rank, with
+  extracting subregion =<range>= or =<element>=.
+  An error is raised if =<name>= is not found.  With the slash
+  before/after rule the argument is decomposed into ~<name|index>/~ and
+  ~<range|element>~.  (e.g., ~lev//3:5~, ~0//:2~)
+
+- ~<name|index>///<range|element>~ ::
+  move =<name>= or =<index>=-th coordinate to the specific rank, with
+  extracting subregion =<range>= or =<element>=, and with renaming to
+  empty.
+  An error is raised if =<name>= is not found.  With the slash
+  before/after rule the argument is decomposed into ~<name|index>//~ and
+  ~<range|element>~.  (e.g., ~lev///3:5~, ~0///:2~)
+
+- ~<name|index>/<replace>/[​/]<range|element>~ ::
+  move =<name>= or =<index>=-th coordinate to the specific rank, with
+  extracting subregion =<range>= or =<element>=, and with renaming to
+  =<replace>=.
+  An error is raised if =<name>= is not found.  With the slash
+  before/after rule the argument is decomposed into
+  ~<name|index>/<replace>~ and ~<range|element>~ (e.g.,
+  ~lev/glev/0:5~)
+
+**** (sub)region selection
 *WARNING: spatial averaging is NOT IMPLEMENTED.*
 Only cutting and spreading can be executed.
 
 The following is an example source file, whose shape is {8}.
-: % chak T=3 demo/yz.base INT =     # T=3 and INT operator are merely to get simple result
+# source:1d
+: % chak T=3 demo/yz.base INT =
 : ## record: 0
-:   read:F0 yz:bs T = 100 DATE = 1973/1/30 00:00:00
 : # stack[0] yz:bs INT
-: #   [lon,0:8] > [:]
-: 0 115
-: 1 116
-: 2 117
-: 3 118
-: 4 119
-: 5 120
-: 6 121
-: 7 122
+: #      [lon/0:8]
+: #   >  [:]
+: #   >> [lon/0:8]
+: 0  115
+: 1  116
+: 2  117
+: 3  118
+: 4  119
+: 5  120
+: 6  121
+: 7  122
+: # T=3 and INT operator are merely to get simple result
 
 Subregion can be specified with Cn=[LOW]:[HIGH] argument:
+# sub/P
 : % chak T=3 demo/yz.base INT X=2:5 =
+: # (or) chak T=3 demo/yz.base INT SHAPE=2:5 =
 : ## record: 0
-:   read:F0 yz:bs T = 100 DATE = 1973/1/30 00:00:00
 : # stack[0] yz:bs INT
-: #   [lon,0:8] > [2:5]
-: 2 117
-: 3 118
-: 4 119
+: #      [lon/0:8]
+: #   >  [2:5]
+: #   >> [lon/2:5]
+: 2  117
+: 3  118
+: 4  119
 
-: % chak -F T=4 demo/yz.base X=3:5 INT =  # with FORTRAN style counting
+# sub/F
+: % chak -F T=4 demo/yz.base INT X=3:5 =
+: # (or) chak -F T=4 demo/yz.base INT SHAPE=3:5 =
 : ## record: 1
-:   read:F1 yz:bs T = 100 DATE = 1973/1/30 00:00:00
 : # stack[1] yz:bs INT
-: #   [lon,1:8] > [3:5]
-: 3 117
-: 4 118
-: 5 119
+: #      [lon/1:8]
+: #   >  [3:5]
+: #   >> [lon/3:5]
+: 3  117
+: 4  118
+: 5  119
+: # with FORTRAN style counting
 
 Outside of the source domain is filled with missing value.
-: chak T=3 demo/yz.base INT X=6:10 =
+# ext
+: % chak T=3 demo/yz.base INT X=6:10 =
+: # (or) chak T=3 demo/yz.base INT SHAPE=6:10 =
 : ## record: 0
-:   read:F0 yz:bs T = 100 DATE = 1973/1/30 00:00:00
 : # stack[0] yz:bs INT
-: #   [lon,0:8] > [6:10]
-: 6 121
-: 7 122
-: 8 .
-: 9 .
+: #      [lon/0:8]
+: #   >  [6:10]
+: #   >> [lon/6:10]
+: 6  121
+: 7  122
+: 8  .
+: 9  .
 
+**** coordinate permutation
 Coordinate permutation can be also specified.
+# source:2d
 : % chak T=3 demo/x.base INT =
 : ## record: 0
-:   read:F0 x:bs T = 100 DATE = 1973/1/30 00:00:00
 : # stack[0] x:bs INT
-: #   [lat,0:4 lev,0:3] > [:]
-: 0 0 3
-: 1 0 13
-: 2 0 23
-: 3 0 33
-: 0 1 103
-: 1 1 113
-: 2 1 123
-: 3 1 133
-: 0 2 203
-: 1 2 213
-: 2 2 223
-: 3 2 233
+: #      [lat/0:4 lev/0:3]
+: #   >  [:]
+: #   >> [lat/0:4 lev/0:3]
+: 0  0  3
+: 1  0  13
+: 2  0  23
+: 3  0  33
+: 0  1  103
+: 1  1  113
+: 2  1  123
+: 3  1  133
+: 0  2  203
+: 1  2  213
+: 2  2  223
+: 3  2  233
 
+# perm:2d/c
 : % chak T=3 demo/x.base INT X=lev =
+: # (or) chak T=3 demo/x.base INT SHAPE=lev =
 : ## record: 0
-:   read:F0 x:bs T = 100 DATE = 1973/1/30 00:00:00
 : # stack[0] x:bs INT
-: #   [lat,0:4 lev,0:3] > [lev,:]
-: 0 0 3
-: 1 0 103
-: 2 0 203
-: 0 1 13
-: 1 1 113
-: 2 1 213
-: 0 2 23
-: 1 2 123
-: 2 2 223
-: 0 3 33
-: 1 3 133
-: 2 3 233
+: #      [lat/0:4 lev/0:3]
+: #   >  [lev/:]
+: #   >> [lev/0:3 lat/0:4]
+: 0  0  3
+: 1  0  103
+: 2  0  203
+: 0  1  13
+: 1  1  113
+: 2  1  213
+: 0  2  23
+: 1  2  123
+: 2  2  223
+: 0  3  33
+: 1  3  133
+: 2  3  233
 
-A basic of coordinate permutation of chak is to rotate between source
-and destination coordinates.  In the above example, =lat= and =lev= order
+A basic of coordinate permutation of chak is to pad unspecified
+coordinates, and keep the number of ranks as far as possible.
+In the above example, =lat= and =lev= order
 is exchanged.  If =Z=lat= is specified, coordinate is rotated as follows:
+# perm:3d+1/c
 : % chak T=3 demo/x.base INT Z=lat =
+: # (or) chak T=3 demo/x.base INT SHAPE=,,lat =
 : ## record: 0
-:   read:F0 x:bs T = 100 DATE = 1973/1/30 00:00:00
 : # stack[0] x:bs INT
-: #   [lat,0:4 lev,0:3] > [: : lat,:]
-: 0 0 0 3
-: 1 0 0 103
-: 2 0 0 203
-: 0 0 1 13
-: 1 0 1 113
-: 2 0 1 213
-: 0 0 2 23
-: 1 0 2 123
-: 2 0 2 223
-: 0 0 3 33
-: 1 0 3 133
-: 2 0 3 233
+: #      [lat/0:4 lev/0:3]
+: #   >  [: : lat/:]
+: #   >> [lev/0:3 <>/: lat/0:4]
+: 0  0  0  3
+: 1  0  0  103
+: 2  0  0  203
+: 0  0  1  13
+: 1  0  1  113
+: 2  0  1  213
+: 0  0  2  23
+: 1  0  2  123
+: 2  0  2  223
+: 0  0  3  33
+: 1  0  3  133
+: 2  0  3  233
 
 In order to insert blank coordinate at beginning needs two
 explicit transformation:
+# perm:3d+0/c
 : % chak T=3 demo/x.base INT Y=lat Z=lev =
+: # (or) chak T=3 demo/x.base INT SHAPE=,lat,lev =
 : ## record: 0
-:   read:F0 x:bs T = 100 DATE = 1973/1/30 00:00:00
 : # stack[0] x:bs INT
-: #   [lat,0:4 lev,0:3] > [: lat,: lev,:]
-: 0 0 0 3
-: 0 1 0 13
-: 0 2 0 23
-: 0 3 0 33
-: 0 0 1 103
-: 0 1 1 113
-: 0 2 1 123
-: 0 3 1 133
-: 0 0 2 203
-: 0 1 2 213
-: 0 2 2 223
-: 0 3 2 233
+: #      [lat/0:4 lev/0:3]
+: #   >  [: lat/: lev/:]
+: #   >> [<>/: lat/0:4 lev/0:3]
+: 0  0  0  3
+: 0  1  0  13
+: 0  2  0  23
+: 0  3  0  33
+: 0  0  1  103
+: 0  1  1  113
+: 0  2  1  123
+: 0  3  1  133
+: 0  0  2  203
+: 0  1  2  213
+: 0  2  2  223
+: 0  3  2  233
 In the above example, =lat=, =lev= order are shifted by 1.
 Vacant coordinate is automatically filled with blank name, null range.
 
-*** avant-garde solution for automatic coordinate matching
+**** avant-garde solution for automatic coordinate matching
 *Disclaimer*
 Automatic coordinate matching is, unfortunately, still buggy,
 in particular when a coordinate with definite range has a blank name.
@@ -953,200 +1108,315 @@ The primitive rule is `the coordinate name is significant.'
 
 If the coordinate names match, then different array range can be adjusted.
 
-In the following demostration, a special operation sequence is
+In the following demonstration, a special operation sequence is
 examined to present the results.
-Operator =REPEAT= push the two operands again, operators =INT ITER=
-convert all the stack to integer.  At the operator =FLUSH -i=, there
-are three stacks remaining, integer conversion of the first file, the
-second file, and the result of operator =ADD=.
-: % chak T=3 demo/yz.base demo/sub3.yz.base REPEAT ADD INT ITER FLUSH -i
+Operator =REPEAT= before =ADD= push the two stack (operands) again.
+At the operator =FLUSH -i=, there are three stacks remaining, integer
+conversion of the first file, the second file, and the result of operator =ADD=.
+# add:1d
+: % chak demo/yz.base T=3 INT demo/sub3.yz.base T=3 INT REPEAT ADD FLUSH -i
 : ## record: 0
-:   read:F0 yz:bs T = 100 DATE = 1973/1/30 00:00:00
-:   read:F1 subx:bs T = 100 DATE = 1973/1/30 00:00:00
-: ## 0 {2056} [lon,0:8] > [:] yz:bs INT
-: ## 1 {2054} [lon,3:6] > [:] subx:bs INT
-: ## 2 {2055} [lon,0:8] > [:] yz:bs subx:bs ADD INT
-: #lon {2056} {2054} {2055}
-: 0 115 . _
-: 1 116 . _
-: 2 117 . _
-: 3 118 118 236
-: 4 119 119 238
-: 5 120 120 240
-: 6 121 . _
-: 7 122 . _
+: ## 0 {2053} [lon/0:8] yz:bs INT
+: ## 1 {2055} [lon/3:6] subx:bs INT
+: ## 2 {2056} [lon/0:8] yz:bs INT subx:bs INT ADD
+: #lon/0:8 {2053} {2055} {2056}
+: 0  115  .    _
+: 1  116  .    _
+: 2  117  .    _
+: 3  118  118  236
+: 4  119  119  238
+: 5  120  120  240
+: 6  121  .    _
+: 7  122  .    _
 
-If the coordinate match on different rank, one of them are shifted.
-: % chak demo/zx.base T=3 demo/sub2.zx.base T=5 REPEAT ADD FLUSH -i
+In the example, two operands share same rank design with different ranges:
+# add:1d/op0
+: % chak demo/yz.base T=3 INT FLUSH
 : ## record: 0
-:   read:F0 zx:bs T = 100 DATE = 1973/1/30 00:00:00
-:   read:F1 suby:bs T = 100 DATE = 1973/1/30 00:00:00
-: ## 0 {F0} [lat,0:4 - -] > [:] zx:bs
-: ## 1 {F1} [- lat,1:3 -] > [:] suby:bs
-: ## 2 {2054} [lat,0:4] > [:] zx:bs suby:bs ADD
-: #lat {F0} {F1} {2054}
-: 0  1.035000E+02 . _
-: 1  1.135000E+02  1.135000E+02  2.270000E+02
-: 2  1.235000E+02  1.235000E+02  2.470000E+02
-: 3  1.335000E+02 . _
-: ## ITER INT affect the second stack shape, so removed from this demonstration
+: # stack[0] yz:bs INT
+: #      [lon/0:8]
+: #   >  [:]
+: #   >> [lon/0:8]
+: 0  115
+: 1  116
+: 2  117
+: 3  118
+: 4  119
+: 5  120
+: 6  121
+: 7  122
+
+# add:1d/op1
+: % chak demo/sub3.yz.base T=3 INT FLUSH
+: ## record: 0
+: # stack[0] subx:bs INT
+: #      [lon/3:6]
+: #   >  [:]
+: #   >> [lon/3:6]
+: 3  118
+: 4  119
+: 5  120
+
+If the coordinate match on different rank, they may be shifted,
+rotated, expanded.
+For example, the first operand shape is ={lat}=, 1 rank.
+# add:1d/op0
+: % chak demo/zx.base T=3 INT FLUSH
+: ## record: 0
+: # stack[0] zx:bs INT
+: #      [lat/0:4]
+: #   >  [:]
+: #   >> [lat/0:4]
+: 0  103
+: 1  113
+: 2  123
+: 3  133
+
+while, the second operand shape is ={-,lat}=, 2 rank.
+# add:1d/op1
+: % chak demo/sub2.zx.base T=5 INT FLUSH
+: ## record: 0
+: # stack[0] suby:bs INT
+: #      [- lat/1:3]
+: #   >  [:]
+: #   >> [/: lat/1:3]
+: 0  1  113
+: 0  2  123
+
+Add operation automatically adjust the latter domain:
+# add:1d
+: % chak demo/zx.base T=3 INT demo/sub2.zx.base T=5 INT REPEAT ADD FLUSH -i
+: ## record: 0
+: ## 0 {2053} [lat/0:4] zx:bs INT
+: ## 1 {2055} [lat/1:3] suby:bs INT
+: ## 2 {2056} [lat/0:4] zx:bs INT suby:bs INT ADD
+: #lat/0:4 {2053} {2055} {2056}
+: 0  103  .    _
+: 1  113  113  226
+: 2  123  123  246
+: 3  133  .    _
+
+The primary policy of the automatic coordinate tweaking is to adjust
+to the first operand at the operation.
+Please check by yourself if the two operands are exchanged:
+: % chak demo/zx.base T=3 INT demo/sub2.zx.base T=5 INT EXCH REPEAT ADD FLUSH -i
 
 If the same rank has different coordinate name, then either of them
 must have different rank candidate for automatic tweaking.
-: % chak demo/z.base T=3 demo/sub2.zx.base T=0 REPEAT ADD INT ITER FLUSH -i
+# add:2d+1d/op0
+: % chak demo/z.base T=3 INT FLUSH
 : ## record: 0
-:   read:F0 z:bs T = 100 DATE = 1973/1/30 00:00:00
-:   read:F1 suby:bs T = 100 DATE = 1973/1/30 00:00:00
-: ## 0 {2056} [lon,0:8 lat,0:4] > [:] z:bs INT
-: ## 1 {2054} [lat,1:3] > [:] suby:bs INT
-: ## 2 {2055} [lon,0:8 lat,0:4] > [:] z:bs suby:bs ADD INT
-: #lon lat {2056} {2054} {2055}
-: 0 0 100 . _
-: 1 0 101 . _
-: 2 0 102 . _
-: 3 0 103 . _
-: 4 0 104 . _
-: 5 0 105 . _
-: 6 0 106 . _
-: 7 0 107 . _
-: 0 1 110 113 223
-: 1 1 111 113 224
-: 2 1 112 113 225
-: 3 1 113 113 226
-: 4 1 114 113 227
-: 5 1 115 113 228
-: 6 1 116 113 229
-: 7 1 117 113 230
-: 0 2 120 123 243
-: 1 2 121 123 244
-: 2 2 122 123 245
-: 3 2 123 123 246
-: 4 2 124 123 247
-: 5 2 125 123 248
-: 6 2 126 123 249
-: 7 2 127 123 250
-: 0 3 130 . _
-: 1 3 131 . _
-: 2 3 132 . _
-: 3 3 133 . _
-: 4 3 134 . _
-: 5 3 135 . _
-: 6 3 136 . _
-: 7 3 137 . _
+: # stack[0] z:bs INT
+: #      [lon/0:8 lat/0:4]
+: #   >  [:]
+: #   >> [lon/0:8 lat/0:4]
+: 0  0  100
+: 1  0  101
+: 2  0  102
+: 3  0  103
+: 4  0  104
+: 5  0  105
+: 6  0  106
+: 7  0  107
+: 0  1  110
+: 1  1  111
+: :
+
+# add:2d+1d/op1
+: % chak demo/sub2.zx.base T=0 INT FLUSH
+: ## record: 0
+: # stack[0] suby:bs INT
+: #      [lat/1:3]
+: #   >  [:]
+: #   >> [lat/1:3]
+: 1  113
+: 2  123
+
+# add:2d+1d
+: % chak demo/z.base T=3 INT demo/sub2.zx.base T=0 INT REPEAT ADD FLUSH -i
+: ## record: 0
+: ## 0 {2053} [lon/0:8 lat/0:4] z:bs INT
+: ## 1 {2055} [*/: lat/1:3] suby:bs INT
+: ## 2 {2056} [lon/0:8 lat/0:4] z:bs INT suby:bs INT ADD
+: #lon/0:8 lat/0:4 {2053} {2055} {2056}
+: 0  0  100  .    _
+: 1  0  101  .    _
+: 2  0  102  .    _
+: 3  0  103  .    _
+: 4  0  104  .    _
+: 5  0  105  .    _
+: 6  0  106  .    _
+: 7  0  107  .    _
+: 0  1  110  113  223
+: 1  1  111  113  224
+: 2  1  112  113  225
+: :
+: 5  2  125  123  248
+: 6  2  126  123  249
+: 7  2  127  123  250
+: 0  3  130  .    _
+: 1  3  131  .    _
+: 2  3  132  .    _
+: 3  3  133  .    _
+: 4  3  134  .    _
+: 5  3  135  .    _
+: 6  3  136  .    _
+: 7  3  137  .    _
 On the above case, the latter spread the data on a missing dimension lon.
 
 If the same rank has different coordinate name with no additional
 information, matching is failed.
-: % chak T=3 demo/zx.base  demo/yz.base FLUSH
+# fail/add:2d/op0
+: % chak demo/zx.base T=3 INT FLUSH
 : ## record: 0
-:   read:F0 zx:bs T = 100 DATE = 1973/1/30 00:00:00
-:   read:F1 yz:bs T = 100 DATE = 1973/1/30 00:00:00
-: # stack[0] zx:bs
-: #   [lat,0:4 - -] > [:]
-: 0  1.035000E+02
-: 1  1.135000E+02
-: 2  1.235000E+02
-: 3  1.335000E+02
-: # stack[1] yz:bs
-: #   [lon,0:8 - -] > [:]
-: 0  1.150000E+02
-: 1  1.160000E+02
-: 2  1.170000E+02
-: 3  1.180000E+02
-: 4  1.190000E+02
-: 5  1.200000E+02
-: 6  1.210000E+02
-: 7  1.220000E+02
+: # stack[0] zx:bs INT
+: #      [lat/0:4]
+: #   >  [:]
+: #   >> [lat/0:4]
+: 0  103
+: 1  113
+: 2  123
+: 3  133
 
-: % chak T=3 demo/zx.base  demo/yz.base ADD =
+# fail/add:2d/op1
+: % chak demo/yz.base T=3 INT FLUSH
 : ## record: 0
-:   read:F0 zx:bs T = 100 DATE = 1973/1/30 00:00:00
-:   read:F1 yz:bs T = 100 DATE = 1973/1/30 00:00:00
-: error:-39: ambiguous fragile coordinates
-: order[fragile] {}=-4 {}=-4 {}=-4 {}=-4 {}=-4 {}=-4
-: order[fragile/0] {lat}=* {-} {-} {-} {-} {-}
-: order[fragile/1] {lon}=* {-} {-} {-} {-} {-}
+: # stack[0] yz:bs INT
+: #      [lon/0:8]
+: #   >  [:]
+: #   >> [lon/0:8]
+: 0  115
+: 1  116
+: 2  117
+: 3  118
+: 4  119
+: 5  120
+: 6  121
+: 7  122
+
+# fail/add:2d
+: % chak demo/zx.base T=3 INT demo/yz.base T=3 INT REPEAT ADD FLUSH -i
+: ## record: 0
+: perm:collision: 0 0 lat
+: perm:collision: 0 1 lon
+: topo:final:0      lat -1 >  -1  -1
+: topo:final:1      lon -1 >  -1  -1
 :  exit =          -39
 Since =lon= and =lat= share the same rank, chak has never chance to
 determine which comes earlier.
 
 On the other hand, if different coordinates do not share the same rank,
 and each opposite is blank, then they succeed to match.
-: % chak demo/zx.base T=5 demo/yz.base T=3 REPEAT ADD FLUSH -i
+# auto/add:2d/op0
+: % chak demo/zx.base T=5 INT FLUSH
 : ## record: 0
-:   read:F0 zx:bs T = 100 DATE = 1973/1/30 00:00:00
-:   read:F1 yz:bs T = 100 DATE = 1973/1/30 00:00:00
-: ## 0 {F0} [- lat,0:4 -] > [:] zx:bs
-: ## 1 {F1} [lon,0:8 - -] > [:] yz:bs
-: ## 2 {2054} [lon,0:8 lat,0:4] > [:] zx:bs yz:bs ADD
-: #lon lat {F0} {F1} {2054}
-: 0 0  1.035000E+02  1.150000E+02  2.185000E+02
-: 1 0  1.035000E+02  1.160000E+02  2.195000E+02
-: 2 0  1.035000E+02  1.170000E+02  2.205000E+02
-: 3 0  1.035000E+02  1.180000E+02  2.215000E+02
-: 4 0  1.035000E+02  1.190000E+02  2.225000E+02
-: 5 0  1.035000E+02  1.200000E+02  2.235000E+02
-: 6 0  1.035000E+02  1.210000E+02  2.245000E+02
-: 7 0  1.035000E+02  1.220000E+02  2.255000E+02
-: 0 1  1.135000E+02  1.150000E+02  2.285000E+02
-: 1 1  1.135000E+02  1.160000E+02  2.295000E+02
-: 2 1  1.135000E+02  1.170000E+02  2.305000E+02
-: 3 1  1.135000E+02  1.180000E+02  2.315000E+02
-: 4 1  1.135000E+02  1.190000E+02  2.325000E+02
+: # stack[0] zx:bs INT
+: #      [- lat/0:4]
+: #   >  [:]
+: #   >> [/: lat/0:4]
+: 0  0  103
+: 0  1  113
+: 0  2  123
+: 0  3  133
+
+# auto/add:2d/op1
+: % chak demo/yz.base T=3 INT FLUSH
+: ## record: 0
+: # stack[0] yz:bs INT
+: #      [lon/0:8]
+: #   >  [:]
+: #   >> [lon/0:8]
+: 0  115
+: 1  116
+: 2  117
+: 3  118
+: 4  119
+: 5  120
+: 6  121
+: 7  122
+
+# auto/add:2d
+: % chak demo/zx.base T=5 INT demo/yz.base T=3 INT REPEAT ADD FLUSH -i
+: ## record: 0
+: ## 0 {2053} [*/: lat/0:4] zx:bs INT
+: ## 1 {2055} [lon/0:8 */:] yz:bs INT
+: ## 2 {2056} [lon/0:8 lat/0:4] zx:bs INT yz:bs INT ADD
+: #lon/0:8 lat/0:4 {2053} {2055} {2056}
+: 0  0  103  115  218
+: 1  0  103  116  219
+: 2  0  103  117  220
+: 3  0  103  118  221
+: 4  0  103  119  222
+: 5  0  103  120  223
+: 6  0  103  121  224
+: 7  0  103  122  225
+: 0  1  113  115  228
+: 1  1  113  116  229
 : :
-: 7 3  1.335000E+02  1.220000E+02  2.555000E+02
-: ## ITER INT affect the stack shape, so removed from this demonstration
 Both files spread the blank coordinates.
 
-You can overcome the former failed operation by tweaking the explict
+You can overcome the former failed operation by tweaking the explicit
 coordinates:
-: % chak T=3 demo/zx.base Y=lat demo/yz.base REPEAT ADD FLUSH -i
+# manual/add:2d
+: % chak demo/zx.base T=3 Y=lat INT demo/yz.base T=3 INT REPEAT ADD FLUSH -i
 : ## record: 0
-: ## 0 {F0} [lat,0:4 - -] > [: lat,:] zx:bs
-: ## 1 {F1} [lon,0:8 - -] > [:] yz:bs
-: ## 2 {2054} [lon,0:8 lat,0:4] > [:] zx:bs yz:bs ADD
-: #lon lat {F0} {F1} {2054}
-: 0  0  1.035000E+02  1.150000E+02  2.185000E+02
-: 1  0  1.035000E+02  1.160000E+02  2.195000E+02
-: 2  0  1.035000E+02  1.170000E+02  2.205000E+02
-: 3  0  1.035000E+02  1.180000E+02  2.215000E+02
-: 4  0  1.035000E+02  1.190000E+02  2.225000E+02
-: 5  0  1.035000E+02  1.200000E+02  2.235000E+02
-: 6  0  1.035000E+02  1.210000E+02  2.245000E+02
-: 7  0  1.035000E+02  1.220000E+02  2.255000E+02
-: 0  1  1.135000E+02  1.150000E+02  2.285000E+02
-: 1  1  1.135000E+02  1.160000E+02  2.295000E+02
+: ## 0 {2053} [*/: lat/0:4] zx:bs INT
+: ## 1 {2055} [lon/0:8 */:] yz:bs INT
+: ## 2 {2056} [lon/0:8 lat/0:4] zx:bs INT yz:bs INT ADD
+: #lon/0:8 lat/0:4 {2053} {2055} {2056}
+: 0  0  103  115  218
+: 1  0  103  116  219
+: 2  0  103  117  220
+: 3  0  103  118  221
+: 4  0  103  119  222
+: 5  0  103  120  223
+: 6  0  103  121  224
+: 7  0  103  122  225
+: 0  1  113  115  228
 : :
-: 7  3  1.335000E+02  1.220000E+02  2.555000E+02
-
 *** flushing
-: % chak T=3 demo/sub2.yz.base demo/sub3.yz.base FLUSH
+# compromise:source
+: % chak T=3 demo/sub5.yz.base INT demo/sub3.yz.base INT FLUSH
 : ## record: 0
-: # stack[0] subx:bs
-: #   [lon,0:2 - -] > [:]
-: 0  1.150000E+02
-: 1  1.160000E+02
-: # stack[1] subx:bs
-: #   [lon,3:6 - -] > [:]
-: 3  1.180000E+02
-: 4  1.190000E+02
-: 5  1.200000E+02
-
+: # stack[0] subx:bs INT
+: #      [lon/0:5]
+: #   >  [:]
+: #   >> [lon/0:5]
+: 0 115
+: 1 116
+: 2 117
+: 3 118
+: 4 119
+: # stack[1] subx:bs INT
+: #      [lon/3:6]
+: #   >  [:]
+: #   >> [lon/3:6]
+: 3 118
+: 4 119
+: 5 120
 Default coordinate index follows python style: the beginning is counted
 from 0, and the ending is not included.  You can change this behaviour
 with global -F option, to follow FORTRAN style:
 
-: % chak -F T=3 demo/sub2.yz.base demo/sub3.yz.base FLUSH
+# compromise:source/F
+: % chak -F T=4 demo/sub5.yz.base INT demo/sub3.yz.base INT FLUSH
 : ## record: 1
-: # stack[1] subx:bs
-: #   [lon,1:2 1:1 1:1] > [:]
-: 1  1.150000E+02
-: 2  1.160000E+02
-: # stack[2] subx:bs
-: #   [lon,4:6 1:1 1:1] > [:]
-: 4  1.180000E+02
-: 5  1.190000E+02
-: 6  1.200000E+02
+: # stack[1] subx:bs INT
+: #      [lon/1:5]
+: #   >  [:]
+: #   >> [lon/1:5]
+: 1 115
+: 2 116
+: 3 117
+: 4 118
+: 5 119
+: # stack[2] subx:bs INT
+: #      [lon/4:6]
+: #   >  [:]
+: #   >> [lon/4:6]
+: 4 118
+: 5 119
+: 6 120
 
 Appending -i option to FLUSH operator changes the behavior to
 horizontal pasting of all the stack.  Inclusive domain of all the
@@ -1154,39 +1424,42 @@ stack is adopted.
 Automatic coordinates matching is examined.  You may need to adjust
 them manually.  In the following example all the files share the same
 shape and coordinates.
-
-: % chak T=3 demo/sub2.yz.base demo/sub3.yz.base FLUSH -i # horizontal output (inclusive)
+# compromise:i
+: % chak T=3 demo/sub5.yz.base INT demo/sub3.yz.base INT FLUSH -i
 : ## record: 0
-: ## 0 {F0} [lon,0:5 - -] > [:] subx:bs
-: ## 1 {F1} [lon,3:6 - -] > [:] subx:bs
-: #lon {F0} {F1}
-: 0  1.150000E+02  .
-: 1  1.160000E+02  .
-: 2  1.170000E+02  .
-: 3  1.180000E+02  1.180000E+02
-: 4  1.190000E+02  1.190000E+02
-: 5  .             1.200000E+02
+: ## 0 {2053} [lon/0:5] subx:bs INT
+: ## 1 {2055} [lon/3:6] subx:bs INT
+: #lon/0:6 {2053} {2055}
+: 0  115  .
+: 1  116  .
+: 2  117  .
+: 3  118  118
+: 4  119  119
+: 5  .    120
+: # horizontal output (inclusive)
 
 The option -x changes the output domain as the intersects.
-: % chak T=3 demo/sub5.yz.base demo/sub3.yz.base FLUSH -x
+# compromise:x
+: % chak T=3 demo/sub5.yz.base INT demo/sub3.yz.base INT FLUSH -x
 : ## record: 0
-: ## 0 {F0} [lon,0:5 - -] > [:] subx:bs
-: ## 1 {F1} [lon,3:6 - -] > [:] subx:bs
-: #lon {F0} {F1}
-: 3  1.180000E+02  1.180000E+02
-: 4  1.190000E+02  1.190000E+02
+: ## 0 {2053} [lon/0:5] subx:bs INT
+: ## 1 {2055} [lon/3:6] subx:bs INT
+: #lon/3:5 {2053} {2055}
+: 3  118  118
+: 4  119  119
 
 The option -l changes the output domain as the first stack.
-: % chak T=3 demo/sub5.yz.base demo/sub3.yz.base FLUSH -l
+# compromise:l
+: % chak T=3 demo/sub5.yz.base INT demo/sub3.yz.base INT FLUSH -l
 : ## record: 0
-: ## 0 {F0} [lon,0:5 - -] > [:] subx:bs
-: ## 1 {F1} [lon,3:6 - -] > [:] subx:bs
-: #lon {F0} {F1}
-: 0  1.150000E+02  .
-: 1  1.160000E+02  .
-: 2  1.170000E+02  .
-: 3  1.180000E+02  1.180000E+02
-: 4  1.190000E+02  1.190000E+02
+: ## 0 {2053} [lon/0:5] subx:bs INT
+: ## 1 {2055} [lon/3:6] subx:bs INT
+: #lon/0:5 {2053} {2055}
+: 0  115  .
+: 1  116  .
+: 2  117  .
+: 3  118  118
+: 4  119  119
 
 ** Recipes
 
@@ -1211,4 +1484,5 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  garde ee ARG REPL FMT th nd Cn vv vvv qq qqq Fortran
 #  LocalWords:  fortran eof Hn ETTL CDATE MDATE CSIGN MSIGN gmtmath
 #  LocalWords:  grdmath EDITn TITLn ETTLn TITL AITM ASTR AEND ngtls
-#  LocalWords:  lev undef br aG
+#  LocalWords:  lev undef br aG bs yz subx zx suby xset yset zset
+#  LocalWords:  glon

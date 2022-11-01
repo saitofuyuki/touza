@@ -1,8 +1,21 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/10/23 11:03:37 fuyuki genopr.sh>
+# Time-stamp: <2022/10/31 08:22:15 fuyuki genopr.sh>
+
+jmzd=$0:h
 
 main ()
 {
+  local opt=
+  while [[ $# -gt 0 ]]
+  do
+    case $1 in
+    (-[dxwc]) opt=$1;;
+    (-*) print -u2 - "unknown argument $1"; return 1;;
+    (*)  break;
+    esac
+    shift
+  done
+
   local call=("$@")
   [[ -z $call ]] && call=(decl reg call sub elem)
 
@@ -26,14 +39,48 @@ main ()
     GRANGE[$grp]="grp_${grp}_bgn grp_${grp}_end"
   done
 
-  [[ -z ${(M)call:#d*} ]] || output_decl $GODR || return $?
-  [[ -z ${(M)call:#r*} ]] || output_register $GODR || return $?
-  [[ -z ${(M)call:#c*} ]] || output_call $GODR || return $?
-  [[ -z ${(M)call:#s*} ]] || output_sub $GODR || return $?
-  [[ -z ${(M)call:#e*} ]] || output_elem $GODR || return $?
-  [[ -z ${(M)call:#t*} ]] || output_table $GODR || return $?
+  [[ -z ${(M)call:#d*} ]] || run $opt decl $GODR || return $?
+  [[ -z ${(M)call:#r*} ]] || run $opt register $GODR || return $?
+  [[ -z ${(M)call:#c*} ]] || run $opt call $GODR || return $?
+  [[ -z ${(M)call:#s*} ]] || run $opt sub $GODR || return $?
+  [[ -z ${(M)call:#e*} ]] || run $opt elem $GODR || return $?
+  [[ -z ${(M)call:#t*} ]] || run $opt table $GODR || return $?
   return 0
 }
+
+run ()
+{
+  local opt=
+  case $1 in
+  (-d) opt=(diff diff); shift;;
+  (-w) opt=(write); shift;;
+  (-x) opt=(diff xxdiff); shift;;
+  (-c) opt=(clip xclip -i); shift;;
+  esac
+  local sub=$1; shift
+  local cmd=(output_$sub "$@")
+  local of=
+  case $sub in
+  (d*) of=$jmzd/chak_decl.F90;;
+  (r*) of=$jmzd/chak_reg.F90;;
+  esac
+
+  case $opt[1] in
+  (diff) [[ -z $of ]] && print -u2 - "Need old file" && return 1;
+         [[ ! -e $of ]] && print -u2 - "no old file $of" && return 1
+         ($cmd || return $?) | $opt[2] - $of
+         ;;
+  (write) [[ -z $of ]] && print -u2 - "Need old file" && return 1;
+          $cmd > $of || return $?
+          ;;
+  (clip)  shift opt
+          $cmd | $opt || return $?
+          ;;
+  (*)     $cmd || return $?
+  esac
+  return 0
+}
+
 
 # cf. http://orc.csres.utexas.edu/documentation/html/refmanual/ref.syntax.precedence.html
 #     https://en.cppreference.com/w/c/language/operator_precedence
@@ -201,18 +248,16 @@ register_all ()
   # register LOW=COOR
 
   # property manipulation
-  register -g buffer -p NAME                  TAG
-  register -g buffer -o c0,c1,c2              C
-  register -g buffer -o NAME/REPL,LOW:HIGH    C0
-  register -g buffer -o NAME/REPL,LOW:HIGH    C1
-  register -g buffer -o NAME/REPL,LOW:HIGH    C2
-  register -g buffer -o NAME/REPL,LOW:HIGH    C3
-  register -g buffer -o NAME/REPL,LOW:HIGH    X
-  register -g buffer -o NAME/REPL,LOW:HIGH    Y
-  register -g buffer -o NAME/REPL,LOW:HIGH    Z
-  register -g buffer -o NAME/REPL,LOW:HIGH    LON
-  register -g buffer -o NAME/REPL,LOW:HIGH    LAT
-  register -g buffer -o NAME/REPL,LOW:HIGH    LEV
+  register -g buffer -p NAME              TAG
+  register -g buffer -p NAME/REPL/RANGE,.. -n 1,1 PERM 'array shape permutatation'
+  register -a PERM SHAPE
+  register -g buffer -o LOW:HIGH     C0
+  register -g buffer -o LOW:HIGH     C1
+  register -g buffer -o LOW:HIGH     C2
+  register -g buffer -o LOW:HIGH     C3
+  register -g buffer -o LOW:HIGH     X
+  register -g buffer -o LOW:HIGH     Y
+  register -g buffer -o LOW:HIGH     Z
   # register -g buffer -p VALUE                 MISS    "replace missing value"
 
   register -g header        -p FORMAT      FMT     "set output data format"

@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz swiss(CH) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2022/10/24 18:23:05 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/31 23:22:31 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -30,7 +30,7 @@ module chak_lib
   use TOUZA_Std,only: KFLT,  KDBL
   use TOUZA_Std,only: is_msglev
   use TOUZA_Std,only: msglev_NORMAL, msglev_INFO, msglev_DEBUG
-  use TOUZA_Std,only: msglev_WARNING
+  use TOUZA_Std,only: msglev_WARNING, msglev_DETAIL
   use TOUZA_Std,only: is_msglev_DETAIL, is_msglev_NORMAL, is_msglev_INFO, is_msglev_DEBUG
   use TOUZA_Nio,only: litem, nitem, GFMT_END
   implicit none
@@ -76,6 +76,7 @@ module chak_lib
      integer :: iter(0:lcoor-1)
      integer :: strd(0:lcoor)       ! with sentry
      integer :: cidx(0:lcoor-1)
+     integer :: lidx(0:lcoor-1)
   end type domain_t
 contains
 !!!_  - initialization
