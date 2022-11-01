@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/10/26 17:47:47 fuyuki demo-chak.sh.in>
+# Time-stamp: <2022/11/01 10:11:33 fuyuki demo-chak.sh.in>
 
 main ()
 {
@@ -21,34 +21,58 @@ demo_operation ()
   # run_demo -F demo/base POP
   # run_demo demo/base FLUSH
   # run_demo -F demo/base FLUSH
-  run_demo T=3 demo/yz.base INT =
-  run_demo T=3 demo/yz.base INT X=2:5 =
-  run_demo -F T=4 demo/yz.base X=3:5 INT =
-  run_demo T=3 demo/yz.base INT X=6:10 =
-  run_demo T=3 demo/x.base INT =
-  run_demo T=3 demo/x.base INT X=lev =
-  run_demo T=3 demo/x.base INT Z=lat =
-  run_demo T=3 demo/x.base INT Y=lat Z=lev =
-  run_demo T=3 demo/yz.base demo/sub3.yz.base REPEAT ADD INT ITER FLUSH -i
-  run_demo demo/zx.base T=3 demo/sub2.zx.base T=5 REPEAT ADD FLUSH -i
-  run_demo demo/z.base T=3 demo/sub2.zx.base T=0 REPEAT ADD INT ITER FLUSH -i
-  run_demo T=3 demo/zx.base  demo/yz.base FLUSH
-  run_demo T=3 demo/zx.base  demo/yz.base ADD =
-  run_demo demo/zx.base T=5 demo/yz.base T=3 REPEAT ADD FLUSH -i
-  run_demo T=3 demo/zx.base Y=lat demo/yz.base REPEAT ADD FLUSH -i
-  run_demo T=3 demo/zx.base Y=lat CLONE demo/yz.base REPEAT ADD FLUSH -i
+  local src=(demo/yz.base INT)
 
-  run_demo -NOCOL    T=3 demo/sub2.yz.base demo/sub3.yz.base FLUSH
-  run_demo -NOCOL -F T=3 demo/sub2.yz.base demo/sub3.yz.base FLUSH
-  run_demo T=3 demo/sub5.yz.base demo/sub3.yz.base FLUSH -i
-  run_demo T=3 demo/sub5.yz.base demo/sub3.yz.base FLUSH -x
-  run_demo T=3 demo/sub5.yz.base demo/sub3.yz.base FLUSH -l
+  run_demo source:1d T=3 $src        =
+  run_demo sub/P     T=3 $src X=2:5  =
+  run_demo sub/F -F  T=4 $src X=3:5  =
+  run_demo ext       T=3 $src X=6:10 =
+
+  src=(T=3 demo/x.base INT)
+  run_demo source:2d $src                 =
+  run_demo perm:2d/c   $src X=lev         =
+  run_demo perm:3d+1/c $src Z=lat         =
+  run_demo perm:3d+0/c $src Y=lat Z=lev   =
+  run_demo perm:2d/o   $src PERM=lev      =
+  run_demo perm:3d+1/o $src PERM=,,lat    =
+  run_demo perm:3d+0/o $src PERM=,lat,lev =
+
+  run_demo_add add:1d    demo/yz.base T=3 demo/sub3.yz.base T=3
+  run_demo_add add:1d    demo/zx.base T=3 demo/sub2.zx.base T=5
+  run_demo_add add:2d+1d demo/z.base  T=3 demo/sub2.zx.base T=0
+
+  run_demo_add fail/add:2d    demo/zx.base T=3       demo/yz.base  T=3
+  run_demo_add auto/add:2d    demo/zx.base T=5       demo/yz.base  T=3
+  run_demo_add manual/add:2d  demo/zx.base T=3 Y=lat demo/yz.base  T=3
+
+  local src=(demo/sub5.yz.base INT demo/sub3.yz.base INT)
+  run_demo compromise:source   -NOCOL    T=3 $src FLUSH
+  run_demo compromise:source/F -NOCOL -F T=4 $src FLUSH
+  run_demo compromise:i                  T=3 $src FLUSH -i
+  run_demo compromise:x                  T=3 $src FLUSH -x
+  run_demo compromise:l                  T=3 $src FLUSH -l
 
   return 0
 }
 
+run_demo_add ()
+{
+  local tag=$1; shift
+  local op0=($1); shift
+  while [[ $# -gt 0 ]]
+  do
+    [[ -e $1 ]] && break
+    op0+=($1)
+    shift
+  done
+  local op1=("$@")
+  run_demo "$tag/op0" $op0 INT FLUSH
+  run_demo "$tag/op1" $op1 INT FLUSH
+  run_demo "$tag" $op0 INT $op1 INT REPEAT ADD FLUSH -i
+}
 run_demo ()
 {
+  local tag=$1; shift
   local col=T
   case $1 in 
   (-NOCOL) col=; shift;;
@@ -56,6 +80,7 @@ run_demo ()
   local args=("$@")
   local tmp=$(mktemp) 
   $chak "${(@)args}" > $tmp 2> /dev/null
+  print "### $tag"
   {
     print "% $chak:t $args"
     sed -e  '/^[0-9]/,$d' $tmp

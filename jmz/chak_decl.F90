@@ -132,7 +132,8 @@
   character(len=*),parameter :: str_MISS = 'MISS'
   !! group: buffer
   character(len=*),parameter :: str_TAG = 'TAG'
-  character(len=*),parameter :: str_C = 'C'
+  character(len=*),parameter :: str_PERM = 'PERM'
+  character(len=*),parameter :: str_SHAPE = 'SHAPE'
   character(len=*),parameter :: str_C0 = 'C0'
   character(len=*),parameter :: str_C1 = 'C1'
   character(len=*),parameter :: str_C2 = 'C2'
@@ -140,9 +141,6 @@
   character(len=*),parameter :: str_X = 'X'
   character(len=*),parameter :: str_Y = 'Y'
   character(len=*),parameter :: str_Z = 'Z'
-  character(len=*),parameter :: str_LON = 'LON'
-  character(len=*),parameter :: str_LAT = 'LAT'
-  character(len=*),parameter :: str_LEV = 'LEV'
   !! operation id
   !! group: system
   integer,parameter :: grp_system_bgn = 0
@@ -306,7 +304,8 @@
   !! group: buffer
   integer,parameter :: grp_buffer_bgn = 110
   integer,parameter :: opr_TAG = 110
-  integer,parameter :: opr_C = 111
+  integer,parameter :: opr_PERM = 111
+  integer,parameter :: opr_SHAPE = opr_PERM
   integer,parameter :: opr_C0 = 112
   integer,parameter :: opr_C1 = 113
   integer,parameter :: opr_C2 = 114
@@ -314,7 +313,4 @@
   integer,parameter :: opr_X = 116
   integer,parameter :: opr_Y = 117
   integer,parameter :: opr_Z = 118
-  integer,parameter :: opr_LON = 119
-  integer,parameter :: opr_LAT = 120
-  integer,parameter :: opr_LEV = 121
-  integer,parameter :: grp_buffer_end = 122
+  integer,parameter :: grp_buffer_end = 119
