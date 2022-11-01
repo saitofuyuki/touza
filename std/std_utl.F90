@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2022/10/31 08:08:15 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/31 23:11:33 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -992,13 +992,13 @@ contains
     lstr = len(str)
 
     jv = 0
-    write(buf, xfmt) v(jv)
+    write(buf, xfmt) trim(v(jv))
     nb = len_trim(buf)
     jstr = jstr + nb
     str = buf(1:nb)
 
     do jv = 1, nv - 1
-       write(buf, xfmt) v(jv)
+       write(buf, xfmt) trim(v(jv))
        nb = len_trim(buf)
        jstr = jstr + nb + lsep
        if (ierr.eq.0) then
