@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/11/01 10:11:33 fuyuki demo-chak.sh.in>
+# Time-stamp: <2022/11/03 10:33:29 fuyuki demo-chak.sh.in>
 
 main ()
 {
@@ -45,12 +45,43 @@ demo_operation ()
   run_demo_add auto/add:2d    demo/zx.base T=5       demo/yz.base  T=3
   run_demo_add manual/add:2d  demo/zx.base T=3 Y=lat demo/yz.base  T=3
 
-  local src=(demo/sub5.yz.base INT demo/sub3.yz.base INT)
+  src=(demo/sub5.yz.base INT demo/sub3.yz.base INT)
   run_demo compromise:source   -NOCOL    T=3 $src FLUSH
   run_demo compromise:source/F -NOCOL -F T=4 $src FLUSH
   run_demo compromise:i                  T=3 $src FLUSH -i
   run_demo compromise:x                  T=3 $src FLUSH -x
   run_demo compromise:l                  T=3 $src FLUSH -l
+
+  # permutation
+  src=(T=0 demo/base INT)
+  run_demo source:3d     -n $src =
+
+  run_demo perm:3d/102a  -n $src PERM=lat  =
+  run_demo perm:3d/102b  -n $src PERM=,lon =
+
+  run_demo perm:3d/201   -n $src PERM=lev =
+  run_demo perm:3d/210a  -n $src PERM=lev,lat =
+  run_demo perm:3d/210b  -n $src PERM=lev,/   =
+
+  run_demo perm:3d/.012        -n $src PERM=-       =
+  run_demo perm:3d/s012        -n $src PERM=set     =
+  run_demo perm:3d/0s12        -n $src PERM=,set    =
+  run_demo perm:3d/012s        -n $src PERM=,,,set  =
+  run_demo perm:3d/s012:error  -n $src PERM=set/    =
+
+  run_demo perm:3d/r2          -n $src PERM=lon/glon   =
+  run_demo perm:3d/r2          -n $src PERM=,,lon/glon =
+  run_demo perm:3d/r2          -n $src PERM=,,lon/lat  =
+
+  src=(T=5 demo/zx.base INT)
+  run_demo source:y      -n $src =
+  run_demo perm:y+x      -n $src PERM=lon =
+  run_demo perm:y+s      -n $src PERM=- =
+  run_demo perm:y+sx     -n $src PERM=lon,- =
+  run_demo perm:y+y      -n $src PERM=,set =
+  run_demo perm:y+sy     -n $src PERM=-,set =
+  run_demo perm:y+z      -n $src PERM=,,lev =
+  run_demo perm:y+z:keep -n $src PERM=/,/,lev =
 
   return 0
 }
@@ -77,21 +108,27 @@ run_demo ()
   case $1 in 
   (-NOCOL) col=; shift;;
   esac
+  local err=
   local args=("$@")
-  local tmp=$(mktemp) 
-  $chak "${(@)args}" > $tmp 2> /dev/null
-  print "### $tag"
+  local tmp=$(mktemp); log=$(mktemp)
+  $chak "${(@)args}" > $tmp 2> $log; err=$?
+  print "# ## $tag"
   {
     print "% $chak:t $args"
-    sed -e  '/^[0-9]/,$d' $tmp
-    if [[ -z $col ]]; then
-      sed -ne '/^[0-9]/,$p' $tmp
+    if [[ $err -eq 0 ]]; then
+      sed -e  '/^[0-9]/,$d' $tmp
+      if [[ -z $col ]]; then
+        sed -ne '/^[0-9]/,$p' $tmp
+      else
+        sed -ne '/^[0-9]/,$p' $tmp | column -t
+      fi
     else
-      sed -ne '/^[0-9]/,$p' $tmp | column -t
+      cat $tmp
+      cat $log
     fi
   } | sed -e 's/^/: /'
   print
-  rm -f $tmp
+  rm -f $tmp $log
 }
 
 demo_inputs ()

@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/11/01 08:54:32 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/03 10:42:52 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -262,6 +262,7 @@ program chak
   character(len=*),parameter :: aext  = '.'  ! character for external
 
   integer,parameter :: stat_help = 1
+  integer           :: dryrun = 0
 !!!_ + Body
   ierr = 0
 
@@ -1040,6 +1041,8 @@ contains
           dbgv = +999
        else if (abuf.eq.'-h') then
           stat = stat_help
+       else if (abuf.eq.'-n') then
+          dryrun = 1
        else if (abuf.eq.'-f') then   ! write-mode
           md = mode_write
        else if (abuf.eq.'-a') then
@@ -1676,20 +1679,22 @@ contains
        ierr = nc
        call message(ierr, 'cannot parse range: ' // trim(arg(jran:larg)))
     else if (nc.eq.0) then
+       b = system_index_bgn(rpos(1))
+       e = system_index_end(rpos(2))
        continue
     else if (nc.eq.1) then
-       rpos(1) = system_index_bgn(rpos(1))
-       rpos(2) = rpos(1) + 1
-       s = 0
+       b = system_index_bgn(rpos(1))
+       e = b + 1
+       s = 1
     else if (nc.eq.2) then
-       s = 0
+       b = system_index_bgn(rpos(1))
+       e = system_index_end(rpos(2))
+       s = 1
+       if (e.le.b) s = 0
     else if (nc.gt.2) then
        ierr = ERR_INVALID_PARAMETER
        call message(ierr, 'fail to extract range ' // trim(arg(jran:larg)))
     endif
-    b = system_index_bgn(rpos(1))
-    e = system_index_end(rpos(2))
-
     ! write(*, *) jrep, jran, '{' // arg(1:jrep) // '}{' // arg(jran:larg) // '} ', b, e, s
   end subroutine decompose_coordinate_mod
 
@@ -3616,11 +3621,14 @@ contains
     implicit none
     integer,intent(in) :: handle
     integer jb, jc
+    integer w
     jb = buf_h2item(handle)
     if (jb.ge.0) then
        n = 1
        do jc = 0, lcoor - 1
-          n = n * max(1, obuffer(jb)%pcp(jc)%end - obuffer(jb)%pcp(jc)%bgn)
+          w = (obuffer(jb)%pcp(jc)%end - obuffer(jb)%pcp(jc)%bgn)
+          n = n * max(1, w * max(0, obuffer(jb)%pcp(jc)%stp))
+          ! n = n * max(1, w)
        enddo
     else
        n = jb
@@ -4398,6 +4406,7 @@ contains
     integer,     intent(in)          :: jstk
     integer,     intent(in),optional :: levv
     integer n
+    integer jc
     integer jb, jrefh
     character(len=128) :: txt
     character(len=litem) :: tstr
@@ -4476,13 +4485,33 @@ contains
     endif
     is_tweak = .FALSE.
     if (ierr.eq.0) then
-       is_tweak = ANY(bstack(jstk)%lcp(:)%stp.ge.0)
+       if (.not.is_tweak) then
+          is_tweak = ANY(bstack(jstk)%lcp(:)%stp.ge.0)
+       endif
        if (.not.is_tweak) then
           is_tweak = ANY(bstack(jstk)%lcp(:)%name.ne.' ')
        endif
        if (is_tweak) then
+          ! write(*, *) 'tweak'
           call tweak_buffer(ierr, btmp, file%bh, jstk)
           if (ierr.eq.0) call put_header_lprops(ierr, head, btmp%pcp, file%hflag)
+       else if (ANY(obuffer(jb)%pcp(:)%stp.eq.0)) then
+          btmp%pcp(:) = obuffer(jb)%pcp(:)
+          if (file%hflag.eq.hflag_nulld) then
+             do jc = 0, lcoor - 1
+                if (btmp%pcp(jc)%stp.eq.0) then
+                   btmp%pcp(jc)%end = btmp%pcp(jc)%bgn
+                endif
+             enddo
+          else
+             do jc = 0, lcoor - 1
+                if (btmp%pcp(jc)%stp.eq.0) then
+                   btmp%pcp(jc)%bgn = 0
+                   btmp%pcp(jc)%end = 0
+                endif
+             enddo
+          endif
+          call put_header_lprops(ierr, head, btmp%pcp, file%hflag)
        else
           call put_header_lprops(ierr, head, obuffer(jb)%pcp, file%hflag)
        endif
@@ -5169,6 +5198,8 @@ contains
 112 format(I0, ':')
 113 format(':', I0)
 114 format(I0, ':', I0)
+115 format(I0, ':', I0, '+', I0)
+116 format(I0, ':', I0, '-', I0)
     bb = user_index_bgn(b)
     ee = user_index_end(e)
     if (bb.eq.null_range) then
@@ -5183,6 +5214,10 @@ contains
        write(str, 114) bb, ee
     else if (b.eq.0.and.e.eq.0) then
        str = '-'
+    else if (s.eq.0) then
+       write(str, 115) bb, ee, s
+    else if (s.lt.0) then
+       write(str, 116) bb, ee, abs(s)
     else
        write(str, 114) bb, ee
     endif
@@ -5437,6 +5472,9 @@ contains
        hterm = aqueue(jq)%term
        termk = handle_type(hterm)
        if (aqueue(jq)%desci.eq.' ') call set_queue_descr(ierr, aqueue(jq))
+       if (is_msglev_DETAIL(levv)) then
+          call trace_queue(jerr, aqueue(jq), levv)
+       endif
        select case(termk)
        case(hk_file)
           if (ierr.eq.0) call push_file(ierr, hterm, levv)
@@ -5451,7 +5489,7 @@ contains
           endif
        end select
        if (is_msglev_DETAIL(levv)) then
-          call trace_queue(jerr, aqueue(jq), levv)
+          ! call trace_queue(jerr, aqueue(jq), levv)
           call show_stack(jerr)
        endif
        if (ierr.ne.0) exit
@@ -5478,7 +5516,7 @@ contains
        brec = irecw
     else if (brec.ge.0) then
        call message &
-            & (ierr, '## record:', (/user_index_bgn(brec)/), &
+            & (ierr, '### record:', (/user_index_bgn(brec)/), &
             &  fmt='(I0)', levm=msglev_normal+1)
        brec = -1
     endif
@@ -5812,20 +5850,22 @@ contains
     character(len=64) :: fmt_xline
 
     type(domain_t) :: doml, domr(1)
+    type(buffer_t) :: htmp
     integer mco
     integer jl, jp
     integer lidx(0:lcoor-1), pidx(0:lcoor-1)
     integer nb
     integer btmp(1), ptmp(1)
+    character(len=256) :: cjoin, val
 
     ierr = 0
     utmp = choice(ulog, u)
 
-212 format('# stack[', I0, '] ', A)
+212 format('## stack[', I0, '] ', A, 1x, A)
 
-231 format('#      ', A)
-232 format('#   >  ', A)
-233 format('#   >> ', A)
+231 format('##      ', A)
+232 format('##   >  ', A)
+233 format('##   >> ', A)
 
 201 format('(', I0, '(I0, 1x), ', A, ')')
 202 format('(', I0, '(I0, 1x), ''.'')')
@@ -5833,6 +5873,7 @@ contains
 221 format('(', A, ')')
 222 format('(', '''.'')')
 223 format('(', '''_'')')
+211 format('#', A, 1x, A)
 
     ! write(*, *) def_write%kfmt, trim(def_write%fmt)
 
@@ -5844,13 +5885,13 @@ contains
        btmp(1) = hb
        ptmp(1) = js
 
-       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, ptmp, nb)
-       if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, ptmp, nb)
-       if (ierr.eq.0) call settle_output_domain(ierr, domL)
-       if (ierr.eq.0) call settle_input_domain(ierr, domR(1), btmp(1), ptmp(1), domL)
+       if (ierr.eq.0) then
+          call get_compromise_domain(ierr, domL, domR, btmp, ptmp, nb, cmode_inclusive, htmp)
+       endif
+       if (ierr.eq.0) call get_obj_string(ierr, val, hb)
 
        if (is_msglev(lev_verbose, msglev_normal+1)) then
-          write(utmp, 212) user_index_bgn(jbuf), trim(obuffer(jb)%desc)
+          if (ierr.eq.0) write(utmp, 212) user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc)
           if (ierr.eq.0) call get_domain_string(ierr, lcstr, bstack(js)%lcp)
           if (ierr.eq.0) call get_domain_string(ierr, pcstr, obuffer(jb)%pcp)
           if (ierr.eq.0) then
@@ -5860,80 +5901,84 @@ contains
           if (ierr.eq.0) write(utmp, 232) trim(lcstr)
           if (ierr.eq.0) write(utmp, 233) trim(dstr)
        endif
-
+       if (ierr.eq.0) call get_domain_result(ierr, cjoin, domL, htmp%pcp)
+       if (ierr.eq.0) write(utmp, 211) trim(cjoin), trim(val)
        ! if (is_msglev_DEBUG(lev_verbose)) then
        !    if (ierr.eq.0) call show_domain(ierr, doml, 'left')
        !    if (ierr.eq.0) call show_domain(ierr, domr(1), 'right')
        ! endif
-
        if (ierr.eq.0) then
-          mco = doml%mco
-          if (mco.gt.0) then
-             write(fmt_xline, 202) mco
-             write(fmt_uline, 203) mco
+          if (dryrun.gt.0) then
+             write(utmp, *)
           else
-             write(fmt_xline, 222)
-             write(fmt_uline, 223)
-          endif
-          lidx(0:mco-1) = 0
-          doml%bgn(0:mco-1) = user_index_bgn(doml%bgn(0:mco-1))
+             mco = doml%mco
+             if (mco.gt.0) then
+                write(fmt_xline, 202) mco
+                write(fmt_uline, 203) mco
+             else
+                write(fmt_xline, 222)
+                write(fmt_uline, 223)
+             endif
+             lidx(0:mco-1) = 0
+             doml%bgn(0:mco-1) = user_index_bgn(doml%bgn(0:mco-1))
 
-          select case(obuffer(jb)%k)
-          case (kv_int)
-             if (mco.gt.0) then
-                write(fmt_nline, 201) mco, trim(afmt_int)
-             else
-                write(fmt_nline, 221) trim(afmt_int)
-             endif
-             do jl = 0, doml%n - 1
-                jp = physical_index(lidx, domr(1))
-                pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
-                if (jp.lt.0) then
-                   write(utmp, fmt_xline) pidx(0:mco-1)
-                else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
-                   write(utmp, fmt_uline) pidx(0:mco-1)
+             select case(obuffer(jb)%k)
+             case (kv_int)
+                if (mco.gt.0) then
+                   write(fmt_nline, 201) mco, trim(afmt_int)
                 else
-                   write(utmp, fmt_nline) pidx(0:mco-1), INT(obuffer(jb)%vd(jp))
+                   write(fmt_nline, 221) trim(afmt_int)
                 endif
-                call incr_logical_index(lidx, doml)
-             enddo
-          case (kv_flt)
-             if (mco.gt.0) then
-                write(fmt_nline, 201) mco, trim(afmt_flt)
-             else
-                write(fmt_nline, 221) trim(afmt_flt)
-             endif
-             do jl = 0, doml%n - 1
-                jp = physical_index(lidx, domr(1))
-                pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
-                if (jp.lt.0) then
-                   write(utmp, fmt_xline) pidx(0:mco-1)
-                else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
-                   write(utmp, fmt_uline) pidx(0:mco-1)
+                do jl = 0, doml%n - 1
+                   jp = physical_index(lidx, domr(1))
+                   pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
+                   if (jp.lt.0) then
+                      write(utmp, fmt_xline) pidx(0:mco-1)
+                   else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
+                      write(utmp, fmt_uline) pidx(0:mco-1)
+                   else
+                      write(utmp, fmt_nline) pidx(0:mco-1), INT(obuffer(jb)%vd(jp))
+                   endif
+                   call incr_logical_index(lidx, doml)
+                enddo
+             case (kv_flt)
+                if (mco.gt.0) then
+                   write(fmt_nline, 201) mco, trim(afmt_flt)
                 else
-                   write(utmp, fmt_nline) pidx(0:mco-1), REAL(obuffer(jb)%vd(jp), kind=KFLT)
+                   write(fmt_nline, 221) trim(afmt_flt)
                 endif
-                call incr_logical_index(lidx, doml)
-             enddo
-          case (kv_dbl)
-             if (mco.gt.0) then
-                write(fmt_nline, 201) mco, trim(afmt_dbl)
-             else
-                write(fmt_nline, 221) trim(afmt_dbl)
-             endif
-             do jl = 0, doml%n - 1
-                jp = physical_index(lidx, domr(1))
-                pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
-                if (jp.lt.0) then
-                   write(utmp, fmt_xline) pidx(0:mco-1)
-                else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
-                   write(utmp, fmt_uline) pidx(0:mco-1)
+                do jl = 0, doml%n - 1
+                   jp = physical_index(lidx, domr(1))
+                   pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
+                   if (jp.lt.0) then
+                      write(utmp, fmt_xline) pidx(0:mco-1)
+                   else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
+                      write(utmp, fmt_uline) pidx(0:mco-1)
+                   else
+                      write(utmp, fmt_nline) pidx(0:mco-1), REAL(obuffer(jb)%vd(jp), kind=KFLT)
+                   endif
+                   call incr_logical_index(lidx, doml)
+                enddo
+             case (kv_dbl)
+                if (mco.gt.0) then
+                   write(fmt_nline, 201) mco, trim(afmt_dbl)
                 else
-                   write(utmp, fmt_nline) pidx(0:mco-1), REAL(obuffer(jb)%vd(jp), kind=KDBL)
+                   write(fmt_nline, 221) trim(afmt_dbl)
                 endif
-                call incr_logical_index(lidx, doml)
-             enddo
-          end select
+                do jl = 0, doml%n - 1
+                   jp = physical_index(lidx, domr(1))
+                   pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
+                   if (jp.lt.0) then
+                      write(utmp, fmt_xline) pidx(0:mco-1)
+                   else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
+                      write(utmp, fmt_uline) pidx(0:mco-1)
+                   else
+                      write(utmp, fmt_nline) pidx(0:mco-1), REAL(obuffer(jb)%vd(jp), kind=KDBL)
+                   endif
+                   call incr_logical_index(lidx, doml)
+                enddo
+             end select
+          endif
        endif
     enddo
   end subroutine flush_buffer_each
@@ -6004,31 +6049,37 @@ contains
        if (ierr.eq.0) call join_list(ierr, vjoin, vals(0:nbuf-1))
 211    format('#', A, 1x, A)
        write(utmp, 211) trim(cjoin), trim(vjoin)
-       do jl = 0, doml%n - 1
-          pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
-          do j = 0, nbuf - 1
-             jb = bufj(j)
-             jp = physical_index(lidx, domr(j))
-             if (jp.lt.0) then
-                vals(j) = '.'
-             else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
-                vals(j) = '_'
-             else
-                select case(obuffer(jb)%k)
-                case (kv_int)
-                   write(vals(j), afmt_int) INT(obuffer(jb)%vd(jp))
-                case (kv_flt)
-                   write(vals(j), afmt_flt) REAL(obuffer(jb)%vd(jp), kind=KFLT)
-                case (kv_dbl)
-                   write(vals(j), afmt_dbl) REAL(obuffer(jb)%vd(jp), kind=KDBL)
-                case default
-                   vals(j) = '*'
-                end select
-             endif
+    endif
+    if (ierr.eq.0) then
+       if (dryrun.gt.0) then
+          write(utmp, *)
+       else
+          do jl = 0, doml%n - 1
+             pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
+             do j = 0, nbuf - 1
+                jb = bufj(j)
+                jp = physical_index(lidx, domr(j))
+                if (jp.lt.0) then
+                   vals(j) = '.'
+                else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
+                   vals(j) = '_'
+                else
+                   select case(obuffer(jb)%k)
+                   case (kv_int)
+                      write(vals(j), afmt_int) INT(obuffer(jb)%vd(jp))
+                   case (kv_flt)
+                      write(vals(j), afmt_flt) REAL(obuffer(jb)%vd(jp), kind=KFLT)
+                   case (kv_dbl)
+                      write(vals(j), afmt_dbl) REAL(obuffer(jb)%vd(jp), kind=KDBL)
+                   case default
+                      vals(j) = '*'
+                   end select
+                endif
+             enddo
+             write(utmp, fmt_xline) pidx(0:mco-1), (trim(vals(j)),j=0,nbuf-1)
+             call incr_logical_index(lidx, doml)
           enddo
-          write(utmp, fmt_xline) pidx(0:mco-1), (trim(vals(j)),j=0,nbuf-1)
-          call incr_logical_index(lidx, doml)
-       enddo
+       endif
     endif
 
   end subroutine flush_buffer_horizontally
@@ -6067,14 +6118,18 @@ contains
     integer,      intent(in)    :: handle
     type(stack_t),intent(inout) :: lefts(0:)
     integer jotgt
-    integer jlogc, jphyc
+    ! integer jlogc, jphyc
     integer lasth, jbref
     integer j, jb
     integer js
     integer b, e,  n, jc
-    integer cpidx(0:lcoor-1), ctype(0:lcoor-1)
-    character(len=litem) cname(0:lcoor-1)
+    ! integer cpidx(0:lcoor-1), ctype(0:lcoor-1)
+    ! character(len=litem) cname(0:lcoor-1)
     character(len=64) :: opr
+    type(buffer_t) :: buf
+    integer nb
+    type(domain_t) :: doml, domr(1)
+    integer btmp(1), ptmp(1)
 
     ierr = 0
     jotgt = handle - opr_C0
@@ -6087,25 +6142,40 @@ contains
     endif
     if (ierr.eq.0) then
        js = mstack - 1
-       call get_logical_shape &
-            & (ierr, cname, ctype, cpidx, bstack(js)%lcp, obuffer(jbref)%pcp, lcoor)
-       if (ierr.eq.0) then
-          jlogc = jotgt
-          jphyc = cpidx(jotgt)
-       endif
+       btmp(1) = lasth
+       ptmp(1) = js
+       nb = 1
+       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, ptmp, nb, buf)
+       if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, ptmp, nb)
+       if (ierr.eq.0) call settle_output_domain(ierr, domL)
+       if (ierr.eq.0) call set_output_buffer(ierr, buf, btmp, domL)
+       ! write(*, *) buf%pcp(:)%bgn
+       ! write(*, *) buf%pcp(:)%end
+       ! write(*, *) buf%pcp(:)%stp
     endif
     if (ierr.eq.0) then
-       b = logical_index(bstack(js)%lcp(jlogc)%bgn, obuffer(jbref)%pcp(jphyc)%bgn)
-       e = logical_index(bstack(js)%lcp(jlogc)%end, obuffer(jbref)%pcp(jphyc)%end)
-       e = max(1 + b, e)
-       n = max(1, e - b)
+       if (jotgt.lt.domL%mco) then
+          b = domL%bgn(jotgt)
+          e = domL%end(jotgt)
+          e = max(1 + b, e)
+          n = max(1, e - b)
+       else
+          b = 0
+          e = 0
+          n = 1
+       endif
        do j = 0, size(lefts) - 1
           jb = buf_h2item(lefts(j)%bh)
           obuffer(jb)%pcp(:) = def_loop
+
+          obuffer(jb)%pcp(:) = buf%pcp(:)
+          obuffer(jb)%pcp(0:domL%mco-1)%stp = 0
+          obuffer(jb)%pcp(domL%mco:)%stp = -1
+
           obuffer(jb)%pcp(jotgt)%bgn = b
           obuffer(jb)%pcp(jotgt)%end = e
           obuffer(jb)%pcp(jotgt)%stp = 1
-          obuffer(jb)%pcp(jotgt)%name = cname(jotgt)
+          obuffer(jb)%pcp(jotgt)%name = buf%pcp(jotgt)%name
           obuffer(jb)%undef = UNDEF
           if (ierr.eq.0) call alloc_buffer_t(ierr, obuffer(jb), n)
           if (ierr.eq.0) then
@@ -6117,6 +6187,9 @@ contains
           obuffer(jb)%ilev  = ilev_term
           obuffer(jb)%desc  = trim(opr)
           obuffer(jb)%desc2 = trim(opr)
+          ! write(*, *) jb, obuffer(jb)%pcp(:)%bgn
+          ! write(*, *) jb, obuffer(jb)%pcp(:)%end
+          ! write(*, *) jb, obuffer(jb)%pcp(:)%stp
        enddo
     endif
   end subroutine apply_INDEX
@@ -6641,7 +6714,7 @@ contains
     integer,       intent(in)             :: bufh(0:*)
     integer,       intent(in)             :: pstk(0:*)
     integer,       intent(in)             :: nbuf
-    type(buffer_t),intent(inout),optional :: bufo
+    type(buffer_t),intent(inout),optional :: bufo       ! to store coordinate names only
 
     integer nceff
     character(len=lname) :: nameL(0:lcoor-1),  nameR(0:lcoor-1, 0:nbuf-1)
@@ -6982,7 +7055,9 @@ contains
   end function coordinate_type
 
 !!!_   . match_perms
-  subroutine match_perms(ierr, nceff, cnameL, clidxR, ctypeR,  cnameR, mco, nbuf, ltbl)
+  subroutine match_perms &
+       & (ierr,   nceff,  cnameL, clidxR, &
+       &  ctypeR, cnameR, mco,    nbuf, ltbl)
     use TOUZA_Std,only: choice, find_first, find_first_range, join_list
     implicit none
     integer,         intent(out) :: ierr
@@ -7010,6 +7085,8 @@ contains
     integer,save :: mtbl = -1
     integer,             allocatable,save :: cout(:, :), nin(:), jbuf(:), jpack(:)
     character(len=lname),allocatable,save :: cbuf(:)
+    character(len=128) :: str
+    integer jerr
 
     ierr = 0
     nceff = -1
@@ -7107,9 +7184,9 @@ contains
              if (count(gidx(jodr + 1:meff(jb) - 1, jb).eq.jco).gt.0) then
                 ierr = ERR_INVALID_PARAMETER
                 call message(ierr, 'duplicate tweaking ', (/jb, jco/))
-301             format('duplicate:', I0, 1x, I0, 1x, A)
+301             format('duplicate:', I0, 1x, A)
                 do jt = jodr, meff(jb) - 1
-                   if (gidx(jt, jb).eq.jco) write(*, 301) jb, jt, trim(cnameR(jt, jb))
+                   if (gidx(jt, jb).eq.jco) write(uerr, 301) jb, trim(cnameR(jt, jb))
                 enddo
              endif
           enddo
@@ -7152,8 +7229,8 @@ contains
              ierr = ERR_INVALID_PARAMETER
              call message(ierr, 'ambiguous fragile coordinates ', (/jodr/))
              do jt = 0, nt - 1
-311             format('perm:collision: ', I0, 1x, I0, 1x, A)
-                if (nin(jt).eq.0) write(*, 311) jodr, jt, cbuf(jt)
+311             format('perm:collision: ', I0, 1x, A)
+                if (nin(jt).eq.0) write(uerr, 311) jodr, cbuf(jt)
              enddo
           endif
           jco = find_first(nin(0:nt-1), 0, offset=0)
@@ -7172,8 +7249,8 @@ contains
              ierr = ERR_INVALID_PARAMETER
              call message(ierr, 'cycle in fragile coordinates')
              do jt = 0, nt - 1
-312             format('perm:cycle: ', I0, 1x, I0, 1x, A)
-                if (nin(jt).ge.0) write(*, 312) jodr, jt, cbuf(jt)
+312             format('perm:cycle: ', I0, 1x, A)
+                if (nin(jt).ge.0) write(uerr, 312) jodr, cbuf(jt)
              enddo
           endif
        endif
@@ -7254,6 +7331,14 @@ contains
                 if (jodr.ge.0) clidxR(jodr, jb) = jco
              endif
           enddo
+       enddo
+    endif
+
+    if (ierr.ne.0) then
+       do jb = 0, nbuf - 1
+          call join_list(jerr, str, cnameR(0:mco-1, jb), sep=',', ldelim='[', rdelim=']')
+901       format('shape:', I0, 1x, A)
+          write(uerr, 901) jb, trim(str)
        enddo
     endif
 
@@ -7357,6 +7442,7 @@ contains
           if (high.eq.hini) high = low + max(0, stp)
           domL%bgn(jo) = low
           domL%end(jo) = high
+          ! write(*, *) 'inclusive', jo, domL%bgn(jo), domL%end(jo)
        enddo
     endif
     return
@@ -7457,7 +7543,8 @@ contains
     endif
     s = -1
     if (jphyc.ge.0) then
-       if (pcp(jphyc)%stp.gt.0) then
+       ! if (pcp(jphyc)%stp.gt.0) then
+       if (pcp(jphyc)%stp.ge.0) then
           if (b.eq.null_range) b = pcp(jphyc)%bgn
           if (e.eq.null_range) e = pcp(jphyc)%end
        endif
@@ -7526,7 +7613,7 @@ contains
     type(domain_t),intent(inout) :: dom
     type(loop_t),  intent(in)    :: pcp(0:*)
 
-    integer jo, jc
+    integer jo, jc, w
     integer strd(0:dom%mco)
 
     ierr = 0
@@ -7541,7 +7628,8 @@ contains
 
     strd(0) = 1
     do jc = 1, dom%mco
-       strd(jc) = strd(jc-1) * max(1, pcp(jc-1)%end - pcp(jc-1)%bgn)
+       w = pcp(jc-1)%end - pcp(jc-1)%bgn
+       strd(jc) = strd(jc-1) * max(1, w * max(0, pcp(jc-1)%stp))
     enddo
     do jo = 0, dom%mco - 1
        jc = dom%cidx(jo)
@@ -7607,7 +7695,8 @@ contains
        do jc = 0, dom%mco - 1
           if (dom%strd(jc).le.0) then
              buf%pcp(jc)%bgn = dom%bgn(jc)
-             buf%pcp(jc)%end = dom%bgn(jc)
+             ! buf%pcp(jc)%end = dom%bgn(jc)
+             buf%pcp(jc)%end = dom%end(jc)
              buf%pcp(jc)%stp = 0
           else
              buf%pcp(jc)%bgn = dom%bgn(jc)

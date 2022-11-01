@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/10/31 08:22:15 fuyuki genopr.sh>
+# Time-stamp: <2022/11/02 18:34:06 fuyuki genopr.sh>
 
 jmzd=$0:h
 
@@ -236,8 +236,10 @@ register_all ()
   register -n 2,1 -i call GEF      'A if A>=B, else MISS'
 
   # reduction operation
-  register -g reduction -i call AVR     'arithmetic mean from the anchor to the top stack'
-  register -g reduction -i call COUNT   'count defined elements from the anchor to the top stack'
+  register -g reduction -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
+  register -g reduction -o RANK -i call SUM     'sum through stacks or rank(s)'
+  register -g reduction -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
+  register -g reduction -o RANK -i call COUNT   'count defined elements through stacks or rank(s)'
 
   # transform operation
   #### coor=0,1,2,name,alias for coodinate, -1 or s for stack
@@ -251,13 +253,13 @@ register_all ()
   register -g buffer -p NAME              TAG
   register -g buffer -p NAME/REPL/RANGE,.. -n 1,1 PERM 'array shape permutatation'
   register -a PERM SHAPE
-  register -g buffer -o LOW:HIGH     C0
-  register -g buffer -o LOW:HIGH     C1
-  register -g buffer -o LOW:HIGH     C2
-  register -g buffer -o LOW:HIGH     C3
-  register -g buffer -o LOW:HIGH     X
-  register -g buffer -o LOW:HIGH     Y
-  register -g buffer -o LOW:HIGH     Z
+  register -g buffer,index -o NAME/REPL/RANGE    C0  'put top stack coordinate[0] index'
+  register -g buffer,index -o NAME/REPL/RANGE    C1  'put top stack coordinate[1] index'
+  register -g buffer,index -o NAME/REPL/RANGE    C2  'put top stack coordinate[2] index'
+  register -g buffer,index -o NAME/REPL/RANGE    C3  'put top stack coordinate[3] index'
+  register -g buffer,index -o NAME/REPL/RANGE    X   'put top stack coordinate[0] index'
+  register -g buffer,index -o NAME/REPL/RANGE    Y   'put top stack coordinate[1] index'
+  register -g buffer,index -o NAME/REPL/RANGE    Z   'put top stack coordinate[2] index'
   # register -g buffer -p VALUE                 MISS    "replace missing value"
 
   register -g header        -p FORMAT      FMT     "set output data format"
@@ -322,6 +324,7 @@ register ()
   fi
   GRP[$grp]+=" $key"
 
+  [[ -n $subg ]] && GRP[$subg]+=" $key"
   SUBG[$key]="$subg"
   OPT[$key]="$opt"
   PARAM[$key]="$param"
@@ -341,6 +344,7 @@ output_decl ()
 {
   local grp= key=
   local iv= av= gv=()
+  local subg=
   # symbol
   fout "!! operation symbols"
   for grp in $@
@@ -348,6 +352,8 @@ output_decl ()
     fout "!! group: $grp"
     for key in ${=GRP[$grp]}
     do
+      subg=$SUBG[$key]
+      [[ ${subg[(wI)$grp]} -gt 0 ]] && continue
       av=$AVAR[$key]
       fout "character(len=*),parameter :: $av = '$SYM[$key]'"
       let jnum++
@@ -365,6 +371,8 @@ output_decl ()
     for key in ${=GRP[$grp]}
     do
       iv=$IVAR[$key]
+      subg=$SUBG[$key]
+      [[ ${subg[(wI)$grp]} -gt 0 ]] && continue
       if [[ -n $ALIAS[$key] ]]; then
         ref=$IVAR[$ALIAS[$key]]
         fout "integer,parameter :: $iv = $ref"
@@ -384,11 +392,15 @@ output_register ()
   local iv= av=
   local nstack=()
   local infix=() rarg=()
+  local sub=
   # symbol
   for grp in "$@"
   do
     for key in ${=GRP[$grp]}
     do
+      subg=$SUBG[$key]
+      [[ ${subg[(wI)$grp]} -gt 0 ]] && continue
+
       av=$AVAR[$key]
       iv=$IVAR[$key]
       nstack=(${=NSTACK[$key]})
@@ -720,7 +732,7 @@ output_table ()
   local grp= key=
   local nstack=() push= pop=
   local sym= alias= opt=
-  local candi=(unary binary lazy ubool bool stack)
+  local candi=(unary binary lazy ubool bool stack index)
   for grp in "$@"
   do
     [[ $candi[(I)$grp] -eq 0 ]] && continue
@@ -736,6 +748,9 @@ output_table ()
       alias=(${(k)ALIAS[(R)$key]})
       syms=($sym $alias)
       opt=$OPT[$key]
+
+      [[ $grp == index ]] && pop=0 push=1 opt=''
+
       [[ -n $opt ]] && syms=(${^syms}"[=$opt]")
       print - "| $syms | $pop | $push | $desc | "
     done
