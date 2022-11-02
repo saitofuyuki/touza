@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/10/25 21:42:53 fuyuki configure.ac>
+# Time-stamp: <2022/11/02 10:46:14 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -34,7 +34,6 @@ AX_PROG_F77_MPI([test x"$with_mpi" != xno], [use_f77_mpi=yes], [use_f77_mpi=no])
 AM_CONDITIONAL([BUILD_WITH_MPI], [test x"[$]with_mpi" != xno])
 
 dnl AC_PROG_FC
-dnl AC_PROG_F77
 
 AC_FC_PP_SRCEXT([F90])
 AC_FC_PP_DEFINE
@@ -45,6 +44,8 @@ AC_FC_MODULE_FLAG
 AC_FC_MODULE_OUTPUT_FLAG([], [AC_MSG_WARN])
 AX_COMPILER_VENDOR
 AC_LANG_POP([Fortran])
+
+AC_PROG_F77
 
 AC_ARG_ENABLE([warn-max],
 [AS_HELP_STRING([--enable-warn-max], [compile with maximum warning option if found @<:@default=no@:>@])],
@@ -199,6 +200,7 @@ MT_PARSE_PACKAGES()
 PKG_PROG_PKG_CONFIG()
 PKG_PREREQ([0.29])
 AC_SUBST([PACKAGE_REQUIRES], [])
+AC_SUBST([pkgconfig_CPPFLAGS])
 AC_CONFIG_FILES([touza.pc])
 
 AC_OUTPUT

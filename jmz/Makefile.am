@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2022/10/25 18:37:06 fuyuki Makefile.am>
+# Time-stamp: <2022/11/02 07:30:10 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -15,10 +15,10 @@ AM_FCFLAGS_MODULE = $(DEBUG) $(TOUZA_CFLAGS)
 # AM_LDFLAGS = $(TOUZA_LDFLAGS)
 LDADD = $(TOUZA_LIBS) libjmz_local.la
 
-bin_PROGRAMS = chak jmzconv jmzcmp
-bin_SCRIPTS = jmzdepf90
-noinst_PROGRAMS = jmzex
-noinst_SCRIPTS = demo-chak.sh
+bin_PROGRAMS = chak
+noinst_SCRIPTS = jmzdepf90
+noinst_PROGRAMS = jmzex jmzconv jmzcmp
+noinst_SCRIPTS += demo-chak.sh
 
 noinst_LTLIBRARIES	=	libjmz_local.la
 
@@ -33,7 +33,7 @@ jmzcmp_SOURCES = jmzcmp.F90 jmz.h
 chak_SOURCES = chak_lib.F90 chak.F90 jmz.h
 chak_to_include = chak_decl.F90 chak_reg.F90
 
-python_PYTHON = jmznml.py
+noinst_PYTHON = jmznml.py
 
 # Following dependencies are necesary, as workaround
 $(jmzconv_OBJECTS): $(noinst_LTLIBRARIES)

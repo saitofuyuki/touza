@@ -1,7 +1,7 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
 # Created: Jun 7 2020
-# Time-stamp: <2022/10/17 15:22:20 fuyuki autogen.sh>
+# Time-stamp: <2022/11/02 08:02:02 fuyuki autogen.sh>
 
 # Copyright (C) 2020, 2021
 #           Japan Agency for Marine-Earth Science and Technology
@@ -13,11 +13,13 @@ DRY=T
 OPTS=''
 CLEAR=''
 VERBOSE=''
+copy_missing=''
 while test $# -gt 0
 do
   case $1 in
   -v) VERBOSE=-v;;
   -c) CLEAR=T;;
+  -m) copy_missing=-c;;
   -y) DRY=;;
   -I) OPTS="$OPTS $1 $2"; shift;;
   *)  break;;
@@ -76,7 +78,7 @@ do
   if test x$CLEAR != x; then
     run rm -rf aclocal.m4 autom4te.cache || exit $?
   fi
-  run libtoolize || exit $?
+  run libtoolize $copy_missing || exit $?
   run aclocal $OPTS -I "$stdm4d" || exit $?
   run autoheader || exit $?
 
@@ -90,11 +92,11 @@ do
     fi
   done
 
-  run automake --add-missing --gnu || exit $?
+  run automake $copy_missing --add-missing --gnu || exit $?
   echo "# automake rerun"
   # shellcheck disable=SC2086
   run rm -f $TMP
-  run automake --foreign || exit $?
+  run automake $copy_missing --foreign || exit $?
 
   run autoconf $VERBOSE || exit $?
 done
