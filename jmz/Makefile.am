@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2022/11/04 09:20:30 fuyuki Makefile.am>
+# Time-stamp: <2022/11/04 10:15:31 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -66,6 +66,7 @@ EXTRA_DIST = jmzdepf90.sh.in demo-chak.sh.in $(chak_to_include)
 MOSTLYCLEANFILES =
 CLEANFILES = $(bin_SCRIPTS) $(noinst_SCRIPTS)
 SUBDIRS = .
+MOSTLYCLEANFILES = *.$(FC_MODEXT)
 
 uninstall-mod:
 	@:

@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/11/02 10:46:14 fuyuki configure.ac>
+# Time-stamp: <2022/11/03 15:40:08 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
