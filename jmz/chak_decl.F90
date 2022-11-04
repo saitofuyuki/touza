@@ -1,3 +1,14 @@
+!!!_! jmz/chak_decl.F90 - TOUZA/Jmz swiss(CH) army knife operator symbol declaration
+! Maintainer: SAITO Fuyuki
+! Created by genopr.sh at 2022-11-04T09:18:12+09:00
+!!!_! MANIFESTO
+!
+! Copyright (C) 2022
+!           Japan Agency for Marine-Earth Science and Technology
+!
+! Licensed under the Apache License, Version 2.0
+!   (https://www.apache.org/licenses/LICENSE-2.0)
+!
   !! operation symbols
   !! group: system
   character(len=*),parameter :: str_INPUT = ' INPUT'
@@ -120,8 +131,11 @@
   character(len=*),parameter :: str_SCALE = 'SCALE'
   !! group: other
   !! group: reduction
+  character(len=*),parameter :: str_NORM = 'NORM'
+  character(len=*),parameter :: str_SUM = 'SUM'
   character(len=*),parameter :: str_AVR = 'AVR'
   character(len=*),parameter :: str_COUNT = 'COUNT'
+  !! group: index
   !! group: header
   character(len=*),parameter :: str_FMT = 'FMT'
   character(len=*),parameter :: str_ITEM = 'ITEM'
@@ -288,29 +302,34 @@
   integer,parameter :: grp_other_end = 101
   !! group: reduction
   integer,parameter :: grp_reduction_bgn = 101
-  integer,parameter :: opr_AVR = 101
-  integer,parameter :: opr_COUNT = 102
-  integer,parameter :: grp_reduction_end = 103
+  integer,parameter :: opr_NORM = 101
+  integer,parameter :: opr_SUM = 102
+  integer,parameter :: opr_AVR = 103
+  integer,parameter :: opr_COUNT = 104
+  integer,parameter :: grp_reduction_end = 105
+  !! group: index
+  integer,parameter :: grp_index_bgn = 105
+  integer,parameter :: grp_index_end = 105
   !! group: header
-  integer,parameter :: grp_header_bgn = 103
-  integer,parameter :: opr_FMT = 103
-  integer,parameter :: opr_ITEM = 104
-  integer,parameter :: opr_UNIT = 105
-  integer,parameter :: opr_TITLE = 106
-  integer,parameter :: opr_EDIT = 107
-  integer,parameter :: opr_TSEL = 108
-  integer,parameter :: opr_MISS = 109
-  integer,parameter :: grp_header_end = 110
+  integer,parameter :: grp_header_bgn = 105
+  integer,parameter :: opr_FMT = 105
+  integer,parameter :: opr_ITEM = 106
+  integer,parameter :: opr_UNIT = 107
+  integer,parameter :: opr_TITLE = 108
+  integer,parameter :: opr_EDIT = 109
+  integer,parameter :: opr_TSEL = 110
+  integer,parameter :: opr_MISS = 111
+  integer,parameter :: grp_header_end = 112
   !! group: buffer
-  integer,parameter :: grp_buffer_bgn = 110
-  integer,parameter :: opr_TAG = 110
-  integer,parameter :: opr_PERM = 111
+  integer,parameter :: grp_buffer_bgn = 112
+  integer,parameter :: opr_TAG = 112
+  integer,parameter :: opr_PERM = 113
   integer,parameter :: opr_SHAPE = opr_PERM
-  integer,parameter :: opr_C0 = 112
-  integer,parameter :: opr_C1 = 113
-  integer,parameter :: opr_C2 = 114
-  integer,parameter :: opr_C3 = 115
-  integer,parameter :: opr_X = 116
-  integer,parameter :: opr_Y = 117
-  integer,parameter :: opr_Z = 118
-  integer,parameter :: grp_buffer_end = 119
+  integer,parameter :: opr_C0 = 114
+  integer,parameter :: opr_C1 = 115
+  integer,parameter :: opr_C2 = 116
+  integer,parameter :: opr_C3 = 117
+  integer,parameter :: opr_X = 118
+  integer,parameter :: opr_Y = 119
+  integer,parameter :: opr_Z = 120
+  integer,parameter :: grp_buffer_end = 121

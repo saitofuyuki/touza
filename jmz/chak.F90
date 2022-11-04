@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/11/03 10:42:52 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/04 09:26:17 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -52,6 +52,7 @@ program chak
 !!!_ + Declaration
 !!!_  - modules
   use chak_lib,lib_init=>init
+  use chak_opr,opr_init=>init
 ! #if HAVE_FORTRAN_IEEE_ARITHMETIC
 !   use IEEE_ARITHMETIC
 ! #endif
@@ -67,43 +68,12 @@ program chak
   integer,parameter :: ERR_NO_CANDIDATE = 1
   integer,parameter :: ERR_FINISHED = 2
 
-  character(len=*),parameter :: paramd = '='
-
   integer,parameter :: hedit_unset = -9
   integer,parameter :: hedit_sign = 0
   integer,parameter :: hedit_edit = 1
   integer,parameter :: hedit_title = 2
   integer,parameter :: hedit_item = 3
   integer,parameter :: hedit_all = 9
-
-!!!_  - operators
-  integer,parameter :: lopr = 512
-
-  !! operation symbols
-#include "chak_decl.F90"
-
-  integer,parameter :: ilev_unset = 0
-  integer,parameter :: ilev_term = 1
-  integer,parameter :: ilev_call = 2
-  integer,parameter :: ilev_neg = 3
-  integer,parameter :: ilev_exp = 4
-  integer,parameter :: ilev_mul = 5
-  integer,parameter :: ilev_add = 6
-  integer,parameter :: ilev_shift = 7
-  integer,parameter :: ilev_and = 8
-  integer,parameter :: ilev_xor = 9
-  integer,parameter :: ilev_or = 10
-  integer,parameter :: ilev_logical = 11
-
-  type opr_t
-     integer :: push = -1
-     integer :: pop = -1
-     integer :: entr = -1
-     integer :: ilev = ilev_unset
-     character(len=8) :: istr = ' '
-  end type opr_t
-  type(opr_t) :: oprop(0:lopr-1)
-  integer :: mopr = 0
 
 !!!_  - variables
   integer ierr
@@ -212,8 +182,6 @@ program chak
   integer           :: mqueue
   integer,parameter :: lqueue=OPT_CHAK_QUEUE
   type(queue_t)     :: aqueue(0:lqueue-1)
-!!!_  - table
-  integer,save :: htopr = -1
 !!!_  - handle offsets and kinds
   integer,parameter :: hk_error = -1
   integer,parameter :: hk_opr = 0
@@ -234,8 +202,6 @@ program chak
   integer :: global_offset_bgn = 0     ! begin-index offset (user-friendly)
   integer :: global_offset_end = 0     ! end-index offset (user-friendly)
 
-  integer lev_verbose, dbgv, stdv
-
   character(len=lfmt),save :: afmt_int = '(I0)'
   character(len=lfmt),save :: afmt_flt = '(es16.12)'
   character(len=lfmt),save :: afmt_dbl = '(es16.12)'
@@ -248,8 +214,6 @@ program chak
   integer,parameter :: co_normal = 0
 
 !!!_  - misc
-  integer :: ulog = -1
-  integer :: uerr = -1
   integer irecw
 
   character(len=*),parameter :: null_coor = '-'
@@ -266,12 +230,9 @@ program chak
 !!!_ + Body
   ierr = 0
 
-  lev_verbose = 0
-  dbgv = -1
-  stdv = -1
   mqueue = 0
 
-  if (ierr.eq.0) call init(ierr, stdv, dbgv)
+  if (ierr.eq.0) call init(ierr)
   if (ierr.eq.0) call parse_args(ierr)
 
   irecw = 0
@@ -303,19 +264,14 @@ program chak
 contains
 !!!_  - commons
 !!!_   . init
-  subroutine init(ierr, stdv, dbgv)
+  subroutine init(ierr)
     use TOUZA_Nio,only: nio_init=>init, nr_init
-    use TOUZA_Std,only: env_init, MPI_COMM_NULL, stdout=>uout, stderr=>uerr
     implicit none
     integer,intent(out) :: ierr
-    integer,intent(in)  :: stdv, dbgv
 
     ierr = 0
-    if (ierr.eq.0) call env_init(ierr, levv=stdv, icomm=MPI_COMM_NULL)
-    if (ierr.eq.0) ulog = stdout
-    if (ierr.eq.0) uerr = stderr
     if (ierr.eq.0) call lib_init(ierr)
-    if (ierr.eq.0) call register_operators(ierr)
+    if (ierr.eq.0) call opr_init(ierr)
     if (ierr.eq.0) call register_predefined(ierr)
     if (ierr.eq.0) call init_sub(ierr)
     if (ierr.eq.0) call nio_init(ierr, levv=dbgv, stdv=stdv)
@@ -369,52 +325,6 @@ contains
     if (ierr.eq.0) call htb_finalize(ierr, levv=dbgv)
     if (ierr.eq.0) call env_finalize(ierr, levv=dbgv)
   end subroutine finalize
-
-!!!_   . message
-  subroutine message(ierr, msg, iadd, fmt, levm, u, indent)
-    use TOUZA_Std,only: choice, join_list
-    implicit none
-    integer,         intent(in)          :: ierr
-    character(len=*),intent(in)          :: msg     ! msg
-    integer,         intent(in),optional :: iadd(:)
-    character(len=*),intent(in),optional :: fmt
-    integer,         intent(in),optional :: levm    ! message level
-    integer,         intent(in),optional :: u
-    integer,         intent(in),optional :: indent
-    integer jerr
-    integer lv, utmp
-    character(len=1024) :: txt
-    integer skp
-    jerr = 0
-    lv = choice(0, levm)
-    if (ierr.ne.0) then
-       utmp = choice(uerr, u)
-    else
-       utmp = choice(ulog, u)
-    endif
-    skp = choice(0, indent)
-    if (ierr.ne.0.or.is_msglev(lev_verbose, lv)) then
-       if (present(iadd)) then
-          if (size(iadd).gt.0) then
-             if (present(fmt)) then
-                write(txt, fmt) iadd(:)
-             else
-                call join_list(jerr, txt, iadd(:), ldelim='(', rdelim=')')
-             endif
-             txt = trim(msg) // ' ' // trim(txt)
-          endif
-       else
-          txt = msg
-       endif
-102    format('error:', I0, ': ', A)
-101    format(A, A)
-       if (ierr.ne.0) then
-          write(utmp, 102) ierr, trim(txt)
-       else
-          write(utmp, 101) repeat(' ', skp), trim(txt)
-       endif
-    endif
-  end subroutine message
 
 !!!_   . show_usage
   subroutine show_usage (ierr, u, levv)
@@ -734,174 +644,6 @@ contains
     enddo
 
   end subroutine show_stack_perms
-
-!!!_  - operator table
-!!!_   . register_operators
-  subroutine register_operators(ierr)
-    use TOUZA_Std,only: htb_init, new_htable, reg_entry
-    implicit none
-    integer,intent(out) :: ierr
-
-    ierr = 0
-    call htb_init(ierr)
-    htopr = new_htable('operators', 0, nstt=1, mem=lopr)
-    ierr = min(0, htopr)
-
-#   include "chak_reg.F90"
-
-  end subroutine register_operators
-!!!_   . reg_opr_prop
-  subroutine reg_opr_prop &
-       & (ierr, idopr, str, pop, push, ilev, istr)
-    use TOUZA_Std,only: choice, reg_entry, store_xstatus
-    implicit none
-    integer,         intent(out)         :: ierr
-    integer,         intent(in)          :: idopr
-    character(len=*),intent(in)          :: str
-    integer,         intent(in),optional :: pop
-    integer,         intent(in),optional :: push
-    integer,         intent(in),optional :: ilev
-    character(len=*),intent(in),optional :: istr
-    integer entr
-    if (idopr.ge.lopr.or.idopr.lt.0) then
-       ierr = ERR_PANIC
-       call message(ierr, 'panic in operator registration')
-       return
-    endif
-    entr = reg_entry(str, htopr, idopr)
-    ierr = min(0, entr)
-    if (ierr.eq.0) then
-       if (oprop(idopr)%entr.lt.0) then
-          oprop(idopr)%entr = entr
-          oprop(idopr)%push = choice(-1, push)
-          oprop(idopr)%pop = choice(-1, pop)
-          oprop(idopr)%ilev = choice(ilev_unset, ilev)
-          if (present(istr)) then
-             oprop(idopr)%istr = istr
-          else
-             oprop(idopr)%istr = ' '
-          endif
-       else
-          ! alias
-          continue
-       endif
-       mopr = max(mopr, idopr + 1)
-    endif
-  end subroutine reg_opr_prop
-
-!!!_   . reg_fake_opr
-  subroutine reg_fake_opr &
-       & (ierr, handle, str)
-    use TOUZA_Std,only: reg_entry, query_entry
-    implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(in)  :: handle
-    character(len=*),intent(in)  :: str
-    integer entr
-    ierr = 0
-    entr = query_entry(str, htopr)
-    if (entr.ge.0) then
-       ierr = ERR_DUPLICATE_SET
-       call message(ierr, 'duplicate registration ' // trim(str))
-    else
-       entr = reg_entry(str, htopr, handle)
-    endif
-  end subroutine reg_fake_opr
-
-!!!_   . parse_term_operator()
-  integer function parse_term_operator(str) result(n)
-    use TOUZA_Std,only: query_status
-    implicit none
-    character(len=*),intent(in) :: str
-    integer jb
-    n = query_status(str, htopr)
-    if (n.lt.0) then
-       jb = index(str, paramd)
-       if (jb.gt.1) then
-          n = query_status(str(1:jb-1), htopr)
-       endif
-    endif
-  end function parse_term_operator
-!!!_   . inquire_opr_nstack
-  subroutine inquire_opr_nstack(ierr, pop, push, handle)
-    implicit none
-    integer,intent(out) :: ierr
-    integer,intent(out) :: pop, push
-    integer,intent(in)  :: handle
-    integer jb
-    ierr = 0
-
-    if (handle.lt.0.or.handle.ge.mopr) then
-       jb = buf_h2item(handle)
-       if (jb.lt.0) then
-          ierr = ERR_INVALID_ITEM
-          call message(ierr, 'invalid operator handle to inquire', (/handle/))
-       else
-          pop = 0
-          push = 1
-       endif
-    else
-       pop = oprop(handle)%pop
-       push = oprop(handle)%push
-    endif
-  end subroutine inquire_opr_nstack
-
-!!!_   . inquire_opr_infix
-  subroutine inquire_opr_infix(ierr, ilev, istr, handle)
-    implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: ilev
-    character(len=*),intent(out) :: istr
-    integer,         intent(in)  :: handle
-    ierr = 0
-
-    if (handle.lt.0.or.handle.ge.mopr) then
-       ierr = ERR_INVALID_ITEM
-       call message(ierr, 'invalid operator handle to inquire', (/handle/))
-       ilev = ilev_unset
-       istr = ' '
-    else
-       ilev = oprop(handle)%ilev
-       istr = oprop(handle)%istr
-       if (istr.eq.' ') then
-          call query_opr_name(ierr, istr, handle)
-       endif
-    endif
-  end subroutine inquire_opr_infix
-
-!!!_   . is_operator_modify()
-  logical function is_operator_modify(handle) result(b)
-    implicit none
-    integer,intent(in) :: handle
-    b = handle.eq.opr_TRANSF
-  end function is_operator_modify
-
-!!!_   . is_operator_reusable()
-  logical function is_operator_reusable(handle) result(b)
-    implicit none
-    integer,intent(in) :: handle
-    integer pop, push
-    integer jerr
-    call inquire_opr_nstack(jerr, pop, push, handle)
-    b = pop.eq.1 .and. push.eq.1
-    ! b = .FALSE.
-  end function is_operator_reusable
-
-!!!_   . query_opr_name
-  subroutine query_opr_name &
-       & (ierr, str, handle)
-    use TOUZA_Std,only: query_name
-    implicit none
-    integer,         intent(out)         :: ierr
-    character(len=*),intent(out)         :: str
-    integer,         intent(in)          :: handle
-    if (handle.lt.0.or.handle.ge.mopr) then
-       ierr = ERR_INVALID_ITEM
-       call message(ierr, 'invalid operator handle', (/handle/))
-       return
-    endif
-    call query_name(ierr, str, oprop(handle)%entr, htopr)
-  end subroutine query_opr_name
 
 !!!_  - argument parser
 !!!_   . parse_args

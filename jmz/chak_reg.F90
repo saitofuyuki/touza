@@ -1,3 +1,14 @@
+!!!_! jmz/chak_reg.F90 - TOUZA/Jmz swiss(CH) army knife operator registration
+! Maintainer: SAITO Fuyuki
+! Created by genopr.sh at 2022-11-04T09:18:10+09:00
+!!!_! MANIFESTO
+!
+! Copyright (C) 2022
+!           Japan Agency for Marine-Earth Science and Technology
+!
+! Licensed under the Apache License, Version 2.0
+!   (https://www.apache.org/licenses/LICENSE-2.0)
+!
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_INPUT, str_INPUT, 1, 1)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_OUTPUT, str_OUTPUT, 1, 0)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_ANCHOR, str_ANCHOR)
@@ -106,6 +117,8 @@
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_EXPONENT, str_EXPONENT, 1, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_FRACTION, str_FRACTION, 1, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_SCALE, str_SCALE, 2, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_NORM, str_NORM, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_SUM, str_SUM, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_AVR, str_AVR, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_COUNT, str_COUNT, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_FMT, str_FMT)

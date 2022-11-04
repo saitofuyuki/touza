@@ -1,6 +1,7 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/11/02 18:34:06 fuyuki genopr.sh>
+# Time-stamp: <2022/11/04 09:15:50 fuyuki genopr.sh>
 
+this=$0:t
 jmzd=$0:h
 
 main ()
@@ -58,12 +59,12 @@ run ()
   (-c) opt=(clip xclip -i); shift;;
   esac
   local sub=$1; shift
-  local cmd=(output_$sub "$@")
   local of=
   case $sub in
   (d*) of=$jmzd/chak_decl.F90;;
   (r*) of=$jmzd/chak_reg.F90;;
   esac
+  local cmd=(output_$sub $of "$@")
 
   case $opt[1] in
   (diff) [[ -z $of ]] && print -u2 - "Need old file" && return 1;
@@ -342,10 +343,13 @@ register ()
 
 output_decl ()
 {
+  local of=$1; shift
   local grp= key=
   local iv= av= gv=()
   local subg=
   # symbol
+  output_f90_header "$of" "operator symbol declaration"
+
   fout "!! operation symbols"
   for grp in $@
   do
@@ -388,11 +392,13 @@ output_decl ()
 
 output_register ()
 {
+  local of="$1"; shift
   local grp= key=
   local iv= av=
   local nstack=()
   local infix=() rarg=()
   local sub=
+  output_f90_header "$of" "operator registration"
   # symbol
   for grp in "$@"
   do
@@ -800,6 +806,27 @@ output_table ()
     done | sort | column -s '|' -o '|' -t
     print -
   done
+}
+
+output_f90_header ()
+{
+  local base=$1 desc="$2"
+  local date=$(date -Iseconds)
+  base=${base#./}
+  cat <<HEADER
+!!!_! $base - TOUZA/Jmz swiss(CH) army knife $desc
+! Maintainer: SAITO Fuyuki
+! Created by $this at $date
+!!!_! MANIFESTO
+!
+! Copyright (C) 2022
+!           Japan Agency for Marine-Earth Science and Technology
+!
+! Licensed under the Apache License, Version 2.0
+!   (https://www.apache.org/licenses/LICENSE-2.0)
+!
+HEADER
+  return 0
 }
 
 main "$@"; err=$?
