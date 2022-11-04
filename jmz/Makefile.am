@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2022/11/04 10:15:31 fuyuki Makefile.am>
+# Time-stamp: <2022/11/04 14:41:01 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -66,7 +66,7 @@ EXTRA_DIST = jmzdepf90.sh.in demo-chak.sh.in $(chak_to_include)
 MOSTLYCLEANFILES =
 CLEANFILES = $(bin_SCRIPTS) $(noinst_SCRIPTS)
 SUBDIRS = .
-MOSTLYCLEANFILES = *.$(FC_MODEXT)
+MOSTLYCLEANFILES += *.$(FC_MODEXT)
 
 uninstall-mod:
 	@:
@@ -76,6 +76,11 @@ install-mod:
 lib:
 	@if test "$(TOUZA_top_builddir)"; \
 	then cd $(TOUZA_top_builddir) && $(MAKE); \
+	else echo "Need to set TOUZA_top_builddir" >&2; exit 1; fi
+
+rebuild-lib:
+	@if test "$(TOUZA_top_builddir)"; \
+	then cd $(TOUZA_top_builddir) && $(MAKE) clean all; \
 	else echo "Need to set TOUZA_top_builddir" >&2; exit 1; fi
 
 ### Local Variables:

@@ -1,9 +1,9 @@
 dnl Filename:   touza/m4c/mt_am_include.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 16 2020
-dnl Time-stamp: <2022/11/01 22:42:59 fuyuki mt_am_include.m4>
+dnl Time-stamp: <2022/11/04 14:55:25 fuyuki mt_am_include.m4>
 
-dnl Copyright: 2020, 2021 JAMSTEC
+dnl Copyright: 2020,2021,2022 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
 dnl   (https://www.apache.org/licenses/LICENSE-2.0)
 
@@ -54,6 +54,12 @@ echo-top_srcdir:
 echo-top_builddir:
 	@echo ${AX_DOLLAR}(top_builddir)
 
+lib:
+	@if test ${AX_DQ}${AX_DOLLAR}(top_builddir)${AX_DQ} = ${AX_DQ}${AX_DOLLAR}(builddir)${AX_DQ}; then :; \\
+	else cd ${AX_DOLLAR}(top_builddir) && ${AX_DOLLAR}(MAKE); fi
+rebuild-lib:
+	@if test ${AX_DQ}${AX_DOLLAR}(top_builddir)${AX_DQ} = ${AX_DQ}${AX_DOLLAR}(builddir)${AX_DQ}; then :; \\
+	else cd ${AX_DOLLAR}(top_builddir) && ${AX_DOLLAR}(MAKE) clean all; fi
 ])
 
 AX_ADD_AM_MACRO_STATIC([
