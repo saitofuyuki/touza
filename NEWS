@@ -1,10 +1,15 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2022/11/01 12:51:17 fuyuki NEWS>
+# Time-stamp: <2022/11/04 10:55:01 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.05.6 from 1.05.6
+- (chak) Reshaping improved.
+  - Index operator (Cn, X, etc) now has dummy null rank of
+    non-specific coordinates.
 
 * Changes in 1.05.5 from 1.05.4
 - (chak) Reshaping redesigned and improved.

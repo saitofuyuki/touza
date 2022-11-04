@@ -1,6 +1,7 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/10/31 08:22:15 fuyuki genopr.sh>
+# Time-stamp: <2022/11/04 09:15:50 fuyuki genopr.sh>
 
+this=$0:t
 jmzd=$0:h
 
 main ()
@@ -58,12 +59,12 @@ run ()
   (-c) opt=(clip xclip -i); shift;;
   esac
   local sub=$1; shift
-  local cmd=(output_$sub "$@")
   local of=
   case $sub in
   (d*) of=$jmzd/chak_decl.F90;;
   (r*) of=$jmzd/chak_reg.F90;;
   esac
+  local cmd=(output_$sub $of "$@")
 
   case $opt[1] in
   (diff) [[ -z $of ]] && print -u2 - "Need old file" && return 1;
@@ -236,8 +237,10 @@ register_all ()
   register -n 2,1 -i call GEF      'A if A>=B, else MISS'
 
   # reduction operation
-  register -g reduction -i call AVR     'arithmetic mean from the anchor to the top stack'
-  register -g reduction -i call COUNT   'count defined elements from the anchor to the top stack'
+  register -g reduction -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
+  register -g reduction -o RANK -i call SUM     'sum through stacks or rank(s)'
+  register -g reduction -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
+  register -g reduction -o RANK -i call COUNT   'count defined elements through stacks or rank(s)'
 
   # transform operation
   #### coor=0,1,2,name,alias for coodinate, -1 or s for stack
@@ -251,13 +254,13 @@ register_all ()
   register -g buffer -p NAME              TAG
   register -g buffer -p NAME/REPL/RANGE,.. -n 1,1 PERM 'array shape permutatation'
   register -a PERM SHAPE
-  register -g buffer -o LOW:HIGH     C0
-  register -g buffer -o LOW:HIGH     C1
-  register -g buffer -o LOW:HIGH     C2
-  register -g buffer -o LOW:HIGH     C3
-  register -g buffer -o LOW:HIGH     X
-  register -g buffer -o LOW:HIGH     Y
-  register -g buffer -o LOW:HIGH     Z
+  register -g buffer,index -o NAME/REPL/RANGE    C0  'put top stack coordinate[0] index'
+  register -g buffer,index -o NAME/REPL/RANGE    C1  'put top stack coordinate[1] index'
+  register -g buffer,index -o NAME/REPL/RANGE    C2  'put top stack coordinate[2] index'
+  register -g buffer,index -o NAME/REPL/RANGE    C3  'put top stack coordinate[3] index'
+  register -g buffer,index -o NAME/REPL/RANGE    X   'put top stack coordinate[0] index'
+  register -g buffer,index -o NAME/REPL/RANGE    Y   'put top stack coordinate[1] index'
+  register -g buffer,index -o NAME/REPL/RANGE    Z   'put top stack coordinate[2] index'
   # register -g buffer -p VALUE                 MISS    "replace missing value"
 
   register -g header        -p FORMAT      FMT     "set output data format"
@@ -322,6 +325,7 @@ register ()
   fi
   GRP[$grp]+=" $key"
 
+  [[ -n $subg ]] && GRP[$subg]+=" $key"
   SUBG[$key]="$subg"
   OPT[$key]="$opt"
   PARAM[$key]="$param"
@@ -339,15 +343,21 @@ register ()
 
 output_decl ()
 {
+  local of=$1; shift
   local grp= key=
   local iv= av= gv=()
+  local subg=
   # symbol
+  output_f90_header "$of" "operator symbol declaration"
+
   fout "!! operation symbols"
   for grp in $@
   do
     fout "!! group: $grp"
     for key in ${=GRP[$grp]}
     do
+      subg=$SUBG[$key]
+      [[ ${subg[(wI)$grp]} -gt 0 ]] && continue
       av=$AVAR[$key]
       fout "character(len=*),parameter :: $av = '$SYM[$key]'"
       let jnum++
@@ -365,6 +375,8 @@ output_decl ()
     for key in ${=GRP[$grp]}
     do
       iv=$IVAR[$key]
+      subg=$SUBG[$key]
+      [[ ${subg[(wI)$grp]} -gt 0 ]] && continue
       if [[ -n $ALIAS[$key] ]]; then
         ref=$IVAR[$ALIAS[$key]]
         fout "integer,parameter :: $iv = $ref"
@@ -380,15 +392,21 @@ output_decl ()
 
 output_register ()
 {
+  local of="$1"; shift
   local grp= key=
   local iv= av=
   local nstack=()
   local infix=() rarg=()
+  local sub=
+  output_f90_header "$of" "operator registration"
   # symbol
   for grp in "$@"
   do
     for key in ${=GRP[$grp]}
     do
+      subg=$SUBG[$key]
+      [[ ${subg[(wI)$grp]} -gt 0 ]] && continue
+
       av=$AVAR[$key]
       iv=$IVAR[$key]
       nstack=(${=NSTACK[$key]})
@@ -720,7 +738,7 @@ output_table ()
   local grp= key=
   local nstack=() push= pop=
   local sym= alias= opt=
-  local candi=(unary binary lazy ubool bool stack)
+  local candi=(unary binary lazy ubool bool stack index)
   for grp in "$@"
   do
     [[ $candi[(I)$grp] -eq 0 ]] && continue
@@ -736,6 +754,9 @@ output_table ()
       alias=(${(k)ALIAS[(R)$key]})
       syms=($sym $alias)
       opt=$OPT[$key]
+
+      [[ $grp == index ]] && pop=0 push=1 opt=''
+
       [[ -n $opt ]] && syms=(${^syms}"[=$opt]")
       print - "| $syms | $pop | $push | $desc | "
     done
@@ -785,6 +806,27 @@ output_table ()
     done | sort | column -s '|' -o '|' -t
     print -
   done
+}
+
+output_f90_header ()
+{
+  local base=$1 desc="$2"
+  local date=$(date -Iseconds)
+  base=${base#./}
+  cat <<HEADER
+!!!_! $base - TOUZA/Jmz swiss(CH) army knife $desc
+! Maintainer: SAITO Fuyuki
+! Created by $this at $date
+!!!_! MANIFESTO
+!
+! Copyright (C) 2022
+!           Japan Agency for Marine-Earth Science and Technology
+!
+! Licensed under the Apache License, Version 2.0
+!   (https://www.apache.org/licenses/LICENSE-2.0)
+!
+HEADER
+  return 0
 }
 
 main "$@"; err=$?

@@ -1,3 +1,12 @@
+Release/1.05.6 2022/11/04
+=========================
+
+  * [build] distcheck includes jmz/.
+  * (chak) chak_opr introduced to separate operation procedures.
+  * (chak) shape logging improved.
+  * (chak) [severe] decompose_coordinate_mod failed to perse.
+  * (chak) [IMPORTANT] physical array accepts null dimension.
+
 Revision 1.05.5 / 2022-11-01
 ============================
 
