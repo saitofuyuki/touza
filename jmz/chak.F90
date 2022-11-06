@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/11/04 09:26:17 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/06 09:01:21 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -83,7 +83,6 @@ program chak
   integer,save      :: mfile=0
   integer,parameter :: lfile=OPT_CHAK_FILES
   integer,parameter :: lpath=OPT_PATH_LEN
-  integer,parameter :: lname=litem*4
   integer,parameter :: ldesc=OPT_DESC_LEN
   integer,parameter :: lfmt =litem*4
 
@@ -130,15 +129,6 @@ program chak
   integer,parameter :: cmode_intersect = 2
   integer,parameter :: cmode_first     = 3
 
-  integer,parameter :: full_range = + HUGE(0)              ! case low:
-  integer,parameter :: null_range = (- HUGE(0)) - 1        ! case low
-!!!_  - loop property
-  type loop_t
-     integer :: bgn = -1
-     integer :: end = -1
-     integer :: stp = -1
-     character(len=lname) :: name
-  end type loop_t
 !!!_  - buffers
   integer,save      :: lcount = 0   ! literal count
   integer,save      :: consts=0     ! predefine constants
@@ -199,31 +189,12 @@ program chak
   integer,parameter :: max_operands = 2
 !!!_  - global flags
   integer :: def_cmode = cmode_inclusive   ! default compromise mode
-  integer :: global_offset_bgn = 0     ! begin-index offset (user-friendly)
-  integer :: global_offset_end = 0     ! end-index offset (user-friendly)
 
   character(len=lfmt),save :: afmt_int = '(I0)'
   character(len=lfmt),save :: afmt_flt = '(es16.12)'
   character(len=lfmt),save :: afmt_dbl = '(es16.12)'
-!!!_  - coordinate matching
-  integer,parameter :: co_unset = -4
-  integer,parameter :: co_null  = -3
-  integer,parameter :: co_ins   = -2
-  integer,parameter :: co_float = -2
-  integer,parameter :: co_wild  = -1
-  integer,parameter :: co_normal = 0
-
 !!!_  - misc
   integer irecw
-
-  character(len=*),parameter :: null_coor = '-'
-  character(len=*),parameter :: rename_sep = '/'
-  character(len=*),parameter :: range_sep = ':'
-
-  type(loop_t),save :: def_loop  = loop_t(null_range, null_range, -1, ' ')
-
-  character(len=*),parameter :: amiss = '_'  ! character for missing value
-  character(len=*),parameter :: aext  = '.'  ! character for external
 
   integer,parameter :: stat_help = 1
   integer           :: dryrun = 0
@@ -741,7 +712,7 @@ contains
     hflag = hflag_unset
     hsub = 0
 
-    jvar = index(abuf, paramd)
+    jvar = index(abuf, param_sep)
     if (jvar.eq.1) then
        ierr = ERR_INVALID_PARAMETER
        call message(ierr, 'invalid option ' // trim(abuf), (/japos/))
@@ -811,16 +782,10 @@ contains
           hsub = +1
        else if (abuf.eq.'-P') then
           call check_only_global(ierr, abuf)
-          if (ierr.eq.0) then
-             global_offset_bgn = 0
-             global_offset_end = 0
-          endif
+          if (ierr.eq.0) call set_user_offsets(ierr, 0, 0)
        else if (abuf.eq.'-F') then
           call check_only_global(ierr, abuf)
-          if (ierr.eq.0) then
-             global_offset_bgn = 1
-             global_offset_end = 0
-          endif
+          if (ierr.eq.0) call set_user_offsets(ierr, 1, 0)
        else if (abuf.eq.'-H') then
           japos = japos + 1
           call get_param(ierr, abuf, japos)
@@ -1183,7 +1148,7 @@ contains
     if (ierr.eq.0) jb = buf_h2item(hbuf)
     if (ierr.eq.0) ierr = min(0, jb)
     if (ierr.eq.0) then
-       jpar = index(arg, paramd) + 1
+       jpar = index(arg, param_sep) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
        select case(hopr)
@@ -1479,7 +1444,7 @@ contains
     endif
 
     if (ierr.eq.0) then
-       jpar = index(arg, paramd) + 1
+       jpar = index(arg, param_sep) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend
        select case(hopr)
@@ -6523,7 +6488,7 @@ contains
 !!!_   . get_logical_shape
   subroutine get_logical_shape &
        & (ierr, cname, ctype, cpidx, lcp, pcp, mco)
-    use TOUZA_Std,only: find_first, parse_number
+    use TOUZA_Std,only: find_first, parse_number, begin_with
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: cname(0:*)   ! coordinate name
@@ -6534,8 +6499,9 @@ contains
 
     ! RANGE is parsed at decompose_coordinate_mod()
 
-    ! NAME/REPL//RANGE   == NAME/REPL/  RANGE      / before RANGE is absorbed
+    ! NAME/REPL//RANGE   == NAME/REPL/  RANGE      slash (/) before RANGE is absorbed
     ! NAME/REPL/RANGE    == NAME/REPL   RANGE
+    ! NAME///RANGE       == NAME//      RANGE
     ! NAME//RANGE        == NAME/       RANGE
     ! NAME/RANGE         == NAME        RANGE
     !  NAME REPL  alpha+alnum
@@ -6549,7 +6515,9 @@ contains
     ! idx/        idx coordinate (error if new)
     ! idx/REPL    idx coordinate and rename to REPL
     ! idx//       order NAME and rename to blank
-    ! -           insert null(dummy) rank
+    ! +           insert null(dummy) rank
+    ! +[/]REPL    insert empty rank with REPL name
+    ! -           delete null(dummy) rank and shift
     ! /           keep the order, same name
     ! //          keep the order and rename to blank
     ! (null)      no touch
@@ -6561,9 +6529,11 @@ contains
     logical xold, xrep
     integer jerr
     integer tblp2l(0:mco-1)
+    character(len=*),parameter :: delete_coor_cont = delete_coor // delete_coor
+    character(len=*),parameter :: delete_coor_full = delete_coor_cont // delete_coor
 
     ierr = 0
-    tblp2l(:) = -1
+    tblp2l(:) = co_unset
     cpidx(0:mco-1) = co_unset
     cname(0:mco-1) = ' '
     ctype(0:mco-1) = co_unset
@@ -6580,9 +6550,31 @@ contains
     do jodr = 0, mco - 1
        if (ierr.eq.0) then
           call parse_coordinate_repl(ierr, cold, xold, crep, xrep, lcp(jodr)%name)
-          if (cold.eq.null_coor) then
+          if (cold.eq.insert_coor) then
              jco = co_ins
              cold = ' '
+          else if (begin_with(cold, delete_coor)) then
+             if (cold.eq.delete_coor_full) then
+                do jco = 0, mco - 1
+                   if (is_null_coor(pcp(jco))) tblp2l(jco) = co_del
+                enddo
+             else if (cold.eq.delete_coor_cont) then
+                do jco = jodr, mco - 1
+                   if (is_null_coor(pcp(jco))) then
+                      tblp2l(jco) = co_del
+                   else
+                      exit
+                   endif
+                enddo
+                cycle
+             else if (cold.eq.delete_coor) then
+                if (is_null_coor(pcp(jodr))) tblp2l(jodr) = co_del
+             else
+                ierr = ERR_INVALID_PARAMETER
+                call message(ierr, 'invalid argument: ' // trim(lcp(jodr)%name))
+                exit
+             endif
+             cycle
           else if (cold.eq.' ') then
              if (xold) then
                 jco = jodr
@@ -6594,7 +6586,7 @@ contains
              if (jerr.eq.0) then
                 jco = system_index_bgn(jco)
                 if (jco.lt.0.or.jco.ge.nranks) then
-                   jco = -1
+                   jco = co_unset
                 else
                    cold = pcp(jco)%name
                 endif
@@ -6617,12 +6609,10 @@ contains
              cpidx(jodr) = jco
              cname(jodr) = pcp(jco)%name
           else if (jco.eq.co_ins) then
-             cpidx(jodr) = co_ins
+             cpidx(jodr) = jco
              cname(jodr) = cold
           endif
-          if (xrep) then
-             cname(jodr) = crep
-          endif
+          if (xrep) cname(jodr) = crep
 ! 101       format('parse_shape:', I0, 1x, I0, ' [', A, '] > ', '[', A, ',', L1,'][', A, ',', L1, ']')
 !           write(*, 101) jodr, jco, trim(lcp(jodr)%name), trim(cold), xold, trim(crep), xrep
        endif
@@ -6633,11 +6623,9 @@ contains
        nskp = 0
        jodr = 0
        do jco = 0, nranks - 1
-          if (tblp2l(jco).lt.0) then
-             ! write(*, *) 'shape/unset', jodr, jco, trim(pcp(jco)%name)
-             if (pcp(jco)%stp.le.0.and.pcp(jco)%name.eq.' ') then
+          if (tblp2l(jco).eq.co_unset) then
+             if (is_null_coor(pcp(jco))) then
                 nskp = nskp + 1
-                ! write(*, *) 'shape/unset/null', jodr, jco, nskp, nins
                 if (nskp.le.nins) then
                    jnull = find_first(cpidx(jnull:mco-1), co_null, offset=jnull, no=mco)
                    if (jnull.lt.mco) then
@@ -6661,15 +6649,11 @@ contains
           endif
        enddo
     endif
-    ! nranks = find_first(cpidx(0:mco-1), co_unset, offset=0, no=mco)
-    ! nranks = max(nranks, jodr)
 
     if (ierr.eq.0) then
        nranks = 0
        ! adjust coordinate types
        do jodr = 0, mco - 1
-          ! write(*, *) 'shape/pcp', jodr, pcp(jodr)
-          ! write(*, *) 'shape/lcp', jodr, lcp(jodr)
           if (cpidx(jodr).ge.0) then
              ctype(jodr) = coordinate_type(cname(jodr), lcp(jodr), pcp(cpidx(jodr)))
           else
@@ -6679,122 +6663,7 @@ contains
        enddo
     endif
 
-    if (ierr.eq.0) then
-       ! do jodr = 0, nranks - 1
-       !    if (ctype(jodr).ne.co_unset) then
-       !       write(*, *) 'shape/perm:', jodr, cpidx(jodr), ctype(jodr), ' ', trim(cname(jodr))
-       !    endif
-       ! enddo
-    endif
-
   end subroutine get_logical_shape
-
-!!!_   . parse_coordinate_repl
-  subroutine parse_coordinate_repl &
-       & (ierr, cold, xold, crep, xrep, str)
-    implicit none
-    integer,         intent(out) :: ierr
-    character(len=*),intent(out) :: cold, crep
-    logical,         intent(out) :: xold, xrep
-    character(len=*),intent(in)  :: str
-
-    integer lstr,  lsep
-    integer jsep0, jsep1
-    ierr = 0
-
-    lstr = len_trim(str)
-    if (lstr.eq.0) then
-       ! (null)
-       xold = .FALSE.
-       xrep = .FALSE.
-       cold = ' '
-       crep = ' '
-       return
-    endif
-    jsep0 = index(str, rename_sep)
-    if (jsep0.eq.0) then
-       ! NAME
-       xold = .FALSE.
-       xrep = .FALSE.
-       cold = str(1:lstr)
-       crep = ' '
-       return
-    endif
-
-    ! [NAME]/[REPL[/]]
-    xold = .TRUE.
-    cold = str(1:jsep0-1)
-    lsep = len(rename_sep)
-    jsep1 = index(str(jsep0+lsep:), rename_sep)
-    if (jsep1.eq.0) then
-       ! [NAME]/REPL
-       crep = str(jsep0+lsep:lstr)
-       xrep = (jsep0+lsep) .le. lstr
-    else
-       ! [NAME]/REPL/
-       jsep1 = jsep0 + lsep + jsep1 - 2
-       crep = str(jsep0+lsep:jsep1)
-       xrep = .TRUE.
-    endif
-
-  end subroutine parse_coordinate_repl
-
-!!!_   . coordinate_type
-  integer function coordinate_type(name, lcp, pcp) result(n)
-    implicit none
-    character(len=*),intent(in)          :: name
-    type(loop_t),    intent(in)          :: lcp
-    type(loop_t),    intent(in),optional :: pcp
-    integer b,e
-
-    if (name.ne.' ') then
-       n = co_normal
-       return
-    endif
-    n = co_unset
-    if (present(pcp)) then
-       if (lcp%stp.lt.0) then
-          if (pcp%stp.gt.0) then
-             n = co_wild
-          else
-             n = co_null
-          endif
-       else
-          b = logical_index(lcp%bgn, pcp%bgn)
-          e = logical_index(lcp%end, pcp%end)
-          if (b.eq.null_range .eqv. e.eq.null_range) then
-             if (b.eq.null_range) then
-                n = co_null
-             else if (b.lt.e) then
-                n = co_wild
-             else
-                n = co_null
-             endif
-          else
-             n = co_wild
-          endif
-       endif
-    else
-       if (lcp%stp.lt.0) then
-          n = co_null
-       else
-          b = lcp%bgn
-          e = lcp%end
-          if (b.eq.null_range .eqv. e.eq.null_range) then
-             if (b.eq.null_range) then
-                n = co_null
-             else if (b.lt.e) then
-                n = co_wild
-             else
-                n = co_null
-             endif
-          else
-             n = co_wild
-          endif
-       endif
-    endif
-
-  end function coordinate_type
 
 !!!_   . match_perms
   subroutine match_perms &
@@ -7453,48 +7322,6 @@ contains
     endif
   end subroutine set_output_buffer
 
-!!!_   . logical_index
-  ELEMENTAL integer function logical_index (l, p) result(n)
-    implicit none
-    integer,intent(in) :: l, p
-    if (l.eq.null_range) then
-       n = p
-    else
-       n = l
-    endif
-  end function logical_index
-
-!!!_   . physical_index
-  PURE integer function physical_index (lidx, dom) result(n)
-    implicit none
-    integer,       intent(in) :: lidx(0:*)
-    type(domain_t),intent(in) :: dom
-    integer jc
-    n = 0
-    do jc = 0, dom%mco - 1
-       if (dom%bgn(jc).le.lidx(jc).and.lidx(jc).lt.dom%end(jc)) then
-          n = n + (dom%ofs(jc) + lidx(jc)) * dom%strd(jc)
-       else
-          n = -1
-          exit
-       endif
-    enddo
-  end function physical_index
-
-!!!_   . incr_logical_index
-  subroutine incr_logical_index(idx, dom)
-    implicit none
-    integer,       intent(inout) :: idx(0:*)
-    type(domain_t),intent(in)    :: dom
-    integer jc, k
-    k = 1
-    do jc = 0, dom%mco - 1
-       idx(jc) = idx(jc) + k
-       k = idx(jc) / dom%iter(jc)
-       idx(jc) = mod(idx(jc), dom%iter(jc))
-    enddo
-  end subroutine incr_logical_index
-
 !!!_   & is_undef()
 !   elemental logical function is_undef(A, N) result(b)
 !     implicit none
@@ -7506,52 +7333,6 @@ contains
 !     b = A .eq. N
 ! #endif
 !   end function is_undef
-
-!!!_  - other utilities
-!!!_   . user_index_bgn()
-  ELEMENTAL integer function user_index_bgn(j, n) result(k)
-    implicit none
-    integer,intent(in)          :: j
-    integer,intent(in),optional :: n
-    if (j.eq.full_range .or. j.eq.null_range) then
-       k = j
-    else
-       k = j + global_offset_bgn
-    endif
-  end function user_index_bgn
-!!!_   . user_index_end()
-  ELEMENTAL integer function user_index_end(j, n) result(k)
-    implicit none
-    integer,intent(in)          :: j
-    integer,intent(in),optional :: n
-    if (j.eq.full_range .or. j.eq.null_range) then
-       k = j
-    else
-       k = j + global_offset_end
-    endif
-  end function user_index_end
-!!!_   . system_index_bgn()
-  ELEMENTAL integer function system_index_bgn(j, n) result(k)
-    implicit none
-    integer,intent(in)          :: j
-    integer,intent(in),optional :: n
-    if (j.eq.full_range .or. j.eq.null_range) then
-       k = j
-    else
-       k = j - global_offset_bgn
-    endif
-  end function system_index_bgn
-!!!_   . system_index_end()
-  ELEMENTAL integer function system_index_end(j, n) result(k)
-    implicit none
-    integer,intent(in)          :: j
-    integer,intent(in),optional :: n
-    if (j.eq.full_range .or. j.eq.null_range) then
-       k = j
-    else
-       k = j - global_offset_end
-    endif
-  end function system_index_end
 
 !!!_ + end chak
 end program chak

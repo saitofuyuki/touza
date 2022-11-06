@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz swiss(CH) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2022/11/04 09:20:52 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/04 21:51:34 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -145,7 +145,7 @@ contains
     integer jb
     n = query_status(str, htopr)
     if (n.lt.0) then
-       jb = index(str, paramd)
+       jb = index(str, param_sep)
        if (jb.gt.1) then
           n = query_status(str(1:jb-1), htopr)
        endif

@@ -637,7 +637,7 @@ completely different between =chak= and GMT implementation.
 | C2[=ARG]           | NAME/REPL/RANGE    |                           |
 | C3[=ARG]           | NAME/REPL/RANGE    |                           |
 | MISS=ARG           | VALUE              | replace missing value     |
-| PERM=ARG SHAPE=ARG | NAME/REPL/RANGE,.. | array shape permutatation |
+| PERM=ARG SHAPE=ARG | NAME/REPL/RANGE,.. | array shape permutation |
 | TAG=ARG            | NAME               |                           |
 | X[=ARG]            | NAME/REPL/RANGE    |                           |
 | Y[=ARG]            | NAME/REPL/RANGE    |                           |
@@ -887,23 +887,36 @@ Concrete examples are helpful rather than to provide the abstract rule.
 
 - ~//~ :: keep the specific rank, with renaming to empty.
 
-- ~-~ :: insert the new empty-name coordinate to the specific rank.
-  ~SHAPE=-~ insert the null coordinate at the first, and shift all the
-  old coordinate by 1.
+- ~-~ :: (*Incompatible with revision 1.05.6 or before*) delete the
+  specific rank coordinate only if it is empty-name coordinate.
+  Leave as it is if normal (named) or wild-card one.
 
-- ~-/<replace>[​/]~ :: insert the new coordinate with name =<replace>=
+- ~--~ :: delete consecutive the empty-name coordinates from the
+  specific rank. For example, ~SHAPE=--~ deletes the head empty
+  coordinates and shift remaining.
+
+- ~---~ :: delete all the empty-name coordinates
+
+- ~+~ :: (*Incompatible with revision 1.05.6 or before*) insert the new
+  empty-name coordinate to the specific rank.  ~SHAPE=+~ insert the
+  null coordinate at the first, and shift all the old coordinate by 1.
+
+- ~+/<replace>[​/]~ :: (*Incompatible with revision 1.05.6 or before*)
+  insert the new coordinate with name =<replace>=
   to the specific rank.
-  ~SHAPE=-/lon~ insert the =<lon>= coordinate at the first, and shift
+  ~SHAPE=+/lon~ insert the =<lon>= coordinate at the first, and shift
   all the old coordinate by 1.
   This means to increase the number of rank.
   This set may have different behaviour with ~<name>~ set above,
-  which may not increase the ranks.
+  which may not increase the total ranks.
 
-- ~<element>~ :: Extract =<element>=-th value along the specific
-  coordinate (e.g., ~5~, non-negative integer).
+- ~+<replace>[​/]~ :: same as above
 
-- ~<range>~  :: Extract =<range>= values along the specific coordinate
-  (e.g., ~3:5~, ~:7~, ~2:~).
+- ~<integer>~ :: Extract a value at specific element index along
+  the specific coordinate (e.g., ~5~, non-negative integer).
+
+- ~[<integer>]:[<integer>]~  :: Extract values of specific range along
+  the specific coordinate (e.g., ~3:5~, ~:7~, ~2:~).
 
 - ~<name|index>/<range|element>~ ::
   move =<name>= or =<index>=-th coordinate to the specific rank, with
@@ -1466,6 +1479,7 @@ The option -l changes the output domain as the first stack.
 : 4  119  119
 
 ** Recipes
+*** =gtext= alternative
 
 * Copyright and license
 Copyright 2022 Japan Agency for Marine-Earth Science and Technology
@@ -1489,4 +1503,4 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  fortran eof Hn ETTL CDATE MDATE CSIGN MSIGN gmtmath
 #  LocalWords:  grdmath EDITn TITLn ETTLn TITL AITM ASTR AEND ngtls
 #  LocalWords:  lev undef br aG bs yz subx zx suby xset yset zset
-#  LocalWords:  glon
+#  LocalWords:  glon BITAND BITNOT BITOR BITXOR LSHIFT RSHIFT
