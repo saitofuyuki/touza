@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2022/10/24 13:22:07 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/22 15:00:12 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -174,14 +174,11 @@ module TOUZA_Std_sus
   public init, diag, finalize
   public sus_open, sus_close
 
-  public sus_write_irec,  sus_read_irec,  sus_skip_irec
-  public sus_write_lrec,  sus_read_lrec,  sus_skip_lrec
+  public sus_write_irec, sus_read_irec, sus_skip_irec, sus_check_irec
+  public sus_write_lrec, sus_read_lrec, sus_skip_lrec, sus_check_lrec
 
-  ! public sus_write_begin_irec, sus_write_end_irec
-  ! public sus_read_begin_irec,  sus_read_end_irec
-
-  public sus_write_isep,  sus_read_isep, sus_read
-  public sus_write_lsep,  sus_read_lsep, sus_write
+  public sus_write_isep, sus_read_isep, sus_read
+  public sus_write_lsep, sus_read_lsep, sus_write
 
   public sus_rseek
   public sus_eswap
@@ -520,6 +517,139 @@ contains
     close(UNIT=u, IOSTAT=ierr)
   end subroutine sus_close
 
+!!!_  - sus_check_irec - health check of 32-bit marker record
+  subroutine sus_check_irec &
+       & (ierr, u, swap, dir, jopos)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, is_eof_ss
+    implicit none
+    integer,parameter :: KISEP=KI32
+    integer,            intent(out)          :: ierr
+    integer,            intent(in)           :: u
+    logical,            intent(in), optional :: swap
+    integer,            intent(in), optional :: dir    ! negative to check backward
+    integer(KIND=KIOFS),intent(out),optional :: jopos  ! file position of the opposite end
+    integer(KIND=KISEP) :: iseph, isepf
+    integer(KIND=KIOFS) :: jpos,  jpini
+    integer d
+    integer jerr
+
+    ierr = 0
+    d = choice(+1, dir)
+    if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpini)
+    !
+    jpos = jpini
+    if (d.lt.0) then
+       ! backward check
+       do
+          if (ierr.eq.0) jpos = jpos - mstrm_sep(isepf)
+          if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
+          if (ierr.eq.0) jpos = jpos - conv_b2strm(abs(isepf)) - mstrm_sep(iseph)
+          if (ierr.eq.0) call sus_read_isep(ierr, u, iseph, pos=jpos, swap=swap)
+          if (ierr.eq.0) then
+             if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          else
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          endif
+          if (ierr.ne.0) exit
+          if (isepf.ge.0) exit
+       enddo
+       if (present(jopos)) then
+          if (ierr.eq.0) jopos = jpos
+       endif
+    else
+       ! forward check
+       do
+          if (ierr.eq.0) call sus_read_isep(ierr, u, iseph, swap=swap)
+          if (ierr.eq.0) jpos = jpos + conv_b2strm(abs(iseph)) + mstrm_sep(iseph)
+          if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) then
+             if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          else
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          endif
+          if (ierr.ne.0) exit
+          if (iseph.ge.0) exit
+       enddo
+       if (present(jopos)) then
+          if (ierr.eq.0) jopos = jpos
+       endif
+    endif
+    ! reset to initial position
+#if OPT_STREAM_RPOS_WORKAROUND
+    call sus_rseek_workaround(jerr, u, jpini)
+#else /* not OPT_STREAM_RPOS_WORKAROUND */
+    read(UNIT=u, IOSTAT=jerr, POS=jpini)
+#endif /* not OPT_STREAM_RPOS_WORKAROUND */
+    if (ierr.eq.0) ierr = jerr
+  end subroutine sus_check_irec
+
+!!!_  - sus_check_lrec - health check of 64-bit marker record
+  subroutine sus_check_lrec &
+       & (ierr, u, swap, dir, jopos)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, is_eof_ss
+    implicit none
+    integer,parameter :: KISEP=KI64
+    integer,            intent(out)          :: ierr
+    integer,            intent(in)           :: u
+    logical,            intent(in), optional :: swap
+    integer,            intent(in), optional :: dir    ! negative to check backward
+    integer(KIND=KIOFS),intent(out),optional :: jopos  ! file position of the opposite end
+    integer(KIND=KISEP) :: lseph, lsepf
+    integer(KIND=KIOFS) :: jpos,  jpini
+    integer d
+    integer jerr
+
+    ierr = 0
+    d = choice(+1, dir)
+    if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpini)
+    !
+    jpos = jpini
+    if (d.lt.0) then
+       ! backward check
+       do
+          if (ierr.eq.0) jpos = jpos - mstrm_sep(lsepf)
+          if (ierr.eq.0) call sus_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
+          if (ierr.eq.0) jpos = jpos - conv_b2strm(lsepf) - mstrm_sep(lseph)
+          if (ierr.eq.0) call sus_read_lsep(ierr, u, lseph, pos=jpos, swap=swap)
+          if (ierr.eq.0) then
+             if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          else
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          endif
+          exit
+       enddo
+       if (present(jopos)) then
+          if (ierr.eq.0) jopos = jpos
+       endif
+    else
+       ! forward check
+       do
+          if (ierr.eq.0) call sus_read_lsep(ierr, u, lseph, swap=swap)
+          if (ierr.eq.0) jpos = jpos + conv_b2strm(lseph) + mstrm_sep(lseph)
+          if (ierr.eq.0) call sus_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) then
+             if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          else
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          endif
+          exit
+       enddo
+       if (present(jopos)) then
+          if (ierr.eq.0) jopos = jpos
+       endif
+    endif
+    ! reset to initial position
+#if OPT_STREAM_RPOS_WORKAROUND
+    call sus_rseek_workaround(jerr, u, jpini)
+#else /* not OPT_STREAM_RPOS_WORKAROUND */
+    read(UNIT=u, IOSTAT=jerr, POS=jpini)
+#endif /* not OPT_STREAM_RPOS_WORKAROUND */
+    if (ierr.eq.0) ierr = jerr
+  end subroutine sus_check_lrec
 !!!_  - sus_skip_irec - forward/backward 32-bit marker records
   ! call sus_skip_irec(ierr, u, WHENCE)      cue only
   ! call sus_skip_irec(ierr, u, N, WHENCE)   skip N records from WHENCE
@@ -1931,13 +2061,14 @@ contains
 
 !!!_  - sus_rseek - seek position to read
   subroutine sus_rseek &
-       & (ierr, u, step, whence)
+       & (ierr, u, step, whence, fmt)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,            intent(out)         :: ierr
     integer,            intent(in)          :: u
     integer(KIND=KIOFS),intent(in),optional :: step
     integer,            intent(in),optional :: whence
+    logical,            intent(in),optional :: fmt     ! formatted or not
 
     integer(KIND=KIOFS) :: jpos, st
     integer wh
@@ -1965,7 +2096,11 @@ contains
 #if OPT_STREAM_RPOS_WORKAROUND
        call sus_rseek_workaround(ierr, u, jpos)
 #else /* not OPT_STREAM_RPOS_WORKAROUND */
-       read(UNIT=u, IOSTAT=ierr, POS=jpos)
+       if (choice(.FALSE., fmt)) then
+          read(UNIT=u, FMT=*, IOSTAT=ierr, POS=jpos)
+       else
+          read(UNIT=u, IOSTAT=ierr, POS=jpos)
+       endif
 #endif /* not OPT_STREAM_RPOS_WORKAROUND */
     endif
     return
