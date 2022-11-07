@@ -2190,6 +2190,7 @@ contains
     if (ierr.eq.0) call get_data_record(ierr, mch,      nk,      u, krect)
     if (ierr.eq.0) call get_data_record(ierr, mofs(2:), nk,      u, krect)
     if (ierr.eq.0) call get_data_record(ierr, dma,      2 * nk,  u, krect)
+    ! write(*, *) mcom, mch, nk, nm
     if (ierr.eq.0) call get_data_record(ierr, imco,     nm * nk, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, icom,     mcom,    u, krect)
 
@@ -2305,7 +2306,7 @@ contains
     nm = count_packed(1, nh, khld)
     imiss = IBITS(HUGE(0_KISRC), 0, nbits)
 
-    jc = 1
+    jc = 0
     kpackm = legacy_packing(1,     nh)
     kpackb = legacy_packing(nbits, nh)
 
@@ -2329,7 +2330,7 @@ contains
             & (ierr, idec, dma(2*jk-1:2*jk), buf(1:), ne, imiss, vmiss)
        jm = (jk - 1) * nm + 1
        call pack_store(ierr, imco(jm:), imsk, nh, 1, kpackm)
-       call pack_store(ierr, icom(jc:), idec, ne, nbits, kpackb)
+       call pack_store(ierr, icom(jc+1:), idec, ne, nbits, kpackb)
        jc = jc + nc
     enddo
     mcom = jc
