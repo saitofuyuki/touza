@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz swiss(CH) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2022/11/05 14:16:49 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/16 16:41:08 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -15,19 +15,23 @@
 #endif
 #include "jmz.h"
 !!!_* macros
-#ifndef    OPT_CHAK_PRECISION
-#  define  OPT_CHAK_PRECISION  0
+#ifndef   OPT_PATH_LEN
+#  define OPT_PATH_LEN 1024
 #endif
-#if OPT_CHAK_PRECISION == 1
-#  define __KBUF KFLT
-#else
-#  define __KBUF KDBL
+#ifndef   OPT_DESC_LEN
+#  define OPT_DESC_LEN 1024
+#endif
+#ifndef   OPT_CHAK_FILES
+#  define OPT_CHAK_FILES    128
+#endif
+#ifndef   OPT_CHAK_BUFFERS
+#  define OPT_CHAK_BUFFERS  256
 #endif
 !!!_@ TOUZA/Jmz/chak-lib - nio swiss army knife (library)
 module chak_lib
 !!!_ + Declaration
 !!!_  - modules
-  use TOUZA_Std,only: KFLT,  KDBL
+  use TOUZA_Std,only: KFLT,  KDBL,   KIOFS
   use TOUZA_Std,only: is_msglev
   use TOUZA_Std,only: msglev_NORMAL, msglev_INFO, msglev_DEBUG
   use TOUZA_Std,only: msglev_WARNING, msglev_DETAIL
@@ -39,6 +43,7 @@ module chak_lib
   integer,parameter :: KBUF = __KBUF
 
   integer,parameter :: lcoor = 6
+  integer,parameter :: mcoor = 3    ! standard max coordinates
 
   real(kind=KBUF),parameter :: ZERO  = 0.0_KBUF
   real(kind=KBUF),parameter :: ONE   = 1.0_KBUF
@@ -73,14 +78,23 @@ module chak_lib
   integer,parameter :: cfmt_binary_r4 = cfmt_binary + cfmt_flags_bo
   integer,parameter :: cfmt_binary_r8 = cfmt_binary + cfmt_flags_bo * 2
 
+!!!_  - variable types
+  integer,parameter :: kv_null = 0
+  integer,parameter :: kv_int  = 1
+  integer,parameter :: kv_flt  = 2
+  integer,parameter :: kv_dbl  = 3
+
 !!!_  - range special
   integer,parameter :: full_range = + HUGE(0)              ! case low:
-  integer,parameter :: null_range = (- HUGE(0)) - 1        ! case low
+  integer,parameter :: null_range = (- HUGE(0)) - 1        ! case low (MUST BE NEGATIVE)
 
 !!!_  - character (symbols) for command-line
   character(len=*),parameter :: param_sep = '='
   character(len=*),parameter :: rename_sep = '/'
   character(len=*),parameter :: range_sep = ':'
+  character(len=*),parameter :: item_sep = ','
+  character(len=*),parameter :: rec_append_sep = '/'
+  character(len=*),parameter :: rec_num_sep = '+'
 
   character(len=*),parameter :: insert_coor = '+'
   character(len=*),parameter :: delete_coor = '-'
@@ -89,11 +103,37 @@ module chak_lib
   character(len=*),parameter :: amiss = '_'  ! character for missing value
   character(len=*),parameter :: aext  = '.'  ! character for external
 !!!_  - i/o units
-  integer :: ulog = -1
-  integer :: uerr = -1
+  integer,save :: ulog = -1
+  integer,save :: uerr = -1
 
 !!!_  - string length
   integer,parameter :: lname = litem * 4
+  integer,parameter :: lpath = OPT_PATH_LEN
+  integer,parameter :: ldesc = OPT_DESC_LEN
+
+!!!_  - handles and types
+  integer,parameter :: lfile = OPT_CHAK_FILES
+  integer,parameter :: lbuffer = OPT_CHAK_BUFFERS
+  integer,parameter :: lopr = 512
+
+  integer,save :: mfile = 0
+  integer,save :: mbuffer = 0
+  integer,save :: mopr = 0
+
+  integer,parameter :: lmodule = max(lopr, lfile, lbuffer) * 2
+!!!_  - handle offsets and kinds
+  integer,parameter :: hk_error = -1
+  integer,parameter :: hk_opr = 0
+  integer,parameter :: hk_file = 1
+  integer,parameter :: hk_buffer = 2
+  integer,parameter :: hk_anchor = 3
+  integer,parameter :: hk_overflow = 4
+
+  integer,parameter :: ofs_opr    = lmodule * hk_opr
+  integer,parameter :: ofs_file   = lmodule * hk_file
+  integer,parameter :: ofs_buffer = lmodule * hk_buffer
+  integer,parameter :: ofs_anchor = lmodule * hk_anchor
+
 !!!_  - global flags
   integer,save :: lev_verbose = 0
   integer,save :: dbgv = -1
@@ -189,6 +229,78 @@ contains
     endif
   end subroutine message
 
+!!!_   . file_h2item()
+  integer function file_h2item(handle) result(n)
+    implicit none
+    integer,intent(in) :: handle
+    n = handle - ofs_file
+    if (n.ge.0.and.n.lt.min(mfile, lfile)) then
+       continue
+    else
+       n = ERR_INVALID_ITEM
+    endif
+  end function file_h2item
+!!!_   . file_i2handle()
+  integer function file_i2handle(item) result(n)
+    implicit none
+    integer,intent(in) :: item
+    if (item.ge.0.and.item.lt.min(mfile, lfile)) then
+       n = item + ofs_file
+    else
+       n = ERR_INVALID_ITEM
+    endif
+  end function file_i2handle
+!!!_   . buf_h2item()
+  ELEMENTAL integer function buf_h2item(handle) result(n)
+    implicit none
+    integer,intent(in) :: handle
+    n = handle - ofs_buffer
+    if (n.ge.0.and.n.lt.min(mbuffer, lbuffer)) then
+       continue
+    else
+       n = ERR_INVALID_ITEM
+    endif
+  end function buf_h2item
+!!!_   . buf_i2handle()
+  integer function buf_i2handle(item) result(n)
+    implicit none
+    integer,intent(in) :: item
+    if (item.ge.0.and.item.lt.min(mbuffer, lbuffer)) then
+       n = item + ofs_buffer
+    else
+       n = ERR_INVALID_ITEM
+    endif
+  end function buf_i2handle
+
+!!!_   . is_operator()
+  logical function is_operator(handle) result(b)
+    implicit none
+    integer,intent(in) :: handle
+    b = (handle_type(handle) .eq. hk_opr)
+  end function is_operator
+
+!!!_   . is_anchor()
+  logical function is_anchor(handle) result(b)
+    implicit none
+    integer,intent(in) :: handle
+    b = (handle_type(handle) .eq. hk_anchor)
+  end function is_anchor
+
+!!!_   . handle_type
+  integer function handle_type(handle) result(k)
+    implicit none
+    integer,intent(in) :: handle
+
+    if (handle.lt.0) then
+       k = hk_error
+    else
+       k = handle / lmodule
+       if (k.ge.hk_overflow) k = hk_error
+    endif
+    return
+  end function handle_type
+
+!!!_  - index
 !!!_   . set_user_offsets
   subroutine set_user_offsets &
        & (ierr, off_bgn, off_end)
