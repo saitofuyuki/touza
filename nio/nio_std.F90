@@ -21,7 +21,7 @@ module TOUZA_Nio_std
   use TOUZA_Std,only: KI32,             KI64,           KDBL,             KFLT
   use TOUZA_Std,only: choice,           choice_a,       condop,           upcase
   use TOUZA_Std,only: control_deep,     control_mode,   is_first_force,   parse_number
-  use TOUZA_Std,only: split_list
+  use TOUZA_Std,only: split_list,       join_list
   use TOUZA_Std,only: is_msglev
   use TOUZA_Std,only: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
   use TOUZA_Std,only: is_msglev_severe, is_msglev_fatal
@@ -75,7 +75,7 @@ module TOUZA_Nio_std
   public :: KI32,             KI64,           KDBL,             KFLT
   public :: choice,           choice_a,       condop,           upcase
   public :: control_deep,     control_mode,   is_first_force,   parse_number
-  public :: split_list
+  public :: split_list,       join_list
   public :: is_msglev
   public :: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
   public :: is_msglev_severe, is_msglev_fatal
