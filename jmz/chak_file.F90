@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz swiss(CH) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2022/11/23 15:42:16 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/23 22:23:29 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -2032,14 +2032,14 @@ contains
     implicit none
     character(len=*),intent(in) :: str
     integer ierr
-    type(grec_t) :: rseq
+    type(rgroup_t) :: rgrp
     integer j
 
-    call parse_rec_argument(ierr, rseq, str)
+    call parse_rec_argument(ierr, rgrp, str)
 101 format('### parse_rec_argument [', A, ']')
     write(*, 101) trim(str)
-    do j = 0, size(rseq%recf) - 1
-       write(*, *) j, rseq%recf(j)%num
+    do j = 0, size(rgrp%filter) - 1
+       write(*, *) j, rgrp%filter(j)%num
     enddo
   end subroutine test_parse_rec_argument
 
