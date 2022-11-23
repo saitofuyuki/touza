@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/11/03 10:33:29 fuyuki demo-chak.sh.in>
+# Time-stamp: <2022/11/04 22:20:56 fuyuki demo-chak.sh.in>
 
 main ()
 {
@@ -63,7 +63,7 @@ demo_operation ()
   run_demo perm:3d/210a  -n $src PERM=lev,lat =
   run_demo perm:3d/210b  -n $src PERM=lev,/   =
 
-  run_demo perm:3d/.012        -n $src PERM=-       =
+  run_demo perm:3d/.012        -n $src PERM=+       =
   run_demo perm:3d/s012        -n $src PERM=set     =
   run_demo perm:3d/0s12        -n $src PERM=,set    =
   run_demo perm:3d/012s        -n $src PERM=,,,set  =
@@ -76,10 +76,10 @@ demo_operation ()
   src=(T=5 demo/zx.base INT)
   run_demo source:y      -n $src =
   run_demo perm:y+x      -n $src PERM=lon =
-  run_demo perm:y+s      -n $src PERM=- =
-  run_demo perm:y+sx     -n $src PERM=lon,- =
+  run_demo perm:y+s      -n $src PERM=+ =
+  run_demo perm:y+sx     -n $src PERM=lon,+ =
   run_demo perm:y+y      -n $src PERM=,set =
-  run_demo perm:y+sy     -n $src PERM=-,set =
+  run_demo perm:y+sy     -n $src PERM=+,set =
   run_demo perm:y+z      -n $src PERM=,,lev =
   run_demo perm:y+z:keep -n $src PERM=/,/,lev =
 

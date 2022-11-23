@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz swiss(CH) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2022/11/04 09:20:52 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/22 21:45:20 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -40,9 +40,6 @@ module chak_opr
   integer,parameter :: ilev_logical = 11
 
 !!!_   . operator properties
-  integer,parameter :: lopr = 512
-  integer,save,private :: mopr = 0
-
   type opr_t
      integer :: push = -1
      integer :: pop = -1
@@ -121,17 +118,22 @@ contains
 !!!_   . reg_fake_opr
   subroutine reg_fake_opr &
        & (ierr, handle, str)
-    use TOUZA_Std,only: reg_entry, query_entry
+    use TOUZA_Std,only: reg_entry, query_entry, query_status
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: handle
     character(len=*),intent(in)  :: str
-    integer entr
+    integer entr, ho
     ierr = 0
     entr = query_entry(str, htopr)
     if (entr.ge.0) then
-       ierr = ERR_DUPLICATE_SET
-       call message(ierr, 'duplicate registration ' // trim(str))
+       ho = query_status(entr, htopr)
+       if (ho.eq.handle) then
+          continue
+       else
+          ierr = ERR_DUPLICATE_SET
+          call message(ierr, 'duplicate registration ' // trim(str))
+       endif
     else
        entr = reg_entry(str, htopr, handle)
     endif
@@ -145,7 +147,7 @@ contains
     integer jb
     n = query_status(str, htopr)
     if (n.lt.0) then
-       jb = index(str, paramd)
+       jb = index(str, param_sep)
        if (jb.gt.1) then
           n = query_status(str(1:jb-1), htopr)
        endif

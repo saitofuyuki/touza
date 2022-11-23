@@ -1,7 +1,7 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2022/09/20 16:56:23 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/07 10:19:39 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -18,37 +18,29 @@
 module TOUZA_Nio_std
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Std_prc,only: KI32, KI64, KDBL, KFLT
-  use TOUZA_Std_utl,only: &
-       & choice, choice_a, condop, upcase, &
-       & control_deep, control_mode, is_first_force, parse_number
-  use TOUZA_Std_log,only: &
-       & is_msglev, &
-       & is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail, &
-       & is_msglev_severe, is_msglev_fatal,  &
-       & get_logu,         unit_global,      trace_fine,       trace_control
-  use TOUZA_Std_env,only: &
-       & KIOFS,           &
-       & nc_strm,         nbits_byte, &
-       & conv_b2strm,     get_size_bytes, &
-       & get_mems_bytes,  get_size_strm,  &
-       & kendi_file,      kendi_mem,      check_bodr_unit, check_byte_order, &
-       & endian_BIG,      endian_LITTLE,  endian_OTHER,    &
-       & is_eof_ss
+  use TOUZA_Std_prc,only: KI32,             KI64,           KDBL,             KFLT
+  use TOUZA_Std_utl,only: choice,           choice_a,       condop,           upcase
+  use TOUZA_Std_utl,only: control_deep,     control_mode,   is_first_force,   parse_number
+  use TOUZA_Std_log,only: is_msglev
+  use TOUZA_Std_log,only: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
+  use TOUZA_Std_log,only: is_msglev_severe, is_msglev_fatal
+  use TOUZA_Std_log,only: get_logu,         unit_global,    trace_fine,       trace_control
+  use TOUZA_Std_log,only: is_error_match
+  use TOUZA_Std_env,only: KIOFS
+  use TOUZA_Std_env,only: nc_strm,          nbits_byte
+  use TOUZA_Std_env,only: conv_b2strm,      get_size_bytes
+  use TOUZA_Std_env,only: get_mems_bytes,   get_size_strm
+  use TOUZA_Std_env,only: kendi_file,       kendi_mem,      check_bodr_unit,  check_byte_order
+  use TOUZA_Std_env,only: endian_BIG,       endian_LITTLE,  endian_OTHER
+  use TOUZA_Std_env,only: is_eof_ss
   use TOUZA_Std_fun,only: new_unit
-  use TOUZA_Std_sus,only: &
-       & WHENCE_BEGIN,    WHENCE_ABS,     WHENCE_CURRENT,  WHENCE_END, &
-       & sus_open,        sus_close, &
-       & sus_write_irec,  sus_read_irec,  sus_skip_irec, &
-       & sus_write_lrec,  sus_read_lrec,  sus_skip_lrec, &
-       & sus_write_isep,  sus_read_isep,  &
-       & sus_write_lsep,  sus_read_lsep,  &
-       & sus_rseek,       sus_eswap
-  ! use TOUZA_Std_htb,only: new_htable,   diag_htable
-  ! use TOUZA_Std_htb,only: new_entry,    reg_entry,     settle_entry
-  ! use TOUZA_Std_htb,only: query_entry,  query_status,  query_name,      search_item
-  ! use TOUZA_Std_htb,only: new_wtable,   reg_item,      check_handle,    flag_default
-  ! use TOUZA_Std_htb,only: get_size_items, get_item_keys, check_index,   reg_alias
+  use TOUZA_Std_sus,only: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
+  use TOUZA_Std_sus,only: sus_open,         sus_close
+  use TOUZA_Std_sus,only: sus_write_irec,   sus_read_irec,  sus_skip_irec
+  use TOUZA_Std_sus,only: sus_write_lrec,   sus_read_lrec,  sus_skip_lrec
+  use TOUZA_Std_sus,only: sus_write_isep,   sus_read_isep
+  use TOUZA_Std_sus,only: sus_write_lsep,   sus_read_lsep
+  use TOUZA_Std_sus,only: sus_rseek,        sus_eswap
 !!!_  - default
   implicit none
   private
@@ -74,34 +66,29 @@ module TOUZA_Nio_std
   public init, diag, finalize
   public msg
 !!!_   . TOUZA_Std
-  public KI32, KI64, KDBL, KFLT
-  public choice, choice_a, condop, upcase
-  public control_deep, control_mode, is_first_force
-  public parse_number
-  public is_msglev
-  public is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
-  public is_msglev_severe, is_msglev_fatal
-  public get_logu,         unit_global,      trace_fine,       trace_control
-  public KIOFS
-  public nc_strm,         nbits_byte
-  public conv_b2strm,     get_size_bytes
-  public get_mems_bytes,  get_size_strm
-  public kendi_file,      kendi_mem,         check_bodr_unit,  check_byte_order
-  public endian_BIG,      endian_LITTLE,     endian_OTHER
-  public is_eof_ss
-  public new_unit
-  public WHENCE_BEGIN,    WHENCE_ABS,     WHENCE_CURRENT,  WHENCE_END
-  public sus_open,        sus_close
-  public sus_write_irec,  sus_read_irec,  sus_skip_irec
-  public sus_write_lrec,  sus_read_lrec,  sus_skip_lrec
-  public sus_write_isep,  sus_read_isep
-  public sus_write_lsep,  sus_read_lsep
-  public sus_rseek,       sus_eswap
-  ! public new_htable,   diag_htable
-  ! public new_entry,    reg_entry,     settle_entry
-  ! public query_entry,  query_status,  query_name,      search_item
-  ! public new_wtable,   reg_item,      check_handle,    flag_default
-  ! public get_size_items, get_item_keys, check_index,   reg_alias
+  public :: KI32,             KI64,           KDBL,             KFLT
+  public :: choice,           choice_a,       condop,           upcase
+  public :: control_deep,     control_mode,   is_first_force,   parse_number
+  public :: is_msglev
+  public :: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
+  public :: is_msglev_severe, is_msglev_fatal
+  public :: get_logu,         unit_global,    trace_fine,       trace_control
+  public :: is_error_match
+  public :: KIOFS
+  public :: nc_strm,          nbits_byte
+  public :: conv_b2strm,      get_size_bytes
+  public :: get_mems_bytes,   get_size_strm
+  public :: kendi_file,       kendi_mem,      check_bodr_unit,  check_byte_order
+  public :: endian_BIG,       endian_LITTLE,  endian_OTHER
+  public :: is_eof_ss
+  public :: new_unit
+  public :: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
+  public :: sus_open,         sus_close
+  public :: sus_write_irec,   sus_read_irec,  sus_skip_irec
+  public :: sus_write_lrec,   sus_read_lrec,  sus_skip_lrec
+  public :: sus_write_isep,   sus_read_isep
+  public :: sus_write_lsep,   sus_read_lsep
+  public :: sus_rseek,        sus_eswap
 contains
 !!!_ + common interfaces
 !!!_  & init

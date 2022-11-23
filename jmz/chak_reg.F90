@@ -1,6 +1,6 @@
 !!!_! jmz/chak_reg.F90 - TOUZA/Jmz swiss(CH) army knife operator registration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2022-11-04T09:18:10+09:00
+! Created by genopr.sh at 2022-11-09T07:12:55+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -86,6 +86,7 @@
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_GTF, str_GTF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LEF, str_LEF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_GEF, str_GEF, 2, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_EXTR, str_EXTR, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_OR, str_OR, 2, 1, ilev=ilev_logical, istr='||')
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LOR, str_LOR)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_ROR, str_ROR, 2, 1, ilev=ilev_call)
@@ -128,6 +129,7 @@
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_EDIT, str_EDIT)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_TSEL, str_TSEL)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_MISS, str_MISS)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_DUR, str_DUR)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_TAG, str_TAG)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_PERM, str_PERM, 1, 1)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_SHAPE, str_SHAPE)

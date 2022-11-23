@@ -6,7 +6,7 @@ TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
-* Changes in 1.05.6 from 1.05.6
+* Changes in 1.05.6 from 1.05.5
 - (chak) Reshaping improved.
   - Index operator (Cn, X, etc) now has dummy null rank of
     non-specific coordinates.

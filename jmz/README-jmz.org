@@ -462,7 +462,7 @@ In order to avoid unexpected behavior, at least decimal point must be
 added for normal mathematics operations, or truncate to integer by INT
 operator.
 
-: % chak -qq 1 =        # treated as integer
+: % chak -qq 1 =       # treated as integer
 : 1
 : % chak -qq 1. =      # treated as floating-point number
 :  1.000000000000000E+00
@@ -637,7 +637,7 @@ completely different between =chak= and GMT implementation.
 | C2[=ARG]           | NAME/REPL/RANGE    |                           |
 | C3[=ARG]           | NAME/REPL/RANGE    |                           |
 | MISS=ARG           | VALUE              | replace missing value     |
-| PERM=ARG SHAPE=ARG | NAME/REPL/RANGE,.. | array shape permutatation |
+| PERM=ARG SHAPE=ARG | NAME/REPL/RANGE,.. | array shape permutation |
 | TAG=ARG            | NAME               |                           |
 | X[=ARG]            | NAME/REPL/RANGE    |                           |
 | Y[=ARG]            | NAME/REPL/RANGE    |                           |
@@ -787,13 +787,23 @@ operators =ITEM=, =TITLE=, respectively.
 =ITEM=, =TITLE= operators apply on the adjacent file argument before the operator.
 
 **** record selection
-Specific record extraction can be operated by =T=LIST=.
+Specific record extraction can be operated by ~T=<list>~.
 
-: chak FILE T=2    # extract record 2 only
-: chak FILE T=1,5  # extract record 1,5 only
-: chak FILE T=:3   # extract 0,1,2
-: chak FILE T=4:   # extract 4,5,...
-: chak FILE T=1:4  # extract 1,2,3
+=<list>= is a sequence of comma separated items which is either range
+or explicit records.
+
+- =<list>= :: =<range|records>[,<range|records>[,<range|records>]...]=
+- =<range>= :: =[<begin>][:[<end>][:[<step>][:[<number>]]]]=
+- =<records>= ::  =<record>[/<record>[/<record>...]]=
+
+Some typical usages are as follows:
+: chak FILE T=2      # extract record 2 only
+: chak FILE T=1,5    # extract record 1,5 only
+: chak FILE T=:3     # extract 0,1,2
+: chak FILE T=4:     # extract 4,5,...
+: chak FILE T=1:4    # extract 1,2,3
+: chak FILE T=1:7:2  # extract 1,3,5
+: chak FILE T=1::2   # extract 1,3,5,7,...
 
 With =-F= option, index can be FORTRAN style:
 
@@ -802,11 +812,68 @@ With =-F= option, index can be FORTRAN style:
 : chak -F FILE T=:3   # extract 1,2,3
 : chak -F FILE T=4:   # extract 4,5,...
 : chak -F FILE T=1:4  # extract 1,2,3,4
+: chak -F FILE T=1:7:2  # extract 1,3,5,7
+: chak -F FILE T=1::2   # extract 1,3,5,7,...
 
 =T= operator applies on the adjacent file argument.
 
 : chak a T=2   b T=3 ADD =   # a[2]+b[3]
 : chak a T=2,3 b T=0 ADD =   # output a[2]+b[0], a[3]+b[0]
+: chak a 0   T=1             # ERROR (not a file operand before T)
+: chak a NEG T=1             # ERROR (not a file operand before T)
+
+=T= operator before any file operands works as default selections.
+
+: chak T=2 a b     c ADD ADD =   # a[2]+b[2]+c[2]
+: chak T=2 a b T=3 c ADD ADD =   # a[2]+b[3]+c[2]
+
+Multiple record stacking from one file can be specified in several ways.
+
+A most simple method is to apply file operand twice:
+: chak a T=3 a T=4 ADD =        # a[3]+a[4]
+Internally, the first and second file operands are dealt as if they
+are different files, so explicit control on each operand can be
+utilized.
+
+Also, the list specification has another field to set number of
+records to push on the stack:
+
+: chak a T=0::12:2   # put two records at every 12 strides
+:   # loop 0   a[0]  a[1]
+:   # loop 1   a[12] a[13]
+:   # loop 2   a[24] a[25]
+:   :
+
+By setting 0 as the number of records, all the record of the strides
+are pushed:
+
+: chak a T=::3:0   # put 3 records at every 3 strides
+:   # loop 0   a[0] a[1] a[2]
+:   # loop 1   a[3] a[4] a[5]
+:   :
+
+With null strides and explicit end and 0 number, all the record from
+begin to end are pushed:
+: chak a T=3:7::0   # put 3:7
+:   # a[3] a[4] a[5] a[6]
+
+The other two methods below are special extension on the ~T~ operator.
+One method is to apply ~T~ operator successively:
+: chak a T=3 T=4 ADD =        # a[3]+a[4]
+Internally, the first and second file operands share the file object.
+Another method is to use ~/~ separator to force multiple selection:
+: chak a T=3/4 ADD =          # a[3]+a[4]
+Successive ~T~ operator and multiple selection can be combined with
+list and range selections.
+
+: chak a T=1/2,3/4,5/6 ADD =
+:   # loop 0 a[1] a[2] ADD
+:   # loop 1 a[3] a[4] ADD
+:   # loop 2 a[5] a[6] ADD
+
+: chak a T=1/2,3/4 T=5,6 ADD =
+:   # loop 0  a[1] a[2] a[5]  ADD
+:   # loop 1  a[3] a[4] a[6]  ADD
 
 *** buffer properties
 **** reshaping
@@ -887,23 +954,36 @@ Concrete examples are helpful rather than to provide the abstract rule.
 
 - ~//~ :: keep the specific rank, with renaming to empty.
 
-- ~-~ :: insert the new empty-name coordinate to the specific rank.
-  ~SHAPE=-~ insert the null coordinate at the first, and shift all the
-  old coordinate by 1.
+- ~-~ :: (*Incompatible with revision 1.05.6 or before*) delete the
+  specific rank coordinate only if it is empty-name coordinate.
+  Leave as it is if normal (named) or wild-card one.
 
-- ~-/<replace>[​/]~ :: insert the new coordinate with name =<replace>=
+- ~--~ :: delete consecutive the empty-name coordinates from the
+  specific rank. For example, ~SHAPE=--~ deletes the head empty
+  coordinates and shift remaining.
+
+- ~---~ :: delete all the empty-name coordinates
+
+- ~+~ :: (*Incompatible with revision 1.05.6 or before*) insert the new
+  empty-name coordinate to the specific rank.  ~SHAPE=+~ insert the
+  null coordinate at the first, and shift all the old coordinate by 1.
+
+- ~+/<replace>[​/]~ :: (*Incompatible with revision 1.05.6 or before*)
+  insert the new coordinate with name =<replace>=
   to the specific rank.
-  ~SHAPE=-/lon~ insert the =<lon>= coordinate at the first, and shift
+  ~SHAPE=+/lon~ insert the =<lon>= coordinate at the first, and shift
   all the old coordinate by 1.
   This means to increase the number of rank.
   This set may have different behaviour with ~<name>~ set above,
-  which may not increase the ranks.
+  which may not increase the total ranks.
 
-- ~<element>~ :: Extract =<element>=-th value along the specific
-  coordinate (e.g., ~5~, non-negative integer).
+- ~+<replace>[​/]~ :: same as above
 
-- ~<range>~  :: Extract =<range>= values along the specific coordinate
-  (e.g., ~3:5~, ~:7~, ~2:~).
+- ~<integer>~ :: Extract a value at specific element index along
+  the specific coordinate (e.g., ~5~, non-negative integer).
+
+- ~[<integer>]:[<integer>]~  :: Extract values of specific range along
+  the specific coordinate (e.g., ~3:5~, ~:7~, ~2:~).
 
 - ~<name|index>/<range|element>~ ::
   move =<name>= or =<index>=-th coordinate to the specific rank, with
@@ -1465,7 +1545,8 @@ The option -l changes the output domain as the first stack.
 : 3  118  118
 : 4  119  119
 
-** Recipes
+*** Recipes
+**** =gtext= alternative
 
 * Copyright and license
 Copyright 2022 Japan Agency for Marine-Earth Science and Technology
@@ -1489,4 +1570,4 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  fortran eof Hn ETTL CDATE MDATE CSIGN MSIGN gmtmath
 #  LocalWords:  grdmath EDITn TITLn ETTLn TITL AITM ASTR AEND ngtls
 #  LocalWords:  lev undef br aG bs yz subx zx suby xset yset zset
-#  LocalWords:  glon
+#  LocalWords:  glon BITAND BITNOT BITOR BITXOR LSHIFT RSHIFT bitwise

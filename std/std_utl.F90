@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2022/10/31 23:11:33 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/11 12:17:59 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -118,6 +118,7 @@ module TOUZA_Std_utl
   public find_first, find_first_range
   public jot
   public inrange
+  public begin_with
 !!!_  - static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -1036,22 +1037,25 @@ contains
 
 !!!_  & split_list - convert array to string
   subroutine split_list_i &
-       & (n, v, str, sep, lim, def)
+       & (n, v, str, sep, lim, def, empty)
     implicit none
     integer,          intent(out)         :: n         ! number of elements or error code
     integer,          intent(inout)       :: v(0:)
     character(len=*), intent(in)          :: str
     character(len=*), intent(in)          :: sep
-    integer,          intent(in),optional :: lim
+    integer,          intent(in),optional :: lim       ! negative to count only; 0 to inifinite
     integer,          intent(in),optional :: def(0:*)  ! no bound check
+    logical,          intent(in),optional :: empty     ! allow empty element (ignored if def present)
 
     integer jpos, lstr, lsep
     integer js,   jh
     integer nlim
     integer jerr
+    logical eallow
 
     jerr = 0
     nlim = choice(+HUGE(0), lim)
+    eallow = choice(.TRUE., empty)
 
     n = 0
     jpos = 0
@@ -1060,10 +1064,10 @@ contains
     lsep = max(1, len_trim(sep))   ! allow single blank only
     js = 0
     do
-       if (n.ge.nlim) then
-          jerr = -1
-          exit
-       endif
+       ! if (nlim.ge.0.and.n.ge.nlim) then
+       !    jerr = -1
+       !    exit
+       ! endif
        js = index(str(jpos+1:lstr), sep(1:lsep))
        if (js.eq.0) then
           jh = lstr
@@ -1072,14 +1076,30 @@ contains
        endif
        ! write(*, *) '  split', n, js, jpos, jh, str(jpos+1:lstr)
        if (jpos.lt.jh) then
-          call parse_number(jerr, v(n), str(jpos+1:jh))
-          if (jerr.ne.0) exit
+          if (nlim.ge.0) then
+             if (n.ge.nlim) then
+                jerr = -1
+             else
+                call parse_number(jerr, v(n), str(jpos+1:jh))
+             endif
+          endif
+          n = n + 1
        else if (present(def)) then
-          v(n) = def(n)
+          if (nlim.ge.0) then
+             if (n.ge.nlim) then
+                jerr = -1
+             else
+                v(n) = def(n)
+             endif
+          endif
+          n = n + 1
+       else if (eallow) then
+          if (nlim.ge.0.and.n.ge.nlim) jerr = -1
+          n = n + 1
        endif
-       n = n + 1
        jpos = jh + lsep
        if (js.eq.0) exit
+       if (jerr.ne.0) exit
     enddo
     if (jerr.ne.0) then
        n = ERR_INVALID_PARAMETER - ERR_MASK_STD_UTL
@@ -1267,6 +1287,21 @@ contains
     integer,intent(in) :: v, l, h
     b = (l.le.v .and. v.le.h)
   end function inrange_i
+
+!!!_  - begin_with - return true if STR begins with SUB
+  PURE logical function begin_with(str, sub) result (b)
+    implicit none
+    character(len=*),intent(in) :: str
+    character(len=*),intent(in) :: sub
+    integer l
+    l = len_trim(sub)
+    if (len(str).lt.l) then
+       b = .FALSE.
+    else
+       b = str(1:l) .eq. sub(1:l)
+    endif
+  end function begin_with
+
 !!!_ + (system) control procedures
 !!!_  - is_first_force () - check if first time or force
   logical function is_first_force(n, mode) result(b)
@@ -1533,15 +1568,21 @@ contains
   subroutine test_split(str)
     implicit none
     character(len=*),intent(in) :: str
-    call test_split_sub(str, 2)
-    call test_split_sub(str, 3)
-    call test_split_sub(str, 4)
+    call test_split_sub(str, -1, .TRUE.)
+    call test_split_sub(str, -1, .FALSE.)
+    call test_split_sub(str, 2,  .TRUE.)
+    call test_split_sub(str, 2,  .FALSE.)
+    call test_split_sub(str, 3,  .TRUE.)
+    call test_split_sub(str, 3,  .FALSE.)
+    call test_split_sub(str, 4,  .TRUE.)
+    call test_split_sub(str, 4,  .FALSE.)
   end subroutine test_split
 
-  subroutine test_split_sub(str, lim)
+  subroutine test_split_sub(str, lim, empty)
     implicit none
     character(len=*),intent(in) :: str
     integer,         intent(in) :: lim
+    logical,         intent(in) :: empty
     integer v(0:lim-1)
     integer def(0:lim-1)
     integer j
@@ -1550,15 +1591,20 @@ contains
        def(j) = - (j + 1)
     enddo
 
-101 format('split/', A, ':', I0, 1x, '[', A, '],', I0, 1x, 5(1x, I0))
+101 format('split/', A, L1, ':', I0, 1x, '[', A, '],', I0, 1x, 5(1x, I0))
 
-    call split_list(n, v, str, ':', lim, def)
-    write(*, 101) 'd', n, trim(str), lim, v(0:lim-1)
+    if (lim.lt.0) then
+       ! count only
+       call split_list(n, v, str, ':', lim, empty=empty)
+       write(*, 101) 'c', empty, n, trim(str), lim
+    else
+       call split_list(n, v, str, ':', lim, def, empty=empty)
+       write(*, 101) 'd', empty, n, trim(str), lim, v(0:lim-1)
 
-    v = def
-    call split_list(n, v, str, ':', lim)
-    write(*, 101) 'n', n, trim(str), lim, v(0:lim-1)
-
+       v = def
+       call split_list(n, v, str, ':', lim, empty=empty)
+       write(*, 101) 'n', empty, n, trim(str), lim, v(0:lim-1)
+    endif
   end subroutine test_split_sub
 
   subroutine test_find(v)

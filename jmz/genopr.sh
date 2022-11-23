@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/11/04 09:15:50 fuyuki genopr.sh>
+# Time-stamp: <2022/11/16 10:10:54 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -236,6 +236,9 @@ register_all ()
   register -n 2,1 -i call LEF      'A if A<=B, else MISS'
   register -n 2,1 -i call GEF      'A if A>=B, else MISS'
 
+  # transform
+  register -n 2,1 -i call EXTR     'extraction'
+
   # reduction operation
   register -g reduction -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
   register -g reduction -o RANK -i call SUM     'sum through stacks or rank(s)'
@@ -268,8 +271,10 @@ register_all ()
   register -g header        -p STRING      UNIT
   register -g header        -p STRING      TITLE
   register -g header        -p STRING      EDIT
+  register -g header        -p STRING      DSET
   register -g header        -p LIST   -s T TSEL
   register -g header,buffer -p VALUE       MISS    "replace missing value"
+  register -g header,buffer -o UNIT        DUR     "duration"
 
   return 0
 }

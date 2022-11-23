@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/23 10:44:37 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/11/18 09:25:19 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -141,7 +141,8 @@ module TOUZA_Nio_record
 #define __MDL__ 'r'
 
   integer,save :: nlhead_std = 0 ! standard gtool header total length in bytes
-  integer,save :: nisep      = 0 ! marker length as character
+  integer,save :: nisep      = 0 ! marker length as character (32-bit)
+  integer,save :: nlsep      = 0 ! marker length as character (64-bit)
 
   integer,save :: udiag = -2    ! io unit to diag urt properties
 !!!_  - interfaces
@@ -277,6 +278,7 @@ module TOUZA_Nio_record
   public nio_read_header,    nio_write_header
   public nio_read_data,      nio_write_data
   public nio_skip_records
+  public nio_bwd_record
   public parse_header_base,  parse_record_fmt
   public parse_header_size
   public get_header_cprop,   put_header_cprop
@@ -339,6 +341,7 @@ contains
        if (init_counts.eq.0) then
           nlhead_std = get_size_bytes(hdummy, nitem)
           nisep = (get_size_bytes(0_KI32) * litem) / get_size_bytes(hdummy)
+          nlsep = (get_size_bytes(0_KI64) * litem) / get_size_bytes(hdummy)
 
           if (ierr.eq.0) call set_bodr_wnative(ierr, bodrw, ulog, lv)
           if (ierr.eq.0) call set_default_switch(ierr, krectw, ulog, lv)
@@ -385,8 +388,8 @@ contains
                 call show_header(ierr, head_def, ' ', utmp, lv)
              endif
              if (is_msglev_info(lv)) then
-                call msg('(''standard heeder length = '', I0, 1x, I0)', &
-                     &   (/nlhead_std, nisep/), __MDL__, utmp)
+                call msg('(''standard heeder length = '', I0, 1x, I0, 1x, I0)', &
+                     &   (/nlhead_std, nisep, nlsep/), __MDL__, utmp)
              endif
           endif
        endif
@@ -622,20 +625,61 @@ contains
     return
   end subroutine get_default_header
 
-!!!_  & nio_read_header_once - read header and set current properties
-  subroutine nio_read_header_once &
+!!!_  & nio_check_magic_header - check magic bytes at current point
+  subroutine nio_check_magic_header &
        & (ierr, &
-       &  head,  krect, u)
+       &  u,    krect, ndrec)
+    use TOUZA_Nio_std,only: KIOFS, sus_rseek, WHENCE_ABS
+    use TOUZA_Nio_header,only: litem
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: krect
+    integer,intent(in)  :: u
+    integer,intent(in)  :: ndrec
+    integer jerr
+    integer idfm
+    integer(kind=KIOFS) :: jpini, jpos
+    character(len=litem) :: head(nitem)
+    integer nd
+    ierr = 0
+    inquire(UNIT=u, IOSTAT=ierr, POS=jpini)
+    if (ierr.eq.0) then
+       if (IAND(krect, REC_LSEP).gt.0) then
+          jpos = jpini + nlsep
+       else
+          jpos = jpini + nisep
+       endif
+       read(UNIT=u, IOSTAT=ierr, POS=jpos) head(1:nitem)
+    endif
+    if (ierr.eq.0) then
+       idfm = check_id_format(head)
+       if (idfm.lt.0) ierr = idfm
+    endif
+    if (ierr.eq.0) then
+       call nio_data_records(nd, head)
+       if (nd.ne.ndrec) ierr = ERR_BROKEN_RECORD
+    endif
+
+    call sus_rseek(jerr, u, jpini, WHENCE_ABS)
+    if (ierr.eq.0) ierr = jerr
+    return
+  end subroutine nio_check_magic_header
+
+!!!_  & nio_read_header - read header and set current properties
+  subroutine nio_read_header &
+       & (ierr, &
+       &  head,  krect, u, pos)
     use TOUZA_Nio_std,   only: &
          & KI32, KI64, KIOFS, is_eof_ss, &
          & WHENCE_ABS, sus_read_isep, sus_read_lsep, sus_skip_irec, sus_rseek, sus_eswap, &
          & conv_b2strm
     use TOUZA_Nio_header,only: nitem, litem
     implicit none
-    integer,         intent(out) :: ierr
-    character(len=*),intent(out) :: head(*)
-    integer,         intent(out) :: krect
-    integer,         intent(in)  :: u
+    integer,            intent(out)         :: ierr
+    character(len=*),   intent(out)         :: head(*)
+    integer,            intent(out)         :: krect
+    integer,            intent(in)          :: u
+    integer(kind=KIOFS),intent(in),optional :: pos
 
     integer(kind=KIOFS) :: jpos, jposf
     integer,parameter :: lbuf = 16  ! enough for most case
@@ -655,61 +699,33 @@ contains
     nlh = 0
     ltop = litem - nisep
 
-    if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+    if (present(pos)) then
+       jpos = pos
+    else
+       if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+    endif
     if (ierr.eq.0) then
        !! read SEP + HEADERS
-       read(UNIT=u, IOSTAT=ierr) &
+       read(UNIT=u, POS=jpos, IOSTAT=ierr) &
             & iseph, &                     ! isep
             & isepl, htop(1:ltop), &       ! item 0
             & head(2:nitem)
-    endif
     ! write(*, *) ierr, is_eof_ss(ierr)
-    if (is_eof_ss(ierr)) then
-       inquire(UNIT=u, IOSTAT=jerr, POS=jposf)
-       if (jpos.eq.jposf) then
-          ierr = ERR_EOF
-          head(1:nitem) = ' '
-       else
-          ierr = ERR_BROKEN_RECORD
+       if (is_eof_ss(ierr)) then
+          inquire(UNIT=u, IOSTAT=jerr, POS=jposf)
+          if (jpos.eq.jposf) then
+             ierr = ERR_EOF
+             head(1:nitem) = ' '
+          else
+             ierr = ERR_BROKEN_RECORD
+          endif
+          return
        endif
-       return
     endif
 
     if (ierr.eq.0) then
-       if (iseph.eq.0) then
-          ! [00 00 00 00] [00 00 04 00]  long/big
-          if (isepl.lt.HEADER_LIMIT) then
-             KRECT = IOR(KRECT, REC_LSEP) ! long native
-             nlh = isepl
-          else
-             KRECT = IOR(IOR(KRECT, REC_LSEP), REC_SWAP) ! long swap
-             nlh = sus_eswap(isepl)
-          endif
-       else if (isepl.eq.0) then
-          ! [00 04 00 00] [00 00 00 00]  long/little
-          if (iseph.lt.HEADER_LIMIT) then
-             KRECT = IOR(KRECT, REC_LSEP) ! long native
-             nlh = iseph
-          else
-             KRECT = IOR(IOR(KRECT, REC_LSEP), REC_SWAP) ! long swap
-             nlh = sus_eswap(iseph)
-          endif
-       else if (isepl.eq.HEADER_SPACES) then
-          ! [ff ff fc 00] [20 20 20 20] short/big/cont
-          ! [00 fc ff ff] [20 20 20 20] short/little/cont
-          ! [00 00 04 00] [20 20 20 20] short/big
-          ! [00 04 00 00] [20 20 20 20] short/little
-          if (abs(iseph).lt.HEADER_LIMIT) then
-             KRECT = KRECT                ! short native
-             nlh = abs(iseph)
-          else
-             KRECT = IOR(KRECT, REC_SWAP) ! short swap
-             nlh = abs(sus_eswap(iseph))
-          endif
-          head(1) = HEADER_FILLS // htop(1:ltop)
-       else
-          nlh = nlhead_std - 1
-       endif
+       call check_magic_bytes(krect, nlh, iseph, isepl)
+
        if (nlh.lt.nlhead_std .or. nlh.ge.HEADER_LIMIT) then
           KRECT = REC_ERROR
           call sus_rseek(ierr, u, jpos, whence=WHENCE_ABS)
@@ -724,6 +740,7 @@ contains
              jposf = jpos + conv_b2strm(abs(nlh) + nisep * 2)
              call sus_read_lsep(ierr, u, lsepf, pos=jposf, swap=swap)
           else
+             head(1) = HEADER_FILLS // htop(1:ltop)
              ! read foot separator
              jposf = jpos + conv_b2strm(abs(nlh) + nisep)
              call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
@@ -742,7 +759,7 @@ contains
     ! endif
     ! ierr = err_default !! TESTING
     return
-  end subroutine nio_read_header_once
+  end subroutine nio_read_header
 
 !!!_   . shift_header
   subroutine shift_header &
@@ -760,25 +777,68 @@ contains
     return
   end subroutine shift_header
 
-!!!_  & nio_read_header - read header and set current properties
-  subroutine nio_read_header &
-       & (ierr, &
-       &  head,  krect, u)
+!!!_  - check_magic_bytes
+  subroutine check_magic_bytes &
+       & (krect, nlenh, iseph, isepl)
+    use TOUZA_Nio_std,only: KIOFS, sus_eswap
     implicit none
-    integer,         intent(out) :: ierr
-    character(len=*),intent(out) :: head(*)
-    integer,         intent(out) :: krect
-    integer,         intent(in)  :: u
+    integer,            intent(out) :: krect
+    integer(kind=KIOFS),intent(out) :: nlenh
+    integer,            intent(in)  :: iseph, isepl
 
-    ierr = err_default
-    if (ierr.eq.0) call nio_read_header_once(ierr, head, krect, u)
+    krect = 0
+    if (iseph.eq.0) then
+       ! [00 00 00 00] [00 00 04 00]  long/big
+       if (isepl.lt.HEADER_LIMIT) then
+          krect = IOR(krect, REC_LSEP) ! long native
+          nlenh = isepl
+       else
+          krect = IOR(IOR(krect, REC_LSEP), REC_SWAP) ! long swap
+          nlenh = sus_eswap(isepl)
+       endif
+    else if (isepl.eq.0) then
+       ! [00 04 00 00] [00 00 00 00]  long/little
+       if (iseph.lt.HEADER_LIMIT) then
+          krect = IOR(krect, REC_LSEP) ! long native
+          nlenh = iseph
+       else
+          krect = IOR(IOR(krect, REC_LSEP), REC_SWAP) ! long swap
+          nlenh = sus_eswap(iseph)
+       endif
+    else if (isepl.eq.HEADER_SPACES) then
+       ! [ff ff fc 00] [20 20 20 20] short/big/cont
+       ! [00 fc ff ff] [20 20 20 20] short/little/cont
+       ! [00 00 04 00] [20 20 20 20] short/big
+       ! [00 04 00 00] [20 20 20 20] short/little
+       if (abs(iseph).lt.HEADER_LIMIT) then
+          krect = krect                ! short native
+          nlenh = abs(iseph)
+       else
+          krect = IOR(krect, REC_SWAP) ! short swap
+          nlenh = abs(sus_eswap(iseph))
+       endif
+       ! head(1) = HEADER_FILLS // htop(1:ltop)
+    else
+       nlenh = nlhead_std - 1
+    endif
     return
+  end subroutine check_magic_bytes
 
-    ierr = err_default
-    if (ierr.eq.0) call get_record_prop(ierr, krect, u)
-    if (ierr.eq.0) call get_header(ierr, head, u, krect)
-    return
-  end subroutine nio_read_header
+! !!!_  & nio_read_header - read header and set current properties
+!   subroutine nio_read_header &
+!        & (ierr, &
+!        &  head,  krect, u, pos)
+!     implicit none
+!     integer,            intent(out)         :: ierr
+!     character(len=*),   intent(out)         :: head(*)
+!     integer,            intent(out)         :: krect
+!     integer,            intent(in)          :: u
+!     integer(kind=KIOFS),intent(in),optional :: pos
+
+!     ierr = err_default
+!     if (ierr.eq.0) call nio_read_header_once(ierr, head, krect, u, pos)
+!     return
+!   end subroutine nio_read_header
 
 !!!_  & nio_write_header - write header and set current properties (if necessary)
   subroutine nio_write_header &
@@ -1325,41 +1385,47 @@ contains
     integer,         intent(out)          :: ierr
     integer,         intent(in)           :: n
     integer,         intent(in)           :: u
-    integer,         intent(out),optional :: nskip    ! number of skipped recored
+    integer,         intent(out),optional :: nskip    ! number of skipped record
     character(len=*),intent(in), optional :: head(*)  ! current record header
     integer,         intent(in), optional :: krect    ! current record header type
 
-    integer j, ns
+    integer j, ns, jbgn
     integer kri
     character(len=litem) :: hi(nitem)
+    logical swap, lrec
 !!!_   . note
-    ! When hcur is present
+    ! When argument head is present
     !   File position must be at the header end (data begin)
-    !   Hcur is used as the first header instead to read next
+    !   argument head is used as the first header instead to read next.
     !   Usual header/data reading is performed from the second block
 !!!_   . body
     ierr = 0
     ns = 0
-    if (n .lt. 0) then
-       ierr = ERR_NOT_IMPLEMENTED
-       return
-    endif
+    jbgn = 0
+
     if (present(head).NEQV.present(krect)) then
        ierr = ERR_PANIC - ERR_MASK_NIO_RECORD
        return
     endif
 
-    if (present(head)) then
-       if (ierr.eq.0) call nio_skip_data(ierr, u, head, krect)
-       if (ierr.eq.0) ns = ns + 1
-       do j = 1, n - 1
+    if (n .lt. 0) then
+       if (present(krect)) then
+          call nio_skip_prec(ierr, u, -1, krect)
+          if (ierr.eq.0) jbgn = jbgn + 1
+       endif
+       if (ierr.eq.0) ns = jbgn
+       do j = jbgn, - n - 1
+          if (ierr.eq.0) call nio_bwd_record(ierr, u, krect)
           if (ierr.ne.0) exit
-          if (ierr.eq.0) call nio_read_header(ierr, hi, kri, u)
-          if (ierr.eq.0) call nio_skip_data(ierr, u, hi, kri)
-          if (ierr.eq.0) ns = ns + 1
+          ns = ns + 1
        enddo
     else
-       do j = 0, n - 1
+       if (present(head)) then
+          if (ierr.eq.0) call nio_skip_data(ierr, u, head, krect)
+          if (ierr.eq.0) jbgn = jbgn + 1
+       endif
+       if (ierr.eq.0) ns = jbgn
+       do j = jbgn, n - 1
           if (ierr.ne.0) exit
           if (ierr.eq.0) call nio_read_header(ierr, hi, kri, u)
           if (ierr.eq.0) call nio_skip_data(ierr, u, hi, kri)
@@ -1376,60 +1442,129 @@ contains
   subroutine nio_skip_data &
        & (ierr, u, head, krect)
     use TOUZA_Nio_std,   only: WHENCE_CURRENT, sus_skip_irec, sus_skip_lrec
-    use TOUZA_Nio_header,only: &
-         & nitem, litem, hi_DFMT, get_item
+    ! use TOUZA_Nio_header,only: &
+    !      & nitem, litem, hi_DFMT, get_item
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: u
     character(len=*),intent(in)  :: head(*)
     integer,         intent(in)  :: krect
-
-    character(len=litem) :: vp
-    integer kfmt
     integer nrec
-    logical swap, lrec
 !!!_   . body
     ierr = 0
-
-    if (ierr.eq.0) call get_item(ierr, head, vp, hi_DFMT)
-    if (ierr.eq.0) call parse_record_fmt(ierr, kfmt, vp)
-    if (ierr.eq.0) then
-       select case (kfmt)
-       case (GFMT_UR4, GFMT_UR8, GFMT_UI4)
-          nrec = 1
-       case (GFMT_MR4, GFMT_MR8, GFMT_MI4)
-          nrec = 3
-       case (GFMT_URC, GFMT_URC2)
-          nrec = parse_header_size(head, 3)
-          if (nrec.le.0) then
-             ierr = -1
-          else
-             nrec = nrec * 4
-          endif
-       case (GFMT_URY:GFMT_URYend)
-          nrec = 2
-       case (GFMT_MRY:GFMT_MRYend)
-          nrec = 6
-       case (GFMT_URT:GFMT_URTend)
-          nrec = 1
-       case (GFMT_MRT:GFMT_MRTend)
-          nrec = 1
-       case default
-          ierr = -1
-       end select
-    endif
-    if (ierr.eq.0) then
-       swap = IAND(krect, REC_SWAP).ne.0
-       lrec = IAND(krect, REC_LSEP).ne.0
-       if (lrec) then
-          call sus_skip_lrec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
-       else
-          call sus_skip_irec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
-       endif
-    endif
+    if (ierr.eq.0) call nio_data_records(nrec, head)
+    ierr = min(0, nrec)
+    if (ierr.eq.0) call nio_skip_prec(ierr, u, nrec, krect)
     return
   end subroutine nio_skip_data
 
+!!!_  & nio_data_records - inquire number of data records
+  subroutine nio_data_records &
+       & (n, head)
+    use TOUZA_Nio_header,only: hi_DFMT, get_item
+    implicit none
+    integer,         intent(out) :: n
+    character(len=*),intent(in)  :: head(*)
+
+    character(len=litem) :: vp
+    integer kfmt
+    integer jerr
+!!!_   . body
+    jerr = 0
+    n = 0
+    if (jerr.eq.0) call get_item(jerr, head, vp, hi_DFMT)
+    if (jerr.eq.0) call parse_record_fmt(jerr, kfmt, vp)
+    if (jerr.eq.0) then
+       select case (kfmt)
+       case (GFMT_UR4, GFMT_UR8, GFMT_UI4)
+          n = 1
+       case (GFMT_MR4, GFMT_MR8, GFMT_MI4)
+          n = 3
+       case (GFMT_URC, GFMT_URC2)
+          n = parse_header_size(head, 3)
+          if (n.le.0) then
+             jerr = ERR_UNKNOWN_FORMAT
+          else
+             n = n * 4
+          endif
+       case (GFMT_URY:GFMT_URYend)
+          n = 2
+       case (GFMT_MRY:GFMT_MRYend)
+          n = 6
+       case (GFMT_URT:GFMT_URTend)
+          n = 1
+       case (GFMT_MRT:GFMT_MRTend)
+          n = 1
+       case default
+          jerr = ERR_UNKNOWN_FORMAT
+       end select
+    endif
+    if (jerr.lt.0) n = jerr
+  end subroutine nio_data_records
+!!!_  - nio_bwd_record - backword one record skip (lazy trial)
+  subroutine nio_bwd_record &
+       & (ierr, u, krect, limtry)
+    use TOUZA_Nio_std,   only: choice
+    use TOUZA_Nio_std,   only: sus_skip_irec, sus_skip_lrec, KIOFS
+    use TOUZA_Nio_std,   only: sus_rseek, WHENCE_CURRENT, WHENCE_ABS
+    use TOUZA_Nio_header,only: &
+         & nitem, litem, hi_DFMT, get_item
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: u
+    integer,intent(in),optional :: krect    ! initial guess
+    integer,intent(in),optional :: limtry   ! trial limit
+    integer l
+    logical swap, lrec
+    integer(kind=KIOFS) :: jpos, jpini
+    integer ndrec
+    integer ltry
+    integer kri
+
+    ierr = 0
+    ltry = choice(0, limtry)
+    inquire(UNIT=u, IOSTAT=ierr, POS=jpini)
+    if (ltry.le.0) ltry = 6  ! MRT records
+    kri = choice(REC_DEFAULT, krect)
+    swap = IAND(kri, REC_SWAP).gt.0
+    lrec = IAND(kri, REC_LSEP).gt.0
+
+    try_all: do l = 0, 3
+       ndrec = 0
+       ! write(*, *) 'bwd:', l, swap, lrec
+       if (lrec) then
+          kri = REC_LSEP
+          if (swap) kri = IOR(kri, REC_SWAP)
+          try_lrec: do
+             if (ierr.eq.0) call sus_skip_lrec(ierr, u, -1, swap=swap)
+             if (ierr.ne.0) exit try_lrec
+             if (ierr.eq.0) call nio_check_magic_header(ierr, u, kri, ndrec)
+             if (ierr.eq.0) return
+             ndrec = ndrec + 1
+             if (ndrec.gt.ltry) exit try_lrec
+             ierr = 0
+          enddo try_lrec
+       else
+          kri = 0
+          if (swap) kri = IOR(kri, REC_SWAP)
+          try_irec: do
+             if (ierr.eq.0) call sus_skip_irec(ierr, u, -1, swap=swap)
+             if (ierr.ne.0) exit try_irec
+             if (ierr.eq.0) call nio_check_magic_header(ierr, u, kri, ndrec)
+             if (ierr.eq.0) return
+             ndrec = ndrec + 1
+             if (ndrec.gt.ltry) exit try_irec
+             ierr = 0
+          enddo try_irec
+       endif
+       swap = .not.swap
+       if (l.eq.1) lrec = .not.lrec
+       call sus_rseek(ierr, u, jpini, whence=WHENCE_ABS)
+       ierr = 0
+    enddo try_all
+    if (ierr.eq.0) ierr = ERR_BROKEN_RECORD
+    return
+  end subroutine nio_bwd_record
 !!!_ + gtool-3 standard formats
 !!!_  - get_data_urc - URC
   subroutine get_data_urc_d &
@@ -2190,6 +2325,7 @@ contains
     if (ierr.eq.0) call get_data_record(ierr, mch,      nk,      u, krect)
     if (ierr.eq.0) call get_data_record(ierr, mofs(2:), nk,      u, krect)
     if (ierr.eq.0) call get_data_record(ierr, dma,      2 * nk,  u, krect)
+    ! write(*, *) mcom, mch, nk, nm
     if (ierr.eq.0) call get_data_record(ierr, imco,     nm * nk, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, icom,     mcom,    u, krect)
 
@@ -2305,7 +2441,7 @@ contains
     nm = count_packed(1, nh, khld)
     imiss = IBITS(HUGE(0_KISRC), 0, nbits)
 
-    jc = 1
+    jc = 0
     kpackm = legacy_packing(1,     nh)
     kpackb = legacy_packing(nbits, nh)
 
@@ -2329,7 +2465,7 @@ contains
             & (ierr, idec, dma(2*jk-1:2*jk), buf(1:), ne, imiss, vmiss)
        jm = (jk - 1) * nm + 1
        call pack_store(ierr, imco(jm:), imsk, nh, 1, kpackm)
-       call pack_store(ierr, icom(jc:), idec, ne, nbits, kpackb)
+       call pack_store(ierr, icom(jc+1:), idec, ne, nbits, kpackb)
        jc = jc + nc
     enddo
     mcom = jc
@@ -4004,6 +4140,30 @@ contains
 
   end subroutine parse_header_base
 
+!!!_  & nio_skip_prec - skip (physical) records
+  subroutine nio_skip_prec &
+       & (ierr, u, nrec, krect)
+    use TOUZA_Nio_std,only: WHENCE_CURRENT, sus_skip_irec, sus_skip_lrec
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: u
+    integer,intent(in)  :: nrec
+    integer,intent(in)  :: krect
+    logical swap, lrec
+!!!_   . body
+    ierr = 0
+    if (ierr.eq.0) then
+       swap = IAND(krect, REC_SWAP).ne.0
+       lrec = IAND(krect, REC_LSEP).ne.0
+       if (lrec) then
+          call sus_skip_lrec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
+       else
+          call sus_skip_irec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
+       endif
+    endif
+    return
+  end subroutine nio_skip_prec
+
 !!!_  & parse_header_size - parse size properties
   integer function parse_header_size_n &
        & (head, kidx, lazy) &
@@ -4675,6 +4835,12 @@ program test_nio_record
      case (3)
         write(*, 201) ktest, 'write with various encoding'
         call test_encoding(ierr, jarg)
+     case (4)
+        write(*, 201) ktest, 'read gtool file backward'
+        call test_read_backward(ierr, jarg)
+     case (5)
+        write(*, 201) ktest, 'read gtool file skipping'
+        call test_read_skip(ierr, jarg)
      case default
         write(*, *) 'INVALID TEST = ', ktest
         ierr = -1
@@ -4739,6 +4905,7 @@ contains
 !!!_ + test_auto_record - auto record parser tests
   subroutine test_auto_record &
        & (ierr, jarg)
+    use TOUZA_std,only: is_error_match
     use TOUZA_Nio_std,   only: KDBL,  KIOFS, &
          & sus_open, sus_close, sus_write_irec, sus_write_lrec
     use TOUZA_Nio_header,only: nitem, litem, hi_ITEM, put_item, get_item
@@ -4808,18 +4975,22 @@ contains
 
     jrec = 0
 401 format('FULL:', I0, 1x, I0, 1x, I0)
+402 format('FULL:EOF', 1x, I0, 1x, I0)
 411 format(I0, ': ', A, '/')
 421 format('  FMT=', 2(1x, I0), 1x, 'COOR=', 3(1x,I0), 1x, E16.9)
     do
        if (ierr.eq.0) then
           hd(:) = ' '
           call nio_read_header(ierr, hd, krect, udat)
-          write (*, 401) ierr, jrec, krect
+          if (is_error_match(ierr, ERR_EOF)) then
+             write (*, 402) jrec, krect
+             ierr = 0
+             exit
+          else
+             write (*, 401) ierr, jrec, krect
+          endif
        endif
-       if (ierr.ne.0) then
-          ierr = 0
-          exit
-       endif
+       if (ierr.ne.0) exit
        if (ierr.eq.0) then
           call get_item(ierr, hd, hitm, hi_ITEM)
           if (hitm.ne.' ') write (*, 411) jrec, TRIM(ADJUSTL(hitm))
@@ -4959,6 +5130,172 @@ contains
     if (ierr.eq.0) deallocate(v, STAT=ierr)
     return
   end subroutine test_read_write_ext
+
+!!!_ + test_read_backward - read external gtool file (backward)
+  subroutine test_read_backward &
+       & (ierr, jarg)
+    use TOUZA_Std,    only: get_param, upcase
+    use TOUZA_Nio_std,only: KBUF=>KDBL
+    use TOUZA_Nio_header
+    use TOUZA_Std_sus,only: sus_open, sus_close, sus_rseek, WHENCE_ABS
+    implicit none
+    integer,intent(out)   :: ierr
+    integer,intent(inout) :: jarg
+    character(len=256) :: rfile
+
+    integer uread
+    integer jrec
+    integer j, n, l, nloop
+    integer jpos
+    integer roff
+
+    integer,parameter :: nhi = nitem + 4
+    character(len=litem) hd(nhi)
+    integer krect, krectw
+    integer,parameter :: lmax = 2 ** 24
+    real(kind=KBUF),allocatable :: v(:)
+    integer(kind=KIOFS) :: jpini
+
+    ierr = 0
+101 format('test/bwd:', I0, 1x, A)
+401 format('header/r:', I0, 1x, I0, 1x, I0)
+402 format('data/r:', I0, 1x, I0)
+301 format('v:', I0, 1x, I0, 1x, E24.16)
+
+    jarg = jarg + 1
+    if (ierr.eq.0) call get_param(ierr, rfile, jarg, ' ')
+    if (rfile.eq.' ') return
+    jarg = jarg + 1
+    if (ierr.eq.0) call get_param(ierr, roff, jarg, 0)
+
+    ierr = 0
+
+    write(*, 101) jarg, trim(rfile)
+
+    uread = 21
+
+    if (ierr.eq.0) call sus_open(ierr, uread, rfile, ACTION='R', POSITION='AP')
+
+    if (ierr.eq.0) allocate(v(1:lmax), STAT=ierr)
+
+    jrec = 0
+    ! krect = REC_DEFAULT
+    krect = REC_SWAP + REC_LSEP  ! force check from farthest
+    do
+       if (ierr.eq.0) call nio_bwd_record(ierr, uread, krect=krect)
+       if (ierr.eq.0) inquire(unit=uread, IOSTAT=ierr, pos=jpini)
+       if (ierr.eq.0) call nio_read_header(ierr, hd, krect, uread)
+       write (*, 401) ierr, jrec, krect
+       if (ierr.eq.0) call nio_read_data(ierr, v, lmax, hd, krect, uread)
+       write (*, 402) ierr, jrec
+       if (ierr.eq.0) then
+          n = parse_header_size(hd, 0)
+          do j = 1, n
+             write(*, 301) roff - jrec, j, v(j)
+          enddo
+       endif
+       if (ierr.eq.0) call sus_rseek(ierr, uread, jpini, WHENCE_ABS)
+       if (ierr.ne.0) exit
+       if (jpini.le.1) exit
+       jrec = jrec + 1
+    enddo
+    if (ierr.eq.0) call sus_close(ierr, uread, rfile)
+    if (ierr.eq.0) deallocate(v, STAT=ierr)
+    return
+  end subroutine test_read_backward
+
+!!!_ + test_read_skip - read external gtool file (skip)
+  subroutine test_read_skip &
+       & (ierr, jarg)
+    use TOUZA_Std,    only: get_param, upcase
+    use TOUZA_Nio_std,only: KBUF=>KDBL
+    use TOUZA_Nio_header
+    use TOUZA_Std_sus,only: sus_open, sus_close, sus_rseek, WHENCE_ABS
+    implicit none
+    integer,intent(out)   :: ierr
+    integer,intent(inout) :: jarg
+    character(len=256) :: rfile
+
+    integer uread
+    integer jrec
+    integer j, n, l, nloop
+    integer jpos
+    integer roff
+    integer nrec
+
+    integer,parameter :: nhi = nitem + 4
+    character(len=litem) hd(nhi)
+    integer krect, krectw
+    integer,parameter :: lmax = 2 ** 24
+    real(kind=KBUF),allocatable :: v(:)
+    integer(kind=KIOFS) :: jpini
+    integer dnum
+
+    ierr = 0
+101 format('test/skip:', I0, 1x, A)
+401 format('header/r:', I0, 1x, I0, 1x, I0)
+402 format('data/r:', I0, 1x, I0)
+301 format('dnum:', I0, 1x, I0, 1x, I0, 1x, I0)
+
+    jarg = jarg + 1
+    if (ierr.eq.0) call get_param(ierr, rfile, jarg, ' ')
+    if (rfile.eq.' ') return
+    jarg = jarg + 1
+    if (ierr.eq.0) call get_param(ierr, roff, jarg, 0)
+
+    ierr = 0
+
+    write(*, 101) jarg, trim(rfile)
+
+    uread = 21
+
+    if (ierr.eq.0) call sus_open(ierr, uread, rfile, ACTION='R')
+    if (ierr.eq.0) allocate(v(1:lmax), STAT=ierr)
+
+    jrec = 0
+    ! krect = REC_DEFAULT
+
+    nrec = 1
+    if (ierr.eq.0) call nio_read_header(ierr, hd, krect, uread)
+    if (ierr.eq.0) call nio_read_data(ierr, v, lmax, hd, krect, uread)
+    if (ierr.eq.0) call get_item(ierr, hd, dnum, hi_DNUM)
+    if (ierr.eq.0) write(*, 301) ierr, dnum, jrec, nrec
+    if (ierr.eq.0) jrec = jrec + nrec
+
+    nrec = 5
+    if (ierr.eq.0) call nio_skip_records(ierr, nrec, uread)
+    if (ierr.eq.0) call nio_read_header(ierr, hd, krect, uread)
+    if (ierr.eq.0) call get_item(ierr, hd, dnum, hi_DNUM)
+    if (ierr.eq.0) jrec = jrec + nrec
+    if (ierr.eq.0) write(*, 301) ierr, dnum, jrec, nrec
+
+    nrec = 5
+    if (ierr.eq.0) call nio_skip_records(ierr, nrec, uread, head=hd, krect=krect)
+    if (ierr.eq.0) call nio_read_header(ierr, hd, krect, uread)
+    if (ierr.eq.0) call nio_read_data(ierr, v, lmax, hd, krect, uread)
+    if (ierr.eq.0) call get_item(ierr, hd, dnum, hi_DNUM)
+    if (ierr.eq.0) jrec = jrec + nrec
+    if (ierr.eq.0) write(*, 301) ierr, dnum, jrec, nrec
+
+    nrec = -5
+    if (ierr.eq.0) call nio_skip_records(ierr, nrec, uread)
+    if (ierr.eq.0) call nio_read_header(ierr, hd, krect, uread)
+    if (ierr.eq.0) call get_item(ierr, hd, dnum, hi_DNUM)
+    if (ierr.eq.0) jrec = jrec + nrec
+    if (ierr.eq.0) write(*, 301) ierr, dnum, jrec, nrec
+
+    nrec = -5
+    if (ierr.eq.0) call nio_skip_records(ierr, nrec, uread, head=hd, krect=krect)
+    if (ierr.eq.0) call nio_read_header(ierr, hd, krect, uread)
+    if (ierr.eq.0) call nio_read_data(ierr, v, lmax, hd, krect, uread)
+    if (ierr.eq.0) call get_item(ierr, hd, dnum, hi_DNUM)
+    if (ierr.eq.0) jrec = jrec + nrec
+    if (ierr.eq.0) write(*, 301) ierr, dnum, jrec, nrec
+
+    if (ierr.eq.0) call sus_close(ierr, uread, rfile)
+    if (ierr.eq.0) deallocate(v, STAT=ierr)
+    return
+  end subroutine test_read_skip
 
 !!!_ + test_encoding - write extreme data
   subroutine test_encoding &
@@ -5220,16 +5557,20 @@ contains
     integer,         intent(in)    :: n
     integer,         intent(in)    :: u
     character(len=*),intent(in)    :: fmt
+    integer,save :: dnum = 0
 
     integer krectw
 
     ierr = 0
-    krectw = REC_DEFAULT
+    krectw = REC_ASIS
+    ! krectw = REC_DEFAULT
     if (ierr.eq.0) call put_item(ierr, hd, trim(fmt), hi_DFMT)
+    if (ierr.eq.0) call put_item(ierr, hd, dnum, hi_DNUM)
     if (ierr.eq.0) call nio_write_header(ierr, hd, krectw, u)
     if (ierr.eq.0) call nio_write_data(ierr, v, n, hd, krectw, u)
-101 format('extreme:', A, ': ', I0)
-    write(*, 101) trim(fmt), ierr
+101 format('extreme:', A, ': ', I0, 1x, I0)
+    write(*, 101) trim(fmt), ierr, dnum
+    dnum = dnum + 1
     return
   end subroutine test_encoding_write
 
