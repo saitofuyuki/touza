@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2022/11/11 11:47:10 fuyuki Makefile.am>
+# Time-stamp: <2022/11/24 16:41:25 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -69,6 +69,7 @@ genx2.sh: genx2.sh.in
 	fi
 
 EXTRA_DIST = jmzdepf90.sh.in demo-chak.sh.in $(chak_to_include)
+EXTRA_DIST += README-jmz.org
 
 MOSTLYCLEANFILES =
 CLEANFILES = $(bin_SCRIPTS) $(noinst_SCRIPTS)
