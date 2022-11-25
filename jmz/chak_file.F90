@@ -703,11 +703,17 @@ contains
              open(UNIT=file%u, FILE=file%name, IOSTAT=ierr, &
                   & ACTION='READ', STATUS='OLD', FORM='FORMATTED', &
                   & ACCESS='STREAM')
-             if (ierr.eq.0) call open_read_ascii(ierr, file)
+             if (ierr.eq.0) then
+                call open_read_ascii(ierr, file)
+             else
+                ierr = ERR_INVALID_PARAMETER
+             endif
           else
              call sus_open(ierr, file%u, file%name, ACTION='R', STATUS='O')
              if (ierr.eq.0) then
                 if (file%kfmt.ge.cfmt_binary) call open_read_binary(ierr, file)
+             else
+                ierr = ERR_INVALID_PARAMETER
              endif
           endif
        endif
