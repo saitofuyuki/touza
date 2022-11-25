@@ -1,0 +1,8 @@
+touza for Debian
+
+TOUZA (楊座), MIROC base infrastructure, is a collection of Fortran
+procedures mainly adopted in MIROC.  TOUZA library and an example
+utility, chak (Swiss[CH] Army Knife for gtool-3.5 format files), are
+separated into touza-bin libtouza libtouza-dev packages.
+
+ -- SAITO Fuyuki <saitofuyuki@jamstec.go.jp>, Fri, 25 Nov 2022 10:08:56 +0900

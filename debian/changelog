@@ -1,0 +1,5 @@
+touza (1.06.0-1) unstable; urgency=low
+
+  * Initial release, as a non-native package.
+
+ -- SAITO Fuyuki <saitofuyuki@jamstec.go.jp>  Thu, 24 Nov 2022 08:56:23 +0900

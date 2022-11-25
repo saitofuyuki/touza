@@ -1,0 +1,7 @@
+usr/include/*.h
+usr/include/touza/*.mod
+usr/share/touza/*
+usr/lib/*/pkgconfig/*
+usr/lib/*/*.a
+usr/lib/*/*.la
+usr/lib/*/*.so

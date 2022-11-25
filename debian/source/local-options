@@ -1,0 +1,5 @@
+#
+# ### gbp-buildpackage(1) user may like this. ###
+#abort-on-upstream-changes
+#unapply-patches
+extend-diff-ignore = "^(m4c/.*\.m4|jmz/genopr\.sh|jmz/genx\.sh\.in|jmz/genx2\.sh\.in|ppp/wtc\.sh|std/wta\.sh|autorevision\..*)$"
