@@ -4499,7 +4499,7 @@ contains
        ! endif
        if (ierr.eq.0) then
           if (dryrun.gt.0) then
-             write(utmp, *)
+             write(utmp, '()')
           else
              mco = doml%mco
              if (mco.gt.0) then
@@ -4642,7 +4642,7 @@ contains
     endif
     if (ierr.eq.0) then
        if (dryrun.gt.0) then
-          write(utmp, *)
+          write(utmp, '()')
        else
           do jl = 0, doml%n - 1
              pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)

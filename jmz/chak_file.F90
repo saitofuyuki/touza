@@ -1326,6 +1326,7 @@ end subroutine cue_read_file
             &            file%rgrp(0:nrg-1)%pos.lt.0 .and. file%rgrp(0:nrg-1)%rec.ge.irec)
        if (jrg.lt.0) exit
        irec = file%rgrp(jrg)%rec
+       if (irec.lt.0) exit
        nsk = irec - file%irec
        call nio_skip_records(ierr, nsk, file%u, nsuc)
        if (is_error_match(ierr, ERR_EOF)) then
