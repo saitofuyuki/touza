@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2022/11/22 15:00:12 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/02 08:08:20 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -45,6 +45,10 @@
 #ifndef   OPT_READ_SWAP_WITH_WORK
 #  define OPT_READ_SWAP_WITH_WORK 1 /* automatic work-array is used for swap */
 #endif
+
+#ifndef   TEST_STD_SUS
+#  define TEST_STD_SUS 0
+#endif
 !!!_@ TOUZA_Std_sus - TOUZA sequential access by stream i/o interfaces
 module TOUZA_Std_sus
 !!!_ = declaration
@@ -84,97 +88,66 @@ module TOUZA_Std_sus
   integer,save :: last_iostat = 0
 !!!_  - interfaces
   interface sus_write_irec
-     module procedure sus_write_irec_i
-     module procedure sus_write_irec_l
-     module procedure sus_write_irec_d
-     module procedure sus_write_irec_f
-     module procedure sus_write_irec_a
+     module procedure sus_write_irec_i, sus_write_irec_l, sus_write_irec_d, sus_write_irec_f, sus_write_irec_a
   end interface sus_write_irec
   interface sus_write_lrec
-     module procedure sus_write_lrec_i
-     module procedure sus_write_lrec_l
-     module procedure sus_write_lrec_d
-     module procedure sus_write_lrec_f
-     module procedure sus_write_lrec_a
+     module procedure sus_write_lrec_i, sus_write_lrec_l, sus_write_lrec_d, sus_write_lrec_f, sus_write_lrec_a
   end interface sus_write_lrec
 
   interface sus_read_irec
-     module procedure sus_read_irec_i
-     module procedure sus_read_irec_l
-     module procedure sus_read_irec_d
-     module procedure sus_read_irec_f
-     module procedure sus_read_irec_a
+     module procedure sus_read_irec_i, sus_read_irec_l, sus_read_irec_d, sus_read_irec_f, sus_read_irec_a
   end interface sus_read_irec
   interface sus_read_lrec
-     module procedure sus_read_lrec_i
-     module procedure sus_read_lrec_l
-     module procedure sus_read_lrec_d
-     module procedure sus_read_lrec_f
-     module procedure sus_read_lrec_a
+     module procedure sus_read_lrec_i, sus_read_lrec_l, sus_read_lrec_d, sus_read_lrec_f, sus_read_lrec_a
   end interface sus_read_lrec
 
+  interface sus_read_slice_irec
+     module procedure sus_read_slice_irec_i, sus_read_slice_irec_l
+     module procedure sus_read_slice_irec_d, sus_read_slice_irec_f, sus_read_slice_irec_a
+  end interface sus_read_slice_irec
+
   interface sus_write_isep
-     module procedure sus_write_isep_l
-     module procedure sus_write_isep_i
+     module procedure sus_write_isep_l, sus_write_isep_i
   end interface sus_write_isep
   interface sus_write_lsep
-     module procedure sus_write_lsep_l
-     module procedure sus_write_lsep_i
+     module procedure sus_write_lsep_l, sus_write_lsep_i
   end interface sus_write_lsep
 
   interface sus_read_isep
-     module procedure sus_read_isep_l
-     module procedure sus_read_isep_i
+     module procedure sus_read_isep_l, sus_read_isep_i
   end interface sus_read_isep
   interface sus_read_lsep
-     module procedure sus_read_lsep_l
-     module procedure sus_read_lsep_i
+     module procedure sus_read_lsep_l, sus_read_lsep_i
   end interface sus_read_lsep
 
   interface sus_write
-     module procedure sus_write_i
-     module procedure sus_write_l
-     module procedure sus_write_d
-     module procedure sus_write_f
-     module procedure sus_write_a
+     module procedure sus_write_i, sus_write_l, sus_write_d, sus_write_f, sus_write_a
   end interface sus_write
 
   interface sus_read
-     module procedure sus_read_i
-     module procedure sus_read_l
-     module procedure sus_read_d
-     module procedure sus_read_f
-     module procedure sus_read_a
+     module procedure sus_read_i, sus_read_l, sus_read_d, sus_read_f, sus_read_a
   end interface sus_read
 
   interface sus_eswap
-     module procedure sus_eswap_i
-     module procedure sus_eswap_l
+     module procedure sus_eswap_i, sus_eswap_l
   end interface sus_eswap
-
   interface sus_swap
-     module procedure sus_swap_i
-     module procedure sus_swap_l
+     module procedure sus_swap_i, sus_swap_l
   end interface sus_swap
 
   interface mstrm_sep
-     module procedure mstrm_sep_i
-     module procedure mstrm_sep_l
+     module procedure mstrm_sep_i, mstrm_sep_l
   end interface mstrm_sep
 
   interface max_members
-     module procedure max_members_a
-     module procedure max_members_i
-     module procedure max_members_l
-     module procedure max_members_f
-     module procedure max_members_d
+     module procedure max_members_a, max_members_i, max_members_l, max_members_f, max_members_d
   end interface max_members
 
 !!!_  - public procedures
   public init, diag, finalize
   public sus_open, sus_close
 
-  public sus_write_irec, sus_read_irec, sus_skip_irec, sus_check_irec
+  public sus_write_irec, sus_read_irec, sus_skip_irec, sus_check_irec, sus_read_slice_irec
   public sus_write_lrec, sus_read_lrec, sus_skip_lrec, sus_check_lrec
 
   public sus_write_isep, sus_read_isep, sus_read
@@ -183,6 +156,9 @@ module TOUZA_Std_sus
   public sus_rseek
   public sus_eswap
 
+#if TEST_STD_SUS
+  public set_slice_loop, init_offset, next_offset
+#endif
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -453,7 +429,6 @@ contains
     character(len=*),intent(in),optional :: action
     character(len=*),intent(in),optional :: position
 
-    integer(kind=KIOFS) :: jpos
     character(len=16) :: STT, ACT, FRM, POS
 
     ierr = ERR_SUCCESS
@@ -1620,6 +1595,520 @@ contains
     endif
     return
   end subroutine sus_read_lrec_a
+
+!!!_  - sus_read_slice_irec - read subarray from a record  with 32-bit marker
+  subroutine sus_read_slice_irec_i &
+       & (ierr, u, v, bes, r, swap, sub)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_size_strm
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI32
+    integer,           intent(out)            :: ierr
+    integer,           intent(in)             :: u
+    integer(KIND=KARG),intent(out)            :: V(0:*)
+    integer,           intent(in)             :: bes(3, 0:*) ! begin/end/stride triplet
+    integer,           intent(in)             :: r           ! ranks
+    logical,           intent(in),   optional :: swap
+    logical,           intent(inout),optional :: sub
+
+    integer rr, rj
+    integer stp(0:r-1), itr(0:r-1)
+    integer idx(0:r-1)
+    integer jsrc, jdst
+    integer n,  m
+    integer jb, je
+    integer(KIND=KISEP) :: iseph, isepf
+    integer(KIND=KIOFS) :: jposh, jposf, jpos
+    integer us
+
+    ierr = err_default
+    us = get_size_strm(V(0))
+
+    call set_slice_loop(rr, stp, itr, bes, r)
+    idx(0:rr-1) = 0
+    jsrc = init_offset(bes, r)
+    jb = 0
+    jdst = 0
+
+    rj = 0
+    loop_rec: do
+       if (ierr.eq.0) then
+          call sus_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit loop_rec
+          endif
+       endif
+       if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jposh)
+       if (ierr.eq.0) then
+          jposf = jposh + conv_b2strm(abs(iseph))
+          n = get_mems_bytes(abs(iseph), V(0))
+          je = jb + n
+       endif
+       if (ierr.eq.0) then
+          ! write(*, *) 'sub = ', idx(0:rr-1), '/', jposh, jb, n, jsrc, jdst
+          do
+             if (jsrc.ge.je) exit
+             m = min((je - jsrc), itr(0) - idx(0))
+             jpos = jposh + us * (jsrc - jb)
+             if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, jpos)
+             if (ierr.ne.0) exit loop_rec
+             jdst = jdst + m
+             call next_offset(jsrc, idx, stp, itr, rr, m)
+             if (jsrc.lt.0) exit
+          enddo
+       endif
+       if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
+       if (ierr.eq.0) then
+          if (iseph.ge.0) exit loop_rec
+          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit loop_rec
+       endif
+       if (jsrc.lt.0) exit
+       jb = je
+    enddo loop_rec
+    if (ierr.eq.0) then
+       if (jsrc.ge.0) then
+          ierr = ERR_INVALID_RECORD_SIZE
+       else if (choice(.false., sub)) then
+          ! sub exist and T
+          sub = (iseph.lt.0)    ! subrecord succeeds
+       else if (iseph.lt.0) then
+          ! skip all
+          call sus_skip_irec(ierr, u, 1, swap=swap)
+       endif
+    endif
+  end subroutine sus_read_slice_irec_i
+
+  subroutine sus_read_slice_irec_l &
+       & (ierr, u, v, bes, r, swap, sub)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_size_strm
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI64
+    integer,           intent(out)            :: ierr
+    integer,           intent(in)             :: u
+    integer(KIND=KARG),intent(out)            :: V(0:*)
+    integer,           intent(in)             :: bes(3, 0:*) ! begin/end/stride triplet
+    integer,           intent(in)             :: r           ! ranks
+    logical,           intent(in),   optional :: swap
+    logical,           intent(inout),optional :: sub
+
+    integer rr, rj
+    integer stp(0:r-1), itr(0:r-1)
+    integer idx(0:r-1)
+    integer jsrc, jdst
+    integer n,  m
+    integer jb, je
+    integer(KIND=KISEP) :: iseph, isepf
+    integer(KIND=KIOFS) :: jposh, jposf, jpos
+    integer us
+
+    ierr = err_default
+    us = get_size_strm(V(0))
+
+    call set_slice_loop(rr, stp, itr, bes, r)
+    idx(0:rr-1) = 0
+    jsrc = init_offset(bes, r)
+    jb = 0
+    jdst = 0
+
+    rj = 0
+    loop_rec: do
+       if (ierr.eq.0) then
+          call sus_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit loop_rec
+          endif
+       endif
+       if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jposh)
+       if (ierr.eq.0) then
+          jposf = jposh + conv_b2strm(abs(iseph))
+          n = get_mems_bytes(abs(iseph), V(0))
+          je = jb + n
+       endif
+       if (ierr.eq.0) then
+          ! write(*, *) 'sub = ', idx(0:rr-1), '/', jposh, jb, n, jsrc, jdst
+          do
+             if (jsrc.ge.je) exit
+             m = min((je - jsrc), itr(0) - idx(0))
+             jpos = jposh + us * (jsrc - jb)
+             if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, jpos)
+             if (ierr.ne.0) exit loop_rec
+             jdst = jdst + m
+             call next_offset(jsrc, idx, stp, itr, rr, m)
+             if (jsrc.lt.0) exit
+          enddo
+       endif
+       if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
+       if (ierr.eq.0) then
+          if (iseph.ge.0) exit loop_rec
+          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit loop_rec
+       endif
+       if (jsrc.lt.0) exit
+       jb = je
+    enddo loop_rec
+    if (ierr.eq.0) then
+       if (jsrc.ge.0) then
+          ierr = ERR_INVALID_RECORD_SIZE
+       else if (choice(.false., sub)) then
+          ! sub exist and T
+          sub = (iseph.lt.0)    ! subrecord succeeds
+       else if (iseph.lt.0) then
+          ! skip all
+          call sus_skip_irec(ierr, u, 1, swap=swap)
+       endif
+    endif
+  end subroutine sus_read_slice_irec_l
+
+  subroutine sus_read_slice_irec_f &
+       & (ierr, u, v, bes, r, swap, sub)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_size_strm
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KFLT
+    integer,        intent(out)            :: ierr
+    integer,        intent(in)             :: u
+    real(KIND=KARG),intent(out)            :: V(0:*)
+    integer,        intent(in)             :: bes(3, 0:*) ! begin/end/stride triplet
+    integer,        intent(in)             :: r           ! ranks
+    logical,        intent(in),   optional :: swap
+    logical,        intent(inout),optional :: sub
+
+    integer rr, rj
+    integer stp(0:r-1), itr(0:r-1)
+    integer idx(0:r-1)
+    integer jsrc, jdst
+    integer n,  m
+    integer jb, je
+    integer(KIND=KISEP) :: iseph, isepf
+    integer(KIND=KIOFS) :: jposh, jposf, jpos
+    integer us
+
+    ierr = err_default
+    us = get_size_strm(V(0))
+
+    call set_slice_loop(rr, stp, itr, bes, r)
+    idx(0:rr-1) = 0
+    jsrc = init_offset(bes, r)
+    jb = 0
+    jdst = 0
+
+    rj = 0
+    loop_rec: do
+       if (ierr.eq.0) then
+          call sus_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit loop_rec
+          endif
+       endif
+       if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jposh)
+       if (ierr.eq.0) then
+          jposf = jposh + conv_b2strm(abs(iseph))
+          n = get_mems_bytes(abs(iseph), V(0))
+          je = jb + n
+       endif
+       if (ierr.eq.0) then
+          ! write(*, *) 'sub = ', idx(0:rr-1), '/', jposh, jb, n, jsrc, jdst
+          do
+             if (jsrc.ge.je) exit
+             m = min((je - jsrc), itr(0) - idx(0))
+             jpos = jposh + us * (jsrc - jb)
+             if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, jpos)
+             if (ierr.ne.0) exit loop_rec
+             jdst = jdst + m
+             call next_offset(jsrc, idx, stp, itr, rr, m)
+             if (jsrc.lt.0) exit
+          enddo
+       endif
+       if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
+       if (ierr.eq.0) then
+          if (iseph.ge.0) exit loop_rec
+          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit loop_rec
+       endif
+       if (jsrc.lt.0) exit
+       jb = je
+    enddo loop_rec
+    if (ierr.eq.0) then
+       if (jsrc.ge.0) then
+          ierr = ERR_INVALID_RECORD_SIZE
+       else if (choice(.false., sub)) then
+          ! sub exist and T
+          sub = (iseph.lt.0)    ! subrecord succeeds
+       else if (iseph.lt.0) then
+          ! skip all
+          call sus_skip_irec(ierr, u, 1, swap=swap)
+       endif
+    endif
+  end subroutine sus_read_slice_irec_f
+
+  subroutine sus_read_slice_irec_d &
+       & (ierr, u, v, bes, r, swap, sub)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_size_strm
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KDBL
+    integer,        intent(out)            :: ierr
+    integer,        intent(in)             :: u
+    real(KIND=KARG),intent(out)            :: V(0:*)
+    integer,        intent(in)             :: bes(3, 0:*) ! begin/end/stride triplet
+    integer,        intent(in)             :: r           ! ranks
+    logical,        intent(in),   optional :: swap
+    logical,        intent(inout),optional :: sub
+
+    integer rr, rj
+    integer stp(0:r-1), itr(0:r-1)
+    integer idx(0:r-1)
+    integer jsrc, jdst
+    integer n,  m
+    integer jb, je
+    integer(KIND=KISEP) :: iseph, isepf
+    integer(KIND=KIOFS) :: jposh, jposf, jpos
+    integer us
+
+    ierr = err_default
+    us = get_size_strm(V(0))
+
+    call set_slice_loop(rr, stp, itr, bes, r)
+    idx(0:rr-1) = 0
+    jsrc = init_offset(bes, r)
+    jb = 0
+    jdst = 0
+
+    rj = 0
+    loop_rec: do
+       if (ierr.eq.0) then
+          call sus_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit loop_rec
+          endif
+       endif
+       if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jposh)
+       if (ierr.eq.0) then
+          jposf = jposh + conv_b2strm(abs(iseph))
+          n = get_mems_bytes(abs(iseph), V(0))
+          je = jb + n
+       endif
+       if (ierr.eq.0) then
+          ! write(*, *) 'sub = ', idx(0:rr-1), '/', jposh, jb, n, jsrc, jdst
+          do
+             if (jsrc.ge.je) exit
+             m = min((je - jsrc), itr(0) - idx(0))
+             jpos = jposh + us * (jsrc - jb)
+             if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, jpos)
+             if (ierr.ne.0) exit loop_rec
+             jdst = jdst + m
+             call next_offset(jsrc, idx, stp, itr, rr, m)
+             if (jsrc.lt.0) exit
+          enddo
+       endif
+       if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
+       if (ierr.eq.0) then
+          if (iseph.ge.0) exit loop_rec
+          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit loop_rec
+       endif
+       if (jsrc.lt.0) exit
+       jb = je
+    enddo loop_rec
+    if (ierr.eq.0) then
+       if (jsrc.ge.0) then
+          ierr = ERR_INVALID_RECORD_SIZE
+       else if (choice(.false., sub)) then
+          ! sub exist and T
+          sub = (iseph.lt.0)    ! subrecord succeeds
+       else if (iseph.lt.0) then
+          ! skip all
+          call sus_skip_irec(ierr, u, 1, swap=swap)
+       endif
+    endif
+  end subroutine sus_read_slice_irec_d
+
+  subroutine sus_read_slice_irec_a &
+       & (ierr, u, v, bes, r, swap, sub)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_size_bytes
+    implicit none
+    integer,parameter :: KISEP=KI32
+    integer,         intent(out)            :: ierr
+    integer,         intent(in)             :: u
+    character(len=*),intent(out)            :: V(0:*)
+    integer,         intent(in)             :: bes(3, 0:*) ! begin/end/stride triplet
+    integer,         intent(in)             :: r           ! ranks
+    logical,         intent(in),   optional :: swap
+    logical,         intent(inout),optional :: sub
+
+    integer rr, rj
+    integer stp(0:r-1), itr(0:r-1)
+    integer idx(0:r-1)
+    integer jsrc, jdst
+    integer n,  m
+    integer jb, je
+    integer(KIND=KISEP) :: iseph, isepf
+    integer(KIND=KIOFS) :: jposh, jposf, jpos
+    integer us
+
+    ierr = err_default
+    us = get_size_bytes(V(0), 1)
+    us = conv_b2strm(us)
+
+    call set_slice_loop(rr, stp, itr, bes, r)
+    idx(0:rr-1) = 0
+    jsrc = init_offset(bes, r)
+    jb = 0
+    jdst = 0
+
+    rj = 0
+    loop_rec: do
+       if (ierr.eq.0) then
+          call sus_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit loop_rec
+          endif
+       endif
+       if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jposh)
+       if (ierr.eq.0) then
+          jposf = jposh + conv_b2strm(abs(iseph))
+          n = get_mems_bytes(abs(iseph), V(0))
+          je = jb + n
+       endif
+       if (ierr.eq.0) then
+          ! write(*, *) 'sub = ', idx(0:rr-1), '/', jposh, jb, n, jsrc, jdst
+          do
+             if (jsrc.ge.je) exit
+             m = min((je - jsrc), itr(0) - idx(0))
+             jpos = jposh + us * (jsrc - jb)
+             if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, jpos)
+             if (ierr.ne.0) exit loop_rec
+             jdst = jdst + m
+             call next_offset(jsrc, idx, stp, itr, rr, m)
+             if (jsrc.lt.0) exit
+          enddo
+       endif
+       if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
+       if (ierr.eq.0) then
+          if (iseph.ge.0) exit loop_rec
+          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit loop_rec
+       endif
+       if (jsrc.lt.0) exit
+       jb = je
+    enddo loop_rec
+    if (ierr.eq.0) then
+       if (jsrc.ge.0) then
+          ierr = ERR_INVALID_RECORD_SIZE
+       else if (choice(.false., sub)) then
+          ! sub exist and T
+          sub = (iseph.lt.0)    ! subrecord succeeds
+       else if (iseph.lt.0) then
+          ! skip all
+          call sus_skip_irec(ierr, u, 1, swap=swap)
+       endif
+    endif
+  end subroutine sus_read_slice_irec_a
+
+!!!_  - set_slice_loop
+  subroutine set_slice_loop(rr, stp, itr, bes, r)
+    implicit none
+    integer,intent(out) :: rr
+    integer,intent(out) :: stp(0:*), itr(0:*)
+    integer,intent(in)  :: bes(3, 0:*)
+    integer,intent(in)  :: r
+    integer j, l, m, n, s
+    rr = 0
+    n = 1
+    s = 0
+    l = 0
+    m = 1
+    itr(rr) = 0
+    stp(rr) = 0
+    do j = 0, r - 1
+       m = max(1, l) * (bes(2, j) - bes(1, j))
+       l = max(1, l) * bes(3, j)
+       if (m.eq.l) then
+          continue
+       else
+          itr(rr) = m
+          stp(rr) = s
+          s = s + n * (l - m)
+          n = n * l
+          l = 0
+          rr = rr + 1
+       endif
+    enddo
+    if (l.gt.0.and.rr.lt.r) then
+       itr(rr) = m
+       stp(rr) = s
+       rr = rr + 1
+    endif
+  end subroutine set_slice_loop
+
+!!!_  - init_offset()
+  PURE &
+  integer function init_offset(bes, r) result(n)
+    implicit none
+    integer,intent(in) :: bes(3, 0:*)
+    integer,intent(in) :: r
+    integer j, m
+    m = 1
+    n = 0
+    do j = 0, r - 1
+       n = n + bes(1, j) * m
+       m = m * bes(3, j)
+    enddo
+  end function init_offset
+
+!!!_  - next_offset()
+  subroutine next_offset(jsrc, idx, stp, itr, rr, m)
+    implicit none
+    integer,intent(inout) :: jsrc
+    integer,intent(inout) :: idx(0:*)
+    integer,intent(in)    :: stp(0:*), itr(0:*)
+    integer,intent(in)    :: rr
+    integer,intent(in)    :: m
+    integer rj
+    idx(0) = idx(0) + m
+    jsrc = jsrc + m
+    if (idx(0).lt.itr(0)) return
+
+    rj = 1
+    idx(0) = 0
+    do
+       if (rj.ge.rr) then
+          jsrc = -1
+          return
+       endif
+       idx(rj) = idx(rj) + 1
+       if (idx(rj).lt.itr(rj)) then
+          jsrc = jsrc + stp(rj)
+          return
+       endif
+       idx(rj) = 0
+       rj = rj + 1
+    enddo
+  end subroutine next_offset
+
 !!!_  - sus_write - write data with optional byte-swapping
   subroutine sus_write_i &
        & (ierr, u, v, n, swap)
@@ -1699,107 +2188,144 @@ contains
   end subroutine sus_write_a
 !!!_  - sus_read - read data with optional byte-swapping
   subroutine sus_read_i &
-       & (ierr, u, v, n, swap)
+       & (ierr, u, v, n, swap, pos)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,parameter :: KARG=KI32
-    integer,           intent(out)         :: ierr
-    integer,           intent(in)          :: u
-    integer(KIND=KARG),intent(out)         :: V(*)
-    integer,           intent(in)          :: n
-    logical,           intent(in),optional :: swap
-    if (choice(.false.,swap)) then
-       read(UNIT=u, IOSTAT=ierr) V(1:n)
-       if (ierr.eq.0) V(1:n) = sus_eswap(V(1:n))
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    integer(KIND=KARG), intent(out)         :: V(*)
+    integer,            intent(in)          :: n
+    logical,            intent(in),optional :: swap
+    integer(kind=KIOFS),intent(in),optional :: pos
+    if (present(pos)) then
+       read(UNIT=u, IOSTAT=ierr, POS=POS) V(1:n)
     else
        read(UNIT=u, IOSTAT=ierr) V(1:n)
+    endif
+    if (choice(.false.,swap)) then
+       if (ierr.eq.0) V(1:n) = sus_eswap(V(1:n))
     endif
   end subroutine sus_read_i
   subroutine sus_read_l &
-       & (ierr, u, v, n, swap)
+       & (ierr, u, v, n, swap, pos)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,parameter :: KARG=KI64
-    integer,           intent(out)         :: ierr
-    integer,           intent(in)          :: u
-    integer(KIND=KARG),intent(out)         :: V(*)
-    integer,           intent(in)          :: n
-    logical,           intent(in),optional :: swap
-    if (choice(.false.,swap)) then
-       read(UNIT=u, IOSTAT=ierr) V(1:n)
-       if (ierr.eq.0) V(1:n) = sus_eswap(V(1:n))
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    integer(KIND=KARG), intent(out)         :: V(*)
+    integer,            intent(in)          :: n
+    logical,            intent(in),optional :: swap
+    integer(kind=KIOFS),intent(in),optional :: pos
+    if (present(pos)) then
+       read(UNIT=u, IOSTAT=ierr, POS=POS) V(1:n)
     else
        read(UNIT=u, IOSTAT=ierr) V(1:n)
     endif
+    if (choice(.false.,swap)) then
+       if (ierr.eq.0) V(1:n) = sus_eswap(V(1:n))
+    endif
   end subroutine sus_read_l
   subroutine sus_read_f &
-       & (ierr, u, v, n, swap)
+       & (ierr, u, v, n, swap, pos)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,parameter :: KARG=KFLT, KBUF=KI32
-    integer,        intent(out)         :: ierr
-    integer,        intent(in)          :: u
-    real(KIND=KARG),intent(out)         :: V(*)
-    integer,        intent(in)          :: n
-    logical,        intent(in),optional :: swap
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    real(KIND=KARG),    intent(out)         :: V(*)
+    integer,            intent(in)          :: n
+    logical,            intent(in),optional :: swap
+    integer(kind=KIOFS),intent(in),optional :: pos
 #if OPT_READ_SWAP_WITH_WORK
     integer(KIND=KBUF) :: W(n)
 #endif /* OPT_READ_SWAP_WITH_WORK */
     if (choice(.false.,swap)) then
 #if OPT_READ_SWAP_WITH_WORK
-       read(UNIT=u, IOSTAT=ierr) W(1:n)
+       if (present(pos)) then
+          read(UNIT=u, IOSTAT=ierr, POS=POS) W(1:n)
+       else
+          read(UNIT=u, IOSTAT=ierr) W(1:n)
+       endif
        if (ierr.eq.0) then
           V(1:n) = TRANSFER(sus_eswap(W(1:n)), 0.0_KARG, n)
        endif
 #else /* not OPT_READ_SWAP_WITH_WORK */
-       read(UNIT=u, IOSTAT=ierr) V(1:n)
+       if (present(pos)) then
+          read(UNIT=u, IOSTAT=ierr, POS=POS) V(1:n)
+       else
+          read(UNIT=u, IOSTAT=ierr) V(1:n)
+       endif
        if (ierr.eq.0) then
           V(1:n) = TRANSFER(sus_eswap(TRANSFER(V(1:n), 0_KBUF, n)), 0.0_KARG, n)
        endif
 #endif /* not OPT_READ_SWAP_WITH_WORK */
     else
-       read(UNIT=u, IOSTAT=ierr) V(1:n)
+       if (present(pos)) then
+          read(UNIT=u, IOSTAT=ierr, POS=POS) V(1:n)
+       else
+          read(UNIT=u, IOSTAT=ierr) V(1:n)
+       endif
     endif
   end subroutine sus_read_f
   subroutine sus_read_d &
-       & (ierr, u, v, n, swap)
+       & (ierr, u, v, n, swap, pos)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,parameter :: KARG=KDBL, KBUF=KI64
-    integer,        intent(out)         :: ierr
-    integer,        intent(in)          :: u
-    real(KIND=KARG),intent(out)         :: V(*)
-    integer,        intent(in)          :: n
-    logical,        intent(in),optional :: swap
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    real(KIND=KARG),    intent(out)         :: V(*)
+    integer,            intent(in)          :: n
+    logical,            intent(in),optional :: swap
+    integer(kind=KIOFS),intent(in),optional :: pos
 #if OPT_READ_SWAP_WITH_WORK
     integer(kind=KBUF) :: W(n)
 #endif /* OPT_READ_SWAP_WITH_WORK */
     if (choice(.false.,swap)) then
 #if OPT_READ_SWAP_WITH_WORK
-       read(UNIT=u, IOSTAT=ierr) W(1:n)
+       if (present(pos)) then
+          read(UNIT=u, IOSTAT=ierr, POS=POS) W(1:n)
+       else
+          read(UNIT=u, IOSTAT=ierr) W(1:n)
+       endif
        if (ierr.eq.0) then
           V(1:n) = TRANSFER(sus_eswap(W(1:n)), 0.0_KARG, n)
        endif
 #else /* not OPT_READ_SWAP_WITH_WORK */
-       read(UNIT=u, IOSTAT=ierr) V(1:n)
+       if (present(pos)) then
+          read(UNIT=u, IOSTAT=ierr, POS=POS) V(1:n)
+       else
+          read(UNIT=u, IOSTAT=ierr) V(1:n)
+       endif
        if (ierr.eq.0) then
           V(1:n) = TRANSFER(sus_eswap(TRANSFER(V(1:n), 0_KBUF, n)), 0.0_KARG, n)
        endif
 #endif /* not OPT_READ_SWAP_WITH_WORK */
     else
-       read(UNIT=u, IOSTAT=ierr) V(1:n)
+       if (present(pos)) then
+          read(UNIT=u, IOSTAT=ierr, POS=POS) V(1:n)
+       else
+          read(UNIT=u, IOSTAT=ierr) V(1:n)
+       endif
     endif
   end subroutine sus_read_d
   subroutine sus_read_a &
-       & (ierr, u, v, n, swap)
+       & (ierr, u, v, n, swap, pos)
     use TOUZA_Std_utl,only: choice
     implicit none
-    integer,         intent(out)         :: ierr
-    integer,         intent(in)          :: u
-    character(len=*),intent(out)         :: V(*)
-    integer,         intent(in)          :: n
-    logical,         intent(in),optional :: swap
-    read(UNIT=u, IOSTAT=ierr) V(1:n)
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    character(len=*),   intent(out)         :: V(*)
+    integer,            intent(in)          :: n
+    logical,            intent(in),optional :: swap
+    integer(kind=KIOFS),intent(in),optional :: pos
+    if (present(pos)) then
+       read(UNIT=u, IOSTAT=ierr, POS=POS) V(1:n)
+    else
+       read(UNIT=u, IOSTAT=ierr) V(1:n)
+    endif
   end subroutine sus_read_a
 !!!_  - sus_write_isep - write 32-bit separator
   subroutine sus_write_isep_i (ierr, u, sep, pos, swap, sub)
@@ -2194,7 +2720,7 @@ contains
 end module TOUZA_Std_sus
 
 !!!_@ test_std_sus - test program
-#ifdef TEST_STD_SUS
+#if TEST_STD_SUS
 program test_std_sus
   use TOUZA_Std_prc,only: KI32,KI64,KFLT,KDBL
   use TOUZA_Std_sus
@@ -2211,6 +2737,9 @@ program test_std_sus
   character(len=la)  :: vas(lv), vad(lv)
 
   character(len=512) :: file = 'out.sus'
+  character(len=512) :: file2 = 'out.sus2'
+
+  integer dims(4)
 
   integer kendi
   integer j
@@ -2292,6 +2821,20 @@ program test_std_sus
   endif
   if (ierr.eq.0) then
      call batch_seqread_check(ierr, u, vis, mi, vls, ml, vfs, mf, vds, md, vas, ma, 'LS')
+  endif
+
+  if (ierr.eq.0) then
+     call test_slice_loop(ierr)
+  endif
+
+  if (ierr.eq.0) close(UNIT=u, IOSTAT=ierr)
+  if (ierr.eq.0) call sus_open(ierr, u, file2, ACTION='W', STATUS='R')
+  if (ierr.eq.0) then
+     dims(:) = (/4, 5, 7, 8/)   ! avoid 3 multiples
+     call test_slice_create(ierr, u, dims)
+     if (ierr.eq.0) call sus_close(ierr, u, file2)
+     if (ierr.eq.0) call sus_open(ierr, u, file2, ACTION='R')
+     if (ierr.eq.0) call batch_slice_read(ierr, u, dims)
   endif
 
   if (ierr.eq.0) call finalize(ierr)
@@ -2424,6 +2967,301 @@ contains
 
     return
   end subroutine batch_seqread_check
+
+  subroutine test_slice_loop(ierr)
+    implicit none
+    integer,intent(out) :: ierr
+    ierr = 0
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 1, (/0,8,8/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 1, (/1,5,8/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 1, (/0,1,1/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,8,8,  0,6,6/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/1,5,8,  0,6,6/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,1,1,  0,6,6/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,8,8,  2,4,6/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/1,5,8,  2,4,6/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,1,1,  2,4,6/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,8,8,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/1,5,8,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,1,1,  0,1,1/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,6,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,6,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,6,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  2,4,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  2,4,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  2,4,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,1,1,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,1,1,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,1,1,  0,4,4/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,6,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,6,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,6,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  2,4,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  2,4,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  2,4,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,1,1,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,1,1,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,1,1,  1,3,4/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,6,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,6,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,6,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  2,4,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  2,4,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  2,4,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,1,1,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,1,1,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,1,1,  0,1,1/))
+
+  end subroutine test_slice_loop
+
+  subroutine test_slice_loop_sub(ierr, r, bes)
+    use TOUZA_Std_utl,only: join_list
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: r
+    integer,intent(in)  :: bes(3, 0:*)
+
+    integer jt
+    integer j
+    integer rr
+    integer stp(0:r-1), itr(0:r-1)
+    integer lidx(0:r-1), pidx(0:r-1)
+    character(len=32)  :: str(0:r-1)
+    character(len=256) :: txti, txto
+    integer jerr
+
+    integer jsrc
+    integer m, mm, k
+
+    call set_slice_loop(rr, stp, itr, bes, r)
+111 format('slice: ', A, ' > ', A)
+
+101 format(I0, ':', I0, '/', I0)
+102 format(I0, '+', I0)
+    do j = 0, r - 1
+       write(str(j), 101) bes(1:3, j)
+    enddo
+    call join_list(jerr, txti, str(0:r-1))
+    do j = 0, rr - 1
+       write(str(j), 102) itr(j), stp(j)
+    enddo
+    call join_list(jerr, txto, str(0:rr-1))
+
+    write(*, 111) trim(txti), trim(txto)
+
+    do jt = 0, 1
+       if (jt.eq.0) then
+          m = itr(0)
+       else if (itr(0).eq.1) then
+          cycle
+       else
+          m = max(1, itr(0) / 2)
+       endif
+       jsrc = init_offset(bes, r)
+       lidx(0:rr-1) = 0
+       do
+          if (jsrc.lt.0) exit
+          k = jsrc
+          do j = 0, r - 1
+             pidx(j) = mod(k, bes(3, j))
+             k = k / bes(3, j)
+          enddo
+          call join_list(jerr, txti, lidx(0:rr-1))
+          call join_list(jerr, txto, pidx(0:r-1))
+121       format('slice/seq+', I0, ': ', I0, ' / ', A, ' > ', A)
+          write(*, 121) m, jsrc, trim(txti), trim(txto)
+          mm = min(m, itr(0) - lidx(0))
+          call next_offset(jsrc, lidx, stp, itr, rr, mm)
+       enddo
+    enddo
+
+  end subroutine test_slice_loop_sub
+
+  subroutine test_slice_create  &
+       & (ierr, u, dims)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: u
+    integer,intent(in)  :: dims(0:)
+
+    integer,allocatable :: vi(:)
+    integer jr, jm
+    integer nr, nm
+    integer jb,  je,   nd,  md
+    logical pre, post, swap
+    integer jt
+
+    ierr = 0
+    nr = size(dims)
+    nm = 1
+    do jr = 0, nr - 1
+       nm = nm * dims(jr)
+    enddo
+    allocate(vi(0:nm-1), STAT=ierr)
+    if (ierr.eq.0) then
+       do jm = 0, nm - 1
+          vi(jm) = jm
+       enddo
+    endif
+    if (ierr.eq.0) call sus_write_irec(ierr, u, vi, nm)
+    if (ierr.eq.0) call sus_write_irec(ierr, u, vi, nm, .TRUE.)
+
+    nd = nm / 3 + 1
+    do jt = 0, 1
+       pre = .FALSE.
+       post = .TRUE.
+       swap = (jt.ne.0)
+       do jb = 0, nm - 1, nd
+          md = min(nd, nm - jb)
+          je = jb + md
+          post = je.lt.nm
+          if (ierr.eq.0) call sus_write_irec(ierr, u, vi(jb:je), md, swap, pre, post)
+          pre = .TRUE.
+       enddo
+    enddo
+    if (ierr.eq.0) deallocate(vi, STAT=ierr)
+
+  end subroutine test_slice_create
+
+  subroutine batch_slice_read  &
+       & (ierr, u, dims)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: u
+    integer,intent(in)  :: dims(0:)
+
+    integer,allocatable :: vi(:)
+    integer,allocatable :: vx(:)
+    integer bes(3, 0:size(dims))
+
+    integer jt, jtt
+    integer jp, np
+    integer nr, jr
+    integer nm
+    logical swap
+    integer jerr
+
+    ierr = 0
+    nr = size(dims)
+    nm = 1
+    do jr = 0, nr - 1
+       nm = nm * dims(jr)
+    enddo
+    allocate(vi(0:nm*2-1), vx(0:nm*2-1), STAT=ierr)
+
+    np = 2 ** nr
+    bes(3, 0:nr-1) = dims(0:nr-1)
+    bes(1:3, nr) = (/0, 2, 2/)
+
+    do jp = 0, np - 1
+       ! if (jp.ne.1) cycle
+       do jr = 0, nr - 1
+          if (ibits(jp, jr, 1).eq.0) then
+             bes(1, jr) = 0
+             bes(2, jr) = dims(jr)
+          else
+             bes(1, jr) = 1
+             bes(2, jr) = dims(jr) - 1
+          endif
+       enddo
+       if (ierr.eq.0) call test_slice_ref(ierr, vx, bes, nr)
+       if (ierr.eq.0) rewind(UNIT=u, IOSTAT=ierr)
+       do jt = 0, 3
+          swap = mod(jt, 2).eq.1
+          if (ierr.eq.0) call test_slice_read(ierr, vi, vx, u, swap, bes, nr, jp, jt)
+       enddo
+
+       do jt = 0, 3
+          if (ierr.eq.0) rewind(UNIT=u, IOSTAT=ierr)
+          do jtt = 0, jt - 1
+             swap = mod(jtt, 2).eq.1
+             if (ierr.eq.0) call sus_skip_irec(ierr, u, 1, swap=swap)
+          enddo
+          swap = mod(jt, 2).eq.1
+          call test_slice_read(jerr, vi, vx, u, swap, bes, nr + 1, jp, jt)
+       enddo
+    enddo
+
+    if (ierr.eq.0) deallocate(vi, vx, STAT=ierr)
+  end subroutine batch_slice_read
+
+  subroutine test_slice_read  &
+       & (ierr, vi, vx, u, swap, bes, nr, jp, jt)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(out) :: vi(0:*)
+    integer,intent(in)  :: vx(0:*)
+    integer,intent(in)  :: u
+    logical,intent(in)  :: swap
+    integer,intent(in)  :: bes(3, 0:*)
+    integer,intent(in)  :: nr
+    integer,intent(in)  :: jp, jt
+    integer jr
+    integer j, m
+    m = 1
+    do jr = 0, nr - 1
+       m = m * (bes(2,jr) - bes(1,jr))
+    enddo
+    ierr = 0
+    vi(0:m-1) = -1
+    call sus_read_slice_irec(ierr, u, vi, bes, nr, swap)
+    if (ierr.eq.0) then
+       if (ALL(vi(0:m-1).eq.vx(0:m-1))) then
+          write(*, *) jp, jt, 'identical', m
+       else
+          do j = 0, m - 1
+             if (vi(j).ne.vx(j)) then
+                write(*, *) jp, jt, j, vi(j), vx(j)
+             endif
+          enddo
+       endif
+    else
+       write(*, *) jp, jt, 'error = ', ierr
+    endif
+  end subroutine test_slice_read
+
+  subroutine test_slice_ref &
+       & (ierr, vx, bes, nr)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(out) :: vx(0:*)
+    integer,intent(in)  :: bes(3, 0:*)
+    integer,intent(in)  :: nr
+    integer idx(0:nr-1)
+    integer jr, np
+    integer jp, jl
+    ierr = 0
+
+    j = 0
+    np = 1
+    do jr = 0, nr - 1
+       np = np * bes(3, jr)
+    enddo
+    idx(0:nr-1) = 0
+    jl = 0
+    do jp = 0, np - 1
+       ! write(*, *) jp, ixd(0:nr-1), jl
+       if (ALL(idx(0:nr-1).ge.bes(1,0:nr-1)) &
+            & .and. ALL(idx(0:nr-1).lt.bes(2,0:nr-1))) then
+          vx(jl) = jp
+          jl = jl + 1
+       endif
+       do jr = 0, nr - 1
+          idx(jr) = idx(jr) + 1
+          if (idx(jr).lt.bes(3,jr)) exit
+          idx(jr) = 0
+       enddo
+    enddo
+  end subroutine test_slice_ref
+
+
 end program test_std_sus
 
 #endif /* TEST_STD_SUS */
