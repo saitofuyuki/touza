@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz swiss(CH) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2022/11/23 22:23:29 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/04 21:09:38 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -1064,7 +1064,6 @@ end subroutine cue_read_file
 
 !!!_   . read_file_data
   subroutine read_file_data(ierr, v, n, file)
-    use TOUZA_Std,only: is_error_match, KIOFS, get_size_strm, sus_read
     use TOUZA_Nio,only: nio_read_data
     implicit none
     integer,        intent(out)   :: ierr
@@ -1080,7 +1079,7 @@ end subroutine cue_read_file
        case(cfmt_binary:)
           call read_data_binary(ierr, v, n, file)
        case default
-          call nio_read_data(ierr, v, n, file%h, file%t, file%u)
+          call read_data_nio(ierr, v, n, file)
        end select
     endif
     if (ierr.eq.0) file%irec = file%irec + 1
@@ -1095,8 +1094,6 @@ end subroutine cue_read_file
 !!!_   . write_file_data
   subroutine write_file_data &
        & (ierr, v, n, head, file, kv)
-    use TOUZA_Std,only: is_error_match, KIOFS, get_size_strm, sus_write
-    use TOUZA_Nio,only: nio_write_data
     implicit none
     integer,         intent(out)   :: ierr
     real(kind=KBUF), intent(in)    :: v(0:*)
@@ -1105,60 +1102,15 @@ end subroutine cue_read_file
     type(file_t),    intent(inout) :: file
     integer,         intent(in)    :: kv
 
-    integer,        allocatable,save :: bufi(:)
-    real(kind=KFLT),allocatable,save :: buff(:)
-    real(kind=KDBL),allocatable,save :: bufd(:)
-    logical swap
-
     ierr = 0
     if (ierr.eq.0) then
        select case(file%kfmt)
        case(cfmt_ascii)
-          call write_file_ascii(ierr, v, n, head, file, kv)
-       case(cfmt_binary_i4:cfmt_binary_i4+cfmt_flags_bo-1)
-          swap = get_swap_switch(file%kfmt - cfmt_binary_i4)
-          if (ierr.eq.0) then
-             if (.not.allocated(bufi)) then
-                allocate(bufi(0:n-1), STAT=ierr)
-             else if (size(bufi).lt.n) then
-                deallocate(bufi, STAT=ierr)
-                if (ierr.eq.0) allocate(bufi(0:n-1), STAT=ierr)
-             endif
-             if (ierr.eq.0) then
-                bufi(0:n-1) = int(v(0:n-1))
-             endif
-             if (ierr.eq.0) call sus_write(ierr, file%u, bufi, n, swap)
-          endif
-       case(cfmt_binary_r4:cfmt_binary_r4+cfmt_flags_bo-1)
-          swap = get_swap_switch(file%kfmt - cfmt_binary_r4)
-          if (ierr.eq.0) then
-             if (.not.allocated(buff)) then
-                allocate(buff(0:n-1), STAT=ierr)
-             else if (size(buff).lt.n) then
-                deallocate(buff, STAT=ierr)
-                if (ierr.eq.0) allocate(buff(0:n-1), STAT=ierr)
-             endif
-             if (ierr.eq.0) then
-                buff(0:n-1) = real(v(0:n-1),kind=KFLT)
-             endif
-             if (ierr.eq.0) call sus_write(ierr, file%u, buff, n, swap)
-          endif
-       case(cfmt_binary_r8:cfmt_binary_r8+cfmt_flags_bo-1)
-          swap = get_swap_switch(file%kfmt - cfmt_binary_r8)
-          if (ierr.eq.0) then
-             if (.not.allocated(bufd)) then
-                allocate(bufd(0:n-1), STAT=ierr)
-             else if (size(bufd).lt.n) then
-                deallocate(bufd, STAT=ierr)
-                if (ierr.eq.0) allocate(bufd(0:n-1), STAT=ierr)
-             endif
-             if (ierr.eq.0) then
-                bufd(0:n-1) = real(v(0:n-1),kind=KDBL)
-             endif
-             if (ierr.eq.0) call sus_write(ierr, file%u, bufd, n, swap)
-          endif
+          call write_data_ascii(ierr, v, n, head, file, kv)
+       case(cfmt_binary:)
+          call write_data_binary(ierr, v, n, head, file, kv)
        case default
-          call nio_write_data(ierr, v, n, head, file%t, file%u)
+          call write_data_nio(ierr, v, n, head, file)
        end select
     endif
 
@@ -1372,6 +1324,7 @@ end subroutine cue_read_file
        & (ierr, head, file, rec, crec)
     use TOUZA_Std,only: is_error_match
     use TOUZA_Nio,only: nio_skip_records, nio_read_header
+    use TOUZA_Nio,only: get_item, hi_DFMT, parse_record_fmt
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(out)   :: head(*)
@@ -1384,6 +1337,8 @@ end subroutine cue_read_file
     nskp = rec - crec
     call nio_skip_records(ierr, nskp, file%u, nskip=nsuc)
     if (ierr.eq.0) call nio_read_header(ierr, head, file%t, file%u)
+    if (ierr.eq.0) call get_item(ierr, head, file%fmt, hi_DFMT)
+    if (ierr.eq.0) call parse_record_fmt(ierr, file%kfmt, file%fmt)
 
   end subroutine read_header_nio
 
@@ -1478,6 +1433,61 @@ end subroutine cue_read_file
        endif
     enddo
   end subroutine put_header_lprops
+
+!!!_   . read_data_nio
+  subroutine read_data_nio(ierr, v, n, file)
+    use TOUZA_Nio,only: nio_read_data, parse_record_fmt
+    use TOUZA_Nio,only: switch_urt_diag
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(out)   :: v(0:*)
+    integer,        intent(in)    :: n
+    type(file_t),   intent(inout) :: file
+
+    ierr = 0
+    if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, ulog)
+    call nio_read_data(ierr, v, n, file%h, file%t, file%u)
+    if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, -2)
+
+  end subroutine read_data_nio
+
+!!!_   . write_data_nio
+  subroutine write_data_nio &
+       & (ierr, v, n, head, file)
+    use TOUZA_Nio,only: nio_write_data, lopts, parse_urt_options
+    use TOUZA_Nio,only: GFMT_URT
+    use TOUZA_Nio,only: GFMT_MRT
+    use TOUZA_Nio,only: switch_urt_diag
+    implicit none
+    integer,         intent(out)   :: ierr
+    real(kind=KBUF), intent(in)    :: v(0:*)
+    integer,         intent(in)    :: n
+    character(len=*),intent(in)    :: head(*)
+    type(file_t),    intent(inout) :: file
+    integer kopts(lopts)
+    integer jo
+    character(len=*),parameter :: osep = '+'
+
+    ierr = 0
+    if (file%kfmt.eq.GFMT_URT .or. file%kfmt.eq.GFMT_MRT) then
+       jo = index(file%fmt, osep)
+       if (jo.gt.0) then
+          call parse_urt_options(ierr, kopts, file%fmt(jo+1:))
+          if (ierr.ne.0) then
+             ierr = ERR_INVALID_PARAMETER
+             call message(ierr, 'invalid *rt options = ' // trim(file%fmt(jo+1:)))
+             return
+          endif
+          if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, ulog)
+          call nio_write_data(ierr, v, n, head, file%t, file%u, kopts)
+          if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, -2)
+       else
+          call nio_write_data(ierr, v, n, head, file%t, file%u)
+       endif
+    else
+       call nio_write_data(ierr, v, n, head, file%t, file%u)
+    endif
+  end subroutine write_data_nio
 
 !!!_  - ascii
 !!!_   . open_read_ascii
@@ -1686,8 +1696,8 @@ end subroutine cue_read_file
     ! endif
   end subroutine read_data_ascii
 
-!!!_   . write_file_ascii
-  subroutine write_file_ascii &
+!!!_   . write_data_ascii
+  subroutine write_data_ascii &
        & (ierr, v, n, head, file, kv)
     implicit none
     integer,         intent(out)   :: ierr
@@ -1736,7 +1746,7 @@ end subroutine cue_read_file
           enddo
        endif
     end select
-  end subroutine write_file_ascii
+  end subroutine write_data_ascii
 !!!_  - binary
 !!!_   . open_read_binary
   subroutine open_read_binary &
@@ -1924,6 +1934,71 @@ end subroutine cue_read_file
     end select
   end subroutine read_data_binary
 
+!!!_   . write_data_binary
+  subroutine write_data_binary &
+       & (ierr, v, n, head, file, kv)
+    use TOUZA_Std,only: sus_write
+    implicit none
+    integer,         intent(out)   :: ierr
+    real(kind=KBUF), intent(in)    :: v(0:*)
+    integer,         intent(in)    :: n
+    character(len=*),intent(in)    :: head(*)
+    type(file_t),    intent(inout) :: file
+    integer,         intent(in)    :: kv
+
+    integer,        allocatable,save :: bufi(:)
+    real(kind=KFLT),allocatable,save :: buff(:)
+    real(kind=KDBL),allocatable,save :: bufd(:)
+    logical swap
+
+    ierr = 0
+
+    select case(file%kfmt)
+    case(cfmt_binary_i4:cfmt_binary_i4+cfmt_flags_bo-1)
+       swap = get_swap_switch(file%kfmt - cfmt_binary_i4)
+       if (ierr.eq.0) then
+          if (.not.allocated(bufi)) then
+             allocate(bufi(0:n-1), STAT=ierr)
+          else if (size(bufi).lt.n) then
+             deallocate(bufi, STAT=ierr)
+             if (ierr.eq.0) allocate(bufi(0:n-1), STAT=ierr)
+          endif
+          if (ierr.eq.0) then
+             bufi(0:n-1) = int(v(0:n-1))
+          endif
+          if (ierr.eq.0) call sus_write(ierr, file%u, bufi, n, swap)
+       endif
+    case(cfmt_binary_r4:cfmt_binary_r4+cfmt_flags_bo-1)
+       swap = get_swap_switch(file%kfmt - cfmt_binary_r4)
+       if (ierr.eq.0) then
+          if (.not.allocated(buff)) then
+             allocate(buff(0:n-1), STAT=ierr)
+          else if (size(buff).lt.n) then
+             deallocate(buff, STAT=ierr)
+             if (ierr.eq.0) allocate(buff(0:n-1), STAT=ierr)
+          endif
+          if (ierr.eq.0) then
+             buff(0:n-1) = real(v(0:n-1),kind=KFLT)
+          endif
+          if (ierr.eq.0) call sus_write(ierr, file%u, buff, n, swap)
+       endif
+    case(cfmt_binary_r8:cfmt_binary_r8+cfmt_flags_bo-1)
+       swap = get_swap_switch(file%kfmt - cfmt_binary_r8)
+       if (ierr.eq.0) then
+          if (.not.allocated(bufd)) then
+             allocate(bufd(0:n-1), STAT=ierr)
+          else if (size(bufd).lt.n) then
+             deallocate(bufd, STAT=ierr)
+             if (ierr.eq.0) allocate(bufd(0:n-1), STAT=ierr)
+          endif
+          if (ierr.eq.0) then
+             bufd(0:n-1) = real(v(0:n-1),kind=KDBL)
+          endif
+          if (ierr.eq.0) call sus_write(ierr, file%u, bufd, n, swap)
+       endif
+    end select
+
+  end subroutine write_data_binary
 !!!_ + end chak_file
 end module chak_file
 !!!_@ test_chak_file
