@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2022/11/11 12:17:59 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/02 08:07:06 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -840,36 +840,45 @@ contains
   ! parse_number[/123] = (-999 0)    (-999 1)    !! null + end of list
   ! parse_number[*123] = (-999 5010) (-999 1)
   ! parse_number[,123] = (-999 0)    (-999 1)
-  subroutine parse_number_i (ierr, num, str)
+  subroutine parse_number_i (ierr, num, str, def)
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(inout) :: num
     character(len=*),intent(in)    :: str
+    integer,optional,intent(in)    :: def
     ierr = check_number_string(str)
     if (ierr.eq.0) then
        read(str, *, IOSTAT=ierr) num
+    else if (present(def)) then
+       num = def
     endif
   end subroutine parse_number_i
-  subroutine parse_number_f (ierr, num, str)
+  subroutine parse_number_f (ierr, num, str, def)
     implicit none
     integer,parameter :: KTGT=KFLT
-    integer,         intent(out)   :: ierr
-    real(kind=KTGT), intent(inout) :: num
-    character(len=*),intent(in)    :: str
+    integer,         intent(out)         :: ierr
+    real(kind=KTGT), intent(inout)       :: num
+    character(len=*),intent(in)          :: str
+    real(kind=KTGT), intent(in),optional :: def
     ierr = check_number_string(str)
     if (ierr.eq.0) then
        read(str, *, IOSTAT=ierr) num
+    else if (present(def)) then
+       num = def
     endif
   end subroutine parse_number_f
-  subroutine parse_number_d (ierr, num, str)
+  subroutine parse_number_d (ierr, num, str, def)
     implicit none
     integer,parameter :: KTGT=KDBL
-    integer,         intent(out)   :: ierr
-    real(kind=KTGT), intent(inout) :: num
-    character(len=*),intent(in)    :: str
+    integer,         intent(out)         :: ierr
+    real(kind=KTGT), intent(inout)       :: num
+    character(len=*),intent(in)          :: str
+    real(kind=KTGT), intent(in),optional :: def
     ierr = check_number_string(str)
     if (ierr.eq.0) then
        read(str, *, IOSTAT=ierr) num
+    else if (present(def)) then
+       num = def
     endif
   end subroutine parse_number_d
   integer function check_number_string(str) result (n)
