@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2022/12/05 08:08:04 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/05 08:37:55 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -45,7 +45,9 @@
 #ifndef   OPT_READ_SWAP_WITH_WORK
 #  define OPT_READ_SWAP_WITH_WORK 1 /* automatic work-array is used for swap */
 #endif
-
+#ifndef   OPT_RECL_MAX_BYTES
+#  define OPT_RECL_MAX_BYTES 0
+#endif
 #ifndef   TEST_STD_SUS
 #  define TEST_STD_SUS 0
 #endif
@@ -64,7 +66,11 @@ module TOUZA_Std_sus
   integer,parameter,public :: WHENCE_END = +1
   integer,parameter,public :: WHENCE_ABS = -99
 
+#if OPT_RECL_MAX_BYTES <= 0
   integer,parameter,public :: RECL_MAX_BYTES = HUGE(0_KI32) - 4 * 2
+#else
+  integer,parameter,public :: RECL_MAX_BYTES = OPT_RECL_MAX_BYTES
+#endif
   ! integer,parameter,public :: RECL_MAX_BYTES = 24
 
 !!!_  - static
@@ -171,6 +177,7 @@ module TOUZA_Std_sus
   public sus_eswap
   public sus_pad
   public sus_record_mems_irec
+  public max_members
 
 #if TEST_STD_SUS
   public set_slice_loop, init_offset, next_offset
@@ -269,6 +276,8 @@ contains
           if (ierr.eq.0) then
              if (VCHECK_NORMAL(lv)) then
                 call msg_mdl(TIME_STAMP, __MDL__, utmp)
+                call msg_mdl('(''maximum record size = '', I0, 1x, I0)', &
+                     & (/OPT_RECL_MAX_BYTES, lsubr/), __MDL__, utmp)
              endif
           endif
        endif
