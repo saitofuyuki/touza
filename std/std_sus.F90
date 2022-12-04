@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2022/12/02 08:08:20 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/05 08:08:04 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -94,6 +94,10 @@ module TOUZA_Std_sus
      module procedure sus_write_lrec_i, sus_write_lrec_l, sus_write_lrec_d, sus_write_lrec_f, sus_write_lrec_a
   end interface sus_write_lrec
 
+  interface sus_pad_irec
+     module procedure sus_pad_irec_i, sus_write_irec_l, sus_write_irec_d, sus_write_irec_f, sus_write_irec_a
+  end interface sus_pad_irec
+
   interface sus_read_irec
      module procedure sus_read_irec_i, sus_read_irec_l, sus_read_irec_d, sus_read_irec_f, sus_read_irec_a
   end interface sus_read_irec
@@ -120,9 +124,18 @@ module TOUZA_Std_sus
      module procedure sus_read_lsep_l, sus_read_lsep_i
   end interface sus_read_lsep
 
+  interface sus_record_mems_irec
+     module procedure sus_record_mems_irec_i, sus_record_mems_irec_l
+     module procedure sus_record_mems_irec_f, sus_record_mems_irec_d
+  end interface sus_record_mems_irec
+
   interface sus_write
      module procedure sus_write_i, sus_write_l, sus_write_d, sus_write_f, sus_write_a
   end interface sus_write
+
+  interface sus_pad
+     module procedure sus_pad_i, sus_pad_l, sus_pad_d, sus_pad_f, sus_pad_a
+  end interface sus_pad
 
   interface sus_read
      module procedure sus_read_i, sus_read_l, sus_read_d, sus_read_f, sus_read_a
@@ -149,12 +162,15 @@ module TOUZA_Std_sus
 
   public sus_write_irec, sus_read_irec, sus_skip_irec, sus_check_irec, sus_read_slice_irec
   public sus_write_lrec, sus_read_lrec, sus_skip_lrec, sus_check_lrec
+  public sus_pad_irec
 
   public sus_write_isep, sus_read_isep, sus_read
   public sus_write_lsep, sus_read_lsep, sus_write
 
   public sus_rseek
   public sus_eswap
+  public sus_pad
+  public sus_record_mems_irec
 
 #if TEST_STD_SUS
   public set_slice_loop, init_offset, next_offset
@@ -1088,6 +1104,478 @@ contains
     return
   end subroutine sus_write_lrec_a
 
+!!!_  - sus_pad_irec - pad single value on a record with 32bit-marker
+  subroutine sus_pad_irec_i &
+       & (ierr, u, v, n, swap, pre, post)
+    use TOUZA_Std_env,only: get_size_bytes
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI32
+    integer,           intent(out)         :: ierr
+    integer,           intent(in)          :: u
+    integer(KIND=KARG),intent(in)          :: V
+    integer,           intent(in)          :: n
+    logical,           intent(in),optional :: swap
+    logical,           intent(in),optional :: pre, post
+    integer(KIND=KISEP) :: isep
+    integer j, m, ns
+
+    ierr = err_default
+    ns = max_members(V)
+    ! write(*, *) 'irec/i', ierr, ns, n
+    if (n.le.ns) then
+       isep = get_size_bytes(V, n)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=post)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=pre)
+    else
+       m = n
+       j = 0
+       isep = get_size_bytes(V, ns)
+       ! first
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, ns, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=pre)
+       ! middle
+       do
+          m = m - ns
+          j = j + ns
+          if (m.le.ns) exit
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+          if (ierr.eq.0) call sus_pad(ierr, u, V, ns, swap)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+       enddo
+       ! last
+       isep = get_size_bytes(V, m)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=post)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, m, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+    endif
+    ! stop
+    return
+  end subroutine sus_pad_irec_i
+  subroutine sus_pad_irec_l &
+       & (ierr, u, v, n, swap, pre, post)
+    use TOUZA_Std_env,only: get_size_bytes
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI64
+    integer,           intent(out)         :: ierr
+    integer,           intent(in)          :: u
+    integer(KIND=KARG),intent(in)          :: V
+    integer,           intent(in)          :: n
+    logical,           intent(in),optional :: swap
+    logical,           intent(in),optional :: pre, post
+    integer(KIND=KISEP) :: isep
+    integer j, m, ns
+
+    ierr = err_default
+    ns = max_members(V)
+    ! write(*, *) 'irec/i', ierr, ns, n
+    if (n.le.ns) then
+       isep = get_size_bytes(V, n)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=post)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=pre)
+    else
+       m = n
+       j = 0
+       isep = get_size_bytes(V, ns)
+       ! first
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, ns, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=pre)
+       ! middle
+       do
+          m = m - ns
+          j = j + ns
+          if (m.le.ns) exit
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+          if (ierr.eq.0) call sus_pad(ierr, u, V, ns, swap)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+       enddo
+       ! last
+       isep = get_size_bytes(V, m)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=post)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, m, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+    endif
+    ! stop
+    return
+  end subroutine sus_pad_irec_l
+  subroutine sus_pad_irec_f &
+       & (ierr, u, v, n, swap, pre, post)
+    use TOUZA_Std_env,only: get_size_bytes
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KFLT
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: u
+    real(KIND=KARG),intent(in)          :: V
+    integer,        intent(in)          :: n
+    logical,        intent(in),optional :: swap
+    logical,        intent(in),optional :: pre, post
+    integer(KIND=KISEP) :: isep
+    integer j, m, ns
+
+    ierr = err_default
+    ns = max_members(V)
+    ! write(*, *) 'irec/i', ierr, ns, n
+    if (n.le.ns) then
+       isep = get_size_bytes(V, n)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=post)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=pre)
+    else
+       m = n
+       j = 0
+       isep = get_size_bytes(V, ns)
+       ! first
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, ns, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=pre)
+       ! middle
+       do
+          m = m - ns
+          j = j + ns
+          if (m.le.ns) exit
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+          if (ierr.eq.0) call sus_pad(ierr, u, V, ns, swap)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+       enddo
+       ! last
+       isep = get_size_bytes(V, m)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=post)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, m, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+    endif
+    ! stop
+    return
+  end subroutine sus_pad_irec_f
+  subroutine sus_pad_irec_d &
+       & (ierr, u, v, n, swap, pre, post)
+    use TOUZA_Std_env,only: get_size_bytes
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KDBL
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: u
+    real(KIND=KARG),intent(in)          :: V
+    integer,        intent(in)          :: n
+    logical,        intent(in),optional :: swap
+    logical,        intent(in),optional :: pre, post
+    integer(KIND=KISEP) :: isep
+    integer j, m, ns
+
+    ierr = err_default
+    ns = max_members(V)
+    ! write(*, *) 'irec/i', ierr, ns, n
+    if (n.le.ns) then
+       isep = get_size_bytes(V, n)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=post)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=pre)
+    else
+       m = n
+       j = 0
+       isep = get_size_bytes(V, ns)
+       ! first
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, ns, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=pre)
+       ! middle
+       do
+          m = m - ns
+          j = j + ns
+          if (m.le.ns) exit
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+          if (ierr.eq.0) call sus_pad(ierr, u, V, ns, swap)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+       enddo
+       ! last
+       isep = get_size_bytes(V, m)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=post)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, m, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+    endif
+    ! stop
+    return
+  end subroutine sus_pad_irec_d
+  subroutine sus_pad_irec_a &
+       & (ierr, u, v, n, swap, pre, post)
+    use TOUZA_Std_env,only: get_size_bytes
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI32
+    integer,         intent(out)         :: ierr
+    integer,         intent(in)          :: u
+    character(len=*),intent(in)          :: V
+    integer,         intent(in)          :: n
+    logical,         intent(in),optional :: swap
+    logical,         intent(in),optional :: pre, post
+    integer(KIND=KISEP) :: isep
+    integer j, m, ns
+
+    ierr = err_default
+    ns = max_members(V)
+    ! write(*, *) 'irec/i', ierr, ns, n
+    if (n.le.ns) then
+       isep = get_size_bytes(V, n)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=post)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=pre)
+    else
+       m = n
+       j = 0
+       isep = get_size_bytes(V, ns)
+       ! first
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, ns, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=pre)
+       ! middle
+       do
+          m = m - ns
+          j = j + ns
+          if (m.le.ns) exit
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+          if (ierr.eq.0) call sus_pad(ierr, u, V, ns, swap)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+       enddo
+       ! last
+       isep = get_size_bytes(V, m)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=post)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, m, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+    endif
+    ! stop
+    return
+  end subroutine sus_pad_irec_a
+
+!!!_  - sus_record_mems_irec - get size of 32bit-marker record in terms of type unit
+  subroutine sus_record_mems_irec_i &
+       & (ierr, n, u, mold, swap, sub)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI32
+    integer,           intent(out)            :: ierr
+    integer,           intent(out)            :: n
+    integer,           intent(in)             :: u
+    integer(kind=KARG),intent(in)             :: mold
+    logical,           intent(in),   optional :: swap
+    logical,           intent(inout),optional :: sub
+    ! if no SUB or F: return total members
+    !    SUB=T:       return sub members.   set F when no more subrecords
+    integer ns
+    integer(KIND=KISEP) :: iseph, isepf
+    integer(KIND=KIOFS) :: jporg, jpos
+    logical bsub
+
+    ierr = 0
+    n = 0
+    bsub = choice(.FALSE., sub)
+
+    if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jporg)
+    if (ierr.eq.0) jpos = jporg
+    do
+       if (ierr.eq.0) then
+          call sus_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit
+          endif
+       endif
+       if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+       if (ierr.eq.0) then
+          jpos = jpos + conv_b2strm(abs(iseph))
+       endif
+       if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
+       if (ierr.eq.0) then
+          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.eq.0) then
+          ns = get_mems_bytes(abs(iseph), mold)
+          n = n + ns
+          if (iseph.ge.0) exit
+          if (bsub) exit
+       endif
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit
+       endif
+    enddo
+    if (present(sub)) then
+       if (ierr.eq.0) sub = iseph.lt.0
+    endif
+    if (ierr.eq.0) call sus_rseek(ierr, u, jporg, whence=WHENCE_ABS)
+  end subroutine sus_record_mems_irec_i
+  subroutine sus_record_mems_irec_l &
+       & (ierr, n, u, mold, swap, sub)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI64
+    integer,           intent(out)            :: ierr
+    integer,           intent(out)            :: n
+    integer,           intent(in)             :: u
+    integer(kind=KARG),intent(in)             :: mold
+    logical,           intent(in),   optional :: swap
+    logical,           intent(inout),optional :: sub
+    ! if no SUB or F: return total members
+    !    SUB=T:       return sub members.   set F when no more subrecords
+    integer ns
+    integer(KIND=KISEP) :: iseph, isepf
+    integer(KIND=KIOFS) :: jporg, jpos
+    logical bsub
+
+    ierr = 0
+    n = 0
+    bsub = choice(.FALSE., sub)
+
+    if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jporg)
+    if (ierr.eq.0) jpos = jporg
+    do
+       if (ierr.eq.0) then
+          call sus_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit
+          endif
+       endif
+       if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+       if (ierr.eq.0) then
+          jpos = jpos + conv_b2strm(abs(iseph))
+       endif
+       if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
+       if (ierr.eq.0) then
+          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.eq.0) then
+          ns = get_mems_bytes(abs(iseph), mold)
+          n = n + ns
+          if (iseph.ge.0) exit
+          if (bsub) exit
+       endif
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit
+       endif
+    enddo
+    if (present(sub)) then
+       if (ierr.eq.0) sub = iseph.lt.0
+    endif
+    if (ierr.eq.0) call sus_rseek(ierr, u, jporg, whence=WHENCE_ABS)
+  end subroutine sus_record_mems_irec_l
+  subroutine sus_record_mems_irec_f &
+       & (ierr, n, u, mold, swap, sub)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KFLT
+    integer,        intent(out)            :: ierr
+    integer,        intent(out)            :: n
+    integer,        intent(in)             :: u
+    real(kind=KARG),intent(in)             :: mold
+    logical,        intent(in),   optional :: swap
+    logical,        intent(inout),optional :: sub
+    ! if no SUB or F: return total members
+    !    SUB=T:       return sub members.   set F when no more subrecords
+    integer ns
+    integer(KIND=KISEP) :: iseph, isepf
+    integer(KIND=KIOFS) :: jporg, jpos
+    logical bsub
+
+    ierr = 0
+    n = 0
+    bsub = choice(.FALSE., sub)
+
+    if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jporg)
+    if (ierr.eq.0) jpos = jporg
+    do
+       if (ierr.eq.0) then
+          call sus_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit
+          endif
+       endif
+       if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+       if (ierr.eq.0) then
+          jpos = jpos + conv_b2strm(abs(iseph))
+       endif
+       if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
+       if (ierr.eq.0) then
+          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.eq.0) then
+          ns = get_mems_bytes(abs(iseph), mold)
+          n = n + ns
+          if (iseph.ge.0) exit
+          if (bsub) exit
+       endif
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit
+       endif
+    enddo
+    if (present(sub)) then
+       if (ierr.eq.0) sub = iseph.lt.0
+    endif
+    if (ierr.eq.0) call sus_rseek(ierr, u, jporg, whence=WHENCE_ABS)
+  end subroutine sus_record_mems_irec_f
+  subroutine sus_record_mems_irec_d &
+       & (ierr, n, u, mold, swap, sub)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KDBL
+    integer,        intent(out)            :: ierr
+    integer,        intent(out)            :: n
+    integer,        intent(in)             :: u
+    real(kind=KARG),intent(in)             :: mold
+    logical,        intent(in),   optional :: swap
+    logical,        intent(inout),optional :: sub
+    ! if no SUB or F: return total members
+    !    SUB=T:       return sub members.   set F when no more subrecords
+    integer ns
+    integer(KIND=KISEP) :: iseph, isepf
+    integer(KIND=KIOFS) :: jporg, jpos
+    logical bsub
+
+    ierr = 0
+    n = 0
+    bsub = choice(.FALSE., sub)
+
+    if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jporg)
+    if (ierr.eq.0) jpos = jporg
+    do
+       if (ierr.eq.0) then
+          call sus_read_isep(ierr, u, iseph, swap=swap)
+          if (is_eof_ss(ierr)) then
+             ierr = ERR_EOF
+             exit
+          endif
+       endif
+       if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+       if (ierr.eq.0) then
+          jpos = jpos + conv_b2strm(abs(iseph))
+       endif
+       if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
+       if (ierr.eq.0) then
+          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.eq.0) then
+          ns = get_mems_bytes(abs(iseph), mold)
+          n = n + ns
+          if (iseph.ge.0) exit
+          if (bsub) exit
+       endif
+       if (ierr.ne.0) then
+          ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+          exit
+       endif
+    enddo
+    if (present(sub)) then
+       if (ierr.eq.0) sub = iseph.lt.0
+    endif
+    if (ierr.eq.0) call sus_rseek(ierr, u, jporg, whence=WHENCE_ABS)
+  end subroutine sus_record_mems_irec_d
+
 !!!_  - sus_read_irec - read a record with 32bit-marker
   subroutine sus_read_irec_i &
        & (ierr, u, v, n, swap, sub)
@@ -1126,8 +1614,10 @@ contains
        if (ierr.eq.0) call sus_read(ierr, u, V(j+1:j+ns), ns, swap)
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
        if (ierr.eq.0) then
-          if (iseph.ge.0) exit
           if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.eq.0) then
+          if (iseph.ge.0) exit
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -1184,8 +1674,10 @@ contains
        if (ierr.eq.0) call sus_read(ierr, u, V(j+1:j+ns), ns, swap)
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
        if (ierr.eq.0) then
-          if (iseph.ge.0) exit
           if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.eq.0) then
+          if (iseph.ge.0) exit
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -1242,8 +1734,10 @@ contains
        if (ierr.eq.0) call sus_read(ierr, u, V(j+1:j+ns), ns, swap)
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
        if (ierr.eq.0) then
-          if (iseph.ge.0) exit
           if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.eq.0) then
+          if (iseph.ge.0) exit
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -1300,8 +1794,10 @@ contains
        if (ierr.eq.0) call sus_read(ierr, u, V(j+1:j+ns), ns, swap)
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
        if (ierr.eq.0) then
-          if (iseph.ge.0) exit
           if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.eq.0) then
+          if (iseph.ge.0) exit
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -1358,8 +1854,10 @@ contains
        if (ierr.eq.0) call sus_read(ierr, u, V(j+1:j+ns), ns, swap)
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
        if (ierr.eq.0) then
-          if (iseph.ge.0) exit
           if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       endif
+       if (ierr.eq.0) then
+          if (iseph.ge.0) exit
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -2186,6 +2684,98 @@ contains
     logical,         intent(in),optional :: swap
     write(UNIT=u, IOSTAT=ierr) V(1:n)
   end subroutine sus_write_a
+
+!!!_  - sus_pad - pad single data with optional byte-swapping
+  subroutine sus_pad_i &
+       & (ierr, u, v, n, swap)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,parameter :: KARG=KI32
+    integer,           intent(out)         :: ierr
+    integer,           intent(in)          :: u
+    integer(KIND=KARG),intent(in)          :: V
+    integer,           intent(in)          :: n
+    logical,           intent(in),optional :: swap
+    integer j
+    integer(kind=KARG) :: B
+    if (choice(.false.,swap)) then
+       B = sus_eswap(V)
+       write(UNIT=u, IOSTAT=ierr) (B, j=0, n-1)
+    else
+       write(UNIT=u, IOSTAT=ierr) (V, j=0, n-1)
+    endif
+  end subroutine sus_pad_i
+  subroutine sus_pad_l &
+       & (ierr, u, v, n, swap)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,parameter :: KARG=KI64
+    integer,           intent(out)         :: ierr
+    integer,           intent(in)          :: u
+    integer(KIND=KARG),intent(in)          :: V
+    integer,           intent(in)          :: n
+    logical,           intent(in),optional :: swap
+    integer j
+    integer(kind=KARG) :: B
+    if (choice(.false.,swap)) then
+       B = sus_eswap(V)
+       write(UNIT=u, IOSTAT=ierr) (B, j=0, n-1)
+    else
+       write(UNIT=u, IOSTAT=ierr) (V, j=0, n-1)
+    endif
+  end subroutine sus_pad_l
+  subroutine sus_pad_f &
+       & (ierr, u, v, n, swap)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,parameter :: KARG=KFLT, KBUF=KI32
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: u
+    real(KIND=KARG),intent(in)          :: V
+    integer,        intent(in)          :: n
+    logical,        intent(in),optional :: swap
+    integer j
+    integer(kind=KBUF) :: B(1)
+    if (choice(.false.,swap)) then
+       B = sus_eswap(TRANSFER(V, 0_KBUF, 1))
+       write(UNIT=u, IOSTAT=ierr) (B(1), j=0, n-1)
+    else
+       write(UNIT=u, IOSTAT=ierr) (V, j=0, n-1)
+    endif
+  end subroutine sus_pad_f
+  subroutine sus_pad_d &
+       & (ierr, u, v, n, swap)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,parameter :: KARG=KDBL, KBUF=KI64
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: u
+    real(KIND=KARG),intent(in)          :: V
+    integer,        intent(in)          :: n
+    logical,        intent(in),optional :: swap
+    integer j
+    integer(kind=KBUF) :: B(1)
+    if (choice(.false.,swap)) then
+       B = sus_eswap(TRANSFER(V, 0_KBUF, 1))
+       write(UNIT=u, IOSTAT=ierr) (B(1), j=0, n-1)
+    else
+       write(UNIT=u, IOSTAT=ierr) (V, j=0, n-1)
+    endif
+  end subroutine sus_pad_d
+  subroutine sus_pad_a &
+       & (ierr, u, v, n, swap)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,parameter :: KARG=KDBL, KBUF=KI64
+    integer,         intent(out)         :: ierr
+    integer,         intent(in)          :: u
+    character(len=*),intent(in)          :: V
+    integer,         intent(in)          :: n
+    logical,         intent(in),optional :: swap
+    integer j
+    write(UNIT=u, IOSTAT=ierr) (V, j = 0, n - 1)
+  end subroutine sus_pad_a
+
 !!!_  - sus_read - read data with optional byte-swapping
   subroutine sus_read_i &
        & (ierr, u, v, n, swap, pos)
@@ -2738,12 +3328,14 @@ program test_std_sus
 
   character(len=512) :: file = 'out.sus'
   character(len=512) :: file2 = 'out.sus2'
+  character(len=512) :: file3 = 'out.sus3'
 
   integer dims(4)
 
   integer kendi
   integer j
   integer mi, ml, mf, md, ma
+  logical swap
 
 101 format(A, ' = ', I0)
 
@@ -2836,6 +3428,13 @@ program test_std_sus
      if (ierr.eq.0) call sus_open(ierr, u, file2, ACTION='R')
      if (ierr.eq.0) call batch_slice_read(ierr, u, dims)
   endif
+
+  if (ierr.eq.0) call sus_open(ierr, u, file3, ACTION='W', STATUS='R')
+  do j = 0, 1
+     swap = j.ne.0
+     if (ierr.eq.0) call sus_pad_irec(ierr, u, 123, 6, swap)
+  enddo
+  if (ierr.eq.0) call sus_close(ierr, u, file3)
 
   if (ierr.eq.0) call finalize(ierr)
   write(*, 101) 'FINAL', ierr
