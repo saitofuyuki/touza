@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2022/09/20 22:00:39 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/05 14:19:30 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -171,7 +171,7 @@ module TOUZA_Trp_float
 
 # define __MDL__ 'f'
 !!!_  - common
-  character(len=256) :: tmsg
+  ! character(len=256) :: tmsg
 !!!_  - interfaces
 ! #if HAVE_FORTRAN_IEEE_ARITHMETIC
 !   interface catalogar_ieee

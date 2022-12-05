@@ -237,7 +237,10 @@ register_all ()
   register -n 2,1 -i call GEF      'A if A>=B, else MISS'
 
   # transform
-  register -n 2,1 -i call EXTR     'extraction'
+  register -n 2,1 -i call EXTR            'extraction'
+  register -n 2,1 -i call -p COOR CDIFF   'central difference'
+  register -n 2,1 -i call -p COOR FDIFF   'forward difference'
+  register -n 2,1 -i call -p COOR BDIFF   'backward difference'
 
   # reduction operation
   register -g reduction -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
