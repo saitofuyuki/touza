@@ -81,12 +81,11 @@ module TOUZA_Std_utl
   end interface parse_number
 
   interface join_list
-     module procedure join_list_i
-     module procedure join_list_a
+     module procedure join_list_i, join_list_a
   end interface join_list
 
   interface split_list
-     module procedure split_list_i
+     module procedure split_list_i, split_list_f, split_list_d
   end interface split_list
 
   interface find_first
@@ -1106,6 +1105,140 @@ contains
     endif
     return
   end subroutine split_list_i
+
+  subroutine split_list_f &
+       & (n, v, str, sep, lim, def, empty)
+    implicit none
+    integer,parameter :: KTGT=KFLT
+    integer,          intent(out)         :: n         ! number of elements or error code
+    real(kind=KTGT),  intent(inout)       :: v(0:)
+    character(len=*), intent(in)          :: str
+    character(len=*), intent(in)          :: sep
+    integer,          intent(in),optional :: lim       ! negative to count only; 0 to inifinite
+    real(kind=KTGT),  intent(in),optional :: def(0:*)  ! no bound check
+    logical,          intent(in),optional :: empty     ! allow empty element (ignored if def present)
+
+    integer jpos, lstr, lsep
+    integer js,   jh
+    integer nlim
+    integer jerr
+    logical eallow
+
+    jerr = 0
+    nlim = choice(+HUGE(0), lim)
+    eallow = choice(.TRUE., empty)
+
+    n = 0
+    jpos = 0
+    lstr = len_trim(str)
+    if (lstr.eq.0) return
+    lsep = max(1, len_trim(sep))   ! allow single blank only
+    js = 0
+    do
+       js = index(str(jpos+1:lstr), sep(1:lsep))
+       if (js.eq.0) then
+          jh = lstr
+       else
+          jh = jpos + js - 1
+       endif
+       if (jpos.lt.jh) then
+          if (nlim.ge.0) then
+             if (n.ge.nlim) then
+                jerr = -1
+             else
+                call parse_number(jerr, v(n), str(jpos+1:jh))
+             endif
+          endif
+          n = n + 1
+       else if (present(def)) then
+          if (nlim.ge.0) then
+             if (n.ge.nlim) then
+                jerr = -1
+             else
+                v(n) = def(n)
+             endif
+          endif
+          n = n + 1
+       else if (eallow) then
+          if (nlim.ge.0.and.n.ge.nlim) jerr = -1
+          n = n + 1
+       endif
+       jpos = jh + lsep
+       if (js.eq.0) exit
+       if (jerr.ne.0) exit
+    enddo
+    if (jerr.ne.0) then
+       n = ERR_INVALID_PARAMETER - ERR_MASK_STD_UTL
+    endif
+    return
+  end subroutine split_list_f
+
+  subroutine split_list_d &
+       & (n, v, str, sep, lim, def, empty)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,          intent(out)         :: n         ! number of elements or error code
+    real(kind=KTGT),  intent(inout)       :: v(0:)
+    character(len=*), intent(in)          :: str
+    character(len=*), intent(in)          :: sep
+    integer,          intent(in),optional :: lim       ! negative to count only; 0 to inifinite
+    real(kind=KTGT),  intent(in),optional :: def(0:*)  ! no bound check
+    logical,          intent(in),optional :: empty     ! allow empty element (ignored if def present)
+
+    integer jpos, lstr, lsep
+    integer js,   jh
+    integer nlim
+    integer jerr
+    logical eallow
+
+    jerr = 0
+    nlim = choice(+HUGE(0), lim)
+    eallow = choice(.TRUE., empty)
+
+    n = 0
+    jpos = 0
+    lstr = len_trim(str)
+    if (lstr.eq.0) return
+    lsep = max(1, len_trim(sep))   ! allow single blank only
+    js = 0
+    do
+       js = index(str(jpos+1:lstr), sep(1:lsep))
+       if (js.eq.0) then
+          jh = lstr
+       else
+          jh = jpos + js - 1
+       endif
+       if (jpos.lt.jh) then
+          if (nlim.ge.0) then
+             if (n.ge.nlim) then
+                jerr = -1
+             else
+                call parse_number(jerr, v(n), str(jpos+1:jh))
+             endif
+          endif
+          n = n + 1
+       else if (present(def)) then
+          if (nlim.ge.0) then
+             if (n.ge.nlim) then
+                jerr = -1
+             else
+                v(n) = def(n)
+             endif
+          endif
+          n = n + 1
+       else if (eallow) then
+          if (nlim.ge.0.and.n.ge.nlim) jerr = -1
+          n = n + 1
+       endif
+       jpos = jh + lsep
+       if (js.eq.0) exit
+       if (jerr.ne.0) exit
+    enddo
+    if (jerr.ne.0) then
+       n = ERR_INVALID_PARAMETER - ERR_MASK_STD_UTL
+    endif
+    return
+  end subroutine split_list_d
 
 !!!_  & find_first_range - find first occurence of array within range (inclusive)
   integer function find_first_range_i &
