@@ -1,10 +1,20 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2022/11/23 22:15:20 fuyuki NEWS>
+# Time-stamp: <2022/12/06 09:00:45 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.07.0 from 1.06.0
+** Major changes
+*** Design of URT MRT revised
+- URT MRT internal formats are revised, which is incompatible with
+  those of 1.06.0 or before.
+- Obsolete design (URTa) is no more supported.
+** Other changes
+- (chak) URT MRT tweaking introduced.
+- some primitive procedures improved.
 
 * Changes in 1.06.0 from 1.05.6
 - (chak) [incompatible] new shape special symbols '+' and '-'.
