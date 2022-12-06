@@ -1,7 +1,7 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2022/11/07 10:19:39 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/05 09:42:11 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -36,11 +36,12 @@ module TOUZA_Nio_std
   use TOUZA_Std_fun,only: new_unit
   use TOUZA_Std_sus,only: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
   use TOUZA_Std_sus,only: sus_open,         sus_close
-  use TOUZA_Std_sus,only: sus_write_irec,   sus_read_irec,  sus_skip_irec
+  use TOUZA_Std_sus,only: sus_write_irec,   sus_read_irec,  sus_skip_irec,    sus_pad_irec
   use TOUZA_Std_sus,only: sus_write_lrec,   sus_read_lrec,  sus_skip_lrec
   use TOUZA_Std_sus,only: sus_write_isep,   sus_read_isep
   use TOUZA_Std_sus,only: sus_write_lsep,   sus_read_lsep
   use TOUZA_Std_sus,only: sus_rseek,        sus_eswap
+  use TOUZA_Std_sus,only: max_members,      sus_record_mems_irec
 !!!_  - default
   implicit none
   private
@@ -84,11 +85,12 @@ module TOUZA_Nio_std
   public :: new_unit
   public :: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
   public :: sus_open,         sus_close
-  public :: sus_write_irec,   sus_read_irec,  sus_skip_irec
+  public :: sus_write_irec,   sus_read_irec,  sus_skip_irec,    sus_pad_irec
   public :: sus_write_lrec,   sus_read_lrec,  sus_skip_lrec
   public :: sus_write_isep,   sus_read_isep
   public :: sus_write_lsep,   sus_read_lsep
   public :: sus_rseek,        sus_eswap
+  public :: max_members,      sus_record_mems_irec
 contains
 !!!_ + common interfaces
 !!!_  & init

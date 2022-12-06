@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2022/11/18 09:25:19 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/05 14:49:23 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -64,7 +64,7 @@ module TOUZA_Nio_record
   integer,parameter,public :: GFMT_MR4  = GFMT_UR4 + GFMT_MASK
 
   integer,parameter,public :: GFMT_URY    = 32
-  integer,parameter,public :: GFMT_URYend = GFMT_URY + BIT_SIZE(0_KI32) - 1
+  integer,parameter,public :: GFMT_URYend = GFMT_URY + BIT_SIZE(0_KI32)
   integer,parameter,public :: GFMT_MRY    = GFMT_URY    + GFMT_MASK
   integer,parameter,public :: GFMT_MRYend = GFMT_URYend + GFMT_MASK
 
@@ -82,9 +82,7 @@ module TOUZA_Nio_record
   integer,parameter,public :: GFMT_MI8  = GFMT_UI8 + GFMT_MASK
 
   integer,parameter,public :: GFMT_URT     = 256
-  integer,parameter,public :: GFMT_URTend  = GFMT_URT + 64
   integer,parameter,public :: GFMT_MRT     = GFMT_URT    + GFMT_MASK
-  integer,parameter,public :: GFMT_MRTend  = GFMT_URTend + GFMT_MASK
 
   integer,parameter,public :: GFMT_END     = GFMT_MASK * 2
 !!!_    * URT details
@@ -97,16 +95,19 @@ module TOUZA_Nio_record
   integer,parameter,public :: PROP_URT_CODES    = 5 /* kcode switches */
   integer,parameter,public :: PROP_URT_BREAK    = 6 /* array break */
 
+  ! positive reserved for explicit chunk size
   integer,parameter,public :: GFMT_URT_BREAK_NONE  = 0
-  integer,parameter,public :: GFMT_URT_BREAK_Z     = 1
-  integer,parameter,public :: GFMT_URT_BREAK_PROC  = 2
-  integer,parameter,public :: GFMT_URT_BREAK_ZPROC = 3
+  integer,parameter,public :: GFMT_URT_BREAK_LEVEL = -1
+  integer,parameter,public :: GFMT_URT_BREAK_PROC  = -2
+  integer,parameter,public :: GFMT_URT_BREAK_LPROC = -3
 
-  integer,parameter,public :: XID_URT = 1632916053 ! 'URTa'
+  ! integer,parameter,public :: XID_URT = 1632916053 ! 'URTa'
+  integer,parameter,public :: XID_URT = 1649693269 ! 'URTb'
   ! integer,parameter,public :: XID_MRT = 1632916045 ! 'MRTa'
   integer,parameter,public :: XTRP_ID = 0  ! index to store nio/urt i
   integer,parameter,public :: XTRP_NX = 1  ! index to store nio/urt number of extra properties
 
+  integer,parameter,public :: lopts = 6
 !!!_  - private parameter
   integer,parameter :: GPROP_NUMX  = 1
   integer,parameter :: GPROP_NUMY  = 2
@@ -130,6 +131,8 @@ module TOUZA_Nio_record
   integer,save :: bodr_wnative = BODR_ASSUME_SYSTEM
 
   integer,save :: def_lazy_size = -1   ! lazy level for size parser
+
+  integer,save :: lrec_urt = 0
 !!!_  - private static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -283,7 +286,7 @@ module TOUZA_Nio_record
   public parse_header_size
   public get_header_cprop,   put_header_cprop
   public get_switch
-  public set_urt_defs
+  public set_urt_defs,       parse_urt_options,  show_urt_options
   public switch_urt_diag
 
 !!!_  - public shared
@@ -299,7 +302,7 @@ contains
        & (ierr,   u,      levv,  mode,  stdv,  &
        &  bodrw,  krectw, klenc, kldec, knenc, kndec, lazy, &
        &  vmiss,  utime,  csign, msign, icomm)
-    use TOUZA_Nio_std,   only: ns_init=>init, choice, get_size_bytes, KDBL
+    use TOUZA_Nio_std,   only: ns_init=>init, choice, get_size_bytes, KDBL, max_members
     use TOUZA_Nio_header,only: nh_init=>init, litem, nitem
     use TOUZA_Trp,       only: trp_init=>init
     implicit none
@@ -351,6 +354,7 @@ contains
           if (ierr.eq.0) then
              call set_default_header(ierr, vmiss, utime, csign, msign)
           endif
+          if (ierr.eq.0) lrec_urt = max_members(1)
        endif
        def_lazy_size = max(-1, min(+1, choice(def_lazy_size, lazy)))
        init_counts = init_counts + 1
@@ -390,6 +394,9 @@ contains
              if (is_msglev_info(lv)) then
                 call msg('(''standard heeder length = '', I0, 1x, I0, 1x, I0)', &
                      &   (/nlhead_std, nisep, nlsep/), __MDL__, utmp)
+             endif
+             if (is_msglev_info(lv)) then
+                call msg('(''urt limit record elements = '', I0)', (/lrec_urt/), __MDL__, utmp)
              endif
           endif
        endif
@@ -1063,20 +1070,20 @@ contains
        nk = kaxs(3)
        call get_data_urc &
             & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
-    case (GFMT_URY:GFMT_URYend)
+    case (GFMT_URY:GFMT_URYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call get_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_MRY:GFMT_MRYend)
+    case (GFMT_MRY:GFMT_MRYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call get_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_URT:GFMT_URTend)
+    case (GFMT_URT)
        call get_data_urt &
             & (ierr, d, n, kaxs, u, krect, vmiss, kfmt, kopts)
-    case (GFMT_MRT:GFMT_MRTend)
+    case (GFMT_MRT)
        call get_data_mrt &
             & (ierr, d, n, kaxs, u, krect, vmiss, kfmt, kopts)
     case default
@@ -1127,12 +1134,12 @@ contains
        nk = kaxs(3)
        call get_data_urc &
             & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
-    case (GFMT_URY:GFMT_URYend)
+    case (GFMT_URY:GFMT_URYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call get_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_MRY:GFMT_MRYend)
+    case (GFMT_MRY:GFMT_MRYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call get_data_mry &
@@ -1185,12 +1192,12 @@ contains
        nk = kaxs(3)
        call get_data_urc &
             & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
-    case (GFMT_URY:GFMT_URYend)
+    case (GFMT_URY:GFMT_URYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call get_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_MRY:GFMT_MRYend)
+    case (GFMT_MRY:GFMT_MRYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call get_data_mry &
@@ -1242,22 +1249,22 @@ contains
        call put_data_mi4(ierr, d, n, u, krect, vmiss)
     case (GFMT_URC, GFMT_URC2)
        ierr = ERR_DEPRECATED_FORMAT - ERR_MASK_NIO_RECORD
-    case (GFMT_URY:GFMT_URYend)
+    case (GFMT_URY:GFMT_URYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call put_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_MRY:GFMT_MRYend)
+    case (GFMT_MRY:GFMT_MRYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call put_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_URT:GFMT_URTend)
+    case (GFMT_URT)
        call put_data_urt_plain &
-            & (ierr, d, n, u, krect, vmiss, kfmt, kopts)
-    case (GFMT_MRT:GFMT_MRTend)
+            & (ierr, d, n, u, krect, vmiss, kfmt, kaxs, kopts)
+    case (GFMT_MRT)
        call put_data_mrt_plain &
-            & (ierr, d, n, u, krect, vmiss, kfmt, kopts)
+            & (ierr, d, n, u, krect, vmiss, kfmt, kaxs, kopts)
     case default
        ierr = ERR_INVALID_SWITCH - ERR_MASK_NIO_RECORD
     end select
@@ -1303,12 +1310,12 @@ contains
        call put_data_mi4(ierr, d, n, u, krect, vmiss)
     case (GFMT_URC, GFMT_URC2)
        ierr = ERR_DEPRECATED_FORMAT - ERR_MASK_NIO_RECORD
-    case (GFMT_URY:GFMT_URYend)
+    case (GFMT_URY:GFMT_URYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call put_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_MRY:GFMT_MRYend)
+    case (GFMT_MRY:GFMT_MRYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call put_data_mry &
@@ -1358,12 +1365,12 @@ contains
        call put_data_mi4(ierr, d, n, u, krect, vmiss)
     case (GFMT_URC, GFMT_URC2)
        ierr = ERR_DEPRECATED_FORMAT - ERR_MASK_NIO_RECORD
-    case (GFMT_URY:GFMT_URYend)
+    case (GFMT_URY:GFMT_URYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call put_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_MRY:GFMT_MRYend)
+    case (GFMT_MRY:GFMT_MRYend-1)
        nh = kaxs(1) * kaxs(2)
        nk = kaxs(3)
        call put_data_mry &
@@ -1487,13 +1494,13 @@ contains
           else
              n = n * 4
           endif
-       case (GFMT_URY:GFMT_URYend)
+       case (GFMT_URY:GFMT_URYend-1)
           n = 2
-       case (GFMT_MRY:GFMT_MRYend)
+       case (GFMT_MRY:GFMT_MRYend-1)
           n = 6
-       case (GFMT_URT:GFMT_URTend)
+       case (GFMT_URT)
           n = 1
-       case (GFMT_MRT:GFMT_MRTend)
+       case (GFMT_MRT)
           n = 1
        case default
           jerr = ERR_UNKNOWN_FORMAT
@@ -2526,63 +2533,83 @@ contains
   end subroutine put_data_mry_i
 
 !!!_ + gtool-3 discarded extension
-!!!_  - URJ
-!!!_  - URZ
+!!!_  - JRn
+!!!_  - ZRn
 !!!_  - URS
 
 !!!_ + *RT system (gtool-3 extension)
 !!!_  - put_data_mrt_plain - URY:TOUZA/Trapiche plain format (full bundle)
   subroutine put_data_mrt_plain_d &
        & (ierr, &
-       &  d, n, u, krect, vmiss, kfmt, kopts)
+       &  d, n, u, krect, vmiss, kfmt, kaxs, kopts)
     use TOUZA_Trp,only: suggest_filling
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(in)  :: d(*)
+    real(kind=KARG), intent(in)  :: d(0:*)
     integer,         intent(in)  :: n
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: kaxs(*)
     integer,optional,intent(in)  :: kopts(:)
 
     integer mbits, xbits, xtop, xbtm
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
 
+    integer j, m
     integer(kind=KISRC) :: mb
-    integer(kind=KISRC) :: icom(n)
+    integer(kind=KISRC) :: icom(0:n-1)
     real(kind=KARG)     :: buf(n)
-    integer ncom
+    integer ncom,  na
     integer kpack, kcode
+    logical pre, post
+    integer nbreak
 
     ierr = err_default
 
     kcode = def_encode_trapiche
-    mbits = kfmt - GFMT_MRT
     if (ierr.eq.0) then
-       call parse_urt_options &
-            & (ierr, mbits, xbits, xtop, xbtm, kcode, mlim, kopts)
+       call extract_urt_options &
+            & (ierr, mbits, xbits, xtop, xbtm, nbreak, kcode, mlim, kaxs, kopts)
     endif
 
-    kpack = suggest_filling(mbits, n, def_encode_trapiche)
+    if (ierr.eq.0) call put_data_urt_cache(ierr, n, nbreak, u, krect)
 
-    call mask_encode &
-         & (ierr, mb,   ncom,   icom,   buf, &
-         &  d,    n,    vmiss,  kpack)
-    if (ierr.eq.0) icom(ncom+1) = kpack
-    if (ierr.eq.0) call put_data_record(ierr, icom, ncom+1, u, krect, post=.true.)
     if (ierr.eq.0) then
-       call put_data_urt_core &
-            & (ierr,  &
-            &  buf,   mb,    u,     krect, .true., .false., &
-            &  vmiss, mbits, xbits, xtop,  xbtm,   kcode)
+       do j = 0, n - 1, nbreak
+          m = min(nbreak, n - j)
+          pre  = .TRUE.
+          post = j + m .lt. n
+          kpack = suggest_filling(mbits, m, def_encode_trapiche)
+          if (ierr.eq.0) then
+             call mask_encode &
+                  & (ierr, mb,   ncom,   icom(2:), buf,   &
+                  &  d(j:j+m-1), m,      vmiss,    kpack)
+          endif
+          if (ierr.eq.0) then
+             na = ncom + 2
+             icom(0) = m
+             icom(1) = kpack
+             ! write(*, *) na, ncom, m, kpack, icom(0:na-1)
+          endif
+          ! write(*, *) kpack, ncom
+          ! if (ierr.eq.0) call put_data_record(ierr, icom, ncom+1, u, krect, post=.true.)
+          ! write(*, *) j, nbreak, m, mb, ncom
+          if (ierr.eq.0) then
+             call put_data_urt_core &
+                  & (ierr,  &
+                  &  buf,   mb,    u,     krect, pre,   post, &
+                  &  vmiss, mbits, xbits, xtop,  xbtm,  kcode,   icom(0:na-1))
+          endif
+       enddo
     endif
     return
   end subroutine put_data_mrt_plain_d
   subroutine put_data_mrt_plain_f &
        & (ierr, &
-       &  d, n, u, krect, vmiss, kfmt, kopts)
+       &  d, n, u, krect, vmiss, kfmt, kaxs, kopts)
     use TOUZA_Trp,only: suggest_filling
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
@@ -2593,38 +2620,55 @@ contains
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: kaxs(*)
     integer,optional,intent(in)  :: kopts(:)
 
     integer mbits, xbits, xtop, xbtm
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
 
+    integer j, m
     integer(kind=KISRC) :: mb
-    integer(kind=KISRC) :: icom(n)
+    integer(kind=KISRC) :: icom(0:n-1)
     real(kind=KARG)     :: buf(n)
-    integer ncom
+    integer ncom,  na
     integer kpack, kcode
+    logical pre, post
+    integer nbreak
 
     ierr = err_default
 
     kcode = def_encode_trapiche
-    mbits = kfmt - GFMT_MRT
     if (ierr.eq.0) then
-       call parse_urt_options &
-            & (ierr, mbits, xbits, xtop, xbtm, kcode, mlim, kopts)
+       call extract_urt_options &
+            & (ierr, mbits, xbits, xtop, xbtm, nbreak, kcode, mlim, kaxs, kopts)
     endif
 
-    kpack = suggest_filling(mbits, n, def_encode_trapiche)
+    if (ierr.eq.0) call put_data_urt_cache(ierr, n, nbreak, u, krect)
 
-    call mask_encode &
-         & (ierr, mb,   ncom,   icom,   buf, &
-         &  d,    n,    vmiss,  kpack)
-    if (ierr.eq.0) icom(ncom+1) = kpack
-    if (ierr.eq.0) call put_data_record(ierr, icom, ncom+1, u, krect, post=.true.)
     if (ierr.eq.0) then
-       call put_data_urt_core &
-            & (ierr,  &
-            &  buf,   mb,    u,     krect, .true., .false., &
-            &  vmiss, mbits, xbits, xtop,  xbtm,   kcode)
+       do j = 0, n - 1, nbreak
+          m = min(nbreak, n - j)
+          pre  = .TRUE.
+          post = j + m .lt. n
+          kpack = suggest_filling(mbits, m, def_encode_trapiche)
+          if (ierr.eq.0) then
+             call mask_encode &
+                  & (ierr, mb,   ncom, icom(2:), buf, &
+                  &  d(j:j+m-1), m,    vmiss,    kpack)
+          endif
+          if (ierr.eq.0) then
+             na = ncom + 2
+             icom(0) = m
+             icom(1) = kpack
+          endif
+          ! if (ierr.eq.0) call put_data_record(ierr, icom, ncom+1, u, krect, post=.true.)
+          if (ierr.eq.0) then
+             call put_data_urt_core &
+                  & (ierr,  &
+                  &  buf,   mb,    u,     krect, pre,    post,    &
+                  &  vmiss, mbits, xbits, xtop,  xbtm,   kcode,   icom(0:na-1))
+          endif
+       enddo
     endif
     return
   end subroutine put_data_mrt_plain_f
@@ -2632,41 +2676,59 @@ contains
 !!!_  - put_data_urt_plain - URY:TOUZA/Trapiche plain format (full bundle)
   subroutine put_data_urt_plain_d &
        & (ierr, &
-       &  d, n, u, krect, vmiss, kfmt, kopts)
+       &  d, n, u, krect, vmiss, kfmt, kaxs, kopts)
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(in)  :: d(*)
+    real(kind=KARG), intent(in)  :: d(0:*)
     integer,         intent(in)  :: n
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: kaxs(*)
     integer,optional,intent(in)  :: kopts(:)
 
+    integer j, m
     integer mbits, xbits, xtop, xbtm
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
     integer kcode
+    logical pre, post
+    integer nbreak
 
     ierr = err_default
-    mbits = kfmt - GFMT_URT
     kcode = def_encode_trapiche
+    ! write(*, *) 'in', ierr
     if (ierr.eq.0) then
-       call parse_urt_options &
-            & (ierr, mbits, xbits, xtop, xbtm, kcode, mlim, kopts)
+       call extract_urt_options &
+            & (ierr, mbits, xbits, xtop, xbtm, nbreak, kcode, mlim, kaxs, kopts)
     endif
+    ! write(*, *) 'extract', ierr
+
+    if (ierr.eq.0) call put_data_urt_cache(ierr, n, nbreak, u, krect)
+    ! write(*, *) 'cache', ierr
 
     if (ierr.eq.0) then
-       call put_data_urt_core &
-            & (ierr,  &
-            &  d,     n,     u,     krect, .false., .false., &
-            &  vmiss, mbits, xbits, xtop,  xbtm,    kcode)
+       do j = 0, n - 1, nbreak
+          m = min(nbreak, n - j)
+          ! pre  = j.gt.0
+          pre  = .TRUE.
+          post = j + m .lt. n
+          ! write(*, *) j, nbreak, m, n
+          if (ierr.eq.0) then
+             call put_data_urt_core &
+                  & (ierr,  &
+                  &  d(j:j+m-1),   m,     u,     krect, pre,  post, &
+                  &  vmiss, mbits, xbits, xtop,  xbtm,  kcode)
+          endif
+       enddo
     endif
+    ! write(*, *) 'data', ierr
     return
   end subroutine put_data_urt_plain_d
   subroutine put_data_urt_plain_f &
        & (ierr, &
-       &  d, n, u, krect, vmiss, kfmt, kopts)
+       &  d, n, u, krect, vmiss, kfmt, kaxs, kopts)
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
     integer,         intent(out) :: ierr
@@ -2676,28 +2738,109 @@ contains
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: kaxs(*)
     integer,optional,intent(in)  :: kopts(:)
 
+    integer j, m
     integer mbits, xbits, xtop, xbtm
     integer,parameter :: mlim = DIGITS(0.0_KRSRC) - 1
     integer kcode
+    logical pre, post
+    integer nbreak
 
     ierr = err_default
-    mbits = kfmt - GFMT_URT
     kcode = def_encode_trapiche
     if (ierr.eq.0) then
-       call parse_urt_options &
-            & (ierr, mbits, xbits, xtop, xbtm, kcode, mlim, kopts)
+       call extract_urt_options &
+            & (ierr, mbits, xbits, xtop, xbtm, nbreak, kcode, mlim, kaxs, kopts)
     endif
+    if (ierr.eq.0) call put_data_urt_cache(ierr, n, nbreak, u, krect)
 
     if (ierr.eq.0) then
-       call put_data_urt_core &
-            & (ierr,  &
-            &  d,     n,     u,     krect, .false., .false., &
-            &  vmiss, mbits, xbits, xtop,  xbtm,    kcode)
+       do j = 0, n - 1, nbreak
+          m = min(nbreak, n - j)
+          ! pre  = j.gt.0
+          pre  = .TRUE.
+          post = j + m .lt. n
+          if (ierr.eq.0) then
+             call put_data_urt_core &
+                  & (ierr,  &
+                  &  d(j:j+m-1),   m,     u,     krect, pre,  post, &
+                  &  vmiss, mbits, xbits, xtop,  xbtm,  kcode)
+          endif
+       enddo
     endif
     return
   end subroutine put_data_urt_plain_f
+
+!!!_  - put_data_urt_cache
+  subroutine put_data_urt_cache &
+       & (ierr,  &
+       &  n,     nbreak,  u,  krect)
+    use TOUZA_Nio_std,only: sus_pad_irec
+    implicit none
+    integer,parameter :: KISRC=KI32
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: n     ! d size
+    integer,intent(in)  :: nbreak
+    integer,intent(in)  :: u
+    integer,intent(in)  :: krect
+    integer mem
+    integer,parameter :: mpr = 2
+    integer(kind=KISRC) :: fill = 0
+    logical swap, lrec
+
+    ierr = err_default
+    swap = IAND(krect, REC_SWAP).ne.0
+    lrec = IAND(krect, REC_LSEP).ne.0
+    if (lrec) then
+       ierr = ERR_NOT_IMPLEMENTED - ERR_MASK_NIO_RECORD
+       return
+    endif
+    if (ierr.eq.0) then
+       mem = (n - 1) / nbreak + 1
+       mem = min(max(1, mem), lrec_urt / mpr) * mpr
+       call sus_pad_irec(ierr, u, fill, mem, swap, .FALSE., .TRUE.)
+    endif
+    return
+  end subroutine put_data_urt_cache
+
+!!!_  - get_data_urt_cache
+  subroutine get_data_urt_cache &
+       & (ierr,  &
+       &  cache, mem, n, u,  krect)
+    use TOUZA_Nio_std,only: sus_record_mems_irec, sus_read_irec
+    implicit none
+    integer,parameter :: KISRC=KI32
+    integer,            intent(out) :: ierr
+    integer(kind=KISRC),intent(out) :: cache(*)
+    integer,            intent(out) :: mem
+    integer,            intent(in)  :: n
+    integer,            intent(in)  :: u
+    integer,            intent(in)  :: krect
+    integer,parameter :: mpr = 2
+    integer ni
+    logical swap, lrec, sub
+
+    ierr = err_default
+    swap = IAND(krect, REC_SWAP).ne.0
+    lrec = IAND(krect, REC_LSEP).ne.0
+    if (lrec) then
+       ierr = ERR_NOT_IMPLEMENTED - ERR_MASK_NIO_RECORD
+       return
+    endif
+    sub = .TRUE.
+    if (ierr.eq.0) call sus_record_mems_irec(ierr, mem, u, cache(1), swap, sub)
+    if (ierr.eq.0) then
+       mem = mem / mpr
+       ni = mem
+       if (n.gt.0) ni = min(ni, n)
+       sub = .TRUE.
+       call sus_read_irec(ierr, u, cache, ni, swap, sub)
+    endif
+    ! write(*, *) 'cache', ierr, mem, ni
+    return
+  end subroutine get_data_urt_cache
 
 !!!_  - put_data_urt_core
   subroutine put_data_urt_core_d &
@@ -2722,8 +2865,8 @@ contains
     integer,         intent(in)  :: kcode
     integer,optional,intent(in)  :: kapp(0:)
 
-    integer(kind=KISRC) :: ibagaz(0:2*n)
-    integer nbgz, napp, jp
+    integer(kind=KISRC) :: ibagaz(0:2*n+KB_HEAD)
+    integer nbgz, napp
 
     ierr = err_default
     if (present(kapp)) then
@@ -2743,18 +2886,17 @@ contains
     if (ierr.eq.0) call guardar_extra(ierr, ibagaz, XTRP_ID, XID_URT)
     if (ierr.eq.0) call guardar_extra(ierr, ibagaz, XTRP_NX, napp)
     if (ierr.eq.0) then
-       nbgz = retrieve_nbgz(ibagaz)
-       if (napp.gt.0) then
-          jp = KB_HEAD + nbgz
-          ibagaz(jp:jp+napp-1) = kapp(0:napp-1)
-          nbgz = nbgz + napp
-       endif
-    endif
-    if (ierr.eq.0) then
        call put_data_record &
             & (ierr, ibagaz(0:KB_HEAD-1), KB_HEAD, u, krect, pre=pre, post=.TRUE.)
     endif
     if (ierr.eq.0) then
+       if (napp.gt.0) then
+          call put_data_record &
+               & (ierr, kapp(0:napp-1), napp, u, krect, pre=.TRUE., post=.TRUE.)
+       endif
+    endif
+    if (ierr.eq.0) then
+       nbgz = retrieve_nbgz(ibagaz)
        call put_data_record &
             & (ierr, ibagaz(KB_HEAD:KB_HEAD+nbgz-1), nbgz, u, krect, pre=.TRUE., post=post)
     endif
@@ -2785,8 +2927,8 @@ contains
     integer,         intent(in)  :: kcode
     integer,optional,intent(in)  :: kapp(0:)
 
-    integer(kind=KISRC) :: ibagaz(0:2*n)
-    integer nbgz, napp, jp
+    integer(kind=KISRC) :: ibagaz(0:2*n+KB_HEAD)
+    integer nbgz, napp
     real(kind=KRSRC) :: rmiss
 
     ierr = err_default
@@ -2809,15 +2951,14 @@ contains
     if (ierr.eq.0) call guardar_extra(ierr, ibagaz, XTRP_NX, napp)
     if (ierr.eq.0) then
        nbgz = retrieve_nbgz(ibagaz)
-       if (napp.gt.0) then
-          jp = KB_HEAD + nbgz
-          ibagaz(jp:jp+napp-1) = kapp(0:napp-1)
-          nbgz = nbgz + napp
-       endif
-    endif
-    if (ierr.eq.0) then
        call put_data_record &
             & (ierr, ibagaz(0:KB_HEAD-1), KB_HEAD, u, krect, pre=pre, post=.TRUE.)
+    endif
+    if (ierr.eq.0) then
+       if (napp.gt.0) then
+          call put_data_record &
+               & (ierr, kapp(0:napp-1), napp, u, krect, pre=.TRUE., post=.TRUE.)
+       endif
     endif
     if (ierr.eq.0) then
        call put_data_record &
@@ -2838,7 +2979,7 @@ contains
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
+    real(kind=KARG), intent(out) :: d(0:*)
     integer,         intent(in)  :: n, kaxs(*)
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
@@ -2846,35 +2987,72 @@ contains
     integer,         intent(in)  :: kfmt
     integer,optional,intent(out) :: kopts(:)
 
-    integer(kind=KISRC) :: icom(n)
+    integer(kind=KISRC) :: icom(0:n-1)
     real(kind=KRSRC)    :: buf(n)
     integer(kind=KISRC),parameter :: khld = 0_KISRC
-    integer ncom
+    integer ncom, na
     logical sub
     integer kpack
+    integer jv, mv, nv, mp
+    integer,parameter :: lcd = 2
+    integer cdummy(lcd)
+    integer cmem
 
     ierr = err_default
 
-    sub = .TRUE.
-    ncom = count_packed(1, n, khld)
+    if (ierr.eq.0) call get_data_urt_cache(ierr, cdummy, cmem, lcd, u, krect)
+
+    nv = n
+    jv = 0
+
+    do
+       if (ierr.eq.0) then
+          sub = .TRUE.
+          call get_data_urt_core &
+               & (ierr, &
+               &  buf,   mv, nv,  u, krect,   sub,  &
+               &  vmiss, def_decode_trapiche, kopts, napp=na, kapp=icom)
+       endif
+       if (ierr.eq.0) then
+          ncom = na - 2
+          mp = icom(0)
+          kpack = icom(1)
+          kpack = suggest_filling(1, mp, kcode=def_decode_trapiche, kfill=kpack)
+
+          call mask_decode &
+               & (ierr,  d(jv:jv+mp-1), mp, buf, icom(2:), vmiss, kpack)
+       endif
+       if (ierr.eq.0) then
+          jv = jv + mp
+          nv = nv - mp
+          if (nv.eq.0) exit
+          if (nv.lt.0) then
+             ierr = ERR_BROKEN_RECORD - ERR_MASK_NIO_RECORD
+          endif
+          if (.not.sub) ierr = ERR_BROKEN_RECORD - ERR_MASK_NIO_RECORD
+       endif
+       if (ierr.ne.0) exit
+    enddo
+    ! sub = .TRUE.
     ! icom(ncom+1) stores filling method
-    if (ierr.eq.0) call get_data_record(ierr, icom, ncom+1, u, krect, sub=sub)
-    if (ierr.eq.0 .and. .NOT.sub) then
-       ierr = -1
-    endif
-    if (ierr.eq.0) then
-       sub = .FALSE.
-       call get_data_urt_core &
-            & (ierr, &
-            &  buf,   n,  u, krect,  sub,  &
-            &  vmiss, def_decode_trapiche, kopts)
-    endif
-    if (ierr.eq.0) then
-       kpack = icom(ncom + 1)
-       kpack = suggest_filling(1, n, kcode=def_decode_trapiche, kfill=kpack)
-       call mask_decode &
-            & (ierr,  d, n, buf, icom, vmiss, kpack)
-    endif
+    ! if (ierr.eq.0) call get_data_record(ierr, icom, ncom+1, u, krect, sub=sub)
+    ! if (ierr.eq.0 .and. .NOT.sub) then
+    !    ierr = -1
+    ! endif
+    ! if (ierr.eq.0) then
+    !    sub = .TRUE.
+    !    call get_data_urt_core &
+    !         & (ierr, &
+    !         &  buf,   mv, nv,  u, krect,  sub,  &
+    !         &  vmiss, def_decode_trapiche, kopts, napp=na, kapp=icom)
+    ! endif
+    ! if (ierr.eq.0) then
+    !    ncom = na - 2
+    !    kpack = icom(na+2)
+    !    kpack = suggest_filling(1, mv, kcode=def_decode_trapiche, kfill=kpack)
+    !    call mask_decode &
+    !         & (ierr,  d, nv, buf, icom, vmiss, kpack)
+    ! endif
     return
   end subroutine get_data_mrt_d
   subroutine get_data_mrt_f &
@@ -2886,7 +3064,7 @@ contains
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
+    real(kind=KARG), intent(out) :: d(0:*)
     integer,         intent(in)  :: n, kaxs(*)
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
@@ -2894,35 +3072,75 @@ contains
     integer,         intent(in)  :: kfmt
     integer,optional,intent(out) :: kopts(:)
 
-    integer(kind=KISRC) :: icom(n)
+    integer(kind=KISRC) :: icom(0:n-1)
     real(kind=KRSRC)    :: buf(n)
     integer(kind=KISRC),parameter :: khld = 0_KISRC
-    integer ncom
+    integer ncom, na
     logical sub
     integer kpack
+    integer jv, mv, nv, mp
+    integer,parameter :: lcd = 2
+    integer cdummy(lcd)
+    integer cmem
 
     ierr = err_default
 
-    sub = .TRUE.
-    ncom = count_packed(1, n, khld)
-    ! icom(ncom+1) stores filling method
-    if (ierr.eq.0) call get_data_record(ierr, icom, ncom+1, u, krect, sub=sub)
-    if (ierr.eq.0 .and. .NOT.sub) then
-       ierr = -1
-    endif
-    if (ierr.eq.0) then
-       sub = .FALSE.
-       call get_data_urt_core &
-            & (ierr, &
-            &  buf,   n,  u, krect,  sub,  &
-            &  vmiss, def_decode_trapiche, kopts)
-    endif
-    if (ierr.eq.0) then
-       kpack = icom(ncom + 1)
-       kpack = suggest_filling(1, n, kcode=def_decode_trapiche, kfill=kpack)
-       call mask_decode &
-            & (ierr,  d, n, buf, icom, vmiss, kpack)
-    endif
+    if (ierr.eq.0) call get_data_urt_cache(ierr, cdummy, cmem, lcd, u, krect)
+
+    nv = n
+    jv = 0
+
+    do
+       if (ierr.eq.0) then
+          sub = .TRUE.
+          call get_data_urt_core &
+               & (ierr, &
+               &  buf,   mv, nv,  u, krect,   sub,  &
+               &  vmiss, def_decode_trapiche, kopts, napp=na, kapp=icom)
+       endif
+       if (ierr.eq.0) then
+          ncom = na - 2
+          mp = icom(0)
+          kpack = icom(1)
+          kpack = suggest_filling(1, mp, kcode=def_decode_trapiche, kfill=kpack)
+
+          call mask_decode &
+               & (ierr,  d(jv:jv+mp-1), mp, buf, icom(2:), vmiss, kpack)
+       endif
+       if (ierr.eq.0) then
+          jv = jv + mp
+          nv = nv - mp
+          if (nv.eq.0) exit
+          if (nv.lt.0) then
+             ierr = ERR_BROKEN_RECORD - ERR_MASK_NIO_RECORD
+          endif
+          if (.not.sub) ierr = ERR_BROKEN_RECORD - ERR_MASK_NIO_RECORD
+       endif
+       if (ierr.ne.0) exit
+    enddo
+
+    ! sub = .TRUE.
+    ! ncom = count_packed(1, n, khld)
+    ! nv = n
+    ! jv = 0
+    ! ! icom(ncom+1) stores filling method
+    ! if (ierr.eq.0) call get_data_record(ierr, icom, ncom+1, u, krect, sub=sub)
+    ! if (ierr.eq.0 .and. .NOT.sub) then
+    !    ierr = -1
+    ! endif
+    ! if (ierr.eq.0) then
+    !    sub = .TRUE.
+    !    call get_data_urt_core &
+    !         & (ierr, &
+    !         &  buf,   mv, nv, u, krect,  sub,  &
+    !         &  vmiss, def_decode_trapiche, kopts)
+    ! endif
+    ! if (ierr.eq.0) then
+    !    kpack = icom(ncom + 1)
+    !    kpack = suggest_filling(1, mv, kcode=def_decode_trapiche, kfill=kpack)
+    !    call mask_decode &
+    !         & (ierr,  d, mv, buf, icom, vmiss, kpack)
+    ! endif
     return
   end subroutine get_data_mrt_f
 
@@ -2934,7 +3152,7 @@ contains
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
+    real(kind=KARG), intent(out) :: d(0:*)
     integer,         intent(in)  :: n, kaxs(*)
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
@@ -2945,17 +3163,51 @@ contains
     integer,optional,intent(out) :: kapp(0:)
 
     logical sub
+    integer jv,   mv,   nv
+    integer japp, ma
+    integer,parameter :: lcd = 2
+    integer cdummy(lcd)
+    integer cmem
 
     ierr = err_default
 
-    sub = .FALSE.
+    if (ierr.eq.0) call get_data_urt_cache(ierr, cdummy, cmem, lcd, u, krect)
 
-    if (ierr.eq.0) then
-       call get_data_urt_core &
-            & (ierr, &
-            &  d,     n,      u,    krect,  sub, &
-            &  vmiss, def_decode_trapiche,     &
-            &  kopts, napp,   kapp)
+    jv = 0
+    nv = n
+    japp = 0
+    sub = .TRUE.
+    do
+       if (present(kapp)) then
+          if (ierr.eq.0) then
+             call get_data_urt_core &
+                  & (ierr,       &
+                  &  d(jv:nv-1), mv,  nv,  u,  krect,  sub, &
+                  &  vmiss,      def_decode_trapiche,       &
+                  &  kopts,      ma,      kapp(japp:))
+             if (ierr.eq.0) japp = japp + ma
+          endif
+       else
+          if (ierr.eq.0) then
+             call get_data_urt_core &
+                  & (ierr,       &
+                  &  d(jv:nv-1), mv,  nv,  u,  krect,  sub, &
+                  &  vmiss,      def_decode_trapiche,       &
+                  &  kopts,      ma)
+          endif
+       endif
+       if (ierr.eq.0) then
+          japp = japp + ma
+          jv = jv + mv
+          nv = nv - mv
+          if (nv.eq.0) exit
+          if (nv.lt.0) ierr = ERR_INSUFFICIENT_BUFFER - ERR_MASK_NIO_RECORD
+          if (.not.sub) ierr = ERR_BROKEN_RECORD - ERR_MASK_NIO_RECORD
+       endif
+       if (ierr.ne.0) exit
+    enddo
+    if (present(napp)) then
+       napp = japp
     endif
     return
   end subroutine get_data_urt_d
@@ -2966,7 +3218,7 @@ contains
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
+    real(kind=KARG), intent(out) :: d(0:*)
     integer,         intent(in)  :: n, kaxs(*)
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
@@ -2977,25 +3229,58 @@ contains
     integer,optional,intent(out) :: kapp(0:)
 
     logical sub
+    integer jv,   mv,   nv
+    integer japp, ma
+    integer,parameter :: lcd = 2
+    integer cdummy(lcd)
+    integer cmem
 
     ierr = err_default
 
-    sub = .FALSE.
+    if (ierr.eq.0) call get_data_urt_cache(ierr, cdummy, cmem, lcd, u, krect)
 
-    if (ierr.eq.0) then
-       call get_data_urt_core &
-            & (ierr, &
-            &  d,     n,      u,    krect,  sub, &
-            &  vmiss, def_decode_trapiche,     &
-            &  kopts, napp,   kapp)
+    jv = 0
+    nv = n
+    japp = 0
+    sub = .TRUE.
+    do
+       if (present(kapp)) then
+          if (ierr.eq.0) then
+             call get_data_urt_core &
+                  & (ierr,       &
+                  &  d(jv:nv-1), mv,  nv,  u,  krect,  sub, &
+                  &  vmiss,      def_decode_trapiche,       &
+                  &  kopts,      ma,      kapp(japp:))
+             if (ierr.eq.0) japp = japp + ma
+          endif
+       else
+          if (ierr.eq.0) then
+             call get_data_urt_core &
+                  & (ierr,       &
+                  &  d(jv:nv-1), mv,  nv,  u,  krect,  sub, &
+                  &  vmiss,      def_decode_trapiche,       &
+                  &  kopts,      ma)
+          endif
+       endif
+       if (ierr.eq.0) then
+          japp = japp + ma
+          jv = jv + mv
+          nv = nv - mv
+          if (nv.eq.0) exit
+          if (nv.lt.0) ierr = ERR_INSUFFICIENT_BUFFER - ERR_MASK_NIO_RECORD
+          if (.not.sub) ierr = ERR_BROKEN_RECORD - ERR_MASK_NIO_RECORD
+       endif
+       if (ierr.ne.0) exit
+    enddo
+    if (present(napp)) then
+       napp = japp
     endif
     return
   end subroutine get_data_urt_f
 
-!!!_  - get_data_urt_core
   subroutine get_data_urt_core_d &
        & (ierr, &
-       &  d,     n,     u,    krect,  sub, &
+       &  d,     m,     n,    u,    krect,  sub, &
        &  vmiss, kcode, kopts,napp, kapp)
     use TOUZA_Trp,only: &
          & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
@@ -3004,7 +3289,8 @@ contains
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out)   :: ierr
     real(kind=KARG), intent(out)   :: d(*)
-    integer,         intent(in)    :: n
+    integer,         intent(out)   :: m    ! elements success
+    integer,         intent(in)    :: n    ! elements limit
     integer,         intent(in)    :: krect
     integer,         intent(in)    :: u
     logical,         intent(inout) :: sub
@@ -3014,8 +3300,9 @@ contains
     integer,optional,intent(out)   :: napp
     integer,optional,intent(out)   :: kapp(0:)
 
-    integer(kind=KISRC) :: ibagaz(0:2*n)
-    integer nbgz, ncnz, nall
+    integer(kind=KISRC) :: ibagaz(0:2*n+KB_HEAD)
+    integer(kind=KISRC) :: kdmy(1)
+    integer nbgz, ncnz
     integer na,   ma, xid, jp
     logical cont
 
@@ -3039,9 +3326,22 @@ contains
     endif
     if (ierr.eq.0) then
        na = retrieve_extra(ibagaz, XTRP_NX)
+       if (present(napp)) then
+          napp = na
+       endif
+       if (na.gt.0) then
+          cont = .TRUE.
+          if (present(kapp)) then
+             ma = min(na, size(kapp))
+             call get_data_record(ierr, kapp(0:ma-1), ma, u, krect, sub=cont)
+          else
+             call get_data_record(ierr, kdmy, 1, u, krect, sub=cont)
+          endif
+       endif
+    endif
+    if (ierr.eq.0) then
        nbgz = retrieve_nbgz(ibagaz)
-       nall = nbgz + na
-       call get_data_record(ierr, ibagaz(KB_HEAD:KB_HEAD+nall-1), nall, u, krect, sub=sub)
+       call get_data_record(ierr, ibagaz(KB_HEAD:KB_HEAD+nbgz-1), nbgz, u, krect, sub)
     endif
 
     if (ierr.eq.0) then
@@ -3051,23 +3351,14 @@ contains
        else
           call decode_alloc(ierr, d, ibagaz, ncnz, vmiss, kcode)
        endif
-    endif
-    if (ierr.eq.0) then
-       if (present(napp)) then
-          napp = na
-       endif
-       if (present(kapp)) then
-          ma = max(na, size(kapp))
-          jp = KB_HEAD + nbgz
-          if (ma.gt.0) kapp(0:ma-1) = ibagaz(jp:jp+ma-1)
-       endif
+       m = ncnz
     endif
     return
   end subroutine get_data_urt_core_d
   subroutine get_data_urt_core_f &
        & (ierr, &
-       &  d,     n,     u,    krect,  sub, &
-       &  vmiss, kcode, kopts,napp, kapp)
+       &  d,     m,     n,     u,    krect,  sub, &
+       &  vmiss, kcode, kopts, napp, kapp)
     use TOUZA_Trp,only: &
          & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
          & KB_HEAD,      show_bagazo_props
@@ -3075,6 +3366,7 @@ contains
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
     integer,         intent(out)   :: ierr
     real(kind=KARG), intent(out)   :: d(*)
+    integer,         intent(out)   :: m
     integer,         intent(in)    :: n
     integer,         intent(in)    :: krect
     integer,         intent(in)    :: u
@@ -3085,9 +3377,10 @@ contains
     integer,optional,intent(out)   :: napp
     integer,optional,intent(out)   :: kapp(0:)
 
-    integer(kind=KISRC) :: ibagaz(0:2*n)
-    integer nbgz, ncnz, nall
-    integer na,   ma, xid, jp
+    integer(kind=KISRC) :: ibagaz(0:2*n+KB_HEAD)
+    integer(kind=KISRC) :: kdmy(1)
+    integer nbgz, ncnz
+    integer na,   ma, xid
     logical cont
     real(kind=KRSRC) :: rmiss
 
@@ -3111,9 +3404,22 @@ contains
     endif
     if (ierr.eq.0) then
        na = retrieve_extra(ibagaz, XTRP_NX)
+       if (present(napp)) then
+          napp = na
+       endif
+       if (na.gt.0) then
+          cont = .TRUE.
+          if (present(kapp)) then
+             ma = min(na, size(kapp))
+             call get_data_record(ierr, kapp(0:ma-1), ma, u, krect, sub=cont)
+          else
+             call get_data_record(ierr, kdmy, 1, u, krect, sub=cont)
+          endif
+       endif
+    endif
+    if (ierr.eq.0) then
        nbgz = retrieve_nbgz(ibagaz)
-       nall = nbgz + na
-       call get_data_record(ierr, ibagaz(KB_HEAD:KB_HEAD+nall-1), nall, u, krect, sub=sub)
+       call get_data_record(ierr, ibagaz(KB_HEAD:KB_HEAD+nbgz-1), nbgz, u, krect, sub=sub)
     endif
 
     if (ierr.eq.0) then
@@ -3124,16 +3430,7 @@ contains
           rmiss = real(vmiss, kind=KRSRC)
           call decode_alloc(ierr, d, ibagaz, ncnz, rmiss, kcode)
        endif
-    endif
-    if (ierr.eq.0) then
-       if (present(napp)) then
-          napp = na
-       endif
-       if (present(kapp)) then
-          ma = max(na, size(kapp))
-          jp = KB_HEAD + nbgz
-          if (ma.gt.0) kapp(0:ma-1) = ibagaz(jp:jp+ma-1)
-       endif
+       m = ncnz
     endif
     return
   end subroutine get_data_urt_core_f
@@ -3151,21 +3448,23 @@ contains
        udiag = u
     endif
   end subroutine switch_urt_diag
-!!!_  & parse_urt_options
-  subroutine parse_urt_options &
+!!!_  & extract_urt_options
+  subroutine extract_urt_options &
        & (ierr, &
-       &  mbits, xbits, xtop, xbtm, kcode, mlim, &
-       &  kopts)
+       &  mbits, xbits, xtop, xbtm, nbreak, kcode, mlim, &
+       &  kaxs,  kopts)
     use TOUZA_Trp,only: XNOTOP, XNOBTM
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(inout)       :: mbits
     integer,intent(out)         :: xbits, xtop, xbtm
+    integer,intent(out)         :: nbreak
     integer,intent(inout)       :: kcode
     integer,intent(in)          :: mlim
+    integer,intent(in)          :: kaxs(*)
     integer,intent(in),optional :: kopts(:)
 
-    integer,parameter :: lo = PROP_URT_BREAK
+    integer,parameter :: lo = lopts
     integer ko(lo)
     integer m, kc
 
@@ -3193,16 +3492,180 @@ contains
        kcode = IOR(kcode, IAND(kc, KCODE_CLIPPING))
        kcode = IOR(kcode, IAND(kc, KCODE_ROUND))
     endif
+    nbreak = ko(PROP_URT_BREAK)
+    if (nbreak.eq.GFMT_URT_BREAK_LEVEL) then
+       if (kaxs(3).eq.1) then
+          if (kaxs(1).eq.1) then
+             nbreak = kaxs(2)
+          else
+             nbreak = kaxs(1)
+          endif
+       else
+          nbreak = kaxs(1) * kaxs(2)
+       endif
+    else if (nbreak.lt.0) then
+       ierr = ERR_NOT_IMPLEMENTED - ERR_MASK_NIO_RECORD
+    else if (nbreak.eq.0) then
+       nbreak = kaxs(1) * kaxs(2) * kaxs(3)
+    endif
+    ! to do: nbreak limiter
+
     return
-  end subroutine parse_urt_options
+  end subroutine extract_urt_options
 
 !!!_  & set_urt_defs
   subroutine set_urt_defs (kopts)
     implicit none
     integer,intent(out) :: kopts(:)
     kopts(:) = PROP_DEFAULT
+    kopts(PROP_URT_BREAK) = GFMT_URT_BREAK_LEVEL
     return
   end subroutine set_urt_defs
+
+!!!_  & parse_urt_options
+  subroutine parse_urt_options &
+       & (ierr, kopts, &
+       &  str,  pat,   isep,  vsep,  psep)
+    use TOUZA_Std,only: choice_a, split_list, parse_number
+    use TOUZA_Trp,only: parse_codes, helper_props
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: kopts(*)
+    character(len=*),intent(in)          :: str
+    integer,         intent(in),optional :: pat
+    character(len=*),intent(in),optional :: isep, vsep, psep
+    character(len=4) :: spi, spv, spp
+    integer             lsi, lsv, lsp
+    integer jp, jb, je
+    integer lstr
+    integer m
+    character c
+    integer,parameter :: lo = lopts
+
+    integer,parameter :: KBUF = KDBL
+    real(kind=KDBL) :: refr(3)
+    real(kind=KBUF),parameter :: rdef = -1.0_KBUF
+    integer,parameter :: xdef = (- HUGE(0)) - 1
+    integer,parameter :: bdef = -1
+
+    integer nbreak
+    integer mbits, xbits
+    integer xlu(2)
+    integer kcode
+
+    ierr = 0
+    call set_urt_defs(kopts(1:lo))
+
+    call choice_a(spi, ',', isep)
+    call choice_a(spv, '/', vsep)
+    call choice_a(spp, '=', psep)
+    lsi = max(1, len_trim(spi))
+    lsv = max(1, len_trim(spv))
+    lsp = max(1, len_trim(spp))
+
+    refr(:) = rdef
+    xlu(:) = xdef
+    mbits = bdef
+    xbits = bdef
+    nbreak = GFMT_URT_BREAK_NONE
+    kcode = 0
+
+    lstr = len_trim(str)
+    jb = 0
+    do
+       if (jb.ge.lstr) exit
+
+       je = index(str(jb+1:lstr), spi(1:lsi)) + jb
+       if (je.eq.jb) je = lstr + 1
+       if (jb.lt.je) then
+          jp = index(str(jb+1:je-1), spp(1:lsp)) + jb
+          if (jp.eq.jb) then
+             ierr = ERR_INVALID_PARAMETER - ERR_MASK_NIO_RECORD
+             exit
+          endif
+          ! write(*, *) jb, je, jp, str(jb+1:jp-1), ' / ', str(jp+lsp:je-1)
+          select case (str(jb+1:jp-1))
+          case('r', 'R')
+             call split_list(m, refr(1:3), str(jp+lsp:je-1), spv(1:lsv), empty=.TRUE.)
+             ! write(*, *) refr
+             ierr = min(m, 0)
+          case('m', 'M')
+             call parse_number(ierr, mbits, str(jp+lsp:je-1), def=bdef)
+          case('x', 'X')
+             call parse_number(ierr, xbits, str(jp+lsp:je-1), def=bdef)
+          case('e', 'E')
+             call split_list(m, xlu(1:2), str(jp+lsp:je-1), spv(1:lsv), empty=.TRUE.)
+             ierr = min(m, 0)
+          case('c', 'C')
+             call parse_codes(ierr, kcode, str(jp+lsp:je-1))
+          case('b', 'B')
+             select case(str(jp+lsp:je-1))
+             case('n', 'N')
+                nbreak = GFMT_URT_BREAK_NONE
+             case('l', 'L')
+                nbreak = GFMT_URT_BREAK_LEVEL
+             case('p', 'P')
+                nbreak = GFMT_URT_BREAK_PROC
+             case('b', 'B')
+                nbreak = GFMT_URT_BREAK_LPROC
+             case default
+                call parse_number(ierr, nbreak, str(jp+lsp:je-1), def=GFMT_URT_BREAK_NONE)
+             end select
+          case default
+          end select
+       endif
+       if (ierr.ne.0) exit
+       jb = je + lsi - 1
+    enddo
+    ! write(*, *) jb, je, ierr, kcode, nbreak, mbits, xbits, xlu, refr
+    if (ierr.eq.0) then
+       kopts(PROP_URT_CODES) = kcode
+       kopts(PROP_URT_BREAK) = nbreak
+
+       if (xlu(1).gt.xdef) kopts(PROP_URT_XBOTTOM)  = xlu(1)
+       if (xlu(2).gt.xdef) kopts(PROP_URT_XTOP)     = xlu(2)
+       if (xbits.gt.bdef)  kopts(PROP_URT_XBITS)    = xbits
+       if (mbits.gt.bdef)  kopts(PROP_URT_MANTISSA) = mbits
+
+       if (refr(1).gt.0.0_KBUF) then
+          refr(2) = max(refr(2), refr(1))
+          call helper_props(mbits, xbits, xlu(1), refr(2), refr(1), refr(3))
+          kopts(PROP_URT_XBOTTOM)  = xlu(1)
+          kopts(PROP_URT_XBITS)    = xbits
+          kopts(PROP_URT_MANTISSA) = mbits
+       endif
+    endif
+  end subroutine parse_urt_options
+!!!_  - show_urt_options
+  subroutine show_urt_options(ierr, kopts, tag, u)
+    use TOUZA_Std,only: choice
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(in)          :: kopts(*)
+    character(len=*),intent(in),optional :: tag
+    integer,         intent(in),optional :: u
+    character(len=128) :: buf
+    integer utmp
+    ierr = 0
+    utmp = get_logu(u, ulog)
+101 format('m', I0, 'e', I0, 1x, I0, ':', I0)
+102 format(A, ': ', 'm', I0, 'e', I0, 1x, I0, ':', I0)
+    if (present(tag)) then
+       write(buf, 102) trim(tag), &
+            & kopts(PROP_URT_MANTISSA), kopts(PROP_URT_XBITS), &
+            & kopts(PROP_URT_XBOTTOM), kopts(PROP_URT_XTOP)
+    else
+       write(buf, 101) &
+            & kopts(PROP_URT_MANTISSA), kopts(PROP_URT_XBITS), &
+            & kopts(PROP_URT_XBOTTOM), kopts(PROP_URT_XTOP)
+    endif
+201 format(A)
+    if (utmp.ge.0) then
+       write(utmp, 201) trim(buf)
+    else if (utmp.eq.-1) then
+       write(*,    201) trim(buf)
+    endif
+  end subroutine show_urt_options
 
 !!!_ + gtool extenstion (MI4)
 !!!_  - get_data_mi4 - MI4
@@ -4291,12 +4754,12 @@ contains
              if (ierr.eq.0) kfmt = kfmt + kk
           case ('T')
              kfmt = kfmt + GFMT_URT
-             read(str(4:), *, IOSTAT=ierr) kk
-             if (ierr.eq.0) then
-                kfmt = kfmt + min(max(0, kk), GFMT_URTend-GFMT_URT)
-             else
-                ierr = 0
-             endif
+             ! read(str(4:), *, IOSTAT=ierr) kk
+             ! if (ierr.eq.0) then
+             !    kfmt = kfmt + min(max(0, kk), GFMT_URTend-GFMT_URT)
+             ! else
+             !    ierr = 0
+             ! endif
           case default
              read(str(3:), *, IOSTAT=ierr) kk
              if (ierr.eq.0) then
@@ -4841,6 +5304,9 @@ program test_nio_record
      case (5)
         write(*, 201) ktest, 'read gtool file skipping'
         call test_read_skip(ierr, jarg)
+     case (6)
+        write(*, 201) ktest, 'parse_urt_options'
+        call test_batch_parse_urt(ierr, jarg)
      case default
         write(*, *) 'INVALID TEST = ', ktest
         ierr = -1
@@ -4865,7 +5331,7 @@ contains
     call test_record_fmt(ierr, 'UI4',   GFMT_UI1)
 
     call test_record_fmt(ierr, 'URT',   GFMT_URT)
-    call test_record_fmt(ierr, 'URT24', GFMT_URT+24)
+    ! call test_record_fmt(ierr, 'URT24', GFMT_URT+24)
 
     call test_record_fmt(ierr, 'MR8',   GFMT_MR8)
     call test_record_fmt(ierr, 'MR4',   GFMT_MR4)
@@ -5054,6 +5520,8 @@ contains
     real(kind=KBUF),allocatable :: v(:)
 
     ierr = 0
+    jpos = -1
+
 101 format('test:', I0, 1x, A, 1x, A, 1x, A)
 401 format('header/r:', I0, 1x, I0, 1x, I0)
 402 format('data/r:', I0, 1x, I0)
@@ -5573,6 +6041,45 @@ contains
     dnum = dnum + 1
     return
   end subroutine test_encoding_write
+
+!!!_ + test_batch_parse_urt - urt option parser tests
+  subroutine test_batch_parse_urt &
+       & (ierr, jarg)
+    integer,intent(out)   :: ierr
+    integer,intent(inout) :: jarg
+    ierr = 0
+    call test_parse_urt(ierr, 'x=7')
+    call test_parse_urt(ierr, 'x=7,m=13')
+    call test_parse_urt(ierr, 'x=7,m=13,e=-6/8')
+    call test_parse_urt(ierr, 'x=7,m=13,e=-6/8,')
+    call test_parse_urt(ierr, 'x=7,m=13,e=-6/')
+    call test_parse_urt(ierr, 'x=7,m=13,e=-6')
+    call test_parse_urt(ierr, 'x=7,m=13,e=/8')
+    call test_parse_urt(ierr, 'x=7,m=13,e=/')
+    call test_parse_urt(ierr, 'x=7,m=13,r=1e3/1e10')
+    call test_parse_urt(ierr, 'x=7,m=13,r=1e3/1e10/1')
+    call test_parse_urt(ierr, 'x=7,m=13,r=1e3/1e10/1,b=30000')
+    call test_parse_urt(ierr, 'x=7,m=13,r=1e3/1e10/1,b=l')
+    call test_parse_urt(ierr, 'x=7,m=13,r=1/64')
+    call test_parse_urt(ierr, 'x=7,m=13,r=1/64/1')
+    call test_parse_urt(ierr, 'x=7,m=13,r=1/64/2')
+
+    return
+  end subroutine test_batch_parse_urt
+
+  subroutine test_parse_urt &
+       & (ierr, str)
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: str
+    integer,parameter :: lo = lopts
+    integer kopts(lo)
+
+    ierr = 0
+
+    call parse_urt_options(ierr, kopts, str)
+    call show_urt_options(ierr, kopts, str)
+
+  end subroutine test_parse_urt
 
 end program test_nio_record
 

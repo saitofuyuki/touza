@@ -1,7 +1,7 @@
 !!!_! trapiche_pack.F90 - TOUZA/Trapiche integer packing/unpacking
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2022/03/14 11:20:41 fuyuki trapiche_pack.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/05 14:18:20 fuyuki trapiche_pack.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -38,7 +38,7 @@ module TOUZA_Trp_pack
   integer,save :: ulog = unit_global
 # define __MDL__ 'p'
 !!!_  - common
-  character(len=256) :: tmsg
+  ! character(len=256) :: tmsg
 !!!_  - interfaces
   interface pack_store
      module procedure pack_store_ii, pack_store_ll

@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/11/23 11:26:45 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/04 21:10:14 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -99,6 +99,7 @@ program chak
      character(len=ldesc)  :: desci
      character(len=ldesc)  :: desco
      type(stack_t),pointer :: lefts(:)       ! result stack to push
+     integer :: opt                  ! option for any use
   end type queue_t
   integer           :: mqueue
   integer,parameter :: lqueue=OPT_CHAK_QUEUE
@@ -3610,7 +3611,7 @@ contains
           k = kv_dbl
        case (GFMT_URY:GFMT_URYend, GFMT_MRY:GFMT_MRYend)
           k = kv_dbl
-       case (GFMT_URT:GFMT_URTend, GFMT_MRT:GFMT_MRTend)
+       case (GFMT_URT, GFMT_MRT)
           k = kv_dbl
        case default
           k = kv_dbl
@@ -4480,7 +4481,7 @@ contains
        endif
        if (ierr.eq.0) call get_obj_string(ierr, val, hb)
 
-       if (is_msglev(lev_verbose, msglev_normal+1)) then
+       if (is_msglev(lev_verbose, msglev_normal)) then
           if (ierr.eq.0) write(utmp, 212) user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc)
           if (ierr.eq.0) call get_domain_string(ierr, lcstr, bstack(js)%lcp)
           if (ierr.eq.0) call get_domain_string(ierr, pcstr, obuffer(jb)%pcp)
@@ -4499,7 +4500,7 @@ contains
        ! endif
        if (ierr.eq.0) then
           if (dryrun.gt.0) then
-             write(utmp, *)
+             write(utmp, '()')
           else
              mco = doml%mco
              if (mco.gt.0) then
@@ -4642,7 +4643,7 @@ contains
     endif
     if (ierr.eq.0) then
        if (dryrun.gt.0) then
-          write(utmp, *)
+          write(utmp, '()')
        else
           do jl = 0, doml%n - 1
              pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)

@@ -1,3 +1,14 @@
+Release-1.07.0 / 2022-12-06
+===========================
+
+  * Design of URT MRT revised --- incompatible from 1.06.0
+  * (nio) URT MRT design revised (URTb).  Default chunk breaking to levels.
+  * (jmz) latest URT MRT with tweaking introduced.
+  * (std) split_list join_list improved.
+  * (std) parse_number improved.
+  * (std) sus_pad sus_pad_irec sus_record_mems_irec
+    sus_read_slice_irec implemented.
+
 Release-1.06.0 / 2022-11-23
 ===========================
 
