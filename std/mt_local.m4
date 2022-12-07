@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2022/09/20 17:22:55 fuyuki mt_local.m4>
+dnl Time-stamp: <2022/12/12 21:35:31 fuyuki mt_local.m4>
 
 dnl Copyright: 2020-2022 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -11,7 +11,7 @@ AC_LANG_PUSH([Fortran])
 
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_command_argument], [1], [])
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getarg], [1, T], [
-character T*30])
+     character T*30])
 MT_FORTRAN_BATCH_CHECK_FUNCTION([command_argument_count], [])
 dnl SX
 MT_FORTRAN_BATCH_CHECK_FUNCTION([iargc], [])
@@ -41,26 +41,26 @@ MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT64_T])
 MT_FORTRAN_BATCH_CHECK_MODULE([ieee_arithmetic])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([open], [iomsg],[
-character T*(30)
-open(UNIT=1,IOMSG=T)])
+      character T*(30)
+      open(UNIT=1,IOMSG=T)])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([open], [convert],[
-open(UNIT=1,CONVERT='BIG_ENDIAN')])
+      open(UNIT=1,CONVERT='BIG_ENDIAN')])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([open], [stream],[
-open(UNIT=1,ACCESS='STREAM')])
+      open(UNIT=1,ACCESS='STREAM')])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [iolength],[
-integer L
-inquire(IOLENGTH=L) int(0)])
+      integer L
+      inquire(IOLENGTH=L) int(0)])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [pos],[
-integer L
-inquire(10, POS=L)])
+      integer L
+      inquire(10, POS=L)])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [convert],[
-character T*(30)
-inquire(10, CONVERT=T)])
+      character T*(30)
+      inquire(10, CONVERT=T)])
 
 dnl system procedures
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_environment_variable], ['A'])
@@ -79,6 +79,10 @@ dnl SX F90_UNIX_ENV module
 MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [getenv])
 MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [getlogin])
 MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [gethostname])
+
+MT_FC_F2003_DEFERRED_TYPE()
+MT_FC_F2003_ALLOCATABLE_DUMMY()
+MT_FC_F2003_ALLOCATABLE_MEMBER()
 
 AC_ARG_VAR([OPT_STDIN_UNIT],    [fortran i/o unit for stdin])
 AC_ARG_VAR([OPT_STDOUT_UNIT],   [fortran i/o unit for stdout])

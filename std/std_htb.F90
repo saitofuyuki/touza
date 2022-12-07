@@ -1,7 +1,7 @@
 !!!_! std_htb.F90 - touza/std simple hash table manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2022/08/15 16:01:18 fuyuki std_htb.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/12 22:09:07 fuyuki std_htb.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -16,6 +16,12 @@
 #endif
 #include "touza_std.h"
 !!!_* macros
+! #define _POINTER pointer
+#if HAVE_F2003_ALLOCATABLE_MEMBER
+#  define _POINTER allocatable
+#else  /* not HAVE_F2003_ALLOCATABLE_MEMBER */
+#  define _POINTER pointer
+#endif /* not HAVE_F2003_ALLOCATABLE_MEMBER */
 #ifndef    OPT_HASH_BASE
 #  define  OPT_HASH_BASE 13
 #endif
@@ -80,19 +86,19 @@ module TOUZA_Std_htb
   integer,parameter :: kunit = OPT_HASH_KEY_LENGTH
 !!!_  - hash table primitive
   type htable_t
-     integer                      :: mem = 0
-     integer                      :: kmdl      ! module
-     integer,             pointer :: nxt(:)    ! starting index at next slot
-     integer,             pointer :: stt(:, :) ! status complex   (0:lstt-1, -1:mem-1)
-     character(len=kunit),pointer :: kbuf(:)
-     integer,             pointer :: mofs(:)
-     integer                      :: width = 0
-     integer                      :: base = OPT_HASH_BASE
-     integer                      :: def = unset
-     integer                      :: nslot = 0
-     integer                      :: lstt = 0  ! size of status complex
-     integer                      :: ntag = 0  ! integer tag size to store in status  (stt(0:ntag-1,:))
-     integer                      :: ktag = 0  ! number of tag to use in hash computation
+     integer                       :: mem = 0
+     integer                       :: kmdl      ! module
+     integer,             _POINTER :: nxt(:)    ! starting index at next slot
+     integer,             _POINTER :: stt(:, :) ! status complex   (0:lstt-1, -1:mem-1)
+     character(len=kunit),_POINTER :: kbuf(:)
+     integer,             _POINTER :: mofs(:)
+     integer                       :: width = 0
+     integer                       :: base = OPT_HASH_BASE
+     integer                       :: def = unset
+     integer                       :: nslot = 0
+     integer                       :: lstt = 0  ! size of status complex
+     integer                       :: ntag = 0  ! integer tag size to store in status  (stt(0:ntag-1,:))
+     integer                       :: ktag = 0  ! number of tag to use in hash computation
   end type htable_t
   type(htable_t),allocatable,save :: htable(:)
   integer,save :: ntable = 0, ltable = 0
@@ -101,12 +107,12 @@ module TOUZA_Std_htb
   !        nxt >0   next slot starting index
 !!!_  - watermarked hash-table shell
   type wtable_t
-     type(htable_t)  :: ht
-     integer         :: root = 0   ! watermark parameters
-     integer         :: seed = 0   !
-     integer         :: n    = 0   ! automatic element current size
-     integer         :: l    = 0   ! automatic element limit size
-     integer,pointer :: entr(:)  ! corresponding hash entry
+     type(htable_t)   :: ht
+     integer          :: root = 0   ! watermark parameters
+     integer          :: seed = 0   !
+     integer          :: n    = 0   ! automatic element current size
+     integer          :: l    = 0   ! automatic element limit size
+     integer,_POINTER :: entr(:)  ! corresponding hash entry
   end type wtable_t
 
   type(wtable_t),allocatable,save :: wmarks(:)
@@ -2158,11 +2164,11 @@ contains
   subroutine save_status_scl_t (ierr, htb, entr, stt, k)
     use TOUZA_Std_utl,only: choice
     implicit none
-    integer,         intent(out) :: ierr
-    type(htable_t),  intent(in)  :: htb
-    integer,         intent(in)  :: entr
-    integer,         intent(in)  :: stt
-    integer,optional,intent(in)  :: k     ! status id
+    integer,         intent(out)   :: ierr
+    type(htable_t),  intent(inout) :: htb
+    integer,         intent(in)    :: entr
+    integer,         intent(in)    :: stt
+    integer,optional,intent(in)    :: k     ! status id
     integer jx
     ierr = check_range_entry(htb, entr)
     if (ierr.eq.0) then
@@ -2174,11 +2180,11 @@ contains
   subroutine save_status_arr_t (ierr, htb, entr, stts, k)
     use TOUZA_Std_utl,only: choice
     implicit none
-    integer,         intent(out) :: ierr
-    type(htable_t),  intent(in)  :: htb
-    integer,         intent(in)  :: entr
-    integer,         intent(in)  :: stts(:)
-    integer,optional,intent(in)  :: k     ! status id
+    integer,         intent(out)   :: ierr
+    type(htable_t),  intent(inout) :: htb
+    integer,         intent(in)    :: entr
+    integer,         intent(in)    :: stts(:)
+    integer,optional,intent(in)    :: k     ! status id
     integer jx, nx
     ierr = check_range_entry(htb, entr)
     if (ierr.eq.0) then
