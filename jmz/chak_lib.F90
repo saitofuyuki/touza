@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz swiss(CH) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2022/11/16 16:41:08 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/11 22:05:02 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -446,8 +446,13 @@ contains
              n = co_null
           endif
        else
-          b = logical_index(lcp%bgn, pcp%bgn)
-          e = logical_index(lcp%end, pcp%end)
+          if (pcp%stp.le.0) then
+             b = lcp%bgn
+             e = lcp%end
+          else
+             b = logical_index(lcp%bgn, pcp%bgn)
+             e = logical_index(lcp%end, pcp%end)
+          endif
           if (b.eq.null_range .eqv. e.eq.null_range) then
              if (b.eq.null_range) then
                 n = co_null

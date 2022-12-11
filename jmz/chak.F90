@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/12/04 21:10:14 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/11 22:04:44 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -1336,7 +1336,7 @@ contains
        b = system_index_bgn(rpos(1))
        e = system_index_end(rpos(2))
        s = 1
-       if (e.le.b) s = 0
+       if (e.ne.null_range .and. e.le.b) s = 0
     else if (nc.gt.2) then
        ierr = ERR_INVALID_PARAMETER
        call message(ierr, 'fail to extract range ' // trim(arg(jran:larg)))
@@ -4159,8 +4159,6 @@ contains
     character(len=8) :: opr
 
     ierr = 0
-    ! write(*, *) rlev, size(lefth)
-
     if (ierr.eq.0) call mpop_stack(ierr, righth, pop, keep=.TRUE.)
     if (ierr.eq.0) then
 !!!_    * output
@@ -5667,7 +5665,6 @@ contains
        meff(jb) = count_coordinates(ctypeR(:, jb), cnameR(:, jb), mco)
     enddo
     mref = maxval(meff(0:nbuf-1))
-    ! write(*, *) 'perm', mref, '/', meff(0:nbuf-1)
     ! set reference priority table
     jb = jbref
     nt = 0
