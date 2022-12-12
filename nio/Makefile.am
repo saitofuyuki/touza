@@ -1,7 +1,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2022/11/09 20:53:31 fuyuki Makefile.am>
+# Time-stamp: <2022/12/12 13:45:03 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -26,6 +26,7 @@ endif
 if with_nctcdf
 libtouza_local_la_SOURCES += nio_nctcdf.F90
 endif
+libtouza_local_la_SOURCES += nio_control.F90
 libtouza_local_la_SOURCES += nio.F90 $(include_HEADERS)
 libtouza_local_la_LDFLAGS =
 
@@ -61,6 +62,7 @@ check_PROGRAMS = test_nio_header test_nio_record test_nio_cache
 if BUILD_div
 check_PROGRAMS += test_nio_division
 endif
+check_PROGRAMS += test_nio_control
 check_PROGRAMS += test_nio test_nio_miroc
 if with_nctcdf
 check_PROGRAMS+= test_nio_nctcdf
@@ -78,6 +80,10 @@ test_nio_record_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_RECORD=1
 test_nio_cache_SOURCES = $(TEST_COMMON_SOURCES) nio_cache.F90
 test_nio_cache_LDADD = $(TEST_COMMON_LIBS)
 test_nio_cache_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_CACHE=1
+
+test_nio_control_SOURCES = $(TEST_COMMON_SOURCES) nio_control.F90
+test_nio_control_LDADD = $(TEST_COMMON_LIBS)
+test_nio_control_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_CONTROL=1
 
 if BUILD_div
 test_nio_division_SOURCES = $(TEST_COMMON_SOURCES) nio_division.F90
