@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/11/16 10:10:54 fuyuki genopr.sh>
+# Time-stamp: <2022/12/06 22:28:34 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -247,6 +247,9 @@ register_all ()
   register -g reduction -o RANK -i call SUM     'sum through stacks or rank(s)'
   register -g reduction -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
   register -g reduction -o RANK -i call COUNT   'count defined elements through stacks or rank(s)'
+
+  register -g reduction -n 1,1 -i call -p RANK -s 'MIN=' UMIN    'minimum'
+  register -g reduction -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'
 
   # transform operation
   #### coor=0,1,2,name,alias for coodinate, -1 or s for stack

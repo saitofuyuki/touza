@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz swiss(CH) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2022/12/04 21:09:38 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/18 21:40:03 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -1823,7 +1823,7 @@ end subroutine cue_read_file
 
 !!!_   . cue_binary_pos()
   integer(kind=KIOFS) function cue_binary_pos(kfmt, m, rec) result (n)
-    use TOUZA_Std,only: get_size_strm
+    use TOUZA_Std,only: get_unit_strm
     implicit none
     integer,intent(in) :: kfmt
     integer,intent(in) :: m
@@ -1839,16 +1839,16 @@ end subroutine cue_read_file
 
 !!!_   . usize_binary()
   integer function usize_binary(kfmt) result (n)
-    use TOUZA_Std,only: get_size_strm
+    use TOUZA_Std,only: get_unit_strm
     implicit none
     integer,intent(in) :: kfmt
     select case(kfmt)
     case(cfmt_binary_i4:cfmt_binary_i4+cfmt_flags_bo-1)
-       n = get_size_strm(0)
+       n = get_unit_strm(0)
     case(cfmt_binary_r4:cfmt_binary_r4+cfmt_flags_bo-1)
-       n = get_size_strm(real(0, kind=KFLT))
+       n = get_unit_strm(real(0, kind=KFLT))
     case(cfmt_binary_r8:cfmt_binary_r8+cfmt_flags_bo-1)
-       n = get_size_strm(real(0, kind=KDBL))
+       n = get_unit_strm(real(0, kind=KDBL))
     case default
        n = 0
     end select
