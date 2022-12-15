@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2022/06/16 07:49:00 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/15 09:49:43 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -42,7 +42,7 @@ module TOUZA_Std_fun
 !!!_  - parameter
   integer,parameter,public :: search_from_head = -3 ! search from category head
   integer,parameter,public :: search_from_last = -2 ! search from last unit
-  integer,parameter,public :: search_from_next = -1 ! search from last unit + 1 (deafult)
+  integer,parameter,public :: search_from_next = -1 ! search from last unit + 1 (default)
 
   integer,parameter,public :: kucat_black = -1
   integer,parameter :: lucat = OPT_UNIT_CATEGORIES
