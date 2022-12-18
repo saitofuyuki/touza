@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2022/12/05 14:49:23 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/21 16:19:58 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -19,8 +19,9 @@ module TOUZA_Nio_record
 !!!_ = declaration
   use TOUZA_Nio_std,only: &
        & KI32, KI64, KDBL, KFLT, &
-       & control_mode, control_deep, is_first_force, &
-       & get_logu,     unit_global,  trace_fine,   trace_control
+       & control_mode,  control_deep, is_first_force, &
+       & get_logu,      unit_global,  trace_fine,    trace_control, &
+       & ignore_bigger, ignore_small, ignore_always, def_block
   use TOUZA_Nio_header,only: litem, nitem
   use TOUZA_Trp, only: &
        & KCODE_CLIPPING,  KCODE_ROUND,      &
@@ -31,13 +32,14 @@ module TOUZA_Nio_record
 !!!_  - public parameters
   integer,parameter,public :: KRMIS=KDBL ! real kind of vmiss
 
-  integer,parameter,public :: REC_ERROR   = -9
-  integer,parameter,public :: REC_ASIS    = -1
-  integer,parameter,public :: REC_DEFAULT = 0
-  integer,parameter,public :: REC_SWAP    = 1  ! with byte-swap
-  integer,parameter,public :: REC_LSEP    = 2  ! with 64-bit record marker
-  integer,parameter,public :: REC_BIG     = 4  ! force big-endian    (use in init only)
-  integer,parameter,public :: REC_LITTLE  = 8  ! force little-endian (use in init only)
+  integer,parameter,public :: REC_ERROR     = -9
+  integer,parameter,public :: REC_ASIS      = -1
+  integer,parameter,public :: REC_DEFAULT   = 0
+  integer,parameter,public :: REC_SWAP      = 1  ! with byte-swap
+  integer,parameter,public :: REC_LSEP      = 2  ! with 64-bit record marker
+  integer,parameter,public :: REC_BIG       = 4  ! force big-endian    (use in init only)
+  integer,parameter,public :: REC_LITTLE    = 8  ! force little-endian (use in init only)
+  integer,parameter,public :: REC_SUB_ALLOW = 16 ! enable subrecord separator mode (Big-GTOOL3 disabled at write)
 
   integer,parameter,public :: REC_LEFT  = 2**8 ! number of extra header items (shift)
 
@@ -117,6 +119,7 @@ module TOUZA_Nio_record
 
   integer,parameter :: IMISS_URC = 65534
 
+  integer,parameter :: MAGIC_DUMMY_SEP = -1
 !!!_  - static
   real(KIND=KRMIS),save :: def_VMISS = -999.0_KRMIS
   integer,save :: def_encode_legacy   = KCODE_MANUAL   ! automatic KCODE_SEQUENTIAL
@@ -125,6 +128,7 @@ module TOUZA_Nio_record
   integer,save :: def_decode_trapiche = KCODE_MANUAL
 
   integer,save :: def_krectw = 0  !  default record switch to write
+  integer,save :: sw_subrec = ignore_bigger
 
   character(len=litem),save :: head_def(nitem) = ' '
 
@@ -285,11 +289,13 @@ module TOUZA_Nio_record
   public parse_header_base,  parse_record_fmt
   public parse_header_size
   public get_header_cprop,   put_header_cprop
-  public get_switch
   public set_urt_defs,       parse_urt_options,  show_urt_options
   public switch_urt_diag
+  public set_switch_subrec,  nio_allow_sub
 
 !!!_  - public shared
+!!!_   . from Std
+  public ignore_bigger, ignore_small, ignore_always, def_block
 !!!_   . from Trp
   public KCODE_CLIPPING
   public KCODE_TRANSPOSE, KCODE_SEQUENTIAL, KCODE_INCREMENTAL
@@ -299,9 +305,9 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init &
-       & (ierr,   u,      levv,  mode,  stdv,  &
-       &  bodrw,  krectw, klenc, kldec, knenc, kndec, lazy, &
-       &  vmiss,  utime,  csign, msign, icomm)
+       & (ierr,   u,      levv,   mode,  stdv,  &
+       &  bodrw,  krectw, subrec, klenc, kldec, knenc, kndec, lazy, &
+       &  vmiss,  utime,  csign,  msign, icomm)
     use TOUZA_Nio_std,   only: ns_init=>init, choice, get_size_bytes, KDBL, max_members
     use TOUZA_Nio_header,only: nh_init=>init, litem, nitem
     use TOUZA_Trp,       only: trp_init=>init
@@ -311,6 +317,7 @@ contains
     integer,         intent(in),optional :: levv, mode, stdv
     integer,         intent(in),optional :: bodrw       ! byte-order native flag
     integer,         intent(in),optional :: krectw      ! default record switch (write)
+    integer,         intent(in),optional :: subrec      ! default subrecord switch (read)
     integer,         intent(in),optional :: klenc,kldec ! packing method for legacy-format (ury)
     integer,         intent(in),optional :: knenc,kndec ! packing method for new format (urt)
     integer,         intent(in),optional :: lazy        ! lazy level for size parse
@@ -348,6 +355,7 @@ contains
 
           if (ierr.eq.0) call set_bodr_wnative(ierr, bodrw, ulog, lv)
           if (ierr.eq.0) call set_default_switch(ierr, krectw, ulog, lv)
+          if (ierr.eq.0) sw_subrec = choice(sw_subrec, subrec)
           if (ierr.eq.0) then
              call init_batch(ierr, klenc, kldec, knenc, kndec, ulog, lv)
           endif
@@ -373,6 +381,8 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
     integer utmp, lv, md, lmd
+    logical swap, lsep, bendi, lendi, asub
+    character(len=128) :: txt
 
     ierr = err_default
 
@@ -388,6 +398,16 @@ contains
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
              if (is_msglev_normal(lv)) call msg('(''byte-order assumption = '', I0)', bodr_wnative, __MDL__, utmp)
              if (is_msglev_normal(lv)) call msg('(''lazy-level = '', I0)', def_lazy_size, __MDL__, utmp)
+             if (is_msglev_normal(lv)) then
+                swap  = IAND(def_krectw, REC_SWAP).gt.0
+                lsep  = IAND(def_krectw, REC_LSEP).gt.0
+                bendi = IAND(def_krectw, REC_BIG).gt.0
+                lendi = IAND(def_krectw, REC_LITTLE).gt.0
+                asub  = IAND(def_krectw, REC_SUB_ALLOW).gt.0
+101             format('swap=', L1, ' lsep=', L1, ' endi=', 2L1, ' sub=', L1)
+                write(txt, 101) swap, lsep, bendi, lendi, asub
+                call msg(txt, __MDL__, utmp)
+             endif
              if (is_msglev_info(lv)) then
                 call show_header(ierr, head_def, ' ', utmp, lv)
              endif
@@ -831,22 +851,6 @@ contains
     return
   end subroutine check_magic_bytes
 
-! !!!_  & nio_read_header - read header and set current properties
-!   subroutine nio_read_header &
-!        & (ierr, &
-!        &  head,  krect, u, pos)
-!     implicit none
-!     integer,            intent(out)         :: ierr
-!     character(len=*),   intent(out)         :: head(*)
-!     integer,            intent(out)         :: krect
-!     integer,            intent(in)          :: u
-!     integer(kind=KIOFS),intent(in),optional :: pos
-
-!     ierr = err_default
-!     if (ierr.eq.0) call nio_read_header_once(ierr, head, krect, u, pos)
-!     return
-!   end subroutine nio_read_header
-
 !!!_  & nio_write_header - write header and set current properties (if necessary)
   subroutine nio_write_header &
        & (ierr, &
@@ -1046,7 +1050,7 @@ contains
 
     ierr = 0
 
-    n = kaxs(1) * kaxs(2) * kaxs(3)
+    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
     if (n.gt.ld) then
        ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
@@ -1066,18 +1070,18 @@ contains
     case (GFMT_MI4)
        call get_data_mi4(ierr, d, n, u, krect, vmiss)
     case (GFMT_URC, GFMT_URC2)
-       nh = kaxs(1) * kaxs(2)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
        nk = kaxs(3)
        call get_data_urc &
             & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
     case (GFMT_URY:GFMT_URYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call get_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case (GFMT_MRY:GFMT_MRYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call get_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case (GFMT_URT)
@@ -1110,7 +1114,7 @@ contains
     integer n, nh, nk
 
     ierr = 0
-    n = kaxs(1) * kaxs(2) * kaxs(3)
+    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
     if (n.gt.ld) then
        ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
@@ -1130,18 +1134,18 @@ contains
     case (GFMT_MI4)
        call get_data_mi4(ierr, d, n, u, krect, vmiss)
     case (GFMT_URC, GFMT_URC2)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call get_data_urc &
             & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
     case (GFMT_URY:GFMT_URYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call get_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case (GFMT_MRY:GFMT_MRYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call get_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case default
@@ -1168,7 +1172,7 @@ contains
     integer n, nh, nk
 
     ierr = 0
-    n = kaxs(1) * kaxs(2) * kaxs(3)
+    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
     if (n.gt.ld) then
        ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
@@ -1188,18 +1192,18 @@ contains
     case (GFMT_MI4)
        call get_data_mi4(ierr, d, n, u, krect, vmiss)
     case (GFMT_URC, GFMT_URC2)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call get_data_urc &
             & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
     case (GFMT_URY:GFMT_URYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call get_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case (GFMT_MRY:GFMT_MRYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call get_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case default
@@ -1228,7 +1232,7 @@ contains
     integer n, nh, nk
 
     ierr = 0
-    n = kaxs(1) * kaxs(2) * kaxs(3)
+    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
     if (n.gt.ld) then
        ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
@@ -1250,13 +1254,13 @@ contains
     case (GFMT_URC, GFMT_URC2)
        ierr = ERR_DEPRECATED_FORMAT - ERR_MASK_NIO_RECORD
     case (GFMT_URY:GFMT_URYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call put_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case (GFMT_MRY:GFMT_MRYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call put_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case (GFMT_URT)
@@ -1289,7 +1293,7 @@ contains
     integer n, nh, nk
 
     ierr = 0
-    n = kaxs(1) * kaxs(2) * kaxs(3)
+    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
     if (n.gt.ld) then
        ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
@@ -1311,13 +1315,13 @@ contains
     case (GFMT_URC, GFMT_URC2)
        ierr = ERR_DEPRECATED_FORMAT - ERR_MASK_NIO_RECORD
     case (GFMT_URY:GFMT_URYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call put_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case (GFMT_MRY:GFMT_MRYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call put_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case default
@@ -1344,7 +1348,7 @@ contains
     integer n, nh, nk
 
     ierr = 0
-    n = kaxs(1) * kaxs(2) * kaxs(3)
+    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
     if (n.gt.ld) then
        ierr = ERR_SIZE_MISMATCH - ERR_MASK_NIO_RECORD
        return
@@ -1366,13 +1370,13 @@ contains
     case (GFMT_URC, GFMT_URC2)
        ierr = ERR_DEPRECATED_FORMAT - ERR_MASK_NIO_RECORD
     case (GFMT_URY:GFMT_URYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call put_data_ury &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case (GFMT_MRY:GFMT_MRYend-1)
-       nh = kaxs(1) * kaxs(2)
-       nk = kaxs(3)
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
        call put_data_mry &
             & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
     case default
@@ -1382,10 +1386,10 @@ contains
     return
   end subroutine nio_write_data_core_i
 
-!!!_  & nio_skip_records - forward record skip
+!!!_  & nio_skip_records - forward/backward gtool-record skip
   subroutine nio_skip_records &
        & (ierr, n, u, nskip, head, krect)
-    use TOUZA_Nio_std,   only: WHENCE_CURRENT, sus_skip_irec, sus_skip_lrec
+    use TOUZA_Nio_std,   only: WHENCE_CURRENT, sus_skip_irec, sus_skip_lrec, choice
     use TOUZA_Nio_header,only: &
          & nitem, litem, hi_DFMT, get_item
     implicit none
@@ -1397,26 +1401,30 @@ contains
     integer,         intent(in), optional :: krect    ! current record header type
 
     integer j, ns, jbgn
-    integer kri
+    integer kri, ksubm
     character(len=litem) :: hi(nitem)
     logical swap, lrec
 !!!_   . note
-    ! When argument head is present
+    ! When argument head is present, krect is also mandatory (the opposite is not)
     !   File position must be at the header end (data begin)
     !   argument head is used as the first header instead to read next.
     !   Usual header/data reading is performed from the second block
+!!!_   . note (dummy separator record)
+    ! Big-GTOOL record cannot be skipped backward, because there is no chance to
+    ! detect the length of data-block.
 !!!_   . body
     ierr = 0
     ns = 0
     jbgn = 0
 
-    if (present(head).NEQV.present(krect)) then
+    if (present(head).and. .not.present(krect)) then
        ierr = ERR_PANIC - ERR_MASK_NIO_RECORD
        return
     endif
 
     if (n .lt. 0) then
-       if (present(krect)) then
+       if (present(head)) then   ! head as placeholder
+          ! back to header head
           call nio_skip_prec(ierr, u, -1, krect)
           if (ierr.eq.0) jbgn = jbgn + 1
        endif
@@ -1432,10 +1440,11 @@ contains
           if (ierr.eq.0) jbgn = jbgn + 1
        endif
        if (ierr.eq.0) ns = jbgn
+       ksubm = IAND(choice(0, krect), REC_SUB_ALLOW)
        do j = jbgn, n - 1
           if (ierr.ne.0) exit
           if (ierr.eq.0) call nio_read_header(ierr, hi, kri, u)
-          if (ierr.eq.0) call nio_skip_data(ierr, u, hi, kri)
+          if (ierr.eq.0) call nio_skip_data(ierr, u, hi, IOR(kri, ksubm))  ! copy argument SUB switch
           if (ierr.eq.0) ns = ns + 1
        enddo
     endif
@@ -1448,7 +1457,8 @@ contains
 !!!_  & nio_skip_data - forward one data record
   subroutine nio_skip_data &
        & (ierr, u, head, krect)
-    use TOUZA_Nio_std,   only: WHENCE_CURRENT, sus_skip_irec, sus_skip_lrec
+    use TOUZA_Nio_std,only: KIOFS, sus_rseek, WHENCE_ABS, WHENCE_CURRENT
+    use TOUZA_Nio_std,only: sus_skip_irec, sus_skip_lrec
     ! use TOUZA_Nio_header,only: &
     !      & nitem, litem, hi_DFMT, get_item
     implicit none
@@ -1456,14 +1466,117 @@ contains
     integer,         intent(in)  :: u
     character(len=*),intent(in)  :: head(*)
     integer,         intent(in)  :: krect
+    logical swap, lrec
     integer nrec
+
+    integer kfmt
+    integer kaxs(3)
+    real(kind=KRMIS) :: vmiss   ! dummy
 !!!_   . body
     ierr = 0
-    if (ierr.eq.0) call nio_data_records(nrec, head)
-    ierr = min(0, nrec)
-    if (ierr.eq.0) call nio_skip_prec(ierr, u, nrec, krect)
+    if (ierr.eq.0) then
+       lrec = IAND(krect, REC_LSEP).ne.0
+       if (lrec) then
+          swap = IAND(krect, REC_SWAP).ne.0
+          call nio_data_records(nrec, head)
+          ierr = min(0, nrec)
+          if (ierr.eq.0) call sus_skip_lrec(ierr, u, nrec, WHENCE_CURRENT, swap=swap)
+       else
+          call parse_header_base(ierr, kfmt, kaxs, vmiss, head)
+          if (ierr.eq.0) call nio_skip_data_irec(ierr, kfmt, kaxs, krect, u)
+       endif
+    endif
     return
   end subroutine nio_skip_data
+
+!!!_  & nio_skip_data_irec - forward one data record with irec-type record
+  subroutine nio_skip_data_irec &
+       & (ierr, kfmt, kaxs, krect, u)
+    use TOUZA_Nio_std,only: KIOFS, sus_rseek, WHENCE_ABS, WHENCE_CURRENT
+    use TOUZA_Nio_std,only: sus_read_irec
+    use TOUZA_Trp,only: count_packed
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: kfmt
+    integer,intent(in)  :: kaxs(*)
+    integer,intent(in)  :: krect
+    integer,intent(in)  :: u
+    integer n
+    integer(kind=KI32) :: vi(1)
+    real(kind=KFLT)    :: vf(1)
+    real(kind=KDBL)    :: vd(1)
+    logical swap
+    integer div
+    integer,parameter :: KISRC=KI32
+    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer ncom
+    integer(kind=KISRC) :: mb
+    integer nrec
+    integer nbits
+    integer,parameter :: KRSRC=KDBL
+    integer nn, nh, nm, nk
+
+    ierr = 0
+    swap = IAND(krect, REC_SWAP).ne.0
+    div = read_sep_flag(krect)
+    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
+    select case (kfmt)
+    case(GFMT_UR4)
+       call sus_read_irec(ierr, u, vf, 0, swap, div=div, lmem=n)
+    case(GFMT_UR8)
+       call sus_read_irec(ierr, u, vd, 0, swap, div=div, lmem=n)
+    case(GFMT_UI4)
+       call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=n)
+    case(GFMT_MR4)
+       ncom = count_packed(1, n, khld)
+       call get_data_record(ierr, mb, u, krect)
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=ncom)
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vf, 0, swap, div=div, lmem=mb)
+    case(GFMT_MR8)
+       ncom = count_packed(1, n, khld)
+       call get_data_record(ierr, mb, u, krect)
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=ncom)
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vd, 0, swap, div=div, lmem=mb)
+    case(GFMT_MI4)
+       ncom = count_packed(1, n, khld)
+       call get_data_record(ierr, mb, u, krect)
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=ncom)
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=mb)
+    case(GFMT_URC, GFMT_URC2)
+       !! to do: dummy separator
+       nrec = max(1, kaxs(3)) * 4
+       call nio_skip_prec(ierr, u, nrec, krect)
+    case (GFMT_URY:GFMT_URYend-1)
+       nbits = kfmt - GFMT_URY
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
+       ncom  = count_packed(nbits, nh, khld)
+       nn = nk * 2
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vd, 0, swap, div=div, lmem=nn)
+       nn = nk * ncom
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=nn)
+    case (GFMT_MRY:GFMT_MRYend-1)
+       nbits = kfmt - GFMT_URY
+       nh = max(1, kaxs(1)) * max(1, kaxs(2))
+       nk = max(1, kaxs(3))
+       nm = count_packed(nbits, nh, khld)
+       if (ierr.eq.0) call get_data_record(ierr, ncom, u, krect)
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=nk)
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=nk)
+       nn = nk * 2
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vd, 0, swap, div=div, lmem=nn)
+       nn = nk * nm
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=nn)
+       if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=ncom)
+    case (GFMT_URT, GFMT_MRT)
+       !! to do: dummy separator
+       nrec = 1
+       call nio_skip_prec(ierr, u, nrec, krect)
+    case default
+       ierr = ERR_UNKNOWN_FORMAT
+    end select
+
+  end subroutine nio_skip_data_irec
 
 !!!_  & nio_data_records - inquire number of data records
   subroutine nio_data_records &
@@ -2800,7 +2913,8 @@ contains
     if (ierr.eq.0) then
        mem = (n - 1) / nbreak + 1
        mem = min(max(1, mem), lrec_urt / mpr) * mpr
-       call sus_pad_irec(ierr, u, fill, mem, swap, .FALSE., .TRUE.)
+       ! force subrecord design
+       call sus_pad_irec(ierr, u, fill, mem, swap, .FALSE., .TRUE., dummy=def_block)
     endif
     return
   end subroutine put_data_urt_cache
@@ -2836,7 +2950,8 @@ contains
        ni = mem
        if (n.gt.0) ni = min(ni, n)
        sub = .TRUE.
-       call sus_read_irec(ierr, u, cache, ni, swap, sub)
+       ! force subrecord design
+       call sus_read_irec(ierr, u, cache, ni, swap, sub, div=def_block)
     endif
     ! write(*, *) 'cache', ierr, mem, ni
     return
@@ -2867,6 +2982,7 @@ contains
 
     integer(kind=KISRC) :: ibagaz(0:2*n+KB_HEAD)
     integer nbgz, napp
+    integer rectx
 
     ierr = err_default
     if (present(kapp)) then
@@ -2874,6 +2990,7 @@ contains
     else
        napp = 0
     endif
+    rectx = IOR(krect, REC_SUB_ALLOW)  ! force sub-record splitting
 
     if (ierr.eq.0) then
        call encode_alloc &
@@ -2887,18 +3004,18 @@ contains
     if (ierr.eq.0) call guardar_extra(ierr, ibagaz, XTRP_NX, napp)
     if (ierr.eq.0) then
        call put_data_record &
-            & (ierr, ibagaz(0:KB_HEAD-1), KB_HEAD, u, krect, pre=pre, post=.TRUE.)
+            & (ierr, ibagaz(0:KB_HEAD-1), KB_HEAD, u, rectx, pre=pre, post=.TRUE.)
     endif
     if (ierr.eq.0) then
        if (napp.gt.0) then
           call put_data_record &
-               & (ierr, kapp(0:napp-1), napp, u, krect, pre=.TRUE., post=.TRUE.)
+               & (ierr, kapp(0:napp-1), napp, u, rectx, pre=.TRUE., post=.TRUE.)
        endif
     endif
     if (ierr.eq.0) then
        nbgz = retrieve_nbgz(ibagaz)
        call put_data_record &
-            & (ierr, ibagaz(KB_HEAD:KB_HEAD+nbgz-1), nbgz, u, krect, pre=.TRUE., post=post)
+            & (ierr, ibagaz(KB_HEAD:KB_HEAD+nbgz-1), nbgz, u, rectx, pre=.TRUE., post=post)
     endif
     if (ierr.eq.0) then
        if (udiag.ge.-1) call show_bagazo_props(ierr, ibagaz, udiag)
@@ -2929,6 +3046,7 @@ contains
 
     integer(kind=KISRC) :: ibagaz(0:2*n+KB_HEAD)
     integer nbgz, napp
+    integer rectx
     real(kind=KRSRC) :: rmiss
 
     ierr = err_default
@@ -2937,6 +3055,7 @@ contains
     else
        napp = 0
     endif
+    rectx = IOR(krect, REC_SUB_ALLOW)  ! force sub-record splitting
 
     if (ierr.eq.0) then
        rmiss = real(vmiss, kind=KRSRC)
@@ -2952,17 +3071,17 @@ contains
     if (ierr.eq.0) then
        nbgz = retrieve_nbgz(ibagaz)
        call put_data_record &
-            & (ierr, ibagaz(0:KB_HEAD-1), KB_HEAD, u, krect, pre=pre, post=.TRUE.)
+            & (ierr, ibagaz(0:KB_HEAD-1), KB_HEAD, u, rectx, pre=pre, post=.TRUE.)
     endif
     if (ierr.eq.0) then
        if (napp.gt.0) then
           call put_data_record &
-               & (ierr, kapp(0:napp-1), napp, u, krect, pre=.TRUE., post=.TRUE.)
+               & (ierr, kapp(0:napp-1), napp, u, rectx, pre=.TRUE., post=.TRUE.)
        endif
     endif
     if (ierr.eq.0) then
        call put_data_record &
-            & (ierr, ibagaz(KB_HEAD:KB_HEAD+nbgz-1), nbgz, u, krect, pre=.TRUE., post=post)
+            & (ierr, ibagaz(KB_HEAD:KB_HEAD+nbgz-1), nbgz, u, rectx, pre=.TRUE., post=post)
     endif
     if (ierr.eq.0) then
        if (udiag.ge.-1) call show_bagazo_props(ierr, ibagaz, udiag)
@@ -3033,26 +3152,6 @@ contains
        endif
        if (ierr.ne.0) exit
     enddo
-    ! sub = .TRUE.
-    ! icom(ncom+1) stores filling method
-    ! if (ierr.eq.0) call get_data_record(ierr, icom, ncom+1, u, krect, sub=sub)
-    ! if (ierr.eq.0 .and. .NOT.sub) then
-    !    ierr = -1
-    ! endif
-    ! if (ierr.eq.0) then
-    !    sub = .TRUE.
-    !    call get_data_urt_core &
-    !         & (ierr, &
-    !         &  buf,   mv, nv,  u, krect,  sub,  &
-    !         &  vmiss, def_decode_trapiche, kopts, napp=na, kapp=icom)
-    ! endif
-    ! if (ierr.eq.0) then
-    !    ncom = na - 2
-    !    kpack = icom(na+2)
-    !    kpack = suggest_filling(1, mv, kcode=def_decode_trapiche, kfill=kpack)
-    !    call mask_decode &
-    !         & (ierr,  d, nv, buf, icom, vmiss, kpack)
-    ! endif
     return
   end subroutine get_data_mrt_d
   subroutine get_data_mrt_f &
@@ -3119,28 +3218,6 @@ contains
        if (ierr.ne.0) exit
     enddo
 
-    ! sub = .TRUE.
-    ! ncom = count_packed(1, n, khld)
-    ! nv = n
-    ! jv = 0
-    ! ! icom(ncom+1) stores filling method
-    ! if (ierr.eq.0) call get_data_record(ierr, icom, ncom+1, u, krect, sub=sub)
-    ! if (ierr.eq.0 .and. .NOT.sub) then
-    !    ierr = -1
-    ! endif
-    ! if (ierr.eq.0) then
-    !    sub = .TRUE.
-    !    call get_data_urt_core &
-    !         & (ierr, &
-    !         &  buf,   mv, nv, u, krect,  sub,  &
-    !         &  vmiss, def_decode_trapiche, kopts)
-    ! endif
-    ! if (ierr.eq.0) then
-    !    kpack = icom(ncom + 1)
-    !    kpack = suggest_filling(1, mv, kcode=def_decode_trapiche, kfill=kpack)
-    !    call mask_decode &
-    !         & (ierr,  d, mv, buf, icom, vmiss, kpack)
-    ! endif
     return
   end subroutine get_data_mrt_f
 
@@ -3305,13 +3382,15 @@ contains
     integer nbgz, ncnz
     integer na,   ma, xid, jp
     logical cont
+    integer rectx
 
     ierr = err_default
     na = 0
+    rectx = IOR(krect, REC_SUB_ALLOW)  ! force sub-record splitting
 
     if (ierr.eq.0) then
        cont = .TRUE.
-       call get_data_record(ierr, ibagaz(0:KB_HEAD-1), KB_HEAD, u, krect, sub=cont)
+       call get_data_record(ierr, ibagaz(0:KB_HEAD-1), KB_HEAD, u, rectx, sub=cont)
     endif
     if (ierr.eq.0.and. .NOT.CONT) then
        ! no packed data follows
@@ -3333,15 +3412,15 @@ contains
           cont = .TRUE.
           if (present(kapp)) then
              ma = min(na, size(kapp))
-             call get_data_record(ierr, kapp(0:ma-1), ma, u, krect, sub=cont)
+             call get_data_record(ierr, kapp(0:ma-1), ma, u, rectx, sub=cont)
           else
-             call get_data_record(ierr, kdmy, 1, u, krect, sub=cont)
+             call get_data_record(ierr, kdmy, 1, u, rectx, sub=cont)
           endif
        endif
     endif
     if (ierr.eq.0) then
        nbgz = retrieve_nbgz(ibagaz)
-       call get_data_record(ierr, ibagaz(KB_HEAD:KB_HEAD+nbgz-1), nbgz, u, krect, sub)
+       call get_data_record(ierr, ibagaz(KB_HEAD:KB_HEAD+nbgz-1), nbgz, u, rectx, sub)
     endif
 
     if (ierr.eq.0) then
@@ -3382,14 +3461,16 @@ contains
     integer nbgz, ncnz
     integer na,   ma, xid
     logical cont
+    integer rectx
     real(kind=KRSRC) :: rmiss
 
     ierr = err_default
     na = 0
+    rectx = IOR(krect, REC_SUB_ALLOW)  ! force sub-record splitting
 
     if (ierr.eq.0) then
        cont = .TRUE.
-       call get_data_record(ierr, ibagaz(0:KB_HEAD-1), KB_HEAD, u, krect, sub=cont)
+       call get_data_record(ierr, ibagaz(0:KB_HEAD-1), KB_HEAD, u, rectx, sub=cont)
     endif
     if (ierr.eq.0.and. .NOT.CONT) then
        ! no packed data follows
@@ -3411,15 +3492,15 @@ contains
           cont = .TRUE.
           if (present(kapp)) then
              ma = min(na, size(kapp))
-             call get_data_record(ierr, kapp(0:ma-1), ma, u, krect, sub=cont)
+             call get_data_record(ierr, kapp(0:ma-1), ma, u, rectx, sub=cont)
           else
-             call get_data_record(ierr, kdmy, 1, u, krect, sub=cont)
+             call get_data_record(ierr, kdmy, 1, u, rectx, sub=cont)
           endif
        endif
     endif
     if (ierr.eq.0) then
        nbgz = retrieve_nbgz(ibagaz)
-       call get_data_record(ierr, ibagaz(KB_HEAD:KB_HEAD+nbgz-1), nbgz, u, krect, sub=sub)
+       call get_data_record(ierr, ibagaz(KB_HEAD:KB_HEAD+nbgz-1), nbgz, u, rectx, sub=sub)
     endif
 
     if (ierr.eq.0) then
@@ -3986,8 +4067,9 @@ contains
 
     ktmp = choice(def_krectw, kcfg)
     if (ktmp.lt.0) ktmp = def_krectw
+    if (ktmp.lt.0) ktmp = REC_DEFAULT
 
-    if (IAND(ktmp, REC_LSEP).gt.0) krect = krect + REC_LSEP
+    krect = IOR(krect, IAND(ktmp, REC_LSEP))
     if (IAND(ktmp, REC_SWAP).gt.0) then
        krect = krect + REC_SWAP
     else if (IAND(ktmp, REC_BIG).gt.0) then
@@ -3995,6 +4077,7 @@ contains
     else if (IAND(ktmp, REC_LITTLE).gt.0) then
        if (kendi.eq.endian_BIG) krect = krect + REC_SWAP
     endif
+    krect = IOR(krect, IAND(ktmp, REC_SUB_ALLOW))
 
     return
   end subroutine get_switch
@@ -4038,6 +4121,7 @@ contains
     logical,           intent(inout),optional :: sub
 
     logical swap, lrec
+    integer div
 
     ierr = 0
     swap = IAND(krect, REC_SWAP).ne.0
@@ -4045,7 +4129,8 @@ contains
     if (lrec) then
        call sus_read_lrec(ierr, u, d, n, swap)
     else
-       call sus_read_irec(ierr, u, d, n, swap, sub)
+       div = read_sep_flag(krect)
+       call sus_read_irec(ierr, u, d, n, swap, sub, div)
     endif
     return
   end subroutine get_data_record_i
@@ -4063,6 +4148,7 @@ contains
     logical,        intent(inout),optional :: sub
 
     logical swap, lrec
+    integer div
 
     ierr = 0
     swap = IAND(krect, REC_SWAP).ne.0
@@ -4070,7 +4156,8 @@ contains
     if (lrec) then
        call sus_read_lrec(ierr, u, d, n, swap)
     else
-       call sus_read_irec(ierr, u, d, n, swap, sub)
+       div = read_sep_flag(krect)
+       call sus_read_irec(ierr, u, d, n, swap, sub, div)
     endif
     return
   end subroutine get_data_record_f
@@ -4088,6 +4175,7 @@ contains
     logical,        intent(inout),optional :: sub
 
     logical swap, lrec
+    integer div
 
     ierr = 0
     swap = IAND(krect, REC_SWAP).ne.0
@@ -4095,7 +4183,8 @@ contains
     if (lrec) then
        call sus_read_lrec(ierr, u, d, n, swap)
     else
-       call sus_read_irec(ierr, u, d, n, swap, sub)
+       div = read_sep_flag(krect)
+       call sus_read_irec(ierr, u, d, n, swap, sub, div)
     endif
     return
   end subroutine get_data_record_d
@@ -4113,6 +4202,7 @@ contains
     logical,           intent(inout),optional :: sub
 
     logical swap, lrec
+    integer div
     integer(kind=KARG) :: b(1)
 
     ierr = 0
@@ -4121,7 +4211,8 @@ contains
     if (lrec) then
        call sus_read_lrec(ierr, u, b, 1, swap)
     else
-       call sus_read_irec(ierr, u, b, 1, swap, sub)
+       div = read_sep_flag(krect)
+       call sus_read_irec(ierr, u, b, 1, swap, sub, div)
     endif
     if (ierr.eq.0) d = b(1)
     return
@@ -4139,6 +4230,7 @@ contains
     logical,        intent(inout),optional :: sub
 
     logical swap, lrec
+    integer div
     real(kind=KARG) :: b(1)
 
     ierr = 0
@@ -4147,7 +4239,8 @@ contains
     if (lrec) then
        call sus_read_lrec(ierr, u, b, 1, swap)
     else
-       call sus_read_irec(ierr, u, b, 1, swap, sub)
+       div = read_sep_flag(krect)
+       call sus_read_irec(ierr, u, b, 1, swap, sub, div)
     endif
     if (ierr.eq.0) d = b(1)
     return
@@ -4165,6 +4258,7 @@ contains
     logical,        intent(inout),optional :: sub
 
     logical swap, lrec
+    integer div
     real(kind=KARG) :: b(1)
 
     ierr = 0
@@ -4173,7 +4267,8 @@ contains
     if (lrec) then
        call sus_read_lrec(ierr, u, b, 1, swap)
     else
-       call sus_read_irec(ierr, u, b, 1, swap, sub)
+       div = read_sep_flag(krect)
+       call sus_read_irec(ierr, u, b, 1, swap, sub, div)
     endif
     if (ierr.eq.0) d = b(1)
     return
@@ -4311,6 +4406,7 @@ contains
     logical,           intent(in),optional :: pre, post
 
     logical swap, lrec
+    integer dummy
 
     ierr = 0
     swap = IAND(krect, REC_SWAP).ne.0
@@ -4318,7 +4414,8 @@ contains
     if (lrec) then
        call sus_write_lrec(ierr, u, d, n, swap)
     else
-       call sus_write_irec(ierr, u, d, n, swap, pre, post)
+       dummy = dummy_sep_flag(krect)
+       call sus_write_irec(ierr, u, d, n, swap, pre, post, dummy)
     endif
     return
   end subroutine put_data_record_i
@@ -4336,6 +4433,7 @@ contains
     logical,        intent(in),optional :: pre, post
 
     logical swap, lrec
+    integer dummy
 
     ierr = 0
     swap = IAND(krect, REC_SWAP).ne.0
@@ -4343,7 +4441,8 @@ contains
     if (lrec) then
        call sus_write_lrec(ierr, u, d, n, swap)
     else
-       call sus_write_irec(ierr, u, d, n, swap, pre, post)
+       dummy = dummy_sep_flag(krect)
+       call sus_write_irec(ierr, u, d, n, swap, pre, post, dummy)
     endif
     return
   end subroutine put_data_record_f
@@ -4361,6 +4460,7 @@ contains
     logical,        intent(in),optional :: pre, post
 
     logical swap, lrec
+    integer dummy
 
     ierr = 0
     swap = IAND(krect, REC_SWAP).ne.0
@@ -4368,7 +4468,8 @@ contains
     if (lrec) then
        call sus_write_lrec(ierr, u, d, n, swap)
     else
-       call sus_write_irec(ierr, u, d, n, swap, pre, post)
+       dummy = dummy_sep_flag(krect)
+       call sus_write_irec(ierr, u, d, n, swap, pre, post, dummy)
     endif
     return
   end subroutine put_data_record_d
@@ -4386,6 +4487,7 @@ contains
     logical,           intent(in),optional :: pre, post
 
     logical swap, lrec
+    integer dummy
     integer(kind=KARG) :: b(1)
 
     ierr = 0
@@ -4395,7 +4497,8 @@ contains
     if (lrec) then
        call sus_write_lrec(ierr, u, b, 1, swap)
     else
-       call sus_write_irec(ierr, u, b, 1, swap, pre, post)
+       dummy = dummy_sep_flag(krect)
+       call sus_write_irec(ierr, u, b, 1, swap, pre, post, dummy)
     endif
     return
   end subroutine put_data_record_i1
@@ -4412,6 +4515,7 @@ contains
     logical,        intent(in),optional :: pre, post
 
     logical swap, lrec
+    integer dummy
     real(kind=KARG) :: b(1)
 
     ierr = 0
@@ -4421,7 +4525,8 @@ contains
     if (lrec) then
        call sus_write_lrec(ierr, u, b, 1, swap)
     else
-       call sus_write_irec(ierr, u, b, 1, swap, pre, post)
+       dummy = dummy_sep_flag(krect)
+       call sus_write_irec(ierr, u, b, 1, swap, pre, post, dummy)
     endif
     return
   end subroutine put_data_record_f1
@@ -4438,6 +4543,7 @@ contains
     logical,        intent(in),optional :: pre, post
 
     logical swap, lrec
+    integer dummy
     real(kind=KARG) :: b(1)
 
     ierr = 0
@@ -4447,7 +4553,8 @@ contains
     if (lrec) then
        call sus_write_lrec(ierr, u, b, 1, swap)
     else
-       call sus_write_irec(ierr, u, b, 1, swap, pre, post)
+       dummy = dummy_sep_flag(krect)
+       call sus_write_irec(ierr, u, b, 1, swap, pre, post, dummy)
     endif
     return
   end subroutine put_data_record_d1
@@ -4559,6 +4666,48 @@ contains
     return
   end subroutine put_data_drecord_f
 
+!!!_  & dummy_sep_flag()
+  integer function dummy_sep_flag(krect) result(k)
+    implicit none
+    integer,intent(in) :: krect
+    if (IAND(krect, REC_SUB_ALLOW).eq.0) then
+       k = MAGIC_DUMMY_SEP
+    else
+       k = 0
+    endif
+  end function dummy_sep_flag
+
+!!!_  & read_sep_flag()
+  integer function read_sep_flag(krect) result(k)
+    implicit none
+    integer,intent(in) :: krect
+    if (IAND(krect, REC_SUB_ALLOW).eq.0) then
+       k = sw_subrec
+    else
+       k = ignore_small
+    endif
+  end function read_sep_flag
+
+!!!_  & nio_allow_sub()
+  integer function nio_allow_sub(krect, cond) result(k)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,intent(in)          :: krect
+    logical,intent(in),optional :: cond
+    ! set SUB bit when COND is TRUE or absent
+    if (choice(.TRUE., cond)) then
+       k = IOR(krect, REC_SUB_ALLOW)
+    else
+       k = krect
+    endif
+  end function nio_allow_sub
+!!!_  & set_switch_subrec()
+  integer function set_switch_subrec(sw) result(n)
+    implicit none
+    integer,intent(in) :: sw
+    n = sw_subrec
+    sw_subrec = sw
+  end function set_switch_subrec
 !!!_  & parse_header_base - parse minimum properties
   subroutine parse_header_base &
        & (ierr, kfmt, kaxs, vmiss, head)

@@ -1,7 +1,7 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2022/12/05 09:42:11 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/20 13:28:02 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -29,7 +29,7 @@ module TOUZA_Nio_std
   use TOUZA_Std_env,only: KIOFS
   use TOUZA_Std_env,only: nc_strm,          nbits_byte
   use TOUZA_Std_env,only: conv_b2strm,      get_size_bytes
-  use TOUZA_Std_env,only: get_mems_bytes,   get_size_strm
+  use TOUZA_Std_env,only: get_mems_bytes
   use TOUZA_Std_env,only: kendi_file,       kendi_mem,      check_bodr_unit,  check_byte_order
   use TOUZA_Std_env,only: endian_BIG,       endian_LITTLE,  endian_OTHER
   use TOUZA_Std_env,only: is_eof_ss
@@ -41,7 +41,9 @@ module TOUZA_Nio_std
   use TOUZA_Std_sus,only: sus_write_isep,   sus_read_isep
   use TOUZA_Std_sus,only: sus_write_lsep,   sus_read_lsep
   use TOUZA_Std_sus,only: sus_rseek,        sus_eswap
-  use TOUZA_Std_sus,only: max_members,      sus_record_mems_irec
+  use TOUZA_Std_sus,only: sus_size_irec
+  use TOUZA_Std_sus,only: max_members,      is_irec_overflow, sus_record_mems_irec
+  use TOUZA_Std_sus,only: def_block,        ignore_small,     ignore_bigger,  ignore_always
 !!!_  - default
   implicit none
   private
@@ -78,7 +80,7 @@ module TOUZA_Nio_std
   public :: KIOFS
   public :: nc_strm,          nbits_byte
   public :: conv_b2strm,      get_size_bytes
-  public :: get_mems_bytes,   get_size_strm
+  public :: get_mems_bytes
   public :: kendi_file,       kendi_mem,      check_bodr_unit,  check_byte_order
   public :: endian_BIG,       endian_LITTLE,  endian_OTHER
   public :: is_eof_ss
@@ -90,7 +92,9 @@ module TOUZA_Nio_std
   public :: sus_write_isep,   sus_read_isep
   public :: sus_write_lsep,   sus_read_lsep
   public :: sus_rseek,        sus_eswap
-  public :: max_members,      sus_record_mems_irec
+  public :: sus_size_irec
+  public :: max_members,      is_irec_overflow, sus_record_mems_irec
+  public :: def_block,        ignore_small,     ignore_bigger,  ignore_always
 contains
 !!!_ + common interfaces
 !!!_  & init
