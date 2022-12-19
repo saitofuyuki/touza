@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2022/09/20 17:04:58 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/19 15:22:13 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2022
@@ -147,6 +147,7 @@ module TOUZA_Std_arg
   public :: parse_param
   public :: inq_end_flags
   public :: check_param
+  public :: cmdline_count_wrap, cmdline_arg_wrap
 !!!_ + basic procedures
 contains
 !!!_  & init
@@ -1848,6 +1849,20 @@ contains
     endif
     return
   end subroutine default_vals_d
+
+!!!_  & cmdline_count_wrap()
+  integer function cmdline_count_wrap() result(n)
+    implicit none
+#   if HAVE_FORTRAN_COMMAND_ARGUMENT_COUNT
+#     define _COMMAND_ARGUMENT_COUNT() COMMAND_ARGUMENT_COUNT()
+#   elif HAVE_FORTRAN_IARGC
+#     define _COMMAND_ARGUMENT_COUNT() IARGC()
+#   else
+#     error "neither COMMAND_ARGUMENT_COUNT nor IARGC found"
+#   endif
+    n = _COMMAND_ARGUMENT_COUNT()
+    return
+  end function cmdline_count_wrap
 
 !!!_  & cmdline_arg_wrap
   subroutine cmdline_arg_wrap &
