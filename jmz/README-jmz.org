@@ -426,7 +426,7 @@ compute compromise (result) domain.
 : 1 a1           b0            a1+b0
 : 2 a2           b0            a2+b0
 
-The former operations are performed only at the definite range, whit
+The former operations are performed only at the definite range, while
 the latter spread along the null rank value.
 
 In order to avoid confusing, chak parser style is *TOGGLED OFF* at

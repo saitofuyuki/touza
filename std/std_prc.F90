@@ -1,10 +1,10 @@
-!!!_! std_prc.F90 - touza/std precision(kind) manager
+!!!_! std_prc.F90 - TOUZA/Std precision(kind) manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Sep 6 2020
-#define TIME_STAMP 'Time-stamp: <2022/02/16 14:59:53 fuyuki std_prc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/07 10:43:08 fuyuki std_prc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021, 2022
+! Copyright (C) 2020,2021,2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -84,6 +84,7 @@ module TOUZA_Std_prc
   private
 # define __MDL__ 'prc'
 # define __TAG__ STD_FORMAT_MDL(__MDL__)
+# define _ERROR(E) (E - ERR_MASK_STD_PRC)
 !!!_  - real precisions
   integer,parameter :: dflt = OPT_REAL_SINGLE_DIGITS
   integer,parameter :: xflt = OPT_REAL_SINGLE_EXP
@@ -134,7 +135,7 @@ module TOUZA_Std_prc
   integer,save :: diag_counts = 0
   integer,save :: fine_counts = 0
   integer,save :: lev_verbose = STD_MSG_LEVEL
-  integer,save :: err_default = ERR_NO_INIT - ERR_MASK_STD_PRC
+  integer,save :: err_default = _ERROR(ERR_NO_INIT)
   integer,save :: ulog = -1
 
   logical,save :: force_check_dnm = .FALSE.
@@ -148,10 +149,10 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    logical,intent(in),optional :: inf,  dnm
+    logical,intent(in),optional :: inf,  dnm    ! boolean to report inifinity, denormalized properties
     integer md
 
-    ierr = 0
+    ierr = ERR_SUCCESS
 
     md = idef(mode, MODE_DEFAULT)
     if (md.eq.MODE_DEFAULT) md = MODE_DEEP
@@ -165,7 +166,7 @@ contains
           call init_set_switches(ierr, inf, dnm)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_PRC
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
     return
   end subroutine init
@@ -196,7 +197,7 @@ contains
                 write(*,    301) ierr
              endif
           endif
-          ierr = 0
+          ierr = ERR_SUCCESS
        endif
        if (diag_counts.eq.0.or.IAND(md,MODE_FORCE).gt.0) then
 101       format(__TAG__, A)
@@ -274,7 +275,7 @@ contains
                 write(*,    301) ierr
              endif
           endif
-          ierr = 0
+          ierr = ERR_SUCCESS
        endif
        fine_counts = fine_counts + 1
     endif
@@ -289,7 +290,7 @@ contains
     logical,intent(in),optional :: inf
     logical,intent(in),optional :: dnm
 
-    ierr = 0
+    ierr = ERR_SUCCESS
     if (present(inf)) then
        force_check_inf = inf
     endif
@@ -306,7 +307,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer utmp
-    ierr = 0
+    ierr = ERR_SUCCESS
     utmp = idef(u, ulog)
 
 201 format(__TAG__, A, ' = ', I0, 2x, I0, ',', I0)
@@ -325,65 +326,6 @@ contains
        write(*,    202) 'int64',  KI64, BIT_SIZE(INT(0, KIND=KI64))
     endif
   end subroutine diag_abstract
-!!!_  & diag_real_props - real properties diagnosis
-  subroutine diag_real_props_d &
-       & (ierr, v, u)
-    implicit none
-    integer,parameter :: KTGT = KDBL
-    integer,        intent(out)         :: ierr
-    real(kind=KTGT),intent(in)          :: v
-    integer,        intent(in),optional :: u
-    integer utmp, k
-    ierr = 0
-    utmp = idef(u, ulog)
-    k = KIND(v)
-101 format(__TAG__, 'real:', I0, ' fraction = ', I0, 1x, I0)
-102 format(__TAG__, 'real:', I0, ' exponent = ', I0, 1x, I0)
-103 format(__TAG__, 'real:', I0, ' precision = ', I0, 1x, I0)
-104 format(__TAG__, 'real:', I0, ' exponent(1 epsilon) = ', I0, 1x, I0)
-    if (utmp.ge.0) then
-       write(utmp, 101) k, RADIX(v), DIGITS(v)
-       write(utmp, 102) k, MINEXPONENT(v), MAXEXPONENT(v)
-       write(utmp, 103) k, PRECISION(v),   RANGE(v)
-       write(utmp, 104) k, EXPONENT(1._KTGT), EXPONENT(EPSILON(v))
-    else
-       write(*, 101) k, RADIX(v), DIGITS(v)
-       write(*, 102) k, MINEXPONENT(v), MAXEXPONENT(v)
-       write(*, 103) k, PRECISION(v),   RANGE(v)
-       write(*, 104) k, EXPONENT(1._KTGT), EXPONENT(EPSILON(v))
-    endif
-    return
-  end subroutine diag_real_props_d
-
-  subroutine diag_real_props_f &
-       & (ierr, v, u)
-    implicit none
-    integer,parameter :: KTGT = KFLT
-    integer,        intent(out)         :: ierr
-    real(kind=KTGT),intent(in)          :: v
-    integer,        intent(in),optional :: u
-    integer utmp, k
-    ierr = 0
-    utmp = idef(u, ulog)
-    k = KIND(v)
-101 format(__TAG__, 'real:', I0, ' fraction = ', I0, 1x, I0)
-102 format(__TAG__, 'real:', I0, ' exponent = ', I0, 1x, I0)
-103 format(__TAG__, 'real:', I0, ' precision = ', I0, 1x, I0)
-104 format(__TAG__, 'real:', I0, ' exponent(1 epsilon) = ', I0, 1x, I0)
-    if (utmp.ge.0) then
-       write(utmp, 101) k, RADIX(v), DIGITS(v)
-       write(utmp, 102) k, MINEXPONENT(v), MAXEXPONENT(v)
-       write(utmp, 103) k, PRECISION(v),   RANGE(v)
-       write(utmp, 104) k, EXPONENT(1._KTGT), EXPONENT(EPSILON(v))
-    else
-       write(*, 101) k, RADIX(v), DIGITS(v)
-       write(*, 102) k, MINEXPONENT(v), MAXEXPONENT(v)
-       write(*, 103) k, PRECISION(v),   RANGE(v)
-       write(*, 104) k, EXPONENT(1._KTGT), EXPONENT(EPSILON(v))
-    endif
-    return
-  end subroutine diag_real_props_f
-
 !!!_  & diag_int_kinds - brute-force checker of integer kinds
   subroutine diag_int_kinds &
        & (ierr, u, maxr, minr)
@@ -396,7 +338,7 @@ contains
     integer k
     integer kprv, knxt
 
-    ierr = 0
+    ierr = ERR_SUCCESS
     utmp = idef(u, ulog)
     rbgn = idef(minr, 1)
     rend = max(rbgn+1, idef(maxr, 128))
@@ -433,7 +375,7 @@ contains
     integer k
     integer kprv, knxt
 
-    ierr = 0
+    ierr = ERR_SUCCESS
     utmp = idef(u, ulog)
     jp   = idef(minp, 1)
     pend = max(jp, idef(maxp, 128))
@@ -463,6 +405,68 @@ contains
 
   end subroutine diag_real_kinds
 
+!!!_  & diag_real_props - real properties diagnosis
+  subroutine diag_real_props_d &
+       & (ierr, mold, u)
+    implicit none
+    integer,parameter :: KTGT = KDBL
+    integer,        intent(out)         :: ierr
+    real(kind=KTGT),intent(in)          :: mold
+    integer,        intent(in),optional :: u
+    ierr = ERR_SUCCESS
+    call diag_real_props_core &
+         & (ierr,  &
+         &  KIND(mold),        RADIX(mold),                  DIGITS(mold),            &
+         &  MINEXPONENT(mold), MAXEXPONENT(mold),            PRECISION(mold),         &
+         &  RANGE(mold),       EXPONENT(real(1, kind=KTGT)), EXPONENT(EPSILON(mold)), &
+         &  u)
+    return
+  end subroutine diag_real_props_d
+  subroutine diag_real_props_f &
+       & (ierr, mold, u)
+    implicit none
+    integer,parameter :: KTGT = KFLT
+    integer,        intent(out)         :: ierr
+    real(kind=KTGT),intent(in)          :: mold
+    integer,        intent(in),optional :: u
+    ierr = ERR_SUCCESS
+    call diag_real_props_core &
+         & (ierr,  &
+         &  KIND(mold),        RADIX(mold),                  DIGITS(mold),            &
+         &  MINEXPONENT(mold), MAXEXPONENT(mold),            PRECISION(mold),         &
+         &  RANGE(mold),       EXPONENT(real(1, kind=KTGT)), EXPONENT(EPSILON(mold)), &
+         &  u)
+    return
+  end subroutine diag_real_props_f
+  subroutine diag_real_props_core &
+       & (ierr, &
+       &  k,    rx, d, mine, maxe, pr, rg, e1, ee, u)
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: k
+    integer,intent(in)          :: rx, d,  mine, maxe
+    integer,intent(in)          :: pr, rg, e1,   ee
+    integer,intent(in),optional :: u
+    integer utmp
+    ierr = ERR_SUCCESS
+    utmp = idef(u, ulog)
+101 format(__TAG__, 'real:', I0, ' fraction = ', I0, 1x, I0)
+102 format(__TAG__, 'real:', I0, ' exponent = ', I0, 1x, I0)
+103 format(__TAG__, 'real:', I0, ' precision = ', I0, 1x, I0)
+104 format(__TAG__, 'real:', I0, ' exponent(1 epsilon) = ', I0, 1x, I0)
+    if (utmp.ge.0) then
+       write(utmp, 101) k, rx,   d
+       write(utmp, 102) k, mine, maxe
+       write(utmp, 103) k, pr,   rg
+       write(utmp, 104) k, e1,   ee
+    else
+       write(*, 101) k, rx,   d
+       write(*, 102) k, mine, maxe
+       write(*, 103) k, pr,   rg
+       write(*, 104) k, e1,   ee
+    endif
+  end subroutine diag_real_props_core
+
 !!!_ + misc
 !!!_  & set_defu - set global logging unit
   subroutine set_defu(u)
@@ -475,11 +479,11 @@ contains
 !!!_ + real properties checker
 !!!_  & check_real_props - batch property checker
   subroutine check_real_props_d &
-       & (kx, v, u, levv)
+       & (kx, mold, u, levv)
     implicit none
     integer,parameter :: KTGT = KDBL
     integer,        intent(out)         :: kx
-    real(kind=KTGT),intent(in)          :: v
+    real(kind=KTGT),intent(in)          :: mold
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: levv
 
@@ -487,11 +491,11 @@ contains
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
 
-    call check_real_zero(kx, v, u, levv)
-    call check_real_one(kx, v, u, levv)
+    call check_real_zero(kx, mold, u, levv)
+    call check_real_one(kx, mold, u, levv)
 101 format(__TAG__, 'real:', I0, ' skip to check ', A)
     if (force_check_inf) then
-       call check_real_inf(kx, v, u, levv)
+       call check_real_inf(kx, mold, u, levv)
     else if (VCHECK_DETAIL(lv)) then
        if (utmp.ge.0) then
           write(utmp, 101) KTGT, 'infinity'
@@ -500,7 +504,7 @@ contains
        endif
     endif
     if (force_check_dnm) then
-       call check_real_dnm(kx, v, u, levv)
+       call check_real_dnm(kx, mold, u, levv)
     else if (VCHECK_DETAIL(lv)) then
        if (utmp.ge.0) then
           write(utmp, 101) KTGT, 'denormalized'
@@ -511,11 +515,11 @@ contains
     return
   end subroutine check_real_props_d
   subroutine check_real_props_f &
-       & (kx, v, u, levv)
+       & (kx, mold, u, levv)
     implicit none
     integer,parameter :: KTGT = KFLT
     integer,        intent(out)         :: kx
-    real(kind=KTGT),intent(in)          :: v
+    real(kind=KTGT),intent(in)          :: mold
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: levv
 
@@ -523,11 +527,11 @@ contains
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
 
-    call check_real_zero(kx, v, u, levv)
-    call check_real_one(kx, v, u, levv)
+    call check_real_zero(kx, mold, u, levv)
+    call check_real_one(kx, mold, u, levv)
 101 format(__TAG__, 'real:', I0, ' skip to check ', A)
     if (force_check_inf) then
-       call check_real_inf(kx, v, u, levv)
+       call check_real_inf(kx, mold, u, levv)
     else if (VCHECK_DETAIL(lv)) then
        if (utmp.ge.0) then
           write(utmp, 101) KTGT, 'infinity'
@@ -536,7 +540,7 @@ contains
        endif
     endif
     if (force_check_dnm) then
-       call check_real_dnm(kx, v, u, levv)
+       call check_real_dnm(kx, mold, u, levv)
     else if (VCHECK_DETAIL(lv)) then
        if (utmp.ge.0) then
           write(utmp, 101) KTGT, 'denormalized'
@@ -551,29 +555,25 @@ contains
   !! return number of significant mantissa bits, i.e., ignoring
   !! the first implicit 1 bit.
   !! Should be identical with DIGITS(x) - 1.
-  integer function check_real_mantissa_d &
-       & (X) &
-       result (m)
+  integer function check_real_mantissa_d (mold) result (m)
     integer,parameter :: KTGT = KDBL
-    real(kind=KTGT),intent(in) :: X    ! placeholder
-    m = EXPONENT(1.0_KTGT) -  EXPONENT(EPSILON(X))
+    real(kind=KTGT),intent(in) :: mold    ! placeholder
+    m = EXPONENT(1.0_KTGT) -  EXPONENT(EPSILON(mold))
     return
   end function check_real_mantissa_d
-  integer function check_real_mantissa_f &
-       & (X) &
-       result (m)
+  integer function check_real_mantissa_f (mold) result (m)
     integer,parameter :: KTGT = KFLT
-    real(kind=KTGT),intent(in) :: X    ! placeholder
-    m = EXPONENT(1.0_KTGT) -  EXPONENT(EPSILON(X))
+    real(kind=KTGT),intent(in) :: mold    ! placeholder
+    m = EXPONENT(1.0_KTGT) -  EXPONENT(EPSILON(mold))
     return
   end function check_real_mantissa_f
 !!!_  & check_real_zero - check real(0) properties, return exponent
   subroutine check_real_zero_d &
-       & (kx, v, u, levv)
+       & (kx, mold, u, levv)
     implicit none
     integer,parameter :: KTGT = KDBL
     integer,        intent(out)         :: kx
-    real(kind=KTGT),intent(in)          :: v
+    real(kind=KTGT),intent(in)          :: mold
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: levv
     real(kind=KTGT) :: fr, t
@@ -583,7 +583,7 @@ contains
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
 
-    t = real(0.0, kind=KIND(v))
+    t = real(0.0, kind=KIND(mold))
     fr = FRACTION(t)
     kx = EXPONENT(t)
 
@@ -593,20 +593,20 @@ contains
     if (VCHECK_DEBUG(lv) &
          & .or. (kx.ne.0 .and. VCHECK_NORMAL(lv))) then
        if (utmp.ge.0) then
-          write(utmp, 101) KIND(v), kx, fr
+          write(utmp, 101) KIND(mold), kx, fr
        else
-          write(*,    101) KIND(v), kx, fr
+          write(*,    101) KIND(mold), kx, fr
        endif
     endif
 
     return
   end subroutine check_real_zero_d
   subroutine check_real_zero_f &
-       & (kx, v, u, levv)
+       & (kx, mold, u, levv)
     implicit none
     integer,parameter :: KTGT = KFLT
     integer,        intent(out)         :: kx
-    real(kind=KTGT),intent(in)          :: v
+    real(kind=KTGT),intent(in)          :: mold
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: levv
     real(kind=KTGT) :: fr, t
@@ -616,7 +616,7 @@ contains
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
 
-    t = real(0.0, kind=KIND(v))
+    t = real(0.0, kind=KIND(mold))
     fr = FRACTION(t)
     kx = EXPONENT(t)
 
@@ -626,9 +626,9 @@ contains
     if (VCHECK_DEBUG(lv) &
          & .or. (kx.ne.0 .and. VCHECK_NORMAL(lv))) then
        if (utmp.ge.0) then
-          write(utmp, 101) KIND(v), kx, fr
+          write(utmp, 101) KIND(mold), kx, fr
        else
-          write(*,    101) KIND(v), kx, fr
+          write(*,    101) KIND(mold), kx, fr
        endif
     endif
 
@@ -637,11 +637,11 @@ contains
 
 !!!_  & check_real_one - check real(1) properties, return exponent
   subroutine check_real_one_d &
-       & (kx, v, u, levv)
+       & (kx, mold, u, levv)
     implicit none
     integer,parameter :: KTGT = KDBL
     integer,        intent(out)         :: kx
-    real(kind=KTGT),intent(in)          :: v
+    real(kind=KTGT),intent(in)          :: mold
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: levv
     real(kind=KTGT) :: fr, t
@@ -651,30 +651,30 @@ contains
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
 
-    t = real(1.0, kind=KIND(v))
+    t = real(1.0, kind=KIND(mold))
     fr = FRACTION(t)
     kx = EXPONENT(t)
 
-    if (fr.eq.real(0.0, kind=KIND(v))) kx = - HUGE(kx)
+    if (fr.eq.real(0.0, kind=KIND(mold))) kx = - HUGE(kx)
 
 101 format(__TAG__, 'real:', I0, ' one = ', I0, ' (', F5.1, ')')
     if (VCHECK_DETAIL(lv) &
          & .or. (kx.ne.1 .and. VCHECK_NORMAL(lv))) then
        if (utmp.ge.0) then
-          write(utmp, 101) KIND(v), kx, fr
+          write(utmp, 101) KIND(mold), kx, fr
        else
-          write(*,    101) KIND(v), kx, fr
+          write(*,    101) KIND(mold), kx, fr
        endif
     endif
 
     return
   end subroutine check_real_one_d
   subroutine check_real_one_f &
-       & (kx, v, u, levv)
+       & (kx, mold, u, levv)
     implicit none
     integer,parameter :: KTGT = KFLT
     integer,        intent(out)         :: kx
-    real(kind=KTGT),intent(in)          :: v
+    real(kind=KTGT),intent(in)          :: mold
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: levv
     real(kind=KTGT) :: fr, t
@@ -684,19 +684,19 @@ contains
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
 
-    t = real(1.0, kind=KIND(v))
+    t = real(1.0, kind=KIND(mold))
     fr = FRACTION(t)
     kx = EXPONENT(t)
 
-    if (fr.eq.real(0.0, kind=KIND(v))) kx = - HUGE(kx)
+    if (fr.eq.real(0.0, kind=KIND(mold))) kx = - HUGE(kx)
 
 101 format(__TAG__, 'real:', I0, ' one = ', I0, ' (', F5.1, ')')
     if (VCHECK_DETAIL(lv) &
          & .or. (kx.ne.1 .and. VCHECK_NORMAL(lv))) then
        if (utmp.ge.0) then
-          write(utmp, 101) KIND(v), kx, fr
+          write(utmp, 101) KIND(mold), kx, fr
        else
-          write(*,    101) KIND(v), kx, fr
+          write(*,    101) KIND(mold), kx, fr
        endif
     endif
 
@@ -705,11 +705,11 @@ contains
 
 !!!_  & check_real_inf - check infinity properties
   subroutine check_real_inf_d &
-       & (istt, v, u, levv)
+       & (istt, mold, u, levv)
     implicit none
     integer,parameter :: KTGT = KDBL
     integer,        intent(out)         :: istt
-    real(kind=KTGT),intent(in)          :: v
+    real(kind=KTGT),intent(in)          :: mold
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: levv
     real(kind=KTGT) :: fh, th, ti
@@ -725,14 +725,14 @@ contains
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
 
-    th = HUGE(v)
-    km = MAXEXPONENT(v)
+    th = HUGE(mold)
+    km = MAXEXPONENT(mold)
     fh = FRACTION(th)
     kh = EXPONENT(th)
 
     if (km.ne.kh) istt = -1
 
-    ti = th * REAL(RADIX(v), kind=KIND(v))
+    ti = th * REAL(RADIX(mold), kind=KIND(mold))
     kx = EXPONENT(ti)
     if (kx.le.kh) istt = -1
 
@@ -744,20 +744,20 @@ contains
     if (VCHECK_DETAIL(lv) &
          & .or. (kx.ne.1 .and. VCHECK_NORMAL(lv))) then
        if (utmp.ge.0) then
-          write(utmp, 101) KIND(v), istt, kx, kh, km
+          write(utmp, 101) KIND(mold), istt, kx, kh, km
        else
-          write(*,    101) KIND(v), istt, kx, kh, km
+          write(*,    101) KIND(mold), istt, kx, kh, km
        endif
     endif
 
     return
   end subroutine check_real_inf_d
   subroutine check_real_inf_f &
-       & (istt, v, u, levv)
+       & (istt, mold, u, levv)
     implicit none
     integer,parameter :: KTGT = KFLT
     integer,        intent(out)         :: istt
-    real(kind=KTGT),intent(in)          :: v
+    real(kind=KTGT),intent(in)          :: mold
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: levv
     real(kind=KTGT) :: fh, th, ti
@@ -773,14 +773,14 @@ contains
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
 
-    th = HUGE(v)
-    km = MAXEXPONENT(v)
+    th = HUGE(mold)
+    km = MAXEXPONENT(mold)
     fh = FRACTION(th)
     kh = EXPONENT(th)
 
     if (km.ne.kh) istt = -1
 
-    ti = th * REAL(RADIX(v), kind=KIND(v))
+    ti = th * REAL(RADIX(mold), kind=KIND(mold))
     kx = EXPONENT(ti)
     if (kx.le.kh) istt = -1
 
@@ -792,9 +792,9 @@ contains
     if (VCHECK_DETAIL(lv) &
          & .or. (kx.ne.1 .and. VCHECK_NORMAL(lv))) then
        if (utmp.ge.0) then
-          write(utmp, 101) KIND(v), istt, kx, kh, km
+          write(utmp, 101) KIND(mold), istt, kx, kh, km
        else
-          write(*,    101) KIND(v), istt, kx, kh, km
+          write(*,    101) KIND(mold), istt, kx, kh, km
        endif
     endif
 
@@ -803,11 +803,11 @@ contains
 
 !!!_  & check_real_dnm - check denormal properties
   subroutine check_real_dnm_d &
-       & (kx, v, u, levv)
+       & (kx, mold, u, levv)
     implicit none
     integer,parameter :: KTGT = KDBL
     integer,        intent(out)         :: kx
-    real(kind=KTGT),intent(in)          :: v
+    real(kind=KTGT),intent(in)          :: mold
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: levv
     integer utmp, lv
@@ -822,19 +822,19 @@ contains
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
 
-    ti = +TINY(V)
-    z  = REAL(0, kind=KIND(v))
+    ti = +TINY(MOLD)
+    z  = REAL(0, kind=KIND(mold))
 
     t = ti
     kr = 0
 201 format(__TAG__, 'real:', I0, 1x, I0, 1x, I0)
-    do j = 1, DIGITS(v) + 1
-       t = t / REAL(RADIX(v), kind=KIND(v))
+    do j = 1, DIGITS(mold) + 1
+       t = t / REAL(RADIX(mold), kind=KIND(mold))
        if (VCHECK_DEBUG(lv)) then
           if (utmp.ge.0) then
-             write(utmp, 201) kind(v), j, exponent(t)
+             write(utmp, 201) kind(mold), j, exponent(t)
           else
-             write(*,    201) kind(v), j, exponent(t)
+             write(*,    201) kind(mold), j, exponent(t)
           endif
        endif
        if (t.eq.z) then
@@ -851,7 +851,7 @@ contains
        ki = EXPONENT(ti)
        fi = FRACTION(ti)
        ! kr SHOULD BE (ki - 1)
-       kr = EXPONENT(ti / REAL(RADIX(v), kind=KIND(v)))
+       kr = EXPONENT(ti / REAL(RADIX(mold), kind=KIND(mold)))
        if (kr.ne.ki-1) kx = 1
        kr = EXPONENT(SET_EXPONENT(fi, ki-1))
        if (kr.ne.ki-1) kx = 2
@@ -861,27 +861,27 @@ contains
     if (VCHECK_DETAIL(lv) &
          & .or. (kx.ne.0 .and. VCHECK_NORMAL(lv))) then
        if (kx.le.0) then
-          t  = SET_EXPONENT(TINY(v), MINEXPONENT(v) + kx)
-          z  = SET_EXPONENT(TINY(v), MINEXPONENT(v) + kx - 1)
+          t  = SET_EXPONENT(TINY(mold), MINEXPONENT(mold) + kx)
+          z  = SET_EXPONENT(TINY(mold), MINEXPONENT(mold) + kx - 1)
        else
-          t  = real(1, kind=KIND(v))
-          z  = real(1, kind=KIND(v))
+          t  = real(1, kind=KIND(mold))
+          z  = real(1, kind=KIND(mold))
        endif
        if (utmp.ge.0) then
-          write(utmp, 101) KIND(v), kx, FRACTION(t), FRACTION(z)
+          write(utmp, 101) KIND(mold), kx, FRACTION(t), FRACTION(z)
        else
-          write(*,    101) KIND(v), kx, FRACTION(t), FRACTION(z)
+          write(*,    101) KIND(mold), kx, FRACTION(t), FRACTION(z)
        endif
     endif
 
     return
   end subroutine check_real_dnm_d
   subroutine check_real_dnm_f &
-       & (kx, v, u, levv)
+       & (kx, mold, u, levv)
     implicit none
     integer,parameter :: KTGT = KFLT
     integer,        intent(out)         :: kx
-    real(kind=KTGT),intent(in)          :: v
+    real(kind=KTGT),intent(in)          :: mold
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: levv
     integer utmp, lv
@@ -896,19 +896,19 @@ contains
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
 
-    ti = +TINY(V)
-    z  = REAL(0, kind=KIND(v))
+    ti = +TINY(MOLD)
+    z  = REAL(0, kind=KIND(mold))
 
     t = ti
     kr = 0
 201 format(__TAG__, 'real:', I0, 1x, I0, 1x, I0)
-    do j = 1, DIGITS(v) + 1
-       t = t / REAL(RADIX(v), kind=KIND(v))
+    do j = 1, DIGITS(mold) + 1
+       t = t / REAL(RADIX(mold), kind=KIND(mold))
        if (VCHECK_DEBUG(lv)) then
           if (utmp.ge.0) then
-             write(utmp, 201) kind(v), j, exponent(t)
+             write(utmp, 201) kind(mold), j, exponent(t)
           else
-             write(*,    201) kind(v), j, exponent(t)
+             write(*,    201) kind(mold), j, exponent(t)
           endif
        endif
        if (t.eq.z) then
@@ -925,7 +925,7 @@ contains
        ki = EXPONENT(ti)
        fi = FRACTION(ti)
        ! kr SHOULD BE (ki - 1)
-       kr = EXPONENT(ti / REAL(RADIX(v), kind=KIND(v)))
+       kr = EXPONENT(ti / REAL(RADIX(mold), kind=KIND(mold)))
        if (kr.ne.ki-1) kx = 1
        kr = EXPONENT(SET_EXPONENT(fi, ki-1))
        if (kr.ne.ki-1) kx = 2
@@ -935,16 +935,16 @@ contains
     if (VCHECK_DETAIL(lv) &
          & .or. (kx.ne.0 .and. VCHECK_NORMAL(lv))) then
        if (kx.le.0) then
-          t  = SET_EXPONENT(TINY(v), MINEXPONENT(v) + kx)
-          z  = SET_EXPONENT(TINY(v), MINEXPONENT(v) + kx - 1)
+          t  = SET_EXPONENT(TINY(mold), MINEXPONENT(mold) + kx)
+          z  = SET_EXPONENT(TINY(mold), MINEXPONENT(mold) + kx - 1)
        else
-          t  = real(1, kind=KIND(v))
-          z  = real(1, kind=KIND(v))
+          t  = real(1, kind=KIND(mold))
+          z  = real(1, kind=KIND(mold))
        endif
        if (utmp.ge.0) then
-          write(utmp, 101) KIND(v), kx, FRACTION(t), FRACTION(z)
+          write(utmp, 101) KIND(mold), kx, FRACTION(t), FRACTION(z)
        else
-          write(*,    101) KIND(v), kx, FRACTION(t), FRACTION(z)
+          write(*,    101) KIND(mold), kx, FRACTION(t), FRACTION(z)
        endif
     endif
 
@@ -987,10 +987,15 @@ program test_std_prc
      call diag_real_props(istt, real(0, kind=KFLT))
      call diag_real_props(istt, real(0, kind=KDBL))
   endif
+
   if (ierr.eq.0) then
      call check_real_props(istt, VDBL, levv=10)
+     call check_real_props(istt, VFLT, levv=10)
   endif
+
+  if (ierr.eq.0) call init_set_switches(ierr, .TRUE., .TRUE.)
   if (ierr.eq.0) then
+     call check_real_props(istt, VDBL, levv=10)
      call check_real_props(istt, VFLT, levv=10)
   endif
 

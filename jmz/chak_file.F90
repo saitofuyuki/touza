@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz swiss(CH) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2022/12/04 21:09:38 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/18 21:40:03 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -68,6 +68,14 @@ module chak_file
   integer,parameter,private :: set_filter   = 2
   integer,parameter,private :: set_end = 3
 
+  ! Big-GTOOL mode
+  ! integer,parameter :: bigg_rmagic  = 0   ! read:  only at magic-separators
+  ! integer,parameter :: bigg_rlarge  = 1   ! read:  larger record or magic-separator
+  ! integer,parameter :: bigg_woff    = 0   ! write: off, sub-record mode
+  ! integer,parameter :: bigg_won     = 1   ! write: on, Big-GTOOL mode
+  integer,parameter :: bigg_off = 0
+  integer,parameter :: bigg_on  = 1
+
 !!!_  - type
   integer,parameter :: rec_bgn = 0
   integer,parameter :: rec_end = 1
@@ -106,6 +114,7 @@ module chak_file
      integer                :: hedit     ! header edit level
      integer                :: hflag = hflag_unset ! header parser flag
      type(rgroup_t),pointer :: rgrp(:)
+     integer                :: big
   end type file_t
 !!!_ + Procedures
 contains
@@ -117,7 +126,7 @@ contains
   end subroutine init
 
 !!!_  - reset_file
-  subroutine reset_file(ierr, file, name, mode, flag)
+  subroutine reset_file(ierr, file, name, mode, flag, big)
     use TOUZA_Std,only: choice
     use TOUZA_Nio,only: GFMT_ERR
     implicit none
@@ -126,6 +135,7 @@ contains
     character(len=*),intent(in),optional :: name
     integer,         intent(in),optional :: mode
     integer,         intent(in),optional :: flag
+    integer,         intent(in),optional :: big
 
     ierr = 0
 
@@ -138,6 +148,7 @@ contains
     file%hedit = hedit_all
     file%mode  = choice(mode_unset, mode)
     file%hflag = choice(hflag_unset, flag)
+    file%big   = choice(bigg_on, big)
     ! file%bh = -1
 
     if (present(name)) then
@@ -981,8 +992,6 @@ end subroutine cue_read_file
 !!!_   . read_file_header
   subroutine read_file_header &
        & (ierr, head, file, rec, crec, def)
-    use TOUZA_Std,only: is_error_match
-    use TOUZA_Nio,only: nio_skip_records, nio_read_header, show_header
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(out)   :: head(*)
@@ -1210,7 +1219,7 @@ end subroutine cue_read_file
   subroutine cue_read_nio &
        & (ierr, file)
     use TOUZA_Std,only: is_error_match, sus_rseek, WHENCE_ABS
-    use TOUZA_Nio,only: nio_skip_records
+    use TOUZA_Nio,only: nio_skip_records, nio_allow_sub
     implicit none
     integer,     intent(out)   :: ierr
     type(file_t),intent(inout) :: file
@@ -1219,6 +1228,7 @@ end subroutine cue_read_file
     integer irec, crec
     integer(kind=KIOFS) :: cpos, fpos
     character(len=128) ::  msg
+    integer ksubm
 
     ! compute record positions (%pos) for group to wait at %rec
     ! set file record limit (%nrec) if found
@@ -1271,6 +1281,7 @@ end subroutine cue_read_file
     endif
     ! forward skipping
     irec = 0
+    ksubm = nio_allow_sub(0, file%big.eq.bigg_off)
     do
        if (mrg.ge.nrg) exit
        ! need offseting
@@ -1280,7 +1291,7 @@ end subroutine cue_read_file
        irec = file%rgrp(jrg)%rec
        if (irec.lt.0) exit
        nsk = irec - file%irec
-       call nio_skip_records(ierr, nsk, file%u, nsuc)
+       call nio_skip_records(ierr, nsk, file%u, nsuc, krect=ksubm)
        if (is_error_match(ierr, ERR_EOF)) then
           ierr = 0
           file%irec = file%irec + nsuc
@@ -1325,17 +1336,19 @@ end subroutine cue_read_file
     use TOUZA_Std,only: is_error_match
     use TOUZA_Nio,only: nio_skip_records, nio_read_header
     use TOUZA_Nio,only: get_item, hi_DFMT, parse_record_fmt
+    use TOUZA_Nio,only: nio_allow_sub
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(out)   :: head(*)
     type(file_t),    intent(inout) :: file
     integer,         intent(in)    :: rec
     integer,         intent(in)    :: crec
-    integer nskp, nsuc
+    integer nskp, nsuc, ksubm
 
     ierr = 0
     nskp = rec - crec
-    call nio_skip_records(ierr, nskp, file%u, nskip=nsuc)
+    ksubm = nio_allow_sub(0, file%big.eq.bigg_off)
+    call nio_skip_records(ierr, nskp, file%u, nskip=nsuc, krect=ksubm)
     if (ierr.eq.0) call nio_read_header(ierr, head, file%t, file%u)
     if (ierr.eq.0) call get_item(ierr, head, file%fmt, hi_DFMT)
     if (ierr.eq.0) call parse_record_fmt(ierr, file%kfmt, file%fmt)
@@ -1436,17 +1449,19 @@ end subroutine cue_read_file
 
 !!!_   . read_data_nio
   subroutine read_data_nio(ierr, v, n, file)
-    use TOUZA_Nio,only: nio_read_data, parse_record_fmt
+    use TOUZA_Nio,only: nio_read_data, parse_record_fmt, nio_allow_sub
     use TOUZA_Nio,only: switch_urt_diag
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(out)   :: v(0:*)
     integer,        intent(in)    :: n
     type(file_t),   intent(inout) :: file
+    integer rect
 
     ierr = 0
     if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, ulog)
-    call nio_read_data(ierr, v, n, file%h, file%t, file%u)
+    rect = nio_allow_sub(file%t, file%big.eq.bigg_off)
+    call nio_read_data(ierr, v, n, file%h, rect, file%u)
     if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, -2)
 
   end subroutine read_data_nio
@@ -1457,7 +1472,7 @@ end subroutine cue_read_file
     use TOUZA_Nio,only: nio_write_data, lopts, parse_urt_options
     use TOUZA_Nio,only: GFMT_URT
     use TOUZA_Nio,only: GFMT_MRT
-    use TOUZA_Nio,only: switch_urt_diag
+    use TOUZA_Nio,only: switch_urt_diag, nio_allow_sub
     implicit none
     integer,         intent(out)   :: ierr
     real(kind=KBUF), intent(in)    :: v(0:*)
@@ -1467,8 +1482,10 @@ end subroutine cue_read_file
     integer kopts(lopts)
     integer jo
     character(len=*),parameter :: osep = '+'
+    integer krect
 
     ierr = 0
+    krect = nio_allow_sub(file%t, file%big.eq.bigg_off)
     if (file%kfmt.eq.GFMT_URT .or. file%kfmt.eq.GFMT_MRT) then
        jo = index(file%fmt, osep)
        if (jo.gt.0) then
@@ -1479,13 +1496,13 @@ end subroutine cue_read_file
              return
           endif
           if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, ulog)
-          call nio_write_data(ierr, v, n, head, file%t, file%u, kopts)
+          call nio_write_data(ierr, v, n, head, krect, file%u, kopts)
           if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, -2)
        else
-          call nio_write_data(ierr, v, n, head, file%t, file%u)
+          call nio_write_data(ierr, v, n, head, krect, file%u)
        endif
     else
-       call nio_write_data(ierr, v, n, head, file%t, file%u)
+       call nio_write_data(ierr, v, n, head, krect, file%u)
     endif
   end subroutine write_data_nio
 
@@ -1823,7 +1840,7 @@ end subroutine cue_read_file
 
 !!!_   . cue_binary_pos()
   integer(kind=KIOFS) function cue_binary_pos(kfmt, m, rec) result (n)
-    use TOUZA_Std,only: get_size_strm
+    use TOUZA_Std,only: get_unit_strm
     implicit none
     integer,intent(in) :: kfmt
     integer,intent(in) :: m
@@ -1839,16 +1856,16 @@ end subroutine cue_read_file
 
 !!!_   . usize_binary()
   integer function usize_binary(kfmt) result (n)
-    use TOUZA_Std,only: get_size_strm
+    use TOUZA_Std,only: get_unit_strm
     implicit none
     integer,intent(in) :: kfmt
     select case(kfmt)
     case(cfmt_binary_i4:cfmt_binary_i4+cfmt_flags_bo-1)
-       n = get_size_strm(0)
+       n = get_unit_strm(0)
     case(cfmt_binary_r4:cfmt_binary_r4+cfmt_flags_bo-1)
-       n = get_size_strm(real(0, kind=KFLT))
+       n = get_unit_strm(real(0, kind=KFLT))
     case(cfmt_binary_r8:cfmt_binary_r8+cfmt_flags_bo-1)
-       n = get_size_strm(real(0, kind=KDBL))
+       n = get_unit_strm(real(0, kind=KDBL))
     case default
        n = 0
     end select

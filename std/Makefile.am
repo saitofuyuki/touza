@@ -1,7 +1,7 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2022/06/27 11:21:30 fuyuki Makefile.am>
+# Time-stamp: <2022/12/19 14:40:52 fuyuki Makefile.am>
 #
 # Copyright (C) 2020, 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -31,6 +31,7 @@ TEST_COMMON_LIBS		=	$(noinst_LTLIBRARIES)
 check_PROGRAMS			=	test_std_prc test_std_utl test_std_log \
 							test_std_bld test_std_mwe test_std_fun test_std_env \
 							test_std_sus test_std_arg test_std_htb test_std
+check_PROGRAMS += test_std_sus1 test_std_sus2
 
 test_std_prc_SOURCES	=	std_prc.F90
 test_std_prc_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_PRC=1
@@ -53,8 +54,15 @@ test_std_env_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_ENV=1
 test_std_env_LDADD		=	$(TEST_COMMON_LIBS)
 
 test_std_sus_SOURCES	=	std_sus.F90
-test_std_sus_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_SUS=1
+test_std_sus_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_SUS=9
 test_std_sus_LDADD		=	$(TEST_COMMON_LIBS)
+
+test_std_sus1_SOURCES	=	std_sus.F90
+test_std_sus1_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_SUS=1
+test_std_sus1_LDADD		=	$(TEST_COMMON_LIBS)
+test_std_sus2_SOURCES	=	std_sus.F90
+test_std_sus2_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_SUS=2
+test_std_sus2_LDADD		=	$(TEST_COMMON_LIBS)
 
 test_std_arg_SOURCES	=	std_arg.F90
 test_std_arg_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_ARG=1

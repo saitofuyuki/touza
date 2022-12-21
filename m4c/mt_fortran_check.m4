@@ -1,7 +1,7 @@
 dnl Filename:  touza/m4c/mt_fortran_check.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 3 2020
-dnl Time-stamp: <2022/04/14 12:09:35 fuyuki mt_fortran_check.m4>
+dnl Time-stamp: <2022/12/08 08:21:24 fuyuki mt_fortran_check.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -337,6 +337,23 @@ AC_DEFUN([MT_FC_F2003_ALLOCATABLE_MEMBER],
 AS_IF([test x"$mt_cv_f2003_allocatable_member" = xyes],
       [AC_DEFINE([HAVE_F2003_ALLOCATABLE_MEMBER], [1], [allocatable type member])])
 ])# MT_FC_F2003_ALLOCATABLE_MEMBER
+
+# MT_FC_F2003_DEFERRED_TYPE()
+# -------------------------------
+# define HAVE_F2003_DEFERRED_TYPE if fortran understand allocatable
+# (deferred) length character
+AC_DEFUN([MT_FC_F2003_DEFERRED_TYPE],
+[AC_CACHE_CHECK([whether fortran accepts deferred-type parameter],
+  [mt_cv_f2003_deferred_type],
+  [AC_LANG_PUSH([Fortran])
+   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],
+[      character(len=:),allocatable :: T])],
+  [mt_cv_f2003_deferred_type=yes],
+  [mt_cv_f2003_deferred_type=no])
+  AC_LANG_POP([Fortran])])
+AS_IF([test x"$mt_cv_f2003_deferred_type" = xyes],
+      [AC_DEFINE([HAVE_F2003_DEFERRED_TYPE], [1], [deferred type parameter])])
+])# MT_FC_F2003_DEFERRED_TYPE
 
 # MT_FC_CONCATENATION()
 # ------------------------------
