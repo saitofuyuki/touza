@@ -1,3 +1,12 @@
+Release-1.08.0 / 2022-12-21
+===========================
+
+  * (jmz,nio) [FATAL] Big-GTOOL design enabled by default.
+  * (jmz) [severe] infinite range failed for a particular pattern.
+  * (std) [severe] get_size_strm() revised.
+  * (m4c,std) Fortran 2003 feature checkers improved.
+  * (std) std_prc cleaned and restructured.
+
 Release-1.07.0 / 2022-12-06
 ===========================
 

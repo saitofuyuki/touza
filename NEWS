@@ -6,6 +6,15 @@ TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
+* Changes in 1.08.0 from 1.07.0
+** Major changes
+*** Big-GTOOL design enabled by default
+- =nio= and =jmz/chak= now correctly manages Big-GTOOL format.
+- =-X= or =+X= option on =chak= disables Big-GTOOL design,
+  i.e., sub-record decomposition is used for large records.
+** Other changs
+- (jmz/chak) fix to parse infinite range.
+
 * Changes in 1.07.0 from 1.06.0
 ** Major changes
 *** Design of URT MRT revised
