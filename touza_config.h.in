@@ -1,0 +1,270 @@
+/* touza_config.h.in.  Generated from configure.ac by autoheader.  */
+
+/* ami is enabled */
+#undef ENABLE_TOUZA_AMI
+
+/* cal is enabled */
+#undef ENABLE_TOUZA_CAL
+
+/* emu is enabled */
+#undef ENABLE_TOUZA_EMU
+
+/* nio is enabled */
+#undef ENABLE_TOUZA_NIO
+
+/* ppp is enabled */
+#undef ENABLE_TOUZA_PPP
+
+/* std is enabled */
+#undef ENABLE_TOUZA_STD
+
+/* trp is enabled */
+#undef ENABLE_TOUZA_TRP
+
+/* Define to 1 if you have the <dlfcn.h> header file. */
+#undef HAVE_DLFCN_H
+
+/* allocatable dummy argument */
+#undef HAVE_F2003_ALLOCATABLE_DUMMY
+
+/* allocatable type member */
+#undef HAVE_F2003_ALLOCATABLE_MEMBER
+
+/* deferred type parameter */
+#undef HAVE_F2003_DEFERRED_TYPE
+
+/* // works */
+#undef HAVE_FC_CONCATENATION
+
+/* whether function amt works */
+#undef HAVE_FORTRAN_AMT
+
+/* whether function command_argument_count works */
+#undef HAVE_FORTRAN_COMMAND_ARGUMENT_COUNT
+
+/* whether function exp2 works */
+#undef HAVE_FORTRAN_EXP2
+
+/* whether module f90_unix_env works with getenv */
+#undef HAVE_FORTRAN_F90_UNIX_ENV_GETENV
+
+/* whether module f90_unix_env works with gethostname */
+#undef HAVE_FORTRAN_F90_UNIX_ENV_GETHOSTNAME
+
+/* whether module f90_unix_env works with getlogin */
+#undef HAVE_FORTRAN_F90_UNIX_ENV_GETLOGIN
+
+/* whether function fseek works */
+#undef HAVE_FORTRAN_FSEEK
+
+/* whether function ftell works */
+#undef HAVE_FORTRAN_FTELL
+
+/* whether function ftelli8 works */
+#undef HAVE_FORTRAN_FTELLI8
+
+/* whether subroutine ftrace_region_begin works */
+#undef HAVE_FORTRAN_FTRACE_REGION_BEGIN
+
+/* whether subroutine ftrace_region_end works */
+#undef HAVE_FORTRAN_FTRACE_REGION_END
+
+/* whether subroutine getarg works */
+#undef HAVE_FORTRAN_GETARG
+
+/* whether subroutine getenv works */
+#undef HAVE_FORTRAN_GETENV
+
+/* whether subroutine getlog works */
+#undef HAVE_FORTRAN_GETLOG
+
+/* whether subroutine get_command_argument works */
+#undef HAVE_FORTRAN_GET_COMMAND_ARGUMENT
+
+/* whether subroutine get_environment_variable works */
+#undef HAVE_FORTRAN_GET_ENVIRONMENT_VARIABLE
+
+/* whether subroutine hostnm works */
+#undef HAVE_FORTRAN_HOSTNM
+
+/* whether function huge works */
+#undef HAVE_FORTRAN_HUGE
+
+/* whether function iargc works */
+#undef HAVE_FORTRAN_IARGC
+
+/* whether module ieee_arithmetic works */
+#undef HAVE_FORTRAN_IEEE_ARITHMETIC
+
+/* whether module ifport works with getenv */
+#undef HAVE_FORTRAN_IFPORT_GETENV
+
+/* whether module ifport works with getlog */
+#undef HAVE_FORTRAN_IFPORT_GETLOG
+
+/* whether module ifport works with hostnam */
+#undef HAVE_FORTRAN_IFPORT_HOSTNAM
+
+/* whether statement inquire works with convert specifier */
+#undef HAVE_FORTRAN_INQUIRE_CONVERT
+
+/* whether statement inquire works with iolength specifier */
+#undef HAVE_FORTRAN_INQUIRE_IOLENGTH
+
+/* whether statement inquire works with pos specifier */
+#undef HAVE_FORTRAN_INQUIRE_POS
+
+/* whether function ire works */
+#undef HAVE_FORTRAN_IRE
+
+/* whether module iso_c_binding works */
+#undef HAVE_FORTRAN_ISO_C_BINDING
+
+/* whether module iso_c_binding works with C_INT32_T */
+#undef HAVE_FORTRAN_ISO_C_BINDING_C_INT32_T
+
+/* whether module iso_c_binding works with C_INT64_T */
+#undef HAVE_FORTRAN_ISO_C_BINDING_C_INT64_T
+
+/* whether module iso_c_binding works with C_INT8_T */
+#undef HAVE_FORTRAN_ISO_C_BINDING_C_INT8_T
+
+/* whether module iso_fortran_env works */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV
+
+/* whether module iso_fortran_env works with INT32 */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_INT32
+
+/* whether module iso_fortran_env works with INT64 */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_INT64
+
+/* whether module iso_fortran_env works with INT8 */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_INT8
+
+/* whether module iso_fortran_env works with INTEGER_KINDS */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_INTEGER_KINDS
+
+/* whether module iso_fortran_env works with IOSTAT_END */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_IOSTAT_END
+
+/* whether module iso_fortran_env works with REAL32 */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_REAL32
+
+/* whether module iso_fortran_env works with REAL64 */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_REAL64
+
+/* whether module iso_fortran_env works with REAL_KINDS */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_REAL_KINDS
+
+/* whether module mpi works */
+#undef HAVE_FORTRAN_MPI
+
+/* whether module mpi_f08 works */
+#undef HAVE_FORTRAN_MPI_F08
+
+/* whether module mpi works with mpi_bcast */
+#undef HAVE_FORTRAN_MPI_MPI_BCAST
+
+/* whether module mpi works with mpi_group_translate_ranks */
+#undef HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
+
+/* whether module mpi works with mpi_irecv */
+#undef HAVE_FORTRAN_MPI_MPI_IRECV
+
+/* whether module mpi works with mpi_isend */
+#undef HAVE_FORTRAN_MPI_MPI_ISEND
+
+/* whether statement open works with convert specifier */
+#undef HAVE_FORTRAN_OPEN_CONVERT
+
+/* whether statement open works with iomsg specifier */
+#undef HAVE_FORTRAN_OPEN_IOMSG
+
+/* whether statement open works with stream specifier */
+#undef HAVE_FORTRAN_OPEN_STREAM
+
+/* Define to 1 if you have the <inttypes.h> header file. */
+#undef HAVE_INTTYPES_H
+
+/* Defined if you have NETCDF4 support */
+#undef HAVE_NETCDF4
+
+/* preprocessor concatenation type */
+#undef HAVE_PP_CONCAT
+
+/* Define to 1 if you have the <stdint.h> header file. */
+#undef HAVE_STDINT_H
+
+/* Define to 1 if you have the <stdio.h> header file. */
+#undef HAVE_STDIO_H
+
+/* Define to 1 if you have the <stdlib.h> header file. */
+#undef HAVE_STDLIB_H
+
+/* Define to 1 if you have the <strings.h> header file. */
+#undef HAVE_STRINGS_H
+
+/* Define to 1 if you have the <string.h> header file. */
+#undef HAVE_STRING_H
+
+/* Define to 1 if you have the <sys/stat.h> header file. */
+#undef HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/types.h> header file. */
+#undef HAVE_SYS_TYPES_H
+
+/* Define to 1 if you have the <unistd.h> header file. */
+#undef HAVE_UNISTD_H
+
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
+#undef LT_OBJDIR
+
+/* prefer elemental function */
+#undef OPT_ENABLE_FORTRAN_ELEMENTAL
+
+/* fortran i/o unit for stderr */
+#undef OPT_STDERR_UNIT
+
+/* fortran i/o unit for stdin */
+#undef OPT_STDIN_UNIT
+
+/* fortran i/o unit for stdout */
+#undef OPT_STDOUT_UNIT
+
+/* Define if you use mpi */
+#undef OPT_USE_MPI
+
+/* build with TOUZA/Nio/nctcdf */
+#undef OPT_WITH_NCTCDF
+
+/* Name of package */
+#undef PACKAGE
+
+/* Define to the address where bug reports for this package should be sent. */
+#undef PACKAGE_BUGREPORT
+
+/* Define to the full name of this package. */
+#undef PACKAGE_NAME
+
+/* Define to the full name and version of this package. */
+#undef PACKAGE_STRING
+
+/* package name */
+#undef PACKAGE_TAG
+
+/* Define to the one symbol short name of this package. */
+#undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
+/* Define to the version of this package. */
+#undef PACKAGE_VERSION
+
+/* Define to 1 if all of the C90 standard headers exist (not just the ones
+   required in a freestanding environment). This macro is provided for
+   backward compatibility; new code need not use it. */
+#undef STDC_HEADERS
+
+/* Version number of package */
+#undef VERSION
