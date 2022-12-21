@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/12/11 22:04:44 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/21 16:20:09 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -611,6 +611,8 @@ contains
     integer md, cmd, hmd
     integer ntmp
     integer hflag, hsub
+    character(len=64) :: xopts
+    integer xsub
 
     md = mode_unset
     cmd = mode_unset
@@ -620,6 +622,8 @@ contains
     stat = 0
     hflag = hflag_unset
     hsub = 0
+    xsub = 0
+    xopts = ' '
 
     jvar = index(abuf, param_sep)
     if (jvar.eq.1) then
@@ -689,6 +693,12 @@ contains
        else if (abuf.eq.'+N') then
           hflag = hflag_nulld        ! special for default write
           hsub = +1
+       else if (abuf(1:2).eq.'-X') then
+          xsub = -1
+          xopts = trim(abuf(3:))     ! file or default read
+       else if (abuf(1:2).eq.'+X') then
+          xsub = +1
+          xopts = trim(abuf(3:))     ! special for default write
        else if (abuf.eq.'-P') then
           call check_only_global(ierr, abuf)
           if (ierr.eq.0) call set_user_offsets(ierr, 0, 0)
@@ -717,6 +727,8 @@ contains
           if (ierr.eq.0) call parse_hedit_option(ierr, hmd)
        else if (hflag.ne.hflag_unset) then
           if (ierr.eq.0) call parse_hflag_option(ierr, hflag, hsub)
+       else if (xsub.ne.0) then
+          if (ierr.eq.0) call parse_xflag_option(ierr, xopts, xsub)
        else if (cmd.ne.mode_unset) then
           if (ierr.eq.0) call parse_operator_option(ierr, cmd)
        endif
@@ -818,6 +830,39 @@ contains
     ofile(jfile)%hflag = flag
   end subroutine parse_hflag_option
 
+!!!_   . parse_xflag_option
+  subroutine parse_xflag_option(ierr, opts, mode)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: opts
+    integer,         intent(in)  :: mode
+
+    integer jfile
+
+    ierr = 0
+    if (mfile.gt.lfile) then
+       ierr = ERR_INSUFFICIENT_BUFFER
+       return
+    endif
+    jfile = mfile - 1
+    if (jfile.lt.bgn_file) then
+       if (mode.gt.0) then
+          jfile = def_write
+       else
+          jfile = def_read
+       endif
+    endif
+    ! enable full extension
+    if (opts.eq.' ') then
+       ofile(jfile)%big = bigg_off
+    endif
+    if (scan(opts, 'Bb').gt.0) then
+       ofile(jfile)%big = bigg_on
+    else if (scan(opts, 'Ss').gt.0) then
+       ofile(jfile)%big = bigg_off
+    endif
+  end subroutine parse_xflag_option
+
 !!!_   . parse_operator_option
   subroutine parse_operator_option(ierr, mode)
     implicit none
@@ -860,6 +905,7 @@ contains
           ofile(jf)%mode  = ofile(def_write)%mode
           ofile(jf)%hedit = ofile(def_write)%hedit
           ofile(jf)%hflag = ofile(def_write)%hflag
+          ofile(jf)%big   = ofile(def_write)%big
           call append_queue(ierr, hfile, pop=1, push=0)
           if (ierr.eq.0) call pop_stack(ierr, hbuf)
           if (ierr.eq.0) then
@@ -881,6 +927,7 @@ contains
              nbufs = count_file_stacks(ofile(def_read))
              ! file to read
              ofile(jf)%mode = mode_read
+             ofile(jf)%big  = ofile(def_read)%big
              ofile(jf)%rgrp => ofile(def_read)%rgrp
              call alloc_file_buffers(ierr, nbufs, rcount-1, 0)
           endif
