@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2022/12/02 08:07:06 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/23 21:45:02 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -30,13 +30,13 @@
 !!!_@ TOUZA_Std_utl - small utilities
 module TOUZA_Std_utl
   use TOUZA_Std_prc, only: KFLT, KDBL, KI64
-#define __MDL__ 'utl'
+# define __MDL__ 'utl'
+# define __TAG__ STD_FORMAT_MDL('utl')
+# define _ERROR(E) (E - ERR_MASK_STD_UTL)
 !!!_ = declaration
   implicit none
   private
 !!!_  - paramters
-# define __TAG__ STD_FORMAT_MDL('utl')
-
   character(len=*),parameter :: separator_range  = '--'
   character(len=*),parameter :: separator_step   = '+'
   character(len=*),parameter :: separator_repeat = '*'
@@ -45,8 +45,8 @@ module TOUZA_Std_utl
   character(len=*),parameter :: char_underflow = '-'
 !!!_  - interfaces
   interface choice
-     module procedure choice_i,  choice_long,  choice_l,  choice_f,  choice_d
-     module procedure choice_ia, choice_longa, choice_la, choice_fa, choice_da
+     module procedure choice_i,  choice_l,  choice_b,  choice_f,  choice_d
+     module procedure choice_ia, choice_la, choice_ba, choice_fa, choice_da
   end interface choice
 
   interface set_if_present
@@ -59,13 +59,11 @@ module TOUZA_Std_utl
   end interface condop
 
   interface upcase
-     module procedure upcase_m
-     module procedure upcase_o
+     module procedure upcase_m, upcase_o
   end interface upcase
 
   interface downcase
-     module procedure downcase_m
-     module procedure downcase_o
+     module procedure downcase_m, downcase_o
   end interface downcase
 
   interface ndigits
@@ -124,7 +122,7 @@ module TOUZA_Std_utl
   integer,save :: diag_counts = 0
   integer,save :: fine_counts = 0
   integer,save :: lev_verbose = STD_MSG_LEVEL
-  integer,save :: err_default = ERR_NO_INIT - ERR_MASK_STD_UTL
+  integer,save :: err_default = _ERROR(ERR_NO_INIT)
   integer,save :: ulog = -1
 
   integer,save :: find_offset = 0   ! array start index in first_find family
@@ -296,12 +294,12 @@ contains
     return
   end function choice_i
 
-  _CHOICE_DECL integer(kind=KI64) function choice_long(d, a) result(r)
+  _CHOICE_DECL integer(kind=KTGT) function choice_l(d, a) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KI64
     implicit none
 !!!_   . note ifort cannot compile with the following declaration
     ! integer,parameter :: KTGT=kind(r)
 !!!_   . body
-    integer,parameter :: KTGT=KI64
     integer(kind=KTGT),intent(in)          :: d
     integer(kind=KTGT),intent(in),optional :: a
     if (present(a)) then
@@ -310,9 +308,9 @@ contains
        r = d
     endif
     return
-  end function choice_long
+  end function choice_l
 
-  _CHOICE_DECL logical function choice_l(d, a) result(r)
+  _CHOICE_DECL logical function choice_b(d, a) result(r)
     implicit none
     logical,intent(in)          :: d
     logical,intent(in),optional :: a
@@ -322,11 +320,11 @@ contains
        r = d
     endif
     return
-  end function choice_l
+  end function choice_b
 
-  _CHOICE_DECL real(kind=KFLT) function choice_f(d, a) result(r)
+  _CHOICE_DECL real(kind=KTGT) function choice_f(d, a) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
-    integer,parameter :: KTGT=KFLT
     real(kind=KTGT),intent(in)          :: d
     real(kind=KTGT),intent(in),optional :: a
     if (present(a)) then
@@ -337,9 +335,9 @@ contains
     return
   end function choice_f
 
-  _CHOICE_DECL real(kind=KDBL) function choice_d(d, a) result(r)
+  _CHOICE_DECL real(kind=KTGT) function choice_d(d, a) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT),intent(in)          :: d
     real(kind=KTGT),intent(in),optional :: a
     if (present(a)) then
@@ -365,9 +363,9 @@ contains
     return
   end function choice_ia
 
-  function choice_longa(d, a) result(r)
+  function choice_la(d, a) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KI64
     implicit none
-    integer,parameter :: KTGT=KI64
     integer(kind=KTGT),intent(in)           :: d(:)
     integer(kind=KTGT),intent(in),optional  :: a(:)
     integer(kind=KTGT),dimension(size(d,1)) :: r
@@ -379,9 +377,9 @@ contains
        r(:) = d(:)
     endif
     return
-  end function choice_longa
+  end function choice_la
 
-  function choice_la(d, a) result(r)
+  function choice_ba(d, a) result(r)
     implicit none
     logical,intent(in)           :: d(:)
     logical,intent(in),optional  :: a(:)
@@ -394,11 +392,11 @@ contains
        r(:) = d(:)
     endif
     return
-  end function choice_la
+  end function choice_ba
 
   function choice_fa(d, a) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
-    integer,parameter :: KTGT=KFLT
     real(kind=KTGT),intent(in)           :: d(:)
     real(kind=KTGT),intent(in),optional  :: a(:)
     real(kind=KTGT),dimension(size(d,1)) :: r
@@ -413,8 +411,8 @@ contains
   end function choice_fa
 
   function choice_da(d, a) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT),intent(in)           :: d(:)
     real(kind=KTGT),intent(in),optional  :: a(:)
     real(kind=KTGT),dimension(size(d,1)) :: r
@@ -457,9 +455,10 @@ contains
   end subroutine set_if_present_i
 
   subroutine set_if_present_f(var, val)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
-    real(kind=KFLT),intent(out),optional :: var
-    real(kind=KFLT),intent(in)           :: val
+    real(kind=KTGT),intent(out),optional :: var
+    real(kind=KTGT),intent(in)           :: val
     if (present(var)) then
        var = val
     endif
@@ -467,9 +466,10 @@ contains
   end subroutine set_if_present_f
 
   subroutine set_if_present_d(var, val)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
-    real(kind=KDBL),intent(out),optional :: var
-    real(kind=KDBL),intent(in)           :: val
+    real(kind=KTGT),intent(out),optional :: var
+    real(kind=KTGT),intent(in)           :: val
     if (present(var)) then
        var = val
     endif
@@ -509,10 +509,11 @@ contains
     return
   end function condop_i
 
-  _CONDOP_DECL real(kind=KFLT) function condop_f (l, vt, vf) result(r)
+  _CONDOP_DECL real(kind=KTGT) function condop_f (l, vt, vf) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
     logical,        intent(in) :: l
-    real(kind=KFLT),intent(in) :: vt, vf
+    real(kind=KTGT),intent(in) :: vt, vf
     if (l) then
        r = vt
     else
@@ -521,10 +522,11 @@ contains
     return
   end function condop_f
 
-  _CONDOP_DECL real(kind=KDBL) function condop_d (l, vt, vf) result(r)
+  _CONDOP_DECL real(kind=KTGT) function condop_d (l, vt, vf) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
     logical,        intent(in) :: l
-    real(kind=KDBL),intent(in) :: vt, vf
+    real(kind=KTGT),intent(in) :: vt, vf
     if (l) then
        r = vt
     else
@@ -854,8 +856,8 @@ contains
     endif
   end subroutine parse_number_i
   subroutine parse_number_f (ierr, num, str, def)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
-    integer,parameter :: KTGT=KFLT
     integer,         intent(out)         :: ierr
     real(kind=KTGT), intent(inout)       :: num
     character(len=*),intent(in)          :: str
@@ -868,8 +870,8 @@ contains
     endif
   end subroutine parse_number_f
   subroutine parse_number_d (ierr, num, str, def)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,         intent(out)         :: ierr
     real(kind=KTGT), intent(inout)       :: num
     character(len=*),intent(in)          :: str
@@ -934,7 +936,7 @@ contains
        jstr = jstr + nb + lsep
        if (ierr.eq.0) then
           if (jstr.gt.lstr) then
-             ierr = ERR_INSUFFICIENT_BUFFER - ERR_MASK_STD_UTL
+             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
           else
              str = trim(str) // xsep(1:lsep) // buf(1:nb)
           endif
@@ -945,7 +947,7 @@ contains
           ns = max(1, len_trim(ldelim))
           jstr = jstr + ns
           if (jstr.gt.lstr) then
-             ierr = ERR_INSUFFICIENT_BUFFER - ERR_MASK_STD_UTL
+             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
           else
              str = ldelim(1:ns) // trim(str)
           endif
@@ -956,7 +958,7 @@ contains
           ns = max(1, len_trim(rdelim))
           jstr = jstr + ns
           if (jstr.gt.lstr) then
-             ierr = ERR_INSUFFICIENT_BUFFER - ERR_MASK_STD_UTL
+             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
           else
              str = trim(str) // rdelim(1:ns)
           endif
@@ -1012,7 +1014,7 @@ contains
        jstr = jstr + nb + lsep
        if (ierr.eq.0) then
           if (jstr.gt.lstr) then
-             ierr = ERR_INSUFFICIENT_BUFFER - ERR_MASK_STD_UTL
+             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
           else
              str = trim(str) // xsep(1:lsep) // buf(1:nb)
           endif
@@ -1023,7 +1025,7 @@ contains
           ns = max(1, len_trim(ldelim))
           jstr = jstr + ns
           if (jstr.gt.lstr) then
-             ierr = ERR_INSUFFICIENT_BUFFER - ERR_MASK_STD_UTL
+             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
           else
              str = ldelim(1:ns) // trim(str)
           endif
@@ -1034,7 +1036,7 @@ contains
           ns = max(1, len_trim(rdelim))
           jstr = jstr + ns
           if (jstr.gt.lstr) then
-             ierr = ERR_INSUFFICIENT_BUFFER - ERR_MASK_STD_UTL
+             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
           else
              str = trim(str) // rdelim(1:ns)
           endif
@@ -1110,15 +1112,15 @@ contains
        if (jerr.ne.0) exit
     enddo
     if (jerr.ne.0) then
-       n = ERR_INVALID_PARAMETER - ERR_MASK_STD_UTL
+       n = _ERROR(ERR_INVALID_PARAMETER)
     endif
     return
   end subroutine split_list_i
 
   subroutine split_list_f &
        & (n, v, str, sep, lim, def, empty)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
-    integer,parameter :: KTGT=KFLT
     integer,          intent(out)         :: n         ! number of elements or error code
     real(kind=KTGT),  intent(inout)       :: v(0:)
     character(len=*), intent(in)          :: str
@@ -1177,15 +1179,15 @@ contains
        if (jerr.ne.0) exit
     enddo
     if (jerr.ne.0) then
-       n = ERR_INVALID_PARAMETER - ERR_MASK_STD_UTL
+       n = _ERROR(ERR_INVALID_PARAMETER)
     endif
     return
   end subroutine split_list_f
 
   subroutine split_list_d &
        & (n, v, str, sep, lim, def, empty)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,          intent(out)         :: n         ! number of elements or error code
     real(kind=KTGT),  intent(inout)       :: v(0:)
     character(len=*), intent(in)          :: str
@@ -1244,7 +1246,7 @@ contains
        if (jerr.ne.0) exit
     enddo
     if (jerr.ne.0) then
-       n = ERR_INVALID_PARAMETER - ERR_MASK_STD_UTL
+       n = _ERROR(ERR_INVALID_PARAMETER)
     endif
     return
   end subroutine split_list_d

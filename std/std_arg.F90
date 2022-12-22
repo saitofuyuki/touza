@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2022/12/19 15:22:13 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/23 22:02:05 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2022
@@ -50,6 +50,8 @@ module TOUZA_Std_arg
 !!!_ + default
   implicit none
   private
+# define __MDL__ 'arg'
+# define _ERROR(E) (E - ERR_MASK_STD_ARG)
 !!!_ + parameters
   integer,parameter :: lentry = ARG_ENTRY_LIM ! limit of entries
 
@@ -61,7 +63,6 @@ module TOUZA_Std_arg
   integer,parameter,public :: PARAM_FILE = 2  ! parameters as external files
 
 !!!_ + static
-#define __MDL__ 'arg'
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
@@ -200,7 +201,7 @@ contains
           endif
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_ARG
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
 
     return
@@ -339,7 +340,7 @@ contains
     ierr = err_default
     if (nregs.ge.0) then
        ! error if parsed already
-       ierr = ERR_SECOND_INVOCATION - ERR_MASK_STD_ARG
+       ierr = _ERROR(ERR_SECOND_INVOCATION)
        return
     endif
 
@@ -347,7 +348,7 @@ contains
     if (jpi.le.0) jpi = mentry + 1
     jentr = jpi - 1
     if (jentr.gt.lentry) then
-       ierr = ERR_OUT_OF_RANGE - ERR_MASK_STD_ARG
+       ierr = _ERROR(ERR_OUT_OF_RANGE)
        return
     endif
     if (present(tag)) then
@@ -378,7 +379,7 @@ contains
 
     ucfg = new_unit()
     if (ucfg.lt.0) then
-       ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ARG
+       ierr = _ERROR(ERR_NO_IO_UNIT)
        return
     endif
 
@@ -437,7 +438,7 @@ contains
        if (l.gt.lstr) then
 101       format('too long argument at ', I0, ':', A)
           write(*, 101) jarg, trim(S)
-          ierr = ERR_INSUFFICIENT_BUFFER - ERR_MASK_STD_ARG
+          ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
        else if (ierr.eq.0) then
           write(ucfg, '(A)', IOSTAT=ierr) trim(S)
        endif
@@ -610,12 +611,12 @@ contains
 
   subroutine get_param_f &
        & (ierr, val, jpos, def, unset)
-    use TOUZA_Std_prc,only: KFLT
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
     integer,        intent(out)         :: ierr
-    real(kind=KFLT),intent(inout)       :: val
+    real(kind=KTGT),intent(inout)       :: val
     integer,        intent(in)          :: jpos
-    real(kind=KFLT),intent(in),optional :: def
+    real(kind=KTGT),intent(in),optional :: def
     logical,        intent(in),optional :: unset
     integer jentr
 
@@ -627,12 +628,12 @@ contains
 
   subroutine get_param_d &
        & (ierr, val, jpos, def, unset)
-    use TOUZA_Std_prc,only: KDBL
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
     integer,        intent(out)         :: ierr
-    real(kind=KDBL),intent(inout)       :: val
+    real(kind=KTGT),intent(inout)       :: val
     integer,        intent(in)          :: jpos
-    real(kind=KDBL),intent(in),optional :: def
+    real(kind=KTGT),intent(in),optional :: def
     logical,        intent(in),optional :: unset
     integer jentr
 
@@ -665,12 +666,12 @@ contains
 
   subroutine get_param_fa &
        & (ierr, vals, jpos, def, sep, unset)
-    use TOUZA_Std_prc,only: KFLT
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
     integer,         intent(out)         :: ierr
-    real(kind=KFLT), intent(inout)       :: vals(:)
+    real(kind=KTGT), intent(inout)       :: vals(:)
     integer,         intent(in)          :: jpos
-    real(kind=KFLT), intent(in),optional :: def
+    real(kind=KTGT), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
     integer jentr
@@ -687,12 +688,12 @@ contains
 
   subroutine get_param_da &
        & (ierr, vals, jpos, def, sep, unset)
-    use TOUZA_Std_prc,only: KDBL
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
     integer,         intent(out)         :: ierr
-    real(kind=KDBL), intent(inout)       :: vals(:)
+    real(kind=KTGT), intent(inout)       :: vals(:)
     integer,         intent(in)          :: jpos
-    real(kind=KDBL), intent(in),optional :: def
+    real(kind=KTGT), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
     integer jentr
@@ -732,13 +733,13 @@ contains
 
   subroutine get_array_f &
        & (ierr, nitem, vals, jpos, def, sep, unset)
-    use TOUZA_Std_prc,only: KFLT
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(out)         :: nitem
-    real(kind=KFLT), intent(inout)       :: vals(:)
+    real(kind=KTGT), intent(inout)       :: vals(:)
     integer,         intent(in)          :: jpos
-    real(kind=KFLT), intent(in),optional :: def
+    real(kind=KTGT), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
     integer jentr
@@ -755,13 +756,13 @@ contains
 
   subroutine get_array_d &
        & (ierr, nitem, vals, jpos, def, sep, unset)
-    use TOUZA_Std_prc,only: KDBL
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(out)         :: nitem
-    real(kind=KDBL), intent(inout)       :: vals(:)
+    real(kind=KTGT), intent(inout)       :: vals(:)
     integer,         intent(in)          :: jpos
-    real(kind=KDBL), intent(in),optional :: def
+    real(kind=KTGT), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
     integer jentr
@@ -813,12 +814,12 @@ contains
 
   subroutine get_option_f &
        & (ierr, val, tag, def, idx, unset)
-    use TOUZA_Std_prc,only: KFLT
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
     integer,         intent(out)         :: ierr
-    real(kind=KFLT), intent(inout)       :: val
+    real(kind=KTGT), intent(inout)       :: val
     character(len=*),intent(in)          :: tag
-    real(kind=KFLT), intent(in),optional :: def
+    real(kind=KTGT), intent(in),optional :: def
     integer,         intent(in),optional :: idx
     logical,         intent(in),optional :: unset
     integer jentr
@@ -831,12 +832,12 @@ contains
 
   subroutine get_option_d &
        & (ierr, val, tag, def, idx, unset)
-    use TOUZA_Std_prc,only: KDBL
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
     integer,         intent(out)         :: ierr
-    real(kind=KDBL), intent(inout)       :: val
+    real(kind=KTGT), intent(inout)       :: val
     character(len=*),intent(in)          :: tag
-    real(kind=KDBL), intent(in),optional :: def
+    real(kind=KTGT), intent(in),optional :: def
     integer,         intent(in),optional :: idx
     logical,         intent(in),optional :: unset
     integer jentr
@@ -871,12 +872,12 @@ contains
 
   subroutine get_option_fa &
        & (ierr, vals, tag, def, idx, sep, unset)
-    use TOUZA_Std_prc,only: KFLT
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
     integer,         intent(out)         :: ierr
-    real(kind=KFLT), intent(inout)       :: vals(:)
+    real(kind=KTGT), intent(inout)       :: vals(:)
     character(len=*),intent(in)          :: tag
-    real(kind=KFLT), intent(in),optional :: def
+    real(kind=KTGT), intent(in),optional :: def
     integer,         intent(in),optional :: idx
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
@@ -894,12 +895,12 @@ contains
 
   subroutine get_option_da &
        & (ierr, vals, tag, def, idx, sep, unset)
-    use TOUZA_Std_prc,only: KDBL
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
     integer,         intent(out)         :: ierr
-    real(kind=KDBL), intent(inout)       :: vals(:)
+    real(kind=KTGT), intent(inout)       :: vals(:)
     character(len=*),intent(in)          :: tag
-    real(kind=KDBL), intent(in),optional :: def
+    real(kind=KTGT), intent(in),optional :: def
     integer,         intent(in),optional :: idx
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
@@ -934,12 +935,12 @@ contains
   end subroutine parse_param_ia
   subroutine parse_param_fa &
        & (ierr, vals, str, def, sep, unset, nitem)
-    use TOUZA_Std_prc,only: KFLT
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
     integer,         intent(out)          :: ierr
-    real(kind=KFLT), intent(inout)        :: vals(:)
+    real(kind=KTGT), intent(inout)        :: vals(:)
     character(len=*),intent(in)           :: str
-    real(kind=KFLT), intent(in),optional  :: def
+    real(kind=KTGT), intent(in),optional  :: def
     character(len=*),intent(in),optional  :: sep
     logical,         intent(in),optional  :: unset
     integer,         intent(out),optional :: nitem
@@ -951,12 +952,12 @@ contains
   end subroutine parse_param_fa
   subroutine parse_param_da &
        & (ierr, vals, str, def, sep, unset, nitem)
-    use TOUZA_Std_prc,only: KDBL
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
     integer,         intent(out)          :: ierr
-    real(kind=KDBL), intent(inout)        :: vals(:)
+    real(kind=KTGT), intent(inout)        :: vals(:)
     character(len=*),intent(in)           :: str
-    real(kind=KDBL), intent(in),optional  :: def
+    real(kind=KTGT), intent(in),optional  :: def
     character(len=*),intent(in),optional  :: sep
     logical,         intent(in),optional  :: unset
     integer,         intent(out),optional :: nitem
@@ -1099,7 +1100,7 @@ contains
     ierr = err_default
     do j = 1, num
        if (jentr.lt.0) then
-          ierr = ERR_OUT_OF_RANGE - ERR_MASK_STD_ARG
+          ierr = _ERROR(ERR_OUT_OF_RANGE)
           exit
        endif
        call get_value_a(ierr, val(j), jentr)
@@ -1282,7 +1283,7 @@ contains
           endif
        endif
        if (me.ge.le) then
-          ierr = ERR_OUT_OF_RANGE - ERR_MASK_STD_ARG
+          ierr = _ERROR(ERR_OUT_OF_RANGE)
        endif
     enddo
 
@@ -1311,7 +1312,7 @@ contains
     mbtm = me
     me   = me + mins
     if (me.gt.le) then
-       ierr = ERR_OUT_OF_RANGE - ERR_MASK_STD_ARG
+       ierr = _ERROR(ERR_OUT_OF_RANGE)
        return
     endif
 
@@ -1444,7 +1445,7 @@ contains
           if (present(def)) then
              val = def
           else
-             ierr = ERR_NEED_ARGUMENT - ERR_MASK_STD_ARG
+             ierr = _ERROR(ERR_NEED_ARGUMENT)
           endif
        else
           ! read(avals(jentr), *, IOSTAT=ierr) val
@@ -1461,14 +1462,14 @@ contains
 
   subroutine extract_val_f &
        & (ierr, val, jentr, cud, def, unset)
-    use TOUZA_Std_prc,only: KFLT
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     use TOUZA_Std_utl,only: choice, parse_number
     implicit none
     integer,          intent(out)         :: ierr
-    real(kind=KFLT),  intent(inout)       :: val
+    real(kind=KTGT),  intent(inout)       :: val
     integer,          intent(in)          :: jentr
     character(len=*), intent(in)          :: cud
-    real(kind=KFLT),  intent(in),optional :: def
+    real(kind=KTGT),  intent(in),optional :: def
     logical,          intent(in),optional :: unset
 
     ierr = err_default
@@ -1482,7 +1483,7 @@ contains
           if (present(def)) then
              val = def
           else
-             ierr = ERR_NEED_ARGUMENT - ERR_MASK_STD_ARG
+             ierr = _ERROR(ERR_NEED_ARGUMENT)
           endif
        else
           ! read(avals(jentr), *, IOSTAT=ierr) val
@@ -1499,14 +1500,14 @@ contains
 
   subroutine extract_val_d &
        & (ierr, val, jentr, cud, def, unset)
-    use TOUZA_Std_prc,only: KDBL
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     use TOUZA_Std_utl,only: choice, parse_number
     implicit none
     integer,         intent(out)         :: ierr
-    real(kind=KDBL), intent(inout)       :: val
+    real(kind=KTGT), intent(inout)       :: val
     integer,         intent(in)          :: jentr
     character(len=*),intent(in)          :: cud
-    real(kind=KDBL), intent(in),optional :: def
+    real(kind=KTGT), intent(in),optional :: def
     logical,         intent(in),optional :: unset
 
     ierr = err_default
@@ -1520,7 +1521,7 @@ contains
           if (present(def)) then
              val = def
           else
-             ierr = ERR_NEED_ARGUMENT - ERR_MASK_STD_ARG
+             ierr = _ERROR(ERR_NEED_ARGUMENT)
           endif
        else
           ! read(avals(jentr), *, IOSTAT=ierr) val
@@ -1625,17 +1626,17 @@ contains
 
   subroutine extract_vals_f &
        & (ierr, vals, str, cud, def, sep, nitem, unset)
-    use TOUZA_Std_prc,only: KFLT
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     use TOUZA_Std_utl,only: choice, choice_a, parse_number
     implicit none
-    integer,         intent(out)          :: ierr
-    real(kind=KFLT), intent(inout)        :: vals(:)
-    character(len=*),intent(in)           :: str
-    character(len=*),intent(in)           :: cud
-    real(kind=KFLT), intent(in), optional :: def
-    character(len=*),intent(in), optional :: sep
-    integer,         intent(out),optional :: nitem
-    logical,         intent(in), optional :: unset
+    integer,            intent(out)          :: ierr
+    real(kind=KTGT),    intent(inout)        :: vals(:)
+    character(len=*),   intent(in)           :: str
+    character(len=*),   intent(in)           :: cud
+    real(kind=KTGT),    intent(in), optional :: def
+    character(len=KTGT),intent(in), optional :: sep
+    integer,            intent(out),optional :: nitem
+    logical,            intent(in), optional :: unset
     integer jb, je, le
     integer jv, nv
     character(len=ltag) :: chs
@@ -1685,14 +1686,14 @@ contains
 
   subroutine extract_vals_d &
        & (ierr, vals, str, cud, def, sep, nitem, unset)
-    use TOUZA_Std_prc,only: KDBL
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     use TOUZA_Std_utl,only: choice, choice_a, parse_number
     implicit none
     integer,         intent(out)          :: ierr
-    real(kind=KDBL), intent(inout)        :: vals(:)
+    real(kind=KTGT), intent(inout)        :: vals(:)
     character(len=*),intent(in)           :: str
     character(len=*),intent(in)           :: cud
-    real(kind=KDBL), intent(in), optional :: def
+    real(kind=KTGT), intent(in), optional :: def
     character(len=*),intent(in), optional :: sep
     integer,         intent(out),optional :: nitem
     logical,         intent(in), optional :: unset
@@ -1800,12 +1801,12 @@ contains
 
   subroutine default_vals_f &
        & (ierr, vals, def, nitem, unset)
-    use TOUZA_Std_prc,only: KFLT
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,        intent(out)          :: ierr
-    real(kind=KFLT),intent(inout)        :: vals(:)
-    real(kind=KFLT),intent(in), optional :: def
+    real(kind=KTGT),intent(inout)        :: vals(:)
+    real(kind=KTGT),intent(in), optional :: def
     integer,        intent(out),optional :: nitem
     logical,        intent(in), optional :: unset
     ierr = err_default
@@ -1826,12 +1827,12 @@ contains
 
   subroutine default_vals_d &
        & (ierr, vals, def, nitem, unset)
-    use TOUZA_Std_prc,only: KDBL
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,        intent(out)          :: ierr
-    real(kind=KDBL),intent(inout)        :: vals(:)
-    real(kind=KDBL),intent(in), optional :: def
+    real(kind=KTGT),intent(inout)        :: vals(:)
+    real(kind=KTGT),intent(in), optional :: def
     integer,        intent(out),optional :: nitem
     logical,        intent(in), optional :: unset
     ierr = err_default
