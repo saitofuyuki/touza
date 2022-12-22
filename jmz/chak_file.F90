@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz swiss(CH) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2022/12/18 21:40:03 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/22 11:25:30 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -113,7 +113,7 @@ module chak_file
      integer                :: mode      ! access mode
      integer                :: hedit     ! header edit level
      integer                :: hflag = hflag_unset ! header parser flag
-     type(rgroup_t),pointer :: rgrp(:)
+     type(rgroup_t),pointer :: rgrp(:) => NULL()
      integer                :: big
   end type file_t
 !!!_ + Procedures
