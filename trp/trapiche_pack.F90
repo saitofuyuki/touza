@@ -1,10 +1,10 @@
 !!!_! trapiche_pack.F90 - TOUZA/Trapiche integer packing/unpacking
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2022/12/05 14:18:20 fuyuki trapiche_pack.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/25 22:20:26 fuyuki trapiche_pack.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022
+! Copyright (C) 2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -20,6 +20,9 @@ module TOUZA_Trp_pack
   use TOUZA_Trp_std,only: KI8, KI32, KI64, &
        & control_mode, control_deep, is_first_force, &
        & unit_global,  trace_fine,   trace_control
+#if OPT_USE_IPC_IBITS
+  use TOUZA_Trp_std,only: ipc_IBITS
+#endif
   implicit none
   private
 !!!_  - public parameters
@@ -37,6 +40,7 @@ module TOUZA_Trp_pack
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
 # define __MDL__ 'p'
+# define _ERROR(E) (E - ERR_MASK_TRP_PACK)
 !!!_  - common
   ! character(len=256) :: tmsg
 !!!_  - interfaces
@@ -154,7 +158,7 @@ contains
           if (ierr.eq.0) call ts_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
     return
   end subroutine init
@@ -237,13 +241,13 @@ contains
     integer,            intent(in),optional :: nbskp
     integer(kind=KICNZ),intent(in),optional :: kxsp
 
-    integer,parameter   :: khld  = 0_KICNZ
+    integer,parameter   :: mold  = 0_KICNZ
     integer(kind=KICNZ) :: maxp, minn
     integer(kind=KICNZ) :: kofs
     integer(kind=KICNZ) :: nw, nb, mc
-    integer,parameter   :: lbits = BIT_SIZE(0_KICNZ)
-    integer(kind=KICNZ) :: lpos = + HUGE(khld)
-    integer(kind=KICNZ) :: lneg = (- HUGE(khld)) - 1
+    integer,parameter   :: lbits = BIT_SIZE(mold)
+    integer(kind=KICNZ) :: lpos = + HUGE(mold)
+    integer(kind=KICNZ) :: lneg = (- HUGE(mold)) - 1
 
     ierr = err_default
     kofs = max(-1_KICNZ, choice(-1_KICNZ, kxsp)) + 1_KICNZ
@@ -312,10 +316,10 @@ contains
     integer(kind=KICNZ) :: nc, nb
     integer(kind=KICNZ) :: ntgt
     integer(kind=KICNZ) :: kofs
-    integer,parameter   :: khld  = 0_KICNZ
-    integer,parameter   :: lbits = BIT_SIZE(khld)
-    integer(kind=KICNZ) :: lpos = + HUGE(khld)
-    integer(kind=KICNZ) :: lneg = - HUGE(khld) - 1
+    integer,parameter   :: mold  = 0_KICNZ
+    integer,parameter   :: lbits = BIT_SIZE(mold)
+    integer(kind=KICNZ) :: lpos = + HUGE(mold)
+    integer(kind=KICNZ) :: lneg = - HUGE(mold) - 1
 
     ierr = 0
 
@@ -413,7 +417,7 @@ contains
           call pack_store_trn_ii(ierr, ibagaz, icanaz, mem, nbits)
        endif
     case default
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_SWITCH)
     end select
     return
   end subroutine pack_store_ii
@@ -443,7 +447,7 @@ contains
     case (RELLENO_TRANSPOSE)
        call pack_store_trn_ll(ierr, ibagaz, icanaz, mem, nbits)
     case default
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_SWITCH)
     end select
     return
   end subroutine pack_store_ll
@@ -504,7 +508,7 @@ contains
           call pack_restore_trn_ii(ierr, icanaz, ibagaz, mem, nbits)
        endif
     case default
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_SWITCH)
     end select
     return
   end subroutine pack_restore_ii
@@ -537,7 +541,7 @@ contains
     case (RELLENO_TRANSPOSE)
        call pack_restore_trn_ll(ierr, icanaz, ibagaz, mem, nbits)
     case default
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_SWITCH)
     end select
     return
   end subroutine pack_restore_ll
@@ -587,18 +591,18 @@ contains
           do jc = jcbgn,     jcbgn
              msh = mskb + (jc - jcbgn) * nbits
              ibagaz(jb) = &
-                  & ISHFT(IBITS(icanaz(jc), 0, msh), lbits - msh)
+                  & ISHFT(_IBITS(icanaz(jc), 0, msh), lbits - msh)
           enddo
           do jc = jcbgn + 1, jcend - 1
              msh = mskb + (jc - jcbgn) * nbits
              ibagaz(jb) = &
-                  & IOR(ibagaz(jb), ISHFT(IBITS(icanaz(jc), 0, nbits), lbits - msh))
+                  & IOR(ibagaz(jb), ISHFT(_IBITS(icanaz(jc), 0, nbits), lbits - msh))
           enddo
           do jc = jcend, min(mem - 1, jcend)
              msh = mskb + (jc - jcbgn) * nbits
              msh = msh - lbits
              ibagaz(jb) = &
-                  & IOR(ibagaz(jb), IBITS(icanaz(jc), msh, nbits - msh))
+                  & IOR(ibagaz(jb), _IBITS(icanaz(jc), msh, nbits - msh))
           enddo
        enddo
     enddo
@@ -650,18 +654,18 @@ contains
           do jc = jcbgn,     jcbgn
              msh = mskb + (jc - jcbgn) * nbits
              ibagaz(jb) = &
-                  & ISHFT(IBITS(icanaz(jc), 0, msh), lbits - msh)
+                  & ISHFT(_IBITS(icanaz(jc), 0, msh), lbits - msh)
           enddo
           do jc = jcbgn + 1, jcend - 1
              msh = mskb + (jc - jcbgn) * nbits
              ibagaz(jb) = &
-                  & IOR(ibagaz(jb), ISHFT(IBITS(icanaz(jc), 0, nbits), lbits - msh))
+                  & IOR(ibagaz(jb), ISHFT(_IBITS(icanaz(jc), 0, nbits), lbits - msh))
           enddo
           do jc = jcend, min(mem - 1, jcend)
              msh = mskb + (jc - jcbgn) * nbits
              msh = msh - lbits
              ibagaz(jb) = &
-                  & IOR(ibagaz(jb), IBITS(icanaz(jc), msh, nbits - msh))
+                  & IOR(ibagaz(jb), _IBITS(icanaz(jc), msh, nbits - msh))
           enddo
        enddo
     enddo
@@ -719,17 +723,17 @@ contains
              msh = mskb + (jc - jcbgn) * nbits
              icanaz(jc) = &
                   & IOR(icanaz(jc), &
-                  &     IBITS(ibagaz(jb), lbits - msh, msh))
+                  &     _IBITS(ibagaz(jb), lbits - msh, msh))
           enddo
           do jc = jcbgn + 1, jcend - 1
              msh = mskb + (jc - jcbgn) * nbits
-             icanaz(jc) = IBITS(ibagaz(jb), lbits - msh, nbits)
+             icanaz(jc) = _IBITS(ibagaz(jb), lbits - msh, nbits)
           enddo
           do jc = jcend, min(mem - 1, jcend)
              msh = mskb + (jc - jcbgn) * nbits
              msh = msh - lbits
              icanaz(jc) = &
-                  & ISHFT(IBITS(ibagaz(jb), 0, nbits - msh), msh)
+                  & ISHFT(_IBITS(ibagaz(jb), 0, nbits - msh), msh)
           enddo
        enddo
     enddo
@@ -785,17 +789,17 @@ contains
              msh = mskb + (jc - jcbgn) * nbits
              icanaz(jc) = &
                   & IOR(icanaz(jc), &
-                  &     IBITS(ibagaz(jb), lbits - msh, msh))
+                  &     _IBITS(ibagaz(jb), lbits - msh, msh))
           enddo
           do jc = jcbgn + 1, jcend - 1
              msh = mskb + (jc - jcbgn) * nbits
-             icanaz(jc) = IBITS(ibagaz(jb), lbits - msh, nbits)
+             icanaz(jc) = _IBITS(ibagaz(jb), lbits - msh, nbits)
           enddo
           do jc = jcend, min(mem - 1, jcend)
              msh = mskb + (jc - jcbgn) * nbits
              msh = msh - lbits
              icanaz(jc) = &
-                  & ISHFT(IBITS(ibagaz(jb), 0, nbits - msh), msh)
+                  & ISHFT(_IBITS(ibagaz(jb), 0, nbits - msh), msh)
           enddo
        enddo
     enddo
@@ -820,7 +824,7 @@ contains
 
     ierr = err_default
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
 
@@ -886,7 +890,7 @@ contains
 
     integer,parameter :: lbits = bit_size(ibagaz(0))
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
 
     return
   end subroutine pack_store_seq_sp1_ll
@@ -910,7 +914,7 @@ contains
 
     ierr = err_default
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
 
@@ -974,7 +978,7 @@ contains
 
     integer,parameter :: lbits = bit_size(ibagaz(0))
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
 
   end subroutine pack_restore_seq_sp1_ll
 
@@ -1021,20 +1025,20 @@ contains
        do jc = jcbgn,     jcbgn
           msh = mskb + (jc - jcbgn) * nbits
           ibagaz(jb:nb-1:nz) = &
-               & ISHFT(IBITS(icanaz(jc:mem-1:ncs), 0, msh), lbits - msh)
+               & ISHFT(_IBITS(icanaz(jc:mem-1:ncs), 0, msh), lbits - msh)
        enddo
        do jc = jcbgn + 1, jcend - 1
           mc = (moff - jc) / ncs
           msh = mskb + (jc - jcbgn) * nbits
           ibagaz(jb:jb+mc*nz-1:nz) = &
-               & IOR(ibagaz(jb:jb+mc*nz-1:nz), ISHFT(IBITS(icanaz(jc:jc+mc*ncs-1:ncs), 0, nbits), lbits - msh))
+               & IOR(ibagaz(jb:jb+mc*nz-1:nz), ISHFT(_IBITS(icanaz(jc:jc+mc*ncs-1:ncs), 0, nbits), lbits - msh))
        enddo
        do jc = jcend, min(mem - 1, jcend)
           msh = mskb + (jc - jcbgn) * nbits
           msh = msh - lbits
           mc = (moff - jc) / ncs
           ibagaz(jb:jb+mc*nz-1:nz) = &
-               & IOR(ibagaz(jb:jb+mc*nz-1:nz), IBITS(icanaz(jc:jc+mc*ncs-1:ncs), msh, nbits - msh))
+               & IOR(ibagaz(jb:jb+mc*nz-1:nz), _IBITS(icanaz(jc:jc+mc*ncs-1:ncs), msh, nbits - msh))
        enddo
     enddo
 
@@ -1083,20 +1087,20 @@ contains
        do jc = jcbgn,     jcbgn
           msh = mskb + (jc - jcbgn) * nbits
           ibagaz(jb:nb-1:nz) = &
-               & ISHFT(IBITS(icanaz(jc:mem-1:ncs), 0, msh), lbits - msh)
+               & ISHFT(_IBITS(icanaz(jc:mem-1:ncs), 0, msh), lbits - msh)
        enddo
        do jc = jcbgn + 1, jcend - 1
           mc = (moff - jc) / ncs
           msh = mskb + (jc - jcbgn) * nbits
           ibagaz(jb:jb+mc*nz-1:nz) = &
-               & IOR(ibagaz(jb:jb+mc*nz-1:nz), ISHFT(IBITS(icanaz(jc:jc+mc*ncs-1:ncs), 0, nbits), lbits - msh))
+               & IOR(ibagaz(jb:jb+mc*nz-1:nz), ISHFT(_IBITS(icanaz(jc:jc+mc*ncs-1:ncs), 0, nbits), lbits - msh))
        enddo
        do jc = jcend, min(mem - 1, jcend)
           msh = mskb + (jc - jcbgn) * nbits
           msh = msh - lbits
           mc = (moff - jc) / ncs
           ibagaz(jb:jb+mc*nz-1:nz) = &
-               & IOR(ibagaz(jb:jb+mc*nz-1:nz), IBITS(icanaz(jc:jc+mc*ncs-1:ncs), msh, nbits - msh))
+               & IOR(ibagaz(jb:jb+mc*nz-1:nz), _IBITS(icanaz(jc:jc+mc*ncs-1:ncs), msh, nbits - msh))
        enddo
     enddo
 
@@ -1149,19 +1153,19 @@ contains
           msh = mskb + (jc - jcbgn) * nbits
           icanaz(jc:mem-1:ncs) = &
                & IOR(icanaz(jc:mem-1:ncs), &
-               &     IBITS(ibagaz(jb:nb-1:nz), lbits - msh, msh))
+               &     _IBITS(ibagaz(jb:nb-1:nz), lbits - msh, msh))
        enddo
        do jc = jcbgn + 1, jcend - 1
           msh = mskb + (jc - jcbgn) * nbits
           mc = (moff - jc) / ncs
-          icanaz(jc:jc+mc*ncs-1:ncs) = IBITS(ibagaz(jb:jb+mc*nz-1:nz), lbits - msh, nbits)
+          icanaz(jc:jc+mc*ncs-1:ncs) = _IBITS(ibagaz(jb:jb+mc*nz-1:nz), lbits - msh, nbits)
        enddo
        do jc = jcend, min(ncs - 1, jcend)
           msh = mskb + (jc - jcbgn) * nbits
           msh = msh - lbits
           mc = (moff - jc) / ncs
           icanaz(jc:jc+mc*ncs-1:ncs) = &
-               & ISHFT(IBITS(ibagaz(jb:jb+mc*nz-1:nz), 0, nbits - msh), msh)
+               & ISHFT(_IBITS(ibagaz(jb:jb+mc*nz-1:nz), 0, nbits - msh), msh)
        enddo
     enddo
 
@@ -1213,19 +1217,19 @@ contains
           msh = mskb + (jc - jcbgn) * nbits
           icanaz(jc:mem-1:ncs) = &
                & IOR(icanaz(jc:mem-1:ncs), &
-               &     IBITS(ibagaz(jb:nb-1:nz), lbits - msh, msh))
+               &     _IBITS(ibagaz(jb:nb-1:nz), lbits - msh, msh))
        enddo
        do jc = jcbgn + 1, jcend - 1
           msh = mskb + (jc - jcbgn) * nbits
           mc = (moff - jc) / ncs
-          icanaz(jc:jc+mc*ncs-1:ncs) = IBITS(ibagaz(jb:jb+mc*nz-1:nz), lbits - msh, nbits)
+          icanaz(jc:jc+mc*ncs-1:ncs) = _IBITS(ibagaz(jb:jb+mc*nz-1:nz), lbits - msh, nbits)
        enddo
        do jc = jcend, min(ncs - 1, jcend)
           msh = mskb + (jc - jcbgn) * nbits
           msh = msh - lbits
           mc = (moff - jc) / ncs
           icanaz(jc:jc+mc*ncs-1:ncs) = &
-               & ISHFT(IBITS(ibagaz(jb:jb+mc*nz-1:nz), 0, nbits - msh), msh)
+               & ISHFT(_IBITS(ibagaz(jb:jb+mc*nz-1:nz), 0, nbits - msh), msh)
        enddo
     enddo
 
@@ -1252,7 +1256,7 @@ contains
 
     ierr = err_default
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
     jbend = mem / lbits
@@ -1325,7 +1329,7 @@ contains
     integer moff,  mc
     integer msh
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
 
     return
   end subroutine pack_store_str_sp1_ll
@@ -1350,7 +1354,7 @@ contains
 
     ierr = err_default
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
 
@@ -1423,7 +1427,7 @@ contains
     integer moff,  mc
     integer msh
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
 
     return
   end subroutine pack_restore_str_sp1_ll
@@ -1479,7 +1483,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
-               & ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, msh), lbits - msh)
+               & ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, msh), lbits - msh)
        enddo
        ! medium entries (copy whole)
        do jo = jobgn + 1, joend - 1
@@ -1490,7 +1494,7 @@ contains
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
                & IOR(ibagaz(jbbgn:jbend-1), &
-               &     ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, nbits), lbits - msh))
+               &     ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, nbits), lbits - msh))
        enddo
        ! bottom entries
        do jo = joend, joend
@@ -1502,7 +1506,7 @@ contains
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
                & IOR(ibagaz(jbbgn:jbend-1), &
-               &     IBITS(icanaz(jcbgn:jcend-1), msh, nbits - msh))
+               &     _IBITS(icanaz(jcbgn:jcend-1), msh, nbits - msh))
        enddo
     enddo
   end subroutine pack_store_trn_ii
@@ -1557,7 +1561,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
-               & ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, msh), lbits - msh)
+               & ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, msh), lbits - msh)
        enddo
        ! medium entries (copy whole)
        do jo = jobgn + 1, joend - 1
@@ -1568,7 +1572,7 @@ contains
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
                & IOR(ibagaz(jbbgn:jbend-1), &
-               &     ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, nbits), lbits - msh))
+               &     ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, nbits), lbits - msh))
        enddo
        ! bottom entries
        do jo = joend, joend
@@ -1580,7 +1584,7 @@ contains
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
                & IOR(ibagaz(jbbgn:jbend-1), &
-               &     IBITS(icanaz(jcbgn:jcend-1), msh, nbits - msh))
+               &     _IBITS(icanaz(jcbgn:jcend-1), msh, nbits - msh))
        enddo
     enddo
   end subroutine pack_store_trn_ll
@@ -1644,7 +1648,7 @@ contains
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
                & IOR(icanaz(jcbgn:jcend-1), &
-               &     IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, msh))
+               &     _IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, msh))
        enddo
        ! medium entries (copy whole)
        do jo = jobgn + 1, joend - 1
@@ -1654,7 +1658,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
-               & IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, nbits)
+               & _IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, nbits)
        enddo
        ! bottom entries
        do jo = joend, joend
@@ -1665,7 +1669,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
-               & ISHFT(IBITS(ibagaz(jbbgn:jbend-1), 0, nbits - msh), msh)
+               & ISHFT(_IBITS(ibagaz(jbbgn:jbend-1), 0, nbits - msh), msh)
        enddo
     enddo
   end subroutine pack_restore_trn_ii
@@ -1728,7 +1732,7 @@ contains
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
                & IOR(icanaz(jcbgn:jcend-1), &
-               &     IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, msh))
+               &     _IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, msh))
        enddo
        ! medium entries (copy whole)
        do jo = jobgn + 1, joend - 1
@@ -1738,7 +1742,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
-               & IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, nbits)
+               & _IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, nbits)
        enddo
        ! bottom entries
        do jo = joend, joend
@@ -1749,7 +1753,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
-               & ISHFT(IBITS(ibagaz(jbbgn:jbend-1), 0, nbits - msh), msh)
+               & ISHFT(_IBITS(ibagaz(jbbgn:jbend-1), 0, nbits - msh), msh)
        enddo
     enddo
   end subroutine pack_restore_trn_ll
@@ -1779,7 +1783,7 @@ contains
     ierr = err_default
 
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
 
@@ -1831,7 +1835,7 @@ contains
             &     +ISHFT(IBITS(icanaz(jcofs(31):jcofs(31)+nc-1),0,1), +0))
     endif
     if (rgrps.gt.0) then
-       ibagaz(jbend-1) = ISHFT(IBITS(icanaz(jcofs(1)-1),0,1), 31)
+       ibagaz(jbend-1) = ISHFT(_IBITS(icanaz(jcofs(1)-1),0,1), 31)
        do jo = 1, ritms - 1
           ibagaz(jbend-1) = IOR(ibagaz(jbend-1), ISHFT(IBITS(icanaz(jcofs(jo+1)-1),0,1), 32-jo-1))
        enddo
@@ -1850,25 +1854,7 @@ contains
     integer(kind=KICNZ),intent(in)  :: icanaz(0:*)  ! source buffer
     integer,            intent(in)  :: mem          ! number of items
     integer,            intent(in)  :: nbits        ! target bit sizes
-
-    integer,parameter :: lbits = bit_size(ibagaz(0))
-
-    integer rgrps, ritms
-    integer jz,    nz
-    integer ngflr
-    integer jobgn, joend, jo    ! serial index of pattern
-    integer jbbgn, jbend        ! range of bagazo (destination) elements
-    integer jcofs(0:lbits), nc  ! range of cana-azucar (source) elements
-    integer msh
-    integer mskb
-
-    ierr = err_default
-
-    if (nbits.ne.1) then
-       ierr = -1
-       return
-    endif
-
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_store_trn_sp1_ll
 
 !!!_  & pack_restore_trn_sp1 - transposed unpacking special (1/32)
@@ -1896,7 +1882,7 @@ contains
     ierr = err_default
 
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
 
@@ -1966,7 +1952,7 @@ contains
 
     integer,parameter :: lbits = bit_size(ibagaz(0))
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_restore_trn_sp1_ll
 
 !!!_  & pack_store_trn_spdiv - transposed packing special (32 divisor)
@@ -1993,7 +1979,7 @@ contains
     integer msh
 
     if (mod(lbits, nbits).ne.0) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
     if (lbits.eq.nbits) then
@@ -2016,7 +2002,7 @@ contains
        nc = jcend - jcbgn
        jbend = jbbgn + nc
        msh = lbits - (jo + 1) * nbits
-       ibagaz(jbbgn:jbend-1) = ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, nbits), msh)
+       ibagaz(jbbgn:jbend-1) = ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, nbits), msh)
     enddo
     do jo = jobgn + 1, joend - 1
        jcbgn = pos_source(jo,   ngflr, ritms)
@@ -2024,7 +2010,7 @@ contains
        nc = jcend - jcbgn
        jbend = jbbgn + nc
        msh = lbits - (jo + 1) * nbits
-       ibagaz(jbbgn:jbend-1) = IOR(ibagaz(jbbgn:jbend-1), ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, nbits), msh))
+       ibagaz(jbbgn:jbend-1) = IOR(ibagaz(jbbgn:jbend-1), ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, nbits), msh))
     enddo
   end subroutine pack_store_trn_spdiv_ii
   subroutine pack_store_trn_spdiv_ll &
@@ -2041,7 +2027,7 @@ contains
 
     integer,parameter :: lbits = bit_size(ibagaz(0))
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_store_trn_spdiv_ll
 
 !!!_  & pack_restore_trn_spdiv - transposed unpacking special (32 divisor)
@@ -2070,7 +2056,7 @@ contains
     ierr = err_default
 
     if (mod(lbits, nbits).ne.0) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
     if (lbits.eq.nbits) then
@@ -2092,7 +2078,7 @@ contains
        nc = jcend - jcbgn
        jbend = jbbgn + nc
        msh = lbits - (jo + 1) * nbits
-       icanaz(jcbgn:jcend-1) = IBITS(ibagaz(jbbgn:jbend-1), msh, nbits)
+       icanaz(jcbgn:jcend-1) = _IBITS(ibagaz(jbbgn:jbend-1), msh, nbits)
     enddo
   end subroutine pack_restore_trn_spdiv_ii
 
@@ -2110,7 +2096,7 @@ contains
 
     integer,parameter :: lbits = bit_size(ibagaz(0))
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_restore_trn_spdiv_ll
 
 !!!_  & unparse_relleno - packing method id
@@ -2534,25 +2520,23 @@ contains
   end function count_zones
 !!!_  & count_packed
   integer function count_packed_ii &
-       & (nbits, mem, istr) result (n)
+       & (nbits, mem, mold) result (n)
     implicit none
     integer,           intent(in) :: nbits
     integer,           intent(in) :: mem
-    integer(kind=KI32),intent(in) :: istr
-    integer lbits
-    lbits = bit_size(istr)
+    integer(kind=KI32),intent(in) :: mold
+    integer,parameter :: lbits = bit_size(mold)
     n = div_ceiling_safe(nbits, mem, lbits)
     return
   end function count_packed_ii
 
   integer function count_packed_ll &
-       & (nbits, mem, istr) result (n)
+       & (nbits, mem, mold) result (n)
     implicit none
     integer,           intent(in) :: nbits
     integer,           intent(in) :: mem
-    integer(kind=KI64),intent(in) :: istr
-    integer lbits
-    lbits = bit_size(istr)
+    integer(kind=KI64),intent(in) :: mold
+    integer,parameter :: lbits = bit_size(mold)
     n = div_ceiling_safe(nbits, mem, lbits)
     return
   end function count_packed_ll
