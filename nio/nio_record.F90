@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2022/12/21 16:19:58 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/12/22 11:25:26 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -1508,7 +1508,7 @@ contains
     logical swap
     integer div
     integer,parameter :: KISRC=KI32
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer(kind=KISRC) :: mb
     integer nrec
@@ -1528,17 +1528,17 @@ contains
     case(GFMT_UI4)
        call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=n)
     case(GFMT_MR4)
-       ncom = count_packed(1, n, khld)
+       ncom = count_packed(1, n, mold)
        call get_data_record(ierr, mb, u, krect)
        if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=ncom)
        if (ierr.eq.0) call sus_read_irec(ierr, u, vf, 0, swap, div=div, lmem=mb)
     case(GFMT_MR8)
-       ncom = count_packed(1, n, khld)
+       ncom = count_packed(1, n, mold)
        call get_data_record(ierr, mb, u, krect)
        if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=ncom)
        if (ierr.eq.0) call sus_read_irec(ierr, u, vd, 0, swap, div=div, lmem=mb)
     case(GFMT_MI4)
-       ncom = count_packed(1, n, khld)
+       ncom = count_packed(1, n, mold)
        call get_data_record(ierr, mb, u, krect)
        if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=ncom)
        if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=mb)
@@ -1550,7 +1550,7 @@ contains
        nbits = kfmt - GFMT_URY
        nh = max(1, kaxs(1)) * max(1, kaxs(2))
        nk = max(1, kaxs(3))
-       ncom  = count_packed(nbits, nh, khld)
+       ncom  = count_packed(nbits, nh, mold)
        nn = nk * 2
        if (ierr.eq.0) call sus_read_irec(ierr, u, vd, 0, swap, div=div, lmem=nn)
        nn = nk * ncom
@@ -1559,7 +1559,7 @@ contains
        nbits = kfmt - GFMT_URY
        nh = max(1, kaxs(1)) * max(1, kaxs(2))
        nk = max(1, kaxs(3))
-       nm = count_packed(nbits, nh, khld)
+       nm = count_packed(nbits, nh, mold)
        if (ierr.eq.0) call get_data_record(ierr, ncom, u, krect)
        if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=nk)
        if (ierr.eq.0) call sus_read_irec(ierr, u, vi, 0, swap, div=div, lmem=nk)
@@ -1896,13 +1896,13 @@ contains
     integer(kind=KISRC) :: icom(nh * nk)
     integer(kind=KISRC) :: imiss
     real(kind=KRSRC)    :: dma(2 * nk)
-    integer,parameter   :: khld = 0_KISRC
+    integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jde, jc
     integer kpack
 
     ierr = 0
     nbits = kfmt - GFMT_URY
-    mcom  = count_packed(nbits, nh, khld)
+    mcom  = count_packed(nbits, nh, mold)
     imiss = ISHFT(1, nbits) - 1
     call get_data_record(ierr, dma, 2 * nk, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, icom, mcom * nk, u, krect)
@@ -1941,13 +1941,13 @@ contains
     integer(kind=KISRC) :: icom(nh * nk)
     integer(kind=KISRC) :: imiss
     real(kind=KRSRC)    :: dma(2 * nk)
-    integer,parameter   :: khld = 0_KISRC
+    integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jde
     integer kpack
 
     ierr = 0
     nbits = kfmt - GFMT_URY
-    mcom  = count_packed(nbits, nh, khld)
+    mcom  = count_packed(nbits, nh, mold)
     imiss = ISHFT(1, nbits) - 1
 
     call get_data_record(ierr, dma, 2 * nk, u, krect)
@@ -2014,13 +2014,13 @@ contains
     integer(kind=KISRC) :: icom(nh * nk)
     integer(kind=KISRC) :: imiss
     real(kind=KRSRC)    :: dma(2 * nk)
-    integer,parameter   :: khld = 0_KISRC
+    integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jde, jc
     integer kpack
 
     ierr = 0
     nbits = kfmt - GFMT_URY
-    mcom  = count_packed(nbits, nh, khld)
+    mcom  = count_packed(nbits, nh, mold)
     imiss = IBITS(HUGE(0_KISRC), 0, nbits)
     kpack = legacy_packing(nbits, nh)
     do jk = 1, nk
@@ -2055,14 +2055,14 @@ contains
     integer(kind=KISRC) :: icom(nh * nk)
     integer(kind=KISRC) :: imiss
     real(kind=KRSRC)    :: dma(2 * nk)
-    integer,parameter   :: khld = 0_KISRC
+    integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jde, jc
     real(kind=KRSRC)    :: buf(nh)
     integer kpack
 
     ierr = 0
     nbits = kfmt - GFMT_URY
-    mcom  = count_packed(nbits, nh, khld)
+    mcom  = count_packed(nbits, nh, mold)
     imiss = IBITS(HUGE(0_KISRC), 0, nbits)
     kpack = legacy_packing(nbits, nh)
     do jk = 1, nk
@@ -2119,12 +2119,12 @@ contains
     integer(kind=KISRC) :: mb
     integer(kind=KISRC) :: icom(n)
     real(kind=KRSRC)    :: buf(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
 
     ierr = 0
-    ncom = count_packed(1, n, khld)
+    ncom = count_packed(1, n, mold)
     call get_data_record(ierr, mb, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, icom, ncom, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, buf,  mb,   u, krect)
@@ -2194,7 +2194,7 @@ contains
     integer(kind=KISRC) :: mb
     integer(kind=KISRC) :: icom(n)
     real(kind=KRSRC)    :: buf(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
 
@@ -2268,12 +2268,12 @@ contains
     integer(kind=KISRC) :: mb
     integer(kind=KISRC) :: icom(n)
     real(kind=KRSRC)    :: buf(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
 
     ierr = 0
-    ncom = count_packed(1, n, khld)
+    ncom = count_packed(1, n, mold)
     call get_data_record(ierr, mb, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, icom, ncom, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, buf,  mb,   u, krect)
@@ -2430,7 +2430,7 @@ contains
     integer             :: idec(nh)
     integer(kind=KISRC) :: icom(nh * nk)
     real(kind=KRSRC)    :: dma(2 * nk)
-    integer,parameter   :: khld = 0_KISRC
+    integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jm, jc, jh, jb
     integer kpackm, kpackb
 
@@ -2438,7 +2438,7 @@ contains
 
     nbits = kfmt - GFMT_MRY
 
-    nm = count_packed(1, nh, khld)
+    nm = count_packed(1, nh, mold)
     mofs(0) = 0
 
     if (ierr.eq.0) call get_data_record(ierr, mcom,     u,          krect)
@@ -2550,7 +2550,7 @@ contains
     integer(kind=KISRC) :: imiss
     real(kind=KRSRC)    :: dma(2 * nk)
     real(kind=KRSRC)    :: buf(nh)
-    integer,parameter   :: khld = 0_KISRC
+    integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jm, jc, jh
     integer             :: nc, ne
     integer kpackm, kpackb
@@ -2558,7 +2558,7 @@ contains
     ierr = 0
 
     nbits = kfmt - GFMT_MRY
-    nm = count_packed(1, nh, khld)
+    nm = count_packed(1, nh, mold)
     imiss = IBITS(HUGE(0_KISRC), 0, nbits)
 
     jc = 0
@@ -2577,7 +2577,7 @@ contains
              imsk(jh) = 0
           endif
        enddo
-       nc = count_packed(nbits, ne, khld)
+       nc = count_packed(nbits, ne, mold)
        mofs(jk) = nc
        mch(jk)  = ne
 
@@ -3108,7 +3108,7 @@ contains
 
     integer(kind=KISRC) :: icom(0:n-1)
     real(kind=KRSRC)    :: buf(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom, na
     logical sub
     integer kpack
@@ -3173,7 +3173,7 @@ contains
 
     integer(kind=KISRC) :: icom(0:n-1)
     real(kind=KRSRC)    :: buf(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom, na
     logical sub
     integer kpack
@@ -3764,11 +3764,11 @@ contains
     real(kind=KRMIS),  intent(in)  :: vmiss
     integer(kind=KISRC) :: mb
     integer(kind=KISRC) :: icom(n), buf(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
     ierr = 0
-    ncom = count_packed(1, n, khld)
+    ncom = count_packed(1, n, mold)
     call get_data_record(ierr, mb, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, icom, ncom, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, buf,  mb,   u, krect)
@@ -3836,7 +3836,7 @@ contains
     real(kind=KRMIS),  intent(in)  :: vmiss
     integer(kind=KISRC) :: mb
     integer(kind=KISRC) :: icom(n), buf(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
 
@@ -4820,7 +4820,7 @@ contains
     return
   end function parse_header_size_n
   integer(kind=KI32) function parse_header_size_i &
-       & (head, kidx, lazy, khld) &
+       & (head, kidx, lazy, mold) &
        & result (n)
     use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_header,only: &
@@ -4831,10 +4831,10 @@ contains
     character(len=*),  intent(in)  :: head(*)
     integer,           intent(in)  :: kidx
     integer,optional,  intent(in)  :: lazy
-    integer(kind=KARG),intent(in)  :: khld
+    integer(kind=KARG),intent(in)  :: mold
     integer kaxs(3)
     integer lz
-    lz = choice(def_lazy_size, lazy) + (0 * khld)
+    lz = choice(def_lazy_size, lazy) + (0 * mold)
     select case (kidx)
     case (1)
        call parse_record_cmem(n, head, hi_ASTR1, hi_AEND1)
@@ -5051,11 +5051,11 @@ contains
     integer,            intent(in)  :: kpack
 
     integer :: imsk(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer j
 
     ierr = 0
-    nc   = count_packed(1, n, khld)
+    nc   = count_packed(1, n, mold)
 
     where(d(1:n).eq.vmiss)
        imsk(1:n) = 0
@@ -5089,11 +5089,11 @@ contains
     integer,            intent(in)  :: kpack
 
     integer :: imsk(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer j
 
     ierr = 0
-    nc   = count_packed(1, n, khld)
+    nc   = count_packed(1, n, mold)
 
     where(d(1:n).eq.vmiss)
        imsk(1:n) = 0
@@ -5128,12 +5128,12 @@ contains
     integer,            intent(in)  :: kpack
 
     integer :: imsk(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer j
     integer(kind=KARG) :: imiss
 
     ierr = 0
-    nc   = count_packed(1, n, khld)
+    nc   = count_packed(1, n, mold)
     imiss = int(vmiss, kind=KARG)
 
     where(d(1:n).eq.imiss)
@@ -5169,7 +5169,7 @@ contains
     integer,            intent(in)  :: kpack
 
     integer :: imsk(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer j, jb
 
     ierr = 0
@@ -5209,7 +5209,7 @@ contains
     integer,            intent(in)  :: kpack
 
     integer :: imsk(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer j, jb
 
     ierr = 0
@@ -5246,7 +5246,7 @@ contains
     integer,            intent(in)  :: kpack
 
     integer :: imsk(n)
-    integer(kind=KISRC),parameter :: khld = 0_KISRC
+    integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer j, jb
     integer(kind=KARG) :: imiss
 

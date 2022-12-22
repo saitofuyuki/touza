@@ -859,7 +859,7 @@ subroutine GFPEEK &
   use TOUZA_Nio_miroc,only: NCC, NDC
   implicit none
 #if WITH_MIROC
-# include "ziopara.F"
+# include "zioparam.F"
 #else
   integer,parameter :: MM_EOF = -128, MM_ERR = -256 ! dummy
 #endif
