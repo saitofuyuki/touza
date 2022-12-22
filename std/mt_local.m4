@@ -1,9 +1,9 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2022/12/12 21:35:31 fuyuki mt_local.m4>
+dnl Time-stamp: <2023/01/08 16:56:32 fuyuki mt_local.m4>
 
-dnl Copyright: 2020-2022 JAMSTEC
+dnl Copyright: 2020-2023 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
 dnl   (https://www.apache.org/licenses/LICENSE-2.0)
 
@@ -25,18 +25,31 @@ MT_FORTRAN_BATCH_CHECK_MODULE([mpi], [mpi_bcast])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT8])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT16])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT32])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT64])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL32])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL64])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL128])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [CHARACTER_KINDS])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INTEGER_KINDS])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL_KINDS])
+
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [CHARACTER_STORAGE_SIZE])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [NUMERIC_STORAGE_SIZE])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [FILE_STORAGE_SIZE])
+
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [IOSTAT_END])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_SIZE_T])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT8_T])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT16_T])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT32_T])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT64_T])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_FLOAT])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_DOUBLE])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_LONG_DOUBLE])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([ieee_arithmetic])
 
