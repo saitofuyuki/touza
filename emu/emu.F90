@@ -20,6 +20,7 @@
 !!!_@ TOUZA_Emu - touza/emu interfaces
 module TOUZA_Emu
   use TOUZA_Emu_usi, usi_init=>init, usi_diag=>diag, usi_finalize=>finalize
+  use TOUZA_Emu_ugg, ugg_init=>init, ugg_diag=>diag, ugg_finalize=>finalize
   use TOUZA_Std,only: get_logu,     unit_global,  trace_fine,   trace_control
 !!!_  - default
   implicit none
@@ -61,6 +62,7 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call usi_init(ierr, ulog, lv, mode=lmd, stdv=stdv, icomm=icomm)
+          if (ierr.eq.0) call ugg_init(ierr, ulog, lv, mode=lmd, stdv=stdv)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -94,6 +96,7 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call usi_diag(ierr, utmp, mode=lmd)
+          if (ierr.eq.0) call ugg_diag(ierr, utmp, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -126,6 +129,7 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call usi_finalize(ierr, utmp, lmd)
+          if (ierr.eq.0) call ugg_finalize(ierr, utmp, lmd)
        endif
        fine_counts = fine_counts + 1
     endif
