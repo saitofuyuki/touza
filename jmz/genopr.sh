@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/12/06 22:28:34 fuyuki genopr.sh>
+# Time-stamp: <2022/12/24 11:10:00 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -749,7 +749,7 @@ output_table ()
   local grp= key=
   local nstack=() push= pop=
   local sym= alias= opt=
-  local candi=(unary binary lazy ubool bool stack index)
+  local candi=(unary binary lazy ubool bool stack index float)
   for grp in "$@"
   do
     [[ $candi[(I)$grp] -eq 0 ]] && continue
