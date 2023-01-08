@@ -1,7 +1,7 @@
 !!!_! nio_miroc.F90 - TOUZA/Nio MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/20 08:22:12 fuyuki nio_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/08 11:20:59 fuyuki nio_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -1074,6 +1074,7 @@ subroutine FOPEN &
   character(len=*),intent(in)    :: HACCSS
 
   integer handle
+  character(LEN=9)  :: status
   character(LEN=9)  :: action
   character(LEN=6)  :: position
 
@@ -1091,7 +1092,21 @@ subroutine FOPEN &
   endif
 # if OPT_WITH_NCTCDF
   if (HFORM == 'NETCDF4') then
-     call nct_open_write(IOS, IFILE, HFILE, action)
+     action = HACT
+     if (action(1:1).eq.'A') then
+        action = 'WRITE'
+        status = 'OLD'
+     else if (action(1:1).eq.'W') then
+        status = 'N'
+     else
+        status = 'O'
+     endif
+     if (action(1:1).eq.'W') then
+        call nct_open_write(IOS, IFILE, HFILE, status)
+     else
+        ! read
+        IOS = -1
+     endif
      return
   endif
 # endif /* OPT_WITH_NCTCDF */

@@ -1,7 +1,7 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2022/12/20 13:28:02 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/07 22:06:16 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022
@@ -44,6 +44,7 @@ module TOUZA_Nio_std
   use TOUZA_Std_sus,only: sus_size_irec
   use TOUZA_Std_sus,only: max_members,      is_irec_overflow, sus_record_mems_irec
   use TOUZA_Std_sus,only: def_block,        ignore_small,     ignore_bigger,  ignore_always
+  use TOUZA_Std_sus,only: sus_is_status_new
 !!!_  - default
   implicit none
   private
@@ -95,6 +96,7 @@ module TOUZA_Nio_std
   public :: sus_size_irec
   public :: max_members,      is_irec_overflow, sus_record_mems_irec
   public :: def_block,        ignore_small,     ignore_bigger,  ignore_always
+  public :: sus_is_status_new
 contains
 !!!_ + common interfaces
 !!!_  & init
