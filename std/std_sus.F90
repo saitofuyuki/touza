@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2022/12/21 08:51:48 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/08 11:07:02 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022
@@ -199,6 +199,8 @@ module TOUZA_Std_sus
 !!!_  - public procedures
   public init, diag, finalize
   public sus_open, sus_close
+  public sus_spec_form, sus_spec_action, sus_spec_status, sus_spec_position
+  public sus_is_status_new
 
   public sus_write_irec, sus_read_irec, sus_skip_irec, sus_check_irec
   public sus_write_lrec, sus_read_lrec, sus_skip_lrec, sus_check_lrec
@@ -480,8 +482,7 @@ contains
 !!!_  - sus_open - open stream
   subroutine sus_open &
        & (ierr, u,      file, &
-       &  form, status, action, position)
-    use TOUZA_Std_utl,only: choice_a, upcase
+       &  form, status, action, position, access)
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: u
@@ -490,57 +491,21 @@ contains
     character(len=*),intent(in),optional :: status
     character(len=*),intent(in),optional :: action
     character(len=*),intent(in),optional :: position
+    character(len=*),intent(in),optional :: access
 
-    character(len=16) :: STT, ACT, FRM, POS
+    character(len=16) :: STT, ACT, FRM, POS, ACC
 
     ierr = ERR_SUCCESS
 
-    call choice_a(STT, 'U', status)
-    call choice_a(ACT, 'R', action)
-    call choice_a(FRM, 'U', form)
-    call choice_a(POS, ' ', position)
-
-    call upcase(STT)
-    call upcase(ACT)
-    call upcase(FRM)
-    call upcase(POS)
-
-    if (STT(1:1).eq.'U'.or.STT.eq.' ') then
-       STT = 'UNKNOWN'
-    else if (STT(1:1).eq.'O') then
-       STT = 'OLD'
-    else if (STT(1:1).eq.'N') then
-       STT = 'NEW'
-    else if (STT(1:1).eq.'R') then
-       STT = 'REPLACE'
-    endif
-
-    if (ACT.eq.'RW') then
-       ACT = 'READWRITE'
-    else if (ACT.eq.'R'.or.ACT.eq.' ') then
-       ACT = 'READ'
-    else if (ACT.eq.'W') then
-       ! ACT = 'READWRITE'
-       ACT = 'WRITE'
-    endif
-
-    if (FRM(1:1).eq.'U'.or.FRM.eq.' ') then
-       FRM='UNFORMATTED'
-    else if (FORM(1:1).eq.'F') then
-       FRM='FORMATTED'
-    endif
-
-    if (POS(1:2).eq.'AP') then
-       POS = 'APPEND'
-    else if (POS(1:1).eq.'R') then
-       POS = 'REWIND'
-    else
-       POS = 'ASIS'
-    endif
+    call sus_spec_status(STT, 'U', status)
+    call sus_spec_action(ACT, 'R', action)
+    call sus_spec_form(FRM, 'U', form)
+    call sus_spec_position(POS, ' ', position)
+    call sus_spec_access(ACC, 'ST', access)
 
     if (ierr.eq.0) then
        open(UNIT=u, IOSTAT=ierr, &
-            &       FILE=file, ACCESS='STREAM', &
+            &       FILE=file, ACCESS=ACC, &
             &       FORM=FRM,  STATUS=STT, ACTION=ACT, POSITION=POS)
     endif
   end subroutine sus_open
@@ -553,6 +518,122 @@ contains
     ierr = ERR_SUCCESS
     close(UNIT=u, IOSTAT=ierr)
   end subroutine sus_close
+
+!!!_  - sus_spec_form
+  subroutine sus_spec_form(form, def, str)
+    use TOUZA_Std_utl,only: upcase
+    implicit none
+    character(len=*),intent(out)         :: form
+    character(len=*),intent(in)          :: def
+    character(len=*),intent(in),optional :: str
+    call choice_b(form, def, str)
+    call upcase(form)
+    if (FORM(1:1).eq.'U') then
+       FORM='UNFORMATTED'
+    else if (FORM(1:1).eq.'F') then
+       FORM='FORMATTED'
+    endif
+  end subroutine sus_spec_form
+!!!_  - sus_spec_action
+  subroutine sus_spec_action(action, def, str)
+    use TOUZA_Std_utl,only: upcase
+    implicit none
+    character(len=*),intent(out)         :: action
+    character(len=*),intent(in)          :: def
+    character(len=*),intent(in),optional :: str
+    call choice_b(action, def, str)
+    call upcase(action)
+    if (ACTION.eq.'RW') then
+       ACTION = 'READWRITE'
+    else if (ACTION.eq.'R') then
+       ACTION = 'READ'
+    else if (ACTION.eq.'W') then
+       ACTION = 'WRITE'
+    endif
+  end subroutine sus_spec_action
+!!!_  - sus_spec_status
+  subroutine sus_spec_status(status, def, str)
+    use TOUZA_Std_utl,only: upcase
+    implicit none
+    character(len=*),intent(out)         :: status
+    character(len=*),intent(in)          :: def
+    character(len=*),intent(in),optional :: str
+    call choice_b(status, def, str)
+    call upcase(status)
+    if (status(1:1).eq.'U') then
+       status = 'UNKNOWN'
+    else if (status(1:1).eq.'O') then
+       status = 'OLD'
+    else if (status(1:1).eq.'N') then
+       status = 'NEW'
+    else if (status(1:1).eq.'R') then
+       status = 'REPLACE'
+    endif
+  end subroutine sus_spec_status
+!!!_  - sus_spec_position
+  subroutine sus_spec_position(position, def, str)
+    use TOUZA_Std_utl,only: upcase
+    implicit none
+    character(len=*),intent(out)         :: position
+    character(len=*),intent(in)          :: def
+    character(len=*),intent(in),optional :: str
+    call choice_b(position, def, str)
+    call upcase(position)
+    if (position(1:2).eq.'AP') then
+       position = 'APPEND'
+    else if (position(1:1).eq.'R') then
+       position = 'REWIND'
+    else
+       position = 'ASIS'
+    endif
+  end subroutine sus_spec_position
+
+!!!_  - sus_spec_access
+  subroutine sus_spec_access(access, def, str)
+    use TOUZA_Std_utl,only: upcase
+    implicit none
+    character(len=*),intent(out)         :: access
+    character(len=*),intent(in)          :: def
+    character(len=*),intent(in),optional :: str
+    call choice_b(access, def, str)
+    call upcase(access)
+    if (access(1:2).eq.'ST') then
+       access = 'STREAM'
+    else if (access(1:1).eq.'D') then
+       access = 'DIRECT'
+    else
+       access = 'SEQUENTIAL'
+    endif
+  end subroutine sus_spec_access
+
+!!!_  - choice_b - choice_a wrapper, use d if blank
+  subroutine choice_b &
+       & (v, d, a)
+    use TOUZA_Std_utl,only: choice_a
+    implicit none
+    character(len=*),intent(out)         :: v
+    character(len=*),intent(in)          :: d  ! default
+    character(len=*),intent(in),optional :: a  ! argument
+    if (present(a)) then
+       v = a
+       if (v.eq.' ') v = d
+    else
+       v = d
+    endif
+    return
+  end subroutine choice_b
+
+!!!_  - sus_is_status_new
+  logical function sus_is_status_new(str, def) result(b)
+    use TOUZA_Std_utl,only: choice_a, upcase
+    implicit none
+    character(len=*),intent(in)          :: str
+    character(len=*),intent(in),optional :: def
+    character(len=16) :: status
+    call choice_a(status, def, str)
+    call upcase(status)
+    b = status(1:1).eq.'N'
+  end function sus_is_status_new
 
 !!!_  - sus_check_irec - health check of 32-bit marker record
   subroutine sus_check_irec &
