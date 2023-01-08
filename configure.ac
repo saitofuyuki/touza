@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/11/03 15:40:08 fuyuki configure.ac>
+# Time-stamp: <2023/01/10 12:24:26 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -145,7 +145,11 @@ AS_IF([test "x$with_build_jmz" != xno],
       [AC_MSG_RESULT([no])])
 
 AS_IF([test "x$with_build_jmz" != xno],
-[AX_SUBDIRS_CONFIGURE([jmz],
+[
+AS_IF([test x"[$]use_nctcdf" = xno],
+      [jmz_nctcdf=no],
+      [jmz_nctcdf=force])
+AX_SUBDIRS_CONFIGURE([jmz],
     [],
     [[TOUZA_top_builddir=${ac_top_build_prefix}],
      [TOUZA_VERSION="${PACKAGE_VERSION}"],
@@ -153,7 +157,7 @@ AS_IF([test "x$with_build_jmz" != xno],
      [TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}],
      [TOUZA_LIBS=${ac_top_build_prefix}lib${with_touza_name}.la ${NETCDF4_FLIBS} ${NETCDF4_LIBS}],
      [TOUZA_LDFLAGS=${NETCDF4_LDFLAGS}]],
-    [],
+    [[--enable-nctcdf="[$]jmz_nctcdf"]],
     [--with-build-jmz])])
 
 AC_ARG_ENABLE([install-switches],

@@ -235,9 +235,15 @@ contains
 
 101 format('chak - Swiss(CH) Army Knife for gtool-3.5 format files')
 102 format(2x, 'with ', A, 1x, A, '; ', A, 1x, A)
+103 format(2x, 'with n*c*tcdf ', A)
     write(utmp, 101)
     write(utmp, 102) PACKAGE_NAME, PACKAGE_VERSION, &
          & TOUZA_NAME, TOUZA_VERSION
+#if OPT_WITH_NCTCDF
+    write(utmp, 103) 'enabled'
+#else /* not OPT_WITH_NCTCDF */
+    write(utmp, 103) 'disabled'
+#endif /* not OPT_WITH_NCTCDF */
     return
   end subroutine show_usage
 

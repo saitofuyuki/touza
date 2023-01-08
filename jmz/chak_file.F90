@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz swiss(CH) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2022/12/22 11:25:30 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/10 12:29:16 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -329,7 +329,7 @@ contains
     else
        ierr = 0
        select case (abuf(1:1))
-       case ('A')
+       case ('A')               ! ascii
           jp = index(abuf, asep)
           if (jp.eq.0) then
              file%fmt = trim(abuf(2:))
@@ -337,7 +337,7 @@ contains
              file%fmt = trim(abuf(jp+1:))
           endif
           file%kfmt = cfmt_ascii
-       case ('B')
+       case ('B')               ! binary
           jp = index(abuf, asep)
           if (jp.eq.0) then
              file%fmt = ' '
@@ -377,6 +377,9 @@ contains
           if (ierr.ne.0) then
              call message(ierr, 'unknown format ' // trim(arg))
           endif
+       case ('C')               ! binary
+          file%fmt = trim(abuf)
+          file%kfmt = cfmt_cdf
        case default
           ierr = ERR_INVALID_PARAMETER
           call message(ierr, 'unknown format ' // trim(arg))
@@ -719,6 +722,8 @@ contains
              else
                 ierr = ERR_INVALID_PARAMETER
              endif
+          else if (file%kfmt.eq.cfmt_cdf) then
+             ierr = ERR_NOT_IMPLEMENTED
           else
              call sus_open(ierr, file%u, file%name, ACTION='R', STATUS='O')
              if (ierr.eq.0) then
@@ -765,8 +770,10 @@ contains
     select case(file%kfmt)
     case(cfmt_ascii)
        call cue_read_ascii(ierr, file)
-    case(cfmt_binary:)
+    case(cfmt_binary:cfmt_cdf-1)
        call cue_read_binary(ierr, file)
+    case(cfmt_cdf)
+       ierr = ERR_NOT_IMPLEMENTED
     case default
        call cue_read_nio(ierr, file)
     end select
@@ -812,8 +819,10 @@ end subroutine cue_read_file
           select case(file%kfmt)
           case(cfmt_ascii)
              call cue_read_ascii(ierr, file)
-          case(cfmt_binary:)
+          case(cfmt_binary:cfmt_cdf-1)
              call cue_read_binary(ierr, file)
+          case(cfmt_cdf)
+             ierr = ERR_NOT_IMPLEMENTED
           case default
              call cue_read_nio(ierr, file)
           end select
@@ -1005,8 +1014,10 @@ end subroutine cue_read_file
        select case(file%kfmt)
        case(cfmt_ascii)
           call emulate_header_ascii(ierr, head, file, rec, crec)
-       case(cfmt_binary:)
+       case(cfmt_binary:cfmt_cdf-1)
           call emulate_header_binary(ierr, head, file, rec, crec)
+       case(cfmt_cdf)
+          ierr = ERR_NOT_IMPLEMENTED
        case default
           call read_header_nio(ierr, head, file, rec, crec)
        end select
@@ -1017,6 +1028,9 @@ end subroutine cue_read_file
   subroutine open_write_file &
        & (ierr, file)
     use TOUZA_Std,only: new_unit, sus_open, is_error_match, upcase
+#if OPT_WITH_NCTCDF
+    use TOUZA_Nio,only: nct_open_write
+#endif
     implicit none
     integer,     intent(out)   :: ierr
     type(file_t),intent(inout) :: file
@@ -1046,7 +1060,7 @@ end subroutine cue_read_file
              open(UNIT=file%u, FILE=file%name, IOSTAT=ierr, &
                   & ACTION='WRITE', FORM='FORMATTED', &
                   & ACCESS='SEQUENTIAL', STATUS=trim(stt), POSITION=trim(pos))
-          else
+          else if (file%kfmt.lt.cfmt_cdf) then
              select case (file%mode)
              case (mode_new)
                 stt = 'N'
@@ -1061,6 +1075,25 @@ end subroutine cue_read_file
                 pos = ' '
              end select
              call sus_open(ierr, file%u, file%name, ACTION='W', STATUS=stt, POSITION=pos)
+          else if (file%kfmt.eq.cfmt_cdf) then
+#if OPT_WITH_NCTCDF
+             select case (file%mode)
+             case (mode_new)
+                stt = 'N'
+             case (mode_write)
+                stt = 'R'
+             case (mode_append)
+                stt = 'U'
+             case default
+                stt = ' '
+             end select
+             call nct_open_write(ierr, file%u, file%name, status=stt)
+#else /* not OPT_WITH_NCTCDF */
+             ierr = ERR_NOT_IMPLEMENTED
+#endif /* not OPT_WITH_NCTCDF */
+          else
+             ierr = ERR_NOT_IMPLEMENTED
+             continue
           endif
           if (ierr.ne.0) then
              write(*, *) 'failed to write open:', trim(file%name)
@@ -1085,8 +1118,10 @@ end subroutine cue_read_file
        select case(file%kfmt)
        case(cfmt_ascii)
           call read_data_ascii(ierr, v, n, file)
-       case(cfmt_binary:)
+       case(cfmt_binary:cfmt_cdf-1)
           call read_data_binary(ierr, v, n, file)
+       case(cfmt_cdf)
+          ierr = ERR_NOT_IMPLEMENTED
        case default
           call read_data_nio(ierr, v, n, file)
        end select
@@ -1116,8 +1151,10 @@ end subroutine cue_read_file
        select case(file%kfmt)
        case(cfmt_ascii)
           call write_data_ascii(ierr, v, n, head, file, kv)
-       case(cfmt_binary:)
+       case(cfmt_binary:cfmt_cdf-1)
           call write_data_binary(ierr, v, n, head, file, kv)
+       case(cfmt_cdf)
+          call write_data_cdf(ierr, v, n, head, file, kv)
        case default
           call write_data_nio(ierr, v, n, head, file)
        end select
@@ -2016,6 +2053,30 @@ end subroutine cue_read_file
     end select
 
   end subroutine write_data_binary
+
+!!!_   . write_data_cdf
+  subroutine write_data_cdf &
+       & (ierr, v, n, head, file, kv)
+#if OPT_WITH_NCTCDF
+    use TOUZA_Nio,only: nct_define_write, nct_write_data
+#endif
+    implicit none
+    integer,         intent(out)   :: ierr
+    real(kind=KBUF), intent(in)    :: v(0:*)
+    integer,         intent(in)    :: n
+    character(len=*),intent(in)    :: head(*)
+    type(file_t),    intent(inout) :: file
+    integer,         intent(in)    :: kv
+
+    ierr = 0
+#if OPT_WITH_NCTCDF
+    call nct_define_write(ierr, file%u, head)
+    if (ierr.eq.0) call nct_write_data(ierr, v, n, file%u, head)
+#else /* not OPT_WITH_NCTCDF */
+    ierr = ERR_NOT_IMPLEMENTED
+#endif /* not OPT_WITH_NCTCDF */
+
+  end subroutine write_data_cdf
 !!!_ + end chak_file
 end module chak_file
 !!!_@ test_chak_file
