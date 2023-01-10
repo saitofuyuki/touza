@@ -1,10 +1,10 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2022/10/24 12:18:20 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/18 22:06:14 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022
+! Copyright (C) 2021, 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -127,7 +127,9 @@ module TOUZA_Nio_header
   integer,save :: lev_verbose = NIO_MSG_LEVEL
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
+
 #define __MDL__ 'h'
+#define _ERROR(E) (E - ERR_MASK_NIO_HEADER)
 !!!_  - interfaces
   interface put_item
      module procedure put_item_a
@@ -204,7 +206,7 @@ contains
           if (ierr.eq.0) call set_def_ranges(ierr, hiends)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
     return
   end subroutine init
@@ -273,32 +275,52 @@ contains
 !!!_ + user interfaces
 !!!_  - show_header - diag entries
   subroutine show_header &
-       & (ierr, head, fmt, u, lev)
-    use TOUZA_Nio_std,only: choice
+       & (ierr, head, tag, u, lev)
+    use TOUZA_Nio_std,only: choice, choice_a
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(in)          :: head(*)
-    character(len=*),intent(in),optional :: fmt
+    character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: lev
     integer ulog
     integer ji
+    character(len=64) :: ti
     ierr = 0
 
     ulog = choice(-1, u)
+    call choice_a(ti, ' ', tag)
 
+101 format(I2, 1x, A)
+102 format(A,  1x, I2, 1x, A)
     if (ulog.ge.0) then
-       do ji = 1, nitem
-          if (head(ji).ne.' ') then
-             write (ulog, *) ji, trim(head(ji))
-          endif
-       enddo
+       if (ti.eq.' ') then
+          do ji = 1, nitem
+             if (head(ji).ne.' ') then
+                write (ulog, 101) ji, trim(head(ji))
+             endif
+          enddo
+       else
+          do ji = 1, nitem
+             if (head(ji).ne.' ') then
+                write (ulog, 102) trim(ti), ji, trim(head(ji))
+             endif
+          enddo
+       endif
     else if (ulog.eq.-1) then
-       do ji = 1, nitem
-          if (head(ji).ne.' ') then
-             write (*,   *) ji, trim(head(ji))
-          endif
-       enddo
+       if (ti.eq.' ') then
+          do ji = 1, nitem
+             if (head(ji).ne.' ') then
+                write (*, 101) ji, trim(head(ji))
+             endif
+          enddo
+       else
+          do ji = 1, nitem
+             if (head(ji).ne.' ') then
+                write (*, 102) trim(ti), ji, trim(head(ji))
+             endif
+          enddo
+       endif
     endif
     return
   end subroutine show_header
@@ -323,7 +345,7 @@ contains
        else if (jend.eq.0) then
           call store_item(ierr, head, v, item, fmt=fmt, tol=tol)
        else
-          ierr = ERR_HITEM_INVALID_RANGE
+          ierr = _ERROR(ERR_HITEM_INVALID_RANGE)
        endif
     else
        ierr = check_hitem_type(item, ht_str)
@@ -405,7 +427,7 @@ contains
        else if (jend.eq.0) then
           call restore_item(ierr, head, v, item, fmt=fmt)
        else
-          ierr = ERR_HITEM_INVALID_RANGE
+          ierr = _ERROR(ERR_HITEM_INVALID_RANGE)
        endif
     else
        ierr = check_hitem_type(item, ht_str)
@@ -491,23 +513,31 @@ contains
        endif
        if (ierr.eq.0) then
           l = len_trim(BUF)
-          jb = 1
-          do ji = item, iteme
-             if (jb.gt.l) exit
-             je = min(l, jb + litem - 1)
-             head(ji) = BUF(jb:je)
-             jb = jb + litem
-          enddo
+          if (l.eq.0) then
+             head(item:iteme) = ' '
+          else
+             jb = 1
+             do ji = item, iteme
+                if (jb.gt.l) exit
+                je = min(l, jb + litem - 1)
+                head(ji) = BUF(jb:je)
+                jb = jb + litem
+             enddo
+          endif
        endif
     else
        l = len_trim(v)
-       if (choice(0, tol).gt.0) then
-          l = min(litem, l)
-       endif
-       if (present(fmt)) then
-          write(head(item), fmt, IOSTAT=ierr) v(1:l)
+       if (l.eq.0) then
+          head(item) = ' '
        else
-          write(head(item), '(A)', IOSTAT=ierr) v(1:l)
+          if (choice(0, tol).gt.0) then
+             l = min(litem, l)
+          endif
+          if (present(fmt)) then
+             write(head(item), fmt, IOSTAT=ierr) v(1:l)
+          else
+             write(head(item), '(A)', IOSTAT=ierr) v(1:l)
+          endif
        endif
     endif
     return
@@ -850,9 +880,9 @@ contains
     integer,intent(in) :: t
 
     if (item.le.0.or.item.gt.nitem) then
-       ierr = ERR_HITEM_INVALID
+       ierr = _ERROR(ERR_HITEM_INVALID)
     else if (hitypes(item) .ne. t) then
-       ierr = ERR_HITEM_TYPE_MISMATCH
+       ierr = _ERROR(ERR_HITEM_TYPE_MISMATCH)
     else
        ierr = 0
     endif
@@ -867,11 +897,11 @@ contains
     integer,intent(in) :: tt(:)
 
     if (item.le.0.or.item.gt.nitem) then
-       ierr = ERR_HITEM_INVALID
+       ierr = _ERROR(ERR_HITEM_INVALID)
     else if (ANY(hitypes(item).eq.tt(:))) then
        ierr = 0
     else
-       ierr = ERR_HITEM_TYPE_MISMATCH
+       ierr = _ERROR(ERR_HITEM_TYPE_MISMATCH)
     endif
 
     return
@@ -880,22 +910,26 @@ contains
 !!!_  & check_hitem_range - check header-item continuation
   integer function check_hitem_range(item, iteme) &
        & result (ierr)
+    use TOUZA_Nio_std,only: choice
     implicit none
-    integer,intent(in) :: item, iteme
+    integer,intent(in)          :: item
+    integer,intent(in),optional :: iteme
     integer jend
+    integer itmp
     ierr = check_hitem_type(item, ht_str)
     if (ierr.eq.0) then
        jend = hiends(item)
-       if (iteme.eq.0) then
+       itmp = choice(-1, iteme)
+       if (itmp.eq.0) then
           if (jend.lt.0) then
              ierr = 0
           else
              ierr = jend
           endif
-       else if (iteme.ge.item.and.iteme.le.jend) then
+       else if (itmp.ge.item.and.itmp.le.jend) then
           ierr = iteme
        else
-          ierr = ERR_HITEM_INVALID_RANGE
+          ierr = _ERROR(ERR_HITEM_INVALID_RANGE)
        endif
     endif
 
