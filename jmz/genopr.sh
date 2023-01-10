@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/12/24 11:10:00 fuyuki genopr.sh>
+# Time-stamp: <2023/01/10 08:14:00 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -273,12 +273,13 @@ register_all ()
   # register -g buffer -p VALUE                 MISS    "replace missing value"
 
   register -g header        -p FORMAT      FMT     "set output data format"
-  register -g header        -p STRING      ITEM    "replace item name"
+  register -g header        -p STRING      ITEM    "item replacement or filter"
   register -g header        -p STRING      UNIT
   register -g header        -p STRING      TITLE
   register -g header        -p STRING      EDIT
   register -g header        -p STRING      DSET
-  register -g header        -p LIST   -s T TSEL
+  register -g header        -p LIST   -s T TSEL    "time filter"
+  register -g header        -p LIST   -s R RSEL    "record filter"
   register -g header,buffer -p VALUE       MISS    "replace missing value"
   register -g header,buffer -o UNIT        DUR     "duration"
 
