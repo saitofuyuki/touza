@@ -1,10 +1,10 @@
 !!!_! emu_usi.F90 - touza/emu usysio emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2022/04/23 13:55:41 fuyuki emu_usi.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/17 11:17:19 fuyuki emu_usi.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2022
+! Copyright (C) 2020-2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -51,6 +51,9 @@ module TOUZA_Emu_usi
   integer,save :: lev_verbose = EMU_MSG_LEVEL
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
+
+  logical,save :: lock_rewind = .FALSE.
+  character(len=16),save :: lock_tag = ' '
 # define __MDL__ 'usi'
 !!!_  - public
   integer,save,public :: IRANK = -1, NRANK = -1
@@ -90,6 +93,11 @@ module TOUZA_Emu_usi
        integer,intent(out) :: IFPAR, JFPAR
      end subroutine REWNML
 
+     subroutine GETIFP(IFPAR)
+       implicit none
+       integer,intent(out) :: IFPAR
+     end subroutine GETIFP
+
      subroutine GETJFP(JFPAR)
        implicit none
        integer,intent(out) :: JFPAR
@@ -102,8 +110,10 @@ module TOUZA_Emu_usi
   public update_color, update_ranks
   public open_sysin,   open_sysout
   public get_sysu
+  public is_locked_rewind, rewind_lock, rewind_unlock
+  public show_lock_status
   public SETNML, SETCLR, SETRNK, SETSIZ
-  public OPNNML, REWNML, GETJFP
+  public OPNNML, REWNML, GETIFP, GETJFP
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -534,6 +544,79 @@ contains
     endif
     path = trim(pfx) // trim(sfx) // dbuf(jz:lint)
   end subroutine gen_path
+!!!_  - rewind_lock
+  subroutine rewind_lock(tag, u)
+    use TOUZA_Std,only: msg_grp
+    implicit none
+    character(len=*),intent(in),optional :: tag
+    integer,         intent(in),optional :: u
+    character(len=128) :: txt
+    integer utmp
+    lock_rewind = .TRUE.
+    if (present(tag)) then
+       utmp = get_logu(u, ulog)
+101    format('rewind locked at ', A)
+       if (tag.ne.' ') then
+          write(txt, 101) trim(tag)
+          lock_tag = trim(tag)
+       else
+          txt = 'rewind locked'
+       endif
+       call msg_grp(txt, __GRP__, __MDL__, utmp)
+    endif
+  end subroutine rewind_lock
+
+!!!_  - rewind_unlock
+  subroutine rewind_unlock(tag, u)
+    use TOUZA_Std,only: msg_grp
+    implicit none
+    character(len=*),intent(in),optional :: tag
+    integer,         intent(in),optional :: u
+    character(len=128) :: txt
+    integer utmp
+    lock_rewind = .FALSE.
+    if (present(tag)) then
+       utmp = get_logu(u, ulog)
+101    format('rewind unlocked at ', A)
+       if (tag.ne.' ') then
+          write(txt, 101) trim(tag)
+       else
+          txt = 'rewind unlocked'
+       endif
+       call msg_grp(txt, __GRP__, __MDL__, utmp)
+    else if (lock_tag.ne.' ') then
+       write(txt, 101) trim(lock_tag)
+       call msg_grp(txt, __GRP__, __MDL__, utmp)
+    endif
+    lock_tag = ' '
+  end subroutine rewind_unlock
+
+!!!_  - is_locked_rewind
+  logical function is_locked_rewind() result(b)
+    implicit none
+    b = lock_rewind
+  end function is_locked_rewind
+!!!_  - show_lock_status
+  subroutine show_lock_status(u)
+    use TOUZA_Std,only: msg_grp
+    implicit none
+    integer,intent(in),optional :: u
+    integer utmp
+    character(len=128) :: txt
+    utmp = get_logu(u, ulog)
+    if (lock_rewind) then
+101    format('rewind locked at ', A)
+       if (lock_tag.eq.' ') then
+          txt = 'rewind locked'
+       else
+          write(txt, 101) trim(lock_tag)
+       endif
+    else
+       txt = 'rewind unlocked'
+    endif
+    call msg_grp(txt, __GRP__, __MDL__, utmp)
+  end subroutine show_lock_status
+
 !!!_  - end TOUZA_Emu_usi
 end module TOUZA_Emu_usi
 
@@ -553,16 +636,31 @@ end subroutine OPNNML
 
 !!!_ + REWNML - rewind input and return input/output units
 subroutine REWNML(IFPAR, JFPAR)
-  use TOUZA_Emu_usi,only: get_sysu
+  use TOUZA_Emu_usi,only: get_sysu, is_locked_rewind, show_lock_status
   implicit none
   integer,intent(out) :: IFPAR, JFPAR
   integer jerr
   call get_sysu(sysi=IFPAR, syso=JFPAR)
   if (IFPAR.ge.0) then
-     REWIND(unit=IFPAR, IOSTAT=jerr)
+     if (is_locked_rewind()) then
+        call show_lock_status(JFPAR)
+        write(JFPAR, *) 'PANIC.  ABORT.'
+        stop
+     else
+        REWIND(unit=IFPAR, IOSTAT=jerr)
+     endif
   endif
   RETURN
 END subroutine REWNML
+
+!!!_ + GETIFP - return input unit
+subroutine GETIFP(IFPAR)
+  use TOUZA_Emu_usi,only: get_sysu
+  implicit none
+  integer,intent(out) :: IFPAR
+  call get_sysu(sysi=IFPAR)
+  RETURN
+END subroutine GETIFP
 
 !!!_ + GETJFP - return output unit
 subroutine GETJFP(JFPAR)
