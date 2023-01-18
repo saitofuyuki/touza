@@ -2,10 +2,10 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2023/01/08 11:07:02 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/18 17:10:40 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022
+! Copyright (C) 2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -214,7 +214,7 @@ module TOUZA_Std_sus
   public sus_eswap
   public sus_pad
   public sus_record_mems_irec
-  public max_members, is_irec_overflow
+  public max_members, is_irec_overflow, is_irec_overflow_mix
   public sus_size_irec
 
 #if TEST_STD_SUS
@@ -4608,6 +4608,38 @@ contains
     character(len=*),intent(in) :: mold
     b = m .gt. max_members(mold)
   end function is_irec_overflow_a
+!!!_  - is_irec_overflow_mix
+  logical function is_irec_overflow_mix(ni, nl, nf, nd) result(b)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: get_size_bytes
+    implicit none
+    integer,intent(in),optional :: ni  ! size of integer
+    integer,intent(in),optional :: nl  ! size of long integer
+    integer,intent(in),optional :: nf  ! size of float
+    integer,intent(in),optional :: nd  ! size of double
+    integer m
+    integer lsubr
+
+    lsubr = RECL_MAX_BYTES
+    m = choice(0, ni)
+    b = m .gt. (lsubr / get_size_bytes(0_KI32))
+    if (.not.b) then
+       lsubr = lsubr - get_size_bytes(0_KI32, m)
+       m = choice(0, nl)
+       b = m .gt. (lsubr / get_size_bytes(0_KI64))
+    endif
+    if (.not.b) then
+       lsubr = lsubr - get_size_bytes(0_KI64, m)
+       m = choice(0, nf)
+       b = m .gt. (lsubr / get_size_bytes(0.0_KFLT))
+    endif
+    if (.not.b) then
+       lsubr = lsubr - get_size_bytes(0.0_KFLT, m)
+       m = choice(0, nd)
+       b = m .gt. (lsubr / get_size_bytes(0.0_KDBL))
+    endif
+
+  end function is_irec_overflow_mix
 
 !!!_  & sus_size_irec - total record size in stream i/o unit
   integer(kind=KMEM) function sus_size_irec_li (mold, n) result(l)
@@ -4711,10 +4743,10 @@ contains
 
 !!!_  - max_members ()
   PURE &
-  integer function max_members_a (t) result(m)
+  integer function max_members_a (mold) result(m)
     implicit none
-    character(len=*),intent(in) :: t
-    m = lsubr / max(1, len(t))
+    character(len=*),intent(in) :: mold
+    m = lsubr / max(1, len(mold))
   end function max_members_a
 
   PURE &
@@ -4828,6 +4860,8 @@ program test_std_sus
      write(file, 111) TEST_STD_SUS, swap, lsep
      call batch_test_i(ierr, file, arg, swap, lsep, mem)
   endif
+  if (ierr.eq.0) call batch_overflow_mix(ierr)
+
   if (ierr.eq.0) call finalize(ierr)
   write(*, 101) 'FINAL', ierr
   stop
@@ -5039,6 +5073,34 @@ contains
     endif
     if (ierr.eq.0) call sus_close(ierr, u, file)
   end subroutine batch_test_i
+
+  subroutine batch_overflow_mix &
+       & (ierr)
+    implicit none
+    integer,intent(out) :: ierr
+    integer ni, nl, nf, nd
+
+    do ni = 0, 8
+       do nl = 0, 4
+          do nf = 0, 8
+             do nd = 0, 4
+                call test_overflow_mix(ierr, ni, nl, nf, nd)
+             enddo
+          enddo
+       enddo
+    enddo
+  end subroutine batch_overflow_mix
+  subroutine test_overflow_mix &
+       & (ierr, ni, nl, nf, nd)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: ni, nl, nf, nd
+    logical b
+    b = is_irec_overflow_mix(ni, nl, nf, nd)
+101 format('mix/overflow:', L1, 1x, I0, 1x, 4(1x, I0))
+    write(*, 101) b, ((ni + nf) * 4 + (nl + nd) * 8), ni, nl, nf, nd
+  end subroutine test_overflow_mix
+
 end program test_std_sus
 #elif TEST_STD_SUS
 program test_std_sus
