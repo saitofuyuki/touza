@@ -1,10 +1,10 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2023/01/07 22:06:16 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/15 08:58:29 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022
+! Copyright (C) 2021, 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -18,33 +18,34 @@
 module TOUZA_Nio_std
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Std_prc,only: KI32,             KI64,           KDBL,             KFLT
-  use TOUZA_Std_utl,only: choice,           choice_a,       condop,           upcase
-  use TOUZA_Std_utl,only: control_deep,     control_mode,   is_first_force,   parse_number
-  use TOUZA_Std_log,only: is_msglev
-  use TOUZA_Std_log,only: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
-  use TOUZA_Std_log,only: is_msglev_severe, is_msglev_fatal
-  use TOUZA_Std_log,only: get_logu,         unit_global,    trace_fine,       trace_control
-  use TOUZA_Std_log,only: is_error_match
-  use TOUZA_Std_env,only: KIOFS
-  use TOUZA_Std_env,only: nc_strm,          nbits_byte
-  use TOUZA_Std_env,only: conv_b2strm,      get_size_bytes
-  use TOUZA_Std_env,only: get_mems_bytes
-  use TOUZA_Std_env,only: kendi_file,       kendi_mem,      check_bodr_unit,  check_byte_order
-  use TOUZA_Std_env,only: endian_BIG,       endian_LITTLE,  endian_OTHER
-  use TOUZA_Std_env,only: is_eof_ss
-  use TOUZA_Std_fun,only: new_unit
-  use TOUZA_Std_sus,only: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
-  use TOUZA_Std_sus,only: sus_open,         sus_close
-  use TOUZA_Std_sus,only: sus_write_irec,   sus_read_irec,  sus_skip_irec,    sus_pad_irec
-  use TOUZA_Std_sus,only: sus_write_lrec,   sus_read_lrec,  sus_skip_lrec
-  use TOUZA_Std_sus,only: sus_write_isep,   sus_read_isep
-  use TOUZA_Std_sus,only: sus_write_lsep,   sus_read_lsep
-  use TOUZA_Std_sus,only: sus_rseek,        sus_eswap
-  use TOUZA_Std_sus,only: sus_size_irec
-  use TOUZA_Std_sus,only: max_members,      is_irec_overflow, sus_record_mems_irec
-  use TOUZA_Std_sus,only: def_block,        ignore_small,     ignore_bigger,  ignore_always
-  use TOUZA_Std_sus,only: sus_is_status_new
+  use TOUZA_Std,only: KI32,             KI64,           KDBL,             KFLT
+  use TOUZA_Std,only: choice,           choice_a,       condop,           upcase
+  use TOUZA_Std,only: control_deep,     control_mode,   is_first_force,   parse_number
+  use TOUZA_Std,only: split_list
+  use TOUZA_Std,only: is_msglev
+  use TOUZA_Std,only: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
+  use TOUZA_Std,only: is_msglev_severe, is_msglev_fatal
+  use TOUZA_Std,only: get_logu,         unit_global,    trace_fine,       trace_control
+  use TOUZA_Std,only: is_error_match
+  use TOUZA_Std,only: KIOFS
+  use TOUZA_Std,only: nc_strm,          nbits_byte
+  use TOUZA_Std,only: conv_b2strm,      get_size_bytes
+  use TOUZA_Std,only: get_mems_bytes
+  use TOUZA_Std,only: kendi_file,       kendi_mem,      check_bodr_unit,  check_byte_order
+  use TOUZA_Std,only: endian_BIG,       endian_LITTLE,  endian_OTHER
+  use TOUZA_Std,only: is_eof_ss
+  use TOUZA_Std,only: new_unit
+  use TOUZA_Std,only: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
+  use TOUZA_Std,only: sus_open,         sus_close
+  use TOUZA_Std,only: sus_write_irec,   sus_read_irec,  sus_skip_irec,    sus_pad_irec
+  use TOUZA_Std,only: sus_write_lrec,   sus_read_lrec,  sus_skip_lrec
+  use TOUZA_Std,only: sus_write_isep,   sus_read_isep
+  use TOUZA_Std,only: sus_write_lsep,   sus_read_lsep
+  use TOUZA_Std,only: sus_rseek,        sus_eswap
+  use TOUZA_Std,only: sus_size_irec
+  use TOUZA_Std,only: max_members,      is_irec_overflow, sus_record_mems_irec
+  use TOUZA_Std,only: def_block,        ignore_small,     ignore_bigger,  ignore_always
+  use TOUZA_Std,only: sus_is_status_new
 !!!_  - default
   implicit none
   private
@@ -61,18 +62,20 @@ module TOUZA_Nio_std
 !!!_  - common
   character(len=256) :: tmsg
 # define __MDL__ 's'
+#define _ERROR(E) (E - ERR_MASK_NIO_STD)
 !!!_  - interfaces
   interface msg
      module procedure msg_txt
      module procedure msg_i, msg_ia
   end interface msg
 !!!_  - public procedures
-  public init, diag, finalize
-  public msg
+  public init,    diag, finalize
+  public gen_tag, msg
 !!!_   . TOUZA_Std
   public :: KI32,             KI64,           KDBL,             KFLT
   public :: choice,           choice_a,       condop,           upcase
   public :: control_deep,     control_mode,   is_first_force,   parse_number
+  public :: split_list
   public :: is_msglev
   public :: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
   public :: is_msglev_severe, is_msglev_fatal
@@ -101,9 +104,7 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
-    use TOUZA_Std_env,only: env_init=>init
-    use TOUZA_Std_sus,only: sus_init=>init
-    use TOUZA_Std_bld,only: bld_init=>init
+    use TOUZA_Std,only: env_init, sus_init, bld_init
     ! use TOUZA_Std_htb,only: htb_init=>init
     implicit none
     integer,intent(out)         :: ierr
@@ -140,9 +141,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std_env,only: env_diag=>diag
-    use TOUZA_Std_sus,only: sus_diag=>diag
-    use TOUZA_Std_bld,only: bld_diag=>diag
+    use TOUZA_Std,only: env_diag, sus_diag, bld_diag
     ! use TOUZA_Std_htb,only: htb_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
@@ -179,9 +178,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std_env,only: env_finalize=>finalize
-    use TOUZA_Std_sus,only: sus_finalize=>finalize
-    use TOUZA_Std_bld,only: bld_finalize=>finalize
+    use TOUZA_Std,only: env_finalize, sus_finalize, bld_finalize
     ! use TOUZA_Std_htb,only: htb_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -214,23 +211,37 @@ contains
   end subroutine finalize
 
 !!!_ + user interfaces
+!!!_  & gen_tag - tag generator (to override std)
+  subroutine gen_tag &
+       & (tag, mdl, fun, asfx, isfx, label)
+    use TOUZA_Std,only: std_gen_tag=>gen_tag
+    implicit none
+    character(len=*),intent(out)         :: tag
+    character(len=*),intent(in),optional :: mdl
+    character(len=*),intent(in),optional :: fun
+    character(len=*),intent(in),optional :: asfx
+    integer,         intent(in),optional :: isfx
+    logical,         intent(in),optional :: label
+    call std_gen_tag &
+         & (tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl, fun=fun, asfx=asfx, isfx=isfx, label=label)
+  end subroutine gen_tag
 !!!_  & msg_txt - message dispatcher (to override std)
   subroutine msg_txt &
        & (txt, mdl, u)
-    use TOUZA_Std,only: choice, std_msg=>msg, gen_tag
+    use TOUZA_Std,only: choice, std_msg=>msg
     implicit none
     character(len=*),intent(in)          :: txt
     character(len=*),intent(in),optional :: mdl
     integer,         intent(in),optional :: u
     character(len=1024) :: tag
-    call gen_tag(tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl)
+    call gen_tag(tag, mdl)
     call std_msg(txt, tag, u)
     return
   end subroutine msg_txt
 !!!_  & msg_i - message dispatcher (to override std)
   subroutine msg_i &
        & (fmt, v, mdl, u)
-    use TOUZA_Std,only: choice, std_msg=>msg, gen_tag
+    use TOUZA_Std,only: choice, std_msg=>msg
     implicit none
     character(len=*),intent(in)          :: fmt
     integer,         intent(in)          :: v

@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/01/18 18:49:41 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/15 08:58:43 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -403,6 +403,7 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
+    use TOUZA_Nio_std,   only: gen_tag
     use TOUZA_Nio_header,only: nh_diag=>diag, show_header
     use TOUZA_Trp,       only: trp_diag=>diag
     implicit none
@@ -438,7 +439,8 @@ contains
                 call msg(txt, __MDL__, utmp)
              endif
              if (is_msglev_info(lv)) then
-                call show_header(ierr, head_def, ' ', utmp, lv)
+                call gen_tag(txt, __MDL__, asfx='default', label=.TRUE.)
+                call show_header(ierr, head_def, txt, utmp, lv)
              endif
              if (is_msglev_info(lv)) then
                 call msg('(''standard heeder length = '', I0, 1x, I0, 1x, I0)', &
@@ -3740,7 +3742,7 @@ contains
   subroutine parse_urt_options &
        & (ierr, kopts, &
        &  str,  pat,   isep,  vsep,  psep)
-    use TOUZA_Std,only: choice_a, split_list, parse_number
+    use TOUZA_Nio_std,only: choice_a, split_list, parse_number
     use TOUZA_Trp,only: parse_codes, helper_props
     implicit none
     integer,         intent(out)         :: ierr
@@ -3852,7 +3854,7 @@ contains
   end subroutine parse_urt_options
 !!!_  - show_urt_options
   subroutine show_urt_options(ierr, kopts, tag, u)
-    use TOUZA_Std,only: choice
+    use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: kopts(*)
@@ -5590,6 +5592,7 @@ contains
   subroutine parse_record_fmt &
        & (ierr, kfmt, str)
     use TOUZA_Nio_std,only: KDBL, KFLT, KI32, KI64
+    use TOUZA_Nio_std,only: parse_number
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: kfmt
@@ -5626,7 +5629,7 @@ contains
              endif
           case ('Y', 'X')
              kfmt = kfmt + GFMT_URY
-             read(str(4:), *, IOSTAT=ierr) kk
+             call parse_number(ierr, kk, str(4:), -1)
              if (ierr.eq.0) then
                 if (kk.gt.(GFMT_URYend - GFMT_URY)) ierr = -1
                 if (kk.lt.1) ierr = _ERROR(ERR_UNKNOWN_FORMAT)
@@ -5641,7 +5644,7 @@ contains
              !    ierr = 0
              ! endif
           case default
-             read(str(3:), *, IOSTAT=ierr) kk
+             call parse_number(ierr, kk, str(3:), -1)
              if (ierr.eq.0) then
                 if (kk.eq.4) then
                    kfmt = kfmt + GFMT_UR4
@@ -5655,7 +5658,7 @@ contains
              endif
           end select
        case ('I')
-          read(str(3:), *, IOSTAT=ierr) kk
+          call parse_number(ierr, kk, str(3:), -1)
           if (ierr.eq.0) then
              if (kk.eq.1) then
                 kfmt = kfmt + GFMT_UI1
