@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2023/01/18 17:10:40 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/19 09:58:49 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023
@@ -272,10 +272,10 @@ contains
              maxmemi_l = lsubr / get_size_bytes(0_KI64)
              maxmemi_f = lsubr / get_size_bytes(0.0_KFLT)
              maxmemi_d = lsubr / get_size_bytes(0.0_KDBL)
-             if (maxmemi_i.le.0) ierr = ERR_FATAL
-             if (maxmemi_l.le.0) ierr = ERR_FATAL
-             if (maxmemi_f.le.0) ierr = ERR_FATAL
-             if (maxmemi_d.le.0) ierr = ERR_FATAL
+             if (maxmemi_i.le.0) ierr = _ERROR(ERR_FATAL)
+             if (maxmemi_l.le.0) ierr = _ERROR(ERR_FATAL)
+             if (maxmemi_f.le.0) ierr = _ERROR(ERR_FATAL)
+             if (maxmemi_d.le.0) ierr = _ERROR(ERR_FATAL)
              if (ierr.ne.0) then
                 write(*,*) 'FATAL:', maxmemi_i, maxmemi_l, maxmemi_f, maxmemi_d
              endif
@@ -665,7 +665,7 @@ contains
           if (ierr.eq.0) jpos = jpos - conv_b2strm(abs(isepf)) - mstrm_sep(iseph)
           if (ierr.eq.0) call sus_read_isep(ierr, u, iseph, pos=jpos, swap=swap)
           if (ierr.eq.0) then
-             if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           else
              ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
@@ -683,7 +683,7 @@ contains
           if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
           if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
           if (ierr.eq.0) then
-             if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           else
              ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
@@ -733,7 +733,7 @@ contains
           if (ierr.eq.0) jpos = jpos - conv_b2strm(lsepf) - mstrm_sep(lseph)
           if (ierr.eq.0) call sus_read_lsep(ierr, u, lseph, pos=jpos, swap=swap)
           if (ierr.eq.0) then
-             if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (lseph.ne.lsepf) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           else
              ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
@@ -750,7 +750,7 @@ contains
           if (ierr.eq.0) call sus_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
           if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
           if (ierr.eq.0) then
-             if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (lseph.ne.lsepf) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           else
              ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
@@ -798,7 +798,7 @@ contains
           if (ierr.eq.0) then
              call sus_read_isep(ierr, u, iseph, swap=swap)
              if (is_eof_ss(ierr)) then
-                ierr = ERR_EOF
+                ierr = _ERROR(ERR_EOF)
                 exit
              endif
           endif
@@ -806,7 +806,7 @@ contains
           if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
           if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
           if (ierr.eq.0) then
-             if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           else
              ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
@@ -822,7 +822,7 @@ contains
           if (ierr.eq.0) jpos = jpos - conv_b2strm(abs(isepf)) - mstrm_sep(iseph)
           if (ierr.eq.0) call sus_read_isep(ierr, u, iseph, pos=jpos, swap=swap)
           if (ierr.eq.0) then
-             if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           else
              ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
@@ -865,7 +865,7 @@ contains
           if (ierr.eq.0) then
              call sus_read_lsep(ierr, u, lseph, swap=swap)
              if (is_eof_ss(ierr)) then
-                ierr = ERR_EOF
+                ierr = _ERROR(ERR_EOF)
                 exit
              endif
           endif
@@ -873,7 +873,7 @@ contains
           if (ierr.eq.0) call sus_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
           if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
           if (ierr.eq.0) then
-             if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (lseph.ne.lsepf) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           else
              ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
@@ -886,7 +886,7 @@ contains
           if (ierr.eq.0) jpos = jpos - conv_b2strm(lsepf) - mstrm_sep(lseph)
           if (ierr.eq.0) call sus_read_lsep(ierr, u, lseph, pos=jpos, swap=swap)
           if (ierr.eq.0) then
-             if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (lseph.ne.lsepf) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           else
              ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
           endif
@@ -1145,7 +1145,7 @@ contains
     ierr = err_default
     d = choice(0, dummy)
     ns = max_members(V(0))
-    if (ns.le.0) ierr = ERR_PANIC
+    if (ns.le.0) ierr = _ERROR(ERR_PANIC)
     if (n.le.ns) then
        isep = get_size_bytes(V(0), n)
        if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=post)
@@ -1906,7 +1906,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit
           endif
        endif
@@ -1916,7 +1916,7 @@ contains
        endif
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
        if (ierr.eq.0) then
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.eq.0) then
           ns = get_mems_bytes(abs(iseph), mold)
@@ -1963,7 +1963,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit
           endif
        endif
@@ -1973,7 +1973,7 @@ contains
        endif
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
        if (ierr.eq.0) then
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.eq.0) then
           ns = get_mems_bytes(abs(iseph), mold)
@@ -2020,7 +2020,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit
           endif
        endif
@@ -2030,7 +2030,7 @@ contains
        endif
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
        if (ierr.eq.0) then
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.eq.0) then
           ns = get_mems_bytes(abs(iseph), mold)
@@ -2077,7 +2077,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit
           endif
        endif
@@ -2087,7 +2087,7 @@ contains
        endif
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jpos, swap=swap)
        if (ierr.eq.0) then
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.eq.0) then
           ns = get_mems_bytes(abs(iseph), mold)
@@ -2142,7 +2142,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit
           endif
        endif
@@ -2169,7 +2169,7 @@ contains
           iseph = 0
        else
           if (ierr.eq.0) then
-             if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           endif
        endif
        if (ierr.eq.0) then
@@ -2184,7 +2184,7 @@ contains
     enddo
     if (ierr.eq.0) then
        if (m.gt.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -2230,7 +2230,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit
           endif
        endif
@@ -2257,7 +2257,7 @@ contains
           iseph = 0
        else
           if (ierr.eq.0) then
-             if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           endif
        endif
        if (ierr.eq.0) then
@@ -2272,7 +2272,7 @@ contains
     enddo
     if (ierr.eq.0) then
        if (m.gt.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -2318,7 +2318,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit
           endif
        endif
@@ -2345,7 +2345,7 @@ contains
           iseph = 0
        else
           if (ierr.eq.0) then
-             if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           endif
        endif
        if (ierr.eq.0) then
@@ -2360,7 +2360,7 @@ contains
     enddo
     if (ierr.eq.0) then
        if (m.gt.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -2406,7 +2406,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit
           endif
        endif
@@ -2433,7 +2433,7 @@ contains
           iseph = 0
        else
           if (ierr.eq.0) then
-             if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           endif
        endif
        if (ierr.eq.0) then
@@ -2448,7 +2448,7 @@ contains
     enddo
     if (ierr.eq.0) then
        if (m.gt.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -2494,7 +2494,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit
           endif
        endif
@@ -2521,7 +2521,7 @@ contains
           iseph = 0
        else
           if (ierr.eq.0) then
-             if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+             if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
           endif
        endif
        if (ierr.eq.0) then
@@ -2536,7 +2536,7 @@ contains
     enddo
     if (ierr.eq.0) then
        if (m.gt.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -2567,7 +2567,7 @@ contains
     if (ierr.eq.0) then
        call sus_read_lsep(ierr, u, lseph, swap=swap)
        if (is_eof_ss(ierr)) then
-          ierr = ERR_EOF
+          ierr = _ERROR(ERR_EOF)
           return
        endif
     endif
@@ -2577,7 +2577,7 @@ contains
        ! to do: check overflow
        m = int(get_mems_bytes(lseph, V(0)))
        if (n.gt.m) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else
           m = min(m, n)
           call sus_read(ierr, u, V, m, swap)
@@ -2585,7 +2585,7 @@ contains
     endif
     if (ierr.eq.0) call sus_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
     if (ierr.eq.0) then
-       if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       if (lseph.ne.lsepf) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
     else
        ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
     endif
@@ -2609,7 +2609,7 @@ contains
     if (ierr.eq.0) then
        call sus_read_lsep(ierr, u, lseph, swap=swap)
        if (is_eof_ss(ierr)) then
-          ierr = ERR_EOF
+          ierr = _ERROR(ERR_EOF)
           return
        endif
     endif
@@ -2619,7 +2619,7 @@ contains
        ! to do: check overflow
        m = int(get_mems_bytes(lseph, V(0)))
        if (n.gt.m) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else
           m = min(m, n)
           call sus_read(ierr, u, V, m, swap)
@@ -2627,7 +2627,7 @@ contains
     endif
     if (ierr.eq.0) call sus_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
     if (ierr.eq.0) then
-       if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       if (lseph.ne.lsepf) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
     else
        ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
     endif
@@ -2651,7 +2651,7 @@ contains
     if (ierr.eq.0) then
        call sus_read_lsep(ierr, u, lseph, swap=swap)
        if (is_eof_ss(ierr)) then
-          ierr = ERR_EOF
+          ierr = _ERROR(ERR_EOF)
           return
        endif
     endif
@@ -2661,7 +2661,7 @@ contains
        ! to do: check overflow
        m = int(get_mems_bytes(lseph, V(0)))
        if (n.gt.m) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else
           m = min(m, n)
           call sus_read(ierr, u, V, m, swap)
@@ -2669,7 +2669,7 @@ contains
     endif
     if (ierr.eq.0) call sus_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
     if (ierr.eq.0) then
-       if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       if (lseph.ne.lsepf) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
     else
        ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
     endif
@@ -2693,7 +2693,7 @@ contains
     if (ierr.eq.0) then
        call sus_read_lsep(ierr, u, lseph, swap=swap)
        if (is_eof_ss(ierr)) then
-          ierr = ERR_EOF
+          ierr = _ERROR(ERR_EOF)
           return
        endif
     endif
@@ -2703,7 +2703,7 @@ contains
        ! to do: check overflow
        m = int(get_mems_bytes(lseph, V(0)))
        if (n.gt.m) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else
           m = min(m, n)
           call sus_read(ierr, u, V, m, swap)
@@ -2711,7 +2711,7 @@ contains
     endif
     if (ierr.eq.0) call sus_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
     if (ierr.eq.0) then
-       if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       if (lseph.ne.lsepf) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
     else
        ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
     endif
@@ -2735,7 +2735,7 @@ contains
     if (ierr.eq.0) then
        call sus_read_lsep(ierr, u, lseph, swap=swap)
        if (is_eof_ss(ierr)) then
-          ierr = ERR_EOF
+          ierr = _ERROR(ERR_EOF)
           return
        endif
     endif
@@ -2745,7 +2745,7 @@ contains
        ! to do: check overflow
        m = int(get_mems_bytes(lseph, V(0)))
        if (n.gt.m) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else
           m = min(m, n)
           call sus_read(ierr, u, V, m, swap)
@@ -2753,7 +2753,7 @@ contains
     endif
     if (ierr.eq.0) call sus_read_lsep(ierr, u, lsepf, pos=jpos, swap=swap)
     if (ierr.eq.0) then
-       if (lseph.ne.lsepf) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+       if (lseph.ne.lsepf) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
     else
        ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
     endif
@@ -2804,7 +2804,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit loop_rec
           endif
        endif
@@ -2838,7 +2838,7 @@ contains
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
        if (ierr.eq.0) then
           if (iseph.ge.0) exit loop_rec
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -2849,7 +2849,7 @@ contains
     enddo loop_rec
     if (ierr.eq.0) then
        if (jsrc.ge.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -2902,7 +2902,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit loop_rec
           endif
        endif
@@ -2936,7 +2936,7 @@ contains
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
        if (ierr.eq.0) then
           if (iseph.ge.0) exit loop_rec
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -2947,7 +2947,7 @@ contains
     enddo loop_rec
     if (ierr.eq.0) then
        if (jsrc.ge.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -3000,7 +3000,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit loop_rec
           endif
        endif
@@ -3034,7 +3034,7 @@ contains
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
        if (ierr.eq.0) then
           if (iseph.ge.0) exit loop_rec
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -3045,7 +3045,7 @@ contains
     enddo loop_rec
     if (ierr.eq.0) then
        if (jsrc.ge.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -3098,7 +3098,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit loop_rec
           endif
        endif
@@ -3132,7 +3132,7 @@ contains
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
        if (ierr.eq.0) then
           if (iseph.ge.0) exit loop_rec
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -3143,7 +3143,7 @@ contains
     enddo loop_rec
     if (ierr.eq.0) then
        if (jsrc.ge.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -3196,7 +3196,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit loop_rec
           endif
        endif
@@ -3230,7 +3230,7 @@ contains
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
        if (ierr.eq.0) then
           if (iseph.ge.0) exit loop_rec
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -3241,7 +3241,7 @@ contains
     enddo loop_rec
     if (ierr.eq.0) then
        if (jsrc.ge.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -3296,7 +3296,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit loop_rec
           endif
        endif
@@ -3331,7 +3331,7 @@ contains
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
        if (ierr.eq.0) then
           if (iseph.ge.0) exit loop_rec
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -3342,7 +3342,7 @@ contains
     enddo loop_rec
     if (ierr.eq.0) then
        if (jsrc.ge.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -3395,7 +3395,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit loop_rec
           endif
        endif
@@ -3430,7 +3430,7 @@ contains
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
        if (ierr.eq.0) then
           if (iseph.ge.0) exit loop_rec
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -3441,7 +3441,7 @@ contains
     enddo loop_rec
     if (ierr.eq.0) then
        if (jsrc.ge.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -3494,7 +3494,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit loop_rec
           endif
        endif
@@ -3529,7 +3529,7 @@ contains
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
        if (ierr.eq.0) then
           if (iseph.ge.0) exit loop_rec
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -3540,7 +3540,7 @@ contains
     enddo loop_rec
     if (ierr.eq.0) then
        if (jsrc.ge.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -3593,7 +3593,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit loop_rec
           endif
        endif
@@ -3628,7 +3628,7 @@ contains
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
        if (ierr.eq.0) then
           if (iseph.ge.0) exit loop_rec
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -3639,7 +3639,7 @@ contains
     enddo loop_rec
     if (ierr.eq.0) then
        if (jsrc.ge.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
@@ -3692,7 +3692,7 @@ contains
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
           if (is_eof_ss(ierr)) then
-             ierr = ERR_EOF
+             ierr = _ERROR(ERR_EOF)
              exit loop_rec
           endif
        endif
@@ -3727,7 +3727,7 @@ contains
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=jposf, swap=swap)
        if (ierr.eq.0) then
           if (iseph.ge.0) exit loop_rec
-          if (abs(iseph).ne.abs(isepf)) ierr = ERR_INCONSISTENT_RECORD_MARKERS
+          if (abs(iseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
        endif
        if (ierr.ne.0) then
           ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
@@ -3738,7 +3738,7 @@ contains
     enddo loop_rec
     if (ierr.eq.0) then
        if (jsrc.ge.0) then
-          ierr = ERR_INVALID_RECORD_SIZE
+          ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
        else if (choice(.false., sub)) then
           ! sub exist and T
           sub = (iseph.lt.0)    ! subrecord succeeds
