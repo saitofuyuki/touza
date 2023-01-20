@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2022/12/23 21:45:02 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/20 11:22:23 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -111,7 +111,7 @@ module TOUZA_Std_utl
   public set_defu
   public parse_number
   public compact_format
-  public join_list,  split_list
+  public join_list,  split_list, split_heads
   public find_first, find_first_range
   public jot
   public inrange
@@ -1045,6 +1045,82 @@ contains
 
   end subroutine join_list_a
 
+!!!_  & split_heads - split string and return head-array
+  subroutine split_heads &
+       & (n, h, str, sep, lim, empty)
+    integer,          intent(out)         :: n         ! number of elements or error code
+    integer,          intent(out)         :: h(0:)
+    character(len=*), intent(in)          :: str
+    character(len=*), intent(in)          :: sep
+    integer,          intent(in),optional :: lim       ! negative to count only; 0 to infinite
+    logical,          intent(in),optional :: empty     ! allow empty element (ignored if def present)
+
+    !  return head positions of items
+    !    item: str(h(i)+1:h(i+1)-len(sep))
+    !  h    h    h    h
+    !  [aaa//bbb//ccc//]
+
+    integer jpos, lstr, lsep
+    integer js,   jh
+    integer nlim
+    integer jerr
+    logical eallow
+
+    jerr = 0
+    nlim = choice(0, lim)
+    if (nlim.eq.0) nlim = +HUGE(0)
+    eallow = choice(.TRUE., empty)
+    n = 0
+    jpos = 0
+    lstr = len_trim(str)
+    if (lstr.eq.0) return
+    lsep = max(1, len_trim(sep))   ! allow single blank only
+
+    if (eallow) then
+       jpos = 0
+    else
+       do
+          if (jpos+lsep.gt.lstr) exit
+          if (str(jpos+1:jpos+lsep).ne.sep(1:lsep)) exit
+          jpos = jpos + lsep
+       enddo
+    endif
+    if (nlim.ge.0) then
+       if (n.gt.nlim) then
+          jerr = -1
+       else
+          h(n) = jpos
+       endif
+    endif
+    n = n + 1
+    do
+       js = index(str(jpos+1:lstr), sep(1:lsep))
+       if (js.gt.0) then
+          jh = jpos + js - 1
+       else
+          jh = lstr
+       endif
+       if (jpos.lt.jh.or.eallow) then
+          if (nlim.ge.0) then
+             if (n.gt.nlim) then
+                jerr = -1
+             else
+                h(n) = jh + lsep
+             endif
+          endif
+          n = n + 1
+       endif
+       jpos = jh + lsep
+       if (js.eq.0) exit
+       if (jerr.ne.0) exit
+    enddo
+    if (jerr.ne.0) then
+       n = _ERROR(ERR_INVALID_PARAMETER)
+    else
+       n = n - 1
+    endif
+  end subroutine split_heads
+
 !!!_  & split_list - convert array to string
   subroutine split_list_i &
        & (n, v, str, sep, lim, def, empty)
@@ -1053,7 +1129,7 @@ contains
     integer,          intent(inout)       :: v(0:)
     character(len=*), intent(in)          :: str
     character(len=*), intent(in)          :: sep
-    integer,          intent(in),optional :: lim       ! negative to count only; 0 to inifinite
+    integer,          intent(in),optional :: lim       ! negative to count only; 0 to infinite
     integer,          intent(in),optional :: def(0:*)  ! no bound check
     logical,          intent(in),optional :: empty     ! allow empty element (ignored if def present)
 
@@ -1064,7 +1140,8 @@ contains
     logical eallow
 
     jerr = 0
-    nlim = choice(+HUGE(0), lim)
+    nlim = choice(0, lim)
+    if (nlim.eq.0) nlim = +HUGE(0)
     eallow = choice(.TRUE., empty)
 
     n = 0
@@ -1074,10 +1151,6 @@ contains
     lsep = max(1, len_trim(sep))   ! allow single blank only
     js = 0
     do
-       ! if (nlim.ge.0.and.n.ge.nlim) then
-       !    jerr = -1
-       !    exit
-       ! endif
        js = index(str(jpos+1:lstr), sep(1:lsep))
        if (js.eq.0) then
           jh = lstr
@@ -1125,7 +1198,7 @@ contains
     real(kind=KTGT),  intent(inout)       :: v(0:)
     character(len=*), intent(in)          :: str
     character(len=*), intent(in)          :: sep
-    integer,          intent(in),optional :: lim       ! negative to count only; 0 to inifinite
+    integer,          intent(in),optional :: lim       ! negative to count only; 0 to infinite
     real(kind=KTGT),  intent(in),optional :: def(0:*)  ! no bound check
     logical,          intent(in),optional :: empty     ! allow empty element (ignored if def present)
 
@@ -1136,7 +1209,8 @@ contains
     logical eallow
 
     jerr = 0
-    nlim = choice(+HUGE(0), lim)
+    nlim = choice(0, lim)
+    if (nlim.eq.0) nlim = +HUGE(0)
     eallow = choice(.TRUE., empty)
 
     n = 0
@@ -1192,7 +1266,7 @@ contains
     real(kind=KTGT),  intent(inout)       :: v(0:)
     character(len=*), intent(in)          :: str
     character(len=*), intent(in)          :: sep
-    integer,          intent(in),optional :: lim       ! negative to count only; 0 to inifinite
+    integer,          intent(in),optional :: lim       ! negative to count only; 0 to infinite
     real(kind=KTGT),  intent(in),optional :: def(0:*)  ! no bound check
     logical,          intent(in),optional :: empty     ! allow empty element (ignored if def present)
 
@@ -1203,7 +1277,8 @@ contains
     logical eallow
 
     jerr = 0
-    nlim = choice(+HUGE(0), lim)
+    nlim = choice(0, lim)
+    if (nlim.eq.0) nlim = +HUGE(0)
     eallow = choice(.TRUE., empty)
 
     n = 0
@@ -1590,6 +1665,16 @@ program test_std_utl
 
   call test_split('::::')
 
+  call test_split_heads('//', ' ')
+  call test_split_heads('//', 'abcde')
+  call test_split_heads('//', 'a//b//c//d')
+  call test_split_heads('//', '//a//b//c//d')
+  call test_split_heads('//', 'a//b//c//d//')
+  call test_split_heads('//', '//a//b//c//d//')
+  call test_split_heads('//', '////a//b//c//d')
+  call test_split_heads('//', '////a//b//c//d////')
+  call test_split_heads('//', '////a////b//c//d////')
+
   call test_find((/0/))
   call test_find((/0,1,2,0,3,4/))
 
@@ -1750,6 +1835,31 @@ contains
        write(*, 101) 'n', empty, n, trim(str), lim, v(0:lim-1)
     endif
   end subroutine test_split_sub
+
+  subroutine test_split_heads(sep, str)
+    implicit none
+    character(len=*),intent(in) :: sep
+    character(len=*),intent(in) :: str
+    call test_split_heads_sub(sep, str, .TRUE.)
+    call test_split_heads_sub(sep, str, .FALSE.)
+  end subroutine test_split_heads
+
+  subroutine test_split_heads_sub(sep, str, empty)
+    implicit none
+    character(len=*),intent(in) :: sep
+    character(len=*),intent(in) :: str
+    logical,         intent(in) :: empty
+
+    integer,parameter :: lim = 32
+    integer h(0:lim-1)
+    integer m, n
+
+    call split_heads(m, h, str, sep, -1, empty)
+    if (m.ge.0) call split_heads(n, h, str, sep, 0,  empty)
+
+101 format('split_heads/', L1, ':', I0, 1x, '[', A, ']', 16(1x, I0))
+    write(*, 101) empty, n, trim(str), h(0:n)
+  end subroutine test_split_heads_sub
 
   subroutine test_find(v)
     implicit none
