@@ -863,12 +863,12 @@ contains
     endif
     ! enable full extension
     if (opts.eq.' ') then
-       ofile(jfile)%big = bigg_off
+       ofile(jfile)%bigg = bigg_off
     endif
     if (scan(opts, 'Bb').gt.0) then
-       ofile(jfile)%big = bigg_on
+       ofile(jfile)%bigg = bigg_on
     else if (scan(opts, 'Ss').gt.0) then
-       ofile(jfile)%big = bigg_off
+       ofile(jfile)%bigg = bigg_off
     endif
   end subroutine parse_xflag_option
 
@@ -914,7 +914,7 @@ contains
           ofile(jf)%mode  = ofile(def_write)%mode
           ofile(jf)%hedit = ofile(def_write)%hedit
           ofile(jf)%hflag = ofile(def_write)%hflag
-          ofile(jf)%big   = ofile(def_write)%big
+          ofile(jf)%bigg  = ofile(def_write)%bigg
           call append_queue(ierr, hfile, pop=1, push=0)
           if (ierr.eq.0) call pop_stack(ierr, hbuf)
           if (ierr.eq.0) then
@@ -936,7 +936,7 @@ contains
              nbufs = count_file_stacks(ofile(def_read))
              ! file to read
              ofile(jf)%mode = mode_read
-             ofile(jf)%big  = ofile(def_read)%big
+             ofile(jf)%bigg = ofile(def_read)%bigg
              ofile(jf)%rgrp => ofile(def_read)%rgrp
              call alloc_file_buffers(ierr, nbufs, rcount-1, 0)
           endif

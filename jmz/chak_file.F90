@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz swiss(CH) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/01/10 12:29:16 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/22 21:37:57 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -114,7 +114,7 @@ module chak_file
      integer                :: hedit     ! header edit level
      integer                :: hflag = hflag_unset ! header parser flag
      type(rgroup_t),pointer :: rgrp(:) => NULL()
-     integer                :: big
+     integer                :: bigg
   end type file_t
 !!!_ + Procedures
 contains
@@ -126,7 +126,7 @@ contains
   end subroutine init
 
 !!!_  - reset_file
-  subroutine reset_file(ierr, file, name, mode, flag, big)
+  subroutine reset_file(ierr, file, name, mode, flag, bigg)
     use TOUZA_Std,only: choice
     use TOUZA_Nio,only: GFMT_ERR
     implicit none
@@ -135,7 +135,7 @@ contains
     character(len=*),intent(in),optional :: name
     integer,         intent(in),optional :: mode
     integer,         intent(in),optional :: flag
-    integer,         intent(in),optional :: big
+    integer,         intent(in),optional :: bigg
 
     ierr = 0
 
@@ -148,7 +148,7 @@ contains
     file%hedit = hedit_all
     file%mode  = choice(mode_unset, mode)
     file%hflag = choice(hflag_unset, flag)
-    file%big   = choice(bigg_on, big)
+    file%bigg  = choice(bigg_on, bigg)
     ! file%bh = -1
 
     if (present(name)) then
@@ -1318,7 +1318,7 @@ end subroutine cue_read_file
     endif
     ! forward skipping
     irec = 0
-    ksubm = nio_allow_sub(0, file%big.eq.bigg_off)
+    ksubm = nio_allow_sub(0, file%bigg.eq.bigg_off)
     do
        if (mrg.ge.nrg) exit
        ! need offseting
@@ -1384,7 +1384,7 @@ end subroutine cue_read_file
 
     ierr = 0
     nskp = rec - crec
-    ksubm = nio_allow_sub(0, file%big.eq.bigg_off)
+    ksubm = nio_allow_sub(0, file%bigg.eq.bigg_off)
     call nio_skip_records(ierr, nskp, file%u, nskip=nsuc, krect=ksubm)
     if (ierr.eq.0) call nio_read_header(ierr, head, file%t, file%u)
     if (ierr.eq.0) call get_item(ierr, head, file%fmt, hi_DFMT)
@@ -1497,7 +1497,7 @@ end subroutine cue_read_file
 
     ierr = 0
     if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, ulog)
-    rect = nio_allow_sub(file%t, file%big.eq.bigg_off)
+    rect = nio_allow_sub(file%t, file%bigg.eq.bigg_off)
     call nio_read_data(ierr, v, n, file%h, rect, file%u)
     if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, -2)
 
@@ -1522,7 +1522,7 @@ end subroutine cue_read_file
     integer krect
 
     ierr = 0
-    krect = nio_allow_sub(file%t, file%big.eq.bigg_off)
+    krect = nio_allow_sub(file%t, file%bigg.eq.bigg_off)
     if (file%kfmt.eq.GFMT_URT .or. file%kfmt.eq.GFMT_MRT) then
        jo = index(file%fmt, osep)
        if (jo.gt.0) then
