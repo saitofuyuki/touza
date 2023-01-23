@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2023/01/19 09:58:49 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 21:57:09 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023
@@ -84,6 +84,9 @@ module TOUZA_Std_sus
   integer,parameter,public :: ignore_bigger  = -2
   integer,parameter,public :: ignore_always  = -3
 
+  integer,parameter,public :: suspend_begin = +1  ! suspend-mode record begin
+  integer,parameter,public :: suspend_mid   = 0
+  integer,parameter,public :: suspend_end   = -1
 !!!_  - static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -101,10 +104,21 @@ module TOUZA_Std_sus
   integer,save :: maxmemi_i = 0, maxmemi_l = 0 !! max members in a sub-record (32-bit marker)
   integer,save :: maxmemi_f = 0, maxmemi_d = 0
 
+  integer,save,public :: RECL_MAX_STREAM = 0
+
   integer(kind=KI32),save :: lsubr = 0
 
   integer,save :: last_iostat = 0
   integer,save :: last_line = 0
+
+  integer,            save :: suspend_wu = -1        !! cached unit for suspend mode
+  integer,            save :: suspend_wsub = 0       !! cached unit record length in bytes
+  integer(kind=KIOFS),save :: suspend_wposh = -1     !! cached record header position for suspend mode
+
+  integer,            save :: suspend_ru = -1        !! cached unit for suspend mode
+  integer(kind=KI32), save :: suspend_rseph = 0      !! cached unit record length in bytes
+  integer(kind=KIOFS),save :: suspend_rposf = -1     !! cached record footer position for suspend mode
+
 !!!_  - interfaces
   interface sus_write_irec
      module procedure sus_write_irec_i, sus_write_irec_l, sus_write_irec_d, sus_write_irec_f, sus_write_irec_a
@@ -119,6 +133,15 @@ module TOUZA_Std_sus
   interface sus_blank_irec
      module procedure sus_blank_irec_i, sus_blank_irec_l, sus_blank_irec_d, sus_blank_irec_f, sus_blank_irec_a
   end interface sus_blank_irec
+
+  interface sus_suspend_write_irec
+     module procedure sus_suspend_write_irec_i, sus_suspend_write_irec_l
+     module procedure sus_suspend_write_irec_f, sus_suspend_write_irec_d, sus_suspend_write_irec_a
+  end interface sus_suspend_write_irec
+  interface sus_suspend_read_irec
+     module procedure sus_suspend_read_irec_i, sus_suspend_read_irec_l
+     module procedure sus_suspend_read_irec_f, sus_suspend_read_irec_d, sus_suspend_read_irec_a
+  end interface sus_suspend_read_irec
 
   interface sus_read_irec
      module procedure sus_read_irec_i, sus_read_irec_l, sus_read_irec_d, sus_read_irec_f, sus_read_irec_a
@@ -187,6 +210,13 @@ module TOUZA_Std_sus
   interface max_members
      module procedure max_members_a, max_members_i, max_members_l, max_members_f, max_members_d
   end interface max_members
+  interface rest_members
+     module procedure rest_members_a, rest_members_i, rest_members_l, rest_members_f, rest_members_d
+  end interface rest_members
+
+  interface check_dummy_irec
+     module procedure check_dummy_irec_i, check_dummy_irec_l
+  end interface check_dummy_irec
 
   interface sus_size_irec
      module procedure sus_size_irec_la,  sus_size_irec_a
@@ -205,7 +235,8 @@ module TOUZA_Std_sus
   public sus_write_irec, sus_read_irec, sus_skip_irec, sus_check_irec
   public sus_write_lrec, sus_read_lrec, sus_skip_lrec, sus_check_lrec
   public sus_pad_irec,   sus_blank_irec
-  public sus_read_slice_irec, sus_edit_slice_irec
+  public sus_suspend_write_irec, sus_edit_slice_irec
+  public sus_suspend_read_irec,  sus_read_slice_irec
 
   public sus_write_isep, sus_read_isep, sus_read
   public sus_write_lsep, sus_read_lsep, sus_write
@@ -216,6 +247,7 @@ module TOUZA_Std_sus
   public sus_record_mems_irec
   public max_members, is_irec_overflow, is_irec_overflow_mix
   public sus_size_irec
+  public sus_is_stream_unit
 
 #if TEST_STD_SUS
   public set_slice_loop, init_offset, next_offset
@@ -228,7 +260,7 @@ contains
     use TOUZA_Std_utl,only: utl_init=>init, choice
     use TOUZA_Std_fun,only: fun_init=>init
     use TOUZA_Std_log,only: log_init=>init
-    use TOUZA_Std_env,only: env_init=>init, get_unit_strm, get_size_bytes
+    use TOUZA_Std_env,only: env_init=>init, get_unit_strm, get_size_bytes, conv_b2strm
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -279,6 +311,7 @@ contains
              if (ierr.ne.0) then
                 write(*,*) 'FATAL:', maxmemi_i, maxmemi_l, maxmemi_f, maxmemi_d
              endif
+             if (ierr.eq.0) RECL_MAX_STREAM = conv_b2strm(RECL_MAX_BYTES)
           endif
        endif
        if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
@@ -2760,6 +2793,1015 @@ contains
     return
   end subroutine sus_read_lrec_a
 
+!!!_  - sus_suspend_write_irec - suspend-mode write a record with 32-bit marker
+  subroutine sus_suspend_write_irec_i &
+       & (ierr, u, v, n, sw, swap, dummy)
+    use TOUZA_Std_utl,only: choice, condop
+    use TOUZA_Std_env,only: get_size_bytes
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI32
+    integer,           intent(out)         :: ierr
+    integer,           intent(in)          :: u
+    integer(KIND=KARG),intent(in)          :: V(0:*)
+    integer,           intent(in)          :: n
+    integer,           intent(in)          :: sw      ! positive/negative for head/foot
+    logical,           intent(in),optional :: swap
+    integer,           intent(in),optional :: dummy
+    integer(KIND=KISEP) :: isep
+    integer j, m, ns
+    integer d
+    integer(KIND=KIOFS) :: jpos
+    integer ss
+
+    ierr = err_default
+    d = choice(0, dummy)
+
+    if (ierr.eq.0) then
+       ! unit check
+       if (sw.gt.0) then
+          ! head
+          if (suspend_wu.ge.0) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             suspend_wu  = u
+             suspend_wsub = 0
+             isep = d
+             inquire(UNIT=u, IOSTAT=ierr, POS=suspend_wposh)
+             if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)  ! write dummy separator
+          endif
+       else if (suspend_wu.ne.u) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       endif
+    endif
+    if (ierr.eq.0) then
+       ns = rest_members(abs(suspend_wsub), V(0))
+       ss = condop((suspend_wsub.lt.0), -1, +1)
+       if (n.le.ns.or.d.lt.0) then
+          call sus_write(ierr, u, V, n, swap)
+          if (ierr.eq.0) then
+             suspend_wsub = suspend_wsub + ss * (get_size_bytes(V(0), n))
+          endif
+       else
+          ! close current subrecord
+          m = n
+          j = 0
+          isep = abs(suspend_wsub) + get_size_bytes(V(0), ns)
+          inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.TRUE., pos=suspend_wposh)
+          if (ierr.eq.0) call sus_write(ierr, u, V(j:j+ns-1), ns, swap, pos=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=(suspend_wsub.lt.0))
+          m = m - ns
+          j = j + ns
+          ns = max_members(V(0))
+          ! middle
+          isep = get_size_bytes(V(0), ns)
+          do
+             if (m.le.ns) exit
+             if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+             if (ierr.eq.0) call sus_write(ierr, u, V(j:j+ns-1), ns, swap)
+             if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+             m = m - ns
+             j = j + ns
+          enddo
+          ! open final subrecord
+          isep = get_size_bytes(V(0), m)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=suspend_wposh)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)  ! write dummy separator
+          if (ierr.eq.0) call sus_write(ierr, u, V(j:j+m-1), m, swap)
+          if (ierr.eq.0) suspend_wsub = - isep
+       endif
+    endif
+    if (sw.lt.0) then
+       if (d.lt.0) then
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)
+       else
+          isep = abs(suspend_wsub)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.FAlSE., pos=suspend_wposh)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=(suspend_wsub.lt.0), pos=jpos)
+       endif
+       if (ierr.eq.0) then
+          suspend_wposh = -1
+          suspend_wsub = 0
+          suspend_wu = -1
+       endif
+    endif
+    return
+  end subroutine sus_suspend_write_irec_i
+  subroutine sus_suspend_write_irec_l &
+       & (ierr, u, v, n, sw, swap, dummy)
+    use TOUZA_Std_utl,only: choice, condop
+    use TOUZA_Std_env,only: get_size_bytes
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI64
+    integer,           intent(out)         :: ierr
+    integer,           intent(in)          :: u
+    integer(KIND=KARG),intent(in)          :: V(0:*)
+    integer,           intent(in)          :: n
+    integer,           intent(in)          :: sw      ! positive/negative for head/foot
+    logical,           intent(in),optional :: swap
+    integer,           intent(in),optional :: dummy
+    integer(KIND=KISEP) :: isep
+    integer j, m, ns
+    integer d
+    integer(KIND=KIOFS) :: jpos
+    integer ss
+
+    ierr = err_default
+    d = choice(0, dummy)
+
+    if (ierr.eq.0) then
+       ! unit check
+       if (sw.gt.0) then
+          ! head
+          if (suspend_wu.ge.0) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             suspend_wu  = u
+             suspend_wsub = 0
+             isep = d
+             inquire(UNIT=u, IOSTAT=ierr, POS=suspend_wposh)
+             if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)  ! write dummy separator
+          endif
+       else if (suspend_wu.ne.u) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       endif
+    endif
+    if (ierr.eq.0) then
+       ns = rest_members(abs(suspend_wsub), V(0))
+       ss = condop((suspend_wsub.lt.0), -1, +1)
+       if (n.le.ns.or.d.lt.0) then
+          call sus_write(ierr, u, V, n, swap)
+          if (ierr.eq.0) then
+             suspend_wsub = suspend_wsub + ss * (get_size_bytes(V(0), n))
+          endif
+       else
+          ! close current subrecord
+          m = n
+          j = 0
+          isep = abs(suspend_wsub) + get_size_bytes(V(0), ns)
+          inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.TRUE., pos=suspend_wposh)
+          if (ierr.eq.0) call sus_write(ierr, u, V(j:j+ns-1), ns, swap, pos=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=(suspend_wsub.lt.0))
+          m = m - ns
+          j = j + ns
+          ns = max_members(V(0))
+          ! middle
+          isep = get_size_bytes(V(0), ns)
+          do
+             if (m.le.ns) exit
+             if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+             if (ierr.eq.0) call sus_write(ierr, u, V(j:j+ns-1), ns, swap)
+             if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+             m = m - ns
+             j = j + ns
+          enddo
+          ! open final subrecord
+          isep = get_size_bytes(V(0), m)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=suspend_wposh)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)  ! write dummy separator
+          if (ierr.eq.0) call sus_write(ierr, u, V(j:j+m-1), m, swap)
+          if (ierr.eq.0) suspend_wsub = - isep
+       endif
+    endif
+    if (sw.lt.0) then
+       if (d.lt.0) then
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)
+       else
+          isep = abs(suspend_wsub)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.FAlSE., pos=suspend_wposh)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=(suspend_wsub.lt.0), pos=jpos)
+       endif
+       if (ierr.eq.0) then
+          suspend_wposh = -1
+          suspend_wsub = 0
+          suspend_wu = -1
+       endif
+    endif
+    return
+  end subroutine sus_suspend_write_irec_l
+  subroutine sus_suspend_write_irec_f &
+       & (ierr, u, v, n, sw, swap, dummy)
+    use TOUZA_Std_utl,only: choice, condop
+    use TOUZA_Std_env,only: get_size_bytes
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KFLT
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: u
+    real(KIND=KARG),intent(in)          :: V(0:*)
+    integer,        intent(in)          :: n
+    integer,        intent(in)          :: sw      ! positive/negative for head/foot
+    logical,        intent(in),optional :: swap
+    integer,        intent(in),optional :: dummy
+    integer(KIND=KISEP) :: isep
+    integer j, m, ns
+    integer d
+    integer(KIND=KIOFS) :: jpos
+    integer ss
+
+    ierr = err_default
+    d = choice(0, dummy)
+
+    if (ierr.eq.0) then
+       ! unit check
+       if (sw.gt.0) then
+          ! head
+          if (suspend_wu.ge.0) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             suspend_wu  = u
+             suspend_wsub = 0
+             isep = d
+             inquire(UNIT=u, IOSTAT=ierr, POS=suspend_wposh)
+             if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)  ! write dummy separator
+          endif
+       else if (suspend_wu.ne.u) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       endif
+    endif
+    if (ierr.eq.0) then
+       ns = rest_members(abs(suspend_wsub), V(0))
+       ss = condop((suspend_wsub.lt.0), -1, +1)
+       if (n.le.ns.or.d.lt.0) then
+          call sus_write(ierr, u, V, n, swap)
+          if (ierr.eq.0) then
+             suspend_wsub = suspend_wsub + ss * (get_size_bytes(V(0), n))
+          endif
+       else
+          ! close current subrecord
+          m = n
+          j = 0
+          isep = abs(suspend_wsub) + get_size_bytes(V(0), ns)
+          inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.TRUE., pos=suspend_wposh)
+          if (ierr.eq.0) call sus_write(ierr, u, V(j:j+ns-1), ns, swap, pos=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=(suspend_wsub.lt.0))
+          m = m - ns
+          j = j + ns
+          ns = max_members(V(0))
+          ! middle
+          isep = get_size_bytes(V(0), ns)
+          do
+             if (m.le.ns) exit
+             if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+             if (ierr.eq.0) call sus_write(ierr, u, V(j:j+ns-1), ns, swap)
+             if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+             m = m - ns
+             j = j + ns
+          enddo
+          ! open final subrecord
+          isep = get_size_bytes(V(0), m)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=suspend_wposh)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)  ! write dummy separator
+          if (ierr.eq.0) call sus_write(ierr, u, V(j:j+m-1), m, swap)
+          if (ierr.eq.0) suspend_wsub = - isep
+       endif
+    endif
+    if (sw.lt.0) then
+       if (d.lt.0) then
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)
+       else
+          isep = abs(suspend_wsub)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.FAlSE., pos=suspend_wposh)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=(suspend_wsub.lt.0), pos=jpos)
+       endif
+       if (ierr.eq.0) then
+          suspend_wposh = -1
+          suspend_wsub = 0
+          suspend_wu = -1
+       endif
+    endif
+    return
+  end subroutine sus_suspend_write_irec_f
+  subroutine sus_suspend_write_irec_d &
+       & (ierr, u, v, n, sw, swap, dummy)
+    use TOUZA_Std_utl,only: choice, condop
+    use TOUZA_Std_env,only: get_size_bytes
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KDBL
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: u
+    real(KIND=KARG),intent(in)          :: V(0:*)
+    integer,        intent(in)          :: n
+    integer,        intent(in)          :: sw      ! positive/negative for head/foot
+    logical,        intent(in),optional :: swap
+    integer,        intent(in),optional :: dummy
+    integer(KIND=KISEP) :: isep
+    integer j, m, ns
+    integer d
+    integer(KIND=KIOFS) :: jpos
+    integer ss
+
+    ierr = err_default
+    d = choice(0, dummy)
+
+    if (ierr.eq.0) then
+       ! unit check
+       if (sw.gt.0) then
+          ! head
+          if (suspend_wu.ge.0) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             suspend_wu  = u
+             suspend_wsub = 0
+             isep = d
+             inquire(UNIT=u, IOSTAT=ierr, POS=suspend_wposh)
+             if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)  ! write dummy separator
+          endif
+       else if (suspend_wu.ne.u) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       endif
+    endif
+    if (ierr.eq.0) then
+       ns = rest_members(abs(suspend_wsub), V(0))
+       ss = condop((suspend_wsub.lt.0), -1, +1)
+       if (n.le.ns.or.d.lt.0) then
+          call sus_write(ierr, u, V, n, swap)
+          if (ierr.eq.0) then
+             suspend_wsub = suspend_wsub + ss * (get_size_bytes(V(0), n))
+          endif
+       else
+          ! close current subrecord
+          m = n
+          j = 0
+          isep = abs(suspend_wsub) + get_size_bytes(V(0), ns)
+          inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.TRUE., pos=suspend_wposh)
+          if (ierr.eq.0) call sus_write(ierr, u, V(j:j+ns-1), ns, swap, pos=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=(suspend_wsub.lt.0))
+          m = m - ns
+          j = j + ns
+          ns = max_members(V(0))
+          ! middle
+          isep = get_size_bytes(V(0), ns)
+          do
+             if (m.le.ns) exit
+             if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+             if (ierr.eq.0) call sus_write(ierr, u, V(j:j+ns-1), ns, swap)
+             if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+             m = m - ns
+             j = j + ns
+          enddo
+          ! open final subrecord
+          isep = get_size_bytes(V(0), m)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=suspend_wposh)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)  ! write dummy separator
+          if (ierr.eq.0) call sus_write(ierr, u, V(j:j+m-1), m, swap)
+          if (ierr.eq.0) suspend_wsub = - isep
+       endif
+    endif
+    if (sw.lt.0) then
+       if (d.lt.0) then
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)
+       else
+          isep = abs(suspend_wsub)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.FAlSE., pos=suspend_wposh)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=(suspend_wsub.lt.0), pos=jpos)
+       endif
+       if (ierr.eq.0) then
+          suspend_wposh = -1
+          suspend_wsub = 0
+          suspend_wu = -1
+       endif
+    endif
+    return
+  end subroutine sus_suspend_write_irec_d
+  subroutine sus_suspend_write_irec_a &
+       & (ierr, u, v, n, sw, swap, dummy)
+    use TOUZA_Std_utl,only: choice, condop
+    use TOUZA_Std_env,only: get_size_bytes
+    implicit none
+    integer,parameter :: KISEP=KI32
+    integer,           intent(out)         :: ierr
+    integer,           intent(in)          :: u
+    character(len=*),  intent(in)          :: V(0:*)
+    integer,           intent(in)          :: n
+    integer,           intent(in)          :: sw      ! positive/negative for head/foot
+    logical,           intent(in),optional :: swap
+    integer,           intent(in),optional :: dummy
+    integer(KIND=KISEP) :: isep
+    integer j, m, ns
+    integer d
+    integer(KIND=KIOFS) :: jpos
+    integer ss
+
+    ierr = err_default
+    d = choice(0, dummy)
+
+    if (ierr.eq.0) then
+       ! unit check
+       if (sw.gt.0) then
+          ! head
+          if (suspend_wu.ge.0) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             suspend_wu  = u
+             suspend_wsub = 0
+             isep = d
+             inquire(UNIT=u, IOSTAT=ierr, POS=suspend_wposh)
+             if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)  ! write dummy separator
+          endif
+       else if (suspend_wu.ne.u) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       endif
+    endif
+    if (ierr.eq.0) then
+       ns = rest_members(abs(suspend_wsub), V(0))
+       ss = condop((suspend_wsub.lt.0), -1, +1)
+       if (n.le.ns.or.d.lt.0) then
+          call sus_write(ierr, u, V, n, swap)
+          if (ierr.eq.0) then
+             suspend_wsub = suspend_wsub + ss * (get_size_bytes(V(0), n))
+          endif
+       else
+          ! close current subrecord
+          m = n
+          j = 0
+          isep = abs(suspend_wsub) + get_size_bytes(V(0), ns)
+          inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.TRUE., pos=suspend_wposh)
+          if (ierr.eq.0) call sus_write(ierr, u, V(j:j+ns-1), ns, swap, pos=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=(suspend_wsub.lt.0))
+          m = m - ns
+          j = j + ns
+          ns = max_members(V(0))
+          ! middle
+          isep = get_size_bytes(V(0), ns)
+          do
+             if (m.le.ns) exit
+             if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+             if (ierr.eq.0) call sus_write(ierr, u, V(j:j+ns-1), ns, swap)
+             if (ierr.eq.0) call sus_write_isep(ierr, u, isep, swap=swap, sub=.TRUE.)
+             m = m - ns
+             j = j + ns
+          enddo
+          ! open final subrecord
+          isep = get_size_bytes(V(0), m)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=suspend_wposh)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)  ! write dummy separator
+          if (ierr.eq.0) call sus_write(ierr, u, V(j:j+m-1), m, swap)
+          if (ierr.eq.0) suspend_wsub = - isep
+       endif
+    endif
+    if (sw.lt.0) then
+       if (d.lt.0) then
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=d, swap=swap)
+       else
+          isep = abs(suspend_wsub)
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.FAlSE., pos=suspend_wposh)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=(suspend_wsub.lt.0), pos=jpos)
+       endif
+       if (ierr.eq.0) then
+          suspend_wposh = -1
+          suspend_wsub = 0
+          suspend_wu = -1
+       endif
+    endif
+    return
+  end subroutine sus_suspend_write_irec_a
+
+!!!_  - sus_suspend_read_irec - suspend-mode write a record with 32-bit marker
+  subroutine sus_suspend_read_irec_i &
+       & (ierr, u, v, n, sw, swap, div, lstrm)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_size_bytes, get_size_strm
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI32
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    integer(KIND=KARG), intent(out)         :: V(0:*)
+    integer,            intent(in)          :: n
+    integer,            intent(in)          :: sw
+    logical,            intent(in),optional :: swap
+    integer,            intent(in),optional :: div    ! separator treatment
+    integer(kind=KIOFS),intent(in),optional :: lstrm  ! total length in stream io unit
+    integer j, m, ns
+    integer(KIND=KISEP) :: isepf
+    integer(KIND=KIOFS) :: jpos,  jpost
+    integer(KIND=KIOFS) :: ls
+    logical bdmy
+
+    ierr = err_default
+    ls = choice(0_KIOFS, lstrm)
+    bdmy = .FALSE.
+    if (ierr.eq.0) then
+       ! unit check
+       if (sw.gt.0) then
+          ! head
+          if (suspend_ru.ge.0) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             suspend_ru  = u
+             suspend_rposf = -1
+             suspend_rseph = 0
+             if (ierr.eq.0) call sus_read_isep(ierr, u, suspend_rseph, swap=swap)
+             if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+             if (ierr.eq.0) then
+                call check_dummy_irec(bdmy, ls, RECL_MAX_STREAM, get_size_bytes(V(0)), suspend_rseph, div)
+                if (bdmy) then
+                   suspend_rposf = jpos + ls
+                   suspend_rseph = 0
+                else
+                   suspend_rposf = jpos + conv_b2strm(abs(suspend_rseph))
+                endif
+             endif
+          endif
+       else if (suspend_ru.ne.u) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       endif
+    endif
+    if (ierr.eq.0) then
+       j = 0
+       m = n
+       do
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          jpost = jpos + get_size_strm(V(j), int(m, kind=KIOFS))
+          if (jpost.lt.suspend_rposf) then
+             ns = m
+          else
+             ns = int(get_mems_bytes((suspend_rposf - jpos), V(j)))
+          endif
+          if (ns.gt.0) call sus_read(ierr, u, V(j:j+ns-1), ns, swap)
+          if (ierr.eq.0) then
+             j = j + ns
+             m = m - ns
+             if (m.eq.0) exit
+             call sus_read_isep(ierr, u, isepf, pos=suspend_rposf, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             if (abs(suspend_rseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
+          endif
+          if (ierr.eq.0) then
+             if (suspend_rseph.ge.0) then
+                ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
+                exit
+             endif
+          endif
+          if (ierr.eq.0) then
+             call sus_read_isep(ierr, u, suspend_rseph, swap=swap)
+             if (is_eof_ss(ierr)) then
+                ierr = _ERROR(ERR_EOF)
+                exit
+             endif
+             if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+             if (ierr.eq.0) suspend_rposf = jpos + conv_b2strm(abs(suspend_rseph))
+          endif
+          if (ierr.ne.0) then
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+             exit
+          endif
+       enddo
+    endif
+    if (ierr.eq.0) then
+       if (sw.lt.0) then
+          call sus_read_isep(ierr, u, isepf, pos=suspend_rposf, swap=swap)
+          if (ierr.eq.0) then
+             if (suspend_rseph.lt.0) call sus_skip_irec(ierr, u, 1, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             suspend_ru = -1
+             suspend_rseph = 0
+             suspend_rposf = -1
+          endif
+       endif
+    endif
+    return
+
+  end subroutine sus_suspend_read_irec_i
+  subroutine sus_suspend_read_irec_l &
+       & (ierr, u, v, n, sw, swap, div, lstrm)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_size_bytes, get_size_strm
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI64
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    integer(KIND=KARG), intent(out)         :: V(0:*)
+    integer,            intent(in)          :: n
+    integer,            intent(in)          :: sw
+    logical,            intent(in),optional :: swap
+    integer,            intent(in),optional :: div    ! separator treatment
+    integer(kind=KIOFS),intent(in),optional :: lstrm  ! total length in stream io unit
+    integer j, m, ns
+    integer(KIND=KISEP) :: isepf
+    integer(KIND=KIOFS) :: jpos,  jpost
+    integer(KIND=KIOFS) :: ls
+    logical bdmy
+
+    ierr = err_default
+    ls = choice(0_KIOFS, lstrm)
+    bdmy = .FALSE.
+    if (ierr.eq.0) then
+       ! unit check
+       if (sw.gt.0) then
+          ! head
+          if (suspend_ru.ge.0) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             suspend_ru  = u
+             suspend_rposf = -1
+             suspend_rseph = 0
+             if (ierr.eq.0) call sus_read_isep(ierr, u, suspend_rseph, swap=swap)
+             if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+             if (ierr.eq.0) then
+                call check_dummy_irec(bdmy, ls, RECL_MAX_STREAM, get_size_bytes(V(0)), suspend_rseph, div)
+                if (bdmy) then
+                   suspend_rposf = jpos + ls
+                   suspend_rseph = 0
+                else
+                   suspend_rposf = jpos + conv_b2strm(abs(suspend_rseph))
+                endif
+             endif
+          endif
+       else if (suspend_ru.ne.u) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       endif
+    endif
+    if (ierr.eq.0) then
+       j = 0
+       m = n
+       do
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          jpost = jpos + get_size_strm(V(j), int(m, kind=KIOFS))
+          if (jpost.lt.suspend_rposf) then
+             ns = m
+          else
+             ns = int(get_mems_bytes((suspend_rposf - jpos), V(j)))
+          endif
+          if (ns.gt.0) call sus_read(ierr, u, V(j:j+ns-1), ns, swap)
+          if (ierr.eq.0) then
+             j = j + ns
+             m = m - ns
+             if (m.eq.0) exit
+             call sus_read_isep(ierr, u, isepf, pos=suspend_rposf, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             if (abs(suspend_rseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
+          endif
+          if (ierr.eq.0) then
+             if (suspend_rseph.ge.0) then
+                ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
+                exit
+             endif
+          endif
+          if (ierr.eq.0) then
+             call sus_read_isep(ierr, u, suspend_rseph, swap=swap)
+             if (is_eof_ss(ierr)) then
+                ierr = _ERROR(ERR_EOF)
+                exit
+             endif
+             if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+             if (ierr.eq.0) suspend_rposf = jpos + conv_b2strm(abs(suspend_rseph))
+          endif
+          if (ierr.ne.0) then
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+             exit
+          endif
+       enddo
+    endif
+    if (ierr.eq.0) then
+       if (sw.lt.0) then
+          call sus_read_isep(ierr, u, isepf, pos=suspend_rposf, swap=swap)
+          if (ierr.eq.0) then
+             if (suspend_rseph.lt.0) call sus_skip_irec(ierr, u, 1, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             suspend_ru = -1
+             suspend_rseph = 0
+             suspend_rposf = -1
+          endif
+       endif
+    endif
+    return
+
+  end subroutine sus_suspend_read_irec_l
+  subroutine sus_suspend_read_irec_f &
+       & (ierr, u, v, n, sw, swap, div, lstrm)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_size_bytes, get_size_strm
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KFLT
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    real(KIND=KARG),    intent(out)         :: V(0:*)
+    integer,            intent(in)          :: n
+    integer,            intent(in)          :: sw
+    logical,            intent(in),optional :: swap
+    integer,            intent(in),optional :: div    ! separator treatment
+    integer(kind=KIOFS),intent(in),optional :: lstrm  ! total length in stream io unit
+    integer j, m, ns
+    integer(KIND=KISEP) :: isepf
+    integer(KIND=KIOFS) :: jpos,  jpost
+    integer(KIND=KIOFS) :: ls
+    logical bdmy
+
+    ierr = err_default
+    ls = choice(0_KIOFS, lstrm)
+    bdmy = .FALSE.
+    if (ierr.eq.0) then
+       ! unit check
+       if (sw.gt.0) then
+          ! head
+          if (suspend_ru.ge.0) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             suspend_ru  = u
+             suspend_rposf = -1
+             suspend_rseph = 0
+             if (ierr.eq.0) call sus_read_isep(ierr, u, suspend_rseph, swap=swap)
+             if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+             if (ierr.eq.0) then
+                call check_dummy_irec(bdmy, ls, RECL_MAX_STREAM, get_size_bytes(V(0)), suspend_rseph, div)
+                if (bdmy) then
+                   suspend_rposf = jpos + ls
+                   suspend_rseph = 0
+                else
+                   suspend_rposf = jpos + conv_b2strm(abs(suspend_rseph))
+                endif
+             endif
+          endif
+       else if (suspend_ru.ne.u) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       endif
+    endif
+    if (ierr.eq.0) then
+       j = 0
+       m = n
+       do
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          jpost = jpos + get_size_strm(V(j), int(m, kind=KIOFS))
+          if (jpost.lt.suspend_rposf) then
+             ns = m
+          else
+             ns = int(get_mems_bytes((suspend_rposf - jpos), V(j)))
+          endif
+          if (ns.gt.0) call sus_read(ierr, u, V(j:j+ns-1), ns, swap)
+          if (ierr.eq.0) then
+             j = j + ns
+             m = m - ns
+             if (m.eq.0) exit
+             call sus_read_isep(ierr, u, isepf, pos=suspend_rposf, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             if (abs(suspend_rseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
+          endif
+          if (ierr.eq.0) then
+             if (suspend_rseph.ge.0) then
+                ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
+                exit
+             endif
+          endif
+          if (ierr.eq.0) then
+             call sus_read_isep(ierr, u, suspend_rseph, swap=swap)
+             if (is_eof_ss(ierr)) then
+                ierr = _ERROR(ERR_EOF)
+                exit
+             endif
+             if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+             if (ierr.eq.0) suspend_rposf = jpos + conv_b2strm(abs(suspend_rseph))
+          endif
+          if (ierr.ne.0) then
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+             exit
+          endif
+       enddo
+    endif
+    if (ierr.eq.0) then
+       if (sw.lt.0) then
+          call sus_read_isep(ierr, u, isepf, pos=suspend_rposf, swap=swap)
+          if (ierr.eq.0) then
+             if (suspend_rseph.lt.0) call sus_skip_irec(ierr, u, 1, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             suspend_ru = -1
+             suspend_rseph = 0
+             suspend_rposf = -1
+          endif
+       endif
+    endif
+    return
+
+  end subroutine sus_suspend_read_irec_f
+  subroutine sus_suspend_read_irec_d &
+       & (ierr, u, v, n, sw, swap, div, lstrm)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_size_bytes, get_size_strm
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KDBL
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    real(KIND=KARG),    intent(out)         :: V(0:*)
+    integer,            intent(in)          :: n
+    integer,            intent(in)          :: sw
+    logical,            intent(in),optional :: swap
+    integer,            intent(in),optional :: div    ! separator treatment
+    integer(kind=KIOFS),intent(in),optional :: lstrm  ! total length in stream io unit
+    integer j, m, ns
+    integer(KIND=KISEP) :: isepf
+    integer(KIND=KIOFS) :: jpos,  jpost
+    integer(KIND=KIOFS) :: ls
+    logical bdmy
+
+    ierr = err_default
+    ls = choice(0_KIOFS, lstrm)
+    bdmy = .FALSE.
+    if (ierr.eq.0) then
+       ! unit check
+       if (sw.gt.0) then
+          ! head
+          if (suspend_ru.ge.0) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             suspend_ru  = u
+             suspend_rposf = -1
+             suspend_rseph = 0
+             if (ierr.eq.0) call sus_read_isep(ierr, u, suspend_rseph, swap=swap)
+             if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+             if (ierr.eq.0) then
+                call check_dummy_irec(bdmy, ls, RECL_MAX_STREAM, get_size_bytes(V(0)), suspend_rseph, div)
+                if (bdmy) then
+                   suspend_rposf = jpos + ls
+                   suspend_rseph = 0
+                else
+                   suspend_rposf = jpos + conv_b2strm(abs(suspend_rseph))
+                endif
+             endif
+          endif
+       else if (suspend_ru.ne.u) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       endif
+    endif
+    if (ierr.eq.0) then
+       j = 0
+       m = n
+       do
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          jpost = jpos + get_size_strm(V(j), int(m, kind=KIOFS))
+          if (jpost.lt.suspend_rposf) then
+             ns = m
+          else
+             ns = int(get_mems_bytes((suspend_rposf - jpos), V(j)))
+          endif
+          if (ns.gt.0) call sus_read(ierr, u, V(j:j+ns-1), ns, swap)
+          if (ierr.eq.0) then
+             j = j + ns
+             m = m - ns
+             if (m.eq.0) exit
+             call sus_read_isep(ierr, u, isepf, pos=suspend_rposf, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             if (abs(suspend_rseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
+          endif
+          if (ierr.eq.0) then
+             if (suspend_rseph.ge.0) then
+                ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
+                exit
+             endif
+          endif
+          if (ierr.eq.0) then
+             call sus_read_isep(ierr, u, suspend_rseph, swap=swap)
+             if (is_eof_ss(ierr)) then
+                ierr = _ERROR(ERR_EOF)
+                exit
+             endif
+             if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+             if (ierr.eq.0) suspend_rposf = jpos + conv_b2strm(abs(suspend_rseph))
+          endif
+          if (ierr.ne.0) then
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+             exit
+          endif
+       enddo
+    endif
+    if (ierr.eq.0) then
+       if (sw.lt.0) then
+          call sus_read_isep(ierr, u, isepf, pos=suspend_rposf, swap=swap)
+          if (ierr.eq.0) then
+             if (suspend_rseph.lt.0) call sus_skip_irec(ierr, u, 1, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             suspend_ru = -1
+             suspend_rseph = 0
+             suspend_rposf = -1
+          endif
+       endif
+    endif
+    return
+
+  end subroutine sus_suspend_read_irec_d
+  subroutine sus_suspend_read_irec_a &
+       & (ierr, u, v, n, sw, swap, div, lstrm)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_size_bytes, get_size_strm
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI32
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    character(len=*),   intent(out)         :: V(0:*)
+    integer,            intent(in)          :: n
+    integer,            intent(in)          :: sw
+    logical,            intent(in),optional :: swap
+    integer,            intent(in),optional :: div    ! separator treatment
+    integer(kind=KIOFS),intent(in),optional :: lstrm  ! total length in stream io unit
+    integer j, m, ns
+    integer(KIND=KISEP) :: isepf
+    integer(KIND=KIOFS) :: jpos,  jpost
+    integer(KIND=KIOFS) :: ls
+    logical bdmy
+
+    ierr = err_default
+    ls = choice(0_KIOFS, lstrm)
+    bdmy = .FALSE.
+    if (ierr.eq.0) then
+       ! unit check
+       if (sw.gt.0) then
+          ! head
+          if (suspend_ru.ge.0) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             suspend_ru  = u
+             suspend_rposf = -1
+             suspend_rseph = 0
+             if (ierr.eq.0) call sus_read_isep(ierr, u, suspend_rseph, swap=swap)
+             if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+             if (ierr.eq.0) then
+                call check_dummy_irec(bdmy, ls, RECL_MAX_STREAM, get_size_bytes(V(0)), suspend_rseph, div)
+                if (bdmy) then
+                   suspend_rposf = jpos + ls
+                   suspend_rseph = 0
+                else
+                   suspend_rposf = jpos + conv_b2strm(abs(suspend_rseph))
+                endif
+             endif
+          endif
+       else if (suspend_ru.ne.u) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       endif
+    endif
+    if (ierr.eq.0) then
+       j = 0
+       m = n
+       do
+          if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+          jpost = jpos + get_size_strm(V(j), int(m, kind=KIOFS))
+          if (jpost.lt.suspend_rposf) then
+             ns = m
+          else
+             ns = int(get_mems_bytes((suspend_rposf - jpos), V(j)))
+          endif
+          if (ns.gt.0) call sus_read(ierr, u, V(j:j+ns-1), ns, swap)
+          if (ierr.eq.0) then
+             j = j + ns
+             m = m - ns
+             if (m.eq.0) exit
+             call sus_read_isep(ierr, u, isepf, pos=suspend_rposf, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             if (abs(suspend_rseph).ne.abs(isepf)) ierr = _ERROR(ERR_INCONSISTENT_RECORD_MARKERS)
+          endif
+          if (ierr.eq.0) then
+             if (suspend_rseph.ge.0) then
+                ierr = _ERROR(ERR_INVALID_RECORD_SIZE)
+                exit
+             endif
+          endif
+          if (ierr.eq.0) then
+             call sus_read_isep(ierr, u, suspend_rseph, swap=swap)
+             if (is_eof_ss(ierr)) then
+                ierr = _ERROR(ERR_EOF)
+                exit
+             endif
+             if (ierr.eq.0) inquire(UNIT=u, IOSTAT=ierr, POS=jpos)
+             if (ierr.eq.0) suspend_rposf = jpos + conv_b2strm(abs(suspend_rseph))
+          endif
+          if (ierr.ne.0) then
+             ierr = transf_iostat(ierr, ERR_BROKEN_RECORD, __LINE__)
+             exit
+          endif
+       enddo
+    endif
+    if (ierr.eq.0) then
+       if (sw.lt.0) then
+          call sus_read_isep(ierr, u, isepf, pos=suspend_rposf, swap=swap)
+          if (ierr.eq.0) then
+             if (suspend_rseph.lt.0) call sus_skip_irec(ierr, u, 1, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             suspend_ru = -1
+             suspend_rseph = 0
+             suspend_rposf = -1
+          endif
+       endif
+    endif
+    return
+
+  end subroutine sus_suspend_read_irec_a
+
 !!!_  - sus_read_slice_irec - read subarray from a record  with 32-bit marker
   subroutine sus_read_slice_irec_i &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
@@ -3962,6 +5004,7 @@ contains
     integer,            intent(in)          :: n
     logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: pos
+    if (present(swap)) continue
     if (present(pos)) then
        write(UNIT=u, IOSTAT=ierr, POS=pos) V(1:n)
     else
@@ -4102,6 +5145,7 @@ contains
     logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: pos
     integer j
+    if (present(swap)) continue
     if (present(pos)) then
        write(UNIT=u, IOSTAT=ierr, POS=pos) (V, j = 0, n - 1)
     else
@@ -4244,6 +5288,7 @@ contains
     integer,            intent(in)          :: n
     logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: pos
+    if (present(swap)) continue
     if (present(pos)) then
        read(UNIT=u, IOSTAT=ierr, POS=POS) V(1:n)
     else
@@ -4724,6 +5769,22 @@ contains
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_a
 
+!!!_  & sus_is_unit_stream() - check whether stream access
+  logical function sus_is_stream_unit(u) result(b)
+    implicit none
+    integer,intent(in) :: u
+    character(len=16) :: ans
+    integer jerr
+    inquire(unit=u, STREAM=ans, IOSTAT=jerr)
+    if (jerr.ne.0) ans = ' '
+    select case (ans(1:1))
+    case('Y', 'y')
+       b = .TRUE.
+    case default
+       b = .FALSE.
+    end select
+  end function sus_is_stream_unit
+
 !!!_ + private subroutines
 !!!_  - mstrm_sep ()
   PURE &
@@ -4731,14 +5792,14 @@ contains
     implicit none
     integer,parameter :: KISEP=KI32
     integer(kind=KISEP),intent(in) :: mold
-    m = mstrm_isep
+    m = mstrm_isep + (0 * kind(mold))
   end function mstrm_sep_i
   PURE &
   integer function mstrm_sep_l (mold) result(m)
     implicit none
     integer,parameter :: KISEP=KI64
     integer(kind=KISEP),intent(in) :: mold
-    m = mstrm_lsep
+    m = mstrm_lsep + (0 * kind(mold))
   end function mstrm_sep_l
 
 !!!_  - max_members ()
@@ -4754,29 +5815,74 @@ contains
     implicit none
     integer,parameter :: KARG=KI32
     integer(kind=KARG),intent(in) :: mold
-    m = maxmemi_i
+    m = maxmemi_i + (0 * kind(mold))
   end function max_members_i
   PURE &
   integer function max_members_l (mold) result(m)
     implicit none
     integer,parameter :: KARG=KI64
     integer(kind=KARG),intent(in) :: mold
-    m = maxmemi_l
+    m = maxmemi_l + (0 * kind(mold))
   end function max_members_l
   PURE &
   integer function max_members_f (mold) result(m)
     implicit none
     integer,parameter :: KARG=KFLT
     real(kind=KARG),intent(in) :: mold
-    m = maxmemi_f
+    m = maxmemi_f + (0 * kind(mold))
   end function max_members_f
   PURE &
   integer function max_members_d (mold) result(m)
     implicit none
     integer,parameter :: KARG=KDBL
     real(kind=KARG),intent(in) :: mold
-    m = maxmemi_d
+    m = maxmemi_d + (0 * kind(mold))
   end function max_members_d
+
+!!!_  - rest_members ()
+  PURE &
+  integer function rest_members_a (nbytes, mold) result(m)
+    use TOUZA_Std_env,only: get_mems_bytes
+    use TOUZA_Std_prc,only: KMEM=>KI32
+    implicit none
+    integer(kind=KMEM),intent(in) :: nbytes
+    character(len=*),  intent(in) :: mold
+    m = max_members(mold) - get_mems_bytes(nbytes, mold)
+  end function rest_members_a
+  PURE &
+  integer function rest_members_i (nbytes, mold) result(m)
+    use TOUZA_Std_env,only: get_mems_bytes
+    use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI32
+    implicit none
+    integer(kind=KMEM),intent(in) :: nbytes
+    integer(kind=KTGT),intent(in) :: mold
+    m = max_members(mold) - get_mems_bytes(nbytes, mold)
+  end function rest_members_i
+  PURE &
+  integer function rest_members_l (nbytes, mold) result(m)
+    use TOUZA_Std_env,only: get_mems_bytes
+    use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI32
+    implicit none
+    integer(kind=KMEM),intent(in) :: nbytes
+    integer(kind=KTGT),intent(in) :: mold
+    m = max_members(mold) - get_mems_bytes(nbytes, mold)
+  end function rest_members_l
+  integer function rest_members_f (nbytes, mold) result(m)
+    use TOUZA_Std_env,only: get_mems_bytes
+    use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI32
+    implicit none
+    integer(kind=KMEM),intent(in) :: nbytes
+    real(kind=KTGT),   intent(in) :: mold
+    m = max_members(mold) - get_mems_bytes(nbytes, mold)
+  end function rest_members_f
+  integer function rest_members_d (nbytes, mold) result(m)
+    use TOUZA_Std_env,only: get_mems_bytes
+    use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI32
+    implicit none
+    integer(kind=KMEM),intent(in) :: nbytes
+    real(kind=KTGT),   intent(in) :: mold
+    m = max_members(mold) - get_mems_bytes(nbytes, mold)
+  end function rest_members_d
 
 !!!_  - transf_iostat
   integer function transf_iostat &
@@ -4793,7 +5899,7 @@ contains
   end function transf_iostat
 
 !!!_  - check_dummy_irec
-  subroutine check_dummy_irec &
+  subroutine check_dummy_irec_i &
        & (dummy, mem, lim, ubyte, isep, div)
     use TOUZA_Std_utl,only: choice
     implicit none
@@ -4805,8 +5911,8 @@ contains
     integer,            intent(in)  :: ubyte
     integer,optional,   intent(in)  :: div
     integer d
-    d = choice(def_block, div)
 
+    d = choice(def_block, div)
     select case(d)
     case(ignore_small)
        ! dummy = (abs(isep).lt.ubyte).or.(mem.gt.lim)
@@ -4819,7 +5925,35 @@ contains
        dummy = .FALSE.
     end select
 
-  end subroutine check_dummy_irec
+  end subroutine check_dummy_irec_i
+
+  subroutine check_dummy_irec_l &
+       & (dummy, mem, lim, ubyte, isep, div)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI32
+    logical,            intent(out) :: dummy
+    integer(kind=KIOFS),intent(in)  :: mem
+    integer,            intent(in)  :: lim
+    integer(kind=KISEP),intent(in)  :: isep
+    integer,            intent(in)  :: ubyte
+    integer,optional,   intent(in)  :: div
+    integer d
+
+    d = choice(def_block, div)
+    select case(d)
+    case(ignore_small)
+       ! dummy = (abs(isep).lt.ubyte).or.(mem.gt.lim)
+       dummy = (abs(isep).lt.ubyte)
+    case(ignore_bigger)
+       dummy = mem.gt.lim
+    case(ignore_always)
+       dummy = .TRUE.
+    case default
+       dummy = .FALSE.
+    end select
+
+  end subroutine check_dummy_irec_l
 
 end module TOUZA_Std_sus
 
@@ -4859,6 +5993,9 @@ program test_std_sus
 111  format('outsus-', I0, L1, L1, '.dat')
      write(file, 111) TEST_STD_SUS, swap, lsep
      call batch_test_i(ierr, file, arg, swap, lsep, mem)
+     if (.not.lsep) then
+        call batch_test_suspend_i(ierr, file, arg, swap, mem)
+     endif
   endif
   if (ierr.eq.0) call batch_overflow_mix(ierr)
 
@@ -5074,12 +6211,85 @@ contains
     if (ierr.eq.0) call sus_close(ierr, u, file)
   end subroutine batch_test_i
 
+  subroutine batch_test_suspend_i(ierr, file, arg, swap, mem)
+    use TOUZA_Std_prc,only: KSRC=>KI32
+    use TOUZA_Std_env,only: KIOFS
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: file
+    character(len=*),intent(in)  :: arg
+    logical,         intent(in)  :: swap
+    integer,         intent(in)  :: mem
+    integer(kind=KSRC) :: v(0:mem-1)
+    integer(kind=KSRC) :: c(0:mem-1)
+    integer(kind=KIOFS) :: jposh
+    integer u
+    integer j, stp, n
+
+    u = 10
+    ierr = 0
+    if (ierr.eq.0) call sus_open(ierr, u, file, ACTION='RW', STATUS='O', POSITION='AP')
+    if (ierr.eq.0) inquire(u, POS=jposh, IOSTAT=ierr)
+    if (ierr.eq.0) then
+111    format('suspend: head = ', Z8.8)
+       write(*, 111) jposh - 1
+
+       do j = 0, mem - 1
+          v(j) = j * 65536 + j
+       enddo
+       call sus_suspend_write_irec(ierr, u, v, 0, sw=+1, swap=swap)
+       stp = max(1, mem / 4) + 2
+       do j = 0, mem - 1, stp
+          n = min(mem, j + stp) - j
+          call sus_suspend_write_irec(ierr, u, v(j:j+n-1), n, sw=0, swap=swap)
+       enddo
+       call sus_suspend_write_irec(ierr, u, v, 0, sw=-1, swap=swap)
+    endif
+    if (ierr.eq.0) call sus_rseek(ierr, u, jposh, whence=WHENCE_ABS)
+    if (ierr.eq.0) call sus_read_irec(ierr, u, c, mem, swap)
+    if (ierr.eq.0) then
+101    format('suspend:success')
+102    format('suspend:fail ', I0, 1x, I0, 1x, I0)
+       if (ALL(v(0:mem-1).eq.c(0:mem-1))) then
+          write(*, 101)
+       else
+          do j = 0, mem - 1
+             if (v(j).ne.c(j)) write(*, 102) j, v(j), c(j)
+          enddo
+       endif
+    endif
+
+    if (ierr.eq.0) call sus_rseek(ierr, u, jposh, whence=WHENCE_ABS)
+    if (ierr.eq.0) then
+       call sus_suspend_read_irec(ierr, u, v, 0, sw=+1, swap=swap)
+       stp = max(1, mem / 5) + 3
+       do j = 0, mem - 1, stp
+          n = min(mem, j + stp) - j
+          if (ierr.eq.0) call sus_suspend_read_irec(ierr, u, c(j:j+n-1), n, sw=0, swap=swap)
+       enddo
+       if (ierr.eq.0) call sus_suspend_read_irec(ierr, u, v, 0, sw=-1, swap=swap)
+    endif
+    if (ierr.eq.0) then
+121    format('suspend/read:success')
+122    format('suspend/read:fail ', I0, 1x, I0, 1x, I0)
+       if (ALL(v(0:mem-1).eq.c(0:mem-1))) then
+          write(*, 121)
+       else
+          do j = 0, mem - 1
+             if (v(j).ne.c(j)) write(*, 122) j, v(j), c(j)
+          enddo
+       endif
+    endif
+
+  end subroutine batch_test_suspend_i
+
   subroutine batch_overflow_mix &
        & (ierr)
     implicit none
     integer,intent(out) :: ierr
     integer ni, nl, nf, nd
 
+    ierr = 0
     do ni = 0, 8
        do nl = 0, 4
           do nf = 0, 8
@@ -5096,6 +6306,7 @@ contains
     integer,intent(out) :: ierr
     integer,intent(in)  :: ni, nl, nf, nd
     logical b
+    ierr = 0
     b = is_irec_overflow_mix(ni, nl, nf, nd)
 101 format('mix/overflow:', L1, 1x, I0, 1x, 4(1x, I0))
     write(*, 101) b, ((ni + nf) * 4 + (nl + nd) * 8), ni, nl, nf, nd
