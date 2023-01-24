@@ -1,9 +1,9 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2022/12/19 14:40:52 fuyuki Makefile.am>
+# Time-stamp: <2023/01/24 20:56:50 fuyuki Makefile.am>
 #
-# Copyright (C) 2020, 2021, 2022
+# Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0

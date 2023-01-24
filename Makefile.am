@@ -1,9 +1,9 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/11/04 09:41:07 fuyuki Makefile.am>
+# Time-stamp: <2023/01/24 21:17:30 fuyuki Makefile.am>
 
-# Copyright (C) 2020, 2021, 2022
+# Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
@@ -74,7 +74,6 @@ SUBDIRS	+=	. $(subdirs_extra)
 include_HEADERS		= touza.h $(CONFIG_HEADER)
 lib_LTLIBRARIES 	= lib@TOUZA_NAME@.la
 lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
-lib@TOUZA_NAME@_la_DEPENDENCIES	= autorevision
 
 local_name			= libtouza_local.la
 
@@ -95,7 +94,9 @@ AUTOREVISION_cache = autorevision.cache
 
 AM_DISTCHECK_CONFIGURE_FLAGS = --with-build-jmz
 
-autorevision: autorevision-cache $(AUTOREVISION_h)
+BUILT_SOURCES = autorevision-cache $(AUTOREVISION_h)
+
+autorevision: $(BUILT_SOURCES)
 
 $(AUTOREVISION_h): $(top_srcdir)/$(AUTOREVISION_cache)
 	@if test x"$(AUTOREVISION)" = x:; then \
