@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/12/21 16:20:09 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/30 17:43:38 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -283,16 +283,19 @@ contains
              call query_opr_name(ierr, buf, aqueue(j)%term)
              if (ierr.eq.0) then
                 if (aqueue(j)%iter.ne.0) then
-                   write(str, 102) trim(buf), aqueue(j)%iter, aqueue(j)%nopr, size(aqueue(j)%lefts), cmd, trim(aqueue(j)%desco)
+                   write(str, 102, IOSTAT=ierr) trim(buf), aqueue(j)%iter, &
+                        & aqueue(j)%nopr, size(aqueue(j)%lefts), cmd, trim(aqueue(j)%desco)
                 else
-                   write(str, 101) trim(buf),                 aqueue(j)%nopr, size(aqueue(j)%lefts), cmd, trim(aqueue(j)%desco)
+                   write(str, 101, IOSTAT=ierr) trim(buf), &
+                        & aqueue(j)%nopr, size(aqueue(j)%lefts), cmd, trim(aqueue(j)%desco)
                 endif
              endif
           case(hk_file)
-             write(str, 111) trim(aqueue(j)%desco)
+             write(str, 111, IOSTAT=ierr) trim(aqueue(j)%desco)
           case default
-             write(str, 121) trim(aqueue(j)%desco)
+             write(str, 121, IOSTAT=ierr) trim(aqueue(j)%desco)
           end select
+          ierr = 0
        endif
 201    format('queue[', I0, '] ', I0, 1x, A)
        if (ierr.eq.0) then
@@ -2728,7 +2731,8 @@ contains
           acc = 'unknown'
        end select
 201    format('file:', A, 1x, A, '[', A, ']')
-       write(str, 201) trim(acc), trim(ofile(jfile)%name), trim(rtmp)
+       write(str, 201, IOSTAT=ierr) trim(acc), trim(ofile(jfile)%name), trim(rtmp)
+       ierr = 0
        if (push.gt.0) then
           if (ierr.eq.0) call get_obj_list(ierr, btmp, aq%lefts, push)
           if (ierr.eq.0) str = trim(str) // ' > ' // trim(btmp)
@@ -2779,7 +2783,8 @@ contains
 101 format('operator:', A, ' -', I0, '+', I0, 1x, A, ' >> ', A)
     call query_opr_name(ierr, opr, aq%term)
 
-    write(str, 101) trim(opr), pop, push, trim(aq%desci), trim(aq%desco)
+    write(str, 101, IOSTAT=ierr) trim(opr), pop, push, trim(aq%desci), trim(aq%desco)
+    ierr = 0
     call message(ierr, str, u=utmp, indent=+2)
     return
   end subroutine trace_operation
@@ -3401,7 +3406,8 @@ contains
        if (jerr.ne.0) tstr = ' '
     endif
 101 format('  read:', A, 1x, A, ' T = ', A, ' DATE = ', I0, '/', I0, '/', I0, 1x, I2.2, ':', I2.2, ':', I2.2)
-    write(txt, 101) trim(buf%name), trim(buf%desc), trim(adjustl(tstr)), dt(:)
+    write(txt, 101, IOSTAT=ierr) trim(buf%name), trim(buf%desc), trim(adjustl(tstr)), dt(:)
+    ierr = 0
     call message(ierr, txt, levm=msglev_normal, u=uerr)
     return
   end subroutine set_buffer_attrs
@@ -3583,7 +3589,8 @@ contains
        if (jerr.ne.0) tstr = ' '
     endif
 101 format('  write:', A, 1x, A, ' T = ', A, ' DATE = ', I0, '/', I0, '/', I0, 1x, I2.2, ':', I2.2, ':', I2.2)
-    write(txt, 101) trim(obuffer(jb)%name), trim(obuffer(jb)%desc), trim(adjustl(tstr)), dt(:)
+    write(txt, 101, IOSTAT=ierr) trim(obuffer(jb)%name), trim(obuffer(jb)%desc), trim(adjustl(tstr)), dt(:)
+    ierr = 0
     call message(ierr, txt, levm=msglev_normal, u=uerr)
 
     if (is_tweak) then
@@ -3777,10 +3784,11 @@ contains
           ls = len_trim(lpp(jc)%name)
           jp = index(lpp(jc)%name(1:ls), rename_sep, back=.TRUE.)
           if (jp.lt.ls-len(rename_sep)+1) then
-             write(cstr(jc), 102) trim(lpp(jc)%name), rename_sep, trim(cran)
+             write(cstr(jc), 102, IOSTAT=ierr) trim(lpp(jc)%name), rename_sep, trim(cran)
           else
-             write(cstr(jc), 103) trim(lpp(jc)%name), trim(cran)
+             write(cstr(jc), 103, IOSTAT=ierr) trim(lpp(jc)%name), trim(cran)
           endif
+          ierr = 0
        endif
        if (lpp(jc)%stp.ge.0) nc = jc
        if (lpp(jc)%name.ne.' ') nc = jc
@@ -5243,16 +5251,17 @@ contains
 112       format(A, '(', A, ')')
 121       format(A, '[', A, ']')
           if (ilevo.eq.ilev_call) then
-             write(obuffer(jbl)%desc2, 101) trim(istr), trim(obuffer(jbr)%desc2)
+             write(obuffer(jbl)%desc2, 101, IOSTAT=ierr) trim(istr), trim(obuffer(jbr)%desc2)
           else if (ilevo.eq.ilev_neg) then
              if (ilevi.ge.ilevo) then
-                write(obuffer(jbl)%desc2, 112) trim(istr), trim(obuffer(jbr)%desc2)
+                write(obuffer(jbl)%desc2, 112, IOSTAT=ierr) trim(istr), trim(obuffer(jbr)%desc2)
              else
-                write(obuffer(jbl)%desc2, 111) trim(istr), trim(obuffer(jbr)%desc2)
+                write(obuffer(jbl)%desc2, 111, IOSTAT=ierr) trim(istr), trim(obuffer(jbr)%desc2)
              endif
           else
-             write(obuffer(jbl)%desc2, 121) trim(istr), trim(obuffer(jbr)%desc2)
+             write(obuffer(jbl)%desc2, 121, IOSTAT=ierr) trim(istr), trim(obuffer(jbr)%desc2)
           endif
+          ierr = 0
           obuffer(jbl)%ilev = ilevo
        endif
     endif
