@@ -1,10 +1,14 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2022/12/06 09:00:45 fuyuki NEWS>
+# Time-stamp: <2023/01/30 17:47:55 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.08.1 from 1.08.0
+** Bug fixs
+- [critical] hack to handle long message (thanks to tatebe-san).
 
 * Changes in 1.08.0 from 1.07.0
 ** Major changes
