@@ -1,7 +1,7 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2023/01/24 20:56:50 fuyuki Makefile.am>
+# Time-stamp: <2023/01/27 09:27:13 fuyuki Makefile.am>
 #
 # Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -30,8 +30,10 @@ TEST_COMMON_LIBS		=	$(noinst_LTLIBRARIES)
 
 check_PROGRAMS			=	test_std_prc test_std_utl test_std_log \
 							test_std_bld test_std_mwe test_std_fun test_std_env \
-							test_std_sus test_std_arg test_std_htb test_std
+							test_std_sus test_std_arg
+check_PROGRAMS += test_std_htb1 test_std_htb2
 check_PROGRAMS += test_std_sus1 test_std_sus2
+check_PROGRAMS += test_std
 
 test_std_prc_SOURCES	=	std_prc.F90
 test_std_prc_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_PRC=1
@@ -76,9 +78,13 @@ test_std_mwe_SOURCES	=	std_mwe.F90
 test_std_mwe_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_MWE=1
 test_std_mwe_LDADD		=	$(TEST_COMMON_LIBS)
 
-test_std_htb_SOURCES	=	std_htb.F90
-test_std_htb_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_HTB=1
-test_std_htb_LDADD		=	$(TEST_COMMON_LIBS)
+test_std_htb1_SOURCES	=	std_htb.F90
+test_std_htb1_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_HTB=1
+test_std_htb1_LDADD		=	$(TEST_COMMON_LIBS)
+
+test_std_htb2_SOURCES	=	$(test_std_htb1_SOURCES)
+test_std_htb2_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_HTB=2
+test_std_htb2_LDADD		=	$(test_std_htb1_LDADD)
 
 test_std_SOURCES	=	std.F90
 test_std_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD=1

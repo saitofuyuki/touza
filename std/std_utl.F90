@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/01/20 11:22:23 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/28 23:01:59 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -891,13 +891,15 @@ contains
 
 !!!_  & join_list - convert array to string
   subroutine join_list_i &
-       & (ierr, str, v, fmt, sep, ldelim, rdelim)
+       & (ierr, str, v, fmt, sep, ldelim, rdelim, mask, skip)
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(out)         :: str
     integer,         intent(in)          :: v(0:)
     character(len=*),intent(in),optional :: fmt
     character(len=*),intent(in),optional :: sep, ldelim, rdelim
+    logical,         intent(in),optional :: mask(0:)
+    character(len=*),intent(in),optional :: skip
 
     integer lstr, jstr
     integer jv, nv
@@ -905,6 +907,7 @@ contains
     character(len=64) :: buf
     character(len=64) :: xfmt
     character(len=64) :: xsep
+    character(len=64) :: cskp
     integer              lsep
 
     ierr = 0
@@ -924,24 +927,54 @@ contains
     jstr = 0
     lstr = len(str)
 
-    jv = 0
-    write(buf, xfmt) v(jv)
-    nb = len_trim(buf)
-    jstr = jstr + nb
-    str = buf(1:nb)
+    if (present(mask)) then
+       call choice_a(cskp, '_', skip)
+       jv = 0
+       if (mask(jv)) then
+          buf = cskp
+       else
+          write(buf, xfmt) v(jv)
+       endif
+       nb = len_trim(buf)
+       jstr = jstr + nb
+       str = buf(1:nb)
 
-    do jv = 1, nv - 1
+       do jv = 1, nv - 1
+          if (mask(jv)) then
+             buf = cskp
+          else
+             write(buf, xfmt) v(jv)
+          endif
+          nb = len_trim(buf)
+          jstr = jstr + nb + lsep
+          if (ierr.eq.0) then
+             if (jstr.gt.lstr) then
+                ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+             else
+                str = trim(str) // xsep(1:lsep) // buf(1:nb)
+             endif
+          endif
+       enddo
+    else
+       jv = 0
        write(buf, xfmt) v(jv)
        nb = len_trim(buf)
-       jstr = jstr + nb + lsep
-       if (ierr.eq.0) then
-          if (jstr.gt.lstr) then
-             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-          else
-             str = trim(str) // xsep(1:lsep) // buf(1:nb)
+       jstr = jstr + nb
+       str = buf(1:nb)
+
+       do jv = 1, nv - 1
+          write(buf, xfmt) v(jv)
+          nb = len_trim(buf)
+          jstr = jstr + nb + lsep
+          if (ierr.eq.0) then
+             if (jstr.gt.lstr) then
+                ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+             else
+                str = trim(str) // xsep(1:lsep) // buf(1:nb)
+             endif
           endif
-       endif
-    enddo
+       enddo
+    endif
     if (present(ldelim)) then
        if (ierr.eq.0) then
           ns = max(1, len_trim(ldelim))
