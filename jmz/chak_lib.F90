@@ -216,7 +216,7 @@ contains
        if (present(iadd)) then
           if (size(iadd).gt.0) then
              if (present(fmt)) then
-                write(txt, fmt) iadd(:)
+                write(txt, fmt, IOSTAT=jerr) iadd(:)
              else
                 call join_list(jerr, txt, iadd(:), ldelim='(', rdelim=')')
              endif

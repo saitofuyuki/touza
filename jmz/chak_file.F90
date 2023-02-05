@@ -4,7 +4,7 @@
 #define TIME_STAMP 'Time-stamp: <2023/01/22 21:37:57 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -177,14 +177,15 @@ contains
     do jrg = 0, nrg - 1
        jrf = file%rgrp(jrg)%cur
        if (file%rgrp(jrg)%filter(jrf)%num.lt.-1) then
-          write(rec(jrg), 101) file%rgrp(jrg)%rec, size(file%rgrp(jrg)%filter(jrf)%seq)
+          write(rec(jrg), 101, IOSTAT=ierr) file%rgrp(jrg)%rec, size(file%rgrp(jrg)%filter(jrf)%seq)
        else if (file%rgrp(jrg)%filter(jrf)%num.eq.-1) then
-          write(rec(jrg), 102) file%rgrp(jrg)%rec
+          write(rec(jrg), 102, IOSTAT=ierr) file%rgrp(jrg)%rec
        else if (file%rgrp(jrg)%filter(jrf)%num.gt.1) then
-          write(rec(jrg), 111) file%rgrp(jrg)%rec, file%rgrp(jrg)%filter(jrf)%num
+          write(rec(jrg), 111, IOSTAT=ierr) file%rgrp(jrg)%rec, file%rgrp(jrg)%filter(jrf)%num
        else
-          write(rec(jrg), 112) file%rgrp(jrg)%rec
+          write(rec(jrg), 112, IOSTAT=ierr) file%rgrp(jrg)%rec
        endif
+       if (ierr.ne.0) exit
        ! rec(0:nrg-1) = file%rgrp(0:nrg-1)%rec
     enddo
     if (ierr.eq.0) call join_list(ierr, str, rec(0:nrg-1), sep=item_sep)
@@ -1266,6 +1267,7 @@ end subroutine cue_read_file
     integer(kind=KIOFS) :: cpos, fpos
     character(len=128) ::  msg
     integer ksubm
+    integer jerr
 
     ! compute record positions (%pos) for group to wait at %rec
     ! set file record limit (%nrec) if found
@@ -1359,7 +1361,7 @@ end subroutine cue_read_file
     if (ierr.ne.0) then
        ierr = ERR_BROKEN_RECORD
 109    format('failed to cue ', A, ' (', I0, ') record=', I0)
-       write(msg, 109) trim(file%name), jrg, user_index_bgn(irec)
+       write(msg, 109, IOSTAT=jerr) trim(file%name), jrg, user_index_bgn(irec)
        call message(ierr, msg)
     endif
 ! 101 format('pos = ', 128(1x, Z8.8))
