@@ -1,10 +1,10 @@
 !!!_! std_bld.F90 - touza/std build environments
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 27 2021
-#define TIME_STAMP 'Time-stamp: <2023/01/17 11:44:48 fuyuki std_bld.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 22:09:31 fuyuki std_bld.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022, 2023
+! Copyright (C) 2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -25,6 +25,7 @@ module TOUZA_Std_bld
   private
 !!!_ + parameters
 # define __MDL__ 'bld'
+# define _ERROR(E) (E - ERR_MASK_STD_BLD)
 !!!_ + public constants
 !!!_ + static
   integer,save :: init_mode = 0
@@ -74,7 +75,7 @@ contains
           if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_BLD
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
 
     return

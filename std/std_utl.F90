@@ -1,10 +1,10 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/01/28 23:01:59 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 21:23:43 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021, 2022
+! Copyright (C) 2020,2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -670,22 +670,30 @@ contains
     character(len=64)  :: buf0, buf1
     integer lb, lsep, lo, lu
 
+    integer jerr
+
+    jerr = 0
+
     npos = 0
     str = ' '
     ch = choice(+ HUGE(KIND(ch)),     cliph)
     cl = choice(- HUGE(KIND(cl)) - 1, clipl)
 
-    call compact_format_gen_i(fmt_item, udf, ovf, fmt, pad)
+    call compact_format_gen_i(jerr, fmt_item, udf, ovf, fmt, pad)
     lo = len_trim(ovf)
     lu = len_trim(udf)
 
 121 format('(I0,''', A, ''',A)')
-122 format('(A,''', A, ''',A)')
-123 format('(A,''', A, ''',A,''', A, ''', I0)')
+122 format('(A, ''', A, ''',A)')
+123 format('(A, ''', A, ''',A,''', A, ''', I0)')
 
-    write(fmt_rep, 121) trim(separator_repeat)
-    write(fmt_range, 122) trim(separator_range)
-    write(fmt_range_step, 123) trim(separator_range), trim(separator_step)
+    if (jerr.eq.0) write(fmt_rep,        121, IOSTAT=jerr) trim(separator_repeat)
+    if (jerr.eq.0) write(fmt_range,      122, IOSTAT=jerr) trim(separator_range)
+    if (jerr.eq.0) write(fmt_range_step, 123, IOSTAT=jerr) trim(separator_range), trim(separator_step)
+    if (jerr.ne.0) then
+       npos = _ERROR(ERR_PANIC)
+       return
+    endif
 
     lstr = len(str)
     if (present(sep)) then
@@ -729,10 +737,6 @@ contains
              d = v(j) - ref
              do
                 m = m + 1
-                ! write(*, *) 'compact/middle', j0, j, ref, v(j), '//', m, n, d, v(j) - v(j-1)
-                ! write(*, *) 'compact/middle/0', j.eq.n
-                ! write(*, *) 'compact/middle/1', v(j).gt.ch.or.v(j).lt.ch
-                ! write(*, *) 'compact/middle/2', v(j) - v(j-1).ne.d
                 if (j.eq.n) exit
                 if (v(j).gt.ch.or.v(j).lt.cl) exit
                 if (v(j) - v(j-1).ne.d) exit
@@ -743,16 +747,19 @@ contains
           m = 0
           d = 0
        endif
-       ! write(*, *) 'compact/result', j0, j, m, '/', minrep, ref, cl, ch
        if (m.gt.minrep) then
           call compact_format_item_i(buf0, ref,    fmt_item, udf(1:lu), ovf(1:lo), cl, ch)
           call compact_format_item_i(buf1, v(j-1), fmt_item, udf(1:lu), ovf(1:lo), cl, ch)
           if (d.eq.0) then
-             write(buf, fmt_rep) m, trim(buf0)
+             write(buf, fmt_rep, IOSTAT=jerr) m, trim(buf0)
           else if (d.eq.+1.or.d.eq.-1) then
-             write(buf, fmt_range) trim(buf0), trim(buf1)
+             write(buf, fmt_range, IOSTAT=jerr) trim(buf0), trim(buf1)
           else
-             write(buf, fmt_range_step) trim(buf0), trim(buf1), abs(d)
+             write(buf, fmt_range_step, IOSTAT=jerr) trim(buf0), trim(buf1), abs(d)
+          endif
+          if (jerr.ne.0) then
+             npos = _ERROR(ERR_PANIC)
+             return
           endif
        else
           call compact_format_item_i(buf, v(j0), fmt_item, udf(1:lu), ovf(1:lo), cl, ch)
@@ -778,14 +785,16 @@ contains
   end subroutine compact_format_i
 !!!_   . compact_format_gen
   subroutine compact_format_gen_i &
-       & (fmt, ufc, ofc, single, pad)
+       & (ierr, fmt, ufc, ofc, single, pad)
     implicit none
+    integer,         intent(out)         :: ierr
     character(len=*),intent(out)         :: fmt
     character(len=*),intent(out)         :: ufc, ofc
     character(len=*),intent(in),optional :: single
     integer,         intent(in),optional :: pad
     integer p
 
+    ierr = 0
     if (present(single)) then
        fmt = single
     else
@@ -795,16 +804,21 @@ contains
        if (p.eq.0) then
           fmt = 'I0'
        else if (p.lt.0) then
-          write(fmt, 112) 1 - p, -p
+          write(fmt, 112, IOSTAT=ierr) 1 - p, -p
        else
-          write(fmt, 111) p, p
+          write(fmt, 111, IOSTAT=ierr) p, p
        endif
     endif
-    fmt = '(' // trim(fmt) // ')'
-    write(ofc, fmt=fmt) 0
-    p = len_trim(ofc)
-    ofc = repeat(char_overflow, p)
-    ufc = repeat(char_underflow, p)
+    if (ierr.eq.0) then
+       fmt = '(' // trim(fmt) // ')'
+       write(ofc, fmt=fmt, IOSTAT=ierr) 0
+    endif
+    if (ierr.eq.0) then
+       p = len_trim(ofc)
+       ofc = repeat(char_overflow, p)
+       ufc = repeat(char_underflow, p)
+    endif
+    if (ierr.ne.0) ierr = _ERROR(ERR_PANIC)
     return
   end subroutine compact_format_gen_i
 !!!_   . compact_format_item
@@ -816,12 +830,13 @@ contains
     character(len=*),intent(in)  :: fmt
     character(len=*),intent(in)  :: ufc,  ofc
     integer,         intent(in)  :: low,  high
+    integer jerr
     if (num.lt.low) then
        str = ufc
     else if (num.gt.high) then
        str = ofc
     else
-       write(str, fmt) num
+       write(str, fmt, IOSTAT=jerr) num
     endif
   end subroutine compact_format_item_i
 !!!_  & parse_number - safely parse number from string
@@ -933,47 +948,54 @@ contains
        if (mask(jv)) then
           buf = cskp
        else
-          write(buf, xfmt) v(jv)
+          write(buf, xfmt, IOSTAT=ierr) v(jv)
        endif
        nb = len_trim(buf)
        jstr = jstr + nb
        str = buf(1:nb)
-
-       do jv = 1, nv - 1
-          if (mask(jv)) then
-             buf = cskp
-          else
-             write(buf, xfmt) v(jv)
-          endif
-          nb = len_trim(buf)
-          jstr = jstr + nb + lsep
-          if (ierr.eq.0) then
-             if (jstr.gt.lstr) then
-                ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+       if (ierr.eq.0) then
+          do jv = 1, nv - 1
+             if (mask(jv)) then
+                buf = cskp
              else
-                str = trim(str) // xsep(1:lsep) // buf(1:nb)
+                write(buf, xfmt, IOSTAT=ierr) v(jv)
+                if (ierr.ne.0) ierr = _ERROR(ERR_PANIC)
              endif
-          endif
-       enddo
+             nb = len_trim(buf)
+             jstr = jstr + nb + lsep
+             if (ierr.eq.0) then
+                if (jstr.gt.lstr) then
+                   ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+                else
+                   str = trim(str) // xsep(1:lsep) // buf(1:nb)
+                endif
+             endif
+             if (ierr.ne.0) exit
+          enddo
+       endif
     else
        jv = 0
-       write(buf, xfmt) v(jv)
+       write(buf, xfmt, IOSTAT=ierr) v(jv)
        nb = len_trim(buf)
        jstr = jstr + nb
        str = buf(1:nb)
 
-       do jv = 1, nv - 1
-          write(buf, xfmt) v(jv)
-          nb = len_trim(buf)
-          jstr = jstr + nb + lsep
-          if (ierr.eq.0) then
-             if (jstr.gt.lstr) then
-                ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-             else
-                str = trim(str) // xsep(1:lsep) // buf(1:nb)
+       if (ierr.eq.0) then
+          do jv = 1, nv - 1
+             write(buf, xfmt, IOSTAT=ierr) v(jv)
+             if (ierr.ne.0) ierr = _ERROR(ERR_PANIC)
+             nb = len_trim(buf)
+             jstr = jstr + nb + lsep
+             if (ierr.eq.0) then
+                if (jstr.gt.lstr) then
+                   ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+                else
+                   str = trim(str) // xsep(1:lsep) // buf(1:nb)
+                endif
              endif
-          endif
-       enddo
+             if (ierr.ne.0) exit
+          enddo
+       endif
     endif
     if (present(ldelim)) then
        if (ierr.eq.0) then
@@ -1036,13 +1058,13 @@ contains
     lstr = len(str)
 
     jv = 0
-    write(buf, xfmt) trim(v(jv))
+    write(buf, xfmt, IOSTAT=ierr) trim(v(jv))
     nb = len_trim(buf)
     jstr = jstr + nb
     str = buf(1:nb)
 
     do jv = 1, nv - 1
-       write(buf, xfmt) trim(v(jv))
+       write(buf, xfmt, IOSTAT=ierr) trim(v(jv))
        nb = len_trim(buf)
        jstr = jstr + nb + lsep
        if (ierr.eq.0) then

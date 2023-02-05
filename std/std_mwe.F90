@@ -1,10 +1,10 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2022/10/20 07:43:44 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 22:07:11 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021, 2022
+! Copyright (C) 2020,2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -61,6 +61,8 @@ module TOUZA_Std_mwe
 
   integer,save :: icomm_default = MPI_COMM_NULL
   integer,save :: switch_mpi = switch_error
+
+# define _ERROR(E) (E - ERR_MASK_STD_MWE)
 !!!_  - public
   public init, diag, finalize
   public set_comm, get_comm
@@ -112,7 +114,7 @@ contains
           if (ierr.eq.0) call set_comm(ierr, icomm, ulog, levv)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_MWE
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
     return
   end subroutine init
@@ -128,6 +130,7 @@ contains
     integer,intent(in),optional :: icomm
     integer ir, nr
     integer utmp, md, lv, lmd
+    integer jerr
 
     ierr = err_default
 
@@ -152,9 +155,9 @@ contains
                 call get_ni_safe(ierr, nr, ir, icomm)
 101             format('ranks = ', I0, 1x, I0, 1x, I0)
                 if (present(icomm)) then
-                   write(tmsg, 101) ir, nr, icomm
+                   write(tmsg, 101, IOSTAT=jerr) ir, nr, icomm
                 else
-                   write(tmsg, 101) ir, nr
+                   write(tmsg, 101, IOSTAT=jerr) ir, nr
                 endif
                 call msg_mdl(tmsg, __MDL__, utmp)
              endif
@@ -248,7 +251,7 @@ contains
        if (ierr.eq.0) then
           if (ic.ne.MPI_COMM_WORLD .and. (.not.isini)) then
              call msg_mdl('(''mpi not initialized ='', I0)', ic, __MDL__, utmp)
-             ierr = ERR_MPI_PANIC - ERR_MASK_STD_MWE
+             ierr = _ERROR(ERR_MPI_PANIC)
           else
              if (.not.isini) call MPI_Init(ierr)
           endif
@@ -259,7 +262,7 @@ contains
           if (ierr.ne.MPI_SUCCESS) then
              if (VCHECK_FATAL(lv)) then
                 call msg_mdl('(''invalid communicator ='', I0)', ic, __MDL__, utmp)
-                ierr = ERR_MPI_PANIC - ERR_MASK_STD_MWE
+                ierr = _ERROR(ERR_MPI_PANIC)
              endif
           endif
        else
@@ -271,7 +274,7 @@ contains
     ic = MPI_COMM_NULL
     if (choice(ic, icomm).ne.ic) then
        if (VCHECK_FATAL(lv)) call msg_mdl('cannot enable mpi.', __MDL__, utmp)
-       ierr = ERR_OPR_DISABLE - ERR_MASK_STD_MWE
+       ierr = _ERROR(ERR_OPR_DISABLE)
     endif
 #endif /* not OPT_USE_MPI */
     icomm_default = ic
@@ -535,7 +538,7 @@ contains
        endif
     endif
 #else
-    ierr = ERR_MPI_PANIC - ERR_MASK_STD_MWE
+    ierr = _ERROR(ERR_MPI_PANIC)
 111 format('mpi-type:', A, ': PANIC')
     if (utmp.ge.0) then
        write(utmp, 111) trim(tag)

@@ -1,10 +1,10 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2022/07/25 18:52:11 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 22:02:08 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2011-2022
+! Copyright (C) 2011-2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -36,6 +36,7 @@ module TOUZA_Std_log
 
 # define __MDL__ 'log'
 # define __TAG__ STD_FORMAT_MDL(__MDL__)
+# define _ERROR(E) (E - ERR_MASK_STD_LOG)
 !!!_  - static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -135,7 +136,7 @@ contains
           if (ierr.eq.0) call utl_init(ierr, default_unit, levv=lv, mode=lmd)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_LOG
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
 
     return
@@ -224,12 +225,13 @@ contains
     integer lv
     character(len=128) :: tag
     character(len=128) :: txt
+    integer jerr
 
 311 format('fine: ', I0, 1x, I0, 1x, I0, 1x, I0)
     lv = choice(msglev_normal, levv)
     if (is_msglev_DEBUG(lv)) then
        call gen_tag(tag, pkg, grp, mdl, fun, isfx)
-       write(txt, 311) ierr, icount, dcount, fcount
+       write(txt, 311, IOSTAT=jerr) ierr, icount, dcount, fcount
        call msg(txt, tag, u)
     endif
     call trace_control &
@@ -253,6 +255,8 @@ contains
     integer lv
     character(len=128) :: tag
     character(len=128) :: txt
+    integer jerr
+
     n = ierr
     if (ierr.ne.0) then
        lv = choice(msglev_normal, levv)
@@ -260,13 +264,13 @@ contains
        if (IAND(mode, MODE_LOOSE).gt.0) then
 301       format('loose: ', I0)
           if (is_msglev_NORMAL(lv)) then
-             write(txt, 301) ierr
+             write(txt, 301, IOSTAT=jerr) ierr
              call msg_txt(txt, tag, u)
           endif
           n = 0
        else if (is_msglev_FATAL(lv)) then
 302       format('trace: ', I0)
-          write(txt, 302) ierr
+          write(txt, 302, IOSTAT=jerr) ierr
           call msg_txt(txt, tag, u)
        endif
     endif
@@ -479,8 +483,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) vv(:)
+    write(txt, fmt, IOSTAT=jerr) vv(:)
     call msg_txt(txt, tag, u)
 
   end subroutine msg_ia
@@ -494,8 +499,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) vv(:)
+    write(txt, fmt, IOSTAT=jerr) vv(:)
     call msg_txt(txt, tag, u)
 
   end subroutine msg_fa
@@ -509,8 +515,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) vv(:)
+    write(txt, fmt, IOSTAT=jerr) vv(:)
     call msg_txt(txt, tag, u)
 
   end subroutine msg_da
@@ -525,8 +532,9 @@ contains
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
     integer j
+    integer jerr
 
-    write(txt, fmt) (trim(vv(j)), j=1, size(vv))
+    write(txt, fmt, IOSTAT=jerr) (trim(vv(j)), j=1, size(vv))
     call msg_txt(txt, tag, u)
 
   end subroutine msg_aa
@@ -540,8 +548,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) v
+    write(txt, fmt, IOSTAT=jerr) v
     call msg_txt(txt, tag, u)
 
   end subroutine msg_is
@@ -555,8 +564,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) v
+    write(txt, fmt, IOSTAT=jerr) v
     call msg_txt(txt, tag, u)
 
   end subroutine msg_fs
@@ -570,8 +580,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) v
+    write(txt, fmt, IOSTAT=jerr) v
     call msg_txt(txt, tag, u)
 
   end subroutine msg_ds
@@ -637,20 +648,22 @@ contains
     character(len=*),intent(in),optional :: pkg, grp, mdl
     character(len=*),intent(in),optional :: fun
     integer,         intent(in),optional :: isfx
-
     character(len=256) :: pfx
+    integer jerr
+
 101 format(_TOUZA_TAG_PGM(A,A,A))
 102 format(_TOUZA_TAG_PG(A,A))
 103 format(_TOUZA_TAG_P(A))
+    jerr = 0
     if (present(pkg)) then
        if (present(grp)) then
           if (present(mdl)) then
-             write(pfx, 101) trim(pkg), trim(grp), trim(mdl)
+             write(pfx, 101, IOSTAT=jerr) trim(pkg), trim(grp), trim(mdl)
           else
-             write(pfx, 102) trim(pkg), trim(grp)
+             write(pfx, 102, IOSTAT=jerr) trim(pkg), trim(grp)
           endif
        else
-          write(pfx, 103) trim(pkg)
+          write(pfx, 103, IOSTAT=jerr) trim(pkg)
        endif
     else
        pfx = ' '
@@ -661,14 +674,14 @@ contains
 204 format(A)
     if (present(fun)) then
        if (present(isfx)) then
-          write(tag, 201) trim(pfx), trim(fun), isfx
+          write(tag, 201, IOSTAT=jerr) trim(pfx), trim(fun), isfx
        else
-          write(tag, 202) trim(pfx), trim(fun)
+          write(tag, 202, IOSTAT=jerr) trim(pfx), trim(fun)
        endif
     else if (present(isfx)) then
-       write(tag, 203) trim(pfx), isfx
+       write(tag, 203, IOSTAT=jerr) trim(pfx), isfx
     else
-       write(tag, 204) trim(pfx)
+       write(tag, 204, IOSTAT=jerr) trim(pfx)
     endif
 
   end subroutine gen_tag
@@ -694,6 +707,8 @@ contains
     integer ind
     integer p
     character(len=64) :: fmt0, fmt1
+    integer jerr
+
     ierr = 0
 
     ut = choice(unit_global, u)
@@ -716,8 +731,8 @@ contains
     else
 111    format('(', I0, 'x, A)')
 112    format('(', I0, 'x, A, 1x, A, 1x, A)')
-       write(fmt0, 111) ind
-       write(fmt1, 112) ind
+       write(fmt0, 111, IOSTAT=jerr) ind
+       write(fmt1, 112, IOSTAT=jerr) ind
     endif
 
     select case (p)
@@ -725,7 +740,7 @@ contains
        if (ut.ge.0) then
           write(ut, fmt1) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
        else if (ut.eq.-1) then
-          write(*, fmt1) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
+          write(*,  fmt1) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
        endif
     case default
        if (ut.ge.0) then

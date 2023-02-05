@@ -2,10 +2,10 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2022/12/23 22:02:05 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 21:40:06 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2019-2022
+! Copyright (C) 2019-2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -1175,14 +1175,15 @@ contains
 
     integer je
     character(len=1024) :: txt
+    integer jerr
 
     ierr = err_default
 104 format('arguments = ', I0, 1x, I0)
-    write(txt, 104) NP, NR
+    write(txt, 104, IOSTAT=jerr) NP, NR
     call msg_mdl(txt, __MDL__, ulog)
 103 format(I0, 2x, A, 3x, A)
     do je = 0, me - 1
-       write(txt, 103) NA(je), trim(T(je)), trim(V(je))
+       write(txt, 103, IOSTAT=jerr) NA(je), trim(T(je)), trim(V(je))
        call msg_mdl(txt, __MDL__, ulog)
     enddo
 
@@ -1364,8 +1365,9 @@ contains
     implicit none
     character(len=*),intent(out) :: tag
     integer,         intent(in)  :: jpos
+    integer jerr
 101 format(A, I0)
-    write(tag, 101) trim(ccomment), jpos
+    write(tag, 101, IOSTAT=jerr) trim(ccomment), jpos
     return
   end subroutine tag_pos
 
