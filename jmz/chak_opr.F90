@@ -1,10 +1,10 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz swiss(CH) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2022/11/22 21:45:20 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 21:01:20 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -51,8 +51,9 @@ module chak_opr
 
 !!!_   . hash table
   integer,save,private :: htopr = -1
+!!!_ + Procedures
 contains
-!!!_  - initialization
+!!!_  - init
   subroutine init(ierr)
     implicit none
     integer,intent(out) :: ierr
@@ -61,25 +62,51 @@ contains
        if (htopr.lt.0) call register_operators(ierr)
     endif
   end subroutine init
+!!!_  - diag
+  subroutine diag(ierr, u, levv)
+    use TOUZA_Std,only: htb_diag
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    ierr = 0
+    if (ierr.eq.0) then
+       call htb_diag(ierr, u, levv)
+    endif
+  end subroutine diag
+!!!_  - finalize
+  subroutine finalize(ierr, u, levv)
+    use TOUZA_Std,only: htb_finalize
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    ierr = 0
+    if (ierr.eq.0) then
+       call htb_finalize(ierr, u, levv)
+    endif
+  end subroutine finalize
 !!!_  - registration
 !!!_   . register_operators
   subroutine register_operators(ierr)
-    use TOUZA_Std,only: htb_init, new_htable, reg_entry
+    use TOUZA_Std,only: htb_init, new_htable, diag_htable
     implicit none
     integer,intent(out) :: ierr
 
     ierr = 0
     call htb_init(ierr)
-    htopr = new_htable('operators', 0, nstt=1, mem=lopr)
+    htopr = new_htable('operators', lopr, oprlen, nstt=1)
     ierr = min(0, htopr)
 
 #   include "chak_reg.F90"
+
+    ! call diag_htable(ierr, htopr)
 
   end subroutine register_operators
 !!!_   . reg_opr_prop
   subroutine reg_opr_prop &
        & (ierr, idopr, str, pop, push, ilev, istr)
-    use TOUZA_Std,only: choice, reg_entry, store_xstatus
+    use TOUZA_Std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: idopr
@@ -94,7 +121,7 @@ contains
        call message(ierr, 'panic in operator registration')
        return
     endif
-    entr = reg_entry(str, htopr, idopr)
+    entr = reg_opr_core(str, idopr)
     ierr = min(0, entr)
     if (ierr.eq.0) then
        if (oprop(idopr)%entr.lt.0) then
@@ -114,20 +141,19 @@ contains
        mopr = max(mopr, idopr + 1)
     endif
   end subroutine reg_opr_prop
-
 !!!_   . reg_fake_opr
   subroutine reg_fake_opr &
        & (ierr, handle, str)
-    use TOUZA_Std,only: reg_entry, query_entry, query_status
+    use TOUZA_Std,only: query_entry
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: handle
     character(len=*),intent(in)  :: str
     integer entr, ho
     ierr = 0
-    entr = query_entry(str, htopr)
+    entr = query_entry(htopr, str)
     if (entr.ge.0) then
-       ho = query_status(entr, htopr)
+       ho = query_opr_handle_e(entr)
        if (ho.eq.handle) then
           continue
        else
@@ -135,21 +161,19 @@ contains
           call message(ierr, 'duplicate registration ' // trim(str))
        endif
     else
-       entr = reg_entry(str, htopr, handle)
+       entr = reg_opr_core(str, handle)
     endif
   end subroutine reg_fake_opr
-
 !!!_   . parse_term_operator()
-  integer function parse_term_operator(str) result(n)
-    use TOUZA_Std,only: query_status
+  integer function parse_term_operator(str) result(ho)
     implicit none
     character(len=*),intent(in) :: str
     integer jb
-    n = query_status(str, htopr)
-    if (n.lt.0) then
+    ho = query_opr_handle_n(str)
+    if (ho.lt.0) then
        jb = index(str, param_sep)
        if (jb.gt.1) then
-          n = query_status(str(1:jb-1), htopr)
+          ho = query_opr_handle_n(str(1:jb-1))
        endif
     endif
   end function parse_term_operator
@@ -176,7 +200,6 @@ contains
        push = oprop(handle)%push
     endif
   end subroutine inquire_opr_nstack
-
 !!!_   . inquire_opr_infix
   subroutine inquire_opr_infix(ierr, ilev, istr, handle)
     implicit none
@@ -199,14 +222,12 @@ contains
        endif
     endif
   end subroutine inquire_opr_infix
-
 !!!_   . is_operator_modify()
   logical function is_operator_modify(handle) result(b)
     implicit none
     integer,intent(in) :: handle
     b = handle.eq.opr_TRANSF
   end function is_operator_modify
-
 !!!_   . is_operator_reusable()
   logical function is_operator_reusable(handle) result(b)
     implicit none
@@ -217,11 +238,21 @@ contains
     b = pop.eq.1 .and. push.eq.1
     ! b = .FALSE.
   end function is_operator_reusable
-
-!!!_   . query_opr_name
+!!!_  - htb wrappers
+!!!_   . reg_opr_core
+  integer function reg_opr_core &
+       & (name, idopr) &
+       & result(ee)
+    use TOUZA_Std,only: reg_entry
+    implicit none
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: idopr
+    ee = reg_entry(htopr, name, status=(/idopr/))
+  end function reg_opr_core
+!!!_   . query_opr_name - query operator name by handle
   subroutine query_opr_name &
        & (ierr, str, handle)
-    use TOUZA_Std,only: query_name
+    use TOUZA_Std,only: query_key
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(out)         :: str
@@ -231,10 +262,30 @@ contains
        call message(ierr, 'invalid operator handle', (/handle/))
        return
     endif
-    call query_name(ierr, str, oprop(handle)%entr, htopr)
+    call query_key(ierr, htopr, oprop(handle)%entr, str)
   end subroutine query_opr_name
-
-
+!!!_   . query_opr_handle_n - query operator handle by name
+  integer function query_opr_handle_n &
+       & (name) &
+       & result(ho)
+    use TOUZA_Std,only: query_status
+    implicit none
+    character(len=*),intent(in) :: name
+    integer jerr
+    call query_status(jerr, ho, htopr, name)
+    if (jerr.lt.0) ho = jerr
+  end function query_opr_handle_n
+!!!_   . query_opr_handle_e - query operator handle by table entry
+  integer function query_opr_handle_e &
+       & (entr) &
+       & result(ho)
+    use TOUZA_Std,only: query_status_entr
+    implicit none
+    integer,intent(in) :: entr
+    integer jerr
+    call query_status_entr(jerr, ho, htopr, entr)
+    if (jerr.lt.0) ho = jerr
+  end function query_opr_handle_e
 !!!_  - templates
 !!!_   . apply_UNARY_template
   subroutine apply_UNARY_template &

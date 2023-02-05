@@ -1,10 +1,10 @@
-!!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
+!!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/01/30 17:43:38 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 20:38:13 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -30,7 +30,7 @@ program chak
 !!!_ + Declaration
 !!!_  - modules
   use chak_lib,lib_init=>init
-  use chak_opr,opr_init=>init
+  use chak_opr,opr_init=>init, opr_diag=>diag, opr_finalize=>finalize
   use chak_file,file_init=>init
 ! #if HAVE_FORTRAN_IEEE_ARITHMETIC
 !   use IEEE_ARITHMETIC
@@ -178,7 +178,6 @@ contains
   end subroutine init
 !!!_    * init_sub
   subroutine init_sub(ierr)
-    ! use TOUZA_Std,only: ndigits
     implicit none
     integer,intent(out)         :: ierr
     integer p, r
@@ -198,7 +197,7 @@ contains
 
 !!!_   . finalize
   subroutine finalize(ierr, u)
-    use TOUZA_Std,only: env_finalize, htb_finalize, htb_diag
+    use TOUZA_Std,only: env_finalize
     use TOUZA_Nio,only: nio_diag=>diag, nio_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -212,10 +211,11 @@ contains
     if (is_msglev_DETAIL(lev_verbose)) then
        if (ierr.eq.0) call show_buffers(ierr, u)
     endif
+    if (ierr.eq.0) call opr_diag(ierr, u, levv=dbgv)
     if (ierr.eq.0) call nio_diag(ierr, levv=dbgv)
-    if (ierr.eq.0) call htb_diag(ierr, levv=dbgv)
+
+    if (ierr.eq.0) call opr_finalize(ierr, u, levv=dbgv)
     if (ierr.eq.0) call nio_finalize(ierr, levv=dbgv)
-    if (ierr.eq.0) call htb_finalize(ierr, levv=dbgv)
     if (ierr.eq.0) call env_finalize(ierr, levv=dbgv)
   end subroutine finalize
 
@@ -233,7 +233,7 @@ contains
     utmp = choice(ulog, u)
     lv = choice(0, levv)
 
-101 format('chak - Swiss(CH) Army Knife for gtool-3.5 format files')
+101 format('chak - CH(Swiss) Army Knife for gtool-3.5 format files')
 102 format(2x, 'with ', A, 1x, A, '; ', A, 1x, A)
 103 format(2x, 'with n*c*tcdf ', A)
     write(utmp, 101)
@@ -1186,7 +1186,7 @@ contains
           endif
        case default
           ierr = ERR_NOT_IMPLEMENTED
-          call message(ierr, 'reserved operator ' // trim(arg))
+          call message(ierr, 'reserved operator(buffer) ' // trim(arg))
        end select
     endif
     return
@@ -1522,7 +1522,7 @@ contains
           call stack_buffer_opr(ierr, hopr)
        case default
           ierr = ERR_NOT_IMPLEMENTED
-          call message(ierr, 'reserved header operator ' // trim(arg))
+          call message(ierr, 'reserved operator(header) ' // trim(arg))
        end select
     endif
     return
@@ -1572,7 +1572,7 @@ contains
        else if (upop.le.0.or.upush.le.0) then
           call query_opr_name(ierr, opr, hopr)
           ierr = ERR_NOT_IMPLEMENTED
-          call message(ierr, 'reserved operator ' // trim(opr))
+          call message(ierr, 'reserved operator(normal) ' // trim(opr))
        endif
     endif
     if (ierr.eq.0) then
@@ -3713,7 +3713,7 @@ contains
 !!!_   . get_obj_string
   subroutine get_obj_string &
        & (ierr, str, handle, levv)
-    use TOUZA_Std,only: query_name, choice
+    use TOUZA_Std,only: choice
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: str
@@ -4409,7 +4409,7 @@ contains
        else
           call query_opr_name(ierr, opr, handle)
           ierr = ERR_NOT_IMPLEMENTED
-          call message(ierr, 'reserved operator ' // trim(opr))
+          call message(ierr, 'reserved operator(apply) ' // trim(opr))
        endif
     endif
     if (ierr.eq.0) then
