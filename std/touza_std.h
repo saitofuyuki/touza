@@ -1,7 +1,7 @@
 /* touza_std.h - touza/std common definition */
 /* Maintainer: SAITO Fuyuki */
 /* Created: May 30 2020 */
-/* Time-stamp: <2023/02/05 21:37:50 fuyuki touza_std.h> */
+/* Time-stamp: <2023/02/15 08:55:44 fuyuki touza_std.h> */
 /* Copyright (C) 2020,2021,2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -32,6 +32,9 @@
 #endif
 #ifndef    TOUZA_FUN_SEP
 #  define  TOUZA_FUN_SEP ':'
+#endif
+#ifndef    TOUZA_SFX_SEP
+#  define  TOUZA_SFX_SEP ','
 #endif
 
 /* macros used in modules deeper than Std_log */

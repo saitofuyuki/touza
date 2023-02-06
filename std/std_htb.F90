@@ -1,7 +1,7 @@
 !!!_! std_htb.F90 - touza/std simple hash table manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2023/02/05 13:53:17 fuyuki std_htb.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/18 20:46:42 fuyuki std_htb.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -15,6 +15,16 @@
 #  include "touza_config.h"
 #endif
 #include "touza_std.h"
+!!!_* issue in old GCC Fortran
+#if __GFORTRAN__
+#  if __GNUC__ < 9
+#     if HAVE_F2003_DEFERRED_TYPE
+#        warning "Force disable F2003 deferred-length character"
+#        undef  HAVE_F2003_DEFERRED_TYPE
+#        define HAVE_F2003_DEFERRED_TYPE 0
+#     endif
+#  endif
+#endif
 !!!_* macros
 ! #define _POINTER pointer
 #if HAVE_F2003_ALLOCATABLE_MEMBER
@@ -43,6 +53,9 @@
 #ifndef    OPT_WATERMARK_ROOT
 #  define  OPT_WATERMARK_ROOT 37
 #endif
+#ifndef    OPT_HASH_RECORD_HISTORY
+#  define  OPT_HASH_RECORD_HISTORY 1
+#endif
 !!!_* switch
 #ifndef   TEST_STD_HTB
 #  define TEST_STD_HTB 0
@@ -52,6 +65,11 @@
 #    undef  HAVE_F2003_DEFERRED_TYPE
 #    define HAVE_F2003_DEFERRED_TYPE 0
 #  endif
+#elif TEST_STD_HTB == 3
+#  ifdef  OPT_HASH_RECORD_HISTORY
+#  undef  OPT_HASH_RECORD_HISTORY
+#  endif
+#  define OPT_HASH_RECORD_HISTORY 2
 #endif
 !!!_@ TOUZA_Std_htb - simple hash table
 module TOUZA_Std_htb
@@ -113,6 +131,9 @@ module TOUZA_Std_htb
      integer :: awidth = 0  ! string length for hash computation
      integer :: iwidth = 0  ! index array length for hash computation
      integer :: jctrl  = -1 ! control index
+
+     integer         :: nhist = -1         ! key registration history for experiment
+     integer,pointer :: hist(:) => NULL()
   end type ktable_t
   type(ktable_t),allocatable,save :: ktable(:)
 
@@ -431,8 +452,8 @@ contains
     if (ierr.eq.0) then
        e = reg_entry_k(ktable(sysk), ' ' // adjustl(name), status=(/wtb%kh/))
        ierr = min(0, e)
+       if (ierr.eq.0) wtb%entr(sysk) = e
     endif
-    if (ierr.eq.0) wtb%entr(sysk) = e
   end subroutine decl_system_bootstrap
 
 !!!_  & decl_system_table
@@ -471,8 +492,8 @@ contains
     if (ierr.eq.0) then
        e = reg_entry_k(ktable(sysk), ' ' // adjustl(name), status=(/wtb%kh/))
        ierr = min(0, e)
+       if (ierr.eq.0) ksystem%entr(jktbl) = e
     endif
-    if (ierr.eq.0) ksystem%entr(jktbl) = e
   end subroutine decl_system_table
 
 !!!_  & init_alloc_ktable
@@ -707,9 +728,62 @@ contains
        enddo
        if (ierr.eq.0) call diag_ctable_j(ierr, ktb%jctrl, nset, utmp)
     endif
+    if (ierr.eq.0) call diag_ktable_history(ierr, ktb, name, utmp)
 
     return
   end subroutine diag_ktable_k
+
+!!!_  & diag_ktable_history
+  subroutine diag_ktable_history &
+       & (ierr, ktb, name, u)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_log,only: msg_mdl
+    implicit none
+    integer,         intent(out)         :: ierr
+    type(ktable_t),  intent(in)          :: ktb
+    character(len=*),intent(in),optional :: name
+    integer,         intent(in),optional :: u
+    integer jh, je, e0
+    character(len=128) :: txt
+    character(len=ktb%lkey)   :: key
+    character(len=ktb%lkey*2) :: repr
+    integer utmp
+    integer sc
+
+    ierr = 0
+    utmp = choice(ulog, u)
+
+101 format(' score:', A, ': ', I0)
+102 format(' score:', 1x,      I0)
+    if (ierr.eq.0) then
+       sc = get_score_j(ktb%jctrl, 100)
+       if (present(name)) then
+          write(txt, 101) trim(name), sc
+       else
+          write(txt, 102) trim(key),  sc
+       endif
+       call msg_mdl(txt, __MDL__, utmp)
+    endif
+
+    do jh = 0, ktb%nhist - 1
+       je = ktb%hist(jh)
+       if (ierr.eq.0) call repr_key(ierr, repr, ktb, je)
+#    if HAVE_F2003_DEFERRED_TYPE
+       if (ierr.eq.0) key = ktb%akey(je)
+#    else
+       if (ierr.eq.0) key = transfer(ktb%akey(:, je), key)
+#    endif
+       if (ierr.eq.0) then
+          e0 = hash_std(ktb, akey=key, ikey=ktb%ikey(:, je))
+       endif
+201    format(2x, I0, ':', I0, '>', I0, 1x, A)
+       if (ierr.eq.0) then
+          write(txt, 201) jh, e0, je, trim(repr)
+          call msg_mdl(txt, __MDL__, utmp)
+       endif
+    enddo
+
+  end subroutine diag_ktable_history
 
 !!!_  & diag_ctable
   subroutine diag_ctable_j &
@@ -793,12 +867,14 @@ contains
           call free_ktable_k(ierr, ktable(jk))
        endif
     else
-       do jk = 0, min(ksystem%n, ksystem%l) - 1
-          if (ierr.eq.0) then
-             call free_ktable_k(ierr, ktable(jk))
-          endif
-       enddo
-       if (ierr.eq.0) deallocate(ktable, STAT=ierr)
+       if (allocated(ktable)) then
+          do jk = 0, min(ksystem%n, ksystem%l) - 1
+             if (ierr.eq.0) then
+                call free_ktable_k(ierr, ktable(jk))
+             endif
+          enddo
+          if (ierr.eq.0) deallocate(ktable, STAT=ierr)
+       endif
     endif
   end subroutine free_ktable_h
 
@@ -808,11 +884,15 @@ contains
     type(ktable_t), intent(inout) :: ktb
     ierr = 0
     if (ierr.eq.0) then
-       deallocate(ktb%akey, ktb%ikey, STAT=ierr)
-       if (ierr.eq.0) then
-          ktb%akey => NULL()
-          ktb%ikey => NULL()
-       endif
+       if (associated(ktb%akey)) deallocate(ktb%akey, ktb%ikey, STAT=ierr)
+    endif
+    if (ierr.eq.0) then
+       if (associated(ktb%hist)) deallocate(ktb%hist, STAT=ierr)
+    endif
+    if (ierr.eq.0) then
+       ktb%akey => NULL()
+       ktb%ikey => NULL()
+       ktb%hist => NULL()
     endif
   end subroutine free_ktable_k
 
@@ -830,12 +910,14 @@ contains
           call free_wtable_t(ierr, wmarks(jw))
        endif
     else
-       do jw = 0, min(wsystem%n, wsystem%l) - 1
-          if (ierr.eq.0) then
-             call free_wtable_t(ierr, wmarks(jw))
-          endif
-       enddo
-       if (ierr.eq.0) deallocate(wmarks, STAT=ierr)
+       if (allocated(wmarks)) then
+          do jw = 0, min(wsystem%n, wsystem%l) - 1
+             if (ierr.eq.0) then
+                call free_wtable_t(ierr, wmarks(jw))
+             endif
+          enddo
+          if (ierr.eq.0) deallocate(wmarks, STAT=ierr)
+       endif
     endif
   end subroutine free_wtable_h
 
@@ -845,7 +927,7 @@ contains
     type(wtable_t), intent(inout) :: wtb
     ierr = 0
     if (ierr.eq.0) then
-       deallocate(wtb%entr, STAT=ierr)
+       if (associated(wtb%entr)) deallocate(wtb%entr, STAT=ierr)
        if (ierr.eq.0) then
           wtb%entr => NULL()
           wtb%kh = -1
@@ -862,7 +944,7 @@ contains
   integer function new_htable &
        & (name, &
        &  span, lkey, nkey, base, awidth, iwidth, &
-       &  nstt, def,  grow) &
+       &  nstt, def,  grow, test) &
        & result(hk)
     implicit none
     character(len=*),intent(in) :: name
@@ -875,10 +957,11 @@ contains
     integer,optional,intent(in) :: nstt
     integer,optional,intent(in) :: def
     logical,optional,intent(in) :: grow
+    logical,optional,intent(in) :: test        ! experiment
     integer jerr
 
     jerr = 0
-    hk = new_ktable(adjustl(name), span, lkey, nkey, base, awidth, iwidth)
+    hk = new_ktable(adjustl(name), span, lkey, nkey, base, awidth, iwidth, test)
     jerr = min(0, hk)
     if (jerr.eq.0) call bind_control(jerr, hk, nstt, def, grow)
     if (jerr.lt.0) hk = jerr
@@ -889,7 +972,7 @@ contains
        & (name, mem, &
        &  lkey, nkey, span, base, awidth, iwidth, &
        &  nstt, def,  grow, &
-       &  root, seed) &
+       &  root, seed, test) &
        &  result(wh)
     use TOUZA_Std_utl,only: choice
     implicit none
@@ -900,6 +983,7 @@ contains
     integer,optional,intent(in) :: nstt, def
     logical,optional,intent(in) :: grow
     integer,optional,intent(in) :: root, seed
+    logical,optional,intent(in) :: test        ! experiment
     integer kh, sp
     integer jerr
 
@@ -908,7 +992,7 @@ contains
     if (jerr.eq.0) then
        sp = choice(0, span)
        if (sp.le.0) sp = mem * 2
-       kh = new_ktable(' ' // adjustl(name), sp, lkey, nkey, base, awidth, iwidth)
+       kh = new_ktable(' ' // adjustl(name), sp, lkey, nkey, base, awidth, iwidth, test)
        jerr = min(0, kh)
     endif
     if (jerr.eq.0) call bind_ktable(jerr, wh, kh, nstt, def, grow)
@@ -943,7 +1027,7 @@ contains
 !!!_ + key-table management
 !!!_  & new_ktable
   integer function new_ktable &
-       & (name, span, lkey, nkey, base, awidth, iwidth) &
+       & (name, span, lkey, nkey, base, awidth, iwidth, test) &
        & result(hk)
     implicit none
     ! either lkey or nkey must be postive
@@ -954,6 +1038,7 @@ contains
     integer,optional,intent(in) :: base        ! hash root
     integer,optional,intent(in) :: awidth      ! string length for hash computation (default: lkey)
     integer,optional,intent(in) :: iwidth      ! array size for hash computation    (default: nkey)
+    logical,optional,intent(in) :: test
 
     integer jk
     integer jerr
@@ -966,7 +1051,7 @@ contains
     endif
     if (jerr.eq.0) then
        call decl_ktable &
-            & (jerr, ktable(jk), span, lkey, nkey, base, awidth, iwidth)
+            & (jerr, ktable(jk), span, lkey, nkey, base, awidth, iwidth, test)
     endif
     if (jerr.lt.0) hk = jerr
   end function new_ktable
@@ -974,7 +1059,7 @@ contains
 !!!_  & decl_ktable
   subroutine decl_ktable &
        & (ierr,  ktb,  &
-       &  span,  lkey, nkey, base, awidth, iwidth)
+       &  span,  lkey, nkey, base, awidth, iwidth, test)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(out)   :: ierr
@@ -982,11 +1067,13 @@ contains
     integer,         intent(in)    :: span
     integer,optional,intent(in)    :: lkey, nkey
     integer,optional,intent(in)    :: base, awidth, iwidth
+    logical,optional,intent(in)    :: test
 
     integer mem
     integer b
     integer lk, nk, kwi, kwa
     integer u
+    logical btest
 
     ierr = 0
     if (ktb%span.gt.0) then
@@ -1047,6 +1134,22 @@ contains
           endif
        endif
     endif
+    if (ierr.eq.0) then
+       if (OPT_HASH_RECORD_HISTORY .eq. 0) then
+          ktb%nhist = -1
+       else
+          btest = choice((OPT_HASH_RECORD_HISTORY.gt.1), test)
+          if (btest) then
+             allocate(ktb%hist(0:mem-1), STAT=ierr)
+             if (ierr.eq.0) ktb%nhist = 0
+             if (ierr.eq.0) ktb%hist  = -1
+          else
+             ktb%nhist = -1
+             ktb%hist => NULL()
+          endif
+       endif
+    endif
+
     if (ierr.eq.0) then
        ktb%lkey   = lk
        ktb%nkey   = nk
@@ -1153,32 +1256,43 @@ contains
     integer,         intent(in)    :: entr
     integer,optional,intent(in)    :: status(0:)
     ierr = fix_entry_j(ktb%jctrl, entr, status)
+    if (OPT_HASH_RECORD_HISTORY.ne.0) then
+       if (ierr.eq.0) then
+          if (ktb%nhist.ge.0) then
+             ktb%hist(ktb%nhist) = entr
+             ktb%nhist = ktb%nhist + 1
+          endif
+       endif
+    endif
   end function settle_entry_k
 
 !!!_  & reg_entry() - register new entry (declare and settle at once)
   integer function reg_entry_h &
-       & (handle, akey, ikey, status) &
+       & (handle, akey, ikey, status, err) &
        & result(ee)
     implicit none
     integer,         intent(in)          :: handle
     character(len=*),intent(in),optional :: akey
     integer,         intent(in),optional :: ikey(0:)
     integer,         intent(in),optional :: status(0:)
+    logical,         intent(in),optional :: err          ! return non-positive if true
     integer jk
 
     jk = check_ktable(handle)
     ee = min(0, jk)
-    if (ee.eq.0) ee = reg_entry_k(ktable(jk), akey, ikey, status)
+    if (ee.eq.0) ee = reg_entry_k(ktable(jk), akey, ikey, status, err)
 
   end function reg_entry_h
   integer function reg_entry_k &
-       & (ktb, akey, ikey, status) &
+       & (ktb, akey, ikey, status, err) &
        & result(ee)
+    use TOUZA_Std_utl,only: choice
     implicit none
     type(ktable_t),  intent(inout)       :: ktb
     character(len=*),intent(in),optional :: akey
     integer,         intent(in),optional :: ikey(0:)
     integer,         intent(in),optional :: status(0:)
+    logical,         intent(in),optional :: err          ! return non-positive if true
     integer jerr
 
     ee = new_entry_k(ktb, akey, ikey)
@@ -1186,6 +1300,7 @@ contains
        jerr = settle_entry_k(ktb, ee, status)
        if (jerr.ne.0) ee = jerr
     endif
+    if (choice(.FALSE., err)) ee = min(0, ee)
   end function reg_entry_k
 
 !!!_  & query_entry() - search entry existence
@@ -1493,6 +1608,7 @@ contains
     character(len=kunit),pointer :: akey(:, :) => NULL()
 #endif
     integer,             pointer :: ikey(:, :) => NULL()
+    integer,             pointer :: hist(:) => NULL()
     integer ni, mn, mo
 
     ierr = 0
@@ -1509,6 +1625,7 @@ contains
              deallocate(ktb%ikey, STAT=ierr)
           endif
           if (ierr.eq.0) ktb%ikey => ikey
+
           if (ierr.eq.0) then
 #           if HAVE_F2003_DEFERRED_TYPE
              allocate(character(len=ktb%lkey)::akey(kmin:mn-1), STAT=ierr)
@@ -1523,6 +1640,18 @@ contains
           endif
           if (ierr.eq.0) deallocate(ktb%akey, STAT=ierr)
           if (ierr.eq.0) ktb%akey => akey
+
+          if (ktb%nhist.ge.0) then
+             if (ierr.eq.0) then
+                allocate(hist(0:mn-1), STAT=ierr)
+             endif
+             if (ierr.eq.0) then
+                hist(0:mo-1)  = ktb%hist(0:mo-1)
+                hist(mo:mn-1) = -1
+                deallocate(ktb%hist, STAT=ierr)
+             endif
+             if (ierr.eq.0) ktb%hist => hist
+          endif
 
           if (ierr.eq.0) ktb%memk = mn
        endif
@@ -2127,6 +2256,45 @@ contains
     endif
     txt = trim(prop) // ' ' // trim(txt)
   end subroutine repr_ctl_c
+!!!_  & get_score()
+  integer function get_score_j(jctrl, nml) result(n)
+    implicit none
+    integer,intent(in)          :: jctrl
+    integer,intent(in),optional :: nml
+    integer jc
+    jc = check_ctable(jctrl)
+    if (jc.ge.0) then
+       n = get_score_c(ctable(jc), nml)
+    else
+       n = jc
+    endif
+  end function get_score_j
+  integer function get_score_c(ctb, nml) result(n)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    type(ctable_t),intent(in)          :: ctb
+    integer,       intent(in),optional :: nml
+    integer j, m, jj, s
+    n = 0
+    do j = 0, ctb%uslot - 1
+       jj = j
+       s = 0
+       m = 0
+       do
+          m = m + max(0, ctb%msh(jj))
+          jj = ctb%nxt(jj)
+          if (jj.le.0) exit
+          s = s + 1
+       enddo
+       ! if (m.gt.0) write(*, *) 'score', j, m, s
+       n = max(n, m + ctb%uslot * s)
+    enddo
+    s = choice(0, nml)
+    if (s.gt.ctb%uslot) then
+       n = max(0, n - 1) * nml / max(1, ctb%uslot)
+    endif
+  end function get_score_c
+  
 !!!_ + hash-table watermarks
 !!!_  & decl_wtable
   subroutine decl_wtable &
