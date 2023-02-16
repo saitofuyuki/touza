@@ -311,6 +311,7 @@ module TOUZA_Nio_record
   public init, diag, finalize
   public set_default_switch
   public set_default_header, get_default_header
+  public nio_check_magic_file
   public nio_read_header,    nio_write_header
   public nio_read_data,      nio_write_data
   public nio_skip_records
@@ -683,6 +684,28 @@ contains
     return
   end subroutine get_default_header
 
+!!!_  & nio_check_magic_file() - check if gtool format
+  integer function nio_check_magic_file &
+       & (u, pos) &
+       & result(krect)
+    use TOUZA_Nio_std,only: KIOFS, WHENCE_ABS, sus_rseek
+    implicit none
+    integer,            intent(in)          :: u
+    integer(kind=KIOFS),intent(in),optional :: pos
+    integer(kind=KIOFS) :: jpini
+    integer jerr, jdmy
+    character(len=litem) :: head(nitem)
+
+    krect = 0
+    inquire(UNIT=u, IOSTAT=jerr, POS=jpini)
+    if (jerr.eq.0) call nio_read_header(jerr, head, krect, u, pos)
+    call sus_rseek(jdmy, u, jpini, WHENCE_ABS)
+    if (jerr.eq.0) then
+       if (jdmy.ne.0) jerr = jdmy
+    endif
+    if (jerr.ne.0) krect = jerr
+  end function nio_check_magic_file
+
 !!!_  & nio_check_magic_header - check magic bytes at current point
   subroutine nio_check_magic_header &
        & (ierr, &
@@ -739,9 +762,10 @@ contains
     integer,            intent(in)          :: u
     integer(kind=KIOFS),intent(in),optional :: pos
 
-    integer(kind=KIOFS) :: jpos, jposf
     integer,parameter :: lbuf = 16  ! enough for most case
     character(len=lbuf) :: bapp
+
+    integer(kind=KIOFS) :: jpos, jposf
     integer(kind=KI32)  :: iseph, isepl, isepf
     integer(kind=KI64)  :: lsepf
     integer(kind=KIOFS) :: nlh
@@ -753,6 +777,7 @@ contains
     integer jerr
 
     ierr = err_default
+
     krect = 0
     nlh = 0
     ltop = litem - nisep
@@ -6453,40 +6478,49 @@ contains
 
     if (ierr.eq.0) allocate(v(1:lmax), STAT=ierr)
 
-    jrec = 0
-    do
-       if (ierr.eq.0) call nio_read_header(ierr, hd, krect, uread)
-       write (*, 401) ierr, jrec, krect
-       if (ierr.eq.0) call nio_read_data(ierr, v, lmax, hd, krect, uread)
-       write (*, 402) ierr, jrec
-       if (ierr.eq.0) then
-          n = parse_header_size(hd, 0)
-          if (uwrite.lt.0) then
-             do j = 1, n
-                write(*, 301) jrec, j, v(j)
-             enddo
-          else
-             krectw = krect
-             if (ierr.eq.0) call put_item(ierr, hd, trim(fmt), hi_DFMT)
-             if (ierr.eq.0) call nio_write_header(ierr, hd, krectw, uwrite)
-             write(*, 501) ierr, jrec, l
-             if (ierr.eq.0) call nio_write_data(ierr, v, lmax, hd, krectw, uwrite)
-             write(*, 502) ierr, jrec, l
-             if (ierr.eq.0) inquire(unit=uwrite, IOSTAT=ierr, pos=JPOS)
-             do l = 0, nloop - 1
-                if (ierr.eq.0) call nio_write_header(ierr, hd, krectw, uwrite)
-                if (ierr.eq.0) call nio_write_data(ierr, v, lmax, hd, krectw, uwrite)
-                if (ierr.eq.0) write(unit=uwrite, IOSTAT=ierr, pos=JPOS)
-             enddo
-             if (ierr.ne.0) exit
-          endif
+    if (ierr.eq.0) krect = nio_check_magic_file(uread)
+
+    if (ierr.eq.0) then
+       if (krect.lt.0) then
+411       format('not a gtool file: ', I0, 1x, A)
+          write(*, 411) krect, trim(rfile)
+       else
+          jrec = 0
+          do
+             if (ierr.eq.0) call nio_read_header(ierr, hd, krect, uread)
+             write (*, 401) ierr, jrec, krect
+             if (ierr.eq.0) call nio_read_data(ierr, v, lmax, hd, krect, uread)
+             write (*, 402) ierr, jrec
+             if (ierr.eq.0) then
+                n = parse_header_size(hd, 0)
+                if (uwrite.lt.0) then
+                   do j = 1, n
+                      write(*, 301) jrec, j, v(j)
+                   enddo
+                else
+                   krectw = krect
+                   if (ierr.eq.0) call put_item(ierr, hd, trim(fmt), hi_DFMT)
+                   if (ierr.eq.0) call nio_write_header(ierr, hd, krectw, uwrite)
+                   write(*, 501) ierr, jrec, l
+                   if (ierr.eq.0) call nio_write_data(ierr, v, lmax, hd, krectw, uwrite)
+                   write(*, 502) ierr, jrec, l
+                   if (ierr.eq.0) inquire(unit=uwrite, IOSTAT=ierr, pos=JPOS)
+                   do l = 0, nloop - 1
+                      if (ierr.eq.0) call nio_write_header(ierr, hd, krectw, uwrite)
+                      if (ierr.eq.0) call nio_write_data(ierr, v, lmax, hd, krectw, uwrite)
+                      if (ierr.eq.0) write(unit=uwrite, IOSTAT=ierr, pos=JPOS)
+                   enddo
+                   if (ierr.ne.0) exit
+                endif
+             endif
+             if (ierr.ne.0) then
+                ierr = 0
+                exit
+             endif
+             jrec = jrec + 1
+          enddo
        endif
-       if (ierr.ne.0) then
-          ierr = 0
-          exit
-       endif
-       jrec = jrec + 1
-    enddo
+    endif
     if (ierr.eq.0) call sus_close(ierr, uread, rfile)
     if (ierr.eq.0.and.uwrite.ge.0) call sus_close(ierr, uwrite, wfile)
     if (ierr.eq.0) deallocate(v, STAT=ierr)
