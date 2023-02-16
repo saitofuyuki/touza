@@ -1,7 +1,7 @@
 /* touza_nio.h - TOUZA/Nio common definition */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Oct 11 2021 */
-/* Time-stamp: <2022/09/08 10:25:25 fuyuki touza_nio.h> */
+/* Time-stamp: <2023/02/16 20:32:50 fuyuki touza_nio.h> */
 /* Copyright (C) 2021, 2022 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -37,5 +37,9 @@
 #define ERR_DEPRECATED_FORMAT           (ERR_MASK_SPECIFIC-13)  /* depreacted gtool format */
 
 #define ERR_SIZE_MISMATCH               (ERR_MASK_SPECIFIC-14)  /* data length mismatch */
+
+#ifndef   OPT_PATH_LEN
+#  define OPT_PATH_LEN 1024 /* file path limit length */
+#endif
 
 #endif /* not _TOUZA_NIO_H */
