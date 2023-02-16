@@ -693,7 +693,7 @@ contains
     integer utmp
     character(len=128) :: txt
     character(len=ktb%lkey*2) :: key
-    character(len=128) :: ctl
+    character(len=128) :: ctl, buf
     integer je
     integer nset
 
@@ -701,13 +701,13 @@ contains
     utmp = choice(ulog, u)
 101 format('hashtable:', A, ': ', A, 1x, A)
 102 format('hashtable:', 1x,      A, 1x, A)
-    if (ierr.eq.0) call repr_ktable(ierr, key, ktb)
+    if (ierr.eq.0) call repr_ktable(ierr, buf, ktb)
     if (ierr.eq.0) call repr_ctable_j(ierr, ctl, ktb%jctrl)
     if (ierr.eq.0) then
        if (present(name)) then
-          write(txt, 101) trim(name), trim(key), trim(ctl)
+          write(txt, 101) trim(name), trim(buf), trim(ctl)
        else
-          write(txt, 102) trim(key), trim(ctl)
+          write(txt, 102) trim(buf), trim(ctl)
        endif
        call msg_mdl(txt, __MDL__, utmp)
     endif
@@ -1758,9 +1758,9 @@ contains
 101    format('a=', I0, '/', I0)
 102    format('a=', I0)
        if (ktb%awidth.lt.lk) then
-          write(txt, 101) ktb%awidth, lk
+          write(txt, 101, IOSTAT=ierr) ktb%awidth, lk
        else
-          write(txt, 102) lk
+          write(txt, 102, IOSTAT=ierr) lk
        endif
     endif
     if (ktb%iwidth.ge.0) then
@@ -2294,7 +2294,7 @@ contains
        n = max(0, n - 1) * nml / max(1, ctb%uslot)
     endif
   end function get_score_c
-  
+
 !!!_ + hash-table watermarks
 !!!_  & decl_wtable
   subroutine decl_wtable &
