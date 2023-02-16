@@ -1,7 +1,7 @@
-!!!_! touza.h - touza definitions
-! Maintainer: SAITO Fuyuki
-! Created: Jun 5 2020
-! Time-stamp: <2023/02/25 15:46:46 fuyuki touza.h>
+/* touza.h - touza definitions */
+/*    Maintainer: SAITO Fuyuki */
+/*    Created: Jun 5 2020 */
+/*     Time-stamp: <2023/02/16 09:48:52 fuyuki touza.h> */
 
 /* Copyright (C) 2020-2022 */
 /*           Japan Agency for Marine-Earth Science and Technology */
@@ -117,6 +117,7 @@
 #define ERR_MASK_NIO_RECORD   (ERR_MASK_NIO + ERR_MASK_MODULE * 3)
 #define ERR_MASK_NIO_DIVISION (ERR_MASK_NIO + ERR_MASK_MODULE * 4)
 #define ERR_MASK_NIO_NCTCDF   (ERR_MASK_NIO + ERR_MASK_MODULE * 5)
+#define ERR_MASK_NIO_INTFC    (ERR_MASK_NIO + ERR_MASK_MODULE * 6)
 
 #define ERR_MASK_TRP          (ERR_MASK_GROUP * 5)
 #define ERR_MASK_TRP_STD      (ERR_MASK_TRP + ERR_MASK_MODULE * 1)
@@ -133,8 +134,7 @@
 #  endif
 
 #endif  /* not _TOUZA_H */
-!!!_! FOOTER
-!!!_ + Local variables
-! Local Variables:
-! mode: f90
-! End:
+
+/* Local Variables: */
+/* mode: f90 */
+/* End: */
