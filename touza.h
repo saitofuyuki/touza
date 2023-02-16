@@ -1,9 +1,9 @@
 /* touza.h - touza definitions */
 /*    Maintainer: SAITO Fuyuki */
 /*    Created: Jun 5 2020 */
-/*     Time-stamp: <2023/02/16 09:48:52 fuyuki touza.h> */
+/*     Time-stamp: <2023/02/16 18:00:21 fuyuki touza.h> */
 
-/* Copyright (C) 2020-2022 */
+/* Copyright (C) 2020-2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
 /*   (https://www.apache.org/licenses/LICENSE-2.0) */
@@ -118,6 +118,7 @@
 #define ERR_MASK_NIO_DIVISION (ERR_MASK_NIO + ERR_MASK_MODULE * 4)
 #define ERR_MASK_NIO_NCTCDF   (ERR_MASK_NIO + ERR_MASK_MODULE * 5)
 #define ERR_MASK_NIO_INTFC    (ERR_MASK_NIO + ERR_MASK_MODULE * 6)
+#define ERR_MASK_NIO_CACHE    (ERR_MASK_NIO + ERR_MASK_MODULE * 7)
 
 #define ERR_MASK_TRP          (ERR_MASK_GROUP * 5)
 #define ERR_MASK_TRP_STD      (ERR_MASK_TRP + ERR_MASK_MODULE * 1)
