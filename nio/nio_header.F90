@@ -664,6 +664,7 @@ contains
     ierr = 0
     if (present(iteme)) then
        if (ierr.eq.0) then
+          buf = ' '
           jb = 1
           do ji = item, iteme
              je = jb + litem - 1
