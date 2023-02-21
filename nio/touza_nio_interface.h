@@ -1,7 +1,7 @@
 /* touza_nio_interface.h - TOUZA/Nio c interfaces */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Feb 16 2023 */
-/* Time-stamp: <2023/02/20 14:41:57 fuyuki touza_nio_interface.h> */
+/* Time-stamp: <2023/02/22 07:18:09 fuyuki touza_nio_interface.h> */
 /* Copyright (C) 2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -37,4 +37,9 @@ extern int tni_co_idx(const int handle, const int gid, const int vid,
 extern int tni_co_name(char * const name,
                        const int handle, const int gid, const int vid,
                        const int cid);
+
+extern int tni_var_read_float(float * const d,
+                              const size_t rec, const size_t *start, const size_t *count,
+                              const int handle, const int gid, const int vid);
+
 #endif /* not _TOUZA_NIO_INTERFACE_H */

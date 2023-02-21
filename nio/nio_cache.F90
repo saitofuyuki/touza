@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2023/02/20 14:37:27 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/22 09:47:06 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -108,6 +108,10 @@ module TOUZA_Nio_cache
   interface cache_get_attr
      module procedure cache_get_attr_i, cache_get_attr_n
   end interface cache_get_attr
+
+  interface cache_var_read
+     module procedure cache_var_read_f
+  end interface cache_var_read
 !!!_  - public procedures
   public init, diag, finalize
   public init_group
@@ -118,6 +122,8 @@ module TOUZA_Nio_cache
   public cache_group_recs
   public cache_var_name,  cache_var_nco, cache_var_id
   public cache_co_name,   cache_co_size, cache_co_idx
+  public cache_var_read
+
   public cache_get_attr
 !!!_  - public shared
 contains
@@ -325,7 +331,6 @@ contains
     integer,intent(in) :: handle
     integer,intent(in) :: gid
     integer jc
-    integer jg
     jc = cache_h2index(handle)
     n = min(0, jc)
     if (n.eq.0) then
@@ -830,7 +835,7 @@ contains
   subroutine cache_scan_file &
        & (ierr, c, u, flag, levv)
     use TOUZA_Nio_std,only: choice, condop, is_error_match
-    use TOUZA_Nio_std,only: msg, is_msglev_DETAIL
+    use TOUZA_Nio_std,only: msg, is_msglev_DETAIL, is_msglev_INFO
     use TOUZA_Nio_record,only: nio_read_header, nio_skip_records
     implicit none
     integer,         intent(out)   :: ierr
@@ -918,7 +923,9 @@ contains
           newr = jr.lt.0
           if (.not.newv .and. .not.newr) then
              if (grp(jg)%o(jr, jv).ge.0) then
-                call msg('(''dup = '', I0, 1x, I0)', (/jv, jr/), __MDL__)
+                if (is_msglev_INFO(lv)) then
+                   call msg('(''dup = '', I0, 1x, I0)', (/jv, jr/), __MDL__)
+                endif
                 newv = .true.
              endif
           endif
@@ -1250,6 +1257,55 @@ contains
     enddo loop_rec
   end subroutine search_rec
 
+!!!_ + cached file access
+!!!_  - cache_var_read
+  subroutine cache_var_read_f &
+       & (ierr, d, handle, gid, vid, rec, start, count)
+    use TOUZA_Nio_std,only: KTGT=>KFLT, KIOFS
+    use TOUZA_Nio_record,only: nio_read_header, nio_read_data
+    integer,        intent(out) :: ierr
+    real(kind=KTGT),intent(out) :: d(*)
+    integer,        intent(in)  :: handle, gid, vid
+    integer,        intent(in)  :: rec
+    integer,        intent(in)  :: start(0:*), count(0:*)
+    integer jc
+    type(group_t),pointer :: g
+    type(var_t),pointer :: v
+    integer ofs(0:lax-1), mem(0:lax-1)
+    character(len=litem) :: h(nitem)
+    integer(kind=KIOFS) :: jpos
+    integer krect, ufile
+    integer jeff, jco
+    integer n
+
+    ierr = 0
+    jc = cache_is_valid(handle, gid, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       ufile = cache_h2unit(handle)
+       g => ctables(jc)%g(gid)
+       v => ctables(jc)%g(gid)%v(vid)
+       if (rec.lt.0.or.rec.ge.g%nrec) ierr = ERR_INVALID_PARAMETER
+    endif
+    ! write(*, *) 'var_read', ierr, jc, handle, gid, vid
+    if (ierr.eq.0) then
+       jpos = g%o(rec, vid) + 1
+       call nio_read_header(ierr, h, krect, ufile, jpos)
+    endif
+    ! write(*, *) 'var_read/header', ierr, rec, jpos, ufile
+    if (ierr.eq.0) then
+       ofs(0:lax-1) = 0
+       mem(0:lax-1) = v%jend(0:lax-1) - v%jbgn(0:lax-1)
+       do jeff = 0, v%neff - 1
+          jco = v%ceff(jeff)
+          ofs(jco) = start(jeff)
+          mem(jco) = count(jeff)
+       enddo
+       n = -1
+       call nio_read_data(ierr, d, n, h, krect, ufile, start=ofs(0:lax-1), count=mem(0:lax-1))
+       ! write(*, *) 'cache_var_read', ierr, n, ofs(0:lax-1), mem(0:lax-1)
+    endif
+  end subroutine cache_var_read_f
 !!!_ + cached file manager
 !!!_  & cache_inquire
 !!!_  & cache_inquire_variable

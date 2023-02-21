@@ -1,7 +1,7 @@
 !!!_! nio_intfc.F90 - TOUZA/Nio c interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2023
-#define TIME_STAMP 'Time-stamp: <2023/02/20 14:41:09 fuyuki nio_intfc.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/22 08:09:57 fuyuki nio_intfc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -29,6 +29,7 @@ module TOUZA_Nio_intfc
   integer,parameter :: lpath = OPT_PATH_LEN
   integer,parameter :: lvar  = 64
 !!!_  - private parameter
+  integer,parameter :: lax = 6   !  3 is enough
 !!!_  - static
 !!!_  - private static
   integer,save :: init_mode = 0
@@ -269,6 +270,7 @@ contains
        jco = nco - 1 - int(cid)
        ns = cache_co_size(int(handle), int(gid), int(vid), jco)
     endif
+    nsize = ns
   end function tni_co_size
 
 !!!_  - tni_co_idx()
@@ -346,6 +348,38 @@ contains
     endif
     ierr = jerr
   end function tni_get_attr
+
+!!!_  - tni_var_read_float()
+  integer(kind=C_INT) function tni_var_read_float &
+       & (d, rec, start, count, handle, gid, vid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_var_read, cache_var_nco
+    implicit none
+    real(kind=C_FLOAT),    intent(out)      :: d(*)
+    integer(kind=C_SIZE_T),intent(in),value :: rec
+    integer(kind=C_SIZE_T),intent(in)       :: start(0:*), count(0:*)
+    integer(kind=C_INT),   intent(in),value :: handle
+    integer(kind=C_INT),   intent(in),value :: gid
+    integer(kind=C_INT),   intent(in),value :: vid
+    integer nco, jco, jeff
+    integer jerr
+    integer st(0:lax-1), co(0:lax-1)
+
+    nco = cache_var_nco(int(handle), int(gid), int(vid))
+    jerr = min(0, nco)
+    do jeff = 0, nco - 1
+       jco = nco - 1 - jeff
+       st(jco) = start(jeff)
+       co(jco) = count(jeff)
+    enddo
+
+    if (jerr.eq.0) then
+       call cache_var_read &
+            & (jerr,        d,           &
+            &  int(handle), int(gid),    int(vid), &
+            &  int(rec),    st(0:nco-1), co(0:nco-1))
+    endif
+    ierr = jerr
+  end function tni_var_read_float
 
 !!!_ + common interfaces
 !!!_  & init
