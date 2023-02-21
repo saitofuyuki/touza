@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz swiss(CH) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/02/05 21:01:20 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/21 10:05:08 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1393,6 +1393,26 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_POW
+!!!_   . apply_BINARY_MODULO
+  subroutine apply_BINARY_MODULO &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_MODULO(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_MODULO
 !!!_   . apply_BINARY_ATAN2
   subroutine apply_BINARY_ATAN2 &
        & (ierr, Z, domZ, FZ, X, domX, FX)
@@ -2413,6 +2433,18 @@ contains
        Z = X ** Y
     endif
   end function elem_POW
+!!!_   & elem_MODULO() - modulo(X, Y)
+  ELEMENTAL &
+  real(kind=KBUF) function elem_MODULO (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else
+       Z = MODULO(X, Y)
+    endif
+  end function elem_MODULO
 !!!_   & elem_MIN() - MIN(X, Y)
   ELEMENTAL &
   real(kind=KBUF) function elem_MIN (X, Y, FX, FY) result(Z)

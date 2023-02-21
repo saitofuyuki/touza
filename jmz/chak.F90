@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/02/05 20:38:13 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/21 10:00:54 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -4317,6 +4317,8 @@ contains
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_MOD)
        else if (handle.eq.opr_POW) then
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_POW)
+       else if (handle.eq.opr_MODULO) then
+          call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_MODULO)
        else if (handle.eq.opr_BITAND) then
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_BITAND)
        else if (handle.eq.opr_BITOR) then

@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/01/10 08:14:00 fuyuki genopr.sh>
+# Time-stamp: <2023/02/21 09:57:30 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -144,6 +144,8 @@ register_all ()
   register -n 2,1 -i mul,'//' IDIV    'A//B'
   register -n 2,1 -i mul,'%'  MOD     'mod(A,B)'
   register -n 2,1 -i exp,'**' POW     'pow(A,B)'
+
+  register -n 2,1 -i call MODULO      'modulo(A,B)'
 
   # primitive binary inclusive
   register -g lazy -n 2,1 -i add,'+'  -f ADD,ZERO LADD    'lazy ADD'
