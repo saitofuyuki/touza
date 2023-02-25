@@ -1,7 +1,7 @@
 !!!_! touza.h - touza definitions
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 5 2020
-! Time-stamp: <2023/01/07 21:54:07 fuyuki touza.h>
+! Time-stamp: <2023/02/25 15:46:46 fuyuki touza.h>
 
 /* Copyright (C) 2020-2022 */
 /*           Japan Agency for Marine-Earth Science and Technology */
@@ -95,6 +95,7 @@
 #define ERR_MASK_STD_WSH (ERR_MASK_STD + ERR_MASK_MODULE * 9)
 #define ERR_MASK_STD_SUS (ERR_MASK_STD + ERR_MASK_MODULE *10)
 #define ERR_MASK_STD_HTB (ERR_MASK_STD + ERR_MASK_MODULE *11)
+#define ERR_MASK_STD_IPC (ERR_MASK_STD + ERR_MASK_MODULE *12)
 
 #define ERR_MASK_DIV        (ERR_MASK_GROUP * 4)
 #define ERR_MASK_DIV_STD    (ERR_MASK_DIV + ERR_MASK_MODULE * 1)

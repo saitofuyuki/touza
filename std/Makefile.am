@@ -1,7 +1,7 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2023/02/17 21:25:53 fuyuki Makefile.am>
+# Time-stamp: <2023/02/25 15:56:23 fuyuki Makefile.am>
 #
 # Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -21,7 +21,7 @@ noinst_LTLIBRARIES	=	libtouza_local.la
 
 libtouza_local_la_SOURCES = std_prc.F90 std_utl.F90 std_log.F90 std_wsh.F90 \
 							std_bld.F90 std_mwe.F90 std_fun.F90 std_env.F90 \
-							std_sus.F90 std_arg.F90 std_htb.F90 \
+							std_ipc.F90 std_sus.F90 std_arg.F90 std_htb.F90 \
 							std.F90 $(include_HEADERS)
 
 MOSTLYCLEANFILES	+=	fort.*
@@ -33,6 +33,7 @@ check_PROGRAMS			=	test_std_prc test_std_utl test_std_log \
 							test_std_sus test_std_arg
 check_PROGRAMS += test_std_htb1 test_std_htb2 test_std_htb3
 check_PROGRAMS += test_std_sus1 test_std_sus2
+check_PROGRAMS += test_std_ipc1 test_std_ipc2
 check_PROGRAMS += test_std
 
 test_std_prc_SOURCES	=	std_prc.F90
@@ -93,6 +94,14 @@ test_std_htb3_LDADD		=	$(test_std_htb1_LDADD)
 test_std_SOURCES	=	std.F90
 test_std_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD=1
 test_std_LDADD		=	$(TEST_COMMON_LIBS)
+
+test_std_ipc1_SOURCES	=	std_ipc.F90
+test_std_ipc1_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_IPC=1
+test_std_ipc1_LDADD		=	$(TEST_COMMON_LIBS)
+
+test_std_ipc2_SOURCES	=	$(test_std_ipc1_SOURCES)
+test_std_ipc2_CPPFLAGS	=	$(AM_CPPFLAGS) -DTEST_STD_IPC=2
+test_std_ipc2_LDADD		=	$(test_std_ipc1_LDADD)
 
 include Makedep.inc
 
