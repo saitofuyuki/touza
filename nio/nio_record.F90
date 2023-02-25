@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/02/15 08:58:43 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/25 22:27:39 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -2156,6 +2156,9 @@ contains
     ierr = 0
     nbits = kfmt - GFMT_URY
     mcom  = count_packed(nbits, nh, mold)
+    ! notes on IBITS()
+    ! ipc_IBITS() substitution is not necessary because nbits < bit_size().
+    ! see TOUZA_Std_ipc.
     imiss = IBITS(HUGE(0_KISRC), 0, nbits)
     kpack = legacy_packing(nbits, nh)
     do jk = 1, nk
