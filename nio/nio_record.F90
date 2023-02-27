@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/02/25 22:27:39 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/06 10:55:45 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -193,6 +193,12 @@ module TOUZA_Nio_record
   interface get_data_record_runl
      module procedure get_data_record_runl_i, get_data_record_runl_f, get_data_record_runl_d
   end interface get_data_record_runl
+  interface get_data_record_list
+     module procedure get_data_record_list_i, get_data_record_list_f, get_data_record_list_d
+  end interface get_data_record_list
+  interface get_data_record_suspend
+     module procedure get_data_record_suspend_i, get_data_record_suspend_f, get_data_record_suspend_d
+  end interface get_data_record_suspend
 
   interface put_data_record
      module procedure put_data_record_i,  put_data_record_f,  put_data_record_d
@@ -944,8 +950,8 @@ contains
     implicit none
     integer,parameter :: KARG=KDBL
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: ld
+    real(kind=KARG), intent(out) :: d(*)             ! data array
+    integer,         intent(in)  :: ld               ! limit size of d
     character(len=*),intent(in)  :: head(*)
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
@@ -1132,7 +1138,7 @@ contains
     integer,parameter :: KARG=KDBL
     integer,         intent(out) :: ierr
     real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: ld
+    integer,         intent(in)  :: ld       ! limit size of d
     integer,         intent(in)  :: kfmt
     integer,         intent(in)  :: kaxs(*)
     real(kind=KRMIS),intent(in)  :: vmiss
@@ -1140,71 +1146,62 @@ contains
     integer,         intent(in)  :: u
     integer,optional,intent(out) :: kopts(:)
 
-    integer n, nh, nk
+    integer nd           ! data size array
+    integer mw, mh, mk   ! data sizes in file (3d, plane, levels)
 
     ierr = 0
-
-    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
-    if (IAND(kfmt, GFMT_LPAD).eq.0) then
-       if (n.gt.ld) then
-          ierr = _ERROR(ERR_SIZE_MISMATCH)
-          return
-       endif
-    else
-       n = ld
-       if (ld.le.0) n = ld
+    if (ierr.eq.0) call nio_read_data_set(ierr, nd, mw, kaxs, laxs, kfmt, ld)
+    if (ierr.eq.0) then
+       select case (kfmt)
+       case (GFMT_UR4)
+          call get_data_frecord(ierr, d, nd, u, krect)
+       case (GFMT_UR8)
+          call get_data_drecord(ierr, d, nd, u, krect)
+       case (GFMT_UI4)
+          call get_data_irecord(ierr, d, nd, u, krect)
+       case (GFMT_MR4)
+          call get_data_mr4(ierr, d, nd, u, krect, vmiss, mw)
+       case (GFMT_MR8)
+          call get_data_mr8(ierr, d, nd, u, krect, vmiss, mw)
+       case (GFMT_MI4)
+          call get_data_mi4(ierr, d, nd, u, krect, vmiss, mw)
+       case (GFMT_URC, GFMT_URC2)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_urc &
+               & (ierr, d, mh, mk, u, krect, vmiss, IMISS_URC, kfmt)
+       case (GFMT_URY:GFMT_URYend-1)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_ury &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk)
+       case (GFMT_MRY:GFMT_MRYend-1)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_mry &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk)
+       case (GFMT_URT)
+          call get_data_urt &
+               & (ierr, d, nd, kaxs, u, krect, vmiss, kfmt, kopts)
+       case (GFMT_MRT)
+          call get_data_mrt &
+               & (ierr, d, nd, kaxs, u, krect, vmiss, kfmt, kopts)
+       case (GFMT_PR8)
+          mk = max(1, kaxs(3))
+          call get_data_pr8 &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mk, kopts)
+       case (GFMT_PR4)
+          mk = max(1, kaxs(3))
+          call get_data_pr4 &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mk, kopts)
+       case (GFMT_PI4)
+          mk = max(1, kaxs(3))
+          call get_data_pi4 &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mk, kopts)
+       case default
+          ierr = _ERROR(ERR_INVALID_SWITCH)
+       end select
     endif
-
-    select case (kfmt)
-    case (GFMT_UR4)
-       call get_data_frecord(ierr, d, n, u, krect)
-    case (GFMT_UR8)
-       call get_data_drecord(ierr, d, n, u, krect)
-    case (GFMT_UI4)
-       call get_data_irecord(ierr, d, n, u, krect)
-    case (GFMT_MR4)
-       call get_data_mr4(ierr, d, n, u, krect, vmiss)
-    case (GFMT_MR8)
-       call get_data_mr8(ierr, d, n, u, krect, vmiss)
-    case (GFMT_MI4)
-       call get_data_mi4(ierr, d, n, u, krect, vmiss)
-    case (GFMT_URC, GFMT_URC2)
-       nh = max(1, kaxs(1)) * max(1, kaxs(2))
-       nk = kaxs(3)
-       call get_data_urc &
-            & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
-    case (GFMT_URY:GFMT_URYend-1)
-       nh = max(1, kaxs(1)) * max(1, kaxs(2))
-       nk = max(1, kaxs(3))
-       call get_data_ury &
-            & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_MRY:GFMT_MRYend-1)
-       nh = max(1, kaxs(1)) * max(1, kaxs(2))
-       nk = max(1, kaxs(3))
-       call get_data_mry &
-            & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_URT)
-       call get_data_urt &
-            & (ierr, d, n, kaxs, u, krect, vmiss, kfmt, kopts)
-    case (GFMT_MRT)
-       call get_data_mrt &
-            & (ierr, d, n, kaxs, u, krect, vmiss, kfmt, kopts)
-    case (GFMT_PR8)
-       nk = max(1, kaxs(3))
-       call get_data_pr8 &
-            & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    case (GFMT_PR4)
-       nk = max(1, kaxs(3))
-       call get_data_pr4 &
-            & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    case (GFMT_PI4)
-       nk = max(1, kaxs(3))
-       call get_data_pi4 &
-            & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    case default
-       ierr = _ERROR(ERR_INVALID_SWITCH)
-    end select
-
     return
   end subroutine nio_read_data_core_d
   subroutine nio_read_data_core_f &
@@ -1222,64 +1219,56 @@ contains
     integer,         intent(in)  :: u
     integer,optional,intent(out) :: kopts(:)
 
-    integer n, nh, nk
+    integer nd           ! data size array
+    integer mw, mh, mk   ! data sizes in file (3d, plane, levels)
 
     ierr = 0
-    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
-    if (IAND(kfmt, GFMT_LPAD).eq.0) then
-       if (n.gt.ld) then
-          ierr = _ERROR(ERR_SIZE_MISMATCH)
-          return
-       endif
-    else
-       n = ld
-       if (ld.le.0) n = ld
+    if (ierr.eq.0) call nio_read_data_set(ierr, nd, mw, kaxs, laxs, kfmt, ld)
+    if (ierr.eq.0) then
+       select case (kfmt)
+       case (GFMT_UR4)
+          call get_data_frecord(ierr, d, nd, u, krect)
+       case (GFMT_UR8)
+          call get_data_drecord(ierr, d, nd, u, krect)
+       case (GFMT_UI4)
+          call get_data_irecord(ierr, d, nd, u, krect)
+       case (GFMT_MR4)
+          call get_data_mr4(ierr, d, nd, u, krect, vmiss, mw)
+       case (GFMT_MR8)
+          call get_data_mr8(ierr, d, nd, u, krect, vmiss, mw)
+       case (GFMT_MI4)
+          call get_data_mi4(ierr, d, nd, u, krect, vmiss, mw)
+       case (GFMT_URC, GFMT_URC2)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_urc &
+               & (ierr, d, mh, mk, u, krect, vmiss, IMISS_URC, kfmt)
+       case (GFMT_URY:GFMT_URYend-1)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_ury &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk)
+       case (GFMT_MRY:GFMT_MRYend-1)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_mry &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk)
+       case (GFMT_PR8)
+          mk = max(1, kaxs(3))
+          call get_data_pr8 &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mk, kopts)
+       case (GFMT_PR4)
+          mk = max(1, kaxs(3))
+          call get_data_pr4 &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mk, kopts)
+       case (GFMT_PI4)
+          mk = max(1, kaxs(3))
+          call get_data_pi4 &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mk, kopts)
+       case default
+          ierr = _ERROR(ERR_INVALID_SWITCH)
+       end select
     endif
-
-    select case (kfmt)
-    case (GFMT_UR4)
-       call get_data_frecord(ierr, d, n, u, krect)
-    case (GFMT_UR8)
-       call get_data_drecord(ierr, d, n, u, krect)
-    case (GFMT_UI4)
-       call get_data_irecord(ierr, d, n, u, krect)
-    case (GFMT_MR4)
-       call get_data_mr4(ierr, d, n, u, krect, vmiss)
-    case (GFMT_MR8)
-       call get_data_mr8(ierr, d, n, u, krect, vmiss)
-    case (GFMT_MI4)
-       call get_data_mi4(ierr, d, n, u, krect, vmiss)
-    case (GFMT_URC, GFMT_URC2)
-       nh = max(1, kaxs(1)) * max(1, kaxs(2))
-       nk = max(1, kaxs(3))
-       call get_data_urc &
-            & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
-    case (GFMT_URY:GFMT_URYend-1)
-       nh = max(1, kaxs(1)) * max(1, kaxs(2))
-       nk = max(1, kaxs(3))
-       call get_data_ury &
-            & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_MRY:GFMT_MRYend-1)
-       nh = max(1, kaxs(1)) * max(1, kaxs(2))
-       nk = max(1, kaxs(3))
-       call get_data_mry &
-            & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_PR8)
-       nk = max(1, kaxs(3))
-       call get_data_pr8 &
-            & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    case (GFMT_PR4)
-       nk = max(1, kaxs(3))
-       call get_data_pr4 &
-            & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    case (GFMT_PI4)
-       nk = max(1, kaxs(3))
-       call get_data_pi4 &
-            & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    case default
-       ierr = _ERROR(ERR_INVALID_SWITCH)
-    end select
-
     return
   end subroutine nio_read_data_core_f
   subroutine nio_read_data_core_i &
@@ -1297,64 +1286,56 @@ contains
     integer,           intent(in)  :: u
     integer,optional,  intent(out) :: kopts(:)
 
-    integer n, nh, nk
+    integer nd           ! data size array
+    integer mw, mh, mk   ! data sizes in file (3d, plane, levels)
 
     ierr = 0
-    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
-    if (IAND(kfmt, GFMT_LPAD).eq.0) then
-       if (n.gt.ld) then
-          ierr = _ERROR(ERR_SIZE_MISMATCH)
-          return
-       endif
-    else
-       n = ld
-       if (ld.le.0) n = ld
+    if (ierr.eq.0) call nio_read_data_set(ierr, nd, mw, kaxs, laxs, kfmt, ld)
+    if (ierr.eq.0) then
+       select case (kfmt)
+       case (GFMT_UR4)
+          call get_data_frecord(ierr, d, nd, u, krect)
+       case (GFMT_UR8)
+          call get_data_drecord(ierr, d, nd, u, krect)
+       case (GFMT_UI4)
+          call get_data_irecord(ierr, d, nd, u, krect)
+       case (GFMT_MR4)
+          call get_data_mr4(ierr, d, nd, u, krect, vmiss, mw)
+       case (GFMT_MR8)
+          call get_data_mr8(ierr, d, nd, u, krect, vmiss, mw)
+       case (GFMT_MI4)
+          call get_data_mi4(ierr, d, nd, u, krect, vmiss, mw)
+       case (GFMT_URC, GFMT_URC2)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_urc &
+               & (ierr, d, mh, mk, u, krect, vmiss, IMISS_URC, kfmt)
+       case (GFMT_URY:GFMT_URYend-1)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_ury &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk)
+       case (GFMT_MRY:GFMT_MRYend-1)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_mry &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk)
+       case (GFMT_PR8)
+          mk = max(1, kaxs(3))
+          call get_data_pr8 &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mk, kopts)
+       case (GFMT_PR4)
+          mk = max(1, kaxs(3))
+          call get_data_pr4 &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mk, kopts)
+       case (GFMT_PI4)
+          mk = max(1, kaxs(3))
+          call get_data_pi4 &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mk, kopts)
+       case default
+          ierr = _ERROR(ERR_INVALID_SWITCH)
+       end select
     endif
-
-    select case (kfmt)
-    case (GFMT_UR4)
-       call get_data_frecord(ierr, d, n, u, krect)
-    case (GFMT_UR8)
-       call get_data_drecord(ierr, d, n, u, krect)
-    case (GFMT_UI4)
-       call get_data_irecord(ierr, d, n, u, krect)
-    case (GFMT_MR4)
-       call get_data_mr4(ierr, d, n, u, krect, vmiss)
-    case (GFMT_MR8)
-       call get_data_mr8(ierr, d, n, u, krect, vmiss)
-    case (GFMT_MI4)
-       call get_data_mi4(ierr, d, n, u, krect, vmiss)
-    case (GFMT_URC, GFMT_URC2)
-       nh = max(1, kaxs(1)) * max(1, kaxs(2))
-       nk = max(1, kaxs(3))
-       call get_data_urc &
-            & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
-    case (GFMT_URY:GFMT_URYend-1)
-       nh = max(1, kaxs(1)) * max(1, kaxs(2))
-       nk = max(1, kaxs(3))
-       call get_data_ury &
-            & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_MRY:GFMT_MRYend-1)
-       nh = max(1, kaxs(1)) * max(1, kaxs(2))
-       nk = max(1, kaxs(3))
-       call get_data_mry &
-            & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    case (GFMT_PR8)
-       nk = max(1, kaxs(3))
-       call get_data_pr8 &
-            & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    case (GFMT_PR4)
-       nk = max(1, kaxs(3))
-       call get_data_pr4 &
-            & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    case (GFMT_PI4)
-       nk = max(1, kaxs(3))
-       call get_data_pi4 &
-            & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    case default
-       ierr = _ERROR(ERR_INVALID_SWITCH)
-    end select
-
     return
   end subroutine nio_read_data_core_i
 
@@ -1367,7 +1348,7 @@ contains
     integer,parameter :: KARG=KDBL
     integer,         intent(out) :: ierr
     real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: ld
+    integer,         intent(in)  :: ld         ! limit size of d. negative for infinite.
     integer,         intent(in)  :: kfmt
     integer,         intent(in)  :: kaxs(*)
     real(kind=KRMIS),intent(in)  :: vmiss
@@ -1377,107 +1358,47 @@ contains
     integer,         intent(in)  :: count(:)
     integer,optional,intent(out) :: kopts(:)
 
-    integer n, nh, nk
-    integer bes(3, laxs), m
+    integer nd           ! data size array
+    integer mw, mh, mk   ! data sizes in file (3d, plane, levels)
+    integer bes(3, laxs)
     integer nb
 
     ierr = 0
-    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
-    if (IAND(kfmt, GFMT_LPAD).eq.0) then
-       if (ld.ge.0.and.n.gt.ld) then
-          ierr = _ERROR(ERR_SIZE_MISMATCH)
-          return
-       endif
-    else
-       n = ld
-       if (ld.le.0) n = ld
-    endif
-
-    select case (kfmt)
-    case (GFMT_UR4,GFMT_UR8,GFMT_UI4)
-       nb = min(size(start), size(count))
-       bes(3, 1:laxs) = max(1, kaxs(1:laxs))
-       bes(1, 1:nb)   = start(1:nb)
-       bes(2, 1:nb)   = start(1:nb) + count(1:nb)
-       bes(1, nb+1:laxs) = 0
-       bes(2, nb+1:laxs) = bes(3, 1:laxs)
-       m = product(count(1:nb))
+    call nio_read_slice_set &
+       & (ierr, bes, nd, mw, kaxs, laxs, kfmt, ld, start, count)
+    if (ierr.eq.0) then
        select case (kfmt)
        case (GFMT_UR4)
-          call get_data_frecord_slice_d(ierr, d, n, u, krect, m, bes, laxs)
+          call get_data_frecord_slice_d(ierr, d, nd, u, krect, mw, bes, laxs)
        case (GFMT_UR8)
-          call get_data_record_slice_d(ierr, d, n, u, krect, bes, laxs)
+          call get_data_record_slice_d(ierr, d, nd, u, krect, mw, bes, laxs)
        case (GFMT_UI4)
-          call get_data_irecord_slice_d(ierr, d, n, u, krect, m, bes, laxs)
+          call get_data_irecord_slice_d(ierr, d, nd, u, krect, mw, bes, laxs)
+       case (GFMT_MR8)
+          call get_data_mr8(ierr, d, nd, u, krect, vmiss, mw, bes, laxs)
+       case (GFMT_MR4)
+          call get_data_mr4(ierr, d, nd, u, krect, vmiss, mw, bes, laxs)
+       case (GFMT_MI4)
+          call get_data_mi4(ierr, d, nd, u, krect, vmiss, mw, bes, laxs)
+       case (GFMT_URC, GFMT_URC2)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_URY:GFMT_URYend-1)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_ury &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk, bes, laxs)
+       case (GFMT_MRY:GFMT_MRYend-1)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_URT)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_MRT)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case default
+          ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
-    case (GFMT_MR4,GFMT_MR8,GFMT_MI4)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_URC, GFMT_URC2)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_URY:GFMT_URYend-1)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_MRY:GFMT_MRYend-1)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_URT)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_MRT)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case default
-       ierr = _ERROR(ERR_INVALID_SWITCH)
-    end select
-
-    ! select case (kfmt)
-    ! case (GFMT_UR4)
-    !    call get_data_frecord(ierr, d, n, u, krect)
-    ! case (GFMT_UR8)
-    !    call get_data_drecord(ierr, d, n, u, krect)
-    ! case (GFMT_UI4)
-    !    call get_data_irecord(ierr, d, n, u, krect)
-    ! case (GFMT_MR4)
-    !    call get_data_mr4(ierr, d, n, u, krect, vmiss)
-    ! case (GFMT_MR8)
-    !    call get_data_mr8(ierr, d, n, u, krect, vmiss)
-    ! case (GFMT_MI4)
-    !    call get_data_mi4(ierr, d, n, u, krect, vmiss)
-    ! case (GFMT_URC, GFMT_URC2)
-    !    nh = max(1, kaxs(1)) * max(1, kaxs(2))
-    !    nk = kaxs(3)
-    !    call get_data_urc &
-    !         & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
-    ! case (GFMT_URY:GFMT_URYend-1)
-    !    nh = max(1, kaxs(1)) * max(1, kaxs(2))
-    !    nk = max(1, kaxs(3))
-    !    call get_data_ury &
-    !         & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    ! case (GFMT_MRY:GFMT_MRYend-1)
-    !    nh = max(1, kaxs(1)) * max(1, kaxs(2))
-    !    nk = max(1, kaxs(3))
-    !    call get_data_mry &
-    !         & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    ! case (GFMT_URT)
-    !    call get_data_urt &
-    !         & (ierr, d, n, kaxs, u, krect, vmiss, kfmt, kopts)
-    ! case (GFMT_MRT)
-    !    call get_data_mrt &
-    !         & (ierr, d, n, kaxs, u, krect, vmiss, kfmt, kopts)
-    ! case (GFMT_PR8)
-    !    nk = max(1, kaxs(3))
-    !    call get_data_pr8 &
-    !         & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    ! case (GFMT_PR4)
-    !    nk = max(1, kaxs(3))
-    !    call get_data_pr4 &
-    !         & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    ! case (GFMT_PI4)
-    !    nk = max(1, kaxs(3))
-    !    call get_data_pi4 &
-    !         & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    ! case default
-    !    ierr = _ERROR(ERR_INVALID_SWITCH)
-    ! end select
-
+    endif
     return
   end subroutine nio_read_data_slice_d
   subroutine nio_read_data_slice_f &
@@ -1498,102 +1419,47 @@ contains
     integer,         intent(in)  :: count(:)
     integer,optional,intent(out) :: kopts(:)
 
-    integer n, nh, nk
-    integer bes(3, laxs), m
+    integer nd           ! data size array
+    integer mw, mh, mk   ! data sizes in file (3d, plane, levels)
+    integer bes(3, laxs)
     integer nb
 
     ierr = 0
-    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
-    if (IAND(kfmt, GFMT_LPAD).eq.0) then
-       if (ld.ge.0.and.n.gt.ld) then
-          ierr = _ERROR(ERR_SIZE_MISMATCH)
-          return
-       endif
-    else
-       n = ld
-       if (ld.le.0) n = ld
-    endif
-
-    select case (kfmt)
-    case (GFMT_UR4,GFMT_UR8,GFMT_UI4)
-       nb = min(size(start), size(count))
-       bes(3, 1:laxs) = max(1, kaxs(1:laxs))
-       bes(1, 1:nb)   = start(1:nb)
-       bes(2, 1:nb)   = start(1:nb) + count(1:nb)
-       bes(1, nb+1:laxs) = 0
-       bes(2, nb+1:laxs) = bes(3, 1:laxs)
-       m = product(count(1:nb))
+    call nio_read_slice_set &
+       & (ierr, bes, nd, mw, kaxs, laxs, kfmt, ld, start, count)
+    if (ierr.eq.0) then
        select case (kfmt)
        case (GFMT_UR4)
-          call get_data_record_slice_f(ierr, d, n, u, krect, bes, laxs)
+          call get_data_record_slice_f(ierr, d, nd, u, krect, mw, bes, laxs)
        case (GFMT_UR8)
-          call get_data_drecord_slice_f(ierr, d, n, u, krect, m, bes, laxs)
+          call get_data_drecord_slice_f(ierr, d, nd, u, krect, mw, bes, laxs)
        case (GFMT_UI4)
-          call get_data_irecord_slice_f(ierr, d, n, u, krect, m, bes, laxs)
+          call get_data_irecord_slice_f(ierr, d, nd, u, krect, mw, bes, laxs)
+       case (GFMT_MR8)
+          call get_data_mr8(ierr, d, nd, u, krect, vmiss, mw, bes, laxs)
+       case (GFMT_MR4)
+          call get_data_mr4(ierr, d, nd, u, krect, vmiss, mw, bes, laxs)
+       case (GFMT_MI4)
+          call get_data_mi4(ierr, d, nd, u, krect, vmiss, mw, bes, laxs)
+       case (GFMT_URC, GFMT_URC2)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_URY:GFMT_URYend-1)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_ury &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk, bes, laxs)
+       case (GFMT_MRY:GFMT_MRYend-1)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_URT)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_MRT)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case default
+          ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
-       ! write(*, *) 'slice', ierr, n, m, bes(:, 1:laxs)
-    case (GFMT_MR4,GFMT_MR8,GFMT_MI4)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_URC, GFMT_URC2)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_URY:GFMT_URYend-1)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_MRY:GFMT_MRYend-1)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_URT)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_MRT)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case default
-       ierr = _ERROR(ERR_INVALID_SWITCH)
-    end select
-
-    ! select case (kfmt)
-    ! case (GFMT_UR4)
-    !    call get_data_frecord(ierr, d, n, u, krect)
-    ! case (GFMT_UR8)
-    !    call get_data_drecord(ierr, d, n, u, krect)
-    ! case (GFMT_UI4)
-    !    call get_data_irecord(ierr, d, n, u, krect)
-    ! case (GFMT_MR4)
-    !    call get_data_mr4(ierr, d, n, u, krect, vmiss)
-    ! case (GFMT_MR8)
-    !    call get_data_mr8(ierr, d, n, u, krect, vmiss)
-    ! case (GFMT_MI4)
-    !    call get_data_mi4(ierr, d, n, u, krect, vmiss)
-    ! case (GFMT_URC, GFMT_URC2)
-    !    nh = max(1, kaxs(1)) * max(1, kaxs(2))
-    !    nk = max(1, kaxs(3))
-    !    call get_data_urc &
-    !         & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
-    ! case (GFMT_URY:GFMT_URYend-1)
-    !    nh = max(1, kaxs(1)) * max(1, kaxs(2))
-    !    nk = max(1, kaxs(3))
-    !    call get_data_ury &
-    !         & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    ! case (GFMT_MRY:GFMT_MRYend-1)
-    !    nh = max(1, kaxs(1)) * max(1, kaxs(2))
-    !    nk = max(1, kaxs(3))
-    !    call get_data_mry &
-    !         & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    ! case (GFMT_PR8)
-    !    nk = max(1, kaxs(3))
-    !    call get_data_pr8 &
-    !         & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    ! case (GFMT_PR4)
-    !    nk = max(1, kaxs(3))
-    !    call get_data_pr4 &
-    !         & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    ! case (GFMT_PI4)
-    !    nk = max(1, kaxs(3))
-    !    call get_data_pi4 &
-    !         & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    ! case default
-    !    ierr = _ERROR(ERR_INVALID_SWITCH)
-    ! end select
-
+    endif
     return
   end subroutine nio_read_data_slice_f
   subroutine nio_read_data_slice_i &
@@ -1614,103 +1480,105 @@ contains
     integer,           intent(in)  :: count(:)
     integer,optional,  intent(out) :: kopts(:)
 
-    integer n, nh, nk
-    integer bes(3, laxs), m
+    integer nd           ! data size array
+    integer mw, mh, mk   ! data sizes in file (3d, plane, levels)
+    integer bes(3, laxs)
     integer nb
 
     ierr = 0
-    n = max(1, kaxs(1)) * max(1, kaxs(2)) * max(1, kaxs(3))
-    if (IAND(kfmt, GFMT_LPAD).eq.0) then
-       if (ld.ge.0.and.n.gt.ld) then
-          ierr = _ERROR(ERR_SIZE_MISMATCH)
-          return
-       endif
-    else
-       n = ld
-       if (ld.le.0) n = ld
-    endif
-
-    select case (kfmt)
-    case (GFMT_UR4,GFMT_UR8,GFMT_UI4)
-       nb = min(size(start), size(count))
-       bes(3, 1:laxs) = max(1, kaxs(1:laxs))
-       bes(1, 1:nb)   = start(1:nb)
-       bes(2, 1:nb)   = start(1:nb) + count(1:nb)
-       bes(1, nb+1:laxs) = 0
-       bes(2, nb+1:laxs) = bes(3, 1:laxs)
-       m = product(count(1:nb))
+    call nio_read_slice_set &
+       & (ierr, bes, nd, mw, kaxs, laxs, kfmt, ld, start, count)
+    if (ierr.eq.0) then
        select case (kfmt)
        case (GFMT_UR4)
-          call get_data_frecord_slice_i(ierr, d, n, u, krect, m, bes, laxs)
+          call get_data_frecord_slice_i(ierr, d, nd, u, krect, mw, bes, laxs)
        case (GFMT_UR8)
-          call get_data_drecord_slice_i(ierr, d, n, u, krect, m, bes, laxs)
+          call get_data_drecord_slice_i(ierr, d, nd, u, krect, mw, bes, laxs)
        case (GFMT_UI4)
-          call get_data_record_slice_i(ierr, d, n, u, krect, bes, laxs)
+          call get_data_record_slice_i(ierr, d, nd, u, krect, mw, bes, laxs)
+       case (GFMT_MR8)
+          call get_data_mr8(ierr, d, nd, u, krect, vmiss, mw, bes, laxs)
+       case (GFMT_MR4)
+          call get_data_mr4(ierr, d, nd, u, krect, vmiss, mw, bes, laxs)
+       case (GFMT_MI4)
+          call get_data_mi4(ierr, d, nd, u, krect, vmiss, mw, bes, laxs)
+       case (GFMT_URC, GFMT_URC2)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_URY:GFMT_URYend-1)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_ury &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk, bes, laxs)
+       case (GFMT_MRY:GFMT_MRYend-1)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_URT)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_MRT)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+       case default
+          ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
-    case (GFMT_MR4,GFMT_MR8,GFMT_MI4)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_URC, GFMT_URC2)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_URY:GFMT_URYend-1)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_MRY:GFMT_MRYend-1)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    ! case (GFMT_URT)
-    !    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    ! case (GFMT_MRT)
-    !    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
-       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    case default
-       ierr = _ERROR(ERR_INVALID_SWITCH)
-    end select
-
-    ! select case (kfmt)
-    ! case (GFMT_UR4)
-    !    call get_data_frecord(ierr, d, n, u, krect)
-    ! case (GFMT_UR8)
-    !    call get_data_drecord(ierr, d, n, u, krect)
-    ! case (GFMT_UI4)
-    !    call get_data_irecord(ierr, d, n, u, krect)
-    ! case (GFMT_MR4)
-    !    call get_data_mr4(ierr, d, n, u, krect, vmiss)
-    ! case (GFMT_MR8)
-    !    call get_data_mr8(ierr, d, n, u, krect, vmiss)
-    ! case (GFMT_MI4)
-    !    call get_data_mi4(ierr, d, n, u, krect, vmiss)
-    ! case (GFMT_URC, GFMT_URC2)
-    !    nh = max(1, kaxs(1)) * max(1, kaxs(2))
-    !    nk = max(1, kaxs(3))
-    !    call get_data_urc &
-    !         & (ierr, d, nh, nk, u, krect, vmiss, IMISS_URC, kfmt)
-    ! case (GFMT_URY:GFMT_URYend-1)
-    !    nh = max(1, kaxs(1)) * max(1, kaxs(2))
-    !    nk = max(1, kaxs(3))
-    !    call get_data_ury &
-    !         & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    ! case (GFMT_MRY:GFMT_MRYend-1)
-    !    nh = max(1, kaxs(1)) * max(1, kaxs(2))
-    !    nk = max(1, kaxs(3))
-    !    call get_data_mry &
-    !         & (ierr, d, nh, nk, u, krect, vmiss, kfmt)
-    ! case (GFMT_PR8)
-    !    nk = max(1, kaxs(3))
-    !    call get_data_pr8 &
-    !         & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    ! case (GFMT_PR4)
-    !    nk = max(1, kaxs(3))
-    !    call get_data_pr4 &
-    !         & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    ! case (GFMT_PI4)
-    !    nk = max(1, kaxs(3))
-    !    call get_data_pi4 &
-    !         & (ierr, d, n, u, krect, vmiss, kfmt, nk, kopts)
-    ! case default
-    !    ierr = _ERROR(ERR_INVALID_SWITCH)
-    ! end select
-
+    endif
     return
   end subroutine nio_read_data_slice_i
+
+!!!_  & nio_read_data_set
+  subroutine nio_read_data_set &
+       & (ierr, nd, mw, kaxs, nr, kfmt, ld)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(out) :: nd   ! target size (to access)
+    integer,intent(out) :: mw   ! full size (in file)
+    integer,intent(in)  :: kaxs(*)
+    integer,intent(in)  :: nr
+    integer,intent(in)  :: kfmt
+    integer,intent(in)  :: ld
+
+    ierr = 0
+    mw = product(max(1, kaxs(1:nr)))
+    nd = mw
+    if (IAND(kfmt, GFMT_LPAD).eq.0) then
+       if (ld.ge.0.and.nd.gt.ld) then
+          ierr = _ERROR(ERR_SIZE_MISMATCH)
+       endif
+    else if (ld.lt.0) then
+       nd = mw
+    else
+       nd = ld
+    endif
+  end subroutine nio_read_data_set
+!!!_  & nio_read_slice_set
+  subroutine nio_read_slice_set &
+       & (ierr, bes, nd, mw, kaxs, nr, kfmt, ld, start, count)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(out) :: bes(3, *)
+    integer,intent(out) :: nd   ! target size (to access)
+    integer,intent(out) :: mw   ! full size (in file)
+    integer,intent(in)  :: kaxs(*)
+    integer,intent(in)  :: nr
+    integer,intent(in)  :: kfmt
+    integer,intent(in)  :: ld
+    integer,intent(in)  :: start(:), count(:)
+
+    ierr = 0
+    mw = product(max(1, kaxs(1:nr)))
+    call bes_triplet(ierr, bes, kaxs, start, count)
+    if (ierr.eq.0) then
+       nd = product(bes(2, 1:nr) - bes(1, 1:nr))
+       if (IAND(kfmt, GFMT_LPAD).eq.0) then
+          if (ld.ge.0.and.nd.gt.ld) then
+             ierr = _ERROR(ERR_SIZE_MISMATCH)
+          endif
+       else if (ld.lt.0) then
+          nd = mw
+       else
+          nd = ld
+       endif
+    endif
+  end subroutine nio_read_slice_set
 
 !!!_  & nio_write_data_core - write data block
   subroutine nio_write_data_core_d &
@@ -2431,118 +2299,269 @@ contains
 !!!_  - get_data_ury - URY
   subroutine get_data_ury_d &
        & (ierr, &
-       &  d, nh, nk, u, krect, vmiss, kfmt)
-    use TOUZA_Trp,only: count_packed, pack_restore
+       &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
+    use TOUZA_Trp,only: count_packed,  pack_restore
+    use TOUZA_Trp,only: pack_gen_runl, pack_gen_bfc, pack_restore_dunp
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: nh, nk
+    real(KIND=KARG),    intent(out) :: d(0:*)
+    integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
-    real(kind=KRMIS),intent(in)  :: vmiss
+    real(KIND=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: mh, mk
+    integer,optional,intent(in)  :: bes(3, *)
+    integer,optional,intent(in)  :: nr
 
     integer             :: nbits, mcom
-    integer             :: idec(nh)
-    integer(kind=KISRC) :: icom(nh * nk)
-    integer(kind=KISRC) :: imiss
-    real(kind=KRSRC)    :: dma(2 * nk)
+    integer             :: idec(0:mh-1)
+    integer(KIND=KISRC) :: icom(0:mh * mk - 1)
+    integer(KIND=KISRC) :: imiss
+    real(KIND=KRSRC)    :: dma(0:2 * mk - 1)
     integer,parameter   :: mold = 0_KISRC
-    integer             :: jk, jdb, jde, jc
+    integer             :: jk, jdb, jde
+    integer,parameter :: cz = 3
     integer kpack
+    integer :: dunp(3, 0:mh), rfil(0:mh)
+    integer :: nunp,          nfil
+    integer :: nh
 
     ierr = 0
     nbits = kfmt - GFMT_URY
-    mcom  = count_packed(nbits, nh, mold)
-    imiss = ISHFT(1, nbits) - 1
-    call get_data_record(ierr, dma, 2 * nk, u, krect)
-    if (ierr.eq.0) call get_data_record(ierr, icom, mcom * nk, u, krect)
-    if (ierr.eq.0) then
-       kpack = legacy_unpacking(nbits, nh)
-       do jk = 1, nk
-          jc = mcom * (jk - 1) + 1
-          call pack_restore(ierr, idec, icom(jc:), nh, nbits, kpack)
-          jdb = nh * (jk - 1) + 1
-          jde = nh * jk
-          where (idec(1:nh).ne.imiss)
-             d(jdb:jde) = dma(2 * jk - 1) + real(idec(1:nh), kind=KARG) * dma(2 * jk)
+    mcom  = count_packed(nbits, mh, mold)
+    ! imiss = ISHFT(1, nbits) - 1
+    imiss = IBITS(NOT(0), 0, nbits)
+    kpack = legacy_unpacking(nbits, mh)
+
+    call get_data_record(ierr, dma, 2 * mk, u, krect)
+    if (present(bes)) then
+       nh = 0
+       if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
+       if (ierr.eq.0) then
+          nfil = 0
+          rfil(nfil) = mcom * bes(1, cz)
+          call get_data_record_suspend(ierr, icom, 0, u, krect, +1, rfil, nfil)
+       endif
+       if (ierr.eq.0) then
+          call pack_gen_bfc &
+               & (ierr, dunp, nunp, rfil, nfil, nbits, mh, bes, cz - 1, kpack, mold)
+          if (ierr.eq.0) nh = dunp(1, nunp)
+       endif
+       do jk = bes(1, cz), bes(2, cz) - 1
+          if (ierr.eq.0) then
+             call get_data_record_suspend(ierr, icom, mcom, u, krect, 0, rfil, nfil)
+          endif
+          if (ierr.eq.0) then
+             call pack_restore_dunp(ierr, idec, icom, mh, nbits, kpack, dunp, nunp)
+          endif
+          jdb = nh * (jk - bes(1, cz))
+          jde = jdb + nh
+          where (idec(0:nh-1).ne.imiss)
+             d(jdb:jde-1) = real(dma(2 * jk) + real(idec(0:nh-1), kind=KRSRC) * dma(2 * jk + 1), &
+                  &              kind=KARG)
           elsewhere
-             d(jdb:jde) = vmiss
+             d(jdb:jde-1) = real(vmiss, kind=KARG)
           end where
        enddo
+       if (ierr.eq.0) then
+          call get_data_record_suspend(ierr, icom, 0, u, krect, -1)
+       endif
+    else
+       if (ierr.eq.0) call get_data_record(ierr, icom, mcom * mk, u, krect)
+       if (ierr.eq.0) then
+          do jk = 0, mk - 1
+             call pack_restore(ierr, idec, icom, mh, nbits, kpack)
+             jdb = mh * jk
+             jde = mh * (jk + 1)
+             where (idec(0:mh-1).ne.imiss)
+                d(jdb:jde-1) = real(dma(2 * jk) + real(idec(0:mh-1), kind=KRSRC) * dma(2 * jk + 1), &
+                     &              kind=KARG)
+             elsewhere
+                d(jdb:jde-1) = real(vmiss, kind=KARG)
+             end where
+          enddo
+       endif
     endif
     return
   end subroutine get_data_ury_d
   subroutine get_data_ury_f &
        & (ierr, &
-       &  d, nh, nk, u, krect, vmiss, kfmt)
-    use TOUZA_Trp,only: count_packed, pack_restore
+       &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
+    use TOUZA_Trp,only: count_packed,  pack_restore
+    use TOUZA_Trp,only: pack_gen_runl, pack_gen_bfc, pack_restore_dunp
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: nh, nk
+    real(KIND=KARG), intent(out) :: d(0:*)
+    integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
-    real(kind=KRMIS),intent(in)  :: vmiss
+    real(KIND=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: mh, mk
+    integer,optional,intent(in)  :: bes(3, *)
+    integer,optional,intent(in)  :: nr
 
     integer             :: nbits, mcom
-    integer             :: idec(nh)
-    integer(kind=KISRC) :: icom(nh * nk)
-    integer(kind=KISRC) :: imiss
-    real(kind=KRSRC)    :: dma(2 * nk)
+    integer             :: idec(0:mh-1)
+    integer(KIND=KISRC) :: icom(0:mh * mk - 1)
+    integer(KIND=KISRC) :: imiss
+    real(KIND=KRSRC)    :: dma(0:2 * mk - 1)
     integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jde
+    integer,parameter :: cz = 3
     integer kpack
+    integer :: dunp(3, 0:mh), rfil(0:mh)
+    integer :: nunp,          nfil
+    integer :: nh
 
     ierr = 0
     nbits = kfmt - GFMT_URY
-    mcom  = count_packed(nbits, nh, mold)
-    imiss = ISHFT(1, nbits) - 1
+    mcom  = count_packed(nbits, mh, mold)
+    ! imiss = ISHFT(1, nbits) - 1
+    imiss = IBITS(NOT(0), 0, nbits)
+    kpack = legacy_unpacking(nbits, mh)
 
-    call get_data_record(ierr, dma, 2 * nk, u, krect)
-    if (ierr.eq.0) call get_data_record(ierr, icom, mcom * nk, u, krect)
-    if (ierr.eq.0) then
-       kpack = legacy_unpacking(nbits, nh)
-       do jk = 1, nk
-          call pack_restore(ierr, idec, icom, nh, nbits, kpack)
-          jdb = nh * (jk - 1) + 1
-          jde = nh * jk
-          where (idec(1:nh).ne.imiss)
-             d(jdb:jde) = real(dma(2 * jk - 1) + real(idec(1:nh), kind=KRSRC) * dma(2 * jk), &
-                  &            kind=KARG)
+    call get_data_record(ierr, dma, 2 * mk, u, krect)
+    if (present(bes)) then
+       nh = 0
+       if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
+       if (ierr.eq.0) then
+          nfil = 0
+          rfil(nfil) = mcom * bes(1, cz)
+          call get_data_record_suspend(ierr, icom, 0, u, krect, +1, rfil, nfil)
+       endif
+       if (ierr.eq.0) then
+          call pack_gen_bfc &
+               & (ierr, dunp, nunp, rfil, nfil, nbits, mh, bes, cz - 1, kpack, mold)
+          if (ierr.eq.0) nh = dunp(1, nunp)
+       endif
+       do jk = bes(1, cz), bes(2, cz) - 1
+          if (ierr.eq.0) then
+             call get_data_record_suspend(ierr, icom, mcom, u, krect, 0, rfil, nfil)
+          endif
+          if (ierr.eq.0) then
+             call pack_restore_dunp(ierr, idec, icom, mh, nbits, kpack, dunp, nunp)
+          endif
+          jdb = nh * (jk - bes(1, cz))
+          jde = jdb + nh
+          where (idec(0:nh-1).ne.imiss)
+             d(jdb:jde-1) = real(dma(2 * jk) + real(idec(0:nh-1), kind=KRSRC) * dma(2 * jk + 1), &
+                  &              kind=KARG)
           elsewhere
-             d(jdb:jde) = real(vmiss, kind=KARG)
+             d(jdb:jde-1) = real(vmiss, kind=KARG)
           end where
        enddo
+       if (ierr.eq.0) then
+          call get_data_record_suspend(ierr, icom, 0, u, krect, -1)
+       endif
+    else
+       if (ierr.eq.0) call get_data_record(ierr, icom, mcom * mk, u, krect)
+       if (ierr.eq.0) then
+          do jk = 0, mk - 1
+             call pack_restore(ierr, idec, icom, mh, nbits, kpack)
+             jdb = mh * jk
+             jde = mh * (jk + 1)
+             where (idec(0:mh-1).ne.imiss)
+                d(jdb:jde-1) = real(dma(2 * jk) + real(idec(0:mh-1), kind=KRSRC) * dma(2 * jk + 1), &
+                     &              kind=KARG)
+             elsewhere
+                d(jdb:jde-1) = real(vmiss, kind=KARG)
+             end where
+          enddo
+       endif
     endif
     return
   end subroutine get_data_ury_f
   subroutine get_data_ury_i &
        & (ierr, &
-       &  d, nh, nk, u, krect, vmiss, kfmt)
+       &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
+    use TOUZA_Trp,only: count_packed,  pack_restore
+    use TOUZA_Trp,only: pack_gen_runl, pack_gen_bfc, pack_restore_dunp
     implicit none
     integer,parameter :: KARG=KI32, KISRC=KI32, KRSRC=KDBL
     integer,           intent(out) :: ierr
-    integer(kind=KARG),intent(out) :: d(*)
-    integer,           intent(in)  :: nh, nk
+    integer(KIND=KARG),intent(out) :: d(0:*)
+    integer,           intent(in)  :: nd
     integer,           intent(in)  :: krect
     integer,           intent(in)  :: u
-    real(kind=KRMIS),  intent(in)  :: vmiss
+    real(KIND=KRMIS),  intent(in)  :: vmiss
     integer,           intent(in)  :: kfmt
+    integer,           intent(in)  :: mh, mk
+    integer,optional,  intent(in)  :: bes(3, *)
+    integer,optional,  intent(in)  :: nr
 
-    real(kind=KRSRC) :: b(nh * nk)
-    integer n
+    integer             :: nbits, mcom
+    integer             :: idec(0:mh-1)
+    integer(KIND=KISRC) :: icom(0:mh * mk - 1)
+    integer(KIND=KISRC) :: imiss
+    real(KIND=KRSRC)    :: dma(0:2 * mk - 1)
+    integer,parameter   :: mold = 0_KISRC
+    integer             :: jk, jdb, jde
+    integer,parameter :: cz = 3
+    integer kpack
+    integer :: dunp(3, 0:mh), rfil(0:mh)
+    integer :: nunp,          nfil
+    integer :: nh
 
     ierr = 0
-    n = nh * nk
-    call get_data_ury_d &
-         & (ierr, &
-         &  b, nh, nk, u, krect, vmiss, kfmt)
-    if (ierr.eq.0) d(1:n) = int(b(1:n), KIND=KARG)
+    nbits = kfmt - GFMT_URY
+    mcom  = count_packed(nbits, mh, mold)
+    ! imiss = ISHFT(1, nbits) - 1
+    imiss = IBITS(NOT(0), 0, nbits)
+    kpack = legacy_unpacking(nbits, mh)
 
+    call get_data_record(ierr, dma, 2 * mk, u, krect)
+    if (present(bes)) then
+       nh = 0
+       if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
+       if (ierr.eq.0) then
+          nfil = 0
+          rfil(nfil) = mcom * bes(1, cz)
+          call get_data_record_suspend(ierr, icom, 0, u, krect, +1, rfil, nfil)
+       endif
+       if (ierr.eq.0) then
+          call pack_gen_bfc &
+               & (ierr, dunp, nunp, rfil, nfil, nbits, mh, bes, cz - 1, kpack, mold)
+          if (ierr.eq.0) nh = dunp(1, nunp)
+       endif
+       do jk = bes(1, cz), bes(2, cz) - 1
+          if (ierr.eq.0) then
+             call get_data_record_suspend(ierr, icom, mcom, u, krect, 0, rfil, nfil)
+          endif
+          if (ierr.eq.0) then
+             call pack_restore_dunp(ierr, idec, icom, mh, nbits, kpack, dunp, nunp)
+          endif
+          jdb = nh * (jk - bes(1, cz))
+          jde = jdb + nh
+          where (idec(0:nh-1).ne.imiss)
+             d(jdb:jde-1) = int(dma(2 * jk) + real(idec(0:nh-1), kind=KRSRC) * dma(2 * jk + 1), &
+                  &              kind=KARG)
+          elsewhere
+             d(jdb:jde-1) = int(vmiss, kind=KARG)
+          end where
+       enddo
+       if (ierr.eq.0) then
+          call get_data_record_suspend(ierr, icom, 0, u, krect, -1)
+       endif
+    else
+       if (ierr.eq.0) call get_data_record(ierr, icom, mcom * mk, u, krect)
+       if (ierr.eq.0) then
+          do jk = 0, mk - 1
+             call pack_restore(ierr, idec, icom, mh, nbits, kpack)
+             jdb = mh * jk
+             jde = mh * (jk + 1)
+             where (idec(0:mh-1).ne.imiss)
+                d(jdb:jde-1) = int(dma(2 * jk) + real(idec(0:mh-1), kind=KRSRC) * dma(2 * jk + 1), &
+                     &             kind=KARG)
+             elsewhere
+                d(jdb:jde-1) = int(vmiss, kind=KARG)
+             end where
+          enddo
+       endif
+    endif
     return
   end subroutine get_data_ury_i
 
@@ -2661,75 +2680,97 @@ contains
 !!!_  - get_data_mr8 - MR8
   subroutine get_data_mr8_d &
        & (ierr, &
-       &  d, n, u, krect, vmiss)
+       &  d, nd, u, krect, vmiss, md, bes, nr)
     use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: n
+    real(kind=KARG), intent(out) :: d(0:*)
+    integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: md
+    integer,optional,intent(in)  :: bes(3, *)
+    integer,optional,intent(in)  :: nr
+
     integer(kind=KISRC) :: mb
-    integer(kind=KISRC) :: icom(n)
-    real(kind=KRSRC)    :: buf(n)
+    integer(kind=KISRC) :: icom(0:md-1)
+    real(kind=KRSRC)    :: buf(0:nd-1)
     integer(kind=KISRC),parameter :: mold = 0_KISRC
+    integer :: ldst(0:nd-1), lsrc(0:nd-1)
+    integer :: nx
     integer ncom
     integer kpack
 
     ierr = 0
-    ncom = count_packed(1, n, mold)
-    call get_data_record(ierr, mb, u, krect)
+    kpack = legacy_unpacking(1, md)
+    ncom = count_packed(1, md, mold)
+    if (ierr.eq.0) call get_data_record(ierr, mb, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, icom, ncom, u, krect)
-    if (ierr.eq.0) call get_data_record(ierr, buf,  mb,   u, krect)
-
-    if (ierr.eq.0) then
-       kpack = legacy_unpacking(1, n)
-       call mask_decode &
-            & (ierr,  d, n, buf, icom, vmiss, kpack)
+    ! write(*, *) ncom
+    if (present(bes)) then
+       if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
+       if (ierr.eq.0) then
+          call mask_to_idxl(ierr, ldst, lsrc, nx, icom, md, bes, nr, kpack)
+       endif
+       if (ierr.eq.0) then
+          call get_data_record_list(ierr, buf, mb, u, krect, mb, lsrc, nx)
+          d(0:nd-1) = vmiss
+          d(ldst(0:nx-1)) = buf(0:nx-1)
+       endif
+    else
+       if (ierr.eq.0) call get_data_record(ierr, buf,  mb,   u, krect)
+       if (ierr.eq.0) then
+          call mask_decode &
+               & (ierr,  d, nd, buf, icom, vmiss, kpack)
+       endif
     endif
-
     return
   end subroutine get_data_mr8_d
   subroutine get_data_mr8_f &
        & (ierr, &
-       &  d, n, u, krect, vmiss)
+       &  d, nd, u, krect, vmiss, md, bes, nr)
     implicit none
-    integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KDBL
+    integer,parameter :: KARG=KFLT, KRSRC=KDBL
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: n
+    real(kind=KARG), intent(out) :: d(0:*)
+    integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: md
+    integer,optional,intent(in)  :: bes(3, *)
+    integer,optional,intent(in)  :: nr
 
-    real(kind=KRSRC) :: buf(n)
+    real(kind=KRSRC) :: buf(0:nd-1)
 
     ierr = 0
-    call get_data_mr8_d(ierr, buf, n, u, krect, vmiss)
-
-    if (ierr.eq.0) d(1:n) = real(buf(1:n), KIND=KARG)
+    call get_data_mr8_d(ierr, buf, nd, u, krect, vmiss, md, bes, nr)
+    if (ierr.eq.0) d(0:nd-1) = real(buf(0:nd-1), KIND=KARG)
     return
   end subroutine get_data_mr8_f
   subroutine get_data_mr8_i &
        & (ierr, &
-       &  d, n, u, krect, vmiss)
+       &  d, nd, u, krect, vmiss, md, bes, nr)
     implicit none
-    integer,parameter :: KARG=KI32, KISRC=KI32, KRSRC=KDBL
+    integer,parameter :: KARG=KI32, KRSRC=KDBL
     integer,           intent(out) :: ierr
-    integer(kind=KARG),intent(out) :: d(*)
-    integer,           intent(in)  :: n
+    integer(kind=KARG),intent(out) :: d(0:*)
+    integer,           intent(in)  :: nd
     integer,           intent(in)  :: krect
     integer,           intent(in)  :: u
     real(kind=KRMIS),  intent(in)  :: vmiss
+    integer,           intent(in)  :: md
+    integer,optional,  intent(in)  :: bes(3, *)
+    integer,optional,  intent(in)  :: nr
 
-    real(kind=KRSRC) :: buf(n)
+    real(kind=KRSRC) :: buf(0:nd-1)
 
     ierr = 0
-    call get_data_mr8_d(ierr, buf, n, u, krect, vmiss)
-
-    if (ierr.eq.0) d(1:n) = int(buf(1:n), KIND=KARG)
+    call get_data_mr8_d(ierr, buf, nd, u, krect, vmiss, md, bes, nr)
+    if (ierr.eq.0) d(0:nd-1) = int(buf(0:nd-1), KIND=KARG)
     return
   end subroutine get_data_mr8_i
 
@@ -2810,77 +2851,99 @@ contains
 !!!_  - get_data_mr4 - MR4
   subroutine get_data_mr4_f &
        & (ierr, &
-       &  d, n, u, krect, vmiss)
+       &  d, nd, u, krect, vmiss, md, bes, nr)
     use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: n
+    real(kind=KARG), intent(out) :: d(0:*)
+    integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: md
+    integer,optional,intent(in)  :: bes(3, *)
+    integer,optional,intent(in)  :: nr
+
     integer(kind=KISRC) :: mb
-    integer(kind=KISRC) :: icom(n)
-    real(kind=KRSRC)    :: buf(n)
+    integer(kind=KISRC) :: icom(md)
+    real(kind=KRSRC)    :: buf(0:nd-1)
     integer(kind=KISRC),parameter :: mold = 0_KISRC
+    integer :: ldst(0:nd-1), lsrc(0:nd-1)
+    integer :: nx
     integer ncom
     integer kpack
 
     ierr = 0
-    ncom = count_packed(1, n, mold)
-    call get_data_record(ierr, mb, u, krect)
+    kpack = legacy_unpacking(1, md)
+    ncom = count_packed(1, md, mold)
+    if (ierr.eq.0) call get_data_record(ierr, mb, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, icom, ncom, u, krect)
-    if (ierr.eq.0) call get_data_record(ierr, buf,  mb,   u, krect)
-
-    if (ierr.eq.0) then
-       kpack = legacy_unpacking(1, n)
-       call mask_decode &
-            & (ierr,  d, n, buf, icom, vmiss, kpack)
+    ! write(*, *) ierr, md, ncom
+    if (present(bes)) then
+       if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
+       if (ierr.eq.0) then
+          call mask_to_idxl(ierr, ldst, lsrc, nx, icom, md, bes, nr, kpack)
+       endif
+       if (ierr.eq.0) then
+          call get_data_record_list(ierr, buf, mb, u, krect, mb, lsrc, nx)
+          d(0:nd-1) = real(vmiss, kind=KARG)
+          d(ldst(0:nx-1)) = buf(0:nx-1)
+       endif
+    else
+       if (ierr.eq.0) call get_data_record(ierr, buf,  mb,   u, krect)
+       if (ierr.eq.0) then
+          call mask_decode &
+               & (ierr,  d, nd, buf, icom, vmiss, kpack)
+       endif
     endif
     return
   end subroutine get_data_mr4_f
   subroutine get_data_mr4_d &
        & (ierr, &
-       &  d, n, u, krect, vmiss)
+       &  d, nd, u, krect, vmiss, md, bes, nr)
     use TOUZA_Trp,only: count_packed, pack_restore
     implicit none
-    integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KFLT
+    integer,parameter :: KARG=KDBL, KRSRC=KFLT
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: n
+    real(kind=KARG), intent(out) :: d(0:*)
+    integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: md
+    integer,optional,intent(in)  :: bes(3, *)
+    integer,optional,intent(in)  :: nr
 
-    real(kind=KRSRC) :: buf(n)
+    real(kind=KRSRC) :: buf(0:nd-1)
 
     ierr = 0
-    call get_data_mr4_f(ierr, buf, n, u, krect, vmiss)
-
-    if (ierr.eq.0) d(1:n) = real(buf(1:n), KIND=KARG)
-
+    call get_data_mr4_f(ierr, buf, nd, u, krect, vmiss, md, bes, nr)
+    if (ierr.eq.0) d(0:nd-1) = real(buf(0:nd-1), KIND=KARG)
     return
   end subroutine get_data_mr4_d
   subroutine get_data_mr4_i &
        & (ierr, &
-       &  d, n, u, krect, vmiss)
+       &  d, nd, u, krect, vmiss, md, bes, nr)
     use TOUZA_Trp,only: count_packed, pack_restore
     implicit none
-    integer,parameter :: KARG=KI32, KISRC=KI32, KRSRC=KFLT
+    integer,parameter :: KARG=KI32, KRSRC=KFLT
     integer,           intent(out) :: ierr
-    integer(kind=KARG),intent(out) :: d(*)
-    integer,           intent(in)  :: n
+    integer(kind=KARG),intent(out) :: d(0:*)
+    integer,           intent(in)  :: nd
     integer,           intent(in)  :: krect
     integer,           intent(in)  :: u
     real(kind=KRMIS),  intent(in)  :: vmiss
+    integer,           intent(in)  :: md
+    integer,optional,  intent(in)  :: bes(3, *)
+    integer,optional,  intent(in)  :: nr
 
-    real(kind=KRSRC) :: buf(n)
+    real(kind=KRSRC) :: buf(0:nd-1)
+
     ierr = 0
-    call get_data_mr4_f(ierr, buf, n, u, krect, vmiss)
-
-    if (ierr.eq.0) d(1:n) = int(buf(1:n), KIND=KARG)
-
+    call get_data_mr4_f(ierr, buf, nd, u, krect, vmiss, md, bes, nr)
+    if (ierr.eq.0) d(0:nd-1) = int(buf(0:nd-1), KIND=KARG)
     return
   end subroutine get_data_mr4_i
 
@@ -2962,29 +3025,30 @@ contains
 !!!_  - get_data_mry - MRY
   subroutine get_data_mry_d &
        & (ierr, &
-       &  d, nh, nk, u, krect, vmiss, kfmt)
+       &  d, nd, u, krect, vmiss, kfmt, mh, mk)
     use TOUZA_Trp,only: count_packed, pack_restore
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
     real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: nh, nk
+    integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: mh, mk
 
     integer             :: nm
-    integer             :: imsk(nh * nk)
-    integer(kind=KISRC) :: imco(nh * nk)
+    integer             :: imsk(mh * mk)
+    integer(kind=KISRC) :: imco(mh * mk)
 
-    integer             :: mch(nk)
-    integer             :: mofs(0:nk+1)
+    integer             :: mch(mk)
+    integer             :: mofs(0:mk)
 
     integer             :: nbits, mcom
-    integer             :: idec(nh)
-    integer(kind=KISRC) :: icom(nh * nk)
-    real(kind=KRSRC)    :: dma(2 * nk)
+    integer             :: idec(mh)
+    integer(kind=KISRC) :: icom(mh * mk)
+    real(kind=KRSRC)    :: dma(2 * mk)
     integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jm, jc, jh, jb
     integer kpackm, kpackb
@@ -2993,31 +3057,31 @@ contains
 
     nbits = kfmt - GFMT_MRY
 
-    nm = count_packed(1, nh, mold)
+    nm = count_packed(1, mh, mold)
     mofs(0) = 0
 
     if (ierr.eq.0) call get_data_record(ierr, mcom,     u,          krect)
-    if (ierr.eq.0) call get_data_record(ierr, mch,      nk,      u, krect)
-    if (ierr.eq.0) call get_data_record(ierr, mofs(2:), nk,      u, krect)
-    if (ierr.eq.0) call get_data_record(ierr, dma,      2 * nk,  u, krect)
-    ! write(*, *) mcom, mch, nk, nm
-    if (ierr.eq.0) call get_data_record(ierr, imco,     nm * nk, u, krect)
+    if (ierr.eq.0) call get_data_record(ierr, mch,      mk,      u, krect)
+    if (ierr.eq.0) call get_data_record(ierr, mofs(1:), mk,      u, krect)
+    if (ierr.eq.0) call get_data_record(ierr, dma,      2 * mk,  u, krect)
+    ! write(*, *) mcom, mch, mk, nm
+    if (ierr.eq.0) call get_data_record(ierr, imco,     nm * mk, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, icom,     mcom,    u, krect)
 
     if (ierr.eq.0) then
-       do jk = 1, nk
-          mofs(jk) = mofs(jk-1) + mofs(jk+1)
+       do jk = 1, mk
+          mofs(jk) = mofs(jk-1) + mofs(jk)
        enddo
-       kpackm = legacy_unpacking(1,     nh)
-       kpackb = legacy_unpacking(nbits, nh)
-       do jk = 1, nk
+       kpackm = legacy_unpacking(1,     mh)
+       kpackb = legacy_unpacking(nbits, mh)
+       do jk = 1, mk
           jm = (jk - 1) * nm + 1
           jc = 1 + mofs(jk-1)
-          call pack_restore(ierr, imsk, imco(jm:), nh, 1, kpackm)
+          call pack_restore(ierr, imsk, imco(jm:), mh, 1, kpackm)
           call pack_restore(ierr, idec, icom(jc:), mch(jk), nbits, kpackb)
           jb = 1
-          jdb = (jk - 1) * nh
-          do jh = 1, nh
+          jdb = (jk - 1) * mh
+          do jh = 1, mh
              if (imsk(jh).eq.1) then
                 d(jdb + jh) = dma(2 * jk - 1) &
                      & + real(idec(jb), kind=KARG) * dma(2 * jk)
@@ -3032,48 +3096,45 @@ contains
   end subroutine get_data_mry_d
   subroutine get_data_mry_f &
        & (ierr, &
-       &  d, nh, nk, u, krect, vmiss, kfmt)
+       &  d, nd, u, krect, vmiss, kfmt, mh, mk)
     implicit none
     integer,parameter :: KARG=KFLT, KRSRC=KDBL
     integer,         intent(out) :: ierr
     real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: nh, nk
+    integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: mh, mk
 
-    real(kind=KRSRC) :: buf(nh * nk)
-    integer n
+    real(kind=KRSRC) :: buf(mh * mk)
 
     ierr = 0
-    n = nh * nk
-    call get_data_mry_d(ierr, buf, nh, nk, u, krect, vmiss, kfmt)
-    if (ierr.eq.0) d(1:n) = real(buf(1:n), KIND=KARG)
+    call get_data_mry_d(ierr, buf, nd, u, krect, vmiss, kfmt, mh, mk)
+    if (ierr.eq.0) d(1:nd) = real(buf(1:nd), KIND=KARG)
 
     return
   end subroutine get_data_mry_f
   subroutine get_data_mry_i &
        & (ierr, &
-       &  d, nh, nk, u, krect, vmiss, kfmt)
+       &  d, nd, u, krect, vmiss, kfmt, mh, mk)
     implicit none
     integer,parameter :: KARG=KI32, KRSRC=KDBL
     integer,           intent(out) :: ierr
     integer(kind=KARG),intent(out) :: d(*)
-    integer,           intent(in)  :: nh, nk
+    integer,           intent(in)  :: nd
     integer,           intent(in)  :: krect
     integer,           intent(in)  :: u
     real(kind=KRMIS),  intent(in)  :: vmiss
     integer,           intent(in)  :: kfmt
+    integer,           intent(in)  :: mh, mk
 
-    real(kind=KRSRC) :: buf(nh * nk)
-    integer n
+    real(kind=KRSRC) :: buf(mh * mk)
 
     ierr = 0
-    n = nh * nk
-    call get_data_mry_d(ierr, buf, nh, nk, u, krect, vmiss, kfmt)
-    if (ierr.eq.0) d(1:n) = int(buf(1:n), KIND=KARG)
-
+    call get_data_mry_d(ierr, buf, nd, u, krect, vmiss, kfmt, mh, mk)
+    if (ierr.eq.0) d(1:nd) = int(buf(1:nd), KIND=KARG)
     return
   end subroutine get_data_mry_i
 
@@ -4899,73 +4960,96 @@ contains
 !!!_  - get_data_mi4 - MI4
   subroutine get_data_mi4_i &
        & (ierr, &
-       &  d, n, u, krect, vmiss)
+       &  d, nd, u, krect, vmiss, md, bes, nr)
     use TOUZA_Trp,only: count_packed
+    use TOUZA_Trp,only: mask_to_idxl
     implicit none
     integer,parameter :: KARG=KI32, KISRC=KI32
     integer,           intent(out) :: ierr
-    integer(kind=KARG),intent(out) :: d(*)
-    integer,           intent(in)  :: n
+    integer(kind=KARG),intent(out) :: d(0:*)
+    integer,           intent(in)  :: nd
     integer,           intent(in)  :: krect
     integer,           intent(in)  :: u
     real(kind=KRMIS),  intent(in)  :: vmiss
+    integer,           intent(in)  :: md
+    integer,optional,  intent(in)  :: bes(3, *)
+    integer,optional,  intent(in)  :: nr
+
     integer(kind=KISRC) :: mb
-    integer(kind=KISRC) :: icom(n), buf(n)
+    integer(kind=KISRC) :: icom(md)
+    integer(kind=KISRC) :: buf(0:nd-1)
     integer(kind=KISRC),parameter :: mold = 0_KISRC
+    integer :: ldst(0:nd-1), lsrc(0:nd-1)
+    integer :: nx
     integer ncom
     integer kpack
+
     ierr = 0
-    ncom = count_packed(1, n, mold)
-    call get_data_record(ierr, mb, u, krect)
+    kpack = legacy_unpacking(1, md)
+    ncom = count_packed(1, md, mold)
+    if (ierr.eq.0) call get_data_record(ierr, mb, u, krect)
     if (ierr.eq.0) call get_data_record(ierr, icom, ncom, u, krect)
-    if (ierr.eq.0) call get_data_record(ierr, buf,  mb,   u, krect)
-
-    if (ierr.eq.0) then
-       kpack = legacy_unpacking(1, n)
-       call mask_decode &
-            & (ierr,  d, n, buf, icom, vmiss, kpack)
+    if (present(bes)) then
+       if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
+       if (ierr.eq.0) then
+          call mask_to_idxl(ierr, ldst, lsrc, nx, icom, md, bes, nr, kpack)
+       endif
+       if (ierr.eq.0) then
+          call get_data_record_list(ierr, buf, mb, u, krect, mb, lsrc, nx)
+          d(0:nd-1) = int(vmiss, kind=KARG)
+          d(ldst(0:nx-1)) = buf(0:nx-1)
+       endif
+    else
+       if (ierr.eq.0) call get_data_record(ierr, buf,  mb,   u, krect)
+       if (ierr.eq.0) then
+          call mask_decode &
+               & (ierr,  d, nd, buf, icom, vmiss, kpack)
+       endif
     endif
-
     return
   end subroutine get_data_mi4_i
   subroutine get_data_mi4_d &
        & (ierr, &
-       &  d, n, u, krect, vmiss)
+       &  d, nd, u, krect, vmiss, md, bes, nr)
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: n
+    real(kind=KARG), intent(out) :: d(0:*)
+    integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: md
+    integer,optional,intent(in)  :: bes(3, *)
+    integer,optional,intent(in)  :: nr
 
-    integer(kind=KISRC) :: buf(n)
+    integer(kind=KISRC) :: buf(0:nd-1)
+
     ierr = 0
-    call get_data_mi4_i(ierr, buf, n, u, krect, vmiss)
-
-    if (ierr.eq.0) d(1:n) = real(buf(1:n), KIND=KARG)
-
+    call get_data_mi4_i(ierr, buf, nd, u, krect, vmiss, md, bes, nr)
+    if (ierr.eq.0) d(0:nd-1) = real(buf(0:nd-1), KIND=KARG)
     return
   end subroutine get_data_mi4_d
   subroutine get_data_mi4_f &
        & (ierr, &
-       &  d, n, u, krect, vmiss)
+       &  d, nd, u, krect, vmiss, md, bes, nr)
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
-    integer,         intent(in)  :: n
+    real(kind=KARG), intent(out) :: d(0:*)
+    integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
     real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: md
+    integer,optional,intent(in)  :: bes(3, *)
+    integer,optional,intent(in)  :: nr
 
-    integer(kind=KISRC) :: buf(n)
+    integer(kind=KISRC) :: buf(0:nd-1)
+
     ierr = 0
-    call get_data_mi4_i(ierr, buf, n, u, krect, vmiss)
-
-    if (ierr.eq.0) d(1:n) = real(buf(1:n), KIND=KARG)
-
+    call get_data_mi4_i(ierr, buf, nd, u, krect, vmiss, md, bes, nr)
+    if (ierr.eq.0) d(0:nd-1) = real(buf(0:nd-1), KIND=KARG)
     return
   end subroutine get_data_mi4_f
 !!!_  - put_data_mi4 - MI4
@@ -4976,7 +5060,7 @@ contains
     implicit none
     integer,parameter :: KARG=KI32, KISRC=KI32
     integer,           intent(out) :: ierr
-    integer(kind=KARG),intent(in)  :: d(*)
+    integer(kind=KARG),intent(in)  :: d(0:*)
     integer,           intent(in)  :: n
     integer,           intent(in)  :: krect
     integer,           intent(in)  :: u
@@ -5420,19 +5504,19 @@ contains
     if (ierr.eq.0) d = b(1)
     return
   end subroutine get_data_record_d1
-
 !!!_  & get_data_record_slice - read data block (slice)
   subroutine get_data_record_slice_i &
        & (ierr, &
-       &  d,  n, u, krect, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, r, sub)
     use TOUZA_Nio_std,only: sus_slice_read_irec
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)            :: ierr
     integer(kind=KARG),intent(out)            :: d(*)
-    integer,           intent(in)             :: n
-    integer,           intent(in)             :: krect
+    integer,           intent(in)             :: nd        ! d size
     integer,           intent(in)             :: u
+    integer,           intent(in)             :: krect
+    integer,           intent(in)             :: md        ! size of data record
     integer,           intent(in)             :: bes(3, *)
     integer,           intent(in)             :: r
     logical,           intent(inout),optional :: sub
@@ -5453,15 +5537,16 @@ contains
   end subroutine get_data_record_slice_i
   subroutine get_data_record_slice_f &
        & (ierr, &
-       &  d,  n, u, krect, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, r, sub)
     use TOUZA_Nio_std,only: sus_slice_read_irec
     implicit none
     integer,parameter :: KARG=KFLT
     integer,        intent(out)            :: ierr
     real(kind=KARG),intent(out)            :: d(*)
-    integer,        intent(in)             :: n
-    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: nd        ! d size
     integer,        intent(in)             :: u
+    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: md        ! size of data record
     integer,        intent(in)             :: bes(3, *)
     integer,        intent(in)             :: r
     logical,        intent(inout),optional :: sub
@@ -5482,15 +5567,16 @@ contains
   end subroutine get_data_record_slice_f
   subroutine get_data_record_slice_d &
        & (ierr, &
-       &  d,  n, u, krect, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, r, sub)
     use TOUZA_Nio_std,only: sus_slice_read_irec
     implicit none
     integer,parameter :: KARG=KDBL
     integer,        intent(out)            :: ierr
     real(kind=KARG),intent(out)            :: d(*)
-    integer,        intent(in)             :: n
-    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: nd        ! d size
     integer,        intent(in)             :: u
+    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: md        ! size of data record
     integer,        intent(in)             :: bes(3, *)
     integer,        intent(in)             :: r
     logical,        intent(inout),optional :: sub
@@ -5597,7 +5683,205 @@ contains
     endif
     return
   end subroutine get_data_record_runl_d
+!!!_  & get_data_record_list
+  subroutine get_data_record_list_i &
+       & (ierr, &
+       &  d,  nd, u, krect, md, list, nl, sub)
+    use TOUZA_Nio_std,only: sus_list_read_irec
+    implicit none
+    integer,parameter :: KARG=KI32
+    integer,           intent(out)            :: ierr
+    integer(kind=KARG),intent(out)            :: d(*)
+    integer,           intent(in)             :: nd        ! d size
+    integer,           intent(in)             :: u
+    integer,           intent(in)             :: krect
+    integer,           intent(in)             :: md        ! size of data record
+    integer,           intent(in)             :: list(*)
+    integer,           intent(in)             :: nl
+    logical,           intent(inout),optional :: sub
 
+    logical swap, lrec
+    integer div
+
+    ierr = 0
+    swap = IAND(krect, REC_SWAP).ne.0
+    lrec = IAND(krect, REC_LSEP).ne.0
+    if (lrec) then
+       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    else
+       div = read_sep_flag(krect)
+       call sus_list_read_irec(ierr, u, d, list, nl, swap, sub, div)
+    endif
+    return
+  end subroutine get_data_record_list_i
+  subroutine get_data_record_list_f &
+       & (ierr, &
+       &  d,  nd, u, krect, md, list, nl, sub)
+    use TOUZA_Nio_std,only: sus_list_read_irec
+    implicit none
+    integer,parameter :: KARG=KFLT
+    integer,        intent(out)            :: ierr
+    real(kind=KARG),intent(out)            :: d(*)
+    integer,        intent(in)             :: nd        ! d size
+    integer,        intent(in)             :: u
+    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: md        ! size of data record
+    integer,        intent(in)             :: list(*)
+    integer,        intent(in)             :: nl
+    logical,        intent(inout),optional :: sub
+
+    logical swap, lrec
+    integer div
+
+    ierr = 0
+    swap = IAND(krect, REC_SWAP).ne.0
+    lrec = IAND(krect, REC_LSEP).ne.0
+    if (lrec) then
+       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    else
+       div = read_sep_flag(krect)
+       call sus_list_read_irec(ierr, u, d, list, nl, swap, sub, div)
+    endif
+    return
+  end subroutine get_data_record_list_f
+  subroutine get_data_record_list_d &
+       & (ierr, &
+       &  d,  nd, u, krect, md, list, nl, sub)
+    use TOUZA_Nio_std,only: sus_list_read_irec
+    implicit none
+    integer,parameter :: KARG=KDBL
+    integer,        intent(out)            :: ierr
+    real(kind=KARG),intent(out)            :: d(*)
+    integer,        intent(in)             :: nd        ! d size
+    integer,        intent(in)             :: u
+    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: md        ! size of data record
+    integer,        intent(in)             :: list(*)
+    integer,        intent(in)             :: nl
+    logical,        intent(inout),optional :: sub
+
+    logical swap, lrec
+    integer div
+
+    ierr = 0
+    swap = IAND(krect, REC_SWAP).ne.0
+    lrec = IAND(krect, REC_LSEP).ne.0
+    if (lrec) then
+       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    else
+       div = read_sep_flag(krect)
+       call sus_list_read_irec(ierr, u, d, list, nl, swap, sub, div)
+    endif
+    return
+  end subroutine get_data_record_list_d
+!!!_  & get_data_record_suspend
+  subroutine get_data_record_suspend_i &
+       & (ierr, &
+       &  d,  mem, u, krect, sw, rfil, nfil)
+    use TOUZA_Nio_std,only: sus_suspend_read_irec
+    implicit none
+    integer,parameter :: KARG=KI32
+    integer,           intent(out)         :: ierr
+    integer(kind=KARG),intent(out)         :: d(0:*)
+    integer,           intent(in)          :: mem        ! d size or full size if with filter
+    integer,           intent(in)          :: u
+    integer,           intent(in)          :: krect
+    integer,           intent(in)          :: sw        ! suspend-mode switch
+    integer,           intent(in),optional :: rfil(0:*)
+    integer,           intent(in),optional :: nfil
+
+    logical swap, lrec
+    integer div
+    integer jf,    jd
+    integer nread, nskip
+
+    ierr = 0
+    swap = IAND(krect, REC_SWAP).ne.0
+    lrec = IAND(krect, REC_LSEP).ne.0
+    if (lrec) then
+       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    else
+       div = read_sep_flag(krect)
+       if (present(rfil)) then
+          jd = 0
+          do jf = 0, nfil - 1, 2
+             nskip = rfil(jf)
+             nread = rfil(jf + 1)
+             ! write(*, *) 'suspend:', jf, nskip, nread
+             if (ierr.eq.0) then
+                call sus_suspend_read_irec &
+                     & (ierr, u, d(jd:jd+nread-1), nread, sw, swap=swap, div=div, nskip=nskip)
+             endif
+             jd = jd + nread
+          enddo
+          if (ierr.eq.0) then
+             nskip = rfil(nfil)
+             ! write(*, *) 'suspend/bottom:', nskip
+             call sus_suspend_read_irec &
+                  & (ierr, u, d, 0, sw, swap=swap, div=div, nskip=nskip)
+          endif
+       else
+          call sus_suspend_read_irec(ierr, u, d, mem, sw, swap=swap, div=div)
+       endif
+    endif
+    return
+  end subroutine get_data_record_suspend_i
+  subroutine get_data_record_suspend_f &
+       & (ierr, &
+       &  d,  nd, u, krect, sw, nskip)
+    use TOUZA_Nio_std,only: sus_suspend_read_irec
+    implicit none
+    integer,parameter :: KARG=KFLT
+    integer,        intent(out)         :: ierr
+    real(kind=KARG),intent(out)         :: d(0:*)
+    integer,        intent(in)          :: nd        ! d size
+    integer,        intent(in)          :: u
+    integer,        intent(in)          :: krect
+    integer,        intent(in)          :: sw        ! suspend-mode switch
+    integer,        intent(in),optional :: nskip
+
+    logical swap, lrec
+    integer div
+
+    ierr = 0
+    swap = IAND(krect, REC_SWAP).ne.0
+    lrec = IAND(krect, REC_LSEP).ne.0
+    if (lrec) then
+       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    else
+       div = read_sep_flag(krect)
+       call sus_suspend_read_irec(ierr, u, d, nd, sw, swap=swap, div=div, nskip=nskip)
+    endif
+    return
+  end subroutine get_data_record_suspend_f
+  subroutine get_data_record_suspend_d &
+       & (ierr, &
+       &  d,  nd, u, krect, sw, nskip)
+    use TOUZA_Nio_std,only: sus_suspend_read_irec
+    implicit none
+    integer,parameter :: KARG=KDBL
+    integer,        intent(out)         :: ierr
+    real(kind=KARG),intent(out)         :: d(0:*)
+    integer,        intent(in)          :: nd        ! d size
+    integer,        intent(in)          :: u
+    integer,        intent(in)          :: krect
+    integer,        intent(in)          :: sw        ! suspend-mode switch
+    integer,        intent(in),optional :: nskip
+
+    logical swap, lrec
+    integer div
+
+    ierr = 0
+    swap = IAND(krect, REC_SWAP).ne.0
+    lrec = IAND(krect, REC_LSEP).ne.0
+    if (lrec) then
+       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    else
+       div = read_sep_flag(krect)
+       call sus_suspend_read_irec(ierr, u, d, nd, sw, swap=swap, div=div, nskip=nskip)
+    endif
+    return
+  end subroutine get_data_record_suspend_d
 !!!_  & get_data_irecord - read integer data block with conversion
   subroutine get_data_irecord_f &
        & (ierr, &
@@ -5719,45 +6003,45 @@ contains
 !!!_  & get_data_irecord_slice - read integer data block with conversion
   subroutine get_data_irecord_slice_f &
        & (ierr, &
-       &  d,  n, u, krect, m, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, r, sub)
     implicit none
     integer,parameter :: KARG=KFLT, KSRC=KI32
     integer,        intent(out)            :: ierr
     real(kind=KARG),intent(out)            :: d(*)
-    integer,        intent(in)             :: n
-    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: nd        ! d size
     integer,        intent(in)             :: u
-    integer,        intent(in)             :: m
+    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: md        ! size of data record
     integer,        intent(in)             :: bes(3, *)
     integer,        intent(in)             :: r
     logical,        intent(inout),optional :: sub
 
-    integer(kind=KSRC) :: w(m)
-    call get_data_record_slice_i (ierr, w, n, u, krect, bes, r, sub)
+    integer(kind=KSRC) :: w(nd)
+    call get_data_record_slice_i (ierr, w, nd, u, krect, md, bes, r, sub)
     if (ierr.eq.0) then
-       d(1:m) = real(w(1:m), kind=KARG)
+       d(1:nd) = real(w(1:nd), kind=KARG)
     endif
     return
   end subroutine get_data_irecord_slice_f
   subroutine get_data_irecord_slice_d &
        & (ierr, &
-       &  d,  n, u, krect, m, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, r, sub)
     implicit none
     integer,parameter :: KARG=KDBL, KSRC=KI32
     integer,        intent(out)            :: ierr
     real(kind=KARG),intent(out)            :: d(*)
-    integer,        intent(in)             :: n
-    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: nd        ! d size
     integer,        intent(in)             :: u
-    integer,        intent(in)             :: m
+    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: md        ! size of data record
     integer,        intent(in)             :: bes(3, *)
     integer,        intent(in)             :: r
     logical,        intent(inout),optional :: sub
 
-    integer(kind=KSRC) :: w(m)
-    call get_data_record_slice_i (ierr, w, n, u, krect, bes, r, sub)
+    integer(kind=KSRC) :: w(nd)
+    call get_data_record_slice_i (ierr, w, nd, u, krect, md, bes, r, sub)
     if (ierr.eq.0) then
-       d(1:m) = real(w(1:m), kind=KARG)
+       d(1:nd) = real(w(1:nd), kind=KARG)
     endif
     return
   end subroutine get_data_irecord_slice_d
@@ -5765,91 +6049,90 @@ contains
 !!!_  & get_data_frecord_slice - read float data block with conversion
   subroutine get_data_frecord_slice_i &
        & (ierr, &
-       &  d,  n, u, krect, m, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, r, sub)
     implicit none
     integer,parameter :: KARG=KI32, KSRC=KFLT
     integer,           intent(out)            :: ierr
     integer(kind=KARG),intent(out)            :: d(*)
-    integer,           intent(in)             :: n
+    integer,           intent(in)             :: nd        ! d size
     integer,           intent(in)             :: krect
     integer,           intent(in)             :: u
-    integer,           intent(in)             :: m
-    integer,           intent(in)             :: bes(3, 0:*)
+    integer,           intent(in)             :: md        ! size of data record
+    integer,           intent(in)             :: bes(3, *)
     integer,           intent(in)             :: r
     logical,           intent(inout),optional :: sub
 
-    real(kind=KSRC) :: w(m)
-    call get_data_record_slice_f (ierr, w, n, u, krect, bes, r, sub)
+    real(kind=KSRC) :: w(nd)
+    call get_data_record_slice_f (ierr, w, nd, u, krect, md, bes, r, sub)
     if (ierr.eq.0) then
-       d(1:m) = int(w(1:m), kind=KARG)
+       d(1:nd) = int(w(1:nd), kind=KARG)
     endif
     return
   end subroutine get_data_frecord_slice_i
   subroutine get_data_frecord_slice_d &
        & (ierr, &
-       &  d,  n, u, krect, m, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, r, sub)
     implicit none
     integer,parameter :: KARG=KDBL, KSRC=KFLT
     integer,        intent(out)            :: ierr
     real(kind=KARG),intent(out)            :: d(*)
-    integer,        intent(in)             :: n
-    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: nd        ! d size
     integer,        intent(in)             :: u
-    integer,        intent(in)             :: m
-    integer,        intent(in)             :: bes(3, 0:*)
+    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: md        ! size of data record
+    integer,        intent(in)             :: bes(3, *)
     integer,        intent(in)             :: r
     logical,        intent(inout),optional :: sub
 
-    real(kind=KSRC) :: w(m)
-    call get_data_record_slice_f (ierr, w, n, u, krect, bes, r, sub)
+    real(kind=KSRC) :: w(nd)
+    call get_data_record_slice_f (ierr, w, nd, u, krect, md, bes, r, sub)
     if (ierr.eq.0) then
-       d(1:m) = real(w(1:m), kind=KARG)
+       d(1:nd) = real(w(1:nd), kind=KARG)
     endif
     return
   end subroutine get_data_frecord_slice_d
 !!!_  & get_data_drecord_slice - read double data block with conversion
   subroutine get_data_drecord_slice_i &
        & (ierr, &
-       &  d,  n, u, krect, m, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, r, sub)
     implicit none
     integer,parameter :: KARG=KI32, KSRC=KDBL
     integer,           intent(out)            :: ierr
     integer(kind=KARG),intent(out)            :: d(*)
-    integer,           intent(in)             :: n
-    integer,           intent(in)             :: krect
+    integer,           intent(in)             :: nd        ! d size
     integer,           intent(in)             :: u
-    integer,           intent(in)             :: m
-    integer,           intent(in)             :: bes(3, 0:*)
+    integer,           intent(in)             :: krect
+    integer,           intent(in)             :: md        ! size of data record
+    integer,           intent(in)             :: bes(3, *)
     integer,           intent(in)             :: r
     logical,           intent(inout),optional :: sub
 
-    real(kind=KSRC) :: w(m)
-    call get_data_record_slice_d (ierr, w, n, u, krect, bes, r, sub)
+    real(kind=KSRC) :: w(nd)
+    call get_data_record_slice_d (ierr, w, nd, u, krect, md, bes, r, sub)
     if (ierr.eq.0) then
-       d(1:m) = int(w(1:m), kind=KARG)
+       d(1:nd) = int(w(1:nd), kind=KARG)
     endif
     return
   end subroutine get_data_drecord_slice_i
   subroutine get_data_drecord_slice_f &
        & (ierr, &
-       &  d,  n, u, krect, m, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, r, sub)
     implicit none
     integer,parameter :: KARG=KFLT, KSRC=KDBL
     integer,        intent(out)            :: ierr
     real(kind=KARG),intent(out)            :: d(*)
-    integer,        intent(in)             :: n
-    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: nd        ! d size
     integer,        intent(in)             :: u
-    integer,        intent(in)             :: m
-    integer,        intent(in)             :: bes(3, 0:*)
+    integer,        intent(in)             :: krect
+    integer,        intent(in)             :: md        ! size of data record
+    integer,        intent(in)             :: bes(3, *)
     integer,        intent(in)             :: r
     logical,        intent(inout),optional :: sub
 
-    real(kind=KSRC) :: w(m)
-    ! write(*,*) 'get_data_drecord_slice_f:', m, n, r, bes(:, 0:r-1)
-    call get_data_record_slice_d (ierr, w, n, u, krect, bes, r, sub)
+    real(kind=KSRC) :: w(nd)
+    call get_data_record_slice_d (ierr, w, nd, u, krect, md, bes, r, sub)
     if (ierr.eq.0) then
-       d(1:m) = real(w(1:m), kind=KARG)
+       d(1:nd) = real(w(1:nd), kind=KARG)
     endif
     return
   end subroutine get_data_drecord_slice_f
@@ -6879,6 +7162,29 @@ contains
     return
   end function check_id_format
 
+!!!_  & bes_triplet
+  subroutine bes_triplet(ierr, bes, kaxs, start, count)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(out) :: bes(3, *)
+    integer,intent(in)  :: kaxs(*)
+    integer,intent(in)  :: start(:)
+    integer,intent(in)  :: count(:)
+    integer nr
+    ierr = 0
+    nr = min(size(start), size(count))
+    if (nr.gt.laxs) then
+       ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+    else
+       bes(3, 1:laxs) = max(1, kaxs(1:laxs))
+       bes(1, 1:nr)   = max(0, start(1:nr))
+       bes(2, 1:nr)   = start(1:nr) + max(0, count(1:nr))
+       bes(1, nr+1:laxs) = 0
+       bes(2, nr+1:laxs) = bes(3, nr+1:laxs)
+    endif
+  end subroutine bes_triplet
+
+!!!_ + end module TOUZA_Nio_record
 end module TOUZA_Nio_record
 
 !!!_@ test_nio_record - test program

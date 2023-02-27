@@ -1,7 +1,7 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2023/02/23 21:48:32 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/28 10:18:30 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -42,6 +42,7 @@ module TOUZA_Nio_std
   use TOUZA_Std,only: sus_write_isep,   sus_read_isep
   use TOUZA_Std,only: sus_write_lsep,   sus_read_lsep
   use TOUZA_Std,only: sus_slice_read_irec, sus_runl_read_irec
+  use TOUZA_Std,only: sus_list_read_irec,  sus_suspend_read_irec
   use TOUZA_Std,only: sus_rseek,        sus_eswap
   use TOUZA_Std,only: sus_size_irec
   use TOUZA_Std,only: max_members,      is_irec_overflow, sus_record_mems_irec
@@ -98,6 +99,7 @@ module TOUZA_Nio_std
   public :: sus_write_isep,   sus_read_isep
   public :: sus_write_lsep,   sus_read_lsep
   public :: sus_slice_read_irec, sus_runl_read_irec
+  public :: sus_list_read_irec,  sus_suspend_read_irec
   public :: sus_rseek,        sus_eswap
   public :: sus_size_irec
   public :: max_members,      is_irec_overflow, sus_record_mems_irec
