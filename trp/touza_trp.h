@@ -1,8 +1,8 @@
 /* touza_trp.h - TOUZA/Trp common definition */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Feb 26 2021 */
-/* Time-stamp: <2021/11/08 21:38:41 fuyuki touza_trp.h> */
-/* Copyright (C) 2021 */
+/* Time-stamp: <2023/02/25 22:19:35 fuyuki touza_trp.h> */
+/* Copyright (C) 2021-2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
 /*   (https://www.apache.org/licenses/LICENSE-2.0) */
@@ -30,6 +30,25 @@
 
 #ifndef    TRP_MSG_LEVEL
 #  define  TRP_MSG_LEVEL 0
+#endif
+
+/* issue in GCC Fortran */
+#if __GFORTRAN__
+#  ifndef OPT_USE_IPC_IBITS
+#  define OPT_USE_IPC_IBITS 1
+#  endif
+#endif
+#ifndef   OPT_USE_IPC_IBITS
+#  define OPT_USE_IPC_IBITS 0
+#endif
+#if OPT_USE_IPC_IBITS
+#  warning "Disable (some) intrinsic ibits() calls."
+#endif
+
+#if OPT_USE_IPC_IBITS
+# define _IBITS(I,P,L) ipc_IBITS(I,P,L)
+#else
+# define _IBITS(I,P,L) IBITS(I,P,L)
 #endif
 
 #endif /* not _TOUZA_TRP_H */

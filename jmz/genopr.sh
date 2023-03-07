@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/12/06 22:28:34 fuyuki genopr.sh>
+# Time-stamp: <2023/02/21 09:57:30 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -145,6 +145,8 @@ register_all ()
   register -n 2,1 -i mul,'%'  MOD     'mod(A,B)'
   register -n 2,1 -i exp,'**' POW     'pow(A,B)'
 
+  register -n 2,1 -i call MODULO      'modulo(A,B)'
+
   # primitive binary inclusive
   register -g lazy -n 2,1 -i add,'+'  -f ADD,ZERO LADD    'lazy ADD'
   register -g lazy -n 2,1 -i add,'-'  -f SUB,ZERO LSUB    'lazy SUB'
@@ -273,12 +275,13 @@ register_all ()
   # register -g buffer -p VALUE                 MISS    "replace missing value"
 
   register -g header        -p FORMAT      FMT     "set output data format"
-  register -g header        -p STRING      ITEM    "replace item name"
+  register -g header        -p STRING      ITEM    "item replacement or filter"
   register -g header        -p STRING      UNIT
   register -g header        -p STRING      TITLE
   register -g header        -p STRING      EDIT
   register -g header        -p STRING      DSET
-  register -g header        -p LIST   -s T TSEL
+  register -g header        -p LIST   -s T TSEL    "time filter"
+  register -g header        -p LIST   -s R RSEL    "record filter"
   register -g header,buffer -p VALUE       MISS    "replace missing value"
   register -g header,buffer -o UNIT        DUR     "duration"
 
@@ -749,7 +752,7 @@ output_table ()
   local grp= key=
   local nstack=() push= pop=
   local sym= alias= opt=
-  local candi=(unary binary lazy ubool bool stack index)
+  local candi=(unary binary lazy ubool bool stack index float)
   for grp in "$@"
   do
     [[ $candi[(I)$grp] -eq 0 ]] && continue

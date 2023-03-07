@@ -1,10 +1,10 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz swiss(CH) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2022/12/11 22:05:02 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 13:05:44 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -78,6 +78,11 @@ module chak_lib
   integer,parameter :: cfmt_binary_r4 = cfmt_binary + cfmt_flags_bo
   integer,parameter :: cfmt_binary_r8 = cfmt_binary + cfmt_flags_bo * 2
 
+  integer,parameter :: cfmt_cdf = cfmt_binary_r8 + 16
+  ! integer,parameter :: cfmt_cdf_i4 = cfmt_cdf + 1
+  ! integer,parameter :: cfmt_cdf_r4 = cfmt_cdf + 2
+  ! integer,parameter :: cfmt_cdf_r8 = cfmt_cdf + 3
+
 !!!_  - variable types
   integer,parameter :: kv_null = 0
   integer,parameter :: kv_int  = 1
@@ -115,6 +120,7 @@ module chak_lib
   integer,parameter :: lfile = OPT_CHAK_FILES
   integer,parameter :: lbuffer = OPT_CHAK_BUFFERS
   integer,parameter :: lopr = 512
+  integer,parameter :: oprlen = 16
 
   integer,save :: mfile = 0
   integer,save :: mbuffer = 0
@@ -210,7 +216,7 @@ contains
        if (present(iadd)) then
           if (size(iadd).gt.0) then
              if (present(fmt)) then
-                write(txt, fmt) iadd(:)
+                write(txt, fmt, IOSTAT=jerr) iadd(:)
              else
                 call join_list(jerr, txt, iadd(:), ldelim='(', rdelim=')')
              endif

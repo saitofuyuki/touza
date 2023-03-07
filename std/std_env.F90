@@ -1,10 +1,10 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2022/12/20 21:34:03 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 21:52:06 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2022
+! Copyright (C) 2020-2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -164,10 +164,10 @@ module TOUZA_Std_env
 !!!_  - default
   implicit none
   private
+# define __MDL__ 'env'
+# define _ERROR(E) (E - ERR_MASK_STD_ENV)
 !!!_  - parameters
   integer,parameter,public :: KIOFS = OPT_INTEGER_OFFSET_KIND
-
-# define __MDL__ 'env'
   integer,parameter,public :: endian_UNKNOWN = 0
   integer,parameter,public :: endian_ERROR  = -1
   integer,parameter,public :: endian_BIG    = 1234
@@ -327,7 +327,7 @@ contains
        endif
        ! write(*, *) 'env/batch', ierr
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
     ! write(*, *) 'env', ierr, init_counts
 
@@ -677,6 +677,7 @@ contains
     character(len=16) :: TA
     character(len=128) :: txt
     integer lv
+    integer jerr
 
     ierr = 0
 
@@ -707,7 +708,7 @@ contains
        endif
 101    format('stdu:', I0, ' = ', I0, 1x, L, 1x, A)
        if (VCHECK_DEBUG(lv)) then
-          write(txt, 101) jchk, ierr, OPND, trim(TA)
+          write(txt, 101, IOSTAT=jerr) jchk, ierr, OPND, trim(TA)
           call msg_mdl(txt, __MDL__)
        endif
     enddo
@@ -740,21 +741,21 @@ contains
           write(txt, 101) 'OPT_STDIN_UNIT'
           call msg_mdl(txt, __MDL__, utmp)
        endif
-       ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       ierr = _ERROR(ERR_FAILURE_INIT)
     endif
     if (uout.lt.0) then
        if (VCHECK_FATAL(lv)) then
           write(txt, 101) 'OPT_STDOUT_UNIT'
           call msg_mdl(txt, __MDL__, utmp)
        endif
-       ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       ierr = _ERROR(ERR_FAILURE_INIT)
     endif
     if (uerr.lt.0) then
        if (VCHECK_FATAL(lv)) then
           write(txt, 101) 'OPT_STDERR_UNIT'
           call msg_mdl(txt, __MDL__, utmp)
        endif
-       ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       ierr = _ERROR(ERR_FAILURE_INIT)
     endif
 
     return
@@ -810,7 +811,7 @@ contains
     endif
     if (ierr.eq.0) call get_ni(ierr, nrank, irank, icomm)
     if (ierr.eq.0) then
-       if (nrank.gt.0.and.iroot.ge.nrank) ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       if (nrank.gt.0.and.iroot.ge.nrank) ierr = _ERROR(ERR_FAILURE_INIT)
     endif
     if (ierr.eq.0) then
        if (VCHECK_INFO(lv)) then
@@ -840,6 +841,7 @@ contains
     integer,optional,intent(in)    :: levv
     character(len=128) :: buf
     integer lv
+    integer jerr
 
     lv = choice(lev_verbose, levv)
     if (vm.eq.0) then
@@ -848,7 +850,7 @@ contains
 101    format('conflict in ', A, ': ', I0, 1x, I0)
        if (vm.ne.vi) then
           if (VCHECK_SEVERE(lv)) then
-             write(buf, 101) trim(t), vm, vi
+             write(buf, 101, IOSTAT=jerr) trim(t), vm, vi
              call msg_mdl(buf, __MDL__, u)
           endif
        endif
@@ -856,7 +858,7 @@ contains
 102    format('error in ', A, ': ', I0, 1x, I0)
        if (vi.gt.0) then
           if (VCHECK_SEVERE(lv)) then
-             write(buf, 102) trim(t), vm, vi
+             write(buf, 102, IOSTAT=jerr) trim(t), vm, vi
              call msg_mdl(buf, __MDL__, u)
           endif
        endif
@@ -966,12 +968,12 @@ contains
     if (lunit.le.0 .or. isf) then
        if (kswi.eq.1) then
           if (utest.lt.0) call new_unit_tmp(utest, tmpf)
-          if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+          if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
           if (ierr.eq.0) call brute_force_recl_unit_rw(ierr, lunit, utest, tmpf, u)
        else
           if (utest.lt.0) utest = new_unit()
-          if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
-          if (ierr.eq.0) call brute_force_recl_unit_w(ierr, lunit, utest, u)
+          if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
+          if (ierr.eq.0) call brute_force_recl_unit_w(ierr, lunit, utest)
        endif
     endif
 
@@ -989,18 +991,18 @@ contains
        if (isf) then
           if (kswi.eq.1) then
              if (utest.lt.0) call new_unit_tmp(utest, tmpf)
-             if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+             if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
              if (ierr.eq.0) call brute_force_recl_type(ierr, lrd, utest, tmpf, real(0, KIND=KDBL))
              if (ierr.eq.0) call brute_force_recl_type(ierr, lrf, utest, tmpf, real(0, KIND=KFLT))
              if (ierr.eq.0) call brute_force_recl_type(ierr, lri, utest, tmpf, int(0, KIND=KI32))
              if (ierr.eq.0) call brute_force_recl_type(ierr, lrl, utest, tmpf, int(0, KIND=KI64))
           else
              if (utest.lt.0) utest = new_unit()
-             if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
-             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrd, utest, check_single_scratch_d, 8, lunit, u)
-             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrf, utest, check_single_scratch_f, 4, lunit, u)
-             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lri, utest, check_single_scratch_i, 4, lunit, u)
-             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrl, utest, check_single_scratch_l, 8, lunit, u)
+             if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
+             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrd, utest, check_single_scratch_d, 8, lunit)
+             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrf, utest, check_single_scratch_f, 4, lunit)
+             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lri, utest, check_single_scratch_i, 4, lunit)
+             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrl, utest, check_single_scratch_l, 8, lunit)
           endif
        endif
     endif
@@ -1012,13 +1014,12 @@ contains
 
 !!!_  & brute_force_recl_unit_w - lazy trial to find file storage unit (ii)
   subroutine brute_force_recl_unit_w &
-       & (ierr, lunit, utest, u)
+       & (ierr, lunit, utest)
     use TOUZA_Std_utl,only: choice
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(out)         :: lunit
-    integer,intent(in)          :: utest
-    integer,intent(in),optional :: u
+    integer,intent(out) :: ierr
+    integer,intent(out) :: lunit
+    integer,intent(in)  :: utest
 
     integer lrec
     character(len=*),parameter :: teststr = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -1052,7 +1053,7 @@ contains
 
 !!!_  & brute_force_recl_type_bs - lazy trial to find record length for unit type (core ii)
   subroutine brute_force_recl_type_bs &
-       & (ierr, lrec, utest, xfunc, nini, lunit, u)
+       & (ierr, lrec, utest, xfunc, nini, lunit)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(out)         :: ierr
@@ -1061,7 +1062,6 @@ contains
     !!! logical :: xfunc ! logical function(int, int, int)
     integer,intent(in)          :: nini  ! initial guess
     integer,intent(in),optional :: lunit ! unit record length in bytes
-    integer,intent(in),optional :: u
 
     interface
        logical function xfunc(ierr, utest, n)
@@ -1080,7 +1080,7 @@ contains
     lrec = -1
 
     lu = choice(0, lunit)
-    if (lu.le.0) ierr = ERR_INVALID_PARAMETER + ERR_MASK_STD_ENV
+    if (lu.le.0) ierr = _ERROR(ERR_INVALID_PARAMETER)
     if (ierr.ne.0) return
 
     ! find good
@@ -1265,7 +1265,7 @@ contains
 
 !!!_   & brute_force_recl_type - lazy trial to find record length for unit type
   subroutine brute_force_recl_type_d &
-       & (ierr, lrec, utest, fn, v, lunit, nini, u)
+       & (ierr, lrec, utest, fn, mold, lunit, nini, u)
     use TOUZA_Std_prc, only: KDBL
     use TOUZA_Std_utl, only: choice
     implicit none
@@ -1273,20 +1273,20 @@ contains
     integer,         intent(out)         :: lrec
     integer,         intent(in)          :: utest
     character(len=*),intent(in)          :: fn
-    real(kind=KDBL), intent(in)          :: v     ! dummy placeholder
+    real(kind=KDBL), intent(in)          :: mold  ! dummy placeholder
     integer,         intent(in),optional :: lunit ! unit record length in bytes
     integer,         intent(in),optional :: nini  ! initial guess
     integer,         intent(in),optional :: u
 
     integer ni
-    ni = choice(8, nini) + 0 * KIND(V)
+    ni = choice(8, nini) + 0 * KIND(mold)
     call brute_force_recl_type_core &
          & (ierr, lrec, utest, fn, check_single_write_d, ni, lunit, u)
 
   end subroutine brute_force_recl_type_d
 
   subroutine brute_force_recl_type_f &
-       & (ierr, lrec, utest, fn, v, lunit, nini, u)
+       & (ierr, lrec, utest, fn, mold, lunit, nini, u)
     use TOUZA_Std_prc, only: KFLT
     use TOUZA_Std_utl, only: choice
     implicit none
@@ -1294,20 +1294,20 @@ contains
     integer,         intent(out)         :: lrec
     integer,         intent(in)          :: utest
     character(len=*),intent(in)          :: fn
-    real(kind=KFLT), intent(in)          :: v     ! dummy placeholder
+    real(kind=KFLT), intent(in)          :: mold  ! dummy placeholder
     integer,         intent(in),optional :: lunit ! unit record length in bytes
     integer,         intent(in),optional :: nini  ! initial guess
     integer,         intent(in),optional :: u
 
     integer ni
-    ni = choice(4, nini) + 0 * KIND(V)
+    ni = choice(4, nini) + 0 * KIND(mold)
     call brute_force_recl_type_core &
          & (ierr, lrec, utest, fn, check_single_write_f, ni, lunit, u)
 
   end subroutine brute_force_recl_type_f
 
   subroutine brute_force_recl_type_i &
-       & (ierr, lrec, utest, fn, v, lunit, nini, u)
+       & (ierr, lrec, utest, fn, mold, lunit, nini, u)
     use TOUZA_Std_prc, only: KI32
     use TOUZA_Std_utl, only: choice
     implicit none
@@ -1315,20 +1315,20 @@ contains
     integer,           intent(out)         :: lrec
     integer,           intent(in)          :: utest
     character(len=*),  intent(in)          :: fn
-    integer(kind=KI32),intent(in)          :: v     ! dummy placeholder
+    integer(kind=KI32),intent(in)          :: mold  ! dummy placeholder
     integer,           intent(in),optional :: lunit ! unit record length in bytes
     integer,           intent(in),optional :: nini  ! initial guess
     integer,           intent(in),optional :: u
 
     integer ni
-    ni = choice(4, nini) + 0 * KIND(V)
+    ni = choice(4, nini) + 0 * KIND(mold)
     call brute_force_recl_type_core &
          & (ierr, lrec, utest, fn, check_single_write_i, ni, lunit, u)
 
   end subroutine brute_force_recl_type_i
 
   subroutine brute_force_recl_type_l &
-       & (ierr, lrec, utest, fn, v, lunit, nini, u)
+       & (ierr, lrec, utest, fn, mold, lunit, nini, u)
     use TOUZA_Std_prc, only: KI64
     use TOUZA_Std_utl, only: choice
     implicit none
@@ -1336,13 +1336,13 @@ contains
     integer,           intent(out)         :: lrec
     integer,           intent(in)          :: utest
     character(len=*),  intent(in)          :: fn
-    integer(kind=KI64),intent(in)          :: v     ! dummy placeholder
+    integer(kind=KI64),intent(in)          :: mold  ! dummy placeholder
     integer,           intent(in),optional :: lunit ! unit record length in bytes
     integer,           intent(in),optional :: nini  ! initial guess
     integer,           intent(in),optional :: u
 
     integer ni
-    ni = choice(8, nini) + 0 * KIND(V)
+    ni = choice(8, nini) + 0 * KIND(mold)
     call brute_force_recl_type_core &
          & (ierr, lrec, utest, fn, check_single_write_l, ni, lunit, u)
 
@@ -1373,7 +1373,7 @@ contains
 
     lu = choice(0, lunit)
     ! if (lu.le.0) call brute_force_storage_unit(ierr, lu, utest, fn, u)
-    if (lu.le.0) ierr = ERR_INVALID_PARAMETER + ERR_MASK_STD_ENV
+    if (lu.le.0) ierr = _ERROR(ERR_INVALID_PARAMETER)
     if (ierr.ne.0) return
 
     ! find good
@@ -1606,7 +1606,7 @@ contains
        endif
        if (lustr.le.0 .or. isf) then
           if (utest.lt.0) utest = new_unit()
-          if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+          if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
           if (ierr.eq.0) call brute_force_stream_unit(ierr, lustr, utest, u)
        endif
     endif
@@ -1659,7 +1659,7 @@ contains
     call msg_mdl('inquire pos disabled', __MDL__, u)
 #   endif /* not HAVE_FORTRAN_INQUIRE_POS */
 #else /* not HAVE_FORTRAN_OPEN_STREAM */
-    ierr = ERR_OPR_DISABLE + ERR_MASK_STD_ENV
+    ierr = _ERROR(ERR_OPR_DISABLE)
     call msg_mdl('stream access unavailable', __MDL__, u)
 #endif /* not HAVE_FORTRAN_OPEN_STREAM */
     return
@@ -1741,7 +1741,7 @@ contains
     ue = ub - 1
     us = 1
     if (ub.lt.0) ub = new_unit()
-    if (ub.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+    if (ub.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
     if (ierr.eq.0) then
        ue = choice(-1, uend)
        if (present(ubgn)) then
@@ -1849,22 +1849,31 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer ul
-    integer,parameter :: L = 8
-    character C(L), T*(L)
+    integer,parameter :: L = 4
+    character(len=1) :: C(L)
+    character(len=L) :: T
     integer lv
 
     ierr = 0
     lv = choice(lev_verbose, levv)
     ul = choice(-1, u)
 
-    write(C, '(8A)') ' '
-    C = transfer(1684234849, C, L)
-    write(T, '(8A)') C
-    if (T(1:4).eq.'abcd') then
-       kendi = endian_LITTLE
-    else if (T(1:4).eq.'dcba') then
-       kendi = endian_BIG
-    else
+    write(C, '(4A)', IOSTAT=ierr) ' '
+    if (ierr.eq.0) then
+       C = transfer(1684234849, C, L)
+       write(T, '(4A)', IOSTAT=ierr) C
+    endif
+    if (ierr.eq.0) then
+       if (T(1:4).eq.'abcd') then
+          kendi = endian_LITTLE
+       else if (T(1:4).eq.'dcba') then
+          kendi = endian_BIG
+       else
+          ierr = _ERROR(ERR_PANIC)
+       endif
+    endif
+    if (ierr.ne.0) then
+       ierr = _ERROR(ERR_PANIC)
        kendi = endian_ERROR
        if (VCHECK_SEVERE(lv)) then
           call msg_mdl &
@@ -2003,13 +2012,14 @@ contains
     integer jerr_eof
     integer lv
     character(len=128) :: txt
+    integer jerr
 
     ierr = 0
     lv = choice(lev_verbose, levv)
 
     jerr_eof = 0
     utest = new_unit()
-    if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+    if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
     if (ierr.eq.0) then
        open(UNIT=utest, &
             & STATUS='SCRATCH',   ACCESS='SEQUENTIAL', &
@@ -2025,7 +2035,7 @@ contains
     if (ierr.ne.0) then
        if (VCHECK_NORMAL(lv)) then
 101       format('eof check failed = ', I0)
-          write(txt, 101) ierr
+          write(txt, 101, IOSTAT=jerr) ierr
           call msg_mdl(txt, __MDL__, u)
        endif
     else if (keof.eq.0) then
@@ -2037,7 +2047,7 @@ contains
           keof = jerr_eof
 102       format('eof detected = ', I0)
           if (VCHECK_DEBUG(lv)) then
-             write(txt, 102) jerr_eof
+             write(txt, 102, IOSTAT=jerr) jerr_eof
              call msg_mdl(txt, __MDL__, u)
           endif
        endif
@@ -2045,13 +2055,13 @@ contains
        keof = jerr_eof
 103    format('eof ignored = ', I0)
        if (VCHECK_NORMAL(lv)) then
-          write(txt, 103) jerr_eof
+          write(txt, 103, IOSTAT=jerr) jerr_eof
           call msg_mdl(txt, __MDL__, u)
        endif
     else
 104    format('eof kept = ', I0)
        if (VCHECK_DEBUG(lv)) then
-          write(txt, 104) jerr_eof
+          write(txt, 104, IOSTAT=jerr) jerr_eof
           call msg_mdl(txt, __MDL__, u)
        endif
     endif

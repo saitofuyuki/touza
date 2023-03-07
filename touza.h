@@ -1,9 +1,9 @@
-!!!_! touza.h - touza definitions
-! Maintainer: SAITO Fuyuki
-! Created: Jun 5 2020
-! Time-stamp: <2022/07/25 09:15:59 fuyuki touza.h>
+/* touza.h - touza definitions */
+/*    Maintainer: SAITO Fuyuki */
+/*    Created: Jun 5 2020 */
+/*     Time-stamp: <2023/02/16 18:00:21 fuyuki touza.h> */
 
-/* Copyright (C) 2020-2022 */
+/* Copyright (C) 2020-2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
 /*   (https://www.apache.org/licenses/LICENSE-2.0) */
@@ -95,6 +95,7 @@
 #define ERR_MASK_STD_WSH (ERR_MASK_STD + ERR_MASK_MODULE * 9)
 #define ERR_MASK_STD_SUS (ERR_MASK_STD + ERR_MASK_MODULE *10)
 #define ERR_MASK_STD_HTB (ERR_MASK_STD + ERR_MASK_MODULE *11)
+#define ERR_MASK_STD_IPC (ERR_MASK_STD + ERR_MASK_MODULE *12)
 
 #define ERR_MASK_DIV        (ERR_MASK_GROUP * 4)
 #define ERR_MASK_DIV_STD    (ERR_MASK_DIV + ERR_MASK_MODULE * 1)
@@ -115,10 +116,17 @@
 #define ERR_MASK_NIO_HEADER   (ERR_MASK_NIO + ERR_MASK_MODULE * 2)
 #define ERR_MASK_NIO_RECORD   (ERR_MASK_NIO + ERR_MASK_MODULE * 3)
 #define ERR_MASK_NIO_DIVISION (ERR_MASK_NIO + ERR_MASK_MODULE * 4)
+#define ERR_MASK_NIO_NCTCDF   (ERR_MASK_NIO + ERR_MASK_MODULE * 5)
+#define ERR_MASK_NIO_INTFC    (ERR_MASK_NIO + ERR_MASK_MODULE * 6)
+#define ERR_MASK_NIO_CACHE    (ERR_MASK_NIO + ERR_MASK_MODULE * 7)
+
+#define ERR_MASK_TRP          (ERR_MASK_GROUP * 5)
+#define ERR_MASK_TRP_STD      (ERR_MASK_TRP + ERR_MASK_MODULE * 1)
+#define ERR_MASK_TRP_PACK     (ERR_MASK_TRP + ERR_MASK_MODULE * 2)
+#define ERR_MASK_TRP_FLOAT    (ERR_MASK_TRP + ERR_MASK_MODULE * 3)
 
 #define ERR_MASK_CAL     (ERR_MASK_GROUP * 2)
 #define ERR_MASK_EMU     (ERR_MASK_GROUP * 3)
-#define ERR_MASK_TRP     (ERR_MASK_GROUP * 5)
 
 #define DEBUG_TRACE(E,T) call trace_debug(E, T, __FILE__, __LINE__)
 
@@ -127,8 +135,7 @@
 #  endif
 
 #endif  /* not _TOUZA_H */
-!!!_! FOOTER
-!!!_ + Local variables
-! Local Variables:
-! mode: f90
-! End:
+
+/* Local Variables: */
+/* mode: f90 */
+/* End: */

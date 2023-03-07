@@ -1,10 +1,10 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2022/07/25 18:52:11 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/15 16:35:49 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2011-2022
+! Copyright (C) 2011-2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -36,6 +36,7 @@ module TOUZA_Std_log
 
 # define __MDL__ 'log'
 # define __TAG__ STD_FORMAT_MDL(__MDL__)
+# define _ERROR(E) (E - ERR_MASK_STD_LOG)
 !!!_  - static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -135,7 +136,7 @@ contains
           if (ierr.eq.0) call utl_init(ierr, default_unit, levv=lv, mode=lmd)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_LOG
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
 
     return
@@ -210,7 +211,7 @@ contains
 !!!_  - trace_fine ()
   subroutine trace_fine &
        & (ierr, mode, icount, dcount, fcount, &
-       &  pkg, grp, mdl, fun, isfx, u, levv)
+       &  pkg,  grp,  mdl,    fun,    asfx,   isfx, u, levv)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(inout)       :: ierr
@@ -218,34 +219,37 @@ contains
     integer,         intent(in)          :: icount, dcount, fcount
     character(len=*),intent(in),optional :: pkg, grp, mdl
     character(len=*),intent(in),optional :: fun
+    character(len=*),intent(in),optional :: asfx
     integer,         intent(in),optional :: isfx
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv
     integer lv
     character(len=128) :: tag
     character(len=128) :: txt
+    integer jerr
 
 311 format('fine: ', I0, 1x, I0, 1x, I0, 1x, I0)
     lv = choice(msglev_normal, levv)
     if (is_msglev_DEBUG(lv)) then
-       call gen_tag(tag, pkg, grp, mdl, fun, isfx)
-       write(txt, 311) ierr, icount, dcount, fcount
+       call gen_tag(tag, pkg, grp, mdl, fun, asfx, isfx)
+       write(txt, 311, IOSTAT=jerr) ierr, icount, dcount, fcount
        call msg(txt, tag, u)
     endif
     call trace_control &
-         & (ierr, mode, pkg, grp, mdl, fun, isfx, u, levv)
+         & (ierr, mode, pkg, grp, mdl, fun, asfx, isfx, u, levv)
     return
   end subroutine trace_fine
 
 !!!_  - trace_control ()
   subroutine trace_control &
-       & (ierr, mode, pkg, grp, mdl, fun, isfx, u, levv)
+       & (ierr, mode, pkg, grp, mdl, fun, asfx, isfx, u, levv)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(inout)       :: ierr
     integer,         intent(in)          :: mode
     character(len=*),intent(in),optional :: pkg, grp, mdl
     character(len=*),intent(in),optional :: fun
+    character(len=*),intent(in),optional :: asfx
     integer,         intent(in),optional :: isfx
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv
@@ -253,20 +257,22 @@ contains
     integer lv
     character(len=128) :: tag
     character(len=128) :: txt
+    integer jerr
+
     n = ierr
     if (ierr.ne.0) then
        lv = choice(msglev_normal, levv)
-       call gen_tag(tag, pkg, grp, mdl, fun, isfx)
+       call gen_tag(tag, pkg, grp, mdl, fun, asfx, isfx)
        if (IAND(mode, MODE_LOOSE).gt.0) then
 301       format('loose: ', I0)
           if (is_msglev_NORMAL(lv)) then
-             write(txt, 301) ierr
+             write(txt, 301, IOSTAT=jerr) ierr
              call msg_txt(txt, tag, u)
           endif
           n = 0
        else if (is_msglev_FATAL(lv)) then
 302       format('trace: ', I0)
-          write(txt, 302) ierr
+          write(txt, 302, IOSTAT=jerr) ierr
           call msg_txt(txt, tag, u)
        endif
     endif
@@ -479,8 +485,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) vv(:)
+    write(txt, fmt, IOSTAT=jerr) vv(:)
     call msg_txt(txt, tag, u)
 
   end subroutine msg_ia
@@ -494,8 +501,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) vv(:)
+    write(txt, fmt, IOSTAT=jerr) vv(:)
     call msg_txt(txt, tag, u)
 
   end subroutine msg_fa
@@ -509,8 +517,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) vv(:)
+    write(txt, fmt, IOSTAT=jerr) vv(:)
     call msg_txt(txt, tag, u)
 
   end subroutine msg_da
@@ -525,8 +534,9 @@ contains
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
     integer j
+    integer jerr
 
-    write(txt, fmt) (trim(vv(j)), j=1, size(vv))
+    write(txt, fmt, IOSTAT=jerr) (trim(vv(j)), j=1, size(vv))
     call msg_txt(txt, tag, u)
 
   end subroutine msg_aa
@@ -540,8 +550,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) v
+    write(txt, fmt, IOSTAT=jerr) v
     call msg_txt(txt, tag, u)
 
   end subroutine msg_is
@@ -555,8 +566,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) v
+    write(txt, fmt, IOSTAT=jerr) v
     call msg_txt(txt, tag, u)
 
   end subroutine msg_fs
@@ -570,8 +582,9 @@ contains
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     character(len=ltxt) :: txt
+    integer jerr
 
-    write(txt, fmt) v
+    write(txt, fmt, IOSTAT=jerr) v
     call msg_txt(txt, tag, u)
 
   end subroutine msg_ds
@@ -631,26 +644,31 @@ contains
 
 !!!_  & gen_tag - generate message tag
   subroutine gen_tag &
-       & (tag, pkg, grp, mdl, fun, isfx)
+       & (tag, pkg, grp, mdl, fun, asfx, isfx, label)
+    use TOUZA_Std_utl,only: choice
     implicit none
     character(len=*),intent(out)         :: tag
     character(len=*),intent(in),optional :: pkg, grp, mdl
     character(len=*),intent(in),optional :: fun
+    character(len=*),intent(in),optional :: asfx
     integer,         intent(in),optional :: isfx
+    logical,         intent(in),optional :: label  ! boolean to apply format conversion
+    character(len=1024) :: pfx
+    integer jerr
 
-    character(len=256) :: pfx
 101 format(_TOUZA_TAG_PGM(A,A,A))
 102 format(_TOUZA_TAG_PG(A,A))
 103 format(_TOUZA_TAG_P(A))
+    jerr = 0
     if (present(pkg)) then
        if (present(grp)) then
           if (present(mdl)) then
-             write(pfx, 101) trim(pkg), trim(grp), trim(mdl)
+             write(pfx, 101, IOSTAT=jerr) trim(pkg), trim(grp), trim(mdl)
           else
-             write(pfx, 102) trim(pkg), trim(grp)
+             write(pfx, 102, IOSTAT=jerr) trim(pkg), trim(grp)
           endif
        else
-          write(pfx, 103) trim(pkg)
+          write(pfx, 103, IOSTAT=jerr) trim(pkg)
        endif
     else
        pfx = ' '
@@ -659,18 +677,40 @@ contains
 202 format(A, _TOUZA_TAG_F(A))
 203 format(A, TOUZA_FUN_SEP, I0)
 204 format(A)
+211 format(A, _TOUZA_TAG_F(A),  TOUZA_FUN_SEP, A, TOUZA_SFX_SEP, I0)
+212 format(A, _TOUZA_TAG_F(A),  TOUZA_FUN_SEP, A)
+213 format(A, TOUZA_FUN_SEP, A, TOUZA_SFX_SEP, I0)
+214 format(A, TOUZA_FUN_SEP, A)
+
     if (present(fun)) then
-       if (present(isfx)) then
-          write(tag, 201) trim(pfx), trim(fun), isfx
+       if (present(asfx)) then
+          if (present(isfx)) then
+             write(tag, 211, IOSTAT=jerr) trim(pfx), trim(fun), trim(asfx), isfx
+          else
+             write(tag, 212, IOSTAT=jerr) trim(pfx), trim(fun), trim(asfx)
+          endif
+       else if (present(isfx)) then
+          write(tag, 201, IOSTAT=jerr) trim(pfx), trim(fun), isfx
        else
-          write(tag, 202) trim(pfx), trim(fun)
+          write(tag, 202, IOSTAT=jerr) trim(pfx), trim(fun)
        endif
     else if (present(isfx)) then
-       write(tag, 203) trim(pfx), isfx
+       if (present(asfx)) then
+          write(tag, 213, IOSTAT=jerr) trim(pfx), trim(asfx), isfx
+       else
+          write(tag, 203, IOSTAT=jerr) trim(pfx), isfx
+       endif
+    else if (present(asfx)) then
+       write(tag, 214, IOSTAT=jerr) trim(pfx), trim(asfx)
     else
-       write(tag, 204) trim(pfx)
+       write(tag, 204, IOSTAT=jerr) trim(pfx)
     endif
 
+    if (choice(.false., label)) then
+301    format(_TOUZA_FORMAT_TAG(A))
+       pfx = tag
+       write(tag, 301, IOSTAT=jerr) trim(pfx)
+    endif
   end subroutine gen_tag
 
 !!!_  & banner - output banner
@@ -694,6 +734,8 @@ contains
     integer ind
     integer p
     character(len=64) :: fmt0, fmt1
+    integer jerr
+
     ierr = 0
 
     ut = choice(unit_global, u)
@@ -716,8 +758,8 @@ contains
     else
 111    format('(', I0, 'x, A)')
 112    format('(', I0, 'x, A, 1x, A, 1x, A)')
-       write(fmt0, 111) ind
-       write(fmt1, 112) ind
+       write(fmt0, 111, IOSTAT=jerr) ind
+       write(fmt1, 112, IOSTAT=jerr) ind
     endif
 
     select case (p)
@@ -725,7 +767,7 @@ contains
        if (ut.ge.0) then
           write(ut, fmt1) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
        else if (ut.eq.-1) then
-          write(*, fmt1) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
+          write(*,  fmt1) repeat(trim(ci), rw), trim(txt), repeat(trim(ci), rw)
        endif
     case default
        if (ut.ge.0) then
@@ -819,7 +861,7 @@ program test_std_log
   call test_gen_tag('P', 'G')
   call test_gen_tag('P', 'G', 'M')
   call test_gen_tag('P', 'G', 'M', 'F')
-  call test_gen_tag('P', 'G', 'M', 'F', 123)
+  call test_gen_tag('P', 'G', 'M', 'F', isfx=123)
   call test_gen_tag(fun='F')
   call test_gen_tag('P', fun='F')
   call test_gen_tag('P', 'G', fun='F')
@@ -847,17 +889,19 @@ program test_std_log
 
 contains
   subroutine test_gen_tag &
-       & (pkg, grp, mdl, fun, isfx)
+       & (pkg, grp, mdl, fun, asfx, isfx)
     implicit none
     character(len=*),intent(in),optional :: pkg, grp, mdl
     character(len=*),intent(in),optional :: fun
+    character(len=*),intent(in),optional :: asfx
     integer,         intent(in),optional :: isfx
 
     character(len=256) :: tag
-    call gen_tag(tag, pkg, grp, mdl, fun, isfx)
-101 format('TAG:', 5L1, ': <', A, '>')
+    call gen_tag(tag, pkg, grp, mdl, fun, asfx, isfx)
+101 format('TAG:', 6L1, ': <', A, '>')
     write(*, 101) &
-         & present(pkg), present(grp), present(mdl), present(fun), present(isfx), &
+         & present(pkg), present(grp),  present(mdl), &
+         & present(fun), present(asfx), present(isfx), &
          & trim(tag)
     return
   end subroutine test_gen_tag

@@ -1,6 +1,6 @@
 !!!_! jmz/chak_reg.F90 - TOUZA/Jmz swiss(CH) army knife operator registration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2022-11-09T07:12:55+09:00
+! Created by genopr.sh at 2023-02-21T09:59:09+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -73,6 +73,7 @@
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_IDIV, str_IDIV, 2, 1, ilev=ilev_mul, istr='//')
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_MOD, str_MOD, 2, 1, ilev=ilev_mul, istr='%')
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_POW, str_POW, 2, 1, ilev=ilev_exp, istr='**')
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_MODULO, str_MODULO, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_BITAND, str_BITAND, 2, 1, ilev=ilev_and, istr='&')
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_BITOR, str_BITOR, 2, 1, ilev=ilev_or, istr='|')
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_BITXOR, str_BITXOR, 2, 1, ilev=ilev_xor, istr='^')
@@ -87,6 +88,9 @@
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LEF, str_LEF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_GEF, str_GEF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_EXTR, str_EXTR, 2, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_CDIFF, str_CDIFF, 2, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_FDIFF, str_FDIFF, 2, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_BDIFF, str_BDIFF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_OR, str_OR, 2, 1, ilev=ilev_logical, istr='||')
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LOR, str_LOR)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_ROR, str_ROR, 2, 1, ilev=ilev_call)
@@ -122,12 +126,16 @@
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_SUM, str_SUM, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_AVR, str_AVR, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_COUNT, str_COUNT, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_UMIN, str_UMIN, 1, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_UMAX, str_UMAX, 1, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_FMT, str_FMT)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_ITEM, str_ITEM)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_UNIT, str_UNIT)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_TITLE, str_TITLE)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_EDIT, str_EDIT)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_DSET, str_DSET)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_TSEL, str_TSEL)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_RSEL, str_RSEL)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_MISS, str_MISS)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_DUR, str_DUR)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_TAG, str_TAG)

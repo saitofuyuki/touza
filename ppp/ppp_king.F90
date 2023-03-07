@@ -1,10 +1,10 @@
 !!!_! ppp_king.F90 - TOUZA/ppp king control (xmcomm/xmking replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2022/10/20 06:59:09 fuyuki ppp_king.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 22:15:54 fuyuki ppp_king.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 #ifdef HAVE_CONFIG_H
@@ -64,6 +64,7 @@ module TOUZA_Ppp_king
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
 #define __MDL__ 'k'
+# define _ERROR(E) (E - ERR_MASK_PPP_KING)
 !!!_ + overload
   interface get_king
      module procedure get_king_a, get_king_i
@@ -111,7 +112,7 @@ contains
           if (ierr.eq.0) call init_table(ierr, nking)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
     return
   end subroutine init
@@ -199,7 +200,7 @@ contains
     ! if (m.le.0) m = lctb * 2
     if (m.le.0) m = lctb
     if (hh_king.lt.0) then
-       hh_king = new_htable('king', lmdl, m, def=king_unset, base=OPT_KING_HASH_BASE, ntag=1)
+       hh_king = new_htable('king', m, lmdl, 1, base=OPT_KING_HASH_BASE, def=king_unset)
        if (hh_king.lt.0) ierr = -1
     endif
     return
@@ -497,14 +498,13 @@ contains
   integer function cache_search &
        & (pat, iagent) &
        & result(n)
-    use TOUZA_Ppp_std,only: query_status
     implicit none
     character(len=*),intent(in) :: pat
     integer,         intent(in) :: iagent
     n = -1
     if (iagent.lt.0) return
 
-    n = query_status(pat, iagent, hh_king)
+    n = query_cache(pat, iagent)
     return
   end function cache_search
 
@@ -552,7 +552,6 @@ contains
   integer function cache_store &
        & (pat, iagent, king) &
        & result(n)
-    use TOUZA_Ppp_std,only: reg_entry, query_status
     implicit none
     character(len=*),intent(in) :: pat
     integer,         intent(in) :: iagent
@@ -560,24 +559,49 @@ contains
 
     integer e
 
-    n = query_status(pat, iagent, hh_king)
+    n = query_cache(pat, iagent)
     if (n.ge.0) then
-       n = ERR_DUPLICATE_SET - ERR_MASK_PPP_KING
+       n = _ERROR(ERR_DUPLICATE_SET)
        return
     endif
     n = mctb
     mctb = mctb + 1
     if (n.ge.lctb) then
-       n = ERR_INSUFFICIENT_BUFFER - ERR_MASK_PPP_KING
+       n = _ERROR(ERR_INSUFFICIENT_BUFFER)
        return
     endif
-    e = reg_entry(pat, iagent, hh_king, n)
+    e = reg_cache(pat, iagent, n)
     cache_a(n) = iagent
     cache_p(n) = pat
     cache_k(n) = king
     cache_n(n) = -1
     if (e.lt.0) n = e
   end function cache_store
+
+!!!_  - reg_cache - reg_entry() wrapper
+  integer function reg_cache &
+       & (name, source, iagent) &
+       & result(ee)
+    use TOUZA_Ppp_std,only: reg_entry
+    implicit none
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: source
+    integer,         intent(in) :: iagent
+    ee = reg_entry(hh_king, name, (/source/), (/iagent/))
+  end function reg_cache
+
+!!!_  - query_cache - query_staus() wrapper
+  integer function query_cache &
+       & (name, source) &
+       & result(n)
+    use TOUZA_Ppp_std,only: query_status
+    implicit none
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: source
+    integer jerr
+    call query_status(jerr, n, hh_king, name, (/source/))
+    if (jerr.ne.0) n = jerr
+  end function query_cache
 
 !!!_ + end TOUZA_Ppp_king
 end module TOUZA_Ppp_king
