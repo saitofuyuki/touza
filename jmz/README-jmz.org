@@ -15,7 +15,7 @@ FORTRAN procedures mainly adopted in MIROC.  See *TOUZA* README
 *TOUZA* collection.
 * Build and installation
 * Brief description of *TOUZA/Jmz* commands
-** chak - Swiss(CH) Army Knife for gtool-3.5 format files
+** chak - CH(Swiss) Army Knife for gtool-3.5 format files
 *** introduction
 chak is a Reverse Polish Notation (RPN) calculator for gtool-3.5
 format data files.
@@ -524,6 +524,7 @@ can be set, which enable multiple record contents in the file.
 
 *** output-file formats
 **** gtool-3.5 format (default)
+**** simple netCDF (in preparation)
 **** ascii output
 : chak ... = <file> FMT=a[<format>]
 
@@ -1617,7 +1618,7 @@ This is equivalent to gtool-3.5 command =gttv= as follows:
 **** =gtext= alternative
 
 * Copyright and license
-Copyright 2022 Japan Agency for Marine-Earth Science and Technology
+Copyright 2022-2023 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)
 

@@ -6,8 +6,12 @@ TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
+* Changes in 1.09.0 from 1.08.1
+** Major changes
+- cache, c-interfaces, slice read access features etc for Nnview.
+- revisit for MIROC/default
 * Changes in 1.08.1 from 1.08.0
-** Bug fixs
+** Bug fixes
 - [critical] hack to handle long message (thanks to tatebe-san).
 
 * Changes in 1.08.0 from 1.07.0

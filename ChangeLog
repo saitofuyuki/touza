@@ -1,3 +1,19 @@
+Release-1.09.0 / 2023-03-07
+===========================
+
+  * Counterpart revision for Nnview.
+  * nio: slice read accesses are implemented for [UM][RI][Yn].
+  * nio: cache feature starts (reserved).
+  * trp: partial decoding implemented (sequential mode only).
+  * pkgconf: add fclibs entry.
+  * std: std_ipc.F90 introduced (to substitute intrinsic IBITS).
+  * jmz: safer internal write, with IOSTAT.
+  * nio: P[IR]n format introduced (reserved).
+  * nio: nct interface improved.
+  * nio: introduce MIROC zioparam.F rename, to merge with updated MIROC.
+  * std: std_htb redesigned to hold string and/or integer keys.
+  * std: suspend-mode access implemented in std_sus.
+
 Release-1.08.1 / 2023-01-30
 ===========================
 
