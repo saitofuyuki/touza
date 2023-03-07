@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/06 10:55:45 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/07 11:38:15 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -813,9 +813,10 @@ contains
             & iseph, &                     ! isep
             & isepl, htop(1:ltop), &       ! item 0
             & head(2:nitem)
-    ! write(*, *) ierr, is_eof_ss(ierr)
+       ! write(*, *) ierr, is_eof_ss(ierr)
        if (is_eof_ss(ierr)) then
           inquire(UNIT=u, IOSTAT=jerr, POS=jposf)
+          ! write(*, *) jerr, jpos, jposf
           if (jpos.eq.jposf) then
              ierr = _ERROR(ERR_EOF)
              head(1:nitem) = ' '
@@ -1361,7 +1362,6 @@ contains
     integer nd           ! data size array
     integer mw, mh, mk   ! data sizes in file (3d, plane, levels)
     integer bes(3, laxs)
-    integer nb
 
     ierr = 0
     call nio_read_slice_set &
@@ -1388,7 +1388,10 @@ contains
           call get_data_ury &
                & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk, bes, laxs)
        case (GFMT_MRY:GFMT_MRYend-1)
-          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_mry &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk, bes, laxs)
        case (GFMT_URT)
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
        case (GFMT_MRT)
@@ -1422,7 +1425,6 @@ contains
     integer nd           ! data size array
     integer mw, mh, mk   ! data sizes in file (3d, plane, levels)
     integer bes(3, laxs)
-    integer nb
 
     ierr = 0
     call nio_read_slice_set &
@@ -1449,7 +1451,10 @@ contains
           call get_data_ury &
                & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk, bes, laxs)
        case (GFMT_MRY:GFMT_MRYend-1)
-          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_mry &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk, bes, laxs)
        case (GFMT_URT)
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
        case (GFMT_MRT)
@@ -1483,7 +1488,6 @@ contains
     integer nd           ! data size array
     integer mw, mh, mk   ! data sizes in file (3d, plane, levels)
     integer bes(3, laxs)
-    integer nb
 
     ierr = 0
     call nio_read_slice_set &
@@ -1510,7 +1514,10 @@ contains
           call get_data_ury &
                & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk, bes, laxs)
        case (GFMT_MRY:GFMT_MRYend-1)
-          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+          mh = max(1, kaxs(1)) * max(1, kaxs(2))
+          mk = max(1, kaxs(3))
+          call get_data_mry &
+               & (ierr, d, nd, u, krect, vmiss, kfmt, mh, mk, bes, laxs)
        case (GFMT_URT)
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
        case (GFMT_MRT)
@@ -1821,7 +1828,6 @@ contains
     integer j, ns, jbgn
     integer kri, ksubm
     character(len=litem) :: hi(nitem)
-    logical swap, lrec
 !!!_   . note
     ! When argument head is present, krect is also mandatory (the opposite is not)
     !   File position must be at the header end (data begin)
@@ -2056,7 +2062,7 @@ contains
     integer,intent(in),optional :: limtry   ! trial limit
     integer l
     logical swap, lrec
-    integer(kind=KIOFS) :: jpos, jpini
+    integer(kind=KIOFS) :: jpini
     integer ndrec
     integer ltry
     integer kri
@@ -2301,7 +2307,7 @@ contains
        & (ierr, &
        &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
     use TOUZA_Trp,only: count_packed,  pack_restore
-    use TOUZA_Trp,only: pack_gen_runl, pack_gen_bfc, pack_restore_dunp
+    use TOUZA_Trp,only: gen_bfc_slice, pack_restore_dunp
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
@@ -2345,7 +2351,7 @@ contains
           call get_data_record_suspend(ierr, icom, 0, u, krect, +1, rfil, nfil)
        endif
        if (ierr.eq.0) then
-          call pack_gen_bfc &
+          call gen_bfc_slice &
                & (ierr, dunp, nunp, rfil, nfil, nbits, mh, bes, cz - 1, kpack, mold)
           if (ierr.eq.0) nh = dunp(1, nunp)
        endif
@@ -2390,7 +2396,7 @@ contains
        & (ierr, &
        &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
     use TOUZA_Trp,only: count_packed,  pack_restore
-    use TOUZA_Trp,only: pack_gen_runl, pack_gen_bfc, pack_restore_dunp
+    use TOUZA_Trp,only: gen_bfc_slice, pack_restore_dunp
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
@@ -2434,7 +2440,7 @@ contains
           call get_data_record_suspend(ierr, icom, 0, u, krect, +1, rfil, nfil)
        endif
        if (ierr.eq.0) then
-          call pack_gen_bfc &
+          call gen_bfc_slice &
                & (ierr, dunp, nunp, rfil, nfil, nbits, mh, bes, cz - 1, kpack, mold)
           if (ierr.eq.0) nh = dunp(1, nunp)
        endif
@@ -2479,7 +2485,7 @@ contains
        & (ierr, &
        &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
     use TOUZA_Trp,only: count_packed,  pack_restore
-    use TOUZA_Trp,only: pack_gen_runl, pack_gen_bfc, pack_restore_dunp
+    use TOUZA_Trp,only: gen_bfc_slice, pack_restore_dunp
     implicit none
     integer,parameter :: KARG=KI32, KISRC=KI32, KRSRC=KDBL
     integer,           intent(out) :: ierr
@@ -2523,7 +2529,7 @@ contains
           call get_data_record_suspend(ierr, icom, 0, u, krect, +1, rfil, nfil)
        endif
        if (ierr.eq.0) then
-          call pack_gen_bfc &
+          call gen_bfc_slice &
                & (ierr, dunp, nunp, rfil, nfil, nbits, mh, bes, cz - 1, kpack, mold)
           if (ierr.eq.0) nh = dunp(1, nunp)
        endif
@@ -3025,116 +3031,413 @@ contains
 !!!_  - get_data_mry - MRY
   subroutine get_data_mry_d &
        & (ierr, &
-       &  d, nd, u, krect, vmiss, kfmt, mh, mk)
-    use TOUZA_Trp,only: count_packed, pack_restore
+       &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
+    use TOUZA_Trp,only: count_packed, pack_restore, pack_restore_dunp
+    use TOUZA_Trp,only: mask_to_idxl, gen_bfc_idxl
+    use TOUZA_Nio_std,only: KIOFS
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
+    real(KIND=KARG), intent(out) :: d(0:*)
     integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
-    real(kind=KRMIS),intent(in)  :: vmiss
+    real(KIND=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
     integer,         intent(in)  :: mh, mk
+    integer,optional,intent(in)  :: bes(3, *)
+    integer,optional,intent(in)  :: nr
 
     integer             :: nm
-    integer             :: imsk(mh * mk)
-    integer(kind=KISRC) :: imco(mh * mk)
+    integer             :: imsk(0:mh * mk)
+    integer(KIND=KISRC) :: imco(0:mh * mk)
 
-    integer             :: mch(mk)
+    integer             :: mch(0:mk-1)
     integer             :: mofs(0:mk)
 
     integer             :: nbits, mcom
-    integer             :: idec(mh)
-    integer(kind=KISRC) :: icom(mh * mk)
-    real(kind=KRSRC)    :: dma(2 * mk)
+    integer             :: idec(0:mh)
+    integer(KIND=KISRC) :: icom(0:mh * mk)
+    real(KIND=KRSRC)    :: dma(0:2 * mk)
     integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jm, jc, jh, jb
     integer kpackm, kpackb
+    integer,parameter :: cz = 3
+    integer :: nidx
+    integer :: idxs(0:mh), idxd(0:mh)
+    integer :: dunp(3, 0:mh), rfil(0:mh)
+    integer :: nunp,          nfil
+    integer :: nk,  nh,  nmd
+    integer :: jmp
+    integer :: jprv
 
     ierr = 0
 
     nbits = kfmt - GFMT_MRY
 
     nm = count_packed(1, mh, mold)
-    mofs(0) = 0
+
+    kpackm = legacy_unpacking(1,     mh)
+    kpackb = legacy_unpacking(nbits, mh)
+    nh = 0
 
     if (ierr.eq.0) call get_data_record(ierr, mcom,     u,          krect)
     if (ierr.eq.0) call get_data_record(ierr, mch,      mk,      u, krect)
     if (ierr.eq.0) call get_data_record(ierr, mofs(1:), mk,      u, krect)
     if (ierr.eq.0) call get_data_record(ierr, dma,      2 * mk,  u, krect)
-    ! write(*, *) mcom, mch, mk, nm
-    if (ierr.eq.0) call get_data_record(ierr, imco,     nm * mk, u, krect)
-    if (ierr.eq.0) call get_data_record(ierr, icom,     mcom,    u, krect)
-
     if (ierr.eq.0) then
+       mofs(0) = 0
        do jk = 1, mk
           mofs(jk) = mofs(jk-1) + mofs(jk)
        enddo
-       kpackm = legacy_unpacking(1,     mh)
-       kpackb = legacy_unpacking(nbits, mh)
-       do jk = 1, mk
-          jm = (jk - 1) * nm + 1
-          jc = 1 + mofs(jk-1)
-          call pack_restore(ierr, imsk, imco(jm:), mh, 1, kpackm)
-          call pack_restore(ierr, idec, icom(jc:), mch(jk), nbits, kpackb)
-          jb = 1
-          jdb = (jk - 1) * mh
-          do jh = 1, mh
-             if (imsk(jh).eq.1) then
-                d(jdb + jh) = dma(2 * jk - 1) &
-                     & + real(idec(jb), kind=KARG) * dma(2 * jk)
-                jb = jb + 1
-             else
-                d(jdb + jh) = vmiss
-             endif
-          enddo
+    endif
+    if (present(bes)) then
+       if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
+       if (ierr.eq.0) then
+          nfil = 2
+          nk = bes(2, cz) - bes(1, cz)
+          rfil(0) = nm * bes(1, cz)
+          rfil(1) = nm * nk
+          call get_data_record_runl(ierr, imco, nm * nk, u, krect, rfil, nfil)
+       endif
+       if (ierr.eq.0) then
+          nfil = 0
+          jk = bes(1, cz)
+          rfil(nfil) = mofs(jk)
+          call get_data_record_suspend(ierr, icom, 0, u, krect, +1, rfil, nfil)
+       endif
+       do jk = bes(1, cz), bes(2, cz) - 1
+          nmd = mofs(jk+1) - mofs(jk)
+          jmp = nm * (jk - bes(1, cz))
+          if (ierr.eq.0) then
+             call mask_to_idxl(ierr, idxd, idxs, nidx, imco(jmp:), mh, bes, cz - 1, kpackm)
+          endif
+          if (ierr.eq.0) then
+             call gen_bfc_idxl(ierr, dunp, nunp, rfil, nfil, nbits, mch(jk), idxs, nidx, kpackb, mold)
+          endif
+          if (ierr.eq.0) then
+             call get_data_record_suspend(ierr, icom, nmd, u, krect, 0, rfil, nfil)
+          endif
+          if (ierr.eq.0) then
+             call pack_restore_dunp(ierr, idec, icom, nmd, nbits, kpackb, dunp, nunp)
+          endif
+          if (ierr.eq.0) then
+             nh = product(bes(2, 1:2) - bes(1, 1:2))
+             jdb = nh * (jk - bes(1, cz))
+             jprv = 0
+             do jc = 0, nidx - 1
+                jh = idxd(jc)
+                d(jdb+jprv:jdb+jh-1) = real(vmiss, kind=KARG)
+                d(jdb+jh) = &
+                     & real(dma(2 * jk) + real(idec(jc), kind=KRSRC) * dma(2 * jk + 1), &
+                     &      kind=KARG)
+                jprv = jh + 1
+             enddo
+             d(jdb+jprv:jdb+nh-1) = real(vmiss, kind=KARG)
+          endif
        enddo
+       if (ierr.eq.0) then
+          call get_data_record_suspend(ierr, icom, 0, u, krect, -1)
+       endif
+    else
+       if (ierr.eq.0) call get_data_record(ierr, imco,     nm * mk, u, krect)
+       if (ierr.eq.0) call get_data_record(ierr, icom,     mcom,    u, krect)
+
+       if (ierr.eq.0) then
+          do jk = 0, mk - 1
+             jm = jk * nm
+             jc = mofs(jk)
+             call pack_restore(ierr, imsk, imco(jm:), mh, 1, kpackm)
+             call pack_restore(ierr, idec, icom(jc:), mch(jk), nbits, kpackb)
+             jb = 0
+             jdb = jk * mh
+             do jh = 0, mh - 1
+                if (imsk(jh).eq.1) then
+                   d(jdb + jh) = &
+                        & real(dma(2 * jk) + real(idec(jb), kind=KRSRC) * dma(2 * jk + 1), &
+                        &      kind=KARG)
+                   jb = jb + 1
+                else
+                   d(jdb + jh) = real(vmiss, kind=KARG)
+                endif
+             enddo
+          enddo
+       endif
     endif
     return
   end subroutine get_data_mry_d
   subroutine get_data_mry_f &
        & (ierr, &
-       &  d, nd, u, krect, vmiss, kfmt, mh, mk)
+       &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
+    use TOUZA_Trp,only: count_packed, pack_restore, pack_restore_dunp
+    use TOUZA_Trp,only: mask_to_idxl, gen_bfc_idxl
+    use TOUZA_Nio_std,only: KIOFS
     implicit none
-    integer,parameter :: KARG=KFLT, KRSRC=KDBL
+    integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
-    real(kind=KARG), intent(out) :: d(*)
+    real(KIND=KARG), intent(out) :: d(0:*)
     integer,         intent(in)  :: nd
     integer,         intent(in)  :: krect
     integer,         intent(in)  :: u
-    real(kind=KRMIS),intent(in)  :: vmiss
+    real(KIND=KRMIS),intent(in)  :: vmiss
     integer,         intent(in)  :: kfmt
     integer,         intent(in)  :: mh, mk
+    integer,optional,intent(in)  :: bes(3, *)
+    integer,optional,intent(in)  :: nr
 
-    real(kind=KRSRC) :: buf(mh * mk)
+    integer             :: nm
+    integer             :: imsk(0:mh * mk)
+    integer(KIND=KISRC) :: imco(0:mh * mk)
+
+    integer             :: mch(0:mk-1)
+    integer             :: mofs(0:mk)
+
+    integer             :: nbits, mcom
+    integer             :: idec(0:mh)
+    integer(KIND=KISRC) :: icom(0:mh * mk)
+    real(KIND=KRSRC)    :: dma(0:2 * mk)
+    integer,parameter   :: mold = 0_KISRC
+    integer             :: jk, jdb, jm, jc, jh, jb
+    integer kpackm, kpackb
+    integer,parameter :: cz = 3
+    integer :: nidx
+    integer :: idxs(0:mh), idxd(0:mh)
+    integer :: dunp(3, 0:mh), rfil(0:mh)
+    integer :: nunp,          nfil
+    integer :: nk,  nh,  nmd
+    integer :: jmp
+    integer :: jprv
 
     ierr = 0
-    call get_data_mry_d(ierr, buf, nd, u, krect, vmiss, kfmt, mh, mk)
-    if (ierr.eq.0) d(1:nd) = real(buf(1:nd), KIND=KARG)
 
+    nbits = kfmt - GFMT_MRY
+
+    nm = count_packed(1, mh, mold)
+
+    kpackm = legacy_unpacking(1,     mh)
+    kpackb = legacy_unpacking(nbits, mh)
+    nh = 0
+
+    if (ierr.eq.0) call get_data_record(ierr, mcom,     u,          krect)
+    if (ierr.eq.0) call get_data_record(ierr, mch,      mk,      u, krect)
+    if (ierr.eq.0) call get_data_record(ierr, mofs(1:), mk,      u, krect)
+    if (ierr.eq.0) call get_data_record(ierr, dma,      2 * mk,  u, krect)
+    if (ierr.eq.0) then
+       mofs(0) = 0
+       do jk = 1, mk
+          mofs(jk) = mofs(jk-1) + mofs(jk)
+       enddo
+    endif
+    if (present(bes)) then
+       if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
+       if (ierr.eq.0) then
+          nfil = 2
+          nk = bes(2, cz) - bes(1, cz)
+          rfil(0) = nm * bes(1, cz)
+          rfil(1) = nm * nk
+          call get_data_record_runl(ierr, imco, nm * nk, u, krect, rfil, nfil)
+       endif
+       if (ierr.eq.0) then
+          nfil = 0
+          jk = bes(1, cz)
+          rfil(nfil) = mofs(jk)
+          call get_data_record_suspend(ierr, icom, 0, u, krect, +1, rfil, nfil)
+       endif
+       do jk = bes(1, cz), bes(2, cz) - 1
+          nmd = mofs(jk+1) - mofs(jk)
+          jmp = nm * (jk - bes(1, cz))
+          if (ierr.eq.0) then
+             call mask_to_idxl(ierr, idxd, idxs, nidx, imco(jmp:), mh, bes, cz - 1, kpackm)
+          endif
+          if (ierr.eq.0) then
+             call gen_bfc_idxl(ierr, dunp, nunp, rfil, nfil, nbits, mch(jk), idxs, nidx, kpackb, mold)
+          endif
+          if (ierr.eq.0) then
+             call get_data_record_suspend(ierr, icom, nmd, u, krect, 0, rfil, nfil)
+          endif
+          if (ierr.eq.0) then
+             call pack_restore_dunp(ierr, idec, icom, nmd, nbits, kpackb, dunp, nunp)
+          endif
+          if (ierr.eq.0) then
+             nh = product(bes(2, 1:2) - bes(1, 1:2))
+             jdb = nh * (jk - bes(1, cz))
+             jprv = 0
+             do jc = 0, nidx - 1
+                jh = idxd(jc)
+                d(jdb+jprv:jdb+jh-1) = real(vmiss, kind=KARG)
+                d(jdb+jh) = &
+                     & real(dma(2 * jk) + real(idec(jc), kind=KRSRC) * dma(2 * jk + 1), &
+                     &      kind=KARG)
+                jprv = jh + 1
+             enddo
+             d(jdb+jprv:jdb+nh-1) = real(vmiss, kind=KARG)
+          endif
+       enddo
+       if (ierr.eq.0) then
+          call get_data_record_suspend(ierr, icom, 0, u, krect, -1)
+       endif
+    else
+       if (ierr.eq.0) call get_data_record(ierr, imco,     nm * mk, u, krect)
+       if (ierr.eq.0) call get_data_record(ierr, icom,     mcom,    u, krect)
+
+       if (ierr.eq.0) then
+          do jk = 0, mk - 1
+             jm = jk * nm
+             jc = mofs(jk)
+             call pack_restore(ierr, imsk, imco(jm:), mh, 1, kpackm)
+             call pack_restore(ierr, idec, icom(jc:), mch(jk), nbits, kpackb)
+             jb = 0
+             jdb = jk * mh
+             do jh = 0, mh - 1
+                if (imsk(jh).eq.1) then
+                   d(jdb + jh) = &
+                        & real(dma(2 * jk) + real(idec(jb), kind=KRSRC) * dma(2 * jk + 1), &
+                        &      kind=KARG)
+                   jb = jb + 1
+                else
+                   d(jdb + jh) = real(vmiss, kind=KARG)
+                endif
+             enddo
+          enddo
+       endif
+    endif
     return
   end subroutine get_data_mry_f
   subroutine get_data_mry_i &
        & (ierr, &
-       &  d, nd, u, krect, vmiss, kfmt, mh, mk)
+       &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
+    use TOUZA_Trp,only: count_packed, pack_restore, pack_restore_dunp
+    use TOUZA_Trp,only: mask_to_idxl, gen_bfc_idxl
+    use TOUZA_Nio_std,only: KIOFS
     implicit none
-    integer,parameter :: KARG=KI32, KRSRC=KDBL
+    integer,parameter :: KARG=KI32, KISRC=KI32, KRSRC=KDBL
     integer,           intent(out) :: ierr
-    integer(kind=KARG),intent(out) :: d(*)
+    integer(KIND=KARG),intent(out) :: d(0:*)
     integer,           intent(in)  :: nd
     integer,           intent(in)  :: krect
     integer,           intent(in)  :: u
-    real(kind=KRMIS),  intent(in)  :: vmiss
+    real(KIND=KRMIS),  intent(in)  :: vmiss
     integer,           intent(in)  :: kfmt
     integer,           intent(in)  :: mh, mk
+    integer,optional,  intent(in)  :: bes(3, *)
+    integer,optional,  intent(in)  :: nr
 
-    real(kind=KRSRC) :: buf(mh * mk)
+    integer             :: nm
+    integer             :: imsk(0:mh * mk)
+    integer(KIND=KISRC) :: imco(0:mh * mk)
+
+    integer             :: mch(0:mk-1)
+    integer             :: mofs(0:mk)
+
+    integer             :: nbits, mcom
+    integer             :: idec(0:mh)
+    integer(KIND=KISRC) :: icom(0:mh * mk)
+    real(KIND=KRSRC)    :: dma(0:2 * mk)
+    integer,parameter   :: mold = 0_KISRC
+    integer             :: jk, jdb, jm, jc, jh, jb
+    integer kpackm, kpackb
+    integer,parameter :: cz = 3
+    integer :: nidx
+    integer :: idxs(0:mh), idxd(0:mh)
+    integer :: dunp(3, 0:mh), rfil(0:mh)
+    integer :: nunp,          nfil
+    integer :: nk,  nh,  nmd
+    integer :: jmp
+    integer :: jprv
 
     ierr = 0
-    call get_data_mry_d(ierr, buf, nd, u, krect, vmiss, kfmt, mh, mk)
-    if (ierr.eq.0) d(1:nd) = int(buf(1:nd), KIND=KARG)
+
+    nbits = kfmt - GFMT_MRY
+
+    nm = count_packed(1, mh, mold)
+
+    kpackm = legacy_unpacking(1,     mh)
+    kpackb = legacy_unpacking(nbits, mh)
+    nh = 0
+
+    if (ierr.eq.0) call get_data_record(ierr, mcom,     u,          krect)
+    if (ierr.eq.0) call get_data_record(ierr, mch,      mk,      u, krect)
+    if (ierr.eq.0) call get_data_record(ierr, mofs(1:), mk,      u, krect)
+    if (ierr.eq.0) call get_data_record(ierr, dma,      2 * mk,  u, krect)
+    if (ierr.eq.0) then
+       mofs(0) = 0
+       do jk = 1, mk
+          mofs(jk) = mofs(jk-1) + mofs(jk)
+       enddo
+    endif
+    if (present(bes)) then
+       if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
+       if (ierr.eq.0) then
+          nfil = 2
+          nk = bes(2, cz) - bes(1, cz)
+          rfil(0) = nm * bes(1, cz)
+          rfil(1) = nm * nk
+          call get_data_record_runl(ierr, imco, nm * nk, u, krect, rfil, nfil)
+       endif
+       if (ierr.eq.0) then
+          nfil = 0
+          jk = bes(1, cz)
+          rfil(nfil) = mofs(jk)
+          call get_data_record_suspend(ierr, icom, 0, u, krect, +1, rfil, nfil)
+       endif
+       do jk = bes(1, cz), bes(2, cz) - 1
+          nmd = mofs(jk+1) - mofs(jk)
+          jmp = nm * (jk - bes(1, cz))
+          if (ierr.eq.0) then
+             call mask_to_idxl(ierr, idxd, idxs, nidx, imco(jmp:), mh, bes, cz - 1, kpackm)
+          endif
+          if (ierr.eq.0) then
+             call gen_bfc_idxl(ierr, dunp, nunp, rfil, nfil, nbits, mch(jk), idxs, nidx, kpackb, mold)
+          endif
+          if (ierr.eq.0) then
+             call get_data_record_suspend(ierr, icom, nmd, u, krect, 0, rfil, nfil)
+          endif
+          if (ierr.eq.0) then
+             call pack_restore_dunp(ierr, idec, icom, nmd, nbits, kpackb, dunp, nunp)
+          endif
+          if (ierr.eq.0) then
+             nh = product(bes(2, 1:2) - bes(1, 1:2))
+             jdb = nh * (jk - bes(1, cz))
+             jprv = 0
+             do jc = 0, nidx - 1
+                jh = idxd(jc)
+                d(jdb+jprv:jdb+jh-1) = int(vmiss, kind=KARG)
+                d(jdb+jh) = &
+                     & int(dma(2 * jk) + real(idec(jc), kind=KRSRC) * dma(2 * jk + 1), &
+                     &      kind=KARG)
+                jprv = jh + 1
+             enddo
+             d(jdb+jprv:jdb+nh-1) = int(vmiss, kind=KARG)
+          endif
+       enddo
+       if (ierr.eq.0) then
+          call get_data_record_suspend(ierr, icom, 0, u, krect, -1)
+       endif
+    else
+       if (ierr.eq.0) call get_data_record(ierr, imco,     nm * mk, u, krect)
+       if (ierr.eq.0) call get_data_record(ierr, icom,     mcom,    u, krect)
+
+       if (ierr.eq.0) then
+          do jk = 0, mk - 1
+             jm = jk * nm
+             jc = mofs(jk)
+             call pack_restore(ierr, imsk, imco(jm:), mh, 1, kpackm)
+             call pack_restore(ierr, idec, icom(jc:), mch(jk), nbits, kpackb)
+             jb = 0
+             jdb = jk * mh
+             do jh = 0, mh - 1
+                if (imsk(jh).eq.1) then
+                   d(jdb + jh) = &
+                        & int(dma(2 * jk) + real(idec(jb), kind=KRSRC) * dma(2 * jk + 1), &
+                        &     kind=KARG)
+                   jb = jb + 1
+                else
+                   d(jdb + jh) = int(vmiss, kind=KARG)
+                endif
+             enddo
+          enddo
+       endif
+    endif
     return
   end subroutine get_data_mry_i
 
@@ -3996,7 +4299,7 @@ contains
     integer(kind=KISRC) :: ibagaz(0:2*n+KB_HEAD)
     integer(kind=KISRC) :: kdmy(1)
     integer nbgz, ncnz
-    integer na,   ma, xid, jp
+    integer na,   ma, xid
     logical cont
     integer rectx
 
@@ -4236,7 +4539,6 @@ contains
     integer jp, jb, je
     integer lstr
     integer m
-    character c
     integer,parameter :: lo = lopts
 
     integer,parameter :: KBUF = KDBL
@@ -8036,6 +8338,8 @@ contains
        & (ierr, jarg)
     use TOUZA_Std,    only: get_param, upcase, get_option
     use TOUZA_Nio_std,only: KBUF=>KDBL
+    use TOUZA_Nio_std,only: is_error_match
+    use TOUZA_Nio_std,only: is_eof_ss
     use TOUZA_Nio_header
     use TOUZA_Std_sus,only: sus_open, sus_close, sus_rseek, WHENCE_ABS
     implicit none
@@ -8062,6 +8366,7 @@ contains
 101 format('test/slice:', I0, 1x, A)
 401 format('header/r:', I0, 1x, I0, 1x, I0)
 402 format('data/r:', I0, 1x, I0)
+403 format('open/r:', I0)
 301 format('v:', I0, 1x, I0, 1x, E24.16)
 
     jarg = jarg + 1
@@ -8084,8 +8389,9 @@ contains
     uread = 21
 
     if (ierr.eq.0) call sus_open(ierr, uread, rfile, ACTION='R', STATUS='O')
+    write (*, 403) ierr
 
-    if (ierr.eq.0) allocate(v(1:lmax), STAT=ierr)
+    if (ierr.eq.0) allocate(v(0:lmax), STAT=ierr)
 
     jrec = 0
     ! krect = REC_DEFAULT
@@ -8093,11 +8399,15 @@ contains
     do
        if (ierr.eq.0) call nio_read_header(ierr, hd, krect, uread)
        write (*, 401) ierr, jrec, krect
+       if (is_error_match(ierr, ERR_EOF)) then
+          ierr = 0
+          exit
+       endif
        if (ierr.eq.0) call nio_read_data(ierr, v, lmax, hd, krect, uread, start=start, count=count)
        write (*, 402) ierr, jrec
        if (ierr.eq.0) then
           n = product(count(1:3))
-          do j = 1, n
+          do j = 0, n - 1
              write(*, 301) jrec, j, v(j)
           enddo
        endif
