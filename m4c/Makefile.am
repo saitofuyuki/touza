@@ -1,7 +1,7 @@
 # touza/m4c Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jan 20 2021
-# Time-stamp: <2022/02/15 11:33:32 fuyuki Makefile.am>
+# Time-stamp: <2022/11/24 16:51:36 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -19,9 +19,11 @@ EXTRA_DIST = mt_am_include.m4 \
              mt_package.m4 \
              mt_prog_fc_mpi.m4 \
              mt_shell.m4
-
+EXTRA_DIST += ax_lib_netcdf4.m4
 dist_pkgdata_DATA = $(EXTRA_DIST)
 
+uninstall-mod:
+	@:
 install-mod:
 	@:
 check-bin:

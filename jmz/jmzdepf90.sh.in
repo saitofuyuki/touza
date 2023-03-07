@@ -1,0 +1,182 @@
+#!@ZSH@
+# Time-stamp: <2022/06/27 11:53:42 fuyuki jmzdepf90.sh.in>
+
+# main DIRECTORY.......
+#   parse DIRECTORY/*.dep and create DIRECTORY/Makedep.inc
+main ()
+{
+  [[ $# -eq 0 ]] && print -u2 - "Need input files (e.g., *.dep)" && return 1
+
+  local mdep=Makedep.inc
+
+  setopt nullglob
+  local d= drepl=() p= srcdir= i=
+  local -A SRCS=()
+  for d in "$@"
+  do
+    [[ ! -d $d ]] && print -u2 - "Not directory $d" && return 1
+
+    print -u2 - "Parse $d"
+    parse_makefile drepl $d || return $?
+    i=${drepl[(i)srcdir]}
+    srcdir=$drepl[$((i+1))]
+
+    p=($d/*.dep)
+    [[ -z $p ]] && print -u2 - "Not found $d/*.dep files" && return 1
+
+    parse_deps SRCS drepl $d "${(@)p}" || return $?
+
+    gen_makedep $srcdir/$mdep "${(@kv)SRCS}" || return $?
+  done
+  return 0
+}
+
+# parse_makefile VAR DIRECTORY
+#    set VAR as (variable directory variable directory ...)
+parse_makefile ()
+{
+  local _v=$1 d=$2
+
+  local makef=$d/makefile
+  [[ ! -e $makef ]] && makef=$d/Makefile
+  [[ ! -e $makef ]] && print -u2 - "Not found $makef" && return 1
+
+  local __v=()
+  local k= v=
+  # dummy make
+  ( cd $d; make echo-srcdir ) >& /dev/null
+  for k in srcdir top_srcdir builddir top_builddir
+  do
+    v=$(cd $d; make echo-$k 2> /dev/null)
+    [[ -z $v ]] && v=$(sed -n -e  "/^$k *= */{s///;p;q}" $makef)
+    v=$(cd $d; realpath $v) || return $?
+    __v+=("$k" "$v")
+  done
+
+  set -A $_v "${(@)__v}"
+  return 0
+}
+
+# parse_deps SRCS VAR-REPL DIR DEPFILE.....
+parse_deps ()
+{
+  local _srcs=$1; shift
+  [[ $_srcs != SRCS ]] && local -A SRCS=()
+  SRCS=()
+  local _drepl=$1; shift
+  [[ $_drepl != drepl ]] && local drepl=("${(@P)_drepl}")
+
+  local objd=$1; shift
+
+  local f= cols=() objs=() srcs=()
+  local i=
+  local s= nsrc=()
+  local -A STMP=()
+  for f in "$@"
+  do
+    print -u2 - "Read $f"
+    exec 3< $f || return $?
+    while read -u3 -A cols
+    do
+      i=${cols[(i)*:]}
+      objs=($cols[1,$i]); objs=(${objs%:}); objs=(${(u)objs})
+      shift $i cols
+      # print - "## $objs // $cols // $srcs"
+      for o in $objs
+      do
+        STMP[$o]+=" $cols"
+      done
+    done
+  done
+  local no= ns=
+  print -u2 - "Adjust $objd"
+  local -A cache=()
+  for o in ${(ok)STMP}
+  do
+    normalize no $o $objd "${(@)drepl}"
+    if [[ -n $no ]]; then
+      srcs=()
+      for s in ${(u)${=STMP[$o]}}
+      do
+        ns=${cache[$s]}
+        if [[ -z $ns ]]; then
+          normalize ns $s $objd "${(@)drepl}"
+          cache[$s]=${ns:--}
+        fi
+        srcs+=(${ns:#-})
+      done
+    fi
+    SRCS[$no]="${srcs}"
+  done
+  [[ $_srcs != SRCS ]] && set -A $_srcs "${(@kv)SRCS}"
+  return 0
+}
+
+normalize ()
+{
+  local _v=$1; shift
+  local file=$1; shift
+  local objd=$1; shift
+  local DD=("$@")
+  local abs=$(cd $objd; realpath $file) || return $?
+  local k= v= dep=
+  local ret=
+  for k v in "${(@)DD}"
+  do
+    dep=$(realpath --relative-base=$v $abs)
+    if [[ $dep[1] != / ]]; then
+      # dep="${dep:r}.\$(FC_MODEXT)"
+      ret="\$($k)/$dep"
+      break
+    fi
+  done
+  : ${(P)_v::="$ret"}
+  return
+}
+
+# gen_makedep OUTPUT OBJ SRCS....
+gen_makedep ()
+{
+  local mdep=$1; shift
+  local -A SRCS=("$@")
+  [[ -e $mdep ]] && cp $mdep $mdep.old
+  local o= s= srcs=() mods=() mvar=
+  local modx='.\$(FC_MODEXT)'
+  local oo=
+  {
+    print - "### automatic dependency"
+    for o in ${(ok)SRCS}
+    do
+      srcs=()
+      mods=()
+      for s in ${=SRCS[$o]}
+      do
+        [[ $o == $s ]] && continue
+        case $s:e in
+        (mod) mods+=("${s:r}$modx");;
+        (*)   srcs+=($s);;
+        esac
+      done  
+      oo="${o/%.mod/$modx}"
+
+      print - "$oo: $srcs"
+      if [[ -n $mods ]]; then
+        mvar=${${o:t}//[.-]/_}_MODULE_DEPS
+        print - "$oo: \$($mvar)"
+        print - "if enable_module_dependencies"
+        print - "$mvar = $mods"
+        print - "endif"
+      fi
+      print -
+    done
+  }  > $mdep
+  return 0
+}
+
+main "$@"; err=$?
+exit $?
+
+# Local Variables:
+# mode: sh-mode
+# sh-shell: zsh
+# End:

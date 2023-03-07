@@ -1,10 +1,10 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2022/02/10 21:48:15 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 22:07:11 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021, 2022
+! Copyright (C) 2020,2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -34,9 +34,20 @@ module TOUZA_Std_mwe
   integer,parameter :: switch_excluded = -1    /* MPI excluded */
 #if OPT_USE_MPI
 #else  /* not OPT_USE_MPI */
+  ! dummy parameters
   integer,parameter :: MPI_COMM_NULL  = 2
   integer,parameter :: MPI_COMM_SELF  = 1
   integer,parameter :: MPI_COMM_WORLD = 0
+  integer,parameter :: MPI_UNDEFINED = -32766
+  integer,parameter :: MPI_DATATYPE_NULL = 0
+  integer,parameter :: MPI_GROUP_NULL = 0
+  integer,parameter :: MPI_GROUP_EMPTY = 1
+  integer,parameter :: MPI_ANY_TAG = -1
+  integer,parameter :: MPI_ANY_SOURCE = -1
+  integer,parameter :: MPI_INTEGER = 7
+  integer,parameter :: MPI_CHARACTER = 5
+  integer,parameter :: MPI_DOUBLE_PRECISION = 17
+  integer,parameter :: MPI_STATUS_SIZE = 6
 #endif /* not OPT_USE_MPI */
 !!!_  - static
 #define __MDL__ 'mwe'
@@ -50,6 +61,8 @@ module TOUZA_Std_mwe
 
   integer,save :: icomm_default = MPI_COMM_NULL
   integer,save :: switch_mpi = switch_error
+
+# define _ERROR(E) (E - ERR_MASK_STD_MWE)
 !!!_  - public
   public init, diag, finalize
   public set_comm, get_comm
@@ -57,9 +70,13 @@ module TOUZA_Std_mwe
   public get_wni,  get_wni_safe
   public get_gni
   public is_mpi_activated
-#if OPT_USE_MPI
+  public show_mpi_type
   public MPI_COMM_WORLD, MPI_COMM_SELF, MPI_COMM_NULL
-#endif
+  public MPI_DATATYPE_NULL, MPI_GROUP_NULL, MPI_UNDEFINED
+  public MPI_STATUS_SIZE,   MPI_GROUP_EMPTY
+  public MPI_INTEGER,       MPI_CHARACTER
+  public MPI_ANY_TAG,       MPI_ANY_SOURCE
+  public MPI_DOUBLE_PRECISION
 !!!_  - misc
   character(len=128) tmsg
 contains
@@ -97,7 +114,7 @@ contains
           if (ierr.eq.0) call set_comm(ierr, icomm, ulog, levv)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_MWE
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
     return
   end subroutine init
@@ -113,6 +130,7 @@ contains
     integer,intent(in),optional :: icomm
     integer ir, nr
     integer utmp, md, lv, lmd
+    integer jerr
 
     ierr = err_default
 
@@ -137,9 +155,9 @@ contains
                 call get_ni_safe(ierr, nr, ir, icomm)
 101             format('ranks = ', I0, 1x, I0, 1x, I0)
                 if (present(icomm)) then
-                   write(tmsg, 101) ir, nr, icomm
+                   write(tmsg, 101, IOSTAT=jerr) ir, nr, icomm
                 else
-                   write(tmsg, 101) ir, nr
+                   write(tmsg, 101, IOSTAT=jerr) ir, nr
                 endif
                 call msg_mdl(tmsg, __MDL__, utmp)
              endif
@@ -233,7 +251,7 @@ contains
        if (ierr.eq.0) then
           if (ic.ne.MPI_COMM_WORLD .and. (.not.isini)) then
              call msg_mdl('(''mpi not initialized ='', I0)', ic, __MDL__, utmp)
-             ierr = -1
+             ierr = _ERROR(ERR_MPI_PANIC)
           else
              if (.not.isini) call MPI_Init(ierr)
           endif
@@ -244,7 +262,7 @@ contains
           if (ierr.ne.MPI_SUCCESS) then
              if (VCHECK_FATAL(lv)) then
                 call msg_mdl('(''invalid communicator ='', I0)', ic, __MDL__, utmp)
-                ierr = -1
+                ierr = _ERROR(ERR_MPI_PANIC)
              endif
           endif
        else
@@ -254,9 +272,9 @@ contains
 #else  /* not OPT_USE_MPI */
     switch_mpi = switch_excluded
     ic = MPI_COMM_NULL
-    if (present(icomm)) then
+    if (choice(ic, icomm).ne.ic) then
        if (VCHECK_FATAL(lv)) call msg_mdl('cannot enable mpi.', __MDL__, utmp)
-       ierr = -1
+       ierr = _ERROR(ERR_OPR_DISABLE)
     endif
 #endif /* not OPT_USE_MPI */
     icomm_default = ic
@@ -289,11 +307,16 @@ contains
 #if OPT_USE_MPI
        ic = choice(icomm_default, icomm)
        if (switch_mpi.eq.switch_enabled) then
-          nrank = -1
-          irank = -1
           if (ic.ne.MPI_COMM_NULL) then
              if (ierr.eq.0) call MPI_Comm_size(ic, nrank, ierr)
              if (ierr.eq.0) call MPI_Comm_rank(ic, irank, ierr)
+             if (ierr.ne.0) then
+                nrank = -1
+                irank = -1
+             endif
+          else
+             nrank = 0
+             irank = 0
           endif
        else
           nrank = 0
@@ -474,6 +497,56 @@ contains
 #endif
     return
   end function is_mpi_activated
+!!!_  & show_mpi_type - check properties of mpi-type
+  subroutine show_mpi_type &
+       & (ierr, mt, tag, u)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: mt
+    character(len=*),intent(in)  :: tag
+    integer,optional,intent(in)  :: u
+    integer utmp
+#if OPT_USE_MPI
+    integer sz
+    integer(kind=MPI_ADDRESS_KIND) :: lb, ex
+#endif
+    ierr = 0
+    utmp = choice(-1, u)
+#if OPT_USE_MPI
+    if (mt.eq.MPI_DATATYPE_NULL) then
+       sz = 0
+       lb = 0
+       ex = 0
+    else
+       if (ierr.eq.0) call MPI_Type_size(mt, sz, ierr)
+       if (ierr.eq.0) call MPI_Type_get_extent(mt, lb, ex, ierr)
+    endif
+101 format('mpi-type:', A, ': ', I0, 1x, I0, '+', I0)
+109 format('mpi-type:', A, ': error = ', I0)
+    if (ierr.eq.0) then
+       if (utmp.ge.0) then
+          write(utmp, 101) trim(tag), sz, lb, ex
+       else if (utmp.eq.-1) then
+          write(*,    101) trim(tag), sz, lb, ex
+       endif
+    else
+       if (utmp.ge.0) then
+          write(utmp, 109) trim(tag), ierr
+       else if (utmp.eq.-1) then
+          write(*,    109) trim(tag), ierr
+       endif
+    endif
+#else
+    ierr = _ERROR(ERR_MPI_PANIC)
+111 format('mpi-type:', A, ': PANIC')
+    if (utmp.ge.0) then
+       write(utmp, 111) trim(tag)
+    else if (utmp.eq.-1) then
+       write(*,    111) trim(tag)
+    endif
+#endif
+  end subroutine show_mpi_type
 
 end module TOUZA_Std_mwe
 !!!_@ test_std_mpi - test program

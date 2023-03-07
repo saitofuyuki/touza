@@ -1,10 +1,10 @@
 !!!_! std_bld.F90 - touza/std build environments
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 27 2021
-#define TIME_STAMP 'Time-stamp: <2022/02/05 15:53:12 fuyuki std_bld.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 22:09:31 fuyuki std_bld.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022
+! Copyright (C) 2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -15,6 +15,7 @@
 #  include "touza_config.h"
 #endif
 #include "touza_std.h"
+#include "autorevision.h"
 !!!_@ TOUZA_Std_bld - build environments
 module TOUZA_Std_bld
   use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
@@ -24,6 +25,7 @@ module TOUZA_Std_bld
   private
 !!!_ + parameters
 # define __MDL__ 'bld'
+# define _ERROR(E) (E - ERR_MASK_STD_BLD)
 !!!_ + public constants
 !!!_ + static
   integer,save :: init_mode = 0
@@ -35,6 +37,7 @@ module TOUZA_Std_bld
   integer,save :: ulog = unit_global
 !!!_ + public
   public init, diag, finalize
+  public check_all,  check_touza
 !!!_ + interfaces
   interface msg_macro
      module procedure msg_macro_i
@@ -72,7 +75,7 @@ contains
           if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_BLD
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
 
     return
@@ -162,11 +165,59 @@ contains
 
     ierr = 0
 
+    if (ierr.eq.0) call check_touza(ierr, ulog)
     if (ierr.eq.0) call check_gcc(ierr, ulog)
     if (ierr.eq.0) call check_nec(ierr, ulog)
     if (ierr.eq.0) call check_intel(ierr, ulog)
     return
   end subroutine check_all
+!!!_ + library
+  subroutine check_touza &
+       & (ierr, ulog)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: ulog
+    ierr = 0
+#ifndef VCS_UUID
+#  define VCS_UUID ' '
+#endif
+#ifndef VCS_NUM
+#  define VCS_NUM ' '
+#endif
+#ifndef VCS_DATA
+#  define VCS_DATA ' '
+#endif
+#ifndef VCS_BRANCH
+#  define VCS_BRANCH ' '
+#endif
+#ifndef VCS_TAG
+#  define VCS_TAG ' '
+#endif
+#ifndef VCS_TICK
+#  define VCS_TICK ' '
+#endif
+#ifndef VCS_EXTRA
+#  define VCS_EXTRA ' '
+#endif
+#ifndef VCS_ACTION_STAMP
+#  define VCS_ACTION_STAMP ' '
+#endif
+#ifndef VCS_FULL_HASH
+#  define VCS_FULL_HASH ' '
+#endif
+#ifndef VCS_WC_MODIFIED
+#  define VCS_WC_MODIFIED ' '
+#endif
+    if (ierr.eq.0) call msg_macro(ierr, 'VCS_UUID', VCS_UUID, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, 'VCS_NUM',  VCS_NUM, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, 'VCS_DATA', VCS_DATE, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, 'VCS_BRANCH', VCS_BRANCH, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, 'VCS_TAG', VCS_TAG, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, 'VCS_TICK', VCS_TICK, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, 'VCS_EXTRA', VCS_EXTRA, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, 'VCS_ACTION_STAMP', VCS_ACTION_STAMP, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, 'VCS_FULL_HASH', VCS_FULL_HASH, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, 'VCS_WC_MODIFIED', VCS_WC_MODIFIED, ulog)
+  end subroutine check_touza
 !!!_ + individual systems
 !!!_  & check_gcc - gcc build information
   subroutine check_gcc &

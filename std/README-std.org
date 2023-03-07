@@ -17,7 +17,7 @@ Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
 * Build and installation
 
 * Brief description of *TOUZA/Std* modules
-** =TOUZA_Std=      (std.F90)
+** =TOUZA_Std=  (std.F90)
 
 ** =TOUZA_Std_prc=  (std_prc.F90) - precision management
 *** constants
@@ -401,7 +401,7 @@ If ICOMM is missing, default communicator is used (usually
 
 ** =TOUZA_Std_bld=  (std_bld.F90) - build information
 
-** =TOUZA_Std_sus= (std_sus.F90) - emulation of (typical) unformatted sequential access
+** =TOUZA_Std_sus=  (std_sus.F90) - emulation of (typical) unformatted sequential access
 *** subroutines
 **** sus_open
 #+begin_src f90
@@ -490,7 +490,77 @@ If ICOMM is missing, default communicator is used (usually
   ELEMENTAL integer(KIND=KI64) function sus_eswap(V)
     integer(kind=KI64),intent(in) :: V
 #+end_src
+** =TOUZA_Std_htb=  (std_htb.F90) - hash-table management
+*** description
+*** constants
+*** procedures
+**** new_htable
+#+begin_src f90
+  integer function new_htable &
+       & (name, lkey, mem, base, def, width, grow)
+    character(len=*),intent(in) :: name     ! name of the hash-table
+    integer,         intent(in) :: lkey     ! maximum key-length
+    integer,optional,intent(in) :: mem      ! size of the hash-table
+    integer,optional,intent(in) :: def      ! default status
+    integer,optional,intent(in) :: base     ! base to compute hash number
+    integer,optional,intent(in) :: width    ! number of characters to compute hash number
+    logical,optional,intent(in) :: grow     ! switch to enable growable hash table
+#+end_src
+**** new_entry
+#+begin_src f90
+  integer function new_entry(name, hh)
+  integer function new_entry(name, hh, func)
+    character(len=*),intent(in) :: name     ! key string
+    integer,         intent(in) :: hh       ! hash-table (handle)
+    external                    :: func
+#+end_src
+**** reg_entry
+#+begin_src f90
+  integer function reg_entry(name, hh, status)
+  integer function reg_entry(name, hh, status, func)
+    character(len=*),intent(in) :: name     ! key string
+    integer,         intent(in) :: hh       ! hash-table (handle)
+    integer,optional,intent(in) :: status   ! status
+    external                    :: func
+#+end_src
+**** settle_entry
+#+begin_src f90
+  subroutine settle_entry &
+       & (ierr, entr, hh, status)
+    integer,         intent(out) :: ierr    ! error code
+    integer,         intent(in)  :: entr    ! hash-index
+    integer,         intent(in)  :: hh      ! hash-table(handle)
+    integer,optional,intent(in)  :: status  ! status
+#+end_src
+**** query_entry
+#+begin_src f90
+  integer function query_entry(name, hh)
+  integer function query_entry(name, hh, func)
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: hh
+    external                    :: func
+#+end_src
+**** query_name
+#+begin_src f90
+  subroutine query_name &
+       & (ierr, name, entr, hh)
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: name
+    integer,         intent(in)  :: entr
+    integer,         intent(in)  :: hh
+#+end_src
+**** query_status
+#+begin_src f90
+  integer function query_status(name, hh)
+  integer function query_status(name, hh, func)
+  integer function query_status(entr, hh)
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: entr
+    integer,         intent(in) :: hh
+    external                    :: func
+#+end_src
 * Test suites
+
 
 * Copyright and license
 Copyright 2020-2022 Japan Agency for Marine-Earth Science and Technology

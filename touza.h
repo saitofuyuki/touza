@@ -1,9 +1,9 @@
-!!!_! touza.h - touza definitions
-! Maintainer: SAITO Fuyuki
-! Created: Jun 5 2020
-! Time-stamp: <2022/02/16 15:12:03 fuyuki touza.h>
+/* touza.h - touza definitions */
+/*    Maintainer: SAITO Fuyuki */
+/*    Created: Jun 5 2020 */
+/*     Time-stamp: <2023/02/16 18:00:21 fuyuki touza.h> */
 
-/* Copyright (C) 2020-2022 */
+/* Copyright (C) 2020-2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
 /*   (https://www.apache.org/licenses/LICENSE-2.0) */
@@ -58,10 +58,22 @@
 #define ERR_FATAL     -254
 #define ERR_PANIC     -255
 
-#define ERR_ALLOCATION    -32 /* allocation error */
-#define ERR_NO_IO_UNIT    -33 /* io unit allocation error */
-#define ERR_EOF           -34 /* end of file */
-#define ERR_BROKEN_RECORD -35 /* broken record (sequential) */
+#define ERR_ALLOCATION          -32 /* allocation error */
+#define ERR_NO_IO_UNIT          -33 /* io unit allocation error */
+#define ERR_EOF                 -34 /* end of file */
+#define ERR_BROKEN_RECORD       -35 /* broken record (sequential) */
+#define ERR_OUT_OF_RANGE        -36
+#define ERR_DUPLICATE_SET       -37 /* item is already set */
+#define ERR_OPR_DISABLE         -38 /* disabled operation */
+#define ERR_INVALID_PARAMETER   -39 /* invalid content for argument(s) */
+#define ERR_INVALID_SWITCH      -40 /* invalid switch for argument */
+#define ERR_SECOND_INVOCATION   -41 /* operation allowed only once  */
+#define ERR_INSUFFICIENT_BUFFER -42 /* buffer is not enough to store */
+#define ERR_NEED_ARGUMENT       -43 /* require (may be optional) argument */
+#define ERR_FRESH               -44 /* something is not initilaized */
+#define ERR_STALE               -45 /* something is already initilaized */
+#define ERR_INVALID_ITEM        -46 /* wrong item */
+#define ERR_NOT_FOUND           -47 /* search failed */
 
 /* module specific errors */
 
@@ -83,20 +95,47 @@
 #define ERR_MASK_STD_WSH (ERR_MASK_STD + ERR_MASK_MODULE * 9)
 #define ERR_MASK_STD_SUS (ERR_MASK_STD + ERR_MASK_MODULE *10)
 #define ERR_MASK_STD_HTB (ERR_MASK_STD + ERR_MASK_MODULE *11)
+#define ERR_MASK_STD_IPC (ERR_MASK_STD + ERR_MASK_MODULE *12)
+
+#define ERR_MASK_DIV        (ERR_MASK_GROUP * 4)
+#define ERR_MASK_DIV_STD    (ERR_MASK_DIV + ERR_MASK_MODULE * 1)
+#define ERR_MASK_DIV_TILE   (ERR_MASK_DIV + ERR_MASK_MODULE * 2)
+#define ERR_MASK_DIV_LAYOUT (ERR_MASK_DIV + ERR_MASK_MODULE * 3)
+#define ERR_MASK_DIV_ZONE   (ERR_MASK_DIV + ERR_MASK_MODULE * 4)
+#define ERR_MASK_DIV_SCAN   (ERR_MASK_DIV + ERR_MASK_MODULE * 5)
+#define ERR_MASK_DIV_CTRL   (ERR_MASK_DIV + ERR_MASK_MODULE * 6)
+
+#define ERR_MASK_PPP      (ERR_MASK_GROUP * 7)
+#define ERR_MASK_PPP_STD  (ERR_MASK_PPP + ERR_MASK_MODULE * 1)
+#define ERR_MASK_PPP_AMNG (ERR_MASK_PPP + ERR_MASK_MODULE * 2)
+#define ERR_MASK_PPP_KING (ERR_MASK_PPP + ERR_MASK_MODULE * 3)
+#define ERR_MASK_PPP_COMM (ERR_MASK_PPP + ERR_MASK_MODULE * 4)
+
+#define ERR_MASK_NIO          (ERR_MASK_GROUP * 6)
+#define ERR_MASK_NIO_STD      (ERR_MASK_NIO + ERR_MASK_MODULE * 1)
+#define ERR_MASK_NIO_HEADER   (ERR_MASK_NIO + ERR_MASK_MODULE * 2)
+#define ERR_MASK_NIO_RECORD   (ERR_MASK_NIO + ERR_MASK_MODULE * 3)
+#define ERR_MASK_NIO_DIVISION (ERR_MASK_NIO + ERR_MASK_MODULE * 4)
+#define ERR_MASK_NIO_NCTCDF   (ERR_MASK_NIO + ERR_MASK_MODULE * 5)
+#define ERR_MASK_NIO_INTFC    (ERR_MASK_NIO + ERR_MASK_MODULE * 6)
+#define ERR_MASK_NIO_CACHE    (ERR_MASK_NIO + ERR_MASK_MODULE * 7)
+
+#define ERR_MASK_TRP          (ERR_MASK_GROUP * 5)
+#define ERR_MASK_TRP_STD      (ERR_MASK_TRP + ERR_MASK_MODULE * 1)
+#define ERR_MASK_TRP_PACK     (ERR_MASK_TRP + ERR_MASK_MODULE * 2)
+#define ERR_MASK_TRP_FLOAT    (ERR_MASK_TRP + ERR_MASK_MODULE * 3)
 
 #define ERR_MASK_CAL     (ERR_MASK_GROUP * 2)
 #define ERR_MASK_EMU     (ERR_MASK_GROUP * 3)
-#define ERR_MASK_DIV     (ERR_MASK_GROUP * 4)
-#define ERR_MASK_TRP     (ERR_MASK_GROUP * 5)
-#define ERR_MASK_NNG     (ERR_MASK_GROUP * 6)
+
+#define DEBUG_TRACE(E,T) call trace_debug(E, T, __FILE__, __LINE__)
 
 #  ifndef __PKG__
 #  define __PKG__ PACKAGE_TAG
 #  endif
 
 #endif  /* not _TOUZA_H */
-!!!_! FOOTER
-!!!_ + Local variables
-! Local Variables:
-! mode: f90
-! End:
+
+/* Local Variables: */
+/* mode: f90 */
+/* End: */

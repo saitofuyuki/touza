@@ -1,3 +1,123 @@
+Release-1.09.0 / 2023-03-07
+===========================
+
+  * Counterpart revision for Nnview.
+  * nio: slice read accesses are implemented for [UM][RI][Yn].
+  * nio: cache feature starts (reserved).
+  * trp: partial decoding implemented (sequential mode only).
+  * pkgconf: add fclibs entry.
+  * std: std_ipc.F90 introduced (to substitute intrinsic IBITS).
+  * jmz: safer internal write, with IOSTAT.
+  * nio: P[IR]n format introduced (reserved).
+  * nio: nct interface improved.
+  * nio: introduce MIROC zioparam.F rename, to merge with updated MIROC.
+  * std: std_htb redesigned to hold string and/or integer keys.
+  * std: suspend-mode access implemented in std_sus.
+
+Release-1.08.1 / 2023-01-30
+===========================
+
+  * (jmz) [critical] hack to handle long message.
+
+Release-1.08.0 / 2022-12-21
+===========================
+
+  * (jmz,nio) [FATAL] Big-GTOOL design enabled by default.
+  * (jmz) [severe] infinite range failed for a particular pattern.
+  * (std) [severe] get_size_strm() revised.
+  * (m4c,std) Fortran 2003 feature checkers improved.
+  * (std) std_prc cleaned and restructured.
+
+Release-1.07.0 / 2022-12-06
+===========================
+
+  * Design of URT MRT revised --- incompatible from 1.06.0
+  * (nio) URT MRT design revised (URTb).  Default chunk breaking to levels.
+  * (jmz) latest URT MRT with tweaking introduced.
+  * (std) split_list join_list improved.
+  * (std) parse_number improved.
+  * (std) sus_pad sus_pad_irec sus_record_mems_irec
+    sus_read_slice_irec implemented.
+
+Release-1.06.0 / 2022-11-23
+===========================
+
+  * (chak) [incompatible] new shape special symbols '+' and '-'
+  * (chak) multiple record stacking implemented.
+  * (nio) multiple backward skipping implemented.
+  * (nio) [FATAL] MRY first property to write was wrong.
+
+Release/1.05.6 2022/11/04
+=========================
+
+  * [build] distcheck includes jmz/.
+  * (chak) chak_opr introduced to separate operation procedures.
+  * (chak) shape logging improved.
+  * (chak) [severe] decompose_coordinate_mod failed to perse.
+  * (chak) [IMPORTANT] physical array accepts null dimension.
+
+Revision 1.05.5 / 2022-11-01
+============================
+
+  * (chak) Reshaping redesigned
+    * permutation, spreading, transforming is greatly improved.
+    * topological sorting introduced to set priority, with preserving
+      natural orders as much as possible.
+    * document on reshaping added, but need improvement.
+  * (std) additional argument on find_first.
+
+Revision 1.05.4 / 2022-10-26
+============================
+
+  * (chak) [critical] default ascii format modified
+    * old fortran may refuse es0.m format (0 width)
+  * (chak) [SEVERE] coordinate ordering may fail at explicit ordering
+
+Revision 1.05.3 / 2022-10-25
+============================
+
+  * Version 1.05.3 yet alpha
+  * Improve automatic coordinate matching
+    * Fix bugs at matching with slicing, to tweak wrong coordinates
+    * Use topological sorting to detect coordinate priorities.
+  * (chak) -N flag introduced to control null-coordinate parsing
+  * [FATAL] opposite BIN operation.
+  * [FATAL] predefined constants not defined as expected.
+
+Revision 1.05.2 / 2022-10-24
+============================
+
+  * Version 1.05.2, with some improvement, still alpha.
+  * (chak) [CRITICAL] modify default MISS to follow the legacy magic number
+  * (chak) ascii/binary input/output hacked
+  * (chak) some operation introduced and restructured
+  * (chak) header edit level introduced
+  * (chak) infix notation is additionally recorded in header
+  * (div) exclude div subdirectory to build for release.
+  * (nio) more arguments for get_default_header().
+
+Revision 1.05.1 / 2022-10-19
+============================
+
+  * Version 1.05.1, to fix chak (alpha version)
+  * various bug fixes on chak
+  * [FATAL] skip deallocation on in-house operation
+  * [FATAL] avoid buffer reuse even unary operation
+  * [CRITICAL] correct binary iteration to search free buffer
+  * queue/stack structure improved
+
+Revision 1.05.0 / 2022-10-17
+============================
+
+  * Version 1.05.0, to publish chak (alpha version).
+  * various bug fixes to publish new command chak.
+    (ppp) [severe] some bugs fixed around communication.
+    (cal) [critical] correct cal::CALNDR arguments for MIROC with-t.
+    (emu) [severe] skip message for unbound units.
+  * note about ifort -heap-arrays option.
+  * (nio) nio_nctcdf introduced.  nio_division is reserved.
+  * (nio,nng) [IMPORTANT] nng renamed into nio.
+  * (std) std_htb implemented for hash-table management, used in ppp.
 
 Revision 1.03.1 / 2022-04-22
 ============================
@@ -23,7 +143,7 @@ Revision 1.02.0 / 2022-02-16
   * HAVE_* macros are renamed to HAVE_FORTRAN_*
   * (ppp) parallel processing procedures, to replace xmcomm/xmking in
     MIROC.
-  * (emu) emulate miroc utilitly
+  * (emu) emulate miroc utility
   * (std/env) [important] on-demand checker introduced.
   * (std/mwe) MPI group procedures
   * (std/sus) replaces (original) nng_io.
@@ -62,10 +182,10 @@ Revision 1.00.3 / 2021-03-06
 Revision 1.00.2 / 2021-02-16
 ============================
 
-  * (cal) coco compatible interfaces introuced.
+  * (cal) coco compatible interfaces introduced.
   * (cal) inim argument added to control TOUZA/Std initialization.
   * (std/env) byte-order diagnostics implemented.
-  * (std/arg) [CRITCAL] the very first argument was skipped.
+  * (std/arg) [CRITICAL] the very first argument was skipped.
 
 Revision 1.00.1 / 2021-02-03
 ============================

@@ -1,7 +1,7 @@
 !!!_! touza.F90 - touza administration
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2022/02/02 08:51:50 fuyuki touza.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/07/20 15:38:38 fuyuki touza.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022
@@ -33,14 +33,18 @@ module TOUZA
 #if ENABLE_TOUZA_TRP
   use TOUZA_Trp, trp_init=>init, trp_diag=>diag, trp_finalize=>finalize, trp_msg=>msg
 #endif /* ENABLE_TOUZA_TRP */
-!!!_  - nng(conditional)
-#if ENABLE_TOUZA_NNG
-  use TOUZA_Nng, nng_init=>init, nng_diag=>diag, nng_finalize=>finalize, nng_msg=>msg
-#endif /* ENABLE_TOUZA_NNG */
+!!!_  - nio(conditional)
+#if ENABLE_TOUZA_NIO
+  use TOUZA_Nio, nio_init=>init, nio_diag=>diag, nio_finalize=>finalize, nio_msg=>msg
+#endif /* ENABLE_TOUZA_NIO */
 !!!_  - ppp(conditional)
 #if ENABLE_TOUZA_PPP
   use TOUZA_Ppp, ppp_init=>init, ppp_diag=>diag, ppp_finalize=>finalize, ppp_msg=>msg
 #endif /* ENABLE_TOUZA_PPP */
+!!!_  - div(conditional)
+#if ENABLE_TOUZA_DIV
+  use TOUZA_Div, div_init=>init, div_diag=>diag, div_finalize=>finalize
+#endif /* ENABLE_TOUZA_DIV */
 !!!_ + default
   implicit none
   public
@@ -85,15 +89,18 @@ contains
 #if ENABLE_TOUZA_PPP
           if (ierr.eq.0) call ppp_init(ierr, u=ulog, levv=lv, mode=lmd, icomm=icomm)
 #endif /* ENABLE_TOUZA_PPP */
+#if ENABLE_TOUZA_DIV
+          if (ierr.eq.0) call div_init(ierr, u=ulog, levv=lv, mode=lmd)
+#endif /* ENABLE_TOUZA_DIV */
 #if ENABLE_TOUZA_CAL
           if (ierr.eq.0) call cal_init(ierr, u=ulog, levv=lv, mode=lmd)
 #endif /* ENABLE_TOUZA_CAL */
 #if ENABLE_TOUZA_TRP
           if (ierr.eq.0) call trp_init(ierr, u=ulog, levv=lv, mode=lmd)
 #endif /* ENABLE_TOUZA_TRP */
-#if ENABLE_TOUZA_NNG
-          if (ierr.eq.0) call nng_init(ierr, u=ulog, levv=lv, mode=lmd)
-#endif /* ENABLE_TOUZA_NNG */
+#if ENABLE_TOUZA_NIO
+          if (ierr.eq.0) call nio_init(ierr, u=ulog, levv=lv, mode=lmd)
+#endif /* ENABLE_TOUZA_NIO */
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -130,6 +137,11 @@ contains
 #else  /* not ENABLE_TOUZA_PPP */
           if (ierr.eq.0) call msg_grp('ppp disabled', u=utmp)
 #endif /* not ENABLE_TOUZA_PPP */
+#if ENABLE_TOUZA_DIV
+          if (ierr.eq.0) call div_diag(ierr, utmp, levv, mode=lmd)
+#else  /* not ENABLE_TOUZA_DIV */
+          if (ierr.eq.0) call msg_grp('div disabled', u=utmp)
+#endif /* not ENABLE_TOUZA_DIV */
 #if ENABLE_TOUZA_CAL
           if (ierr.eq.0) call cal_diag(ierr, utmp, levv, mode=lmd)
 #else  /* not ENABLE_TOUZA_CAL */
@@ -140,11 +152,11 @@ contains
 #else  /* not ENABLE_TOUZA_TRP */
           if (ierr.eq.0) call msg_grp('trp disabled', u=utmp)
 #endif /* not ENABLE_TOUZA_TRP */
-#if ENABLE_TOUZA_NNG
-          if (ierr.eq.0) call nng_diag(ierr, utmp, levv, mode=lmd)
-#else  /* not ENABLE_TOUZA_NNG */
-          if (ierr.eq.0) call msg_grp('nng disabled', u=utmp)
-#endif /* not ENABLE_TOUZA_NNG */
+#if ENABLE_TOUZA_NIO
+          if (ierr.eq.0) call nio_diag(ierr, utmp, levv, mode=lmd)
+#else  /* not ENABLE_TOUZA_NIO */
+          if (ierr.eq.0) call msg_grp('nio disabled', u=utmp)
+#endif /* not ENABLE_TOUZA_NIO */
        endif
        diag_counts = diag_counts + 1
     endif
@@ -173,15 +185,18 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_DEEP) then
-#if ENABLE_TOUZA_NNG
-          if (ierr.eq.0) call nng_finalize(ierr, utmp, levv, mode=lmd)
-#endif /* ENABLE_TOUZA_NNG */
+#if ENABLE_TOUZA_NIO
+          if (ierr.eq.0) call nio_finalize(ierr, utmp, levv, mode=lmd)
+#endif /* ENABLE_TOUZA_NIO */
 #if ENABLE_TOUZA_TRP
           if (ierr.eq.0) call trp_finalize(ierr, utmp, levv, mode=lmd)
 #endif /* ENABLE_TOUZA_TRP */
 #if ENABLE_TOUZA_CAL
           if (ierr.eq.0) call cal_finalize(ierr, utmp, levv, mode=lmd)
 #endif /* ENABLE_TOUZA_CAL */
+#if ENABLE_TOUZA_DIV
+          if (ierr.eq.0) call div_finalize(ierr, utmp, levv, mode=lmd)
+#endif /* ENABLE_TOUZA_DIV */
 #if ENABLE_TOUZA_PPP
           if (ierr.eq.0) call ppp_finalize(ierr, utmp, levv, mode=lmd)
 #endif /* ENABLE_TOUZA_PPP */

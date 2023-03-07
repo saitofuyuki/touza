@@ -1,10 +1,10 @@
-!!!_! nng_std.F90 - TOUZA/Nng utilities (and bridge to Std)
+!!!_! ami_std.F90 - TOUZA/Ami bridge to Std
 ! Maintainer: SAITO Fuyuki
-! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2022/02/07 11:17:54 fuyuki nng_std.F90>'
+! Created: May 2 2022
+#define TIME_STAMP 'Time-stamp: <2022/05/02 14:16:03 fuyuki ami_std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -13,37 +13,20 @@
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"
 #endif
-#include "touza_nng.h"
-!!!_@ TOUZA_Nng_std - Nng utilities
-module TOUZA_Nng_std
+#include "touza_ami.h"
+!!!_@ TOUZA_Ami_std - Ami utilities
+module TOUZA_Ami_std
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Std_prc,only: KI32, KI64, KDBL, KFLT
+  use TOUZA_Std_prc,only: KDBL
   use TOUZA_Std_utl,only: &
-       & choice, choice_a, condop, upcase, &
+       & choice,       choice_a,     set_if_present, &
        & control_deep, control_mode, is_first_force
   use TOUZA_Std_log,only: &
        & is_msglev, &
        & is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail, &
        & is_msglev_severe, is_msglev_fatal,  &
        & get_logu,         unit_global,      trace_fine,       trace_control
-  use TOUZA_Std_env,only: &
-       & KIOFS,           &
-       & nc_strm,         nbits_byte, &
-       & conv_b2strm,     get_size_bytes, &
-       & get_mems_bytes,  get_size_strm,  &
-       & kendi_file,      kendi_mem,      check_bodr_unit, check_byte_order, &
-       & endian_BIG,      endian_LITTLE,  endian_OTHER,    &
-       & is_eof_ss
-  use TOUZA_Std_fun,only: new_unit
-  use TOUZA_Std_sus,only: &
-       & WHENCE_BEGIN,    WHENCE_ABS,     WHENCE_CURRENT,  WHENCE_END, &
-       & sus_open,        sus_close, &
-       & sus_write_irec,  sus_read_irec,  sus_skip_irec, &
-       & sus_write_lrec,  sus_read_lrec,  sus_skip_lrec, &
-       & sus_write_isep,  sus_read_isep,  &
-       & sus_write_lsep,  sus_read_lsep,  &
-       & sus_rseek,       sus_eswap
 !!!_  - default
   implicit none
   private
@@ -52,52 +35,35 @@ module TOUZA_Nng_std
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
   integer,save :: fine_counts = 0
-  integer,save :: lev_verbose = NNG_MSG_LEVEL
-  integer,save :: lev_stdv    = NNG_MSG_LEVEL - 1
+  integer,save :: lev_verbose = AMI_MSG_LEVEL
+  integer,save :: lev_stdv    = AMI_MSG_LEVEL - 1
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
-
 !!!_  - common
   character(len=256) :: tmsg
 # define __MDL__ 's'
 !!!_  - interfaces
   interface msg
      module procedure msg_txt
-     module procedure msg_i, msg_ia
+     module procedure msg_i, msg_ia, msg_aa
   end interface msg
 !!!_  - public procedures
   public init, diag, finalize
   public msg
 !!!_   . TOUZA_Std
-  public KI32, KI64, KDBL, KFLT
-  public choice, choice_a, condop, upcase
-  public control_deep, control_mode, is_first_force
+  public KDBL
+  public choice,       choice_a,     set_if_present
+  public control_mode, control_deep, is_first_force
   public is_msglev
   public is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
   public is_msglev_severe, is_msglev_fatal
   public get_logu,         unit_global,      trace_fine,       trace_control
-  public KIOFS
-  public nc_strm,         nbits_byte
-  public conv_b2strm,     get_size_bytes
-  public get_mems_bytes,  get_size_strm
-  public kendi_file,      kendi_mem,         check_bodr_unit,  check_byte_order
-  public endian_BIG,      endian_LITTLE,     endian_OTHER
-  public is_eof_ss
-  public new_unit
-  public WHENCE_BEGIN,    WHENCE_ABS,     WHENCE_CURRENT,  WHENCE_END
-  public sus_open,        sus_close
-  public sus_write_irec,  sus_read_irec,  sus_skip_irec
-  public sus_write_lrec,  sus_read_lrec,  sus_skip_lrec
-  public sus_write_isep,  sus_read_isep
-  public sus_write_lsep,  sus_read_lsep
-  public sus_rseek,       sus_eswap
 contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
+    use TOUZA_Std_mwe,only: mwe_init=>init
     use TOUZA_Std_env,only: env_init=>init
-    use TOUZA_Std_sus,only: sus_init=>init
-    use TOUZA_Std_bld,only: bld_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -120,9 +86,8 @@ contains
        lmd = control_deep(md)
        if (md.ge.MODE_DEEP) then
           lev_stdv = choice(lev_stdv, stdv)
-          if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
+          if (ierr.eq.0) call mwe_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
-          if (ierr.eq.0) call sus_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -132,9 +97,8 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Std_mwe,only: mwe_diag=>diag
     use TOUZA_Std_env,only: env_diag=>diag
-    use TOUZA_Std_sus,only: sus_diag=>diag
-    use TOUZA_Std_bld,only: bld_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -158,9 +122,8 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_DEEP) then
-          if (ierr.eq.0) call bld_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
+          if (ierr.eq.0) call mwe_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
-          if (ierr.eq.0) call sus_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -169,9 +132,8 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std_mwe,only: mwe_finalize=>finalize
     use TOUZA_Std_env,only: env_finalize=>finalize
-    use TOUZA_Std_sus,only: sus_finalize=>finalize
-    use TOUZA_Std_bld,only: bld_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -192,9 +154,8 @@ contains
        endif
        lmd = control_deep(md)
        if (md.ge.MODE_DEEP) then
-          if (ierr.eq.0) call bld_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)
-          if (ierr.eq.0) call sus_finalize(ierr, utmp, lev_stdv, mode=lmd)
+          if (ierr.eq.0) call mwe_finalize(ierr, utmp, lev_stdv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
     endif
@@ -239,18 +200,29 @@ contains
     write(tmsg, fmt) vv(:)
     call msg_txt(tmsg, mdl, u)
   end subroutine msg_ia
+!!!_  & msg_aa - message dispatcher (to override std)
+  subroutine msg_aa &
+       & (fmt, vv, mdl, u)
+    implicit none
+    character(len=*),intent(in)          :: fmt
+    character(len=*),intent(in)          :: vv(:)
+    character(len=*),intent(in),optional :: mdl
+    integer,         intent(in),optional :: u
+    write(tmsg, fmt) vv(:)
+    call msg_txt(tmsg, mdl, u)
+  end subroutine msg_aa
 
-end module TOUZA_Nng_std
+end module TOUZA_Ami_std
 
-!!!_@ test_nng_std - test program
-#ifdef TEST_NNG_STD
-program test_nng_std
-  use TOUZA_Nng_std
+!!!_@ test_ami_std - test program
+#ifdef TEST_AMI_STD
+program test_ami_std
+  use TOUZA_Ami_std
   implicit none
   integer ierr
 
 101 format(A, ' = ', I0)
-  call init(ierr)
+  call init(ierr, stdv=+999)
   write(*, 101) 'INIT', ierr
 
   if (ierr.eq.0) call diag(ierr)
@@ -259,9 +231,9 @@ program test_nng_std
   if (ierr.eq.0) call finalize(ierr)
   write(*, 101) 'FINAL', ierr
   stop
-end program test_nng_std
+end program test_ami_std
 
-#endif /* TEST_NNG_STD */
+#endif /* TEST_AMI_STD */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

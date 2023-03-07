@@ -1,10 +1,10 @@
-!!!_! jmzconv.F90 - TOUZA/Jmz nng conversion
+!!!_! jmzconv.F90 - TOUZA/Jmz nio(nng) conversion
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/24 11:00:00 fuyuki jmzconv.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/09/05 13:52:07 fuyuki jmzconv.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021,2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -14,25 +14,20 @@
 #  include "touza_config.h"
 #endif
 #include "jmz.h"
-!!!_@ TOUZA/Jmz/conv - jmz: nng convertion
+!!!_@ TOUZA/Jmz/conv - jmz: nio conversion
 program jmzconv
 !!!_ + Declaration
 !!!_  - modules
   use TOUZA_Std,only: arg_diag, env_init
-  use TOUZA_Nng, nng_init=>init, nng_diag=>diag, nng_finalize=>finalize
+  use TOUZA_Nio, nio_init=>init, nio_diag=>diag, nio_finalize=>finalize
+  use jmzlib
 !!!_  - variables
   implicit none
   integer ierr
   integer levv, dbgv, stdv
   integer japos
 
-  integer,parameter :: kfmt_ascii  = 1
-  integer,parameter :: kfmt_binary = 2
-  integer,parameter :: kfmt_gtool_legacy   = 3
-  integer,parameter :: kfmt_gtool_trapiche = 4
-
   integer kflag
-  integer,parameter :: bforce = 1  ! force overwrite
   integer,parameter :: larg = 1024
   character(len=larg) :: tlists
 !!!_ + Body
@@ -43,12 +38,13 @@ program jmzconv
   stdv = -2
   call parse_options (ierr, japos, levv, dbgv, stdv, kflag, tlists)
   if (ierr.eq.0) call env_init(ierr, levv=stdv)
-  if (ierr.eq.0) call nng_init(ierr, levv=dbgv, stdv=stdv)
+  if (ierr.eq.0) call nio_init(ierr, levv=dbgv, stdv=stdv)
+  if (ierr.eq.0) call nr_init(ierr, lazy=+1)
 
   if (ierr.eq.0) call conv_main(ierr, japos, levv, kflag, tlists)
 
-  if (ierr.eq.0) call nng_diag(ierr)
-  if (ierr.eq.0) call nng_finalize(ierr)
+  if (ierr.eq.0) call nio_diag(ierr)
+  if (ierr.eq.0) call nio_finalize(ierr)
   if (ierr.eq.0) call arg_diag(ierr, levv=stdv)
   if (ierr.ne.0) then
      write(*, *) 'exit = ', ierr
@@ -60,9 +56,9 @@ contains
   subroutine conv_main &
        & (ierr, japos, levv, kflag, tlists)
     use TOUZA_Std,only: get_param, get_option, upcase, uout, uerr, is_error_match
-    use TOUZA_Nng_std,only: KI32, KFLT, KDBL
-    use TOUZA_Nng_header
-    use TOUZA_Nng_record,only: set_urt_defs
+    use TOUZA_Nio_std,only: KI32, KFLT, KDBL
+    use TOUZA_Nio_header
+    use TOUZA_Nio_record,only: set_urt_defs
     use TOUZA_Trp,only: helper_props, parse_codes
     implicit none
     integer,         intent(out)   :: ierr
@@ -158,13 +154,13 @@ contains
           endif
           if (ierr.eq.0) call parse_codes(ierr, kcode, ccode)
           if (ierr.eq.0) kopts(PROP_URT_CODES) = kcode
-       endif
-       if (ierr.eq.0) then
-          if (refr(1).gt.0.0) then
-             call helper_props(mbits, xbits, xbtm, refr(1), refr(2), refr(3))
-             kopts(PROP_URT_XBOTTOM)  = xbtm
-             kopts(PROP_URT_XBITS)    = xbits
-             kopts(PROP_URT_MANTISSA) = mbits
+          if (ierr.eq.0) then
+             if (refr(1).gt.0.0) then
+                call helper_props(mbits, xbits, xbtm, refr(1), refr(2), refr(3))
+                kopts(PROP_URT_XBOTTOM)  = xbtm
+                kopts(PROP_URT_XBITS)    = xbits
+                kopts(PROP_URT_MANTISSA) = mbits
+             endif
           endif
        endif
     endif
@@ -225,7 +221,7 @@ contains
        & (ierr,   jrec,   v,     &
        &  uread,  uwrite, udiag, jrbgn, jrend, &
        &  wfile,  fmt,    kfmt,  kopts)
-    use TOUZA_Nng,only: KI32, KFLT, KDBL, sus_rseek, WHENCE_BEGIN
+    use TOUZA_Nio,only: KI32, KFLT, KDBL, sus_rseek, WHENCE_BEGIN
     use TOUZA_Std,only: is_error_match
     implicit none
     integer,parameter :: KARG = KDBL
@@ -256,11 +252,11 @@ contains
        inquire(uread, POS=jpos)
     endif
     if (ierr.eq.0) then
-       call nng_skip_records(ierr, jrbgn - jrec, uread)
+       call nio_skip_records(ierr, jrbgn - jrec, uread)
        if (ierr.eq.0) jrec = jrbgn
     endif
     do
-       if (ierr.eq.0) call nng_read_header(ierr, head, krect, uread)
+       if (ierr.eq.0) call nio_read_header(ierr, head, krect, uread)
        if (is_error_match(ierr, ERR_EOF)) then
           ierr = 0
           exit
@@ -273,7 +269,7 @@ contains
              if (ierr.eq.0) allocate(v(mv), STAT=ierr)
           endif
        endif
-       if (ierr.eq.0) call nng_read_data(ierr, v, n, head, krect, uread)
+       if (ierr.eq.0) call nio_read_data(ierr, v, n, head, krect, uread)
        if (kfmt.eq.kfmt_ascii) then
           if (ierr.eq.0) call get_item(ierr, head, vmiss, hi_MISS)
           if (ierr.eq.0) then
@@ -289,11 +285,11 @@ contains
           endif
        else
           if (ierr.eq.0) call put_item(ierr, head, trim(fmt), hi_DFMT)
-          if (ierr.eq.0) call nng_write_header(ierr, head, krect, uwrite)
+          if (ierr.eq.0) call nio_write_header(ierr, head, krect, uwrite)
           if (ierr.eq.0) then
              if (levv.gt.1) call switch_urt_diag(wfile, jrec, udiag)
           endif
-          if (ierr.eq.0) call nng_write_data(ierr, v, n, head, krect, uwrite, kopts)
+          if (ierr.eq.0) call nio_write_data(ierr, v, n, head, krect, uwrite, kopts)
        endif
        if (ierr.ne.0) exit
        jrec = jrec + 1
@@ -301,66 +297,6 @@ contains
     enddo
     return
   end subroutine conv_core_d
-!!!_  - open_write - open file to write complex
-  subroutine open_write &
-       & (ierr, uwrite, kfmt, fmt, wfile, kflag)
-    use TOUZA_Std,only: upcase, uout, uerr
-    implicit none
-    integer,         intent(out)   :: ierr
-    integer,         intent(inout) :: uwrite
-    integer,         intent(out)   :: kfmt
-    character(len=*),intent(inout) :: fmt
-    character(len=*),intent(in)    :: wfile
-    integer,         intent(in)    :: kflag
-    character(len=16) CSTT
-
-    ierr = 0
-
-    call upcase(fmt)
-
-    if (wfile.eq.' ' .or. wfile.eq.'-') then
-       ! stdout (ascii mode only)
-       uwrite = uout
-       kfmt = kfmt_ascii
-       if (fmt.eq.' '.or.fmt(1:1).eq.'(') then
-          continue
-       else
-          ierr = -1
-       endif
-    else
-       CSTT = 'NEW'
-       if (IAND(kflag, bforce).ne.0) CSTT = 'REPLACE'
-       if (fmt.eq.' '.or.fmt(1:1).eq.'(') then
-          ! ascii mode
-          kfmt = kfmt_ascii
-          open(UNIT=uwrite, FILE=wfile, IOSTAT=ierr, &
-               & ACTION='WRITE', STATUS=CSTT, FORM='FORMATTED', ACCESS='SEQUENTIAL')
-       else if (fmt(1:1).eq.'B') then
-          ! binary mode
-          kfmt = kfmt_binary
-          if (ierr.eq.0) call sus_open(ierr, uwrite, wfile, ACTION='W', STATUS=CSTT)
-       else
-          if (fmt(2:3).eq.'RT') then
-             kfmt = kfmt_gtool_trapiche
-          else
-             kfmt = kfmt_gtool_legacy
-          endif
-          ! gtool mode
-          if (ierr.eq.0) call sus_open(ierr, uwrite, wfile, ACTION='W', STATUS=CSTT)
-       endif
-       if (ierr.ne.0) then
-201       format('error = ', I0, ' to open ', A)
-          write(uerr, 201) ierr, trim(wfile)
-          return
-       endif
-    endif
-    if (ierr.eq.0) then
-       if (kfmt.eq.kfmt_ascii &
-            & .and. fmt.eq.' ') fmt = '(E16.9)'
-    endif
-    return
-  end subroutine open_write
-
 !!!_  - options
   subroutine parse_options (ierr, japos, levv, dbgv, stdv, kflag, tlists)
     use TOUZA_Std,only: arg_init, parse, get_param
@@ -381,10 +317,14 @@ contains
     tlists = ' '
     if (ierr.eq.0) call arg_init(ierr, levv=stdv)
     if (ierr.eq.0) call parse(ierr)
-    if (ierr.eq.0) then
-       do
-          japos = japos + 1
-          call get_param(ierr, astr, japos)
+    do
+       if (ierr.ne.0) then
+          ierr = min(0, ierr)
+          exit
+       endif
+       japos = japos + 1
+       call get_param(ierr, astr, japos)
+       if (ierr.eq.0) then
           if (astr(1:1).eq.'-') then
              if (astr.eq.'-v') then          ! -v    - increase verbosity
                 levv = max(-1, levv) + 1
@@ -406,12 +346,8 @@ contains
              japos = japos - 1
              exit
           endif
-          if (ierr.ne.0) then
-             ierr = min(0, ierr)
-             exit
-          endif
-       enddo
-    endif
+       endif
+    enddo
   end subroutine parse_options
 !!!_ + End jmzconv
 end program jmzconv

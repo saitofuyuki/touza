@@ -1,10 +1,10 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2022/02/16 15:29:56 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 21:52:06 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2022
+! Copyright (C) 2020-2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -158,16 +158,16 @@ module TOUZA_Std_env
 #    define OPT_INTEGER_OFFSET_KIND MPI_OFFSET_KIND
   use mpi,only: MPI_OFFSET_KIND
 #  else
-#    define OPT_INTEGER_OFFSET_KIND KI32
+#    define OPT_INTEGER_OFFSET_KIND KI64
 #  endif
 #endif /* not OPT_INTEGER_OFFSET_KIND */
 !!!_  - default
   implicit none
   private
+# define __MDL__ 'env'
+# define _ERROR(E) (E - ERR_MASK_STD_ENV)
 !!!_  - parameters
   integer,parameter,public :: KIOFS = OPT_INTEGER_OFFSET_KIND
-
-# define __MDL__ 'env'
   integer,parameter,public :: endian_UNKNOWN = 0
   integer,parameter,public :: endian_ERROR  = -1
   integer,parameter,public :: endian_BIG    = 1234
@@ -219,10 +219,11 @@ module TOUZA_Std_env
   public init, diag, finalize
   public init_batch
   public init_unfmtd_recl, get_size_ufd
-  public init_unfmtd_strm, get_size_strm
+  public init_unfmtd_strm, get_unit_strm, get_size_strm
   public init_file_bodr,   check_byte_order, check_bodr_unit
   public init_io_status,   is_eof_ss
-  public get_size_bytes,   conv_b2strm,  get_mems_bytes
+  public get_size_bytes,   conv_b2strm,   get_mems_bytes
+  public get_login_name,   get_host_name
 #if DEBUG_PRIVATES
   public check_bodr_mem, check_bodr_files
   public brute_force_stdu
@@ -244,11 +245,20 @@ module TOUZA_Std_env
      module procedure get_size_ufd_d
   end interface get_size_ufd
 
+  interface get_unit_strm
+     module procedure get_unit_strm_i
+     module procedure get_unit_strm_l
+     module procedure get_unit_strm_f
+     module procedure get_unit_strm_d
+     module procedure get_unit_strm_a
+  end interface get_unit_strm
+
   interface get_size_strm
-     module procedure get_size_strm_i
-     module procedure get_size_strm_l
-     module procedure get_size_strm_f
-     module procedure get_size_strm_d
+     module procedure get_size_strm_i, get_size_strm_li
+     module procedure get_size_strm_l, get_size_strm_ll
+     module procedure get_size_strm_f, get_size_strm_lf
+     module procedure get_size_strm_d, get_size_strm_ld
+     module procedure get_size_strm_a, get_size_strm_la
   end interface get_size_strm
 
   interface get_size_bytes
@@ -317,7 +327,7 @@ contains
        endif
        ! write(*, *) 'env/batch', ierr
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
     ! write(*, *) 'env', ierr, init_counts
 
@@ -667,6 +677,7 @@ contains
     character(len=16) :: TA
     character(len=128) :: txt
     integer lv
+    integer jerr
 
     ierr = 0
 
@@ -697,7 +708,7 @@ contains
        endif
 101    format('stdu:', I0, ' = ', I0, 1x, L, 1x, A)
        if (VCHECK_DEBUG(lv)) then
-          write(txt, 101) jchk, ierr, OPND, trim(TA)
+          write(txt, 101, IOSTAT=jerr) jchk, ierr, OPND, trim(TA)
           call msg_mdl(txt, __MDL__)
        endif
     enddo
@@ -730,21 +741,21 @@ contains
           write(txt, 101) 'OPT_STDIN_UNIT'
           call msg_mdl(txt, __MDL__, utmp)
        endif
-       ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       ierr = _ERROR(ERR_FAILURE_INIT)
     endif
     if (uout.lt.0) then
        if (VCHECK_FATAL(lv)) then
           write(txt, 101) 'OPT_STDOUT_UNIT'
           call msg_mdl(txt, __MDL__, utmp)
        endif
-       ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       ierr = _ERROR(ERR_FAILURE_INIT)
     endif
     if (uerr.lt.0) then
        if (VCHECK_FATAL(lv)) then
           write(txt, 101) 'OPT_STDERR_UNIT'
           call msg_mdl(txt, __MDL__, utmp)
        endif
-       ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       ierr = _ERROR(ERR_FAILURE_INIT)
     endif
 
     return
@@ -759,8 +770,8 @@ contains
 !           if IROOT >=0:  rank=IROOT runs, and the result broadcasted
 !!!_  & set_mpi
   subroutine set_mpi &
-       & (ierr, irank, iroot, icomm, tag, iru, icu, u, levv)
-    use TOUZA_Std_mwe,only: get_ni, get_comm
+       & (ierr, irank, nrank, iroot, icomm, tag, iru, icu, u, levv)
+    use TOUZA_Std_mwe,only: get_ni, get_comm, MPI_COMM_NULL
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
 #if OPT_USE_MPI
@@ -768,12 +779,11 @@ contains
 #endif
     implicit none
     integer,         intent(out) :: ierr
-    integer,         intent(out) :: irank, iroot, icomm
+    integer,         intent(out) :: irank, nrank, iroot, icomm
     character(len=*),intent(in)  :: tag
     integer,optional,intent(in)  :: iru, icu
     integer,optional,intent(in)  :: u
     integer,optional,intent(in)  :: levv
-    integer nrank
     integer utmp
     integer lv
 
@@ -801,7 +811,7 @@ contains
     endif
     if (ierr.eq.0) call get_ni(ierr, nrank, irank, icomm)
     if (ierr.eq.0) then
-       if (iroot.ge.nrank) ierr = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       if (nrank.gt.0.and.iroot.ge.nrank) ierr = _ERROR(ERR_FAILURE_INIT)
     endif
     if (ierr.eq.0) then
        if (VCHECK_INFO(lv)) then
@@ -809,8 +819,9 @@ contains
        endif
     endif
 #else
-    icomm = 0
+    icomm = MPI_COMM_NULL
     irank = 0
+    nrank = 0
     iroot = 0
 #endif
     return
@@ -830,6 +841,7 @@ contains
     integer,optional,intent(in)    :: levv
     character(len=128) :: buf
     integer lv
+    integer jerr
 
     lv = choice(lev_verbose, levv)
     if (vm.eq.0) then
@@ -838,7 +850,7 @@ contains
 101    format('conflict in ', A, ': ', I0, 1x, I0)
        if (vm.ne.vi) then
           if (VCHECK_SEVERE(lv)) then
-             write(buf, 101) trim(t), vm, vi
+             write(buf, 101, IOSTAT=jerr) trim(t), vm, vi
              call msg_mdl(buf, __MDL__, u)
           endif
        endif
@@ -846,7 +858,7 @@ contains
 102    format('error in ', A, ': ', I0, 1x, I0)
        if (vi.gt.0) then
           if (VCHECK_SEVERE(lv)) then
-             write(buf, 102) trim(t), vm, vi
+             write(buf, 102, IOSTAT=jerr) trim(t), vm, vi
              call msg_mdl(buf, __MDL__, u)
           endif
        endif
@@ -873,13 +885,14 @@ contains
     integer,intent(in),optional :: levtry
     integer,intent(in),optional :: iroot, icomm
 
-    integer ir, ic, ik
+    integer ir, ic, ik, nr
     integer,parameter :: mb=5
     integer ibuf(mb)
 
     ierr = ERR_SUCCESS
+    nr = 0
 
-    call set_mpi(ierr, ir, ik, ic, 'recl', iroot, icomm, u, levv)
+    call set_mpi(ierr, ir, nr, ik, ic, 'recl', iroot, icomm, u, levv)
     if (ierr.eq.0) then
        ibuf(1:5) = (/lrecd, lrecf, lreci, lrecl, nb_recl/)
        if (ir.eq.ik .or. ik.lt.0) then
@@ -891,7 +904,7 @@ contains
     endif
     if (ierr.eq.0) then
 #if OPT_USE_MPI
-       call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
+       if (nr.ge.1) call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
 #endif
     endif
     if (ierr.eq.0) then
@@ -908,7 +921,9 @@ contains
        nbytd = (nb_recl * lrecd)
     endif
 #if OPT_USE_MPI
-    if (ierr.ne.0) call MPI_Abort(ic, ERR_PANIC, ierr)
+    if (ierr.ne.0) then
+       if (nr.ge.1) call MPI_Abort(ic, ERR_PANIC, ierr)
+    endif
 #endif
     return
   end subroutine init_unfmtd_recl
@@ -953,12 +968,12 @@ contains
     if (lunit.le.0 .or. isf) then
        if (kswi.eq.1) then
           if (utest.lt.0) call new_unit_tmp(utest, tmpf)
-          if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+          if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
           if (ierr.eq.0) call brute_force_recl_unit_rw(ierr, lunit, utest, tmpf, u)
        else
           if (utest.lt.0) utest = new_unit()
-          if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
-          if (ierr.eq.0) call brute_force_recl_unit_w(ierr, lunit, utest, u)
+          if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
+          if (ierr.eq.0) call brute_force_recl_unit_w(ierr, lunit, utest)
        endif
     endif
 
@@ -976,18 +991,18 @@ contains
        if (isf) then
           if (kswi.eq.1) then
              if (utest.lt.0) call new_unit_tmp(utest, tmpf)
-             if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+             if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
              if (ierr.eq.0) call brute_force_recl_type(ierr, lrd, utest, tmpf, real(0, KIND=KDBL))
              if (ierr.eq.0) call brute_force_recl_type(ierr, lrf, utest, tmpf, real(0, KIND=KFLT))
              if (ierr.eq.0) call brute_force_recl_type(ierr, lri, utest, tmpf, int(0, KIND=KI32))
              if (ierr.eq.0) call brute_force_recl_type(ierr, lrl, utest, tmpf, int(0, KIND=KI64))
           else
              if (utest.lt.0) utest = new_unit()
-             if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
-             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrd, utest, check_single_scratch_d, 8, lunit, u)
-             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrf, utest, check_single_scratch_f, 4, lunit, u)
-             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lri, utest, check_single_scratch_i, 4, lunit, u)
-             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrl, utest, check_single_scratch_l, 8, lunit, u)
+             if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
+             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrd, utest, check_single_scratch_d, 8, lunit)
+             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrf, utest, check_single_scratch_f, 4, lunit)
+             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lri, utest, check_single_scratch_i, 4, lunit)
+             if (ierr.eq.0) call brute_force_recl_type_bs(ierr, lrl, utest, check_single_scratch_l, 8, lunit)
           endif
        endif
     endif
@@ -999,13 +1014,12 @@ contains
 
 !!!_  & brute_force_recl_unit_w - lazy trial to find file storage unit (ii)
   subroutine brute_force_recl_unit_w &
-       & (ierr, lunit, utest, u)
+       & (ierr, lunit, utest)
     use TOUZA_Std_utl,only: choice
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(out)         :: lunit
-    integer,intent(in)          :: utest
-    integer,intent(in),optional :: u
+    integer,intent(out) :: ierr
+    integer,intent(out) :: lunit
+    integer,intent(in)  :: utest
 
     integer lrec
     character(len=*),parameter :: teststr = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -1039,7 +1053,7 @@ contains
 
 !!!_  & brute_force_recl_type_bs - lazy trial to find record length for unit type (core ii)
   subroutine brute_force_recl_type_bs &
-       & (ierr, lrec, utest, xfunc, nini, lunit, u)
+       & (ierr, lrec, utest, xfunc, nini, lunit)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(out)         :: ierr
@@ -1048,7 +1062,6 @@ contains
     !!! logical :: xfunc ! logical function(int, int, int)
     integer,intent(in)          :: nini  ! initial guess
     integer,intent(in),optional :: lunit ! unit record length in bytes
-    integer,intent(in),optional :: u
 
     interface
        logical function xfunc(ierr, utest, n)
@@ -1067,7 +1080,7 @@ contains
     lrec = -1
 
     lu = choice(0, lunit)
-    if (lu.le.0) ierr = -1
+    if (lu.le.0) ierr = _ERROR(ERR_INVALID_PARAMETER)
     if (ierr.ne.0) return
 
     ! find good
@@ -1252,7 +1265,7 @@ contains
 
 !!!_   & brute_force_recl_type - lazy trial to find record length for unit type
   subroutine brute_force_recl_type_d &
-       & (ierr, lrec, utest, fn, v, lunit, nini, u)
+       & (ierr, lrec, utest, fn, mold, lunit, nini, u)
     use TOUZA_Std_prc, only: KDBL
     use TOUZA_Std_utl, only: choice
     implicit none
@@ -1260,20 +1273,20 @@ contains
     integer,         intent(out)         :: lrec
     integer,         intent(in)          :: utest
     character(len=*),intent(in)          :: fn
-    real(kind=KDBL), intent(in)          :: v     ! dummy placeholder
+    real(kind=KDBL), intent(in)          :: mold  ! dummy placeholder
     integer,         intent(in),optional :: lunit ! unit record length in bytes
     integer,         intent(in),optional :: nini  ! initial guess
     integer,         intent(in),optional :: u
 
     integer ni
-    ni = choice(8, nini) + 0 * KIND(V)
+    ni = choice(8, nini) + 0 * KIND(mold)
     call brute_force_recl_type_core &
          & (ierr, lrec, utest, fn, check_single_write_d, ni, lunit, u)
 
   end subroutine brute_force_recl_type_d
 
   subroutine brute_force_recl_type_f &
-       & (ierr, lrec, utest, fn, v, lunit, nini, u)
+       & (ierr, lrec, utest, fn, mold, lunit, nini, u)
     use TOUZA_Std_prc, only: KFLT
     use TOUZA_Std_utl, only: choice
     implicit none
@@ -1281,20 +1294,20 @@ contains
     integer,         intent(out)         :: lrec
     integer,         intent(in)          :: utest
     character(len=*),intent(in)          :: fn
-    real(kind=KFLT), intent(in)          :: v     ! dummy placeholder
+    real(kind=KFLT), intent(in)          :: mold  ! dummy placeholder
     integer,         intent(in),optional :: lunit ! unit record length in bytes
     integer,         intent(in),optional :: nini  ! initial guess
     integer,         intent(in),optional :: u
 
     integer ni
-    ni = choice(4, nini) + 0 * KIND(V)
+    ni = choice(4, nini) + 0 * KIND(mold)
     call brute_force_recl_type_core &
          & (ierr, lrec, utest, fn, check_single_write_f, ni, lunit, u)
 
   end subroutine brute_force_recl_type_f
 
   subroutine brute_force_recl_type_i &
-       & (ierr, lrec, utest, fn, v, lunit, nini, u)
+       & (ierr, lrec, utest, fn, mold, lunit, nini, u)
     use TOUZA_Std_prc, only: KI32
     use TOUZA_Std_utl, only: choice
     implicit none
@@ -1302,20 +1315,20 @@ contains
     integer,           intent(out)         :: lrec
     integer,           intent(in)          :: utest
     character(len=*),  intent(in)          :: fn
-    integer(kind=KI32),intent(in)          :: v     ! dummy placeholder
+    integer(kind=KI32),intent(in)          :: mold  ! dummy placeholder
     integer,           intent(in),optional :: lunit ! unit record length in bytes
     integer,           intent(in),optional :: nini  ! initial guess
     integer,           intent(in),optional :: u
 
     integer ni
-    ni = choice(4, nini) + 0 * KIND(V)
+    ni = choice(4, nini) + 0 * KIND(mold)
     call brute_force_recl_type_core &
          & (ierr, lrec, utest, fn, check_single_write_i, ni, lunit, u)
 
   end subroutine brute_force_recl_type_i
 
   subroutine brute_force_recl_type_l &
-       & (ierr, lrec, utest, fn, v, lunit, nini, u)
+       & (ierr, lrec, utest, fn, mold, lunit, nini, u)
     use TOUZA_Std_prc, only: KI64
     use TOUZA_Std_utl, only: choice
     implicit none
@@ -1323,13 +1336,13 @@ contains
     integer,           intent(out)         :: lrec
     integer,           intent(in)          :: utest
     character(len=*),  intent(in)          :: fn
-    integer(kind=KI64),intent(in)          :: v     ! dummy placeholder
+    integer(kind=KI64),intent(in)          :: mold  ! dummy placeholder
     integer,           intent(in),optional :: lunit ! unit record length in bytes
     integer,           intent(in),optional :: nini  ! initial guess
     integer,           intent(in),optional :: u
 
     integer ni
-    ni = choice(8, nini) + 0 * KIND(V)
+    ni = choice(8, nini) + 0 * KIND(mold)
     call brute_force_recl_type_core &
          & (ierr, lrec, utest, fn, check_single_write_l, ni, lunit, u)
 
@@ -1360,7 +1373,7 @@ contains
 
     lu = choice(0, lunit)
     ! if (lu.le.0) call brute_force_storage_unit(ierr, lu, utest, fn, u)
-    if (lu.le.0) ierr = -1
+    if (lu.le.0) ierr = _ERROR(ERR_INVALID_PARAMETER)
     if (ierr.ne.0) return
 
     ! find good
@@ -1522,16 +1535,17 @@ contains
     integer,intent(in),optional :: levtry
     integer,intent(in),optional :: iroot, icomm
 
-    integer ir, ic, ik
+    integer ir, nr, ic, ik
     integer,parameter :: mb=1
     integer ibuf(mb)
 
     ierr = ERR_SUCCESS
+    nr = 0
 
     ! needs nbyt*
     if (ierr.eq.0) call init_unfmtd_recl(ierr, u, levv, levtry, iroot, icomm)
 
-    if (ierr.eq.0) call set_mpi(ierr, ir, ik, ic, 'strm', iroot, icomm, u, levv)
+    if (ierr.eq.0) call set_mpi(ierr, ir, nr, ik, ic, 'strm', iroot, icomm, u, levv)
     if (ierr.eq.0) then
        ibuf(1:1) = (/nc_strm/)
        if (ir.eq.ik .or. ik.lt.0) then
@@ -1543,7 +1557,7 @@ contains
     endif
     if (ierr.eq.0) then
 #if OPT_USE_MPI
-       call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
+       if (nr.ge.1) call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
 #endif
     endif
     if (ierr.eq.0) then
@@ -1556,7 +1570,9 @@ contains
        mstrmd = nbytd / max(1, nc_strm)
     endif
 #if OPT_USE_MPI
-    if (ierr.ne.0) call MPI_Abort(ic, ERR_PANIC, ierr)
+    if (ierr.ne.0) then
+       if (nr.ge.1) call MPI_Abort(ic, ERR_PANIC, ierr)
+    endif
 #endif
     return
   end subroutine init_unfmtd_strm
@@ -1590,7 +1606,7 @@ contains
        endif
        if (lustr.le.0 .or. isf) then
           if (utest.lt.0) utest = new_unit()
-          if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+          if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
           if (ierr.eq.0) call brute_force_stream_unit(ierr, lustr, utest, u)
        endif
     endif
@@ -1643,7 +1659,7 @@ contains
     call msg_mdl('inquire pos disabled', __MDL__, u)
 #   endif /* not HAVE_FORTRAN_INQUIRE_POS */
 #else /* not HAVE_FORTRAN_OPEN_STREAM */
-    ierr = -1
+    ierr = _ERROR(ERR_OPR_DISABLE)
     call msg_mdl('stream access unavailable', __MDL__, u)
 #endif /* not HAVE_FORTRAN_OPEN_STREAM */
     return
@@ -1666,12 +1682,13 @@ contains
     integer,intent(in),optional :: ubgn,  uend, ustp
     integer,intent(in),optional :: iroot, icomm
 
-    integer ir, ic, ik
+    integer ir, nr, ic, ik
     integer,parameter :: mb=1
     integer ibuf(mb)
 
     ierr = 0
-    call set_mpi(ierr, ir, ik, ic, 'bodr', iroot, icomm, u, levv)
+    nr = 0
+    call set_mpi(ierr, ir, nr, ik, ic, 'bodr', iroot, icomm, u, levv)
 
     if (ierr.eq.0) then
        ibuf(1:1) = (/kendi_file/)
@@ -1679,14 +1696,16 @@ contains
     endif
     if (ierr.eq.0) then
 #if OPT_USE_MPI
-       call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
+       if (nr.ge.1) call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
 #endif
     endif
     if (ierr.eq.0) then
        call health_check_ufd(ierr, kendi_file, ibuf(1), 'BODR', u, levv)
     endif
 #if OPT_USE_MPI
-    if (ierr.ne.0) call MPI_Abort(ic, ERR_PANIC, ierr)
+    if (ierr.ne.0) then
+       if (nr.ge.1) call MPI_Abort(ic, ERR_PANIC, ierr)
+    endif
 #endif
     return
   end subroutine init_file_bodr
@@ -1722,7 +1741,7 @@ contains
     ue = ub - 1
     us = 1
     if (ub.lt.0) ub = new_unit()
-    if (ub.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+    if (ub.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
     if (ierr.eq.0) then
        ue = choice(-1, uend)
        if (present(ubgn)) then
@@ -1830,22 +1849,31 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer ul
-    integer,parameter :: L = 8
-    character C(L), T*(L)
+    integer,parameter :: L = 4
+    character(len=1) :: C(L)
+    character(len=L) :: T
     integer lv
 
     ierr = 0
     lv = choice(lev_verbose, levv)
     ul = choice(-1, u)
 
-    write(C, '(8A)') ' '
-    C = transfer(1684234849, C, L)
-    write(T, '(8A)') C
-    if (T(1:4).eq.'abcd') then
-       kendi = endian_LITTLE
-    else if (T(1:4).eq.'dcba') then
-       kendi = endian_BIG
-    else
+    write(C, '(4A)', IOSTAT=ierr) ' '
+    if (ierr.eq.0) then
+       C = transfer(1684234849, C, L)
+       write(T, '(4A)', IOSTAT=ierr) C
+    endif
+    if (ierr.eq.0) then
+       if (T(1:4).eq.'abcd') then
+          kendi = endian_LITTLE
+       else if (T(1:4).eq.'dcba') then
+          kendi = endian_BIG
+       else
+          ierr = _ERROR(ERR_PANIC)
+       endif
+    endif
+    if (ierr.ne.0) then
+       ierr = _ERROR(ERR_PANIC)
        kendi = endian_ERROR
        if (VCHECK_SEVERE(lv)) then
           call msg_mdl &
@@ -1938,13 +1966,14 @@ contains
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: iroot, icomm
 
-    integer ir, ic, ik
+    integer ir, nr, ic, ik
     integer,parameter :: mb=1
     integer ibuf(mb)
 
     ierr = ERR_SUCCESS
+    nr = 0
 
-    call set_mpi(ierr, ir, ik, ic, 'ios', iroot, icomm, u, levv)
+    call set_mpi(ierr, ir, nr, ik, ic, 'ios', iroot, icomm, u, levv)
     if (ierr.eq.0) then
        ibuf(1:1) = (/err_eof/)
        if (ir.eq.ik .or. ik.lt.0) then
@@ -1955,12 +1984,14 @@ contains
     endif
     if (ierr.eq.0) then
 #if OPT_USE_MPI
-       call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
+       if (nr.ge.1) call MPI_Bcast(ibuf, mb, MPI_INTEGER, ik, ic, ierr)
 #endif
     endif
     if (ierr.eq.0) err_eof = ibuf(1)
 #if OPT_USE_MPI
-    if (ierr.ne.0) call MPI_Abort(ic, ERR_PANIC, ierr)
+    if (ierr.ne.0) then
+       if (nr.ge.1) call MPI_Abort(ic, ERR_PANIC, ierr)
+    endif
 #endif
     return
   end subroutine init_io_status
@@ -1981,13 +2012,14 @@ contains
     integer jerr_eof
     integer lv
     character(len=128) :: txt
+    integer jerr
 
     ierr = 0
     lv = choice(lev_verbose, levv)
 
     jerr_eof = 0
     utest = new_unit()
-    if (utest.lt.0) ierr = ERR_NO_IO_UNIT - ERR_MASK_STD_ENV
+    if (utest.lt.0) ierr = _ERROR(ERR_NO_IO_UNIT)
     if (ierr.eq.0) then
        open(UNIT=utest, &
             & STATUS='SCRATCH',   ACCESS='SEQUENTIAL', &
@@ -2003,7 +2035,7 @@ contains
     if (ierr.ne.0) then
        if (VCHECK_NORMAL(lv)) then
 101       format('eof check failed = ', I0)
-          write(txt, 101) ierr
+          write(txt, 101, IOSTAT=jerr) ierr
           call msg_mdl(txt, __MDL__, u)
        endif
     else if (keof.eq.0) then
@@ -2015,7 +2047,7 @@ contains
           keof = jerr_eof
 102       format('eof detected = ', I0)
           if (VCHECK_DEBUG(lv)) then
-             write(txt, 102) jerr_eof
+             write(txt, 102, IOSTAT=jerr) jerr_eof
              call msg_mdl(txt, __MDL__, u)
           endif
        endif
@@ -2023,13 +2055,13 @@ contains
        keof = jerr_eof
 103    format('eof ignored = ', I0)
        if (VCHECK_NORMAL(lv)) then
-          write(txt, 103) jerr_eof
+          write(txt, 103, IOSTAT=jerr) jerr_eof
           call msg_mdl(txt, __MDL__, u)
        endif
     else
 104    format('eof kept = ', I0)
        if (VCHECK_DEBUG(lv)) then
-          write(txt, 104) jerr_eof
+          write(txt, 104, IOSTAT=jerr) jerr_eof
           call msg_mdl(txt, __MDL__, u)
        endif
     endif
@@ -2074,254 +2106,385 @@ contains
     ms = nb / nc_strm
   end function conv_b2strm_l
 !!!_ + queries
-!!!_  & get_size_strm - get unit length in stream i/o
+!!!_  & get_unit_strm - get unit length in stream i/o
   PURE &
-  integer function get_size_strm_i (V) result(l)
-    use TOUZA_Std_prc,only: KI32
+  integer function get_unit_strm_i (mold) result(l)
+    use TOUZA_Std_prc,only: KTGT=>KI32
     implicit none
-    integer(KIND=KI32),intent(in) :: V
-    l = mstrmi + 0 * KIND(V)
+    integer(KIND=KTGT),intent(in) :: mold
+    l = mstrmi + 0 * KIND(mold)
+  end function get_unit_strm_i
+  PURE &
+  integer function get_unit_strm_l (mold) result(l)
+    use TOUZA_Std_prc,only: KTGT=>KI64
+    implicit none
+    integer(KIND=KTGT),intent(in) :: mold
+    l = mstrml + 0 * KIND(mold)
+  end function get_unit_strm_l
+  PURE &
+  integer function get_unit_strm_f(mold) result(l)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    real(KIND=KTGT),intent(in) :: mold
+    l = mstrmf + 0 * KIND(mold)
+  end function get_unit_strm_f
+  PURE &
+  integer function get_unit_strm_d(mold) result(l)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    real(KIND=KTGT),intent(in) :: mold
+    l = mstrmd + 0 * KIND(mold)
+  end function get_unit_strm_d
+  PURE &
+  integer function get_unit_strm_a(mold) result(l)
+    implicit none
+    character(len=*),intent(in) :: mold
+    l = conv_b2strm(get_size_bytes(mold, 1))
+  end function get_unit_strm_a
+
+!!!_  & get_size_strm - get total length in stream i/o
+  PURE &
+  integer(kind=KMEM) function get_size_strm_i (mold, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI32
+    implicit none
+    integer(KIND=KTGT),intent(in)          :: mold
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = mstrmi * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_i
   PURE &
-  integer function get_size_strm_l (V) result(l)
-    use TOUZA_Std_prc,only: KI64
+  integer(kind=KMEM) function get_size_strm_l (mold, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI32
     implicit none
-    integer(KIND=KI64),intent(in) :: V
-    l = mstrml + 0 * KIND(V)
+    integer(KIND=KTGT),intent(in)          :: mold
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = mstrml * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_l
   PURE &
-  integer function get_size_strm_f (V) result(l)
-    use TOUZA_Std_prc,only: KFLT
+  integer(kind=KMEM) function get_size_strm_f (mold, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI32
     implicit none
-    real(KIND=KFLT),intent(in) :: V
-    l = mstrmf + 0 * KIND(V)
+    real(KIND=KTGT),   intent(in)          :: mold
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = mstrmf * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_f
   PURE &
-  integer function get_size_strm_d (V) result(l)
-    use TOUZA_Std_prc,only: KDBL
+  integer(kind=KMEM) function get_size_strm_d (mold, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI32
     implicit none
-    real(KIND=KDBL),intent(in) :: V
-    l = mstrmd + 0 * KIND(V)
+    real(KIND=KTGT),   intent(in)          :: mold
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = mstrmd * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_d
-
-!!!_  & get_size_bytes - get unit/total length in bytes
   PURE &
-  integer(kind=KMEM) function get_size_bytes_a (V, n) result(l)
+  integer(kind=KMEM) function get_size_strm_a (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI32
     implicit none
-    character(len=*),  intent(in)          :: V
+    character(len=*),  intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
-    !! todo: nbyta detection
-    l = len(V) * choice(1_KMEM, n)  + 0 * KIND(V)
-  end function get_size_bytes_a
+    l = (len(mold) / max(1, nc_strm)) * choice(1_KMEM, n)
+  end function get_size_strm_a
   PURE &
-  integer(kind=KMEM) function get_size_bytes_i (V, n) result(l)
+  integer(kind=KMEM) function get_size_strm_li (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KI32,KMEM=>KI32
+    use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI64
     implicit none
-    integer(KIND=KI32),intent(in)          :: V
-    integer(KIND=KMEM),intent(in),optional :: n
-    l = nbyti * choice(1_KMEM, n)  + 0 * KIND(V)
-  end function get_size_bytes_i
+    integer(KIND=KTGT),intent(in) :: mold
+    integer(KIND=KMEM),intent(in) :: n
+    l = mstrmi * choice(1_KMEM, n)  + 0 * KIND(mold)
+  end function get_size_strm_li
   PURE &
-  integer(kind=KMEM) function get_size_bytes_l (V, n) result(l)
+  integer(kind=KMEM) function get_size_strm_ll (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KI64,KMEM=>KI32
+    use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI64
     implicit none
-    integer(KIND=KI64),intent(in)          :: V
-    integer(KIND=KMEM),intent(in),optional :: n
-    l = nbytl * choice(1_KMEM, n)  + 0 * KIND(V)
-  end function get_size_bytes_l
+    integer(KIND=KTGT),intent(in) :: mold
+    integer(KIND=KMEM),intent(in) :: n
+    l = mstrml * choice(1_KMEM, n)  + 0 * KIND(mold)
+  end function get_size_strm_ll
   PURE &
-  integer(kind=KMEM) function get_size_bytes_f (V, n) result(l)
+  integer(kind=KMEM) function get_size_strm_lf (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KFLT,KMEM=>KI32
+    use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI64
     implicit none
-    real(KIND=KFLT),   intent(in)          :: V
-    integer(KIND=KMEM),intent(in),optional :: n
-    l = nbytf * choice(1_KMEM, n) + 0 * KIND(V)
-  end function get_size_bytes_f
+    real(KIND=KTGT),   intent(in) :: mold
+    integer(KIND=KMEM),intent(in) :: n
+    l = mstrmf * choice(1_KMEM, n)  + 0 * KIND(mold)
+  end function get_size_strm_lf
   PURE &
-  integer(kind=KMEM) function get_size_bytes_d (V, n) result(l)
+  integer(kind=KMEM) function get_size_strm_ld (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KDBL,KMEM=>KI32
+    use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI64
     implicit none
-    real(KIND=KDBL),   intent(in)          :: V
-    integer(KIND=KMEM),intent(in),optional :: n
-    l = nbytd * choice(1_KMEM, n)  + 0 * KIND(V)
-  end function get_size_bytes_d
-
+    real(KIND=KTGT),   intent(in) :: mold
+    integer(KIND=KMEM),intent(in) :: n
+    l = mstrmd * choice(1_KMEM, n)  + 0 * KIND(mold)
+  end function get_size_strm_ld
   PURE &
-  integer(kind=KMEM) function get_size_bytes_la (V, n) result(l)
+  integer(kind=KMEM) function get_size_strm_la (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI64
     implicit none
-    character(len=*),  intent(in) :: V
+    character(len=*),  intent(in) :: mold
+    integer(KIND=KMEM),intent(in) :: n
+    l = (len(mold) / max(1, nc_strm)) * choice(1_KMEM, n)
+  end function get_size_strm_la
+
+!!!_  & get_size_bytes - get unit/total length in bytes
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_a (mold, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KMEM=>KI32
+    implicit none
+    character(len=*),  intent(in)          :: mold
+    integer(KIND=KMEM),intent(in),optional :: n
+    !! todo: nbyta detection
+    l = len(mold) * choice(1_KMEM, n)  + 0 * KIND(mold)
+  end function get_size_bytes_a
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_i (mold, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI32
+    implicit none
+    integer(KIND=KTGT),intent(in)          :: mold
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = nbyti * choice(1_KMEM, n)  + 0 * KIND(mold)
+  end function get_size_bytes_i
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_l (mold, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI32
+    implicit none
+    integer(KIND=KTGT),intent(in)          :: mold
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = nbytl * choice(1_KMEM, n)  + 0 * KIND(mold)
+  end function get_size_bytes_l
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_f (mold, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI32
+    implicit none
+    real(KIND=KTGT),   intent(in)          :: mold
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = nbytf * choice(1_KMEM, n) + 0 * KIND(mold)
+  end function get_size_bytes_f
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_d (mold, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI32
+    implicit none
+    real(KIND=KTGT),   intent(in)          :: mold
+    integer(KIND=KMEM),intent(in),optional :: n
+    l = nbytd * choice(1_KMEM, n)  + 0 * KIND(mold)
+  end function get_size_bytes_d
+
+  PURE &
+  integer(kind=KMEM) function get_size_bytes_la (mold, n) result(l)
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_prc,only: KMEM=>KI64
+    implicit none
+    character(len=*),  intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
     !! todo: nbyta detection
-    l = len(V) * n  + 0 * KIND(V)
+    l = len(mold) * n  + 0 * KIND(mold)
   end function get_size_bytes_la
   PURE &
-  integer(kind=KMEM) function get_size_bytes_li (V, n) result(l)
+  integer(kind=KMEM) function get_size_bytes_li (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KI32,KMEM=>KI64
+    use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI64
     implicit none
-    integer(KIND=KI32),intent(in) :: V
+    integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
-    l = nbyti * n  + 0 * KIND(V)
+    l = nbyti * n  + 0 * KIND(mold)
   end function get_size_bytes_li
   PURE &
-  integer(kind=KMEM) function get_size_bytes_ll (V, n) result(l)
+  integer(kind=KMEM) function get_size_bytes_ll (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KI64,KMEM=>KI64
+    use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI64
     implicit none
-    integer(KIND=KI64),intent(in) :: V
+    integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
-    l = nbytl * n  + 0 * KIND(V)
+    l = nbytl * n  + 0 * KIND(mold)
   end function get_size_bytes_ll
   PURE &
-  integer(kind=KMEM) function get_size_bytes_lf (V, n) result(l)
+  integer(kind=KMEM) function get_size_bytes_lf (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KFLT,KMEM=>KI64
+    use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI64
     implicit none
-    real(KIND=KFLT),   intent(in) :: V
+    real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
-    l = nbytf * n + 0 * KIND(V)
+    l = nbytf * n + 0 * KIND(mold)
   end function get_size_bytes_lf
   PURE &
-  integer(kind=KMEM) function get_size_bytes_ld (V, n) result(l)
+  integer(kind=KMEM) function get_size_bytes_ld (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KDBL,KMEM=>KI64
+    use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI64
     implicit none
-    real(KIND=KDBL),   intent(in) :: V
+    real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
-    l = nbytd * n  + 0 * KIND(V)
+    l = nbytd * n  + 0 * KIND(mold)
   end function get_size_bytes_ld
 
 !!!_  & get_mems_bytes - get members from byte-length
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_a (l, V) result(n)
+  integer(kind=KMEM) function get_mems_bytes_a (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI32
     implicit none
-    character(len=*),  intent(in) :: V
+    character(len=*),  intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     !! todo: nbyta detection
-    n = l / len(V)   + 0 * KIND(V)
+    n = l / len(mold)   + 0 * KIND(mold)
   end function get_mems_bytes_a
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_i (l, V) result(n)
+  integer(kind=KMEM) function get_mems_bytes_i (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KI32,KMEM=>KI32
+    use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI32
     implicit none
-    integer(KIND=KI32),intent(in) :: V
+    integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
-    n = l / nbyti  + 0 * KIND(V)
+    n = l / nbyti  + 0 * KIND(mold)
   end function get_mems_bytes_i
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_l (l, V) result(n)
+  integer(kind=KMEM) function get_mems_bytes_l (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KI64,KMEM=>KI32
+    use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI32
     implicit none
-    integer(KIND=KI64),intent(in) :: V
+    integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
-    n = l / nbytl  + 0 * KIND(V)
+    n = l / nbytl  + 0 * KIND(mold)
   end function get_mems_bytes_l
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_f (l, V) result(n)
+  integer(kind=KMEM) function get_mems_bytes_f (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KFLT,KMEM=>KI32
+    use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI32
     implicit none
-    real(KIND=KFLT),   intent(in) :: V
+    real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
-    n = l / nbytf  + 0 * KIND(V)
+    n = l / nbytf  + 0 * KIND(mold)
   end function get_mems_bytes_f
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_d (l, V) result(n)
+  integer(kind=KMEM) function get_mems_bytes_d (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KDBL,KMEM=>KI32
+    use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI32
     implicit none
-    real(KIND=KDBL),   intent(in) :: V
+    real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
-    n = l / nbytd  + 0 * KIND(V)
+    n = l / nbytd  + 0 * KIND(mold)
   end function get_mems_bytes_d
 
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_la (l, V) result(n)
+  integer(kind=KMEM) function get_mems_bytes_la (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI64
     implicit none
-    character(len=*),  intent(in) :: V
+    character(len=*),  intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     !! todo: nbyta detection
-    n = l / len(V)   + 0 * KIND(V)
+    n = l / len(mold)   + 0 * KIND(mold)
   end function get_mems_bytes_la
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_li (l, V) result(n)
+  integer(kind=KMEM) function get_mems_bytes_li (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KI32,KMEM=>KI64
+    use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI64
     implicit none
-    integer(KIND=KI32),intent(in) :: V
+    integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
-    n = l / nbyti  + 0 * KIND(V)
+    n = l / nbyti  + 0 * KIND(mold)
   end function get_mems_bytes_li
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_ll (l, V) result(n)
+  integer(kind=KMEM) function get_mems_bytes_ll (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KI64,KMEM=>KI64
+    use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI64
     implicit none
-    integer(KIND=KI64),intent(in) :: V
+    integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
-    n = l / nbytl  + 0 * KIND(V)
+    n = l / nbytl  + 0 * KIND(mold)
   end function get_mems_bytes_ll
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_lf (l, V) result(n)
+  integer(kind=KMEM) function get_mems_bytes_lf (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KFLT,KMEM=>KI64
+    use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI64
     implicit none
-    real(KIND=KFLT),   intent(in) :: V
+    real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
-    n = l / nbytf  + 0 * KIND(V)
+    n = l / nbytf  + 0 * KIND(mold)
   end function get_mems_bytes_lf
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_ld (l, V) result(n)
+  integer(kind=KMEM) function get_mems_bytes_ld (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_prc,only: KDBL,KMEM=>KI64
+    use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI64
     implicit none
-    real(KIND=KDBL),   intent(in) :: V
+    real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
-    n = l / nbytd  + 0 * KIND(V)
+    n = l / nbytd  + 0 * KIND(mold)
   end function get_mems_bytes_ld
 
 !!!_  & get_size_ufd - get unit length in direct i/o
   PURE &
-  integer function get_size_ufd_d (V) result(l)
-    use TOUZA_Std_prc,only: KDBL
+  integer function get_size_ufd_d (mold) result(l)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
-    real(kind=KDBL),intent(in) :: V
-    l = lrecd + 0 * kind(V)
+    real(kind=KTGT),intent(in) :: mold
+    l = lrecd + 0 * kind(mold)
   end function get_size_ufd_d
   PURE &
-  integer function get_size_ufd_f (V) result(l)
-    use TOUZA_Std_prc,only: KFLT
+  integer function get_size_ufd_f (mold) result(l)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
-    real(kind=KFLT),intent(in) :: V
-    l = lrecf + 0 * kind(V)
+    real(kind=KTGT),intent(in) :: mold
+    l = lrecf + 0 * kind(mold)
   end function get_size_ufd_f
   PURE &
-  integer function get_size_ufd_i (V) result(l)
+  integer function get_size_ufd_i (mold) result(l)
+    use TOUZA_Std_prc,only: KTGT=>KI32
     implicit none
-    integer(KIND=KI32),intent(in) :: V
-    l = lreci + 0 * kind(V)
+    integer(KIND=KTGT),intent(in) :: mold
+    l = lreci + 0 * kind(mold)
   end function get_size_ufd_i
   PURE &
-  integer function get_size_ufd_l (V) result(l)
+  integer function get_size_ufd_l (mold) result(l)
+    use TOUZA_Std_prc,only: KTGT=>KI64
     implicit none
-    integer(KIND=KI64),intent(in) :: V
-    l = lreci + 0 * kind(V)
+    integer(KIND=KTGT),intent(in) :: mold
+    l = lreci + 0 * kind(mold)
   end function get_size_ufd_l
 
+!!!_ + system procedures wrapper
+!!!_  & get_login_name
+  subroutine get_login_name &
+       & (ierr, name)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: name
+#if HAVE_FORTRAN_GETLOG
+    ierr = 0
+    call GETLOG(name)
+#else
+    ierr = 0
+    name = ' '
+#endif
+  end subroutine get_login_name
+!!!_  & get_host_name
+  subroutine get_host_name &
+       & (ierr, name)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: name
+#if HAVE_FORTRAN_HOSTNM
+    ierr = 0
+    call HOSTNM(name)
+#else
+    ierr = 0
+    name = ' '
+#endif
+  end subroutine get_host_name
+!!!_  & get_env_var
+!!!_ + end TOUZA_Std_env
 end module TOUZA_Std_env
 
 !!!_@ test_std_env - test program
@@ -2334,6 +2497,7 @@ program test_std_env
   integer ui, uo, ue
   integer ut
   integer kendi
+  character(len=128) :: str
 
   ierr = 0
   ut=10
@@ -2366,6 +2530,11 @@ program test_std_env
         write(*, *) 'ENDIANNESS(unit) = ', ut, kendi, ierr
      enddo
   endif
+
+  if (ierr.eq.0) call get_login_name(ierr, str)
+  if (ierr.eq.0) write(*, *) 'login = ', trim(str)
+  if (ierr.eq.0) call get_host_name(ierr, str)
+  if (ierr.eq.0) write(*, *) 'host = ', trim(str)
 
   if (ierr.eq.0) call diag(ierr, mode=MODE_FORCE+MODE_SHALLOW, levv=+10)
   if (ierr.eq.0) call finalize(ierr, levv=+10)

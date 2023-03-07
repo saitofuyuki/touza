@@ -1,7 +1,7 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/04/17 22:59:58 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/01/17 15:15:50 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -38,6 +38,7 @@ module TOUZA_Ppp_miroc
 !!!_ = declaration
   use TOUZA_Ppp_std,only: unit_global
   use TOUZA_Ppp,only: diag_maps_batch, barrier_trace
+  use TOUZA_Ppp,only: set_king, get_king, is_king
 !!!_  - default
   implicit none
   private
@@ -142,13 +143,14 @@ module TOUZA_Ppp_miroc
   public get_wcolor
   public affils_legacy
   public gen_agent_union
-  public push_agent, pop_agent, top_agent, switch_agent
+  public push_agent, pop_agent, top_agent, switch_agent, spinoff_agent
   public diag_agent_maps
   public query_handle, query_nprocs, query_comm
   public terminate
-
+!!!_   . export
   public barrier_trace
-
+  public set_king, get_king, is_king
+!!!_   . legacy
   public XCKINI, MMGetColor, XMGetColor, XMIComm, XMCOMM, XMGETK, XMProc, XMOKNG
   public XMquit, XMabort,    XMabort0,   XMFinal
   public XCKINI_legacy
@@ -158,7 +160,7 @@ contains
   subroutine init(ierr, u, levv, mode, stdv, icomm, affils, greeting)
     use TOUZA_Ppp,only: ppp_init=>init, choice, &
          & control_mode, control_deep, is_first_force, is_msglev_NORMAL
-    use TOUZA_Std,only: mwe_init
+    use TOUZA_Std,only: mwe_init, bld_init
     use TOUZA_Emu,only: usi_init
     implicit none
     integer,         intent(out)         :: ierr
@@ -193,6 +195,7 @@ contains
           if (ierr.eq.0) call usi_init(ierr, u, levv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
        if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call bld_init(ierr, u, levv, mode=lmd)
           if (ierr.eq.0) call ppp_init(ierr, u, levv, mode=md, stdv=stdv, icomm=icomm)
        endif
        if (present(affils)) then
@@ -208,6 +211,7 @@ contains
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Ppp,only: ppp_diag=>diag, ppp_msg=>msg
     use TOUZA_Std,only: mwe_diag, control_mode, control_deep, get_logu, choice, is_first_force, is_msglev_NORMAL
+    use TOUZA_Std,only: bld_diag
     use TOUZA_Emu,only: usi_diag
     implicit none
     integer,intent(out)         :: ierr
@@ -231,6 +235,7 @@ contains
        lmd = control_deep(md)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ppp_diag(ierr, u, levv, md)
+          if (ierr.eq.0) call bld_diag(ierr, u, levv, md)
        endif
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call mwe_diag(ierr, u, levv, lmd)
@@ -243,7 +248,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std,only: mwe_finalize
+    use TOUZA_Std,only: mwe_finalize, bld_finalize
     use TOUZA_Ppp,only: ppp_finalize=>finalize, &
          & control_mode, control_deep, get_logu, choice, &
          & is_first_force, trace_fine
@@ -273,6 +278,7 @@ contains
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call usi_finalize(ierr, u, levv, mode=lmd)
           if (ierr.eq.0) call mwe_finalize(ierr, u, levv, mode=lmd)
+          if (ierr.eq.0) call bld_finalize(ierr, u, levv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
     endif
@@ -609,6 +615,30 @@ contains
     endif
     return
   end subroutine switch_agent
+!!!_  & spinoff_agent - create spinoff agent if not exists
+  subroutine spinoff_agent &
+       & (ierr, iaspin, name, iagnt)
+    use TOUZA_Ppp,only: is_child_agent, new_agent_spinoff, &
+         &              top_agent, pop_agent, clone_agent, query_agent
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: iaspin
+    character(len=*),intent(in)  :: name
+    integer,         intent(in)  :: iagnt
+    integer jac
+    ierr = 0
+    iaspin = -1
+    if (is_child_agent(name, iagnt)) then
+       jac = clone_agent(iagnt)
+       if (jac.ge.0) iaspin = query_agent(name, jac)
+    else
+       ! to do: improve amng
+       call new_agent_spinoff(ierr, name, iagnt, switch=+1)
+       if (ierr.eq.0) call top_agent(ierr, iaspin)
+       if (ierr.eq.0) call pop_agent(ierr)
+    endif
+  end subroutine spinoff_agent
+
 !!!_  & query_handle - get agent handle from agent string (XMCiJA)
   subroutine query_handle(IAGNT, HCTZ)
     use TOUZA_Emu,only: get_sysu
@@ -720,7 +750,7 @@ subroutine XCKINI(AFFILS, N, GREETING)
   external :: greeting
   integer jerr
   call init(jerr, levv=+9, stdv=+9, affils=AFFILS(1:N), greeting=greeting)
-  call diag(jerr, levv=+1)
+  call diag(jerr, levv=+2)
   return
 end subroutine XCKINI
 !!!_  & XCKINI_legacy
@@ -743,7 +773,7 @@ subroutine XCKINI_legacy(HDRVR, GREETING)
   endif
 
   call init(jerr, levv=+9, stdv=+9, affils=affils(1:na), greeting=greeting)
-  call diag(jerr, levv=+1)
+  call diag(jerr, levv=+2)
   return
 end subroutine XCKINI_legacy
 !!!_  & XMSETK (XCKINI entry) - DELETED
@@ -929,7 +959,6 @@ program test_ppp_miroc
   ierr = 0
 
   call XCKINI_legacy(_DRIVER, greeting)
-
   call gen_agent_union(jdmy, 'W', (/'A', 'O'/), 2)
   call gen_agent_union(jdmy, 'H', (/'@'/), 1)
 
