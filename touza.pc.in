@@ -1,7 +1,7 @@
 # touza.pc
 # Maintainer: SAITO Fuyuki
 # Created: Oct 10 2021
-# Time-stamp: <2022/11/02 07:47:37 fuyuki touza.pc.in>
+# Time-stamp: <2023/02/16 10:42:06 fuyuki touza.pc.in>
 #
 # manually modified after automatic generation with AX_CREATE_PKGCONFIG_INFO
 prefix=@prefix@
@@ -22,6 +22,7 @@ moddir=@moddir@
 fc_modinc="@FC_MODINC@"
 touza_lib="-l@TOUZA_NAME@"
 touza_name="@TOUZA_NAME@"
+fclibs="@FCLIBS@"
 
 Name: @PACKAGE_NAME@
 Description: @TOUZA_NAME@ library

@@ -1,10 +1,10 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2022/10/20 06:57:02 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 22:29:18 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 #ifdef HAVE_CONFIG_H
@@ -108,6 +108,7 @@ module TOUZA_Ppp_amng
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
 #define __MDL__ 'a'
+# define _ERROR(E) (E - ERR_MASK_PPP_AMNG)
 !!!_ + overload
   interface switch_agent
      module procedure switch_agent_ai, switch_agent_ni
@@ -183,7 +184,7 @@ contains
           if (ierr.eq.0) call init_world(ierr, u=ulog)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
     return
   end subroutine init
@@ -292,7 +293,6 @@ contains
   subroutine init_table &
        & (ierr, n)
     use TOUZA_Ppp_std,only: choice, new_htable
-    ! use TOUZA_Ppp_std,only: reg_entry
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: n
@@ -302,7 +302,7 @@ contains
     m = choice(0, n)
     if (m.le.0) m = latbl * 2
     if (hh_agent.lt.0) then
-       hh_agent = new_htable('agents', lagent, m, def=agent_unset, ntag=1)
+       hh_agent = new_htable('agents', m, lagent, nkey=1, def=agent_unset)
        if (hh_agent.lt.0) ierr = -1
     endif
     return
@@ -2068,24 +2068,24 @@ contains
   integer function add_agent_core &
        & (name, source) &
        & result(n)
-    use TOUZA_Ppp_std,only: query_status, reg_entry, choice
+    use TOUZA_Ppp_std,only: choice
     implicit none
     character(len=*),intent(in) :: name
     integer,         intent(in) :: source
     integer e
 
-    n = query_status(name, source, hh_agent)
+    n = query_agent_core(name, source)
     if (n.ge.0) then
-       n = ERR_DUPLICATE_SET - ERR_MASK_PPP_AMNG
+       n = _ERROR(ERR_DUPLICATE_SET)
        return
     endif
     n = matbl
     matbl = matbl + 1
     if (n.ge.latbl) then
-       n = ERR_INSUFFICIENT_BUFFER - ERR_MASK_PPP_AMNG
+       n = _ERROR(ERR_INSUFFICIENT_BUFFER)
        return
     endif
-    e = reg_entry(name, source, hh_agent, n)
+    e = reg_agent(name, source, n)
     atblp(n)%isrc = source
     if (e.lt.0) n = e
   end function add_agent_core
@@ -2094,23 +2094,34 @@ contains
   integer function add_agent_alias &
        & (name, source, iagent) &
        & result(n)
-    use TOUZA_Ppp_std,only: query_status, reg_entry
     implicit none
     character(len=*),intent(in) :: name
     integer,         intent(in) :: source
     integer,         intent(in) :: iagent
     integer e
 
-    n = query_status(name, source, hh_agent)
+    n = query_agent_core(name, source)
     if (n.ge.0) then
-       n = ERR_DUPLICATE_SET - ERR_MASK_PPP_AMNG
+       n = _ERROR(ERR_DUPLICATE_SET)
        return
     endif
-    e = reg_entry(name, source, hh_agent, iagent)
+    e = reg_agent(name, source, iagent)
     n = min(0, e)
   end function add_agent_alias
 
-!!!_  - query_agent_core
+!!!_  - reg_agent - reg_entry() wrapper
+  integer function reg_agent &
+       & (name, source, iagent) &
+       & result(ee)
+    use TOUZA_Ppp_std,only: reg_entry
+    implicit none
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: source
+    integer,         intent(in) :: iagent
+    ee = reg_entry(hh_agent, name, (/source/), (/iagent/))
+  end function reg_agent
+
+!!!_  - query_agent_core - query_staus() wrapper
   integer function query_agent_core &
        & (name, source) &
        & result(n)
@@ -2118,8 +2129,9 @@ contains
     implicit none
     character(len=*),intent(in) :: name
     integer,         intent(in) :: source
-
-    n = query_status(name, source, hh_agent)
+    integer jerr
+    call query_status(jerr, n, hh_agent, name, (/source/))
+    if (jerr.ne.0) n = jerr
   end function query_agent_core
 
 !!!_ + end TOUZA_Ppp_amng

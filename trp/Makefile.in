@@ -25,7 +25,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Wed Dec 21 18:47:04 JST 2022
+# from AX_AM_MACROS_STATIC on Tue Mar  7 21:53:11 JST 2023
 
 
 
@@ -396,6 +396,7 @@ FC = @FC@
 FCFLAGS = @FCFLAGS@
 FCFLAGS_F = @FCFLAGS_F@
 FCFLAGS_F90 = @FCFLAGS_F90@
+FCLIBS = @FCLIBS@
 FC_DEFINE = @FC_DEFINE@
 FC_INCLUDE_touza_ami = @FC_INCLUDE_touza_ami@
 FC_INCLUDE_touza_cal = @FC_INCLUDE_touza_cal@

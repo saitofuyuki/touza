@@ -1,10 +1,10 @@
 !!!_! std_wsh.F90 - touza/std standard work-sharing
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2022/02/05 15:52:24 fuyuki std_wsh.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 22:08:24 fuyuki std_wsh.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022
+! Copyright (C) 2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -27,7 +27,7 @@ module TOUZA_Std_wsh
 !!!_  - parameters
 # define __MDL__ 'wsh'
 # define __TAG__ STD_FORMAT_MDL(__MDL__)
-
+# define _ERROR(E) (E - ERR_MASK_STD_WSH)
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
@@ -35,7 +35,7 @@ module TOUZA_Std_wsh
   integer,save :: lev_verbose = STD_MSG_LEVEL
   integer,save :: ulog = -1
 
-  integer,save :: err_default = ERR_NO_INIT - ERR_MASK_STD_WSH
+  integer,save :: err_default = _ERROR(ERR_NO_INIT)
 !!!_  - public parameter
   integer,parameter,public :: LWI = 4
   integer,parameter,public :: LWL = 4
@@ -104,7 +104,7 @@ contains
           if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_ENV
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
 
     return

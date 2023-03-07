@@ -17,9 +17,9 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2022/11/24 16:41:25 fuyuki Makefile.am>
+# Time-stamp: <2023/02/05 20:34:18 fuyuki Makefile.am>
 
-# Copyright (C) 2021,2022
+# Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -100,7 +100,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-noinst_PROGRAMS = jmzex$(EXEEXT) jmzconv$(EXEEXT) jmzcmp$(EXEEXT)
+noinst_PROGRAMS =
+EXTRA_PROGRAMS = jmzex$(EXEEXT) jmzconv$(EXEEXT) jmzcmp$(EXEEXT)
 bin_PROGRAMS = chak$(EXEEXT)
 check_PROGRAMS = test_chak_file$(EXEEXT)
 subdir = .
@@ -131,22 +132,22 @@ am_chak_OBJECTS = chak.$(OBJEXT)
 chak_OBJECTS = $(am_chak_OBJECTS)
 chak_LDADD = $(LDADD)
 am__DEPENDENCIES_1 =
-chak_DEPENDENCIES = $(am__DEPENDENCIES_1) libjmz_local.la
+chak_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_1)
 am_jmzcmp_OBJECTS = jmzcmp.$(OBJEXT)
 jmzcmp_OBJECTS = $(am_jmzcmp_OBJECTS)
 jmzcmp_LDADD = $(LDADD)
-jmzcmp_DEPENDENCIES = $(am__DEPENDENCIES_1) libjmz_local.la
+jmzcmp_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_1)
 am_jmzconv_OBJECTS = jmzconv.$(OBJEXT)
 jmzconv_OBJECTS = $(am_jmzconv_OBJECTS)
 jmzconv_LDADD = $(LDADD)
-jmzconv_DEPENDENCIES = $(am__DEPENDENCIES_1) libjmz_local.la
+jmzconv_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_1)
 am_jmzex_OBJECTS = jmzex.$(OBJEXT)
 jmzex_OBJECTS = $(am_jmzex_OBJECTS)
 jmzex_LDADD = $(LDADD)
-jmzex_DEPENDENCIES = $(am__DEPENDENCIES_1) libjmz_local.la
+jmzex_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_1)
 am_test_chak_file_OBJECTS = test_chak_file-chak_file.$(OBJEXT)
 test_chak_file_OBJECTS = $(am_test_chak_file_OBJECTS)
-am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1) libjmz_local.la
+am__DEPENDENCIES_2 = libjmz_local.la $(am__DEPENDENCIES_1)
 test_chak_file_DEPENDENCIES = $(TEST_COMMON_LIBS) \
 	$(am__DEPENDENCIES_2)
 SCRIPTS = $(noinst_SCRIPTS)
@@ -454,7 +455,7 @@ top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I ../m4c
 AM_FCFLAGS_MODULE = $(DEBUG) $(TOUZA_CFLAGS)
 # AM_LDFLAGS = $(TOUZA_LDFLAGS)
-LDADD = $(TOUZA_LIBS) libjmz_local.la
+LDADD = libjmz_local.la $(TOUZA_LIBS)
 noinst_SCRIPTS = jmzdepf90 demo-chak.sh
 noinst_LTLIBRARIES = libjmz_local.la
 libjmz_local_la_SOURCES = jmzlib.F90 chak_lib.F90 chak_opr.F90 chak_file.F90

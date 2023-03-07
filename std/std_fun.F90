@@ -1,10 +1,10 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2022/12/15 09:49:43 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/05 21:28:58 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021, 2022
+! Copyright (C) 2020,2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -48,6 +48,7 @@ module TOUZA_Std_fun
   integer,parameter :: lucat = OPT_UNIT_CATEGORIES
 # define __MDL__ 'fun'
 # define __TAG__ STD_FORMAT_MDL(__MDL__)
+#define _ERROR(E) (E - ERR_MASK_STD_FUN)
 !!!_  - static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -118,7 +119,7 @@ contains
           enddo
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_FUN
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
     return
   end subroutine init
@@ -218,7 +219,7 @@ contains
     integer,intent(in)  :: uend
     ierr = 0
     if (jc.lt.kucat_black .or. jc.ge.lucat) then
-       ierr = ERR_INVALID_PARAMETER - ERR_MASK_STD_FUN
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        call msg_mdl('(''invalid unit category = '', I0)', (/ jc /), __MDL__)
        return
     endif
@@ -234,7 +235,7 @@ contains
     integer,intent(in)  :: jc
     ierr = 0
     if (jc.lt.kucat_black .or. jc.ge.lucat) then
-       ierr = ERR_INVALID_PARAMETER - ERR_MASK_STD_FUN
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        call msg_mdl('(''invalid unit category = '', I0)', (/ jc /), __MDL__)
        return
     endif
@@ -354,8 +355,8 @@ contains
     if (un.lt.0) return
 
     do jc = 0, ltry_newu
-       write(fn, tmp_fmt) tmp_id, jc
-       open(UNIT=un, FILE=fn, STATUS='NEW', IOSTAT=jerr)
+       write(fn, tmp_fmt, IOSTAT=jerr) tmp_id, jc
+       if (jerr.eq.0) open(UNIT=un, FILE=fn, STATUS='NEW', IOSTAT=jerr)
        if (jerr.eq.0) then
           close(UNIT=un, IOSTAT=jerr)   ! not delete but keep
           return
@@ -387,6 +388,7 @@ contains
     logical opnd
     integer uli
     character(len=1024) :: tmsg, txt
+    integer jerr
 
     ierr = 0
     lchk = choice(limu, limit)
@@ -396,7 +398,7 @@ contains
     nopn  = 0
     nopnd = 0
     if (ierr.ne.0) then
-       ierr = ERR_ALLOCATION - ERR_MASK_STD_FUN
+       ierr = _ERROR(ERR_ALLOCATION)
     else
        stt(:) = 0
        do jchk = ubgn, lchk
@@ -413,7 +415,7 @@ contains
              endif
           endif
 101       format('file unit check[', I0, '] ', I0, 1x, I0, 1x, A)
-          write(txt, 101) jchk, stt(jchk), ierr, trim(tmsg)
+          write(txt, 101, IOSTAT=jerr) jchk, stt(jchk), ierr, trim(tmsg)
           call msg_mdl(txt, __MDL__, uli)
           if (ierr.ne.0) exit
        enddo
@@ -443,6 +445,10 @@ contains
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: u
     character(len=*),intent(out) :: tmsg
+#if HAVE_FORTRAN_OPEN_IOMSG
+#else
+    integer jerr
+#endif
     ierr = 0
     tmsg = ' '
 #if HAVE_FORTRAN_OPEN_IOMSG
@@ -451,7 +457,7 @@ contains
     open(UNIT=u, STATUS='SCRATCH', IOSTAT=iErr)
     if (ierr.ne.0) then
 101    format('open error for scratch = ', I0)
-       write(tmsg, 101) iErr
+       write(tmsg, 101, IOSTAT=jerr) iErr
     endif
 #endif /* not HAVE_FORTRAN_OPEN_IOMSG */
     return

@@ -1,10 +1,10 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2022/12/05 14:19:30 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/25 22:22:54 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022
+! Copyright (C) 2021, 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -53,6 +53,9 @@ module TOUZA_Trp_float
   use TOUZA_Trp_std,only: KI32, KDBL, KFLT, &
        & control_mode, control_deep, is_first_force, &
        & unit_global,  trace_fine,   trace_control
+#if OPT_USE_IPC_IBITS
+  use TOUZA_Trp_std,only: ipc_IBITS
+#endif
   implicit none
   private
 !!!_  - public parameters (switches)
@@ -1193,14 +1196,14 @@ contains
 !!!_ + user subroutines
 !!!_  & health_check
   subroutine health_check_d &
-       & (ierr, vhld, u, levv)
+       & (ierr, mold, u, levv)
     use TOUZA_Trp_std,only: choice, &
          & msg, is_msglev, is_msglev_detail, &
          & check_real_dnm
     implicit none
     integer,parameter :: KRFLD=KDBL
     integer,         intent(out)         :: ierr
-    real(kind=KRFLD),intent(in)          :: vhld
+    real(kind=KRFLD),intent(in)          :: mold
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv
     integer ixdnm
@@ -1209,21 +1212,21 @@ contains
     ierr = 0
     lv = choice(lev_verbose, levv)
 
-    if (ierr.eq.0) call check_real_dnm(ixdnm, vhld, levv=-99) ! force silent
+    if (ierr.eq.0) call check_real_dnm(ixdnm, mold, levv=-99) ! force silentb
     if (is_msglev_detail(lv)) then
        call msg('(''denormalized = '', I0)', ixdnm, __MDL__, u)
     endif
     return
   end subroutine health_check_d
   subroutine health_check_f &
-       & (ierr, vhld, u, levv)
+       & (ierr, mold, u, levv)
     use TOUZA_Trp_std,only: choice, &
          & msg, is_msglev, is_msglev_detail, &
          & check_real_dnm
     implicit none
     integer,parameter :: KRFLD=KFLT
     integer,         intent(out)         :: ierr
-    real(kind=KRFLD),intent(in)          :: vhld
+    real(kind=KRFLD),intent(in)          :: mold
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv
     integer ixdnm
@@ -1232,7 +1235,7 @@ contains
     ierr = 0
     lv = choice(lev_verbose, levv)
 
-    if (ierr.eq.0) call check_real_dnm(ixdnm, vhld, levv=-99) ! force silent
+    if (ierr.eq.0) call check_real_dnm(ixdnm, mold, levv=-99) ! force silent
     if (is_msglev_detail(lv)) then
        call msg('(''denormalized = '', I0)', ixdnm, __MDL__, u)
     endif
@@ -2181,7 +2184,7 @@ contains
 
     mbits = nbitsh + nbitsl
     maskl = IBSET(0, nbitsl - nbmv) - 1
-    maskh = IBITS(NOT(kzero), 0, nbitsh)
+    maskh = _IBITS(NOT(kzero), 0, nbitsh)
 
     kxufl = kxdnm - mbits
     kxdnh = kxdnm - nbitsh
@@ -2199,18 +2202,18 @@ contains
 
     if (xbits.eq.0) then
        mh_unf  = 0
-       mh_ovf  = IBITS(NOT(kzero), 0, nbitsh+nbmv)
+       mh_ovf  = _IBITS(NOT(kzero), 0, nbitsh+nbmv)
        mh_miss = mh_ovf
        mh_inf  = mh_ovf
        ml_unf  = 0
-       ml_ovf  = IBITS(NOT(kzero), 0, nbitsl-nbmv)
+       ml_ovf  = _IBITS(NOT(kzero), 0, nbitsl-nbmv)
        ml_miss = ml_ovf
        ml_inf  = ml_ovf
     else
-       mh_unf  = IBITS(KX_UNFL, 0, nbitsh)
-       mh_ovf  = IBITS(KX_OVFL, 0, nbitsh)
-       mh_miss = IBITS(KX_MISS, 0, nbitsh)
-       mh_inf  = IBITS(KX_INF,  0, nbitsh)
+       mh_unf  = _IBITS(KX_UNFL, 0, nbitsh)
+       mh_ovf  = _IBITS(KX_OVFL, 0, nbitsh)
+       mh_miss = _IBITS(KX_MISS, 0, nbitsh)
+       mh_inf  = _IBITS(KX_INF,  0, nbitsh)
        ml_unf  = 0
        ml_ovf  = 0
        ml_miss = 0
@@ -2257,7 +2260,7 @@ contains
           iwx(j) = jxdnm
        else
           ! if normalized (hard-coded 1 bit transfer)
-          iwh(j) = IOR(ISHFT(iwh(j), nbmv), IBITS(iwl(j), nbitsl-nbmv, nbmv))
+          iwh(j) = IOR(ISHFT(iwh(j), nbmv), _IBITS(iwl(j), nbitsl-nbmv, nbmv))
           iwl(j) = IBCLR(iwl(j), nbitsl-nbmv)
           iwx(j) = iwx(j) + jxoff
        endif
@@ -2306,7 +2309,7 @@ contains
     mbits = nbitsh + nbitsl
     mask_sign = condop((ksignp.eq.0), IBSET(0, nbitsh), 0)
     maskl = IBSET(0, nbitsl) - 1
-    maskh = IBITS(NOT(kzero), 0, nbitsh)
+    maskh = _IBITS(NOT(kzero), 0, nbitsh)
     maska = IOR(maskh, mask_sign)
 
     kxufl = kxdnm - mbits
@@ -2325,19 +2328,19 @@ contains
 
     if (xbits.eq.0) then
        mh_unf  = 0
-       mh_ovf  = IBITS(NOT(kzero), 0, nbitsh)
+       mh_ovf  = _IBITS(NOT(kzero), 0, nbitsh)
        mh_ovf  = -1
        mh_miss = mh_ovf
        mh_inf  = mh_ovf
        ml_unf  = 0
-       ml_ovf  = IBITS(NOT(kzero), 0, nbitsl)
+       ml_ovf  = _IBITS(NOT(kzero), 0, nbitsl)
        ml_miss = ml_ovf
        ml_inf  = ml_ovf
     else
-       mh_unf  = IBITS(KX_UNFL, 0, nbitsh)
-       mh_ovf  = IBITS(KX_OVFL, 0, nbitsh)
-       mh_miss = IBITS(KX_MISS, 0, nbitsh)
-       mh_inf  = IBITS(KX_INF,  0, nbitsh)
+       mh_unf  = _IBITS(KX_UNFL, 0, nbitsh)
+       mh_ovf  = _IBITS(KX_OVFL, 0, nbitsh)
+       mh_miss = _IBITS(KX_MISS, 0, nbitsh)
+       mh_inf  = _IBITS(KX_INF,  0, nbitsh)
        ml_unf  = 0
        ml_ovf  = 0
        ml_miss = 0
@@ -2428,7 +2431,7 @@ contains
 
     mbits = nbitsh + 0
     mask_sign = condop((ksignp.eq.0), IBSET(0, nbitsh), 0)
-    maskh = IBITS(NOT(kzero), 0, nbitsh)
+    maskh = _IBITS(NOT(kzero), 0, nbitsh)
     maska = IOR(maskh, mask_sign)
 
     kxufl = kxdnm - mbits
@@ -2447,15 +2450,15 @@ contains
 
     if (xbits.eq.0) then
        mh_unf  = 0
-       mh_ovf  = IBITS(NOT(kzero), 0, nbitsh)
+       mh_ovf  = _IBITS(NOT(kzero), 0, nbitsh)
        mh_ovf  = -1
        mh_miss = mh_ovf
        mh_inf  = mh_ovf
     else
-       mh_unf  = IBITS(KX_UNFL, 0, nbitsh)
-       mh_ovf  = IBITS(KX_OVFL, 0, nbitsh)
-       mh_miss = IBITS(KX_MISS, 0, nbitsh)
-       mh_inf  = IBITS(KX_INF,  0, nbitsh)
+       mh_unf  = _IBITS(KX_UNFL, 0, nbitsh)
+       mh_ovf  = _IBITS(KX_OVFL, 0, nbitsh)
+       mh_miss = _IBITS(KX_MISS, 0, nbitsh)
+       mh_inf  = _IBITS(KX_INF,  0, nbitsh)
     endif
 
     do j = 0, mem - 1
@@ -2812,9 +2815,9 @@ contains
        vmsk = _SET_EXPONENT(one, nbitsh + ixone)
        if (ksign.eq.0) then
           iwork(0:ncnz-1) = IOR(ISHFT(IBITS(iwork(0:ncnz-1), ebitsh, 1), nbitsh), &
-               &               IOR(IBITS(IBITS(iwork(0:ncnz-1), 0, ebitsh) + moffsh, 0, nbitsh), mmskh))
+               &               IOR(_IBITS(_IBITS(iwork(0:ncnz-1), 0, ebitsh) + moffsh, 0, nbitsh), mmskh))
           vdst(0:ncnz-1) = &
-               & _SET_EXPONENT(vmsk + real(ibits(iwork(0:ncnz-1), 0, nbitsh), kind=KRFLD), &
+               & _SET_EXPONENT(vmsk + real(_IBITS(iwork(0:ncnz-1), 0, nbitsh), kind=KRFLD), &
                &              mbits + ixone)
           vsign = - one
           if (_PREFER_DOIF) then
@@ -2854,7 +2857,7 @@ contains
                &               mbits + ixone)
           vdst(0:ncnz-1) = sign(vdst(0:ncnz-1), vsign)
        else
-          iwork(0:ncnz-1) = IOR(IBITS(iwork(0:ncnz-1) + moffsh, 0, nbitsh), mmskh)
+          iwork(0:ncnz-1) = IOR(_IBITS(iwork(0:ncnz-1) + moffsh, 0, nbitsh), mmskh)
           vsign = real(ksign, kind=KRFLD)
           vdst(0:ncnz-1) = &
                & _SET_EXPONENT(vmsk + real(iwork(0:ncnz-1), kind=KRFLD), &
@@ -2868,7 +2871,7 @@ contains
           kpackl = suggest_filling(ebitsl, ncnz, kcode, kpackl)
           call pack_restore &
                & (ierr, iwork, ibagaz(jbbgn:jbend-1), ncnz, ebitsl, kpackl)
-          iwork(0:ncnz-1) = IOR(IBITS(iwork(0:ncnz-1) + moffsl, 0, nbitsl), mmskl)
+          iwork(0:ncnz-1) = IOR(_IBITS(iwork(0:ncnz-1) + moffsl, 0, nbitsl), mmskl)
           vdst(0:ncnz-1) = sign(abs(vdst(0:ncnz-1)) + real(iwork(0:ncnz-1), kind=KRFLD), &
                &               vdst(0:ncnz-1))
        endif
@@ -3084,9 +3087,9 @@ contains
        vmsk = _SET_EXPONENT(one, nbitsh + ixone)
        if (ksign.eq.0) then
           iwork(0:ncnz-1) = IOR(ISHFT(IBITS(iwork(0:ncnz-1), ebitsh, 1), nbitsh), &
-               &               IOR(IBITS(IBITS(iwork(0:ncnz-1), 0, ebitsh) + moffsh, 0, nbitsh), mmskh))
+               &               IOR(_IBITS(_IBITS(iwork(0:ncnz-1), 0, ebitsh) + moffsh, 0, nbitsh), mmskh))
           vdst(0:ncnz-1) = &
-               & _SET_EXPONENT(vmsk + real(ibits(iwork(0:ncnz-1), 0, nbitsh), kind=KRFLD), &
+               & _SET_EXPONENT(vmsk + real(_IBITS(iwork(0:ncnz-1), 0, nbitsh), kind=KRFLD), &
                &              mbits + ixone)
           vsign = - one
           if (_PREFER_DOIF) then
@@ -3126,7 +3129,7 @@ contains
                &               mbits + ixone)
           vdst(0:ncnz-1) = sign(vdst(0:ncnz-1), vsign)
        else
-          iwork(0:ncnz-1) = IOR(IBITS(iwork(0:ncnz-1) + moffsh, 0, nbitsh), mmskh)
+          iwork(0:ncnz-1) = IOR(_IBITS(iwork(0:ncnz-1) + moffsh, 0, nbitsh), mmskh)
           vsign = real(ksign, kind=KRFLD)
           vdst(0:ncnz-1) = &
                & _SET_EXPONENT(vmsk + real(iwork(0:ncnz-1), kind=KRFLD), &
@@ -3140,7 +3143,7 @@ contains
           kpackl = suggest_filling(ebitsl, ncnz, kcode, kpackl)
           call pack_restore &
                & (ierr, iwork, ibagaz(jbbgn:jbend-1), ncnz, ebitsl, kpackl)
-          iwork(0:ncnz-1) = IOR(IBITS(iwork(0:ncnz-1) + moffsl, 0, nbitsl), mmskl)
+          iwork(0:ncnz-1) = IOR(_IBITS(iwork(0:ncnz-1) + moffsl, 0, nbitsl), mmskl)
           vdst(0:ncnz-1) = sign(abs(vdst(0:ncnz-1)) + real(iwork(0:ncnz-1), kind=KRFLD), &
                &               vdst(0:ncnz-1))
        endif
@@ -3439,26 +3442,26 @@ contains
   end function xuint_f
 
 !!!_  & xureal - unsigned integer conversion emulation
-  ELEMENTAL real(kind=KDBL) function xureal_d(n, v) result(r)
+  ELEMENTAL real(kind=KDBL) function xureal_d(n, mold) result(r)
     implicit none
     integer,parameter :: KRTGT=KDBL
     integer,         intent(in) :: n
-    real(kind=KRTGT),intent(in) :: v
+    real(kind=KRTGT),intent(in) :: mold
     real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
     real(kind=KRTGT),parameter  :: d = o * 2.0_KRTGT
 
-    r = mod(real(n, kind=KIND(v)) + d, d)
+    r = mod(real(n, kind=KIND(mold)) + d, d)
     return
   end function xureal_d
-  ELEMENTAL real(kind=KFLT) function xureal_f(n, v) result(r)
+  ELEMENTAL real(kind=KFLT) function xureal_f(n, mold) result(r)
     implicit none
     integer,parameter :: KRTGT=KFLT
     integer,         intent(in) :: n
-    real(kind=KRTGT),intent(in) :: v
+    real(kind=KRTGT),intent(in) :: mold
     real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
     real(kind=KRTGT),parameter  :: d = o * 2.0_KRTGT
 
-    r = mod(real(n, kind=KIND(v)) + d, d)
+    r = mod(real(n, kind=KIND(mold)) + d, d)
     return
   end function xureal_f
 
@@ -3523,7 +3526,7 @@ contains
     endif
     ! why not work for maximum bits?
     if (nh.lt.BIT_SIZE(0_KIBGZ)) then
-       jh = IBITS(IOR(jh, mh), 0, nh)
+       jh = _IBITS(IOR(jh, mh), 0, nh)
     endif
     mbits  = nh + nl
     vmsk = _SET_EXPONENT(one, nh + ixone)
@@ -3531,7 +3534,7 @@ contains
 
     if (nl.gt.0) then
        jl = 0 + kl
-       jl = IBITS(IOR(jl, ml), 0, nl)
+       jl = _IBITS(IOR(jl, ml), 0, nl)
        v  = v + real(jl, kind=KRTGT)
     endif
     return
@@ -3560,7 +3563,7 @@ contains
     endif
     ! why not work for maximum bits?
     if (nh.lt.BIT_SIZE(0_KIBGZ)) then
-       jh = IBITS(IOR(jh, mh), 0, nh)
+       jh = _IBITS(IOR(jh, mh), 0, nh)
     endif
     mbits  = nh + nl
     vmsk = _SET_EXPONENT(one, nh + ixone)
@@ -3568,7 +3571,7 @@ contains
 
     if (nl.gt.0) then
        jl = 0 + kl
-       jl = IBITS(IOR(jl, ml), 0, nl)
+       jl = _IBITS(IOR(jl, ml), 0, nl)
        v  = v + real(jl, kind=KRTGT)
     endif
     return
@@ -4421,7 +4424,7 @@ program test_trapiche_float
   integer ierr
   integer,         parameter :: KRFLD = KDBL
   real(kind=KRFLD),parameter :: vone = 1.0_KRFLD ! placeholder
-  real(kind=KRFLD),parameter :: vhld = vone
+  real(kind=KRFLD),parameter :: mold = vone
 
   integer :: lbgz, lcnz, lwrk
   real(kind=KRFLD),POINTER :: vsrc(:)
@@ -4451,7 +4454,7 @@ program test_trapiche_float
   call init(ierr, levv=-1)
   ! write(*, 101) 'init', ierr
   if (ierr.eq.0) call diag(ierr)
-  if (ierr.eq.0) call diag_real_props(ierr, vhld)
+  if (ierr.eq.0) call diag_real_props(ierr, mold)
   ! write(*, 101) 'diag', ierr
 
   if (ierr.eq.0) call test_helper(ierr, 300.0_KRFLD, 1.0_KRFLD)

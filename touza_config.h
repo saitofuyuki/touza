@@ -121,6 +121,15 @@
 /* whether module iso_c_binding works */
 #define HAVE_FORTRAN_ISO_C_BINDING 1
 
+/* whether module iso_c_binding works with C_DOUBLE */
+#define HAVE_FORTRAN_ISO_C_BINDING_C_DOUBLE 1
+
+/* whether module iso_c_binding works with C_FLOAT */
+#define HAVE_FORTRAN_ISO_C_BINDING_C_FLOAT 1
+
+/* whether module iso_c_binding works with C_INT16_T */
+#define HAVE_FORTRAN_ISO_C_BINDING_C_INT16_T 1
+
 /* whether module iso_c_binding works with C_INT32_T */
 #define HAVE_FORTRAN_ISO_C_BINDING_C_INT32_T 1
 
@@ -130,8 +139,26 @@
 /* whether module iso_c_binding works with C_INT8_T */
 #define HAVE_FORTRAN_ISO_C_BINDING_C_INT8_T 1
 
+/* whether module iso_c_binding works with C_LONG_DOUBLE */
+#define HAVE_FORTRAN_ISO_C_BINDING_C_LONG_DOUBLE 1
+
+/* whether module iso_c_binding works with C_SIZE_T */
+#define HAVE_FORTRAN_ISO_C_BINDING_C_SIZE_T 1
+
 /* whether module iso_fortran_env works */
 #define HAVE_FORTRAN_ISO_FORTRAN_ENV 1
+
+/* whether module iso_fortran_env works with CHARACTER_KINDS */
+#define HAVE_FORTRAN_ISO_FORTRAN_ENV_CHARACTER_KINDS 1
+
+/* whether module iso_fortran_env works with CHARACTER_STORAGE_SIZE */
+#define HAVE_FORTRAN_ISO_FORTRAN_ENV_CHARACTER_STORAGE_SIZE 1
+
+/* whether module iso_fortran_env works with FILE_STORAGE_SIZE */
+#define HAVE_FORTRAN_ISO_FORTRAN_ENV_FILE_STORAGE_SIZE 1
+
+/* whether module iso_fortran_env works with INT16 */
+#define HAVE_FORTRAN_ISO_FORTRAN_ENV_INT16 1
 
 /* whether module iso_fortran_env works with INT32 */
 #define HAVE_FORTRAN_ISO_FORTRAN_ENV_INT32 1
@@ -147,6 +174,12 @@
 
 /* whether module iso_fortran_env works with IOSTAT_END */
 #define HAVE_FORTRAN_ISO_FORTRAN_ENV_IOSTAT_END 1
+
+/* whether module iso_fortran_env works with NUMERIC_STORAGE_SIZE */
+#define HAVE_FORTRAN_ISO_FORTRAN_ENV_NUMERIC_STORAGE_SIZE 1
+
+/* whether module iso_fortran_env works with REAL128 */
+#define HAVE_FORTRAN_ISO_FORTRAN_ENV_REAL128 1
 
 /* whether module iso_fortran_env works with REAL32 */
 #define HAVE_FORTRAN_ISO_FORTRAN_ENV_REAL32 1
@@ -189,6 +222,9 @@
 
 /* Defined if you have NETCDF4 support */
 /* #undef HAVE_NETCDF4 */
+
+/* preprocessor comment */
+#define HAVE_PP_COMMENT_KEPT 1
 
 /* preprocessor concatenation type */
 #define HAVE_PP_CONCAT 2
@@ -248,7 +284,7 @@
 #define PACKAGE_NAME "touza"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "touza 1.08.0"
+#define PACKAGE_STRING "touza 1.09.0"
 
 /* package name */
 #define PACKAGE_TAG 'TOUZA'
@@ -260,7 +296,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.08.0"
+#define PACKAGE_VERSION "1.09.0"
 
 /* Define to 1 if all of the C90 standard headers exist (not just the ones
    required in a freestanding environment). This macro is provided for
@@ -268,4 +304,4 @@
 #define STDC_HEADERS 1
 
 /* Version number of package */
-#define VERSION "1.08.0"
+#define VERSION "1.09.0"

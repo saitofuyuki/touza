@@ -42,6 +42,9 @@
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 
+/* build with TOUZA/Nio/nctcdf */
+#undef OPT_WITH_NCTCDF
+
 /* Name of package */
 #undef PACKAGE
 

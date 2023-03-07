@@ -707,6 +707,121 @@ AC_DEFUN([AX_REQUIRE_DEFINED], [dnl
   m4_ifndef([$1], [m4_fatal([macro ]$1[ is not defined; is a m4 file missing?])])
 ])dnl AX_REQUIRE_DEFINED
 
+# ===========================================================================
+#       https://www.gnu.org/software/autoconf-archive/ax_var_push.html
+# ===========================================================================
+#
+# SYNOPSIS
+#
+#   AX_VAR_PUSHVALUE(VARIABLE, [VALUE])
+#
+# DESCRIPTION
+#
+#   Stores a copy of variable_name's value and assigns it to 'value' If no
+#   value is given, its original value is kept. Compile, link and running
+#   tests usually require the programmer to provide additional flags.
+#   However, it is strongly recommended not to override flags defined by the
+#   user through the configure command. AX_VAR_PUSHVALUE and AX_VAR_POPVALUE
+#   are clean way to temporarily store a variable's value and restore it
+#   later, using a stack-like behaviour. This macro supports nesting.
+#
+#   Example:
+#
+#     AX_VAR_PUSHVALUE([CXXFLAGS],["my test flags"])
+#     perform some checks with CXXFLAGS...
+#     CXXFLAGS value will be "my test flags"
+#     AX_VAR_POPVALUE([CXXFLAGS])
+#     CXXFLAGS is restored to its original value
+#
+# LICENSE
+#
+#   Copyright (c) 2015 Jorge Bellon <jbelloncastro@gmail.com>
+#
+#   This program is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU General Public License as published by the
+#   Free Software Foundation, either version 3 of the License, or (at your
+#   option) any later version.
+#
+#   This program is distributed in the hope that it will be useful, but
+#   WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+#   Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License along
+#   with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+#   As a special exception, the respective Autoconf Macro's copyright owner
+#   gives unlimited permission to copy, distribute and modify the configure
+#   scripts that are the output of Autoconf when processing the Macro. You
+#   need not follow the terms of the GNU General Public License when using
+#   or distributing such scripts, even though portions of the text of the
+#   Macro appear in them. The GNU General Public License (GPL) does govern
+#   all other use of the material that constitutes the Autoconf Macro.
+#
+#   This special exception to the GPL applies to versions of the Autoconf
+#   Macro released by the Autoconf Archive. When you make and distribute a
+#   modified version of the Autoconf Macro, you may extend this special
+#   exception to the GPL to apply to your modified version as well.
+
+#serial 3
+
+AC_DEFUN([AX_VAR_PUSHVALUE],[
+  increment([$1_counter])
+
+  AS_VAR_PUSHDEF([variable],[$1]) dnl
+  AS_VAR_PUSHDEF([backup],[save_$1_]$1_counter) dnl
+
+  AS_VAR_SET(backup,$variable) dnl
+  AS_VAR_SET(variable,["]m4_default($2,$variable)["]) dnl
+
+  AS_VAR_POPDEF([variable]) dnl
+  AS_VAR_POPDEF([backup]) dnl
+])dnl AX_PUSH_VAR
+
+AC_DEFUN([AX_VAR_POPVALUE],[
+  AS_VAR_PUSHDEF([variable],[$1]) dnl
+  AS_VAR_PUSHDEF([backup],[save_$1_]$1_counter) dnl
+
+  AS_VAR_SET(variable,$backup) dnl
+
+  decrement([$1_counter])
+  AS_VAR_POPDEF([variable]) dnl
+  AS_VAR_POPDEF([backup]) dnl
+])dnl AX_POP_VAR
+
+# -------------------------
+# Auxiliary macro
+# -------------------------
+# increment(counter_name)
+#
+# Increment the value of a named counter.
+# Initialize to 1 if not defined
+# -------------------------
+m4_define([increment],[dnl
+  m4_ifdef([$1],dnl
+    [m4_define([$1],m4_incr($1))],dnl
+    [m4_define([$1],[1])]dnl
+  )dnl
+])dnl
+
+# -------------------------
+# Auxiliary macro
+# -------------------------
+# decrement(counter_name)
+#
+# Decrement the value of a named counter.
+# Throws an error if counter not defined
+# or value reaches zero.
+# -------------------------
+m4_define([decrement],[dnl
+ m4_ifdef([$1],dnl
+   [m4_if(m4_eval($1 > 0),
+     [1],m4_define([$1],m4_decr($1)),dnl
+     [m4_fatal([Missing call to AX_VAR_PUSHVALUE with var $1])]dnl
+   )],dnl
+   [m4_fatal([Missing call to AX_VAR_PUSHVALUE with var $1])])dnl
+])dnl
+
 # pkg.m4 - Macros to locate and use pkg-config.   -*- Autoconf -*-
 # serial 12 (pkg-config-0.29.2)
 
@@ -11725,7 +11840,7 @@ m4_ifndef([_LT_PROG_CXX],		[AC_DEFUN([_LT_PROG_CXX])])
 dnl Filename:  touza/m4c/mt_fortran_check.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 3 2020
-dnl Time-stamp: <2022/12/08 08:21:24 fuyuki mt_fortran_check.m4>
+dnl Time-stamp: <2023/01/31 09:04:01 fuyuki mt_fortran_check.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -11813,14 +11928,16 @@ AS_IF([test "x$[]$2" = xyes],
 # Check whether FUNCTION can be used.
 AC_DEFUN([MT_FORTRAN_CHECK_FUNCTION],
 [MT_FORTRAN_CHECK_DEFINE([$1],
-      [write(*,*) $1($2)], [$3], [$4])])# MT_FORTRAN_CHECK_FUNCTION
+      [
+       write(*,*) $1($2)], [$3], [$4])])# MT_FORTRAN_CHECK_FUNCTION
 
 # MT_FORTRAN_CHECK_SUBROUTINE(SUBROUTINE, [ARGUMENTS], [PROLOGUE], [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # -----------------------------------------------------------------------------------------
 # Check whether SUBROUTINE can be used.
 AC_DEFUN([MT_FORTRAN_CHECK_SUBROUTINE],
 [MT_FORTRAN_CHECK_DEFINE([$1],
-      [$3
+      [
+       $3
        call $1($2)], [$4], [$5])])# MT_FORTRAN_CHECK_SUBROUTINE
 
 # MT_FORTRAN_CHECK_MODULE(MODULE, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
@@ -11828,14 +11945,16 @@ AC_DEFUN([MT_FORTRAN_CHECK_SUBROUTINE],
 # Check whether MODULE can be used.
 AC_DEFUN([MT_FORTRAN_CHECK_MODULE],
 [MT_FORTRAN_CHECK_DEFINE([$1],
-      [use $1], [$2], [$3])])# MT_FORTRAN_CHECK_MODULE
+      [
+       use $1], [$2], [$3])])# MT_FORTRAN_CHECK_MODULE
 
 # MT_FORTRAN_CHECK_MODULE_MEMBER(MODULE, MEMBER, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # -----------------------------------------------------------------------------------
 # Check whether MODULE contains MEMBER.
 AC_DEFUN([MT_FORTRAN_CHECK_MODULE_MEMBER],
 [MT_FORTRAN_CHECK_DEFINE([$1_$2],
-     [use $1,only: $2], [$3], [$4])])# MT_FORTRAN_CHECK_MODULE_MEMBER
+      [
+       use $1,only: $2], [$3], [$4])])# MT_FORTRAN_CHECK_MODULE_MEMBER
 
 # MT_FORTRAN_CHECK_STATEMENT_SPEC(STATEMENT, SPEC, CODE, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # -----------------------------------------------------------------------------------------------
@@ -11886,6 +12005,33 @@ dnl @%:@elif $1 == 2
 dnl @%:@define _CONCAT(A,B) A/**/B
 dnl @%:@endif])
 ])# MT_FORTRAN_PP_CONCAT
+
+# ======================================================================
+# MT_FORTRAN_PP_COMMENT(MACRO, [DIALECT, [CACHE]])
+# ------------------------------------
+# Check whether comment character ! is left as it is after preprocessing.
+# Result set as MACRO, where 1 if left, 0 if removed.
+AC_DEFUN([MT_FORTRAN_PP_COMMENT],
+[_$0([$1],
+     m4_default([$2], [Fortran]),
+     [m4_default([$3], [mt_cv_fortran_pp_comment])])])
+
+AC_DEFUN([_MT_FORTRAN_PP_COMMENT],
+[AC_LANG_PUSH([$2])dnl
+AC_CACHE_CHECK([preprocessor comment treatment],
+[$3],
+[# check comment
+AS_VAR_SET([$3], 0)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],
+[@%:@define IGNORE !
+         IGNORE do 100
+])],
+[AS_VAR_SET([$3], 1)],
+[AS_VAR_SET([$3], 0)])])
+AS_IF([test x"$[]$3" != x],
+      [AC_DEFINE_UNQUOTED([$1], [$[]$3],
+                          [preprocessor comment])])
+AC_LANG_POP([$2])])# _MT_FORTRAN_PP_COMMENT
 
 # ======================================================================
 

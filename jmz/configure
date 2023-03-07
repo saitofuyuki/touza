@@ -685,6 +685,8 @@ PYTHON_PREFIX
 PYTHON_PLATFORM
 PYTHON_VERSION
 PYTHON
+with_nctcdf_FALSE
+with_nctcdf_TRUE
 PACKAGE_REQUIRES
 TOUZA_top_builddir
 TOUZA_LDFLAGS
@@ -847,6 +849,7 @@ with_aix_soname
 with_gnu_ld
 with_sysroot
 enable_libtool_lock
+enable_nctcdf
 with_python_sys_prefix
 with_python_prefix
 with_python_exec_prefix
@@ -1516,6 +1519,7 @@ Optional Features:
   --enable-fast-install[=PKGS]
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
+  --enable-nctcdf         enable nio/n*c*tcdf features[default=no]
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -4493,6 +4497,7 @@ then :
 else $as_nop
   cat > conftest.$ac_ext <<_ACEOF
       program main
+
 
        call exit(1)
       end
@@ -21143,6 +21148,103 @@ printf "%s\n" "#define TOUZA_NAME '${TOUZA_NAME}'" >>confdefs.h
 printf "%s\n" "#define TOUZA_VERSION '${TOUZA_VERSION}'" >>confdefs.h
 
 
+# Check whether --enable-nctcdf was given.
+if test ${enable_nctcdf+y}
+then :
+  enableval=$enable_nctcdf; use_nctcdf=$enableval
+else $as_nop
+  use_nctcdf=no
+fi
+
+if test x"$use_nctcdf" = xforce
+then :
+  use_nctcdf=yes
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: nctcdf force enabled (expected if built-in)" >&5
+printf "%s\n" "$as_me: WARNING: nctcdf force enabled (expected if built-in)" >&2;}
+elif test x"$use_nctcdf" != xno
+then :
+  ac_ext=${ac_fc_srcext-f}
+ac_compile='$FC -c $FCFLAGS $ac_fcflags_srcext conftest.$ac_ext >&5'
+ac_link='$FC -o conftest$ac_exeext $FCFLAGS $LDFLAGS $ac_fcflags_srcext conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_fc_compiler_gnu
+
+
+
+
+
+  save_LIBS_1=$LIBS   LIBS="$LIBS $TOUZA_LIBS"
+
+
+
+
+
+  save_LDFLAGS_1=$LDFLAGS   LDFLAGS="$LDFLAGS $TOUZA_LDFLAGS"
+
+
+
+
+
+  save_FCFLAGS_1=$FCFLAGS   FCFLAGS="$FCFLAGS $TOUZA_FCFLAGS $TOUZA_CFLAGS"
+
+cat > conftest.$ac_ext <<_ACEOF
+
+program actest
+  use TOUZA_Nio,only: nct_open_write
+end program actest
+
+_ACEOF
+if ac_fn_fc_try_link "$LINENO"
+then :
+  use_nctcdf=yes
+else $as_nop
+  use_nctcdf=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+
+
+  LIBS=$save_LIBS_1
+
+
+
+
+  LDFLAGS=$save_LDFLAGS_1
+
+
+
+
+  FCFLAGS=$save_FCFLAGS_1
+
+
+ac_ext=c
+ac_cpp='$CPP $CPPFLAGS'
+ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_c_compiler_gnu
+
+if test x"$use_nctcdf" = xno
+then :
+  as_fn_error $? "nctcdf disabled." "$LINENO" 5
+fi
+use_nctcdf=yes
+fi
+
+ if test x"$use_nctcdf" = xyes; then
+  with_nctcdf_TRUE=
+  with_nctcdf_FALSE='#'
+else
+  with_nctcdf_TRUE='#'
+  with_nctcdf_FALSE=
+fi
+
+if test x"$use_nctcdf" = xyes
+then :
+
+printf "%s\n" "#define OPT_WITH_NCTCDF 1" >>confdefs.h
+
+fi
+
+
 
 
 
@@ -21964,6 +22066,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${am__fastdepCC_TRUE}" && test -z "${am__fastdepCC_FALSE}"; then
   as_fn_error $? "conditional \"am__fastdepCC\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${with_nctcdf_TRUE}" && test -z "${with_nctcdf_FALSE}"; then
+  as_fn_error $? "conditional \"with_nctcdf\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${HAVE_PYTHON_TRUE}" && test -z "${HAVE_PYTHON_FALSE}"; then

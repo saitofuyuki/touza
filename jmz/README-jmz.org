@@ -15,7 +15,7 @@ FORTRAN procedures mainly adopted in MIROC.  See *TOUZA* README
 *TOUZA* collection.
 * Build and installation
 * Brief description of *TOUZA/Jmz* commands
-** chak - Swiss(CH) Army Knife for gtool-3.5 format files
+** chak - CH(Swiss) Army Knife for gtool-3.5 format files
 *** introduction
 chak is a Reverse Polish Notation (RPN) calculator for gtool-3.5
 format data files.
@@ -28,57 +28,61 @@ on this alpha version, it can emulate some of the original commands
 partially.
 
 Unary operator filters:
-- gtabs --- absolute value of data
-- gtatan --- arctangent value of data
-- gtcos --- cosine of data
-- gtexp --- exponent of data
-- gtinv --- inverse of data
-- gtlog --- logarithm of data
-- gtlog10 --- base-10 logarithm of data
-- gtsin --- sine of data
-- gtsqr --- square of data
-- gtsqrt --- square root of data
-- gttan --- tangent of data
-- gttanh --- hyperbolic tangent of data
+- =gtabs= --- absolute value of data
+- =gtatan= --- arctangent value of data
+- =gtcos= --- cosine of data
+- =gtexp= --- exponent of data
+- =gtinv= --- inverse of data
+- =gtlog= --- logarithm of data
+- =gtlog10= --- base-10 logarithm of data
+- =gtsin= --- sine of data
+- =gtsqr= --- square of data
+- =gtsqrt= --- square root of data
+- =gttan= --- tangent of data
+- =gttanh= --- hyperbolic tangent of data
 
 Binary operator filters:
-- gtadd --- addition of two files
-- gtsub --- subtraction of two files
-- gtmlt --- multiplication of two files
-- gtdiv --- division of two files
-- gtpow --- power (exponent)
-- gtmod --- remainder
+- =gtadd= --- addition of two files
+- =gtsub= --- subtraction of two files
+- =gtmlt= --- multiplication of two files
+- =gtdiv= --- division of two files
+- =gtpow= --- power (exponent)
+- =gtmod= --- remainder
 
 Other general filters:
-- gtext --- spreading
-- gtmask --- masking of missing value
-- gtset --- several tweaking of data file
+- =gtext= --- spreading
+- =gtmask= --- masking of missing value
+- =gtset= --- several tweaking of data file
+
+Format conversion utilities:
+- =gtrdir= --- conversion from plain binary file to gtool-3.5 format file
+- =gtwdir= --- conversion from gtool-3.5 format file to plain binary file
 
 The following are not implemented but reserved for future extensions:
-- gtshift --- spatial shift of data
-- gtintrp --- spatial interpolation (i)
-- gtintrp2 --- spatial interpolation (ii)
-- gtimis --- spatial interpolation on missing values
+- =gtshift= --- spatial shift of data
+- =gtintrp= --- spatial interpolation (i)
+- =gtintrp2= --- spatial interpolation (ii)
+- =gtimis= --- spatial interpolation on missing values
 
 The following are out of the scope of chak development, because ngt
 series do much better job:
 
-- gtsel --- extraction of subregion
-- gtavr --- averaging
-- gthead --- edit header (metadata)
+- =gtsel= --- extraction of subregion
+- =gtavr= --- averaging
+- =gthead= --- edit header (metadata)
 
 Other general filters (gtseq, gtedy, etc) are under consideration.
 
 Following Some special filters are reserved for next developments:
 
-- gts2p --- sigma to p transformation
-- gtz2p --- z to p transformation
-- gthdiv --- divergence computation on spherical domain
-- gthvor --- vorticity computation on spherical domain
-- gtxdf --- flux differential along longitude
-- gtxdv --- differential along longitude
-- gtydf --- flux differential along latitude
-- gtydv --- differential along latitude
+- =gts2p= --- sigma to p transformation
+- =gtz2p= --- z to p transformation
+- =gthdiv= --- divergence computation on spherical domain
+- =gthvor= --- vorticity computation on spherical domain
+- =gtxdf= --- flux differential along longitude
+- =gtxdv= --- differential along longitude
+- =gtydf= --- flux differential along latitude
+- =gtydv= --- differential along latitude
 
 *** usage
 : chak [<option>]... [<operand>|<operator>|<option>]... [{=|:=} <output>] ....
@@ -443,6 +447,9 @@ If there are no input/output file before the options, '-N' set strict
 output file, the both options work identically, to set strict =chak=
 mode on the file.
 
+**** Record format flag
+- =-X[<flags>]=, =+X[<flags>]= :: set record format options.
+
 **** Compromise domain policy
 - =-i= :: Inclusive domain mode for operation (default)
 - =-x= :: Intersect domain mode for operation
@@ -517,6 +524,7 @@ can be set, which enable multiple record contents in the file.
 
 *** output-file formats
 **** gtool-3.5 format (default)
+**** simple netCDF (in preparation)
 **** ascii output
 : chak ... = <file> FMT=a[<format>]
 
@@ -538,9 +546,14 @@ completely different between =chak= and GMT implementation.
 
 **** operators on stacks
 | operator   | pop |   push | description                                                      |
+|------------+-----+--------+------------------------------------------------------------------|
 | ABS        |   1 |      1 | abs(A)                                                           |
+| ACOS       |   1 |      1 | arccos(A)                                                        |
 | ADD        |   2 |      1 | A+B                                                              |
 | AND        |   2 |      1 | logical and; B if both A and B are defined, else MISS            |
+| ASIN       |   1 |      1 | arcsin(A)                                                        |
+| ATAN2      |   2 |      1 | arctan(A/B)                                                      |
+| BDIFF      |   2 |      1 | backward difference                                              |
 | BIN        |   1 |      1 | binary; 1 if defined, else 0                                     |
 | BITAND     |   2 |      1 | bitwise AND                                                      |
 | BITNOT     |   1 |      1 | bitwise NOT                                                      |
@@ -551,9 +564,13 @@ completely different between =chak= and GMT implementation.
 | C1         |   0 |      1 | put top stack coordinate[1] index                                |
 | C2         |   0 |      1 | put top stack coordinate[2] index                                |
 | C3         |   0 |      1 | put top stack coordinate[3] index                                |
+| CDIFF      |   2 |      1 | central difference                                               |
 | CEIL       |   1 |      1 | smallest integer >=A                                             |
 | CLONE      |   1 |      1 | copy top stack on new buffer and discard the original            |
 | COPY       |   1 |      2 | copy top stack on new buffer                                     |
+| COS        |   1 |      1 | cos(A)                                                           |
+| COSH       |   1 |      1 | cosh(A)                                                          |
+| D2R        |   1 |      1 | Convert degree to radian                                         |
 | DIST       |   m | 2(m-1) | distribute top stack for every stack from last anchor            |
 | DIV        |   2 |      1 | A/B                                                              |
 | DUP        |   1 |      2 | duplicate top stack                                              |
@@ -561,14 +578,20 @@ completely different between =chak= and GMT implementation.
 | EQB        |   2 |      1 | 1 if A==B, else 0                                                |
 | EQF        |   2 |      1 | A if A==B, else MISS                                             |
 | EXCH       |   2 |      2 | B A; exchange two top stacks                                     |
+| EXP        |   1 |      1 | exp(A)                                                           |
+| EXPONENT   |   1 |      1 | exponent(A)                                                      |
+| EXTR       |   2 |      1 | extraction                                                       |
+| FDIFF      |   2 |      1 | forward difference                                               |
 | FLOOR      |   1 |      1 | largest integer <= A                                             |
 | FLUSH      |   m |      0 | flush-out from last anchor                                       |
+| FRACTION   |   1 |      1 | fraction(A)                                                      |
 | GE GEU     |   2 |      1 | 1, 0, MISS for A>=B, not, either MISS                            |
 | GEB        |   2 |      1 | 1 if A>=B, else 0                                                |
 | GEF        |   2 |      1 | A if A>=B, else MISS                                             |
 | GT GTU     |   2 |      1 | 1, 0, MISS for A>B, not, either MISS                             |
 | GTB        |   2 |      1 | 1 if A>B, else 0                                                 |
 | GTF        |   2 |      1 | A if A>B, else MISS                                              |
+| HYPOT      |   2 |      1 | sqrt(A * A + B * B)                                              |
 | IDIV       |   2 |      1 | A//B                                                             |
 | INSERT     |   m |      m | move top stack after last anchor                                 |
 | INT        |   1 |      1 | truncate toward 0 and convert                                    |
@@ -583,6 +606,8 @@ completely different between =chak= and GMT implementation.
 | LMAX       |   2 |      1 | lazy MAX                                                         |
 | LMIN       |   2 |      1 | lazy MIN                                                         |
 | LMUL       |   2 |      1 | lazy MUL                                                         |
+| LOG        |   1 |      1 | log(A)                                                           |
+| LOG10      |   1 |      1 | log10(A)                                                         |
 | LSHIFT     |   2 |      1 | bitwise left shift                                               |
 | LSUB       |   2 |      1 | lazy SUB                                                         |
 | LT LTU     |   2 |      1 | 1, 0, MISS for A<B, not, either MISS                             |
@@ -602,13 +627,20 @@ completely different between =chak= and GMT implementation.
 | OR LOR     |   2 |      1 | logical or; A if defined, else B if defined, else MISS           |
 | POP[=NAME] |   1 |      0 | discard top stack and optionally tag                             |
 | POW        |   2 |      1 | pow(A,B)                                                         |
+| R2D        |   1 |      1 | Convert radian to degree                                         |
 | REPEAT     |   m |     2m | repeat from last non-adjacent anchor                             |
 | ROR        |   2 |      1 | logical or (reverse); B if defined, else A if defined, else MISS |
 | ROUND      |   1 |      1 | nearest integer of A                                             |
 | RSHIFT     |   2 |      1 | bitwise right shift                                              |
+| SCALE      |   2 |      1 | scale(A,B)                                                       |
 | SIGN       |   1 |      1 | copy A sign on 1                                                 |
+| SIN        |   1 |      1 | sin(A)                                                           |
+| SINH       |   1 |      1 | sinh(A)                                                          |
 | SQR        |   1 |      1 | A*A                                                              |
+| SQRT       |   1 |      1 | square root                                                      |
 | SUB        |   2 |      1 | A-B                                                              |
+| TAN        |   1 |      1 | tan(A)                                                           |
+| TANH       |   1 |      1 | tanh(A)                                                          |
 | TRUNC      |   1 |      1 | truncate toward 0                                                |
 | X          |   0 |      1 | put top stack coordinate[0] index                                |
 | XOR        |   2 |      1 | logical exclusive-or; A or B if B or A undefined, else MISS      |
@@ -630,28 +662,32 @@ completely different between =chak= and GMT implementation.
 | MAP      | reserved; DIST ITER                                       |
 
 **** operators on buffers
-| operator           | argument           | description               |
-|--------------------+--------------------+---------------------------|
-| C0[=ARG]           | NAME/REPL/RANGE    |                           |
-| C1[=ARG]           | NAME/REPL/RANGE    |                           |
-| C2[=ARG]           | NAME/REPL/RANGE    |                           |
-| C3[=ARG]           | NAME/REPL/RANGE    |                           |
-| MISS=ARG           | VALUE              | replace missing value     |
-| PERM=ARG SHAPE=ARG | NAME/REPL/RANGE,.. | array shape permutation |
-| TAG=ARG            | NAME               |                           |
-| X[=ARG]            | NAME/REPL/RANGE    |                           |
-| Y[=ARG]            | NAME/REPL/RANGE    |                           |
-| Z[=ARG]            | NAME/REPL/RANGE    |                           |
+| operator           | argument           | description                       |
+|--------------------+--------------------+-----------------------------------|
+| C0[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[0] index |
+| C1[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[1] index |
+| C2[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[2] index |
+| C3[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[3] index |
+| DUR[=ARG]          | UNIT               | duration                          |
+| MISS=ARG           | VALUE              | replace missing value             |
+| PERM=ARG SHAPE=ARG | NAME/REPL/RANGE,.. | array shape permutatation         |
+| TAG=ARG            | NAME               |                                   |
+| X[=ARG]            | NAME/REPL/RANGE    | put top stack coordinate[0] index |
+| Y[=ARG]            | NAME/REPL/RANGE    | put top stack coordinate[1] index |
+| Z[=ARG]            | NAME/REPL/RANGE    | put top stack coordinate[2] index |
 
 **** operators on files
-| operator    | argument | description            |
-|-------------+----------+------------------------|
-| FMT=ARG     | FORMAT   | set output data format |
-| EDIT=ARG    | STRING   |                        |
-| ITEM=ARG    | STRING   | replace item name      |
-| TITLE=ARG   | STRING   |                        |
-| T=ARG       | LIST     |                        |
-| UNIT=ARG    | STRING   |                        |
+| operator  | argument | description            |
+|-----------+----------+------------------------|
+| DSET=ARG  | STRING   |                        |
+| DUR[=ARG] | UNIT     | duration               |
+| EDIT=ARG  | STRING   |                        |
+| FMT=ARG   | FORMAT   | set output data format |
+| ITEM=ARG  | STRING   | replace item name      |
+| MISS=ARG  | VALUE    | replace missing value  |
+| T=ARG     | LIST     |                        |
+| TITLE=ARG | STRING   |                        |
+| UNIT=ARG  | STRING   |                        |
 
 *** logical operators cheat sheet
 **** unary operators
@@ -730,6 +766,9 @@ examples
 | STOP a b c d e DIST           | a e  b e  c e  d e        | distribute top stack                |
 | STOP a b c d e DIST DIST      | a d e  b d e  c d e       | distribute top two stacks           |
 | STOP a b c d e DIST DIST DIST | a c d e   b c d e         | distribute top tree stacks          |
+|-------------------------------+---------------------------+-------------------------------------|
+| STOP a b c d DIST DIST        | a c d b c d               |                                     |
+| STOP a b c d DIST NOP DIST    | a d d d b d d d c d       | NOP separate two DIST               |
 |-------------------------------+---------------------------+-------------------------------------|
 | STOP a b c REPEAT             | STOP  a b c  a b c        |                                     |
 | STOP a b c REPEAT REPEAT      | STOP  a b c  a b c  a b c |                                     |
@@ -1546,10 +1585,40 @@ The option -l changes the output domain as the first stack.
 : 4  119  119
 
 *** Recipes
+**** Constant definition
+Operator =POP= can name the last buffer for later recall.
+: % chak 9.8 POP=GRAV 1004.6 POP=CP 273.15 POP=TMELT GRAV CP TMELT FLUSH -i
+: ## 0 {GRAV}  9.8
+: ## 1 {CP}  1004.6
+: ## 2 {TMELT}  273.15
+: # {GRAV} {CP} {TMELT}
+:  9.800000000000001E+00  1.004600000000000E+03  2.731500000000000E+02
+
+**** =gttv= alternative
+Specify corresponding files at =<Q>=, =<T>= and =<TV>= as
+specific humidity(input), temperature(input) and virtiual temperature(output).
+
+: # RAIR = 287.04
+: # RVAP = 461.0
+: # EPSV = RAIR / RVAP
+: # EPSVT = 1.0 / EPSV - 1.0
+: # TV = T * (1 + EPSVT * Q)
+: % chak <T> <Q> 1.0 287.04 461. DIV DIV 1.0 SUB MUL 1.0 ADD MUL = <TV>
+
+More verbose way, which define named constants before the core equation:
+: % chak <T> <Q> 287.04 POP=RAIR 461.0 POP=RVAP RAIR RVAP DIV POP=EPSV 1.0 EPSV DIV 1.0 SUB POP=EPSVT \
+:        EPSVT MUL 1 ADD MUL = <TV>
+
+There are no single sequence to apply the equivalent operation, but
+for scripting, it is better to put all the operands (in this case
+=<T>= and =<Q>=) before any items.
+
+This is equivalent to gtool-3.5 command =gttv= as follows:
+: % gttv t:<T> q:<Q> out:<TV>
 **** =gtext= alternative
 
 * Copyright and license
-Copyright 2022 Japan Agency for Marine-Earth Science and Technology
+Copyright 2022-2023 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)
 

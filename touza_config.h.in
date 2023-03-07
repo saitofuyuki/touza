@@ -120,6 +120,15 @@
 /* whether module iso_c_binding works */
 #undef HAVE_FORTRAN_ISO_C_BINDING
 
+/* whether module iso_c_binding works with C_DOUBLE */
+#undef HAVE_FORTRAN_ISO_C_BINDING_C_DOUBLE
+
+/* whether module iso_c_binding works with C_FLOAT */
+#undef HAVE_FORTRAN_ISO_C_BINDING_C_FLOAT
+
+/* whether module iso_c_binding works with C_INT16_T */
+#undef HAVE_FORTRAN_ISO_C_BINDING_C_INT16_T
+
 /* whether module iso_c_binding works with C_INT32_T */
 #undef HAVE_FORTRAN_ISO_C_BINDING_C_INT32_T
 
@@ -129,8 +138,26 @@
 /* whether module iso_c_binding works with C_INT8_T */
 #undef HAVE_FORTRAN_ISO_C_BINDING_C_INT8_T
 
+/* whether module iso_c_binding works with C_LONG_DOUBLE */
+#undef HAVE_FORTRAN_ISO_C_BINDING_C_LONG_DOUBLE
+
+/* whether module iso_c_binding works with C_SIZE_T */
+#undef HAVE_FORTRAN_ISO_C_BINDING_C_SIZE_T
+
 /* whether module iso_fortran_env works */
 #undef HAVE_FORTRAN_ISO_FORTRAN_ENV
+
+/* whether module iso_fortran_env works with CHARACTER_KINDS */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_CHARACTER_KINDS
+
+/* whether module iso_fortran_env works with CHARACTER_STORAGE_SIZE */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_CHARACTER_STORAGE_SIZE
+
+/* whether module iso_fortran_env works with FILE_STORAGE_SIZE */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_FILE_STORAGE_SIZE
+
+/* whether module iso_fortran_env works with INT16 */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_INT16
 
 /* whether module iso_fortran_env works with INT32 */
 #undef HAVE_FORTRAN_ISO_FORTRAN_ENV_INT32
@@ -146,6 +173,12 @@
 
 /* whether module iso_fortran_env works with IOSTAT_END */
 #undef HAVE_FORTRAN_ISO_FORTRAN_ENV_IOSTAT_END
+
+/* whether module iso_fortran_env works with NUMERIC_STORAGE_SIZE */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_NUMERIC_STORAGE_SIZE
+
+/* whether module iso_fortran_env works with REAL128 */
+#undef HAVE_FORTRAN_ISO_FORTRAN_ENV_REAL128
 
 /* whether module iso_fortran_env works with REAL32 */
 #undef HAVE_FORTRAN_ISO_FORTRAN_ENV_REAL32
@@ -188,6 +221,9 @@
 
 /* Defined if you have NETCDF4 support */
 #undef HAVE_NETCDF4
+
+/* preprocessor comment */
+#undef HAVE_PP_COMMENT_KEPT
 
 /* preprocessor concatenation type */
 #undef HAVE_PP_CONCAT

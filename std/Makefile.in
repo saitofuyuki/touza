@@ -17,9 +17,9 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2022/12/19 14:40:52 fuyuki Makefile.am>
+# Time-stamp: <2023/02/25 15:56:23 fuyuki Makefile.am>
 #
-# Copyright (C) 2020, 2021, 2022
+# Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
@@ -27,7 +27,7 @@
 #
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Wed Dec 21 18:47:04 JST 2022
+# from AX_AM_MACROS_STATIC on Tue Mar  7 21:53:11 JST 2023
 
 
 
@@ -114,8 +114,11 @@ check_PROGRAMS = test_std_prc$(EXEEXT) test_std_utl$(EXEEXT) \
 	test_std_log$(EXEEXT) test_std_bld$(EXEEXT) \
 	test_std_mwe$(EXEEXT) test_std_fun$(EXEEXT) \
 	test_std_env$(EXEEXT) test_std_sus$(EXEEXT) \
-	test_std_arg$(EXEEXT) test_std_htb$(EXEEXT) test_std$(EXEEXT) \
-	test_std_sus1$(EXEEXT) test_std_sus2$(EXEEXT)
+	test_std_arg$(EXEEXT) test_std_htb1$(EXEEXT) \
+	test_std_htb2$(EXEEXT) test_std_htb3$(EXEEXT) \
+	test_std_sus1$(EXEEXT) test_std_sus2$(EXEEXT) \
+	test_std_ipc1$(EXEEXT) test_std_ipc2$(EXEEXT) \
+	test_std$(EXEEXT)
 subdir = std
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
@@ -136,7 +139,8 @@ libtouza_local_la_LIBADD =
 am__objects_1 =
 am_libtouza_local_la_OBJECTS = std_prc.lo std_utl.lo std_log.lo \
 	std_wsh.lo std_bld.lo std_mwe.lo std_fun.lo std_env.lo \
-	std_sus.lo std_arg.lo std_htb.lo std.lo $(am__objects_1)
+	std_ipc.lo std_sus.lo std_arg.lo std_htb.lo std.lo \
+	$(am__objects_1)
 libtouza_local_la_OBJECTS = $(am_libtouza_local_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -157,9 +161,24 @@ test_std_env_DEPENDENCIES = $(TEST_COMMON_LIBS)
 am_test_std_fun_OBJECTS = test_std_fun-std_fun.$(OBJEXT)
 test_std_fun_OBJECTS = $(am_test_std_fun_OBJECTS)
 test_std_fun_DEPENDENCIES = $(TEST_COMMON_LIBS)
-am_test_std_htb_OBJECTS = test_std_htb-std_htb.$(OBJEXT)
-test_std_htb_OBJECTS = $(am_test_std_htb_OBJECTS)
-test_std_htb_DEPENDENCIES = $(TEST_COMMON_LIBS)
+am_test_std_htb1_OBJECTS = test_std_htb1-std_htb.$(OBJEXT)
+test_std_htb1_OBJECTS = $(am_test_std_htb1_OBJECTS)
+test_std_htb1_DEPENDENCIES = $(TEST_COMMON_LIBS)
+am__objects_2 = test_std_htb2-std_htb.$(OBJEXT)
+am_test_std_htb2_OBJECTS = $(am__objects_2)
+test_std_htb2_OBJECTS = $(am_test_std_htb2_OBJECTS)
+test_std_htb2_DEPENDENCIES = $(test_std_htb1_LDADD)
+am__objects_3 = test_std_htb3-std_htb.$(OBJEXT)
+am_test_std_htb3_OBJECTS = $(am__objects_3)
+test_std_htb3_OBJECTS = $(am_test_std_htb3_OBJECTS)
+test_std_htb3_DEPENDENCIES = $(test_std_htb1_LDADD)
+am_test_std_ipc1_OBJECTS = test_std_ipc1-std_ipc.$(OBJEXT)
+test_std_ipc1_OBJECTS = $(am_test_std_ipc1_OBJECTS)
+test_std_ipc1_DEPENDENCIES = $(TEST_COMMON_LIBS)
+am__objects_4 = test_std_ipc2-std_ipc.$(OBJEXT)
+am_test_std_ipc2_OBJECTS = $(am__objects_4)
+test_std_ipc2_OBJECTS = $(am_test_std_ipc2_OBJECTS)
+test_std_ipc2_DEPENDENCIES = $(test_std_ipc1_LDADD)
 am_test_std_log_OBJECTS = test_std_log-std_log.$(OBJEXT)
 test_std_log_OBJECTS = $(am_test_std_log_OBJECTS)
 test_std_log_DEPENDENCIES = $(TEST_COMMON_LIBS)
@@ -233,14 +252,18 @@ am__v_CCLD_1 =
 SOURCES = $(libtouza_local_la_SOURCES) $(test_std_SOURCES) \
 	$(test_std_arg_SOURCES) $(test_std_bld_SOURCES) \
 	$(test_std_env_SOURCES) $(test_std_fun_SOURCES) \
-	$(test_std_htb_SOURCES) $(test_std_log_SOURCES) \
+	$(test_std_htb1_SOURCES) $(test_std_htb2_SOURCES) \
+	$(test_std_htb3_SOURCES) $(test_std_ipc1_SOURCES) \
+	$(test_std_ipc2_SOURCES) $(test_std_log_SOURCES) \
 	$(test_std_mwe_SOURCES) $(test_std_prc_SOURCES) \
 	$(test_std_sus_SOURCES) $(test_std_sus1_SOURCES) \
 	$(test_std_sus2_SOURCES) $(test_std_utl_SOURCES)
 DIST_SOURCES = $(libtouza_local_la_SOURCES) $(test_std_SOURCES) \
 	$(test_std_arg_SOURCES) $(test_std_bld_SOURCES) \
 	$(test_std_env_SOURCES) $(test_std_fun_SOURCES) \
-	$(test_std_htb_SOURCES) $(test_std_log_SOURCES) \
+	$(test_std_htb1_SOURCES) $(test_std_htb2_SOURCES) \
+	$(test_std_htb3_SOURCES) $(test_std_ipc1_SOURCES) \
+	$(test_std_ipc2_SOURCES) $(test_std_log_SOURCES) \
 	$(test_std_mwe_SOURCES) $(test_std_prc_SOURCES) \
 	$(test_std_sus_SOURCES) $(test_std_sus1_SOURCES) \
 	$(test_std_sus2_SOURCES) $(test_std_utl_SOURCES)
@@ -375,6 +398,7 @@ FC = @FC@
 FCFLAGS = @FCFLAGS@
 FCFLAGS_F = @FCFLAGS_F@
 FCFLAGS_F90 = @FCFLAGS_F90@
+FCLIBS = @FCLIBS@
 FC_DEFINE = @FC_DEFINE@
 FC_INCLUDE_touza_ami = @FC_INCLUDE_touza_ami@
 FC_INCLUDE_touza_cal = @FC_INCLUDE_touza_cal@
@@ -561,7 +585,7 @@ include_HEADERS = touza_std.h
 noinst_LTLIBRARIES = libtouza_local.la
 libtouza_local_la_SOURCES = std_prc.F90 std_utl.F90 std_log.F90 std_wsh.F90 \
 							std_bld.F90 std_mwe.F90 std_fun.F90 std_env.F90 \
-							std_sus.F90 std_arg.F90 std_htb.F90 \
+							std_ipc.F90 std_sus.F90 std_arg.F90 std_htb.F90 \
 							std.F90 $(include_HEADERS)
 
 TEST_COMMON_LIBS = $(noinst_LTLIBRARIES)
@@ -598,12 +622,24 @@ test_std_bld_LDADD = $(TEST_COMMON_LIBS)
 test_std_mwe_SOURCES = std_mwe.F90
 test_std_mwe_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_MWE=1
 test_std_mwe_LDADD = $(TEST_COMMON_LIBS)
-test_std_htb_SOURCES = std_htb.F90
-test_std_htb_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_HTB=1
-test_std_htb_LDADD = $(TEST_COMMON_LIBS)
+test_std_htb1_SOURCES = std_htb.F90
+test_std_htb1_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_HTB=1
+test_std_htb1_LDADD = $(TEST_COMMON_LIBS)
+test_std_htb2_SOURCES = $(test_std_htb1_SOURCES)
+test_std_htb2_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_HTB=2
+test_std_htb2_LDADD = $(test_std_htb1_LDADD)
+test_std_htb3_SOURCES = $(test_std_htb1_SOURCES)
+test_std_htb3_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_HTB=3
+test_std_htb3_LDADD = $(test_std_htb1_LDADD)
 test_std_SOURCES = std.F90
 test_std_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD=1
 test_std_LDADD = $(TEST_COMMON_LIBS)
+test_std_ipc1_SOURCES = std_ipc.F90
+test_std_ipc1_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_IPC=1
+test_std_ipc1_LDADD = $(TEST_COMMON_LIBS)
+test_std_ipc2_SOURCES = $(test_std_ipc1_SOURCES)
+test_std_ipc2_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_IPC=2
+test_std_ipc2_LDADD = $(test_std_ipc1_LDADD)
 @enable_module_dependencies_TRUE@std_lo_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_arg.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_sus.$(FC_MODEXT) $(builddir)/touza_std_bld.$(FC_MODEXT) $(builddir)/touza_std_wsh.$(FC_MODEXT) $(builddir)/touza_std_htb.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@std_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_arg.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_sus.$(FC_MODEXT) $(builddir)/touza_std_bld.$(FC_MODEXT) $(builddir)/touza_std_wsh.$(FC_MODEXT) $(builddir)/touza_std_htb.$(FC_MODEXT) $(builddir)/touza_std.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@std_arg_lo_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT)
@@ -727,9 +763,25 @@ test_std_fun$(EXEEXT): $(test_std_fun_OBJECTS) $(test_std_fun_DEPENDENCIES) $(EX
 	@rm -f test_std_fun$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_std_fun_OBJECTS) $(test_std_fun_LDADD) $(LIBS)
 
-test_std_htb$(EXEEXT): $(test_std_htb_OBJECTS) $(test_std_htb_DEPENDENCIES) $(EXTRA_test_std_htb_DEPENDENCIES) 
-	@rm -f test_std_htb$(EXEEXT)
-	$(AM_V_FCLD)$(FCLINK) $(test_std_htb_OBJECTS) $(test_std_htb_LDADD) $(LIBS)
+test_std_htb1$(EXEEXT): $(test_std_htb1_OBJECTS) $(test_std_htb1_DEPENDENCIES) $(EXTRA_test_std_htb1_DEPENDENCIES) 
+	@rm -f test_std_htb1$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_std_htb1_OBJECTS) $(test_std_htb1_LDADD) $(LIBS)
+
+test_std_htb2$(EXEEXT): $(test_std_htb2_OBJECTS) $(test_std_htb2_DEPENDENCIES) $(EXTRA_test_std_htb2_DEPENDENCIES) 
+	@rm -f test_std_htb2$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_std_htb2_OBJECTS) $(test_std_htb2_LDADD) $(LIBS)
+
+test_std_htb3$(EXEEXT): $(test_std_htb3_OBJECTS) $(test_std_htb3_DEPENDENCIES) $(EXTRA_test_std_htb3_DEPENDENCIES) 
+	@rm -f test_std_htb3$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_std_htb3_OBJECTS) $(test_std_htb3_LDADD) $(LIBS)
+
+test_std_ipc1$(EXEEXT): $(test_std_ipc1_OBJECTS) $(test_std_ipc1_DEPENDENCIES) $(EXTRA_test_std_ipc1_DEPENDENCIES) 
+	@rm -f test_std_ipc1$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_std_ipc1_OBJECTS) $(test_std_ipc1_LDADD) $(LIBS)
+
+test_std_ipc2$(EXEEXT): $(test_std_ipc2_OBJECTS) $(test_std_ipc2_DEPENDENCIES) $(EXTRA_test_std_ipc2_DEPENDENCIES) 
+	@rm -f test_std_ipc2$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_std_ipc2_OBJECTS) $(test_std_ipc2_LDADD) $(LIBS)
 
 test_std_log$(EXEEXT): $(test_std_log_OBJECTS) $(test_std_log_DEPENDENCIES) $(EXTRA_test_std_log_DEPENDENCIES) 
 	@rm -f test_std_log$(EXEEXT)
@@ -804,11 +856,35 @@ test_std_fun-std_fun.o: std_fun.F90
 test_std_fun-std_fun.obj: std_fun.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_fun_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_fun-std_fun.obj `if test -f 'std_fun.F90'; then $(CYGPATH_W) 'std_fun.F90'; else $(CYGPATH_W) '$(srcdir)/std_fun.F90'; fi`
 
-test_std_htb-std_htb.o: std_htb.F90
-	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_htb_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_htb-std_htb.o `test -f 'std_htb.F90' || echo '$(srcdir)/'`std_htb.F90
+test_std_htb1-std_htb.o: std_htb.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_htb1_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_htb1-std_htb.o `test -f 'std_htb.F90' || echo '$(srcdir)/'`std_htb.F90
 
-test_std_htb-std_htb.obj: std_htb.F90
-	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_htb_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_htb-std_htb.obj `if test -f 'std_htb.F90'; then $(CYGPATH_W) 'std_htb.F90'; else $(CYGPATH_W) '$(srcdir)/std_htb.F90'; fi`
+test_std_htb1-std_htb.obj: std_htb.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_htb1_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_htb1-std_htb.obj `if test -f 'std_htb.F90'; then $(CYGPATH_W) 'std_htb.F90'; else $(CYGPATH_W) '$(srcdir)/std_htb.F90'; fi`
+
+test_std_htb2-std_htb.o: std_htb.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_htb2_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_htb2-std_htb.o `test -f 'std_htb.F90' || echo '$(srcdir)/'`std_htb.F90
+
+test_std_htb2-std_htb.obj: std_htb.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_htb2_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_htb2-std_htb.obj `if test -f 'std_htb.F90'; then $(CYGPATH_W) 'std_htb.F90'; else $(CYGPATH_W) '$(srcdir)/std_htb.F90'; fi`
+
+test_std_htb3-std_htb.o: std_htb.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_htb3_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_htb3-std_htb.o `test -f 'std_htb.F90' || echo '$(srcdir)/'`std_htb.F90
+
+test_std_htb3-std_htb.obj: std_htb.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_htb3_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_htb3-std_htb.obj `if test -f 'std_htb.F90'; then $(CYGPATH_W) 'std_htb.F90'; else $(CYGPATH_W) '$(srcdir)/std_htb.F90'; fi`
+
+test_std_ipc1-std_ipc.o: std_ipc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_ipc1_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_ipc1-std_ipc.o `test -f 'std_ipc.F90' || echo '$(srcdir)/'`std_ipc.F90
+
+test_std_ipc1-std_ipc.obj: std_ipc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_ipc1_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_ipc1-std_ipc.obj `if test -f 'std_ipc.F90'; then $(CYGPATH_W) 'std_ipc.F90'; else $(CYGPATH_W) '$(srcdir)/std_ipc.F90'; fi`
+
+test_std_ipc2-std_ipc.o: std_ipc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_ipc2_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_ipc2-std_ipc.o `test -f 'std_ipc.F90' || echo '$(srcdir)/'`std_ipc.F90
+
+test_std_ipc2-std_ipc.obj: std_ipc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_ipc2_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_ipc2-std_ipc.obj `if test -f 'std_ipc.F90'; then $(CYGPATH_W) 'std_ipc.F90'; else $(CYGPATH_W) '$(srcdir)/std_ipc.F90'; fi`
 
 test_std_log-std_log.o: std_log.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_log_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_log-std_log.o `test -f 'std_log.F90' || echo '$(srcdir)/'`std_log.F90

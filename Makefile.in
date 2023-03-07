@@ -17,16 +17,16 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2022/11/04 09:41:07 fuyuki Makefile.am>
+# Time-stamp: <2023/01/24 21:17:30 fuyuki Makefile.am>
 
-# Copyright (C) 2020, 2021, 2022
+# Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Wed Dec 21 18:47:04 JST 2022
+# from AX_AM_MACROS_STATIC on Tue Mar  7 21:53:11 JST 2023
 
 
 
@@ -185,6 +185,9 @@ am__uninstall_files_from_dir = { \
 am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(pkgconfigdir)" \
 	"$(DESTDIR)$(switchdir)" "$(DESTDIR)$(includedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
+lib@TOUZA_NAME@_la_DEPENDENCIES = std/$(local_name) $(am__append_5) \
+	$(am__append_8) $(am__append_11) $(am__append_14) \
+	$(am__append_17) $(am__append_20)
 am__objects_1 =
 am_lib@TOUZA_NAME@_la_OBJECTS = touza.lo $(am__objects_1)
 lib@TOUZA_NAME@_la_OBJECTS = $(am_lib@TOUZA_NAME@_la_OBJECTS)
@@ -390,6 +393,7 @@ FC = @FC@
 FCFLAGS = @FCFLAGS@
 FCFLAGS_F = @FCFLAGS_F@
 FCFLAGS_F90 = @FCFLAGS_F90@
+FCLIBS = @FCLIBS@
 FC_DEFINE = @FC_DEFINE@
 FC_INCLUDE_touza_ami = @FC_INCLUDE_touza_ami@
 FC_INCLUDE_touza_cal = @FC_INCLUDE_touza_cal@
@@ -587,7 +591,6 @@ pkgconfig_DATA = touza.pc
 include_HEADERS = touza.h $(CONFIG_HEADER)
 lib_LTLIBRARIES = lib@TOUZA_NAME@.la
 lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
-lib@TOUZA_NAME@_la_DEPENDENCIES = autorevision
 local_name = libtouza_local.la
 test_touza_SOURCES = touza.F90
 test_touza_LDADD = $(lib_LTLIBRARIES)
@@ -596,12 +599,13 @@ test_touza_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TOUZA=1
 AUTOREVISION_h = autorevision.h
 AUTOREVISION_cache = autorevision.cache
 AM_DISTCHECK_CONFIGURE_FLAGS = --with-build-jmz
+BUILT_SOURCES = autorevision-cache $(AUTOREVISION_h)
 EXPORT = 
 @enable_module_dependencies_TRUE@test_touza_touza_o_MODULE_DEPS = $(builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/cal/touza_cal.$(FC_MODEXT) $(builddir)/trp/touza_trp.$(FC_MODEXT) $(builddir)/nio/touza_nio.$(FC_MODEXT) $(builddir)/ppp/touza_ppp.$(FC_MODEXT) $(builddir)/touza.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@touza_lo_MODULE_DEPS = $(builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/cal/touza_cal.$(FC_MODEXT) $(builddir)/trp/touza_trp.$(FC_MODEXT) $(builddir)/nio/touza_nio.$(FC_MODEXT) $(builddir)/ppp/touza_ppp.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@touza_mod_MODULE_DEPS = $(builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/cal/touza_cal.$(FC_MODEXT) $(builddir)/trp/touza_trp.$(FC_MODEXT) $(builddir)/nio/touza_nio.$(FC_MODEXT) $(builddir)/ppp/touza_ppp.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@touza_o_MODULE_DEPS = $(builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/cal/touza_cal.$(FC_MODEXT) $(builddir)/trp/touza_trp.$(FC_MODEXT) $(builddir)/nio/touza_nio.$(FC_MODEXT) $(builddir)/ppp/touza_ppp.$(FC_MODEXT) $(builddir)/touza.$(FC_MODEXT)
-all: touza_config.h
+all: $(BUILT_SOURCES) touza_config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
@@ -1141,7 +1145,8 @@ distcleancheck: distclean
 	       exit 1; } >&2
 check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
-check: check-recursive
+check: $(BUILT_SOURCES)
+	$(MAKE) $(AM_MAKEFLAGS) check-recursive
 all-am: Makefile $(LTLIBRARIES) $(SCRIPTS) $(DATA) $(HEADERS) \
 		touza_config.h
 install-EXTRAPROGRAMS: install-libLTLIBRARIES
@@ -1153,8 +1158,10 @@ installdirs-am:
 	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(switchdir)" "$(DESTDIR)$(includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
-install: install-recursive
-install-exec: install-exec-recursive
+install: $(BUILT_SOURCES)
+	$(MAKE) $(AM_MAKEFLAGS) install-recursive
+install-exec: $(BUILT_SOURCES)
+	$(MAKE) $(AM_MAKEFLAGS) install-exec-recursive
 install-data: install-data-recursive
 uninstall: uninstall-recursive
 
@@ -1185,6 +1192,7 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
+	-test -z "$(BUILT_SOURCES)" || rm -f $(BUILT_SOURCES)
 clean: clean-recursive
 
 clean-am: clean-checkPROGRAMS clean-generic clean-libLTLIBRARIES \
@@ -1264,8 +1272,9 @@ uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES \
 	uninstall-pkgconfigDATA uninstall-switchDATA
 	@$(NORMAL_INSTALL)
 	$(MAKE) $(AM_MAKEFLAGS) uninstall-hook
-.MAKE: $(am__recursive_targets) all check-am install-am \
-	install-data-am install-exec-am install-strip uninstall-am
+.MAKE: $(am__recursive_targets) all check check-am install install-am \
+	install-data-am install-exec install-exec-am install-strip \
+	uninstall-am
 
 .PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am \
 	am--depfiles am--refresh check check-am clean \
@@ -1409,7 +1418,7 @@ check-bin-am:$(check_PROGRAMS)
 
 install-data-hook: install-switchDATA
 
-autorevision: autorevision-cache $(AUTOREVISION_h)
+autorevision: $(BUILT_SOURCES)
 
 $(AUTOREVISION_h): $(top_srcdir)/$(AUTOREVISION_cache)
 	@if test x"$(AUTOREVISION)" = x:; then \

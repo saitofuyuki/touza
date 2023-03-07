@@ -12365,7 +12365,7 @@ dnl end:
 dnl Filename:  touza/m4c/mt_fortran_check.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 3 2020
-dnl Time-stamp: <2022/12/08 08:21:24 fuyuki mt_fortran_check.m4>
+dnl Time-stamp: <2023/01/31 09:04:01 fuyuki mt_fortran_check.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -12453,14 +12453,16 @@ AS_IF([test "x$[]$2" = xyes],
 # Check whether FUNCTION can be used.
 AC_DEFUN([MT_FORTRAN_CHECK_FUNCTION],
 [MT_FORTRAN_CHECK_DEFINE([$1],
-      [write(*,*) $1($2)], [$3], [$4])])# MT_FORTRAN_CHECK_FUNCTION
+      [
+       write(*,*) $1($2)], [$3], [$4])])# MT_FORTRAN_CHECK_FUNCTION
 
 # MT_FORTRAN_CHECK_SUBROUTINE(SUBROUTINE, [ARGUMENTS], [PROLOGUE], [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # -----------------------------------------------------------------------------------------
 # Check whether SUBROUTINE can be used.
 AC_DEFUN([MT_FORTRAN_CHECK_SUBROUTINE],
 [MT_FORTRAN_CHECK_DEFINE([$1],
-      [$3
+      [
+       $3
        call $1($2)], [$4], [$5])])# MT_FORTRAN_CHECK_SUBROUTINE
 
 # MT_FORTRAN_CHECK_MODULE(MODULE, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
@@ -12468,14 +12470,16 @@ AC_DEFUN([MT_FORTRAN_CHECK_SUBROUTINE],
 # Check whether MODULE can be used.
 AC_DEFUN([MT_FORTRAN_CHECK_MODULE],
 [MT_FORTRAN_CHECK_DEFINE([$1],
-      [use $1], [$2], [$3])])# MT_FORTRAN_CHECK_MODULE
+      [
+       use $1], [$2], [$3])])# MT_FORTRAN_CHECK_MODULE
 
 # MT_FORTRAN_CHECK_MODULE_MEMBER(MODULE, MEMBER, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # -----------------------------------------------------------------------------------
 # Check whether MODULE contains MEMBER.
 AC_DEFUN([MT_FORTRAN_CHECK_MODULE_MEMBER],
 [MT_FORTRAN_CHECK_DEFINE([$1_$2],
-     [use $1,only: $2], [$3], [$4])])# MT_FORTRAN_CHECK_MODULE_MEMBER
+      [
+       use $1,only: $2], [$3], [$4])])# MT_FORTRAN_CHECK_MODULE_MEMBER
 
 # MT_FORTRAN_CHECK_STATEMENT_SPEC(STATEMENT, SPEC, CODE, [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # -----------------------------------------------------------------------------------------------
@@ -12526,6 +12530,33 @@ dnl @%:@elif $1 == 2
 dnl @%:@define _CONCAT(A,B) A/**/B
 dnl @%:@endif])
 ])# MT_FORTRAN_PP_CONCAT
+
+# ======================================================================
+# MT_FORTRAN_PP_COMMENT(MACRO, [DIALECT, [CACHE]])
+# ------------------------------------
+# Check whether comment character ! is left as it is after preprocessing.
+# Result set as MACRO, where 1 if left, 0 if removed.
+AC_DEFUN([MT_FORTRAN_PP_COMMENT],
+[_$0([$1],
+     m4_default([$2], [Fortran]),
+     [m4_default([$3], [mt_cv_fortran_pp_comment])])])
+
+AC_DEFUN([_MT_FORTRAN_PP_COMMENT],
+[AC_LANG_PUSH([$2])dnl
+AC_CACHE_CHECK([preprocessor comment treatment],
+[$3],
+[# check comment
+AS_VAR_SET([$3], 0)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],
+[@%:@define IGNORE !
+         IGNORE do 100
+])],
+[AS_VAR_SET([$3], 1)],
+[AS_VAR_SET([$3], 0)])])
+AS_IF([test x"$[]$3" != x],
+      [AC_DEFINE_UNQUOTED([$1], [$[]$3],
+                          [preprocessor comment])])
+AC_LANG_POP([$2])])# _MT_FORTRAN_PP_COMMENT
 
 # ======================================================================
 
@@ -12813,7 +12844,7 @@ dnl end:
 dnl Filename:   touza/m4c/mt_package.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 7 2020
-dnl Time-stamp: <2022/04/18 12:04:49 fuyuki mt_package.m4>
+dnl Time-stamp: <2023/01/31 08:50:08 fuyuki mt_package.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -12839,6 +12870,7 @@ MT_ENV_MODULES()
 AC_DEFUN([MT_ENV_PP],
 [AC_LANG_PUSH([Fortran])
 MT_FORTRAN_PP_CONCAT([HAVE_PP_CONCAT])
+MT_FORTRAN_PP_COMMENT([HAVE_PP_COMMENT_KEPT])
 AC_LANG_POP([Fortran])
 ])# MT_ENV_PP
 

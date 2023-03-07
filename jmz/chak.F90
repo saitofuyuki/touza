@@ -1,10 +1,10 @@
-!!!_! chak.F90 - TOUZA/Jmz swiss(CH) army knife
+!!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/12/21 16:20:09 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/21 10:00:54 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -30,7 +30,7 @@ program chak
 !!!_ + Declaration
 !!!_  - modules
   use chak_lib,lib_init=>init
-  use chak_opr,opr_init=>init
+  use chak_opr,opr_init=>init, opr_diag=>diag, opr_finalize=>finalize
   use chak_file,file_init=>init
 ! #if HAVE_FORTRAN_IEEE_ARITHMETIC
 !   use IEEE_ARITHMETIC
@@ -178,7 +178,6 @@ contains
   end subroutine init
 !!!_    * init_sub
   subroutine init_sub(ierr)
-    ! use TOUZA_Std,only: ndigits
     implicit none
     integer,intent(out)         :: ierr
     integer p, r
@@ -198,7 +197,7 @@ contains
 
 !!!_   . finalize
   subroutine finalize(ierr, u)
-    use TOUZA_Std,only: env_finalize, htb_finalize, htb_diag
+    use TOUZA_Std,only: env_finalize
     use TOUZA_Nio,only: nio_diag=>diag, nio_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -212,10 +211,11 @@ contains
     if (is_msglev_DETAIL(lev_verbose)) then
        if (ierr.eq.0) call show_buffers(ierr, u)
     endif
+    if (ierr.eq.0) call opr_diag(ierr, u, levv=dbgv)
     if (ierr.eq.0) call nio_diag(ierr, levv=dbgv)
-    if (ierr.eq.0) call htb_diag(ierr, levv=dbgv)
+
+    if (ierr.eq.0) call opr_finalize(ierr, u, levv=dbgv)
     if (ierr.eq.0) call nio_finalize(ierr, levv=dbgv)
-    if (ierr.eq.0) call htb_finalize(ierr, levv=dbgv)
     if (ierr.eq.0) call env_finalize(ierr, levv=dbgv)
   end subroutine finalize
 
@@ -233,11 +233,17 @@ contains
     utmp = choice(ulog, u)
     lv = choice(0, levv)
 
-101 format('chak - Swiss(CH) Army Knife for gtool-3.5 format files')
+101 format('chak - CH(Swiss) Army Knife for gtool-3.5 format files')
 102 format(2x, 'with ', A, 1x, A, '; ', A, 1x, A)
+103 format(2x, 'with n*c*tcdf ', A)
     write(utmp, 101)
     write(utmp, 102) PACKAGE_NAME, PACKAGE_VERSION, &
          & TOUZA_NAME, TOUZA_VERSION
+#if OPT_WITH_NCTCDF
+    write(utmp, 103) 'enabled'
+#else /* not OPT_WITH_NCTCDF */
+    write(utmp, 103) 'disabled'
+#endif /* not OPT_WITH_NCTCDF */
     return
   end subroutine show_usage
 
@@ -283,16 +289,19 @@ contains
              call query_opr_name(ierr, buf, aqueue(j)%term)
              if (ierr.eq.0) then
                 if (aqueue(j)%iter.ne.0) then
-                   write(str, 102) trim(buf), aqueue(j)%iter, aqueue(j)%nopr, size(aqueue(j)%lefts), cmd, trim(aqueue(j)%desco)
+                   write(str, 102, IOSTAT=ierr) trim(buf), aqueue(j)%iter, &
+                        & aqueue(j)%nopr, size(aqueue(j)%lefts), cmd, trim(aqueue(j)%desco)
                 else
-                   write(str, 101) trim(buf),                 aqueue(j)%nopr, size(aqueue(j)%lefts), cmd, trim(aqueue(j)%desco)
+                   write(str, 101, IOSTAT=ierr) trim(buf), &
+                        & aqueue(j)%nopr, size(aqueue(j)%lefts), cmd, trim(aqueue(j)%desco)
                 endif
              endif
           case(hk_file)
-             write(str, 111) trim(aqueue(j)%desco)
+             write(str, 111, IOSTAT=ierr) trim(aqueue(j)%desco)
           case default
-             write(str, 121) trim(aqueue(j)%desco)
+             write(str, 121, IOSTAT=ierr) trim(aqueue(j)%desco)
           end select
+          ierr = 0
        endif
 201    format('queue[', I0, '] ', I0, 1x, A)
        if (ierr.eq.0) then
@@ -342,6 +351,7 @@ contains
     character(len=1) :: cs
     character(len=1),parameter :: CSTT(stt_locked:stt_free) = (/'L', 'N', 'F'/)
     integer jbgn
+    integer jerr
 
     ierr = 0
     utmp = choice(ulog, u)
@@ -378,7 +388,7 @@ contains
        if (obuffer(j)%name.eq.' ') then
           write(bname, 211) h
        else
-          write(bname, 212) trim(obuffer(j)%name)
+          write(bname, 212, IOSTAT=jerr) trim(obuffer(j)%name)
        endif
        write(utmp, 201) trim(bname), cs, trim(txt), obuffer(j)%undef
     enddo
@@ -401,6 +411,7 @@ contains
     integer alev
     integer jas
     integer m
+    integer jerr
 
     ierr = 0
     lv = choice(lev_verbose, levv)
@@ -427,7 +438,7 @@ contains
           if (jb.ge.0) then
              if (obuffer(jb)%desc.ne.' ') then
 202             format(1x, '<', A, '>')
-                write(desc, 202) trim(obuffer(jb)%desc)
+                write(desc, 202, IOSTAT=jerr) trim(obuffer(jb)%desc)
                 str = trim(str) // trim(desc)
              else
                 m = buffer_vmems(obuffer(jb))
@@ -754,6 +765,7 @@ contains
 
     integer jfile
     character(len=128) :: msg
+    integer jerr
 
     ierr = 0
     if (mfile.gt.lfile) then
@@ -780,7 +792,7 @@ contains
     endif
     if (ierr.ne.0) then
 101    format('cannot set file option for file ', I0)
-       write(msg, 101) jfile
+       write(msg, 101, IOSTAT=jerr) jfile
        call message(ierr, msg)
     endif
   end subroutine parse_file_option
@@ -854,12 +866,12 @@ contains
     endif
     ! enable full extension
     if (opts.eq.' ') then
-       ofile(jfile)%big = bigg_off
+       ofile(jfile)%bigg = bigg_off
     endif
     if (scan(opts, 'Bb').gt.0) then
-       ofile(jfile)%big = bigg_on
+       ofile(jfile)%bigg = bigg_on
     else if (scan(opts, 'Ss').gt.0) then
-       ofile(jfile)%big = bigg_off
+       ofile(jfile)%bigg = bigg_off
     endif
   end subroutine parse_xflag_option
 
@@ -890,6 +902,8 @@ contains
     integer jf
     integer nbufs
     character(len=lname) :: bname
+    integer jerr
+
     ierr = 0
     call new_file(ierr, hfile, arg)
     if (ierr.eq.0) then
@@ -905,7 +919,7 @@ contains
           ofile(jf)%mode  = ofile(def_write)%mode
           ofile(jf)%hedit = ofile(def_write)%hedit
           ofile(jf)%hflag = ofile(def_write)%hflag
-          ofile(jf)%big   = ofile(def_write)%big
+          ofile(jf)%bigg  = ofile(def_write)%bigg
           call append_queue(ierr, hfile, pop=1, push=0)
           if (ierr.eq.0) call pop_stack(ierr, hbuf)
           if (ierr.eq.0) then
@@ -913,7 +927,7 @@ contains
              obuffer(jb)%stt = stt_locked
              ! ofile(jf)%bh = hbuf
 1011         format('W', I0)
-             write(bname, 1011) user_index_bgn(wcount)
+             write(bname, 1011, IOSTAT=jerr) user_index_bgn(wcount)
              obuffer(jb)%name = bname
              wcount = wcount + 1
           endif
@@ -927,7 +941,7 @@ contains
              nbufs = count_file_stacks(ofile(def_read))
              ! file to read
              ofile(jf)%mode = mode_read
-             ofile(jf)%big  = ofile(def_read)%big
+             ofile(jf)%bigg = ofile(def_read)%bigg
              ofile(jf)%rgrp => ofile(def_read)%rgrp
              call alloc_file_buffers(ierr, nbufs, rcount-1, 0)
           endif
@@ -947,6 +961,7 @@ contains
     integer,intent(in)  :: jsub
     integer jj, jb, hbuf
     character(len=lname) :: tag
+    integer jerr
 
     ierr = 0
 101 format('F', I0)
@@ -954,9 +969,9 @@ contains
     do jj = 0, nbufs - 1
        if (ierr.eq.0) then
           if (nbufs.le.1.and.jsub.lt.1) then
-             write(tag, 101) user_index_bgn(jtag)
+             write(tag, 101, IOSTAT=jerr) user_index_bgn(jtag)
           else
-             write(tag, 102) user_index_bgn(jtag), user_index_bgn(jsub + jj)
+             write(tag, 102, IOSTAT=jerr) user_index_bgn(jtag), user_index_bgn(jsub + jj)
           endif
        endif
        if (ierr.eq.0) call new_buffer(ierr, hbuf, tag)
@@ -1177,7 +1192,7 @@ contains
           endif
        case default
           ierr = ERR_NOT_IMPLEMENTED
-          call message(ierr, 'reserved operator ' // trim(arg))
+          call message(ierr, 'reserved operator(buffer) ' // trim(arg))
        end select
     endif
     return
@@ -1513,7 +1528,7 @@ contains
           call stack_buffer_opr(ierr, hopr)
        case default
           ierr = ERR_NOT_IMPLEMENTED
-          call message(ierr, 'reserved header operator ' // trim(arg))
+          call message(ierr, 'reserved operator(header) ' // trim(arg))
        end select
     endif
     return
@@ -1563,7 +1578,7 @@ contains
        else if (upop.le.0.or.upush.le.0) then
           call query_opr_name(ierr, opr, hopr)
           ierr = ERR_NOT_IMPLEMENTED
-          call message(ierr, 'reserved operator ' // trim(opr))
+          call message(ierr, 'reserved operator(normal) ' // trim(opr))
        endif
     endif
     if (ierr.eq.0) then
@@ -2686,6 +2701,7 @@ contains
     character(len=128) :: rtmp
     integer push, pop
     integer nrg
+    integer jerr
 
     ierr = 0
     utmp = choice(ulog, u)
@@ -2703,7 +2719,7 @@ contains
           call get_recs_str(ierr, rtmp, ofile(jfile), nrg)
        else
 101       format(I0)
-          write(rtmp, 101) user_index_bgn(ofile(jfile)%irec)
+          write(rtmp, 101, IOSTAT=jerr) user_index_bgn(ofile(jfile)%irec)
        endif
     else
        rtmp = ' '
@@ -2728,7 +2744,7 @@ contains
           acc = 'unknown'
        end select
 201    format('file:', A, 1x, A, '[', A, ']')
-       write(str, 201) trim(acc), trim(ofile(jfile)%name), trim(rtmp)
+       write(str, 201, IOSTAT=jerr) trim(acc), trim(ofile(jfile)%name), trim(rtmp)
        if (push.gt.0) then
           if (ierr.eq.0) call get_obj_list(ierr, btmp, aq%lefts, push)
           if (ierr.eq.0) str = trim(str) // ' > ' // trim(btmp)
@@ -2769,6 +2785,7 @@ contains
     integer push, pop
     character(len=256) :: str
     character(len=64)  :: opr
+    integer jerr
 
     ierr = 0
     utmp = choice(ulog, u)
@@ -2779,7 +2796,7 @@ contains
 101 format('operator:', A, ' -', I0, '+', I0, 1x, A, ' >> ', A)
     call query_opr_name(ierr, opr, aq%term)
 
-    write(str, 101) trim(opr), pop, push, trim(aq%desci), trim(aq%desco)
+    write(str, 101, IOSTAT=jerr) trim(opr), pop, push, trim(aq%desci), trim(aq%desco)
     call message(ierr, str, u=utmp, indent=+2)
     return
   end subroutine trace_operation
@@ -3081,6 +3098,7 @@ contains
     integer jb
     integer m
     character(len=lname) :: bname
+    integer jerr
 
     ierr = 0
     call new_buffer(ierr, handle)
@@ -3094,7 +3112,7 @@ contains
              if (ierr.eq.0) obuffer(jb)%name = name
           else
 101          format('L', I0)
-             write(bname, 101) user_index_bgn(lcount)
+             write(bname, 101, IOSTAT=jerr) user_index_bgn(lcount)
              lcount = lcount + 1
              obuffer(jb)%name  = bname
           endif
@@ -3401,7 +3419,7 @@ contains
        if (jerr.ne.0) tstr = ' '
     endif
 101 format('  read:', A, 1x, A, ' T = ', A, ' DATE = ', I0, '/', I0, '/', I0, 1x, I2.2, ':', I2.2, ':', I2.2)
-    write(txt, 101) trim(buf%name), trim(buf%desc), trim(adjustl(tstr)), dt(:)
+    write(txt, 101, IOSTAT=jerr) trim(buf%name), trim(buf%desc), trim(adjustl(tstr)), dt(:)
     call message(ierr, txt, levm=msglev_normal, u=uerr)
     return
   end subroutine set_buffer_attrs
@@ -3583,7 +3601,7 @@ contains
        if (jerr.ne.0) tstr = ' '
     endif
 101 format('  write:', A, 1x, A, ' T = ', A, ' DATE = ', I0, '/', I0, '/', I0, 1x, I2.2, ':', I2.2, ':', I2.2)
-    write(txt, 101) trim(obuffer(jb)%name), trim(obuffer(jb)%desc), trim(adjustl(tstr)), dt(:)
+    write(txt, 101, IOSTAT=jerr) trim(obuffer(jb)%name), trim(obuffer(jb)%desc), trim(adjustl(tstr)), dt(:)
     call message(ierr, txt, levm=msglev_normal, u=uerr)
 
     if (is_tweak) then
@@ -3700,7 +3718,7 @@ contains
 !!!_   . get_obj_string
   subroutine get_obj_string &
        & (ierr, str, handle, levv)
-    use TOUZA_Std,only: query_name, choice
+    use TOUZA_Std,only: choice
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: str
@@ -3722,29 +3740,27 @@ contains
 106 format('anchor[-]')
     j = file_h2item(handle)
     if (j.ge.0) then
-       write(str, 102) handle
+       write(str, 102, IOSTAT=ierr) handle
        return
     endif
     j = buf_h2item(handle)
     if (j.ge.0) then
        if (obuffer(j)%name.ne.' ') then
-          write(str, 112) trim(obuffer(j)%name)
+          write(str, 112, IOSTAT=ierr) trim(obuffer(j)%name)
        else
-          write(str, 111) handle
+          write(str, 111, IOSTAT=ierr) handle
        endif
        return
     endif
     j = anchor_h2level(handle)
     if (j.gt.0) then
-       write(str, 105) j
+       write(str, 105, IOSTAT=ierr) j
     else if (j.eq.0) then
-       write(str, 106)
+       write(str, 106, IOSTAT=ierr)
     else
        call query_opr_name(ierr, buf, handle)
-       if (ierr.eq.0) then
-          write(str, 104) trim(buf)
-       endif
-       if (ierr.ne.0) write(str, 103) handle
+       if (ierr.eq.0) write(str, 104, IOSTAT=ierr) trim(buf)
+       if (ierr.ne.0) write(str, 103, IOSTAT=ierr) handle
     endif
   end subroutine get_obj_string
 
@@ -3763,6 +3779,7 @@ contains
     integer jc, nc
     integer mc
     integer jp, ls
+    integer jerr
 
     ierr = 0
     nc = 0
@@ -3777,9 +3794,9 @@ contains
           ls = len_trim(lpp(jc)%name)
           jp = index(lpp(jc)%name(1:ls), rename_sep, back=.TRUE.)
           if (jp.lt.ls-len(rename_sep)+1) then
-             write(cstr(jc), 102) trim(lpp(jc)%name), rename_sep, trim(cran)
+             write(cstr(jc), 102, IOSTAT=jerr) trim(lpp(jc)%name), rename_sep, trim(cran)
           else
-             write(cstr(jc), 103) trim(lpp(jc)%name), trim(cran)
+             write(cstr(jc), 103, IOSTAT=jerr) trim(lpp(jc)%name), trim(cran)
           endif
        endif
        if (lpp(jc)%stp.ge.0) nc = jc
@@ -3809,22 +3826,22 @@ contains
     ee = user_index_end(e)
     if (bb.eq.null_range) then
        if (ee.eq.null_range) then
-          write(str, 111)
+          write(str, 111, IOSTAT=ierr)
        else
-          write(str, 113) ee
+          write(str, 113, IOSTAT=ierr) ee
        endif
     else if (ee.eq.null_range) then
-       write(str, 112) bb
+       write(str, 112, IOSTAT=ierr) bb
     else if (s.gt.0) then
-       write(str, 114) bb, ee
+       write(str, 114, IOSTAT=ierr) bb, ee
     else if (b.eq.0.and.e.eq.0) then
        str = '-'
     else if (s.eq.0) then
-       write(str, 115) bb, ee, s
+       write(str, 115, IOSTAT=ierr) bb, ee, s
     else if (s.lt.0) then
-       write(str, 116) bb, ee, abs(s)
+       write(str, 116, IOSTAT=ierr) bb, ee, abs(s)
     else
-       write(str, 114) bb, ee
+       write(str, 114, IOSTAT=ierr) bb, ee
     endif
 
   end subroutine get_range_string
@@ -3864,35 +3881,35 @@ contains
           case(co_wild)
              if (jco.ge.0) then
                 if (pcp(jco)%name.ne.' ') then
-                   write(co(jodr), 111) trim(pcp(jco)%name), '*'
+                   write(co(jodr), 111, IOSTAT=ierr) trim(pcp(jco)%name), '*'
                 else
-                   write(co(jodr), 114) jco, '*'
+                   write(co(jodr), 114, IOSTAT=ierr) jco, '*'
                 endif
              else
-                write(co(jodr), 112) '*'
+                write(co(jodr), 112, IOSTAT=ierr) '*'
              endif
           case(co_null)
              if (jco.ge.0) then
                 if (pcp(jco)%name.ne.' ') then
-                   write(co(jodr), 111) trim(pcp(jco)%name), '-'
+                   write(co(jodr), 111, IOSTAT=ierr) trim(pcp(jco)%name), '-'
                 else
-                   write(co(jodr), 114) jco, '-'
+                   write(co(jodr), 114, IOSTAT=ierr) jco, '-'
                 endif
              else
-                write(co(jodr), 112) '-'
+                write(co(jodr), 112, IOSTAT=ierr) '-'
              endif
           case(co_normal)
              if (jco.ge.0) then
                 if (pcp(jco)%name.eq.cname(jodr)) then
                    co(jodr) = cname(jodr)
                 else
-                   write(co(jodr), 111) trim(pcp(jco)%name), trim(cname(jodr))
+                   write(co(jodr), 111, IOSTAT=ierr) trim(pcp(jco)%name), trim(cname(jodr))
                 endif
              else
-                write(co(jodr), 112) trim(cname(jodr))
+                write(co(jodr), 112, IOSTAT=ierr) trim(cname(jodr))
              endif
           case default
-             write(co(jodr), 113) jodr
+             write(co(jodr), 113, IOSTAT=ierr) jodr
           end select
           if (jco.ge.0 .or. ctype(jodr).ne.co_null) meff = jodr
        enddo
@@ -3900,7 +3917,7 @@ contains
     endif
     if (ierr.eq.0) then
 101    format(A, 1x, A, ' > ', A)
-       write(str, 101) trim(pdom), trim(ldom), trim(ndom)
+       write(str, 101, IOSTAT=ierr) trim(pdom), trim(ldom), trim(ndom)
     endif
   end subroutine get_perm_string
 
@@ -3924,11 +3941,11 @@ contains
        if (jco.lt.0) then
           cbuf(jodr) = '.'
        else if (ctype(jco).eq.co_null) then
-          write(cbuf(jodr), 411) '-', jco
+          write(cbuf(jodr), 411, IOSTAT=ierr) '-', jco
        else if (ctype(jco).eq.co_wild) then
-          write(cbuf(jodr), 411) '*', jco
+          write(cbuf(jodr), 411, IOSTAT=ierr) '*', jco
        else
-          write(cbuf(jodr), 411) trim(cname(jco)), jco
+          write(cbuf(jodr), 411, IOSTAT=ierr) trim(cname(jco)), jco
        endif
     enddo
     call join_list(ierr, str, cbuf(0:dom%mco-1), ldelim='[', rdelim=']')
@@ -3963,14 +3980,14 @@ contains
 ! 103       format('<', A, '>/', A)
           select case(jphyc)
           case(co_wild)
-             write(cbuf(jodr), 101) '*', trim(cran)
+             write(cbuf(jodr), 101, IOSTAT=ierr) '*', trim(cran)
           case(co_null)
-             write(cbuf(jodr), 101) '-', trim(cran)
+             write(cbuf(jodr), 101, IOSTAT=ierr) '-', trim(cran)
           case(0:)
              if (pcp(jodr)%name.eq.' ') then
-                write(cbuf(jodr), 102) trim(cran)
+                write(cbuf(jodr), 102, IOSTAT=ierr) trim(cran)
              else
-                write(cbuf(jodr), 101) trim(pcp(jodr)%name), trim(cran)
+                write(cbuf(jodr), 101, IOSTAT=ierr) trim(pcp(jodr)%name), trim(cran)
              endif
           case default
              cbuf(jodr) = trim(cran)
@@ -4009,18 +4026,18 @@ contains
 103       format('<', A, '>/', A)
           select case(jphyc)
           case(co_wild)
-             write(cbuf(jodr), 101) '*', trim(cran)
+             write(cbuf(jodr), 101, IOSTAT=ierr) '*', trim(cran)
           case(co_null)
-             write(cbuf(jodr), 101) '-', trim(cran)
+             write(cbuf(jodr), 101, IOSTAT=ierr) '-', trim(cran)
           case(0:)
              if (pcp(jphyc)%name.eq.' ') then
-                write(cbuf(jodr), 102) trim(cran)
+                write(cbuf(jodr), 102, IOSTAT=ierr) trim(cran)
              else
-                write(cbuf(jodr), 101) trim(pcp(jphyc)%name), trim(cran)
+                write(cbuf(jodr), 101, IOSTAT=ierr) trim(pcp(jphyc)%name), trim(cran)
              endif
           case default
              if (jlogc.ge.0) then
-                write(cbuf(jodr), 103) trim(lcp(jlogc)%name), trim(cran)
+                write(cbuf(jodr), 103, IOSTAT=ierr) trim(lcp(jlogc)%name), trim(cran)
              else
                 cbuf(jodr) = trim(cran)
              endif
@@ -4300,6 +4317,8 @@ contains
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_MOD)
        else if (handle.eq.opr_POW) then
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_POW)
+       else if (handle.eq.opr_MODULO) then
+          call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_MODULO)
        else if (handle.eq.opr_BITAND) then
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_BITAND)
        else if (handle.eq.opr_BITOR) then
@@ -4395,7 +4414,7 @@ contains
        else
           call query_opr_name(ierr, opr, handle)
           ierr = ERR_NOT_IMPLEMENTED
-          call message(ierr, 'reserved operator ' // trim(opr))
+          call message(ierr, 'reserved operator(apply) ' // trim(opr))
        endif
     endif
     if (ierr.eq.0) then
@@ -4549,11 +4568,11 @@ contains
           else
              mco = doml%mco
              if (mco.gt.0) then
-                write(fmt_xline, 202) mco
-                write(fmt_uline, 203) mco
+                write(fmt_xline, 202, IOSTAT=ierr) mco
+                write(fmt_uline, 203, IOSTAT=ierr) mco
              else
-                write(fmt_xline, 222)
-                write(fmt_uline, 223)
+                write(fmt_xline, 222, IOSTAT=ierr)
+                write(fmt_uline, 223, IOSTAT=ierr)
              endif
              lidx(0:mco-1) = 0
              doml%bgn(0:mco-1) = user_index_bgn(doml%bgn(0:mco-1))
@@ -4561,9 +4580,9 @@ contains
              select case(obuffer(jb)%k)
              case (kv_int)
                 if (mco.gt.0) then
-                   write(fmt_nline, 201) mco, trim(afmt_int)
+                   write(fmt_nline, 201, IOSTAT=ierr) mco, trim(afmt_int)
                 else
-                   write(fmt_nline, 221) trim(afmt_int)
+                   write(fmt_nline, 221, IOSTAT=ierr) trim(afmt_int)
                 endif
                 do jl = 0, doml%n - 1
                    jp = physical_index(lidx, domr(1))
@@ -4579,9 +4598,9 @@ contains
                 enddo
              case (kv_flt)
                 if (mco.gt.0) then
-                   write(fmt_nline, 201) mco, trim(afmt_flt)
+                   write(fmt_nline, 201, IOSTAT=ierr) mco, trim(afmt_flt)
                 else
-                   write(fmt_nline, 221) trim(afmt_flt)
+                   write(fmt_nline, 221, IOSTAT=ierr) trim(afmt_flt)
                 endif
                 do jl = 0, doml%n - 1
                    jp = physical_index(lidx, domr(1))
@@ -4597,9 +4616,9 @@ contains
                 enddo
              case (kv_dbl)
                 if (mco.gt.0) then
-                   write(fmt_nline, 201) mco, trim(afmt_dbl)
+                   write(fmt_nline, 201, IOSTAT=ierr) mco, trim(afmt_dbl)
                 else
-                   write(fmt_nline, 221) trim(afmt_dbl)
+                   write(fmt_nline, 221, IOSTAT=ierr) trim(afmt_dbl)
                 endif
                 do jl = 0, doml%n - 1
                    jp = physical_index(lidx, domr(1))
@@ -4676,9 +4695,9 @@ contains
 201    format('(', I0, '(I0, 1x), ', I0, '(A, 1x))')
 221    format('(', I0, '(A, 1x))')
        if (mco.gt.0) then
-          write(fmt_xline, 201) mco, nbuf
+          write(fmt_xline, 201, IOSTAT=ierr) mco, nbuf
        else
-          write(fmt_xline, 221) nbuf
+          write(fmt_xline, 221, IOSTAT=ierr) nbuf
        endif
        lidx(0:mco-1) = 0
        doml%bgn(0:mco-1) = user_index_bgn(doml%bgn(0:mco-1))
@@ -4702,11 +4721,11 @@ contains
                 else
                    select case(obuffer(jb)%k)
                    case (kv_int)
-                      write(vals(j), afmt_int) INT(obuffer(jb)%vd(jp))
+                      write(vals(j), afmt_int, IOSTAT=ierr) INT(obuffer(jb)%vd(jp))
                    case (kv_flt)
-                      write(vals(j), afmt_flt) REAL(obuffer(jb)%vd(jp), kind=KFLT)
+                      write(vals(j), afmt_flt, IOSTAT=ierr) REAL(obuffer(jb)%vd(jp), kind=KFLT)
                    case (kv_dbl)
-                      write(vals(j), afmt_dbl) REAL(obuffer(jb)%vd(jp), kind=KDBL)
+                      write(vals(j), afmt_dbl, IOSTAT=ierr) REAL(obuffer(jb)%vd(jp), kind=KDBL)
                    case default
                       vals(j) = '*'
                    end select
@@ -5226,6 +5245,7 @@ contains
     integer ilevi, ilevo
     character(len=64) :: opr
     character(len=64) :: istr
+    integer jerr
 
     ierr = 0
     if (ierr.eq.0) call query_opr_name(ierr, opr, oprh)
@@ -5243,15 +5263,15 @@ contains
 112       format(A, '(', A, ')')
 121       format(A, '[', A, ']')
           if (ilevo.eq.ilev_call) then
-             write(obuffer(jbl)%desc2, 101) trim(istr), trim(obuffer(jbr)%desc2)
+             write(obuffer(jbl)%desc2, 101, IOSTAT=jerr) trim(istr), trim(obuffer(jbr)%desc2)
           else if (ilevo.eq.ilev_neg) then
              if (ilevi.ge.ilevo) then
-                write(obuffer(jbl)%desc2, 112) trim(istr), trim(obuffer(jbr)%desc2)
+                write(obuffer(jbl)%desc2, 112, IOSTAT=jerr) trim(istr), trim(obuffer(jbr)%desc2)
              else
-                write(obuffer(jbl)%desc2, 111) trim(istr), trim(obuffer(jbr)%desc2)
+                write(obuffer(jbl)%desc2, 111, IOSTAT=jerr) trim(istr), trim(obuffer(jbr)%desc2)
              endif
           else
-             write(obuffer(jbl)%desc2, 121) trim(istr), trim(obuffer(jbr)%desc2)
+             write(obuffer(jbl)%desc2, 121, IOSTAT=jerr) trim(istr), trim(obuffer(jbr)%desc2)
           endif
           obuffer(jbl)%ilev = ilevo
        endif
