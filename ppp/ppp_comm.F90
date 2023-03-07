@@ -1,7 +1,7 @@
 !!!_! ppp_comm.F90 - TOUZA/ppp communication
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/04/18 08:22:03 fuyuki ppp_comm.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/10/20 07:00:15 fuyuki ppp_comm.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022
@@ -40,9 +40,14 @@ module TOUZA_Ppp_comm
      module procedure broadcast_ia, broadcast_i
   end interface broadcast
 !!!_ + interfaces
+  interface transfer
+     module procedure transfer_ia
+  end interface transfer
+!!!_ + interfaces
   public init, diag, finalize
   public barrier_trace
   public broadcast
+  public transfer
 !!!_ + common interfaces
 contains
 !!!_  & init
@@ -155,7 +160,9 @@ contains
 !!!_ + barrier_trace
   subroutine barrier_trace &
        & (ierr, iagent, tag, u)
-    use mpi,only: MPI_Barrier
+#if OPT_USE_MPI
+    use MPI,only: MPI_Barrier
+#endif /* OPT_USE_MPI */
     use TOUZA_Ppp_amng,only: inquire_agent
     implicit none
     integer,         intent(out)         :: ierr
@@ -193,8 +200,8 @@ contains
   subroutine broadcast_ia &
        & (ierr, buf, iagent, iroot)
     use TOUZA_Ppp_std,only: choice
+    use TOUZA_Ppp_std,only: MPI_INTEGER
     use TOUZA_Ppp_amng,only: inquire_agent
-    use mpi,only: MPI_INTEGER
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
     use mpi,only: MPI_Bcast
 #  endif
@@ -218,6 +225,132 @@ contains
   end subroutine broadcast_ia
 !!!_ + gather
 !!!_ + scatter
+!!!_ + sendrecv
+!!!_ + transfer - send/recieve among the same family
+  subroutine transfer_ia &
+       & (ierr,   buf,    &
+       &  irsend, irrecv, iagent, iarecv, ktag)
+    use TOUZA_Ppp_std,only: MPI_STATUS_SIZE, MPI_ANY_TAG, MPI_INTEGER
+#if OPT_USE_MPI
+    use MPI,only: MPI_Wait
+#endif /* OPT_USE_MPI */
+#  if HAVE_FORTRAN_MPI_MPI_ISEND
+    use MPI,only: MPI_Isend
+#  endif
+#  if HAVE_FORTRAN_MPI_MPI_IRECV
+    use MPI,only: MPI_Irecv
+#  endif
+    use TOUZA_Ppp_std,only: choice
+    use TOUZA_Ppp_amng,only: &
+         & check_agent, base_agent, agents_translate, inquire_agent
+    implicit none
+    integer,parameter :: KMTGT = MPI_INTEGER
+    integer,intent(out)         :: ierr
+    integer,intent(inout)       :: buf(:)
+    integer,intent(in)          :: irsend
+    integer,intent(in)          :: irrecv
+    integer,intent(in),optional :: iagent   ! send(/recieve) rank agent
+    integer,intent(in),optional :: iarecv   ! optional recieve rank agent
+    integer,intent(in),optional :: ktag
+    integer jasend, jarecv
+    integer jabase
+    integer iranks, irankr, irself
+    integer n
+    integer icomm
+    integer ireqs, ireqr
+    integer istts(MPI_STATUS_SIZE), isttr(MPI_STATUS_SIZE)
+    integer tag
+
+    ierr = 0
+    jasend = check_agent(iagent)
+    jarecv = choice(jasend, iarecv)
+    if (jasend.lt.0.or.jarecv.lt.0) then
+       ierr = -1
+       return
+    endif
+    jabase = base_agent(jasend)
+    if (jabase.lt.0) then
+       ierr = -1
+       return
+    endif
+    if (jabase.ne.base_agent(jarecv)) then
+       ierr = -1
+       return
+    endif
+
+    n = size(buf)
+    tag = choice(MPI_ANY_TAG, ktag)
+
+    if (ierr.eq.0) then
+       call inquire_agent(ierr, iagent=jabase, irank=irself, icomm=icomm)
+    endif
+    if (ierr.eq.0) then
+       call agents_translate(ierr, iranks, jabase, irsend, jasend)
+    endif
+    if (ierr.eq.0) then
+       call agents_translate(ierr, irankr, jabase, irrecv, jarecv)
+    endif
+    if (ierr.eq.0) then
+       if (iranks.eq.irself) then
+          call MPI_Isend &
+               & (buf(:), n, KMTGT, irankr, tag, icomm, ireqs, ierr)
+       endif
+    endif
+    if (ierr.eq.0) then
+       if (irankr.eq.irself) then
+          call MPI_Irecv &
+               & (buf(:), n, KMTGT, iranks, tag, icomm, ireqr, ierr)
+       endif
+    endif
+    if (ierr.eq.0) then
+       if (iranks.eq.irself) call MPI_Wait(ireqs, istts, ierr)
+       if (irankr.eq.irself) call MPI_Wait(ireqr, isttr, ierr)
+    endif
+  end subroutine transfer_ia
+
+  ! subroutine broadcast_remote_ia &
+  !      & (ierr, buf, iabcast, irbcast, iasend, irsend)
+  !   use TOUZA_Ppp_amng,only: check_agent, source_agent
+  !   implicit none
+  !   integer,intent(out)         :: ierr
+  !   integer,intent(inout)       :: buf(:)
+  !   integer,intent(in),optional :: iabcast
+  !   integer,intent(in),optional :: irbcast
+  !   integer,intent(in),optional :: iasend
+  !   integer,intent(in),optional :: irsend
+
+  !   integer jasrcs, jasrcb
+  !   integer jasend, jabcast
+
+  !   ierr = 0
+
+  !   jasend  = check_agent(iasend)
+  !   jabcast = check_agent(iabcast)
+
+  !   if (jasend.lt.0 .or. jabcast .lt.0) then
+  !      ierr = -1
+  !      return
+  !   endif
+  !   jasrcs = source_agent(jasend)
+  !   jasrcb = source_agent(jabcast)
+  !   if (jasrcs.ne.jasrcb) then
+  !      ierr = -1
+  !      return
+  !   endif
+
+  !   ! if (.not.present(iasend)) then
+  !   !    if (.not.present(iabcast)) then
+  !   !       call broadcast(ierr, buf, iabcast, irbcast)
+  !   !       return
+  !   !    else
+
+  !   !    endif
+  !   ! else if (.not.present(iabcast)) then
+
+  !   ! else
+
+  !   ! endif
+  ! end subroutine broadcast_remote_ia
 !!!_ + end TOUZA_Ppp_comm
 end module TOUZA_Ppp_comm
 !!!_@ test_ppp_comm - test program

@@ -1,10 +1,10 @@
 !!!_! calendar_miroc.F90 - touza/calendar: miroc compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2021/11/15 13:20:24 fuyuki calendar_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/04/25 11:28:04 fuyuki calendar_miroc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2011-2021
+! Copyright (C) 2011-2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -25,11 +25,11 @@ module TOUZA_Cal_miroc
 # define __MDL__ 'miroc'
 !!!_  * interfaces (external)
   interface
-     ! subroutine CALNDR(IFPAR, JFPAR)
-     !   implicit none
-     !   integer,intent(in),optional :: IFPAR
-     !   integer,intent(in),optional :: JFPAR
-     ! end subroutine CALNDR
+     subroutine CALNDR(IFPAR, JFPAR)
+       implicit none
+       integer,intent(in) :: IFPAR
+       integer,intent(in) :: JFPAR
+     end subroutine CALNDR
      subroutine CPERPT(IYEAR, IMONTH, IDAY)
        implicit none
        integer,intent(in) :: IYEAR, IMONTH, IDAY
@@ -328,14 +328,9 @@ end subroutine UCALN
 subroutine CALNDR(IFPAR, JFPAR)
   use TOUZA_Cal_miroc,only: init
   implicit none
-  integer,intent(in),optional :: IFPAR
-  integer,intent(in),optional :: JFPAR
-  if (present(IFPAR).and.present(JFPAR)) then
-     call init(IFPAR, JFPAR)
-  else
-     write(*,*) 'ABORTS.  UCALN/CALNDR SUBROUTINE REQUIRES ARGUMENTS'
-     stop
-  endif
+  integer,intent(in) :: IFPAR
+  integer,intent(in) :: JFPAR
+  call init(IFPAR, JFPAR)
   return
 end subroutine CALNDR
 

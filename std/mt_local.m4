@@ -1,9 +1,9 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2022/04/14 12:33:13 fuyuki mt_local.m4>
+dnl Time-stamp: <2023/01/08 16:56:32 fuyuki mt_local.m4>
 
-dnl Copyright: 2020-2022 JAMSTEC
+dnl Copyright: 2020-2023 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
 dnl   (https://www.apache.org/licenses/LICENSE-2.0)
 
@@ -11,7 +11,7 @@ AC_LANG_PUSH([Fortran])
 
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_command_argument], [1], [])
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getarg], [1, T], [
-character T*30])
+     character T*30])
 MT_FORTRAN_BATCH_CHECK_FUNCTION([command_argument_count], [])
 dnl SX
 MT_FORTRAN_BATCH_CHECK_FUNCTION([iargc], [])
@@ -25,42 +25,77 @@ MT_FORTRAN_BATCH_CHECK_MODULE([mpi], [mpi_bcast])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT8])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT16])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT32])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT64])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL32])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL64])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL128])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [CHARACTER_KINDS])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INTEGER_KINDS])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [REAL_KINDS])
+
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [CHARACTER_STORAGE_SIZE])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [NUMERIC_STORAGE_SIZE])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [FILE_STORAGE_SIZE])
+
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [IOSTAT_END])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_SIZE_T])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT8_T])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT16_T])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT32_T])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT64_T])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_FLOAT])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_DOUBLE])
+MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_LONG_DOUBLE])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([ieee_arithmetic])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([open], [iomsg],[
-character T*(30)
-open(UNIT=1,IOMSG=T)])
+      character T*(30)
+      open(UNIT=1,IOMSG=T)])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([open], [convert],[
-open(UNIT=1,CONVERT='BIG_ENDIAN')])
+      open(UNIT=1,CONVERT='BIG_ENDIAN')])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([open], [stream],[
-open(UNIT=1,ACCESS='STREAM')])
+      open(UNIT=1,ACCESS='STREAM')])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [iolength],[
-integer L
-inquire(IOLENGTH=L) int(0)])
+      integer L
+      inquire(IOLENGTH=L) int(0)])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [pos],[
-integer L
-inquire(10, POS=L)])
+      integer L
+      inquire(10, POS=L)])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [convert],[
-character T*(30)
-inquire(10, CONVERT=T)])
+      character T*(30)
+      inquire(10, CONVERT=T)])
+
+dnl system procedures
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_environment_variable], ['A'])
+dnl GNU extensions
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getlog], [T], [
+character T*30])
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getenv], ['A', T], [
+character T*30])
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([hostnm], [T], [
+character T*30])
+dnl intel IFPORT module
+MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [getenv])
+MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [getlog])
+MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [hostnam])
+dnl SX F90_UNIX_ENV module
+MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [getenv])
+MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [getlogin])
+MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [gethostname])
+
+MT_FC_F2003_DEFERRED_TYPE()
+MT_FC_F2003_ALLOCATABLE_DUMMY()
+MT_FC_F2003_ALLOCATABLE_MEMBER()
 
 AC_ARG_VAR([OPT_STDIN_UNIT],    [fortran i/o unit for stdin])
 AC_ARG_VAR([OPT_STDOUT_UNIT],   [fortran i/o unit for stdout])

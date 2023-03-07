@@ -1,10 +1,10 @@
-!!!_! jmzcmp.F90 - TOUZA/Jmz nng comparison
+!!!_! jmzcmp.F90 - TOUZA/Jmz nio(nng) comparison
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 28 2021
-#define TIME_STAMP 'Time-stamp: <2021/12/24 10:59:40 fuyuki jmzcmp.F90>'
+#define TIME_STAMP 'Time-stamp: <2022/09/02 21:09:07 fuyuki jmzcmp.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021,2022
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -14,12 +14,12 @@
 #  include "touza_config.h"
 #endif
 #include "jmz.h"
-!!!_@ TOUZA/Jmz/cmp - jmz: nng comparison
+!!!_@ TOUZA/Jmz/cmp - jmz: nio comparison
 program jmzcmp
 !!!_ + Declaration
 !!!_  - modules
   use TOUZA_Std,only: arg_diag, env_init
-  use TOUZA_Nng, nng_init=>init, nng_diag=>diag, nng_finalize=>finalize
+  use TOUZA_Nio, nio_init=>init, nio_diag=>diag, nio_finalize=>finalize
 !!!_  - variables
   implicit none
 
@@ -42,12 +42,12 @@ program jmzcmp
        & (ierr, japos, levv, dbgv, stdv, &
        &  atol, rtol,  kflag)
   if (ierr.eq.0) call env_init(ierr, levv=stdv)
-  if (ierr.eq.0) call nng_init(ierr, levv=dbgv, stdv=stdv)
+  if (ierr.eq.0) call nio_init(ierr, levv=dbgv, stdv=stdv)
   if (ierr.eq.0) then
      call cmp_main(ierr, japos, levv, kflag)
   endif
-  if (ierr.eq.0) call nng_diag(ierr)
-  if (ierr.eq.0) call nng_finalize(ierr)
+  if (ierr.eq.0) call nio_diag(ierr)
+  if (ierr.eq.0) call nio_finalize(ierr)
   if (ierr.eq.0) call arg_diag(ierr, levv=stdv)
   if (ierr.ne.0) then
      write(*, *) 'exit = ', ierr
@@ -59,9 +59,9 @@ contains
   subroutine cmp_main &
        & (ierr, japos, levv, kflag)
     use TOUZA_Std,only: get_param, get_option, upcase, uout, uerr, is_error_match
-    use TOUZA_Nng_std,only: KI32, KFLT, KDBL
-    use TOUZA_Nng_header
-    use TOUZA_Nng_record,only: set_urt_defs, switch_urt_diag, KCODE_CLIPPING
+    use TOUZA_Nio_std,only: KI32, KFLT, KDBL
+    use TOUZA_Nio_header
+    use TOUZA_Nio_record,only: set_urt_defs, switch_urt_diag, KCODE_CLIPPING
     use TOUZA_Trp,only: helper_props, compare_element
     implicit none
     integer,intent(out)   :: ierr
@@ -164,7 +164,7 @@ contains
          & 'miss.tgt', 'miss.ref'
     do
        ! reference
-       if (ierr.eq.0) call nng_read_header(ierr, headr, krectr, uref)
+       if (ierr.eq.0) call nio_read_header(ierr, headr, krectr, uref)
        if (is_error_match(ierr, ERR_EOF)) then
           ierr = 0
           exit
@@ -180,9 +180,9 @@ contains
        if (ierr.eq.0) then
           if (levv.gt.1) call switch_urt_diag(rfile, jrec, udiag)
        endif
-       if (ierr.eq.0) call nng_read_data(ierr, vref, nref, headr, krectr, uref)
+       if (ierr.eq.0) call nio_read_data(ierr, vref, nref, headr, krectr, uref)
        ! target
-       if (ierr.eq.0) call nng_read_header(ierr, headt, krectt, utgt)
+       if (ierr.eq.0) call nio_read_header(ierr, headt, krectt, utgt)
        if (is_error_match(ierr, ERR_EOF)) then
           ierr = 0
           exit
@@ -198,7 +198,7 @@ contains
        if (ierr.eq.0) then
           if (levv.gt.1) call switch_urt_diag(tfile, jrec, udiag)
        endif
-       if (ierr.eq.0) call nng_read_data(ierr, vtgt, ntgt, headt, krectt, utgt)
+       if (ierr.eq.0) call nio_read_data(ierr, vtgt, ntgt, headt, krectt, utgt)
 
        if (ierr.ne.0) exit
 
@@ -303,8 +303,8 @@ contains
              write(vitemd, 1021) trim(vitemt), trim(vitemr)
              if (ierr.eq.0) call put_item(ierr, headd, trim(vitemd), hi_ITEM)
           endif
-          if (ierr.eq.0) call nng_write_header(ierr, headd, krectd, udif)
-          if (ierr.eq.0) call nng_write_data(ierr, vdfa, nref, headd, krectd, udif)
+          if (ierr.eq.0) call nio_write_header(ierr, headd, krectd, udif)
+          if (ierr.eq.0) call nio_write_data(ierr, vdfa, nref, headd, krectd, udif)
        endif
        jrec = jrec + 1
     enddo
@@ -352,10 +352,14 @@ contains
 
     if (ierr.eq.0) call arg_init(ierr, levv=stdv)
     if (ierr.eq.0) call parse(ierr)
-    if (ierr.eq.0) then
-       do
-          japos = japos + 1
-          call get_param(ierr, astr, japos)
+    do
+       if (ierr.ne.0) then
+          ierr = min(0, ierr)
+          exit
+       endif
+       japos = japos + 1
+       call get_param(ierr, astr, japos)
+       if (ierr.eq.0) then
           if (astr(1:1).eq.'-') then
              if (astr.eq.'-v') then          ! -v    - increase verbosity
                 levv = max(-1, levv) + 1
@@ -382,12 +386,8 @@ contains
              japos = japos - 1
              exit
           endif
-          if (ierr.ne.0) then
-             ierr = min(0, ierr)
-             exit
-          endif
-       enddo
-    endif
+       endif
+    enddo
   end subroutine parse_options
 !!!_ + End jmzcmp
 end program jmzcmp

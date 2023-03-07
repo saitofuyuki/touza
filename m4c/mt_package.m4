@@ -1,7 +1,7 @@
 dnl Filename:   touza/m4c/mt_package.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 7 2020
-dnl Time-stamp: <2022/04/18 12:04:49 fuyuki mt_package.m4>
+dnl Time-stamp: <2023/01/31 08:50:08 fuyuki mt_package.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -27,6 +27,7 @@ MT_ENV_MODULES()
 AC_DEFUN([MT_ENV_PP],
 [AC_LANG_PUSH([Fortran])
 MT_FORTRAN_PP_CONCAT([HAVE_PP_CONCAT])
+MT_FORTRAN_PP_COMMENT([HAVE_PP_COMMENT_KEPT])
 AC_LANG_POP([Fortran])
 ])# MT_ENV_PP
 

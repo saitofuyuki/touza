@@ -1,10 +1,77 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2022/04/22 11:39:53 fuyuki NEWS>
+# Time-stamp: <2023/01/30 17:47:55 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.09.0 from 1.08.1
+** Major changes
+- cache, c-interfaces, slice read access features etc for Nnview.
+- revisit for MIROC/default
+* Changes in 1.08.1 from 1.08.0
+** Bug fixes
+- [critical] hack to handle long message (thanks to tatebe-san).
+
+* Changes in 1.08.0 from 1.07.0
+** Major changes
+*** Big-GTOOL design enabled by default
+- =nio= and =jmz/chak= now correctly manages Big-GTOOL format.
+- =-X= or =+X= option on =chak= disables Big-GTOOL design,
+  i.e., sub-record decomposition is used for large records.
+** Other changs
+- (jmz/chak) fix to parse infinite range.
+
+* Changes in 1.07.0 from 1.06.0
+** Major changes
+*** Design of URT MRT revised
+- URT MRT internal formats are revised, which is incompatible with
+  those of 1.06.0 or before.
+- Obsolete design (URTa) is no more supported.
+** Other changes
+- (chak) URT MRT tweaking introduced.
+- some primitive procedures improved.
+
+* Changes in 1.06.0 from 1.05.6
+- (chak) [incompatible] new shape special symbols '+' and '-'.
+  '-' in shape argument now deletes the specific rank.
+  '+' in shape argument replaces old behaviour of '-', which inserts
+  new (empty or named) coordinate at the specific rank.
+- (chak) multiple record stacking from file operands implemented.
+
+* Changes in 1.05.6 from 1.05.5
+- (chak) Reshaping improved.
+  - Index operator (Cn, X, etc) now has dummy null rank of
+    non-specific coordinates.
+
+* Changes in 1.05.5 from 1.05.4
+- (chak) Reshaping redesigned and improved.
+
+* Changes in 1.05.4 from 1.05.3
+- (chak) [critical] default ascii format modified
+- (chak) [SEVERE] coordinate ordering may fail at explicit ordering
+
+* Changes in 1.05.3 from 1.05.2
+- (chak) Improve automatic coordinate matching
+- (chak) -N flag introduced to control null-coordinate parsing
+- (chak) some bug fixes.
+
+* Changes in 1.05.2 from 1.05.1
+- (chak) [CRITICAL] modify default MISS to follow the legacy magic number
+- (chak) ascii/binary input/output hacked
+- (chak) header editing improved
+- (div) exclude div subdirectory to build for release
+
+* Changes in 1.05.1 from 1.03.0
+- various bug fix in jmz/chak alpha
+
+* Changes in 1.05.0 from 1.03.1
+- jmz/chak alpha version
+- nio/nio_nctcdf for minimum usage of NetCDF library
+- nng is renamed into nio.
+- std/std_htb implemented for hash-table management
+- various bug fixes
 
 * Changes in 1.03.1 from 1.03.0
 - [FATAL] MIROC with-T confirmed to build/run *even not on git*
@@ -17,7 +84,7 @@ Please refer ChangeLog and git log for more information.
 * Changes in 1.02.0 from 1.01.0
 - MIROC with-T pilot (xmcomm replacement)
 - (ppp) parallel processing procedures, to replace xmcomm/xmking
-- (emu) emulate miroc utilitly
+- (emu) emulate miroc utility
 
 * Changes in 1.01.0 from 1.00.4
 - Alpha release to provide URT-format trials
@@ -69,7 +136,7 @@ Please refer ChangeLog and git log for more information.
   alone.
 - Module naming modified.  Hard-coded module names are form of
   `TOUZA_<Sub>' or `TOUZA_<Sub>_<member>'.   Transformation of
-  module names are redisigned and reserved for future development.
+  module names are redesigned and reserved for future development.
 - Header files are renamed into `touza_<sub>.h'
 - Default installation paths are changed.  Module files are under
   $(pkgincludedir);  Header file are under $(includedir).
@@ -80,3 +147,10 @@ Please refer ChangeLog and git log for more information.
 # Local Variables:
 # mode: org
 # End:
+
+#  LocalWords:  TOUZA SAITO Fuyuki fuyuki ChangeLog chak ascii jmz YH
+#  LocalWords:  subdirectory nio nctcdf NetCDF nng htb MIROC ppp URT
+#  LocalWords:  xmcomm xmking miroc gtool trp trapiche pkgconf init
+#  LocalWords:  ILS MATSIRO inim env iso fortran formatter ucaln CCC
+#  LocalWords:  pre diag autoconf args arg submodule Subpackages
+#  LocalWords:  touza pkgincludedir includedir

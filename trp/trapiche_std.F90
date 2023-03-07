@@ -1,7 +1,7 @@
 !!!_! trapiche_std.F90 - TOUZA/Trapiche utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 30 2021
-#define TIME_STAMP 'Time-stamp: <2021/11/30 08:13:40 fuyuki trapiche_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/25 22:15:37 fuyuki trapiche_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021
@@ -26,6 +26,8 @@ module TOUZA_Trp_std
        & is_msglev, &
        & is_msglev_severe, is_msglev_debug, is_msglev_normal, is_msglev_detail, &
        & unit_global,      trace_fine,      trace_control
+  use TOUZA_Std_mwe,only: MPI_INTEGER, MPI_STATUS_SIZE, MPI_DOUBLE_PRECISION
+  use TOUZA_Std_ipc,only: ipc_IBITS
   implicit none
   private
 !!!_  - static
@@ -87,12 +89,15 @@ module TOUZA_Trp_std
   public is_msglev_detail
   public trace_control, trace_fine
   public unit_global
-
+!!!_   . TOUZA_Std_mwe
+  public MPI_INTEGER, MPI_STATUS_SIZE, MPI_DOUBLE_PRECISION
+!!!_   . TOUZA_Std_ipc
+  public ipc_IBITS
 !!!_ + common interfaces
 contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv)
-    use TOUZA_Std,only: utl_init, prc_init, log_init
+    use TOUZA_Std,only: utl_init, prc_init, log_init, ipc_init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -119,6 +124,7 @@ contains
           if (ierr.eq.0) call utl_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call prc_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call log_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
+          if (ierr.eq.0) call ipc_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -141,7 +147,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std,only: utl_diag, prc_diag, log_diag
+    use TOUZA_Std,only: utl_diag, prc_diag, log_diag, ipc_diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -168,6 +174,7 @@ contains
           if (ierr.eq.0) call utl_diag(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call prc_diag(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call log_diag(ierr, utmp, lev_stdv, mode=lmd)
+          if (ierr.eq.0) call ipc_diag(ierr, utmp, lev_stdv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -176,7 +183,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std,only: utl_finalize, prc_finalize, log_finalize
+    use TOUZA_Std,only: utl_finalize, prc_finalize, log_finalize, ipc_finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -201,6 +208,7 @@ contains
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call prc_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call log_finalize(ierr, utmp, lev_stdv, mode=lmd)
+          if (ierr.eq.0) call ipc_finalize(ierr, utmp, lev_stdv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
     endif
@@ -255,15 +263,15 @@ contains
 
 !!!_   . health_check_l - health checker for first_bit_l
   subroutine health_check_l &
-       & (ierr, khld, u, levv)
+       & (ierr, mold, u, levv)
     implicit none
     integer,parameter :: KITGT=KI64
     integer,            intent(out)         :: ierr
-    integer(kind=KITGT),intent(in)          :: khld
+    integer(kind=KITGT),intent(in)          :: mold
     integer,            intent(in),optional :: u
     integer,            intent(in),optional :: levv
 
-    integer,parameter :: lbits = BIT_SIZE(khld)
+    integer,parameter :: lbits = BIT_SIZE(mold)
     integer lv
 
     ierr = 0
@@ -287,15 +295,15 @@ contains
 
 !!!_   . health_check_i - health checker for first_bit_i
   subroutine health_check_i &
-       & (ierr, khld, u, levv)
+       & (ierr, mold, u, levv)
     implicit none
     integer,parameter :: KITGT=KI32
     integer,            intent(out)         :: ierr
-    integer(kind=KITGT),intent(in)          :: khld
+    integer(kind=KITGT),intent(in)          :: mold
     integer,            intent(in),optional :: u
     integer,            intent(in),optional :: levv
 
-    integer,parameter :: lbits = BIT_SIZE(khld)
+    integer,parameter :: lbits = BIT_SIZE(mold)
     integer lv
 
     ierr = 0

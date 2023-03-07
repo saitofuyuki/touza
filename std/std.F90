@@ -1,10 +1,10 @@
 !!!_! std.F90 - touza/std interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2022/02/07 20:45:07 fuyuki std.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/02/25 22:17:20 fuyuki std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021, 2022
+! Copyright (C) 2020, 2021, 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -29,6 +29,8 @@ module TOUZA_Std
   use TOUZA_Std_sus, sus_init=>init, sus_diag=>diag, sus_finalize=>finalize
   use TOUZA_Std_bld, bld_init=>init, bld_diag=>diag, bld_finalize=>finalize
   use TOUZA_Std_wsh, wsh_init=>init, wsh_diag=>diag, wsh_finalize=>finalize
+  use TOUZA_Std_htb, htb_init=>init, htb_diag=>diag, htb_finalize=>finalize
+  use TOUZA_Std_ipc, ipc_init=>init, ipc_diag=>diag, ipc_finalize=>finalize
 !!!_  - default
   implicit none
   public
@@ -87,8 +89,11 @@ contains
 
           if (ierr.eq.0) call mwe_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE, icomm=icomm) ! utl log
           if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! utl log
+          if (ierr.eq.0) call htb_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! utl log
 
-          if (ierr.eq.0) call fun_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! utl log mew
+          if (ierr.eq.0) call ipc_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc utl log
+
+          if (ierr.eq.0) call fun_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! utl log mwe
 
           if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE, levtry=envtry) ! prc utl log fun mwe
 
@@ -135,6 +140,8 @@ contains
           if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call mwe_diag(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call bld_diag(ierr, utmp, lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call htb_diag(ierr, utmp, lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call ipc_diag(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call fun_diag(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call env_diag(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call sus_diag(ierr, utmp, lv, mode=MODE_SURFACE)
@@ -173,6 +180,8 @@ contains
           if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call mwe_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call bld_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call htb_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call ipc_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call fun_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call env_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call sus_finalize(ierr, utmp, lv, mode=MODE_SURFACE)

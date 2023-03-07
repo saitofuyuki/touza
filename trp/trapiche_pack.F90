@@ -1,10 +1,10 @@
 !!!_! trapiche_pack.F90 - TOUZA/Trapiche integer packing/unpacking
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2022/03/14 11:20:41 fuyuki trapiche_pack.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/06 17:38:55 fuyuki trapiche_pack.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022
+! Copyright (C) 2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -14,12 +14,18 @@
 #  include "touza_config.h"
 #endif
 #include "touza_trp.h"
+#ifndef   TEST_TRAPICHE_PACK
+#  define TEST_TRAPICHE_PACK 0
+#endif
 !!!_@ TOUZA_Trp_pack - trapiche packing manager
 module TOUZA_Trp_pack
 !!!_ = declaration
   use TOUZA_Trp_std,only: KI8, KI32, KI64, &
        & control_mode, control_deep, is_first_force, &
        & unit_global,  trace_fine,   trace_control
+#if OPT_USE_IPC_IBITS
+  use TOUZA_Trp_std,only: ipc_IBITS
+#endif
   implicit none
   private
 !!!_  - public parameters
@@ -37,8 +43,9 @@ module TOUZA_Trp_pack
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
 # define __MDL__ 'p'
+# define _ERROR(E) (E - ERR_MASK_TRP_PACK)
 !!!_  - common
-  character(len=256) :: tmsg
+  ! character(len=256) :: tmsg
 !!!_  - interfaces
   interface pack_store
      module procedure pack_store_ii, pack_store_ll
@@ -46,6 +53,12 @@ module TOUZA_Trp_pack
   interface pack_restore
      module procedure pack_restore_ii, pack_restore_ll
   end interface pack_restore
+  interface pack_restore_slice
+     module procedure pack_restore_slice_ii
+  end interface pack_restore_slice
+  interface pack_restore_dunp
+     module procedure pack_restore_dunp_ii
+  end interface pack_restore_dunp
 
   interface pack_store_trn
      module procedure pack_store_trn_ii, pack_store_trn_ll
@@ -67,11 +80,6 @@ module TOUZA_Trp_pack
   interface pack_restore_trn_spdiv
      module procedure pack_restore_trn_spdiv_ii, pack_restore_trn_spdiv_ll
   end interface pack_restore_trn_spdiv
-
-  ! interface pack_restore_trn
-  !    module procedure pack_restore_trn_ii
-  !    module procedure pack_restore_trn_ll
-  ! end interface pack_restore_trn
 
   interface pack_store_seq
      module procedure pack_store_seq_ii, pack_store_seq_ll
@@ -109,10 +117,50 @@ module TOUZA_Trp_pack
      module procedure show_packed_i, show_packed_l
   end interface show_packed
 
+  interface mask_to_idxl
+     module procedure mask_to_idxl_i
+  end interface mask_to_idxl
+  interface mask_to_idxl_seq
+     module procedure mask_to_idxl_seq_i
+  end interface mask_to_idxl_seq
+
+  interface pack_gen_dspl
+     module procedure pack_gen_dspl_i
+  end interface pack_gen_dspl
+  interface pack_gen_dspl_seq
+     module procedure pack_gen_dspl_seq_i
+  end interface pack_gen_dspl_seq
+
+  interface pack_gen_runl
+     module procedure pack_gen_runl_i
+  end interface pack_gen_runl
+  interface pack_gen_runl_seq
+     module procedure pack_gen_runl_seq_i
+  end interface pack_gen_runl_seq
+
+  interface gen_bfc_slice
+     module procedure gen_bfc_slice_i
+  end interface gen_bfc_slice
+  interface gen_bfc_slice_seq
+     module procedure gen_bfc_slice_seq_i
+  end interface gen_bfc_slice_seq
+
+  interface gen_bfc_idxl
+     module procedure gen_bfc_idxl_i
+  end interface gen_bfc_idxl
+  interface gen_bfc_idxl_seq
+     module procedure gen_bfc_idxl_seq_i
+  end interface gen_bfc_idxl_seq
+
+  interface popcount_tab
+     module procedure popcount_tab_i, popcount_tab_l
+  end interface popcount_tab
 !!!_  - public
   public init, diag, finalize
   public count_packed
   public pack_store,          pack_restore
+  public pack_restore_slice,  pack_restore_dunp
+#if TEST_TRAPICHE_PACK
   public pack_store_trn,      pack_restore_trn
   public pack_store_trn_sp1,  pack_restore_trn_sp1
   public pack_store_trn_spdiv,pack_restore_trn_spdiv
@@ -120,9 +168,23 @@ module TOUZA_Trp_pack
   public pack_store_seq_sp1,  pack_restore_seq_sp1
   public pack_store_str,      pack_restore_str
   public pack_store_str_sp1,  pack_restore_str_sp1
+#endif
   public unparse_relleno
-  public show_props_trn,      show_packed
-  public div_ceiling, div_ceiling_safe
+  public show_props_trn,    show_packed
+  public div_ceiling,       div_ceiling_safe
+  public mask_to_idxl,      mask_to_idxl_seq
+  public pack_gen_dspl,     pack_gen_runl,     gen_bfc_slice
+  public gen_bfc_idxl
+#if TEST_TRAPICHE_PACK
+  public pack_gen_dspl_seq, pack_gen_runl_seq, gen_bfc_slice_seq
+  public gen_bfc_idxl_seq
+#endif
+  public popcount_tab
+  public set_loop_slice
+  public is_in_slice
+#if TEST_TRAPICHE_PACK
+  public count_zones
+#endif
 !!!_   . TOUZA_Trp_std
   public KI8, KI32, KI64
 
@@ -154,7 +216,7 @@ contains
           if (ierr.eq.0) call ts_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
        endif
        init_counts = init_counts + 1
-       if (ierr.ne.0) err_default = ERR_FAILURE_INIT
+       if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
     return
   end subroutine init
@@ -237,13 +299,13 @@ contains
     integer,            intent(in),optional :: nbskp
     integer(kind=KICNZ),intent(in),optional :: kxsp
 
-    integer,parameter   :: khld  = 0_KICNZ
+    integer,parameter   :: mold  = 0_KICNZ
     integer(kind=KICNZ) :: maxp, minn
     integer(kind=KICNZ) :: kofs
     integer(kind=KICNZ) :: nw, nb, mc
-    integer,parameter   :: lbits = BIT_SIZE(0_KICNZ)
-    integer(kind=KICNZ) :: lpos = + HUGE(khld)
-    integer(kind=KICNZ) :: lneg = (- HUGE(khld)) - 1
+    integer,parameter   :: lbits = BIT_SIZE(mold)
+    integer(kind=KICNZ) :: lpos = + HUGE(mold)
+    integer(kind=KICNZ) :: lneg = (- HUGE(mold)) - 1
 
     ierr = err_default
     kofs = max(-1_KICNZ, choice(-1_KICNZ, kxsp)) + 1_KICNZ
@@ -312,10 +374,10 @@ contains
     integer(kind=KICNZ) :: nc, nb
     integer(kind=KICNZ) :: ntgt
     integer(kind=KICNZ) :: kofs
-    integer,parameter   :: khld  = 0_KICNZ
-    integer,parameter   :: lbits = BIT_SIZE(khld)
-    integer(kind=KICNZ) :: lpos = + HUGE(khld)
-    integer(kind=KICNZ) :: lneg = - HUGE(khld) - 1
+    integer,parameter   :: mold  = 0_KICNZ
+    integer,parameter   :: lbits = BIT_SIZE(mold)
+    integer(kind=KICNZ) :: lpos = + HUGE(mold)
+    integer(kind=KICNZ) :: lneg = - HUGE(mold) - 1
 
     ierr = 0
 
@@ -413,7 +475,7 @@ contains
           call pack_store_trn_ii(ierr, ibagaz, icanaz, mem, nbits)
        endif
     case default
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_SWITCH)
     end select
     return
   end subroutine pack_store_ii
@@ -443,15 +505,112 @@ contains
     case (RELLENO_TRANSPOSE)
        call pack_store_trn_ll(ierr, ibagaz, icanaz, mem, nbits)
     case default
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_SWITCH)
     end select
     return
   end subroutine pack_store_ll
 
+!!!_  & pack_restore_slice - pack_restore wrapper (slice by runlength)
+  subroutine pack_restore_slice_ii &
+       & (ierr,   icanaz, &
+       &  ibagaz, mem,    nbits, kpack, &
+       &  lofs,   rsrc,   nfil,  bes,   nr)
+    use TOUZA_Trp_std,only: choice
+    implicit none
+    integer,parameter :: KIBGZ = KI32, KICNZ = KI32
+    integer,            intent(out) :: ierr
+    integer(kind=KICNZ),intent(out) :: icanaz(0:*)  ! destination buffer
+    integer(kind=KIBGZ),intent(in)  :: ibagaz(0:*)  ! source buffer
+    integer,            intent(in)  :: mem          ! number of items
+    integer,            intent(in)  :: nbits        ! target bit sizes
+    integer,            intent(in)  :: kpack        ! packing method
+    integer,            intent(in)  :: lofs(2, 0:*)
+    integer,            intent(in)  :: rsrc(0:*)
+    integer,            intent(in)  :: nfil
+    integer,            intent(in)  :: bes(3, 0:*)
+    integer,            intent(in)  :: nr
+
+    integer next(0:nr), span(0:nr-1), gstep(0:nr)
+    integer idx(0:nr-1)
+    integer jgb
+    integer jr, nrc
+    integer icont, inext
+    integer jf
+    integer jb,    mb
+    integer jcbgn, jcend
+    integer corg,  cskp
+
+    ierr = err_default
+    call set_loop_slice(jgb, gstep, next, span, bes, nr)
+    nrc = 0
+    do jr = 0, nr - 1
+       nrc = nrc + 1
+       if (next(jr).gt.0) exit
+    enddo
+    icont = product(span(0:nrc-1))
+    inext = sum(next(0:nrc-1)) + icont
+    idx(0:nr-1) = 0
+    jb = 0
+    do jf = 0, nfil / 2 - 1
+       mb     = rsrc(2 * jf + 1)
+       jcbgn  = lofs(1, jf)
+       jcend  = lofs(1, jf + 1)
+       corg   = lofs(2, jf)
+       cskp   = 0
+       do
+          if (jcbgn.ge.jcend) exit
+          call pack_restore_ii(ierr, icanaz(jcbgn), ibagaz(jb), icont, nbits, kpack, corg, cskp)
+          jcbgn = jcbgn + icont
+          cskp  = cskp  + inext
+          do jr = nrc, nr - 1
+             idx(jr) = idx(jr) + 1
+             if (idx(jr).lt.span(jr)) exit
+             cskp = cskp + next(jr)
+             idx(jr) = 0
+          enddo
+       enddo
+       jb = jb + mb
+    enddo
+  end subroutine pack_restore_slice_ii
+
+!!!_  & pack_restore_dunp - pack_restore wrapper (displacement+length list)
+  subroutine pack_restore_dunp_ii &
+       & (ierr,   icanaz, &
+       &  ibagaz, mem,    nbits, kpack, &
+       &  dunp,   nunp)
+    use TOUZA_Trp_std,only: choice
+    implicit none
+    integer,parameter :: KIBGZ = KI32, KICNZ = KI32
+    integer,            intent(out) :: ierr
+    integer(kind=KICNZ),intent(out) :: icanaz(0:*)  ! destination buffer
+    integer(kind=KIBGZ),intent(in)  :: ibagaz(0:*)  ! source buffer
+    integer,            intent(in)  :: mem          ! number of items
+    integer,            intent(in)  :: nbits        ! target bit sizes
+    integer,            intent(in)  :: kpack        ! packing method
+    integer,            intent(in)  :: dunp(3, 0:*)
+    integer,            intent(in)  :: nunp
+
+    integer ju
+    integer jbofs
+    integer jcbgn, ncont
+    integer corg,  cskp
+
+    ierr = err_default
+    cskp = 0
+    do ju = 0, nunp - 1
+       jcbgn = dunp(1, ju)
+       ncont = dunp(1, ju + 1) - jcbgn
+       jbofs = dunp(2, ju)
+       corg  = dunp(3, ju)
+       call pack_restore_ii(ierr, icanaz(jcbgn), ibagaz(jbofs), ncont, nbits, kpack, corg, cskp)
+    enddo
+  end subroutine pack_restore_dunp_ii
+
 !!!_  & pack_restore - pack_restore dispatcher
   subroutine pack_restore_ii &
        & (ierr,   icanaz, &
-       &  ibagaz, mem,   nbits, kpack)
+       &  ibagaz, mem,    nbits, kpack, org, skip)
+    use TOUZA_Trp_std,only: choice
     implicit none
     integer,parameter :: KIBGZ = KI32, KICNZ = KI32
 
@@ -461,37 +620,65 @@ contains
     integer,            intent(in)  :: mem          ! number of items
     integer,            intent(in)  :: nbits        ! target bit sizes
     integer,            intent(in)  :: kpack        ! packing method
+    integer,optional,   intent(in)  :: org          ! origin of source buffer
+    integer,optional,   intent(in)  :: skip         ! cue size at source
     integer kp
     integer,parameter :: lbits = bit_size(ibagaz(0))
-
+    integer xorg, xskip
+    integer cofs, bofs
     ierr = err_default
     if (nbits.eq.0) then
        icanaz(0:mem-1) = 0
        return
     endif
+    xskip = choice(0, skip)
+    if (lbits.eq.nbits) then
+       icanaz(0:mem-1) = ibagaz(xskip:xskip+mem-1)
+       return
+    endif
+    xorg = choice(0, org)
+
     kp = pack_method(-nbits, mem, kpack)
     select case (kp)
     case (RELLENO_SEQUENTIAL)
-       if (is_enabled_manual(nbits, mem, kpack)) then
-          if (nbits.eq.1) then
-             call pack_restore_seq_sp1_ii(ierr, icanaz, ibagaz, mem, nbits)
+       if (ierr.eq.0) then
+          call pack_restore_seq_head_ii &
+               & (ierr,   cofs,  bofs,  icanaz, &
+               &  ibagaz, mem,   nbits, xorg,   xskip)
+       endif
+       if (ierr.eq.0) then
+          if (is_enabled_manual(nbits, mem, kpack)) then
+             if (nbits.eq.1) then
+                call pack_restore_seq_sp1_ii(ierr, icanaz(cofs), ibagaz(bofs), mem - cofs, nbits)
+             else
+                call pack_restore_seq_ii(ierr, icanaz(cofs), ibagaz(bofs), mem - cofs, nbits)
+             endif
           else
-             call pack_restore_seq_ii(ierr, icanaz, ibagaz, mem, nbits)
+             call pack_restore_seq_ii(ierr, icanaz(cofs), ibagaz(bofs), mem - cofs, nbits)
           endif
-       else
-          call pack_restore_seq_ii(ierr, icanaz, ibagaz, mem, nbits)
        endif
     case (RELLENO_STRIDE)
-       if (is_enabled_manual(nbits, mem, kpack)) then
-          if (nbits.eq.1) then
-             call pack_restore_str_sp1_ii(ierr, icanaz, ibagaz, mem, nbits)
+       if (ierr.eq.0) then
+          call pack_restore_seq_head_ii &
+               & (ierr,   cofs,  bofs,  icanaz, &
+               &  ibagaz, mem,   nbits, xorg,   xskip)
+       endif
+       if (ierr.eq.0) then
+          if (is_enabled_manual(nbits, mem, kpack)) then
+             if (nbits.eq.1) then
+                call pack_restore_str_sp1_ii(ierr, icanaz(cofs), ibagaz(bofs), mem - cofs, nbits)
+             else
+                call pack_restore_str_ii(ierr, icanaz(cofs), ibagaz(bofs), mem - cofs, nbits)
+             endif
           else
-             call pack_restore_str_ii(ierr, icanaz, ibagaz, mem, nbits)
+             call pack_restore_str_ii(ierr, icanaz(cofs), ibagaz(bofs), mem - cofs, nbits)
           endif
-       else
-          call pack_restore_str_ii(ierr, icanaz, ibagaz, mem, nbits)
        endif
     case (RELLENO_TRANSPOSE)
+       if (present(org)) then
+          ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+          return
+       endif
        if (is_enabled_manual(nbits, mem, kpack)) then
           if (nbits.eq.1) then
              call pack_restore_trn_sp1_ii(ierr, icanaz, ibagaz, mem, nbits)
@@ -504,7 +691,7 @@ contains
           call pack_restore_trn_ii(ierr, icanaz, ibagaz, mem, nbits)
        endif
     case default
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_SWITCH)
     end select
     return
   end subroutine pack_restore_ii
@@ -537,11 +724,65 @@ contains
     case (RELLENO_TRANSPOSE)
        call pack_restore_trn_ll(ierr, icanaz, ibagaz, mem, nbits)
     case default
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_SWITCH)
     end select
     return
   end subroutine pack_restore_ll
 
+!!!_  & pack_restore_seq_head - special treatment on first some members
+  subroutine pack_restore_seq_head_ii &
+       & (ierr,   cofs,  bofs,  icanaz, &
+       &  ibagaz, mem,   nbits, org,    skip)
+    use TOUZA_Trp_std,only: choice
+    implicit none
+    integer,parameter :: KIBGZ = KI32, KICNZ = KI32
+
+    integer,            intent(out) :: ierr
+    integer,            intent(out) :: cofs, bofs   ! canaz/bagaz offsets for remnant
+    integer(kind=KICNZ),intent(out) :: icanaz(0:*)  ! destination buffer
+    integer(kind=KIBGZ),intent(in)  :: ibagaz(0:*)  ! source buffer
+    integer,            intent(in)  :: mem          ! number of items
+    integer,            intent(in)  :: nbits        ! target bit sizes
+    integer,            intent(in)  :: org          ! origin of source buffer
+    integer,            intent(in)  :: skip         ! cue size at source
+    integer,parameter :: lbits = bit_size(ibagaz(0))
+
+    integer nz
+    integer mskb, mske, msh
+    integer jc,   mc
+    integer corg, cskp
+
+    ierr = err_default
+
+    nz = count_zones(nbits, lbits)
+    mc = (nz * lbits) / nbits   ! number of canaz in nz zones
+    corg = mod(org, mc)
+    cskp = skip + corg
+
+    ! special treatment for the first line
+    cofs = mod(cskp, mc)
+    bofs = safe_div(cskp, nbits, lbits) -  safe_div(corg, nbits, lbits)
+    if (cofs.gt.0) then
+       mskb = mod(cofs * nbits, lbits)
+       cofs = min(mem, mc - cofs)
+       do jc = 0, cofs - 1
+          msh = mskb + nbits
+          mske = min(lbits, msh)
+          icanaz(jc) = &
+               & _IBITS(ibagaz(bofs), lbits - mske, mske - mskb)
+          if (msh.gt.lbits) then
+             bofs = bofs + 1
+             mskb = msh - lbits
+             icanaz(jc) = &
+                  & IOR(ISHFT(icanaz(jc), mskb), &
+                  &     _IBITS(ibagaz(bofs), lbits - mskb, mskb))
+          else
+             mskb = mske
+          endif
+       enddo
+       bofs = bofs + 1
+    endif
+  end subroutine pack_restore_seq_head_ii
 !!!_  & pack_store_seq - sequential packing
   subroutine pack_store_seq_ii &
        & (ierr,   ibagaz, &
@@ -587,18 +828,18 @@ contains
           do jc = jcbgn,     jcbgn
              msh = mskb + (jc - jcbgn) * nbits
              ibagaz(jb) = &
-                  & ISHFT(IBITS(icanaz(jc), 0, msh), lbits - msh)
+                  & ISHFT(_IBITS(icanaz(jc), 0, msh), lbits - msh)
           enddo
           do jc = jcbgn + 1, jcend - 1
              msh = mskb + (jc - jcbgn) * nbits
              ibagaz(jb) = &
-                  & IOR(ibagaz(jb), ISHFT(IBITS(icanaz(jc), 0, nbits), lbits - msh))
+                  & IOR(ibagaz(jb), ISHFT(_IBITS(icanaz(jc), 0, nbits), lbits - msh))
           enddo
           do jc = jcend, min(mem - 1, jcend)
              msh = mskb + (jc - jcbgn) * nbits
              msh = msh - lbits
              ibagaz(jb) = &
-                  & IOR(ibagaz(jb), IBITS(icanaz(jc), msh, nbits - msh))
+                  & IOR(ibagaz(jb), _IBITS(icanaz(jc), msh, nbits - msh))
           enddo
        enddo
     enddo
@@ -650,18 +891,18 @@ contains
           do jc = jcbgn,     jcbgn
              msh = mskb + (jc - jcbgn) * nbits
              ibagaz(jb) = &
-                  & ISHFT(IBITS(icanaz(jc), 0, msh), lbits - msh)
+                  & ISHFT(_IBITS(icanaz(jc), 0, msh), lbits - msh)
           enddo
           do jc = jcbgn + 1, jcend - 1
              msh = mskb + (jc - jcbgn) * nbits
              ibagaz(jb) = &
-                  & IOR(ibagaz(jb), ISHFT(IBITS(icanaz(jc), 0, nbits), lbits - msh))
+                  & IOR(ibagaz(jb), ISHFT(_IBITS(icanaz(jc), 0, nbits), lbits - msh))
           enddo
           do jc = jcend, min(mem - 1, jcend)
              msh = mskb + (jc - jcbgn) * nbits
              msh = msh - lbits
              ibagaz(jb) = &
-                  & IOR(ibagaz(jb), IBITS(icanaz(jc), msh, nbits - msh))
+                  & IOR(ibagaz(jb), _IBITS(icanaz(jc), msh, nbits - msh))
           enddo
        enddo
     enddo
@@ -672,7 +913,8 @@ contains
 !!!_  & pack_restore_seq - sequential unpacking
   subroutine pack_restore_seq_ii &
        & (ierr,   icanaz, &
-       &  ibagaz, mem,   nbits)
+       &  ibagaz, mem,    nbits)
+    use TOUZA_Trp_std,only: choice
     implicit none
     integer,parameter :: KIBGZ = KI32, KICNZ = KI32
 
@@ -719,17 +961,17 @@ contains
              msh = mskb + (jc - jcbgn) * nbits
              icanaz(jc) = &
                   & IOR(icanaz(jc), &
-                  &     IBITS(ibagaz(jb), lbits - msh, msh))
+                  &     _IBITS(ibagaz(jb), lbits - msh, msh))
           enddo
           do jc = jcbgn + 1, jcend - 1
              msh = mskb + (jc - jcbgn) * nbits
-             icanaz(jc) = IBITS(ibagaz(jb), lbits - msh, nbits)
+             icanaz(jc) = _IBITS(ibagaz(jb), lbits - msh, nbits)
           enddo
           do jc = jcend, min(mem - 1, jcend)
              msh = mskb + (jc - jcbgn) * nbits
              msh = msh - lbits
              icanaz(jc) = &
-                  & ISHFT(IBITS(ibagaz(jb), 0, nbits - msh), msh)
+                  & ISHFT(_IBITS(ibagaz(jb), 0, nbits - msh), msh)
           enddo
        enddo
     enddo
@@ -785,17 +1027,17 @@ contains
              msh = mskb + (jc - jcbgn) * nbits
              icanaz(jc) = &
                   & IOR(icanaz(jc), &
-                  &     IBITS(ibagaz(jb), lbits - msh, msh))
+                  &     _IBITS(ibagaz(jb), lbits - msh, msh))
           enddo
           do jc = jcbgn + 1, jcend - 1
              msh = mskb + (jc - jcbgn) * nbits
-             icanaz(jc) = IBITS(ibagaz(jb), lbits - msh, nbits)
+             icanaz(jc) = _IBITS(ibagaz(jb), lbits - msh, nbits)
           enddo
           do jc = jcend, min(mem - 1, jcend)
              msh = mskb + (jc - jcbgn) * nbits
              msh = msh - lbits
              icanaz(jc) = &
-                  & ISHFT(IBITS(ibagaz(jb), 0, nbits - msh), msh)
+                  & ISHFT(_IBITS(ibagaz(jb), 0, nbits - msh), msh)
           enddo
        enddo
     enddo
@@ -820,7 +1062,7 @@ contains
 
     ierr = err_default
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
 
@@ -886,7 +1128,7 @@ contains
 
     integer,parameter :: lbits = bit_size(ibagaz(0))
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
 
     return
   end subroutine pack_store_seq_sp1_ll
@@ -910,7 +1152,7 @@ contains
 
     ierr = err_default
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
 
@@ -974,7 +1216,7 @@ contains
 
     integer,parameter :: lbits = bit_size(ibagaz(0))
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
 
   end subroutine pack_restore_seq_sp1_ll
 
@@ -1021,20 +1263,20 @@ contains
        do jc = jcbgn,     jcbgn
           msh = mskb + (jc - jcbgn) * nbits
           ibagaz(jb:nb-1:nz) = &
-               & ISHFT(IBITS(icanaz(jc:mem-1:ncs), 0, msh), lbits - msh)
+               & ISHFT(_IBITS(icanaz(jc:mem-1:ncs), 0, msh), lbits - msh)
        enddo
        do jc = jcbgn + 1, jcend - 1
           mc = (moff - jc) / ncs
           msh = mskb + (jc - jcbgn) * nbits
           ibagaz(jb:jb+mc*nz-1:nz) = &
-               & IOR(ibagaz(jb:jb+mc*nz-1:nz), ISHFT(IBITS(icanaz(jc:jc+mc*ncs-1:ncs), 0, nbits), lbits - msh))
+               & IOR(ibagaz(jb:jb+mc*nz-1:nz), ISHFT(_IBITS(icanaz(jc:jc+mc*ncs-1:ncs), 0, nbits), lbits - msh))
        enddo
        do jc = jcend, min(mem - 1, jcend)
           msh = mskb + (jc - jcbgn) * nbits
           msh = msh - lbits
           mc = (moff - jc) / ncs
           ibagaz(jb:jb+mc*nz-1:nz) = &
-               & IOR(ibagaz(jb:jb+mc*nz-1:nz), IBITS(icanaz(jc:jc+mc*ncs-1:ncs), msh, nbits - msh))
+               & IOR(ibagaz(jb:jb+mc*nz-1:nz), _IBITS(icanaz(jc:jc+mc*ncs-1:ncs), msh, nbits - msh))
        enddo
     enddo
 
@@ -1083,20 +1325,20 @@ contains
        do jc = jcbgn,     jcbgn
           msh = mskb + (jc - jcbgn) * nbits
           ibagaz(jb:nb-1:nz) = &
-               & ISHFT(IBITS(icanaz(jc:mem-1:ncs), 0, msh), lbits - msh)
+               & ISHFT(_IBITS(icanaz(jc:mem-1:ncs), 0, msh), lbits - msh)
        enddo
        do jc = jcbgn + 1, jcend - 1
           mc = (moff - jc) / ncs
           msh = mskb + (jc - jcbgn) * nbits
           ibagaz(jb:jb+mc*nz-1:nz) = &
-               & IOR(ibagaz(jb:jb+mc*nz-1:nz), ISHFT(IBITS(icanaz(jc:jc+mc*ncs-1:ncs), 0, nbits), lbits - msh))
+               & IOR(ibagaz(jb:jb+mc*nz-1:nz), ISHFT(_IBITS(icanaz(jc:jc+mc*ncs-1:ncs), 0, nbits), lbits - msh))
        enddo
        do jc = jcend, min(mem - 1, jcend)
           msh = mskb + (jc - jcbgn) * nbits
           msh = msh - lbits
           mc = (moff - jc) / ncs
           ibagaz(jb:jb+mc*nz-1:nz) = &
-               & IOR(ibagaz(jb:jb+mc*nz-1:nz), IBITS(icanaz(jc:jc+mc*ncs-1:ncs), msh, nbits - msh))
+               & IOR(ibagaz(jb:jb+mc*nz-1:nz), _IBITS(icanaz(jc:jc+mc*ncs-1:ncs), msh, nbits - msh))
        enddo
     enddo
 
@@ -1149,19 +1391,19 @@ contains
           msh = mskb + (jc - jcbgn) * nbits
           icanaz(jc:mem-1:ncs) = &
                & IOR(icanaz(jc:mem-1:ncs), &
-               &     IBITS(ibagaz(jb:nb-1:nz), lbits - msh, msh))
+               &     _IBITS(ibagaz(jb:nb-1:nz), lbits - msh, msh))
        enddo
        do jc = jcbgn + 1, jcend - 1
           msh = mskb + (jc - jcbgn) * nbits
           mc = (moff - jc) / ncs
-          icanaz(jc:jc+mc*ncs-1:ncs) = IBITS(ibagaz(jb:jb+mc*nz-1:nz), lbits - msh, nbits)
+          icanaz(jc:jc+mc*ncs-1:ncs) = _IBITS(ibagaz(jb:jb+mc*nz-1:nz), lbits - msh, nbits)
        enddo
        do jc = jcend, min(ncs - 1, jcend)
           msh = mskb + (jc - jcbgn) * nbits
           msh = msh - lbits
           mc = (moff - jc) / ncs
           icanaz(jc:jc+mc*ncs-1:ncs) = &
-               & ISHFT(IBITS(ibagaz(jb:jb+mc*nz-1:nz), 0, nbits - msh), msh)
+               & ISHFT(_IBITS(ibagaz(jb:jb+mc*nz-1:nz), 0, nbits - msh), msh)
        enddo
     enddo
 
@@ -1213,19 +1455,19 @@ contains
           msh = mskb + (jc - jcbgn) * nbits
           icanaz(jc:mem-1:ncs) = &
                & IOR(icanaz(jc:mem-1:ncs), &
-               &     IBITS(ibagaz(jb:nb-1:nz), lbits - msh, msh))
+               &     _IBITS(ibagaz(jb:nb-1:nz), lbits - msh, msh))
        enddo
        do jc = jcbgn + 1, jcend - 1
           msh = mskb + (jc - jcbgn) * nbits
           mc = (moff - jc) / ncs
-          icanaz(jc:jc+mc*ncs-1:ncs) = IBITS(ibagaz(jb:jb+mc*nz-1:nz), lbits - msh, nbits)
+          icanaz(jc:jc+mc*ncs-1:ncs) = _IBITS(ibagaz(jb:jb+mc*nz-1:nz), lbits - msh, nbits)
        enddo
        do jc = jcend, min(ncs - 1, jcend)
           msh = mskb + (jc - jcbgn) * nbits
           msh = msh - lbits
           mc = (moff - jc) / ncs
           icanaz(jc:jc+mc*ncs-1:ncs) = &
-               & ISHFT(IBITS(ibagaz(jb:jb+mc*nz-1:nz), 0, nbits - msh), msh)
+               & ISHFT(_IBITS(ibagaz(jb:jb+mc*nz-1:nz), 0, nbits - msh), msh)
        enddo
     enddo
 
@@ -1252,7 +1494,7 @@ contains
 
     ierr = err_default
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
     jbend = mem / lbits
@@ -1317,15 +1559,15 @@ contains
     integer,            intent(in)  :: mem          ! number of items
     integer,            intent(in)  :: nbits        ! target bit sizes
 
-    integer,parameter :: lbits = bit_size(ibagaz(0))
-    integer jz, nz
-    integer jb, nb  ! range of bagazo (destination) elements
-    integer mskb
-    integer jcbgn, jcend, jc, ncs
-    integer moff,  mc
-    integer msh
+    ! integer,parameter :: lbits = bit_size(ibagaz(0))
+    ! integer jz, nz
+    ! integer jb, nb  ! range of bagazo (destination) elements
+    ! integer mskb
+    ! integer jcbgn, jcend, jc, ncs
+    ! integer moff,  mc
+    ! integer msh
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
 
     return
   end subroutine pack_store_str_sp1_ll
@@ -1350,7 +1592,7 @@ contains
 
     ierr = err_default
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
 
@@ -1415,15 +1657,15 @@ contains
     integer,            intent(in)  :: mem          ! number of items
     integer,            intent(in)  :: nbits        ! target bit sizes
 
-    integer,parameter :: lbits = bit_size(ibagaz(0))
-    integer jz, nz
-    integer jb, nb  ! range of bagazo (destination) elements
-    integer mskb
-    integer jcbgn, jcend, jc, ncs
-    integer moff,  mc
-    integer msh
+    ! integer,parameter :: lbits = bit_size(ibagaz(0))
+    ! integer jz, nz
+    ! integer jb, nb  ! range of bagazo (destination) elements
+    ! integer mskb
+    ! integer jcbgn, jcend, jc, ncs
+    ! integer moff,  mc
+    ! integer msh
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
 
     return
   end subroutine pack_restore_str_sp1_ll
@@ -1479,7 +1721,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
-               & ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, msh), lbits - msh)
+               & ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, msh), lbits - msh)
        enddo
        ! medium entries (copy whole)
        do jo = jobgn + 1, joend - 1
@@ -1490,7 +1732,7 @@ contains
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
                & IOR(ibagaz(jbbgn:jbend-1), &
-               &     ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, nbits), lbits - msh))
+               &     ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, nbits), lbits - msh))
        enddo
        ! bottom entries
        do jo = joend, joend
@@ -1502,7 +1744,7 @@ contains
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
                & IOR(ibagaz(jbbgn:jbend-1), &
-               &     IBITS(icanaz(jcbgn:jcend-1), msh, nbits - msh))
+               &     _IBITS(icanaz(jcbgn:jcend-1), msh, nbits - msh))
        enddo
     enddo
   end subroutine pack_store_trn_ii
@@ -1557,7 +1799,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
-               & ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, msh), lbits - msh)
+               & ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, msh), lbits - msh)
        enddo
        ! medium entries (copy whole)
        do jo = jobgn + 1, joend - 1
@@ -1568,7 +1810,7 @@ contains
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
                & IOR(ibagaz(jbbgn:jbend-1), &
-               &     ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, nbits), lbits - msh))
+               &     ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, nbits), lbits - msh))
        enddo
        ! bottom entries
        do jo = joend, joend
@@ -1580,7 +1822,7 @@ contains
           jbend = jbbgn + nc
           ibagaz(jbbgn:jbend-1) = &
                & IOR(ibagaz(jbbgn:jbend-1), &
-               &     IBITS(icanaz(jcbgn:jcend-1), msh, nbits - msh))
+               &     _IBITS(icanaz(jcbgn:jcend-1), msh, nbits - msh))
        enddo
     enddo
   end subroutine pack_store_trn_ll
@@ -1644,7 +1886,7 @@ contains
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
                & IOR(icanaz(jcbgn:jcend-1), &
-               &     IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, msh))
+               &     _IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, msh))
        enddo
        ! medium entries (copy whole)
        do jo = jobgn + 1, joend - 1
@@ -1654,7 +1896,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
-               & IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, nbits)
+               & _IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, nbits)
        enddo
        ! bottom entries
        do jo = joend, joend
@@ -1665,7 +1907,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
-               & ISHFT(IBITS(ibagaz(jbbgn:jbend-1), 0, nbits - msh), msh)
+               & ISHFT(_IBITS(ibagaz(jbbgn:jbend-1), 0, nbits - msh), msh)
        enddo
     enddo
   end subroutine pack_restore_trn_ii
@@ -1728,7 +1970,7 @@ contains
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
                & IOR(icanaz(jcbgn:jcend-1), &
-               &     IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, msh))
+               &     _IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, msh))
        enddo
        ! medium entries (copy whole)
        do jo = jobgn + 1, joend - 1
@@ -1738,7 +1980,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
-               & IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, nbits)
+               & _IBITS(ibagaz(jbbgn:jbend-1), lbits - msh, nbits)
        enddo
        ! bottom entries
        do jo = joend, joend
@@ -1749,7 +1991,7 @@ contains
           nc = jcend - jcbgn
           jbend = jbbgn + nc
           icanaz(jcbgn:jcend-1) = &
-               & ISHFT(IBITS(ibagaz(jbbgn:jbend-1), 0, nbits - msh), msh)
+               & ISHFT(_IBITS(ibagaz(jbbgn:jbend-1), 0, nbits - msh), msh)
        enddo
     enddo
   end subroutine pack_restore_trn_ll
@@ -1774,12 +2016,12 @@ contains
     integer ngflr
     integer jobgn, joend, jo        ! serial index of pattern
     integer jbbgn, jbend            ! range of bagazo (destination) elements
-    integer jcofs(0:lbits), nc, jc  ! range of cana-azucar (source) elements
+    integer jcofs(0:lbits), nc      ! range of cana-azucar (source) elements
 
     ierr = err_default
 
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
 
@@ -1831,7 +2073,7 @@ contains
             &     +ISHFT(IBITS(icanaz(jcofs(31):jcofs(31)+nc-1),0,1), +0))
     endif
     if (rgrps.gt.0) then
-       ibagaz(jbend-1) = ISHFT(IBITS(icanaz(jcofs(1)-1),0,1), 31)
+       ibagaz(jbend-1) = ISHFT(_IBITS(icanaz(jcofs(1)-1),0,1), 31)
        do jo = 1, ritms - 1
           ibagaz(jbend-1) = IOR(ibagaz(jbend-1), ISHFT(IBITS(icanaz(jcofs(jo+1)-1),0,1), 32-jo-1))
        enddo
@@ -1850,25 +2092,7 @@ contains
     integer(kind=KICNZ),intent(in)  :: icanaz(0:*)  ! source buffer
     integer,            intent(in)  :: mem          ! number of items
     integer,            intent(in)  :: nbits        ! target bit sizes
-
-    integer,parameter :: lbits = bit_size(ibagaz(0))
-
-    integer rgrps, ritms
-    integer jz,    nz
-    integer ngflr
-    integer jobgn, joend, jo    ! serial index of pattern
-    integer jbbgn, jbend        ! range of bagazo (destination) elements
-    integer jcofs(0:lbits), nc  ! range of cana-azucar (source) elements
-    integer msh
-    integer mskb
-
-    ierr = err_default
-
-    if (nbits.ne.1) then
-       ierr = -1
-       return
-    endif
-
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_store_trn_sp1_ll
 
 !!!_  & pack_restore_trn_sp1 - transposed unpacking special (1/32)
@@ -1891,12 +2115,12 @@ contains
     integer ngflr
     integer jobgn, joend, jo        ! serial index of pattern
     integer jbbgn, jbend            ! range of bagazo (destination) elements
-    integer jcofs(0:lbits), nc, jc  ! range of cana-azucar (source) elements
+    integer jcofs(0:lbits), nc      ! range of cana-azucar (source) elements
 
     ierr = err_default
 
     if (nbits.ne.1) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
 
@@ -1966,7 +2190,7 @@ contains
 
     integer,parameter :: lbits = bit_size(ibagaz(0))
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_restore_trn_sp1_ll
 
 !!!_  & pack_store_trn_spdiv - transposed packing special (32 divisor)
@@ -1993,7 +2217,7 @@ contains
     integer msh
 
     if (mod(lbits, nbits).ne.0) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
     if (lbits.eq.nbits) then
@@ -2016,7 +2240,7 @@ contains
        nc = jcend - jcbgn
        jbend = jbbgn + nc
        msh = lbits - (jo + 1) * nbits
-       ibagaz(jbbgn:jbend-1) = ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, nbits), msh)
+       ibagaz(jbbgn:jbend-1) = ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, nbits), msh)
     enddo
     do jo = jobgn + 1, joend - 1
        jcbgn = pos_source(jo,   ngflr, ritms)
@@ -2024,7 +2248,7 @@ contains
        nc = jcend - jcbgn
        jbend = jbbgn + nc
        msh = lbits - (jo + 1) * nbits
-       ibagaz(jbbgn:jbend-1) = IOR(ibagaz(jbbgn:jbend-1), ISHFT(IBITS(icanaz(jcbgn:jcend-1), 0, nbits), msh))
+       ibagaz(jbbgn:jbend-1) = IOR(ibagaz(jbbgn:jbend-1), ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, nbits), msh))
     enddo
   end subroutine pack_store_trn_spdiv_ii
   subroutine pack_store_trn_spdiv_ll &
@@ -2041,7 +2265,7 @@ contains
 
     integer,parameter :: lbits = bit_size(ibagaz(0))
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_store_trn_spdiv_ll
 
 !!!_  & pack_restore_trn_spdiv - transposed unpacking special (32 divisor)
@@ -2070,7 +2294,7 @@ contains
     ierr = err_default
 
     if (mod(lbits, nbits).ne.0) then
-       ierr = -1
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
        return
     endif
     if (lbits.eq.nbits) then
@@ -2092,7 +2316,7 @@ contains
        nc = jcend - jcbgn
        jbend = jbbgn + nc
        msh = lbits - (jo + 1) * nbits
-       icanaz(jcbgn:jcend-1) = IBITS(ibagaz(jbbgn:jbend-1), msh, nbits)
+       icanaz(jcbgn:jcend-1) = _IBITS(ibagaz(jbbgn:jbend-1), msh, nbits)
     enddo
   end subroutine pack_restore_trn_spdiv_ii
 
@@ -2110,7 +2334,7 @@ contains
 
     integer,parameter :: lbits = bit_size(ibagaz(0))
 
-    ierr = -1
+    ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_restore_trn_spdiv_ll
 
 !!!_  & unparse_relleno - packing method id
@@ -2488,8 +2712,720 @@ contains
     return
   end subroutine show_packed_seq_l
 
+!!!_ + custom-made procedures
+!!!_  & mask_to_idxl - 1/32 (mask) array expansion to index list
+  subroutine mask_to_idxl_i &
+       & (ierr,  ldst, lsrc, nidx,  &
+       &  imask, mem,  bes,  nr, kpack)
+    implicit none
+    integer,parameter :: KIBGZ = KI32
+    integer,            intent(out) :: ierr
+    integer,            intent(out) :: ldst(0:*)    ! index-list (unpacked, local)
+    integer,            intent(out) :: lsrc(0:*)    ! index-list (packed)
+    integer,            intent(out) :: nidx         ! size of list
+    integer(kind=KIBGZ),intent(in)  :: imask(0:*)   ! source array (mask)
+    integer,            intent(in)  :: mem          ! number of items (not size of ibagaz)
+    integer,            intent(in)  :: bes(3,0:*)   ! begin/end/stride set
+    integer,            intent(in)  :: nr           ! rank of bes
+    integer,            intent(in)  :: kpack        ! packing method
+    integer,parameter :: nbits = 1
+    integer kp
+    ierr = err_default
+    kp = pack_method(-nbits, mem, kpack)
+    select case (kp)
+    case (RELLENO_SEQUENTIAL,RELLENO_STRIDE)
+       call mask_to_idxl_seq_i(ierr, ldst, lsrc, nidx, imask, mem, bes, nr)
+    case (RELLENO_TRANSPOSE)
+       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    case default
+       ierr = _ERROR(ERR_INVALID_SWITCH)
+    end select
+  end subroutine mask_to_idxl_i
+!!!_  & mask_to_idxl - 1/32 (mask) array expansion to index list
+  subroutine mask_to_idxl_seq_i &
+       & (ierr,  ldst, lsrc, nidx,  &
+       &  imask, mem,  bes,  nr)
+    implicit none
+    integer,parameter :: KIBGZ = KI32
+    integer,            intent(out) :: ierr
+    integer,            intent(out) :: ldst(0:*)    ! index-list (unpacked, local)
+    integer,            intent(out) :: lsrc(0:*)    ! index-list (packed)
+    integer,            intent(out) :: nidx         ! size of list
+    integer(kind=KIBGZ),intent(in)  :: imask(0:*)   ! source array (mask)
+    integer,            intent(in)  :: mem          ! number of items (not size of ibagaz)
+    integer,            intent(in)  :: bes(3,0:*)   ! begin/end/stride set
+    integer,            intent(in)  :: nr           ! rank of bes
+
+    integer,parameter :: mold = 0_KIBGZ
+    integer,parameter :: nbits = 1
+    integer,parameter :: lbits = bit_size(mold)
+    integer jcbgn, jcend, jcnxt, jc
+    integer jbbgn, jbend, rbbgn, rbend, jb, rb     ! j: element  r: mod
+    integer mr_c,  cspan_c,  dspan_c
+    integer mr_b,  cspan_b,  dspan_b
+    integer idx(0:nr-1), next(0:nr), span(0:nr-1)
+    integer gstep(0:nr)
+    integer jr
+    integer jset, jdst
+
+    ierr = 0
+    call set_loop_slice(jcbgn, gstep, next, span, bes, nr)
+    ! mr_b, continuous ranks (gap allowed)
+    mr_b = continuous_ranks(next, nr, nbits, lbits)
+    ! mr_c, continuous ranks (no gap allowed)
+    mr_c = continuous_ranks(next, nr, lbits, lbits)
+    ! cspan_b, conitinuous span
+    cspan_b = 1 + SUM((span(0:mr_b-1) - 1) * gstep(0:mr_b-1))
+    ! cspan_b, conitinuous span
+    cspan_c = 1 + SUM((span(0:mr_c-1) - 1) * gstep(0:mr_c-1))
+    ! dspan_b, discontinuous span
+    dspan_b = sum(next(0:mr_b-1))
+    ! dspan_c, discontinuous span
+    dspan_c = sum(next(0:mr_c-1))
+
+    idx(0:nr-1) = 0
+    jcend = 0
+    nidx = 0
+    jset = 0
+    jdst = 0
+    loop_main: do
+       ! nonactive span jcend[prev]:jcbgn
+       jbbgn = jcbgn / lbits            ! safe_div(jcbgn, nbits=1, lbits)
+       rbbgn = mod(jcbgn, lbits)        ! safe_mod(jcbgn, nbits=1, lbits)
+       jbend = jcend / lbits
+       rbend = mod(jcend, lbits)
+       !  e     b
+       ! [xxxxx]+(... )
+       jset = jset + SUM(popcount_tab(imask(jbend:jbbgn-1)))
+       jset = jset + popcount_tab(_IBITS(imask(jbbgn), lbits - rbbgn, rbbgn))
+       ! continuous active span jcbgn:jcend[new]
+       jcend = jcbgn
+       jcnxt = jcbgn + cspan_b + dspan_b
+       loop_cont: do
+          ! gap
+          do jc = jcend, jcbgn - 1
+             jb = jc / lbits
+             rb = mod(jc, lbits)
+             if (BTEST(imask(jb), lbits - rb - 1)) jset = jset + 1
+          enddo
+          ! filled
+          jcend = jcbgn + cspan_c
+          do jc = jcbgn, jcend - 1
+             jb = jc / lbits
+             rb = mod(jc, lbits)
+             if (BTEST(imask(jb), lbits - rb - 1)) then
+                lsrc(nidx) = jset
+                ldst(nidx) = jdst
+                nidx = nidx + 1
+                jset = jset + 1
+             endif
+             jdst = jdst + 1
+          enddo
+          jcbgn = jcend + dspan_c
+          do jr = mr_c, mr_b - 1
+             idx(jr) = idx(jr) + 1
+             if (idx(jr).lt.span(jr)) cycle loop_cont
+             jcbgn = jcbgn + next(jr)
+             idx(jr) = 0
+          enddo
+          exit loop_cont
+       enddo loop_cont
+       ! remnant
+       jb = jcend / lbits
+       rb = mod(jcend, lbits)
+       jcend = jcend + lbits - rb
+       ! non-active
+       jcbgn = jcnxt
+       do jr = mr_b, nr - 1
+          idx(jr) = idx(jr) + 1
+          if (idx(jr).lt.span(jr)) then
+             ! update here to avoid out-of-bound access
+             jset = jset + popcount_tab(_IBITS(imask(jb), 0, lbits - rb))
+             cycle loop_main
+          endif
+          jcbgn = jcbgn + next(jr)
+          idx(jr) = 0
+       enddo
+       exit loop_main
+    enddo loop_main
+    return
+  end subroutine mask_to_idxl_seq_i
+!!!_  & mask_to_runl - 1/32 (mask) array expansion to alternate runlength list
+!!!_  & mask_to_runl_seq
+  ! subroutine mask_to_runl_seq_i &
+  !      & (ierr,  rfil, nfil, &
+  !      &  imask, mem,  bes,  nr)
+  !   implicit none
+  !   integer,parameter :: KIBGZ = KI32
+  !   integer,            intent(out) :: ierr
+  !   integer,            intent(out) :: rfil(0:*)    ! runlength list (skip read, ..., final-skip)
+  !   integer,            intent(out) :: nfil         ! size of rfil.  rfil[nfil] == final-skip
+  !   integer(kind=KIBGZ),intent(in)  :: imask(0:*)   ! source array (mask)
+  !   integer,            intent(in)  :: mem          ! number of expanded elements
+  !   integer,            intent(in)  :: bes(3,0:*)   ! begin/end/stride set
+  !   integer,            intent(in)  :: nr           ! rank of bes
+  !   integer,parameter :: mold = 0_KIBGZ
+
+  !   integer,parameter :: nbits = 1
+  !   integer,parameter :: lbits = bit_size(mold)
+  !   integer idx(0:nr-1), next(0:nr), span(0:nr-1)
+  !   integer gstep(0:nr)
+  !   integer jcbgn, jcend
+  !   integer jbbgn, jbend, rbbgn, rbend     ! j: element  r: mod
+  !   integer mr_c,  cspan_c,  dspan_c
+
+  !   ierr = err_default
+  !   call set_loop_slice(jcbgn, gstep, next, span, bes, nr)
+  !   ! mr_c, continuous ranks (no gap allowed)
+  !   mr_c = continuous_ranks(next, nr, lbits, lbits)
+  !   cspan_c = 1 + SUM((span(0:mr_c-1) - 1) * gstep(0:mr_c-1))
+  !   dspan_c = sum(next(0:mr_c-1))
+
+  !   idx(0:nr-1) = 0
+  !   nfil = 0
+  !   jcend = 0
+  !   jbend = 0
+  !   rfil(nfil) = 0
+  !   loop_main: do
+  !      ! nonactive span jge:jgb
+  !      jbbgn = safe_div(jcbgn, nbits, lbits)
+  !      rbbgn = safe_mod(jcbgn, nbits, lbits)
+  !   enddo loop_main
+
+  ! end subroutine mask_to_runl_seq_i
+
+!!!_  & pack_gen_dspl - 1/32 (mask) generate displacement+length list
+  subroutine pack_gen_dspl_i &
+       & (ierr,  lofs, dsrc, n,   &
+       &  nbits, mem,  bes,  nr,  kpack, mold)
+    implicit none
+    integer,parameter :: KIBGZ = KI32
+    integer,            intent(out) :: ierr
+    integer,            intent(out) :: lofs(2, 0:*)    ! offset (unpacked, local, bit offset)
+    integer,            intent(out) :: dsrc(2, 0:*)    ! disp+length-list (packed)
+    integer,            intent(out) :: n               ! size of list
+    integer,            intent(in)  :: nbits           ! source bits
+    integer,            intent(in)  :: mem             ! not used
+    integer,            intent(in)  :: bes(3,0:*)      ! begin/end/stride set
+    integer,            intent(in)  :: nr              ! rank of bes
+    integer,            intent(in)  :: kpack           ! packing method
+    integer(kind=KIBGZ),intent(in)  :: mold
+
+    integer kp
+    ierr = err_default
+    kp = pack_method(-nbits, mem, kpack)
+    select case (kp)
+    case (RELLENO_SEQUENTIAL,RELLENO_STRIDE)
+       call pack_gen_dspl_seq_i(ierr, lofs, dsrc, n, nbits, mem, bes, nr, mold)
+    case (RELLENO_TRANSPOSE)
+       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    case default
+       ierr = _ERROR(ERR_INVALID_SWITCH)
+    end select
+  end subroutine pack_gen_dspl_i
+!!!_  & pack_gen_dspl_seq - 1/32 (mask) generate displacement+length list
+  subroutine pack_gen_dspl_seq_i &
+       & (ierr,  lofs, dsrc, n,   &
+       &  nbits, mem,  bes,  nr,  mold)
+    implicit none
+    integer,parameter :: KIBGZ = KI32
+    integer,            intent(out) :: ierr
+    integer,            intent(out) :: lofs(2, 0:*)    ! offset (unpacked, local, bit offset)
+    integer,            intent(out) :: dsrc(2, 0:*)    ! disp+length-list (packed)
+    integer,            intent(out) :: n               ! size of list
+    integer,            intent(in)  :: nbits           ! source bits
+    integer,            intent(in)  :: mem             ! not used
+    integer,            intent(in)  :: bes(3,0:*)      ! begin/end/stride set
+    integer,            intent(in)  :: nr              ! rank of bes
+    integer(kind=KIBGZ),intent(in)  :: mold
+
+    integer,parameter :: lbits = bit_size(mold)
+    integer jgb, jge, ngi, ngx, ngz
+    integer jmb, jme, rmb, rme
+    integer idx(0:nr-1), next(0:nr), span(0:nr-1)
+    integer gstep(0:nr), lstep(0:nr)
+    integer jr, nri
+    integer mc
+
+    ierr = 0
+    call set_loop_slice(jgb, gstep, next, span, bes, nr)
+    lstep(0) = 1
+    do jr = 0, nr - 1
+       lstep(jr+1) = lstep(jr) * span(jr)
+    enddo
+    ! nri, continuous ranks
+    nri = continuous_ranks(next, nr, nbits, lbits)
+    ! ngi, innermost span
+    ngi = max(0, span(0))
+    ! ngx, conitinuous span
+    ngx = 1 + SUM((span(0:nri-1) - 1) * gstep(0:nri-1))
+    ! ngz, discontinuous step
+    ngz = sum(next(0:nri-1))
+    ! mc, number of canaz in nz zones
+    mc = (count_zones(nbits, lbits) * lbits) / nbits
+    ! create displacement+length list
+    idx(0:nr-1) = 0
+    jgb = sum(bes(1, 0:nr-1) * gstep(0:nr-1))
+    rme = lbits
+    n = 0
+    loop_main: do
+       jge = jgb + ngx
+       ! continuous active span
+       jmb = safe_div(jgb, nbits, lbits)
+       rmb = safe_mod(jgb, nbits, lbits)
+       jme = safe_div(jge, nbits, lbits)
+       rme = safe_mod(jge, nbits, lbits)
+       dsrc(1, n) = jmb
+       dsrc(2, n) = jme - jmb + min(1, rme)
+       lofs(1, n) = sum(idx(0:nr-1) * lstep(0:nr-1))
+       lofs(2, n) = mod(jgb, mc)
+       n = n + 1
+       ! iterate nonactive
+       jgb = jge + ngz
+       do jr = nri, nr - 1
+          idx(jr) = idx(jr) + 1
+          if (idx(jr).lt.span(jr)) cycle loop_main
+          jgb = jgb + next(jr)
+          idx(jr) = 0
+       enddo
+       exit loop_main
+    enddo loop_main
+    ! sentry
+    if (ierr.eq.0) then
+       lofs(1, n) = product(span(0:nr-1))
+       lofs(2, n) = product(bes(3, 0:nr-1))
+    endif
+
+    return
+  end subroutine pack_gen_dspl_seq_i
+  subroutine pack_gen_runl_i &
+       & (ierr,  lofs, rsrc, n,   &
+       &  nbits, mem,  bes,  nr,  kpack, mold)
+    implicit none
+    integer,parameter :: KIBGZ = KI32
+    integer,            intent(out) :: ierr
+    integer,            intent(out) :: lofs(2, 0:*)    ! offset (unpacked, local, bit offset)
+    integer,            intent(out) :: rsrc(0:*)       ! runlength list (packed)  skip,read,skip,...
+    integer,            intent(out) :: n               ! size of list
+    integer,            intent(in)  :: nbits           ! source bits
+    integer,            intent(in)  :: mem             ! not used
+    integer,            intent(in)  :: bes(3,0:*)      ! begin/end/stride set
+    integer,            intent(in)  :: nr              ! rank of bes
+    integer,            intent(in)  :: kpack           ! packing method
+    integer(kind=KIBGZ),intent(in)  :: mold
+
+    integer kp
+    ierr = err_default
+    kp = pack_method(-nbits, mem, kpack)
+    select case (kp)
+    case (RELLENO_SEQUENTIAL,RELLENO_STRIDE)
+       call pack_gen_runl_seq_i(ierr, lofs, rsrc, n, nbits, mem, bes, nr, mold)
+    case (RELLENO_TRANSPOSE)
+       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    case default
+       ierr = _ERROR(ERR_INVALID_SWITCH)
+    end select
+  end subroutine pack_gen_runl_i
+!!!_  & pack_gen_runl_seq - 1/32 (mask) generate runlength list
+  subroutine pack_gen_runl_seq_i &
+       & (ierr,  lofs, rsrc, n,   &
+       &  nbits, mem,  bes,  nr,  mold)
+    implicit none
+    integer,parameter :: KIBGZ = KI32
+    integer,            intent(out) :: ierr
+    integer,            intent(out) :: lofs(2, 0:*)    ! offset (unpacked, local, bit offset)
+    integer,            intent(out) :: rsrc(0:*)       ! runlength list (packed)  skip,read,skip,...
+    integer,            intent(out) :: n               ! size of list
+    integer,            intent(in)  :: nbits           ! source bits
+    integer,            intent(in)  :: mem             ! not used
+    integer,            intent(in)  :: bes(3,0:*)      ! begin/end/stride set
+    integer,            intent(in)  :: nr              ! rank of bes
+    integer(kind=KIBGZ),intent(in)  :: mold
+
+    integer,parameter :: lbits = bit_size(mold)
+    integer jgb, jge, ngi, ngx, ngz
+    integer jmb, jme, rmb, rme
+    integer idx(0:nr-1), next(0:nr), span(0:nr-1)
+    integer gstep(0:nr), lstep(0:nr)
+    integer jr, nri
+    integer mc
+
+    ierr = 0
+    call set_loop_slice(jgb, gstep, next, span, bes, nr)
+    lstep(0) = 1
+    do jr = 0, nr - 1
+       lstep(jr+1) = lstep(jr) * span(jr)
+    enddo
+    ! nri, continuous ranks
+    nri = continuous_ranks(next, nr, nbits, lbits)
+    ! ngi, innermost span
+    ngi = max(0, span(0))
+    ! ngx, conitinuous span
+    ngx = 1 + SUM((span(0:nri-1) - 1) * gstep(0:nri-1))
+    ! ngz, discontinuous step
+    ngz = sum(next(0:nri-1))
+
+    ! mc, number of canaz in nz zones
+    mc = (count_zones(nbits, lbits) * lbits) / nbits
+
+    ! create displacement+length list
+    idx(0:nr-1) = 0
+    rme = lbits
+    n = 0
+    jge = 0
+    jme = 0
+    loop_main: do
+       ! nonactive span jge:jgb
+       jmb = safe_div(jgb, nbits, lbits)
+       rmb = safe_mod(jgb, nbits, lbits)
+       ! write(*, *) 'runl', n, jme, jmb, '/', jge, jgb
+       rsrc(n) = jmb - jme
+       n = n + 1
+       ! continuous active span jgb:jge
+       jge = jgb + ngx
+       jme = safe_div(jge, nbits, lbits)
+       rme = safe_mod(jge, nbits, lbits)
+       ! write(*, *) 'runl', n, jmb, jme + min(1, rme), '/', jgb, jge
+       rsrc(n) = jme + min(1, rme) - jmb
+       lofs(1, n/2) = sum(idx(0:nr-1) * lstep(0:nr-1))
+       lofs(2, n/2) = mod(jgb, mc)
+       n = n + 1
+       ! iterate nonactive
+       jgb = jge + ngz
+       jme = jme + min(1, rme)
+       do jr = nri, nr - 1
+          idx(jr) = idx(jr) + 1
+          if (idx(jr).lt.span(jr)) cycle loop_main
+          jgb = jgb + next(jr)
+          idx(jr) = 0
+       enddo
+       exit loop_main
+    enddo loop_main
+    ! sentry
+    if (ierr.eq.0) then
+       lofs(1, n/2) = product(span(0:nr-1))
+       lofs(2, n/2) = product(bes(3, 0:nr-1))
+    endif
+    return
+  end subroutine pack_gen_runl_seq_i
+!!!_  - gen_bfc_slice
+  subroutine gen_bfc_slice_i &
+       & (ierr,  dunp, nunp, rfil, nfil, &
+       &  nbits, mem,  bes,  nr,   kpack, mold)
+    implicit none
+    integer,parameter :: KIBGZ = KI32
+    integer,            intent(out) :: ierr
+    integer,            intent(out) :: dunp(3, 0:*)    ! unpack sequence (unp offset, buf offset, buf origin)
+    integer,            intent(out) :: rfil(0:*)       ! bagaz to buffer runlength list (skip,read,skip,..., final-skip)
+    integer,            intent(out) :: nunp, nfil      ! size of dunp rfil
+    integer,            intent(in)  :: nbits           ! source bits
+    integer,            intent(in)  :: mem             ! not used
+    integer,            intent(in)  :: bes(3,0:*)      ! begin/end/stride set
+    integer,            intent(in)  :: nr              ! rank of bes
+    integer,            intent(in)  :: kpack           ! packing method
+    integer(kind=KIBGZ),intent(in)  :: mold
+
+    integer kp
+    ierr = err_default
+    kp = pack_method(-nbits, mem, kpack)
+    select case (kp)
+    case (RELLENO_SEQUENTIAL,RELLENO_STRIDE)
+       call gen_bfc_slice_seq_i(ierr, dunp, nunp, rfil, nfil, nbits, mem, bes, nr, mold)
+    case (RELLENO_TRANSPOSE)
+       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    case default
+       ierr = _ERROR(ERR_INVALID_SWITCH)
+    end select
+  end subroutine gen_bfc_slice_i
+!!!_  & gen_bfc_slice_seq - 1/32 (mask) generate bagaz/filter/canaz
+  subroutine gen_bfc_slice_seq_i &
+       & (ierr,  dunp, nunp, rfil, nfil, &
+       &  nbits, mem,  bes,  nr,   mold)
+    implicit none
+    integer,parameter :: KIBGZ = KI32
+    integer,            intent(out) :: ierr
+    integer,            intent(out) :: dunp(3, 0:*)    ! unpack sequence (unp offset, buf offset, buf origin)
+    integer,            intent(out) :: rfil(0:*)       ! bagaz to buffer runlength list (skip,read,skip,...)
+    integer,            intent(out) :: nunp, nfil      ! size of dunp rfil
+    integer,            intent(in)  :: nbits           ! source bits
+    integer,            intent(in)  :: mem             ! not used
+    integer,            intent(in)  :: bes(3,0:*)      ! begin/end/stride set
+    integer,            intent(in)  :: nr              ! rank of bes
+    integer(kind=KIBGZ),intent(in)  :: mold
+
+    integer,parameter :: lbits = bit_size(mold)
+    integer jcbgn, jcend
+    integer jbbgn, jbend, rbbgn, rbend     ! j: element  r: mod
+    integer idx(0:nr-1), next(0:nr), span(0:nr-1)
+    integer gstep(0:nr)
+    integer jr
+    integer mc
+    integer mr_b, cspan_b, dspan_b
+    integer mr_c, cspan_c, dspan_c
+    integer jfbgn, jfofs
+    integer jubgn, juend
+    ! [b] bagaz elements, packed global
+    ! [f] filtered bagaz elements
+    ! [c] canaz elements, unpacked global
+    ! [u] filtered canaz elements
+
+    ierr = 0
+    call set_loop_slice(jcbgn, gstep, next, span, bes, nr)
+    ! mr_b, continuous ranks (gap allowed)
+    mr_b = continuous_ranks(next, nr, nbits, lbits)
+    ! mr_c, continuous ranks (no gap allowed)
+    mr_c = continuous_ranks(next, nr, lbits, lbits)
+    ! cspan_b, conitinuous span
+    cspan_b = 1 + SUM((span(0:mr_b-1) - 1) * gstep(0:mr_b-1))
+    ! cspan_b, conitinuous span
+    cspan_c = 1 + SUM((span(0:mr_c-1) - 1) * gstep(0:mr_c-1))
+    ! dspan_b, discontinuous span
+    dspan_b = sum(next(0:mr_b-1))
+    ! dspan_c, discontinuous span
+    dspan_c = sum(next(0:mr_c-1))
+
+    ! mc, number of canaz in nz zones
+    mc = (count_zones(nbits, lbits) * lbits) / nbits
+
+    idx(0:nr-1) = 0
+    nfil = 0
+    nunp = 0
+    jcend = 0
+    jbend = 0
+    jfbgn = 0
+    jubgn = 0
+    loop_main: do
+       ! nonactive span jcend[prev]:jcbgn
+       jbbgn = safe_div(jcbgn, nbits, lbits)
+       rbbgn = safe_mod(jcbgn, nbits, lbits)
+       rfil(nfil) = jbbgn - jbend
+       nfil = nfil + 1
+       ! continuous active span jcbgn:jcend[new]
+       jcend = jcbgn + cspan_b
+       jbend = safe_div(jcend, nbits, lbits)
+       rbend = safe_mod(jcend, nbits, lbits)
+       rfil(nfil) = jbend + min(1, rbend) - jbbgn
+       nfil = nfil + 1
+       ! unpack list
+       jfofs = safe_div(jcbgn, nbits, lbits)
+       loop_unp: do
+          ! write(*, *) 'bfc', nfil, nunp, jubgn, jcbgn
+          dunp(1, nunp) = jubgn
+          dunp(2, nunp) = jfbgn + safe_div(jcbgn, nbits, lbits) - jfofs
+          dunp(3, nunp) = mod(jcbgn, mc)
+          nunp = nunp + 1
+          jubgn = jubgn + cspan_c
+          jcbgn = jcbgn + cspan_c + dspan_c
+          do jr = mr_c, mr_b - 1
+             idx(jr) = idx(jr) + 1
+             if (idx(jr).lt.span(jr)) cycle loop_unp
+             jcbgn = jcbgn + next(jr)
+             idx(jr) = 0
+          enddo
+          exit loop_unp
+       enddo loop_unp
+       ! iterate nonactive
+       jcbgn = jcend + dspan_b
+       jbend = jbend + min(1, rbend)
+       jfbgn = jfbgn + jbend - jbbgn
+       do jr = mr_b, nr - 1
+          idx(jr) = idx(jr) + 1
+          if (idx(jr).lt.span(jr)) cycle loop_main
+          jcbgn = jcbgn + next(jr)
+          idx(jr) = 0
+       enddo
+       exit loop_main
+    enddo loop_main
+    ! sentry
+    if (ierr.eq.0) then
+       jbbgn = count_packed_ii(nbits, mem, mold)
+       rfil(nfil) = jbbgn - jbend
+       dunp(1, nunp) = product(span(0:nr-1))
+       dunp(2, nunp) = jfbgn
+       dunp(3, nunp) = 0
+    endif
+    return
+  end subroutine gen_bfc_slice_seq_i
+
+!!!_  & set_loop_slice
+  subroutine set_loop_slice &
+       & (jgorg, gstep, gnext, lspan, bes, nr)
+    implicit none
+    integer,intent(out) :: jgorg
+    integer,intent(out) :: gstep(0:*)
+    integer,intent(out) :: gnext(0:*)
+    integer,intent(out) :: lspan(0:*)
+    integer,intent(in)  :: bes(3, 0:*)    ! [begin, end, size] along rank
+    integer,intent(in)  :: nr
+    integer jr
+
+    ! lspan: e - b along rank
+    lspan(0:nr-1) = max(0, &
+         &              max(0, min(bes(3, 0:nr-1), bes(2, 0:nr-1))) &
+         &              - max(0, min(bes(3, 0:nr-1), bes(1, 0:nr-1))))
+
+    ! gstep: (*,j,*) to (*,j+1,*)
+    gstep(0) = 1
+    do jr = 0, nr - 1
+       gstep(jr+1) = gstep(jr) * max(0, bes(3, jr))
+    enddo
+
+    ! gnext: (*,e,j) to (*,b,j+1)
+    gnext(0:nr-1) = gstep(0:nr-1) * max(0, bes(3, 0:nr-1) - lspan(0:nr-1))
+
+    ! jgorg: (b,b,b)
+    jgorg = sum(bes(1, 0:nr-1) * gstep(0:nr-1))
+
+    return
+  end subroutine set_loop_slice
+
+!!!_  & continuous_ranks()
+  integer function continuous_ranks(gnext, nr, nbits, lbits) result(n)
+    implicit none
+    integer,intent(in) :: gnext(0:*)
+    integer,intent(in) :: nr
+    integer,intent(in) :: nbits, lbits    ! tolerance of gap in bits
+    integer m, jr
+    n = 0
+    m = 0
+    do jr = 0, nr - 1
+       n = n + 1
+       m = m + gnext(jr)
+       if (m * nbits.ge.lbits) exit
+    enddo
+  end function continuous_ranks
+
+!!!_  & is_in_slice()
+  PURE &
+    logical function is_in_slice(j, bes, nr) result(b)
+    implicit none
+    integer,intent(in) :: j
+    integer,intent(in) :: bes(3, 0:*)
+    integer,intent(in) :: nr
+    integer jr, jb, jx
+    b = .FALSE.
+    jb = j
+    do jr = 0, nr - 1
+       jx = mod(jb, bes(3, jr))
+       if (jx.lt.bes(1, jr).or.bes(2, jr).le.jx) return
+       jb = jb / bes(3, jr)
+    enddo
+    b = .TRUE.
+  end function is_in_slice
+
+!!!_  & gen_bfc_idxl - 1/32 (mask) generate bagaz/filter/canaz
+  subroutine gen_bfc_idxl_i &
+       & (ierr,  dunp, nunp, rfil, nfil,  &
+       &  nbits, mem,  lsrc, nidx, kpack, mold)
+    implicit none
+    integer,parameter :: KIBGZ = KI32
+    integer,            intent(out) :: ierr
+    integer,            intent(out) :: dunp(3, 0:*)    ! unpack sequence (unp offset, buf offset, buf origin)
+    integer,            intent(out) :: rfil(0:*)       ! bagaz to buffer runlength list (skip,read,skip,...)
+    integer,            intent(out) :: nunp, nfil      ! size of dunp rfil
+    integer,            intent(in)  :: nbits           ! source bits
+    integer,            intent(in)  :: mem             ! not used
+    integer,            intent(in)  :: lsrc(0:*)       ! index list
+    integer,            intent(in)  :: nidx            ! rank of bes
+    integer,            intent(in)  :: kpack           ! packing method
+    integer(kind=KIBGZ),intent(in)  :: mold
+
+    integer kp
+    ierr = err_default
+    kp = pack_method(-nbits, mem, kpack)
+    select case (kp)
+    case (RELLENO_SEQUENTIAL,RELLENO_STRIDE)
+       call gen_bfc_idxl_seq_i &
+            & (ierr,  dunp, nunp, rfil, nfil, &
+            &  nbits, mem,  lsrc, nidx, mold)
+    case (RELLENO_TRANSPOSE)
+       ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    case default
+       ierr = _ERROR(ERR_INVALID_SWITCH)
+    end select
+  end subroutine gen_bfc_idxl_i
+
+!!!_  & gen_bfc_idxl_seq - 1/32 (mask) generate bagaz/filter/canaz
+  subroutine gen_bfc_idxl_seq_i &
+       & (ierr,  dunp, nunp, rfil, nfil, &
+       &  nbits, mem,  lsrc, nidx, mold)
+    implicit none
+    integer,parameter :: KIBGZ = KI32
+    integer,            intent(out) :: ierr
+    integer,            intent(out) :: dunp(3, 0:*)    ! unpack sequence (unp offset, buf offset, buf origin)
+    integer,            intent(out) :: rfil(0:*)       ! bagaz to buffer runlength list (skip,read,skip,...)
+    integer,            intent(out) :: nunp, nfil      ! size of dunp rfil
+    integer,            intent(in)  :: nbits           ! source bits
+    integer,            intent(in)  :: mem             ! not used
+    integer,            intent(in)  :: lsrc(0:*)       ! index list
+    integer,            intent(in)  :: nidx            ! rank of bes
+    integer(kind=KIBGZ),intent(in)  :: mold
+
+    integer,parameter :: lbits = bit_size(mold)
+    integer ji
+    integer jfbgn, jfend, rfend, jforg
+    integer juorg, juend
+    integer jcorg
+    integer nc, mc, mu, mf
+    integer mgap
+
+    ierr = 0
+    ! mc, number of canaz in nz zones
+    mc = (count_zones(nbits, lbits) * lbits) / nbits
+    mgap = (lbits - 1) / nbits + 1
+
+    nunp = 0
+    nfil = 0
+    ji = 0
+    jfbgn = 0
+    jfend = 0
+    jforg = 0
+  ! write(*, *) 'bfc/lsrc:', lsrc(0:nidx-1)
+    loop_out: do
+       if (ji.ge.nidx) exit
+       jfbgn = safe_div(lsrc(ji), nbits, lbits)
+       ! write(*, *) 'bfc/idxl: ', ji, lsrc(ji), jfend, jforg
+       rfil(nfil) = jfbgn - jfend
+       nfil = nfil + 1
+       loop_unp: do
+          juorg = lsrc(ji)
+          dunp(1, nunp) = ji
+          dunp(2, nunp) = jforg + safe_div(juorg, nbits, lbits) - jfbgn
+          dunp(3, nunp) = mod(juorg, mc)
+          nunp = nunp + 1
+          ! juorg:juorg+nu  no-gap continuous sequence
+          mu = 0
+          do
+             ji = ji + 1
+             mu = mu + 1
+             if (ji.ge.nidx) exit loop_unp
+             if (lsrc(ji).gt.juorg + mu) exit
+          enddo
+          ! write(*, *) 'bfc/idxl/cont: ', ji, lsrc(ji-1), lsrc(ji), mgap
+          !! identical
+          !! if (lsrc(ji) - (lsrc(ji - 1) + 1) .ge. mgap) exit loop_unp
+          if (lsrc(ji) - (lsrc(ji - 1)) .gt. mgap) exit loop_unp
+       enddo loop_unp
+       juend = lsrc(ji - 1) + 1
+       jfend = safe_div(juend, nbits, lbits)
+       rfend = safe_mod(juend, nbits, lbits)
+       jfend = jfend + min(1, rfend)
+       rfil(nfil) = jfend - jfbgn
+       jforg = jforg + jfend - jfbgn
+       nfil = nfil + 1
+    enddo loop_out
+    ! sentry
+    if (ierr.eq.0) then
+       jfbgn = count_packed_ii(nbits, mem, mold)
+       rfil(nfil) = jfbgn - jfend
+       dunp(1, nunp) = nidx
+       dunp(2, nunp) = jforg
+       dunp(3, nunp) = 0
+    endif
+  end subroutine gen_bfc_idxl_seq_i
 !!!_ + private procedures
 !!!_  & pack_method ()
+  PURE &
   integer function pack_method &
        & (nbits, nmem, kpack) &
        & result(m)
@@ -2502,6 +3438,7 @@ contains
   end function pack_method
 
 !!!_  & is_enabled_manual ()
+  PURE &
   logical function is_enabled_manual &
        & (nbits, nmem, kpack) &
        & result(b)
@@ -2513,46 +3450,48 @@ contains
   end function is_enabled_manual
 
 !!!_  & count_zones() - count different padding patterns (maximum)
-  PURE integer function count_zones &
+  PURE &
+  integer function count_zones &
        & (nbits, lbits) result(n)
     implicit none
     integer,intent(in) :: nbits ! target bit sizes
     integer,intent(in) :: lbits ! storage bit sizes
     integer k, m
-    ! get gcd
-    k = lbits
-    n = nbits
-    do
-       m = mod(k, n)
-       if (m.eq.0) exit
-       k = n
-       n = m
-    enddo
-    n = nbits / n
-
+    if (nbits.le.0) then
+       n = -1
+    else
+       ! get gcd
+       k = lbits
+       n = nbits
+       do
+          m = mod(k, n)
+          if (m.eq.0) exit
+          k = n
+          n = m
+       enddo
+       n = nbits / n
+    endif
     return
   end function count_zones
 !!!_  & count_packed
   integer function count_packed_ii &
-       & (nbits, mem, istr) result (n)
+       & (nbits, mem, mold) result (n)
     implicit none
     integer,           intent(in) :: nbits
     integer,           intent(in) :: mem
-    integer(kind=KI32),intent(in) :: istr
-    integer lbits
-    lbits = bit_size(istr)
+    integer(kind=KI32),intent(in) :: mold
+    integer,parameter :: lbits = bit_size(mold)
     n = div_ceiling_safe(nbits, mem, lbits)
     return
   end function count_packed_ii
 
   integer function count_packed_ll &
-       & (nbits, mem, istr) result (n)
+       & (nbits, mem, mold) result (n)
     implicit none
     integer,           intent(in) :: nbits
     integer,           intent(in) :: mem
-    integer(kind=KI64),intent(in) :: istr
-    integer lbits
-    lbits = bit_size(istr)
+    integer(kind=KI64),intent(in) :: mold
+    integer,parameter :: lbits = bit_size(mold)
     n = div_ceiling_safe(nbits, mem, lbits)
     return
   end function count_packed_ll
@@ -2599,6 +3538,26 @@ contains
     return
   end function div_ceiling_safe
 
+!!!_  & safe_div() - large * small / d
+  ELEMENTAL integer function safe_div (l, s, d) result(r)
+    implicit none
+    !  L = da + b
+    ! (L * S) / d = (Sda + Sb) / d = Sa + Sb / d
+    integer,intent(in) :: l, s, d
+    r = s * (l / d) + (s * mod(l, d)) / d
+    return
+  end function safe_div
+
+!!!_  & safe_mod() - large * small % d
+  ELEMENTAL integer function safe_mod (l, s, d) result(r)
+    implicit none
+    !  L = da + b
+    ! (L * S) % d = (Sda + Sb) % d = Sb % d
+    integer,intent(in) :: l, s, d
+    r = mod((s * mod(l, d)), d)
+    return
+  end function safe_mod
+
 !!!_  & pos_pattern ()
   ELEMENTAL integer function pos_pattern &
        & (jzone, nbits, lbits) result(r)
@@ -2639,11 +3598,42 @@ contains
     return
   end function initial_mask
 
+!!!_  & popcount_tab()
+  ELEMENTAL integer function popcount_tab_i(i) result(n)
+    implicit none
+    integer,parameter :: KITGT = KI32
+    integer(kind=KITGT),intent(in) :: i
+    integer,parameter :: bs = BIT_SIZE(i)
+    integer,parameter :: r = 4
+    integer,parameter :: rr = 2 ** r
+    integer,parameter :: tab(0:rr-1) &
+         & = (/0, 1, 1, 2,  1, 2, 2, 3,  1, 2, 2, 3,  2, 3, 3, 4/)
+    integer j
+    n = 0
+    do j = 0, bs - 1, r
+       n = n + tab(IBITS(i, j, r))
+    enddo
+  end function popcount_tab_i
+  ELEMENTAL integer function popcount_tab_l(i) result(n)
+    implicit none
+    integer,parameter :: KITGT = KI64
+    integer(kind=KITGT),intent(in) :: i
+    integer,parameter :: bs = BIT_SIZE(i)
+    integer,parameter :: r = 4
+    integer,parameter :: rr = 2 ** r
+    integer,parameter :: tab(0:rr-1) &
+         & = (/0, 1, 1, 2,  1, 2, 2, 3,  1, 2, 2, 3,  2, 3, 3, 4/)
+    integer j
+    n = 0
+    do j = 0, bs - 1, r
+       n = n + tab(IBITS(i, j, r))
+    enddo
+  end function popcount_tab_l
 !!!_ + end of TOUZA_Trp_pack
 end module TOUZA_Trp_pack
 
 !!!_@ test_trapiche_pack - test program
-#ifdef TEST_TRAPICHE_PACK
+#if TEST_TRAPICHE_PACK
 program test_trp_pack
   use TOUZA_Trp_std,only: show_pattern
   use TOUZA_Trp_pack
@@ -2660,7 +3650,7 @@ program test_trp_pack
   integer(kind=KITEST),allocatable :: isrc(:), idest(:), irstr(:)
   integer :: loop
   integer :: kend, kstp, kini, verb
-  integer jm
+  integer jm, jb
 !!!_ + usage
   !!   echo "BITS MEMBERS LOOP" | ./test_trapiche_pack_32  ! 32-bit storage
   !!   echo "BITS MEMBERS LOOP" | ./test_trapiche_pack_64  ! 64-bit storage
@@ -2682,6 +3672,13 @@ program test_trp_pack
         ierr = -1
      endif
      write(*, *) '#TEST: ', nbits, mem, loop, verb
+  endif
+!!!_  - count_zones test
+  if (ierr.eq.0) then
+301  format('zones: ', I0, 1x, I0, 1x, I0)
+     do jb = 0, lbits
+        write(*, 301) jb, lbits, count_zones(jb, lbits)
+     enddo
   endif
 !!!_  - create input array
   if (ierr.eq.0) allocate(isrc(0:mem-1), idest(0:mem-1), irstr(0:mem-1), STAT=ierr)
@@ -2735,6 +3732,32 @@ program test_trp_pack
      endif
   endif
 #endif /* TEST_UINTPACK */
+  if (ierr.eq.0) then
+     call test_batch_popcount(ierr, 0, 2**10, 39, verb)
+  endif
+# if TEST_TRAPICHE_PACK == 32
+  if (ierr.eq.0) then
+     call test_batch_list(ierr, (/0,32,32,  0,3,3/), verb, RELLENO_SEQUENTIAL, 3)
+     call test_batch_list(ierr, (/0,32,63,  0,2,2/), verb, RELLENO_SEQUENTIAL, 3)
+     call test_batch_list(ierr, (/0,32,64,  0,2,2/), verb, RELLENO_SEQUENTIAL, 3)
+     call test_batch_list(ierr, (/0,32,65,  0,2,2/), verb, RELLENO_SEQUENTIAL, 3)
+
+     call test_batch_list(ierr, (/1,4,5,  0,2,4,  2,4,4,  0,4,7/),   verb, RELLENO_SEQUENTIAL, 3)
+     call test_batch_list(ierr, (/0,4,5,  0,2,4,  0,4,4,  0,4,7/),   verb, RELLENO_SEQUENTIAL, 11)
+
+     call test_batch_list(ierr, (/0,5,5,  0,4,4,  0,9,9,  0,11,11/), verb, RELLENO_SEQUENTIAL, 7)
+     call test_batch_list(ierr, (/3,4,5,  0,4,4,  0,9,9,  0,11,11/), verb, RELLENO_SEQUENTIAL, 7)
+     call test_batch_list(ierr, (/0,5,5,  2,3,4,  0,9,9,  0,11,11/), verb, RELLENO_SEQUENTIAL, 7)
+     call test_batch_list(ierr, (/0,5,5,  0,4,4,  5,6,9,  0,11,11/), verb, RELLENO_SEQUENTIAL, 7)
+     call test_batch_list(ierr, (/0,5,5,  0,4,4,  5,6,9,  7,8,11/),  verb, RELLENO_SEQUENTIAL, 7)
+  endif
+  if (ierr.eq.0) then
+     call test_batch_dspl(ierr, nbits, verb, 'seq', RELLENO_SEQUENTIAL)
+  endif
+  if (ierr.eq.0) then
+     call test_batch_dspl(ierr, nbits, verb, 'str', RELLENO_STRIDE)
+  endif
+#endif
   if (ierr.eq.0) then
      call finalize(ierr)
   endif
@@ -2937,7 +3960,370 @@ contains
     return
   end subroutine check_results
 
+  subroutine test_batch_popcount &
+       & (ierr,  jbgn, jend, jstp, verb)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: jbgn, jend, jstp
+    integer,intent(in)  :: verb
+    integer(kind=TEST_TRAPICHE_PACK_KIND) j
+    integer ptab, pref
+
+    ierr = 0
+301 format('popcount: ', I0, 1x, L1, 1x, B16.16, 1x, I0, 1x, I0)
+    do j = jbgn, jend, jstp
+       ptab = popcount_tab(j)
+       pref = popcount_ref(j)
+       if (verb.gt.0.or.ptab.ne.pref) then
+          write(*, 301) j, ptab.eq.pref, j, ptab, pref
+       endif
+    enddo
+  end subroutine test_batch_popcount
+
+  ELEMENTAL integer function popcount_ref(i) result(n)
+    implicit none
+    integer(kind=TEST_TRAPICHE_PACK_KIND),intent(in) :: i
+    integer,parameter :: bs = BIT_SIZE(i)
+    integer j
+    n = 0
+    do j = 0, bs - 1
+       n = n + INT(IBITS(i, j, 1))
+    enddo
+  end function popcount_ref
+
+  subroutine test_batch_list(ierr, bchk, verb, kpack, mdl)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: bchk(:)
+    integer,intent(in)  :: verb
+    integer,intent(in)  :: kpack
+    integer,intent(in)  :: mdl
+    integer jr, nr
+    integer ldst(0:mem), lsrc(0:mem)
+    integer nidx
+    integer j, jg
+    integer mpack
+    character(len=32) :: buf0, buf1
+
+    integer,allocatable :: imask(:),  ival(:)
+    integer,allocatable :: ibagaz(:), iextr(:), iref(:)
+    integer,parameter :: lr = 8
+    integer idx(0:lr-1), bes(3, 0:lr-1)
+    integer :: gmem, lmem
+    integer jp, jl, km
+
+    ierr = 0
+    nr = size(bchk)
+    if (mod(nr, 3).ne.0) then
+       ierr = -1
+       return
+    endif
+    nr = nr / 3
+    do jr = 0, nr - 1
+       bes(1:3, jr) = bchk(3*jr+1:3*jr+3)
+    enddo
+    do jr = 0, nr - 1
+       write(*, *) 'bes = ', jr, bes(:, jr)
+    enddo
+
+    gmem = product(bes(3,0:nr-1))
+    lmem = product(bes(2,0:nr-1) - bes(1,0:nr-1))
+
+    mpack = count_packed(1, gmem, int(0, kind=KIND(imask)))
+    write(*, *) 'mem = ', gmem, mpack
+    if (ierr.eq.0) allocate(imask(0:gmem-1), ival(0:gmem-1), ibagaz(0:mpack-1), STAT=ierr)
+    if (ierr.eq.0) allocate(iref(0:lmem-1), iextr(0:lmem-1), STAT=ierr)
+
+    if (ierr.eq.0) then
+       iref(:) = -1
+       jp = 0
+       jl = 0
+       do j = 0, gmem - 1
+          jg = j
+          do jr = 0, nr - 1
+             idx(jr) = mod(jg, bes(3, jr))
+             jg = jg / bes(3, jr)
+          enddo
+          km = 0
+          if (mod(j, mdl).eq.0) km = 1
+          imask(j) = km
+          if (km.gt.0) then
+             ival(jp) = j
+             jp = jp + 1
+          endif
+          if (ALL(bes(1,0:nr-1).le.idx(0:nr-1) .and. idx(0:nr-1).lt.bes(2,0:nr-1))) then
+             if (km.gt.0) iref(jl) = j
+             jl = jl + 1
+          endif
+       enddo
+    endif
+    if (ierr.eq.0) call pack_store(ierr, ibagaz, imask, gmem, 1, kpack)
+
+    if (ierr.eq.0) then
+       call mask_to_idxl_seq(ierr, ldst, lsrc, nidx, ibagaz, gmem, bes(1:3,0:nr-1), nr)
+    endif
+    if (ierr.eq.0) then
+       do j = 0, nidx - 1
+101       format('list: ', I0, 1x, I0, ' < ', I0)
+          write(*, 101) j, ldst(j), lsrc(j)
+       enddo
+111    format('list:', I0, 1x, B32.32)
+       do j = 0, mpack - 1
+          write(*, 111) j, ibagaz(j)
+       enddo
+       iextr(:) = -1
+       do jp = 0, nidx - 1
+          iextr(ldst(jp)) = ival(lsrc(jp))
+       enddo
+       if (ALL(iref(0:lmem-1).eq.iextr(0:lmem-1))) then
+122       format('list/result: success')
+          write(*, 122)
+       else
+121       format('list/result:', I0, 1x, I0, 1x, I0)
+          do jp = 0, lmem - 1
+             if (iref(jp).ne.iextr(jp)) then
+                write(*, 121) jp, iextr(jp), iref(jp)
+             endif
+          enddo
+       endif
+    endif
+
+  end subroutine test_batch_list
+
+  subroutine test_batch_dspl(ierr, nbits, verb, tag, kpack)
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: nbits
+    integer,         intent(in)  :: verb
+    character(len=*),intent(in)  :: tag
+    integer,         intent(in)  :: kpack
+
+    ierr = 0
+    if (ierr.eq.0) call test_dspl(ierr, 3, (/0,11,22,  0,3,3/), verb, tag, kpack)
+    if (ierr.eq.0) call test_dspl(ierr, 3, (/0,11,21,  0,3,3/), verb, tag, kpack)
+
+    if (ierr.eq.0) call test_dspl(ierr, nbits, (/0,32,32,  0,3,3/), verb, tag, kpack)
+    if (ierr.eq.0) call test_dspl(ierr, nbits, (/0,31,32,  1,2,3/), verb, tag, kpack)
+    if (ierr.eq.0) call test_dspl(ierr, nbits, (/0,32,63,  0,2,2/), verb, tag, kpack)
+    if (ierr.eq.0) call test_dspl(ierr, nbits, (/0,32,64,  0,2,2/), verb, tag, kpack)
+    if (ierr.eq.0) call test_dspl(ierr, nbits, (/0,32,65,  0,2,2/), verb, tag, kpack)
+    if (ierr.eq.0) call test_dspl(ierr, nbits, (/0,24,32,  0,3,3/), verb, tag, kpack)
+    if (ierr.eq.0) call test_dspl(ierr, nbits, (/0,24,32,  1,3,3,  0,2,2/), verb, tag, kpack)
+    if (ierr.eq.0) call test_dspl(ierr, nbits, (/1,25,32,  1,3,3,  0,2,2/), verb, tag, kpack)
+
+   end subroutine test_batch_dspl
+
+  subroutine test_dspl(ierr, nbits, bchk, verb, tag, kpack)
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: nbits
+    integer,         intent(in)  :: bchk(:)
+    integer,         intent(in)  :: verb
+    character(len=*),intent(in)  :: tag
+    integer,         intent(in)  :: kpack
+    integer jr, nr
+    integer lofd(2, 0:mem), dsrc(2, 0:mem)
+    integer lofr(2, 0:mem), rsrc(0:2*mem)
+
+    integer dunp(3, 0:mem), rfil(0:2*mem)
+    integer nunp, nfil
+
+    integer nsrc
+    integer lsrc(0:mem)
+    integer dunp2(3, 0:mem), rfil2(0:2*mem)
+    integer nunp2, nfil2
+
+    integer j, nd, nu, jg
+    integer mpack
+    integer,parameter :: mold = 0
+
+    integer,allocatable :: ival(:)
+    integer,allocatable :: ibagaz(:), iextr(:), iref(:), ircv(:)
+    integer,parameter :: lr = 8
+    integer idx(0:lr-1), bes(3, 0:lr-1)
+    integer :: gmem, lmem
+    integer jp, jl, js, ms
+    integer mdl
+
+    ierr = 0
+    mdl = 2 ** nbits - 2
+
+    nr = size(bchk)
+    if (mod(nr, 3).ne.0) then
+       ierr = -1
+       return
+    endif
+    nr = nr / 3
+    do jr = 0, nr - 1
+       bes(1:3, jr) = bchk(3*jr+1:3*jr+3)
+    enddo
+101 format('dspl:test/', A, 1x, I0, 1x, I0, ':', I0, '/', I0)
+    do jr = 0, nr - 1
+       write(*, 101) tag, jr, bes(:, jr)
+    enddo
+
+    gmem = product(bes(3,0:nr-1))
+    lmem = product(bes(2,0:nr-1) - bes(1,0:nr-1))
+
+    mpack = count_packed(nbits, gmem, int(0, kind=KIND(ival)))
+102 format('dspl:set/', A, 1x, I0, 1x, I0, 1x, I0)
+    write(*, 102) tag, gmem, mpack, nbits
+    if (ierr.eq.0) allocate(ival(0:gmem-1), ibagaz(0:mpack-1), STAT=ierr)
+    if (ierr.eq.0) allocate(iref(0:lmem-1), ircv(0:lmem-1), iextr(0:gmem-1), STAT=ierr)
+    if (ierr.eq.0) then
+       iref(:) = -1
+       jp = 0
+       jl = 0
+       nsrc = 0
+       do j = 0, gmem - 1
+          jg = j
+          do jr = 0, nr - 1
+             idx(jr) = mod(jg, bes(3, jr))
+             jg = jg / bes(3, jr)
+          enddo
+          if (ALL(bes(1,0:nr-1).le.idx(0:nr-1) .and. idx(0:nr-1).lt.bes(2,0:nr-1))) then
+             lsrc(nsrc) = j
+             ival(j) = mdl
+             iref(jl) = mdl
+             nsrc = nsrc + 1
+             jl = jl + 1
+          else
+             ival(j) = 0
+          endif
+       enddo
+    endif
+    if (ierr.eq.0) call pack_store(ierr, ibagaz, ival, gmem, nbits, kpack)
+    if (ierr.eq.0) then
+       call pack_gen_dspl &
+            & (ierr, lofd, dsrc, nd, nbits, gmem, bes(1:3,0:nr-1), nr, kpack, mold)
+       call pack_gen_runl &
+            & (ierr, lofr, rsrc, nu, nbits, gmem, bes(1:3,0:nr-1), nr, kpack, mold)
+       call gen_bfc_slice &
+            & (ierr, dunp, nunp, rfil, nfil, nbits, gmem, bes(1:3,0:nr-1), nr, kpack, mold)
+       call gen_bfc_idxl &
+            & (ierr, dunp2, nunp2, rfil2, nfil2, nbits, gmem, lsrc, nsrc, kpack, mold)
+    endif
+    if (ierr.eq.0) then
+111    format('dspl:dspl/', A, 1x, I0, 1x, I0, '/', I0, ' < ', I0, ':+', I0)
+       do j = 0, nd - 1
+          write(*, 111) tag, j, lofd(1:2, j), dsrc(:, j)
+       enddo
+       write(*, 111) tag, nd, lofd(1:2, nd)
+
+112    format('dspl:runl/', A, 1x, I0, 1x, I0, '/', I0, ' < ', '+', I0, ':+', I0)
+       do j = 0, nu - 1, 2
+          write(*, 112) tag, j / 2, lofr(1:2, j / 2), rsrc(j:j+1)
+       enddo
+       write(*, 112) tag, nu / 2, lofr(1:2, nu / 2)
+
+118    format('dspl:bfc/r/', A, 1x, I0, ' +', I0, ':+', I0)
+       do j = 0, nfil - 1, 2
+          write(*, 118) tag, j / 2, rfil(j:j+1)
+       enddo
+       write(*, 118) tag, nfil, rfil(nfil)
+117    format('dspl:bfc/d/', A, 1x, I0, 1x, I0, ' < ', I0, '+', I0)
+       do j = 0, nunp
+          write(*, 117) tag, j, dunp(1, j), dunp(2:3, j)
+       enddo
+
+128    format('dspl:bfc/r2/', A, 1x, I0, ' +', I0, ':+', I0)
+       do j = 0, nfil2 - 1, 2
+          write(*, 128) tag, j / 2, rfil2(j:j+1)
+       enddo
+       write(*, 128) tag, nfil2, rfil2(nfil2)
+127    format('dspl:bfc/d2/', A, 1x, I0, 1x, I0, ' < ', I0, '+', I0)
+       do j = 0, nunp2
+          write(*, 127) tag, j, dunp2(1, j), dunp2(2:3, j)
+       enddo
+       write(*, *) 'dspl/bfc/r/check: ', nfil2.eq.nfil, ALL(rfil2(0:nfil).eq.rfil(0:nfil))
+       write(*, *) 'dspl/bfc/d/check: ', nunp2.eq.nunp, ALL(dunp(:,0:nunp).eq.dunp2(:,0:nunp))
+
+113    format('dspl:src/', A, 1x, I0, 1x, B32.32)
+       do j = 0, mpack - 1
+          write(*, 113) tag, j, ibagaz(j)
+       enddo
+       iextr(:) = -1
+       jp = 0
+       js = 0
+       do j = 0, nu - 1, 2
+          js = js + rsrc(j)
+          ms = rsrc(j+1)
+          iextr(jp:jp+ms-1) = ibagaz(js:js+ms-1)
+          js = js + ms
+          jp = jp + ms
+       enddo
+       do j = 0, jp - 1
+114       format('dspl:filter/', A, 1x, I4, 1x, B32.32)
+          write(*, 114) tag, j, iextr(j)
+       enddo
+    endif
+    if (ierr.eq.0) then
+       call pack_restore_slice &
+            & (ierr, ircv,  &
+            &  iextr, gmem, nbits, kpack, &
+            &  lofr,  rsrc, nu,    bes,   nr)
+    endif
+    if (ierr.eq.0) then
+       if (ALL(ircv(0:lmem-1).eq.iref(0:lmem-1))) then
+122       format('dspl:result/', A, ' success')
+          write(*, 122) tag
+       else
+121       format('dspl:result/', A, 1x, I0, 1x, I0, 1x, I0)
+          do jp = 0, lmem - 1
+             if (ircv(jp).ne.iref(jp)) then
+                write(*, 121) tag, jp, ircv(jp), iref(jp)
+             endif
+          enddo
+       endif
+    endif
+    if (ierr.eq.0) then
+       ircv(:) = -1
+       call pack_restore_dunp &
+            & (ierr,  ircv,  &
+            &  iextr, gmem, nbits, kpack, &
+            &  dunp,  nunp)
+    endif
+    if (ierr.eq.0) then
+       if (ALL(ircv(0:lmem-1).eq.iref(0:lmem-1))) then
+132       format('dspl:result/bfc/', A, ' success')
+          write(*, 132) tag
+       else
+131       format('dspl:result/bfc/', A, 1x, I0, 1x, I0, 1x, I0)
+          do jp = 0, lmem - 1
+             if (ircv(jp).ne.iref(jp)) then
+                write(*, 131) tag, jp, ircv(jp), iref(jp)
+             endif
+          enddo
+       endif
+    endif
+  end subroutine test_dspl
+
 end program test_trp_pack
+!!!_   . procedure for debug
+subroutine bes_idx(txt, jg, bes, nr, lbits)
+  use TOUZA_Std_utl,only: join_list
+  implicit none
+  character(len=*),intent(out) :: txt
+  integer,         intent(in)  :: jg
+  integer,         intent(in)  :: bes(3,0:*)
+  integer,         intent(in)  :: nr
+  integer,optional,intent(in)  :: lbits
+  integer :: idx(0:nr-1)
+  integer jt, jr
+  integer jerr
+  character(len=64) :: buf
+  jt = jg
+  do jr = 0, nr - 1
+     idx(jr) = mod(jt, bes(3, jr))
+     jt      = jt / bes(3, jr)
+  enddo
+  call join_list(jerr, txt, idx, sep=',', ldelim='[', rdelim=']')
+  if (present(lbits)) then
+101  format('(', I0, '+', I0, ')')
+     write(buf, 101) jg / lbits, mod(jg, lbits)
+     txt = trim(txt) // trim(buf)
+  endif
+end subroutine bes_idx
 
 #endif /* TEST_TRAPICHE_PACK */
 !!!_! FOOTER

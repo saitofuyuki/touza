@@ -1,0 +1,302 @@
+#!/usr/bin/zsh -f
+# Time-stamp: <2022/11/04 22:20:56 fuyuki demo-chak.sh.in>
+
+main ()
+{
+  local demod=demo
+  local chak=./chak
+  local ngted=ngted
+  local ngtls=ngtls
+  local ngtmean=ngtmean
+  local ngtconv=ngtconv
+
+  demo_inputs $demod || return $?
+  demo_operation || return $?
+  return 0
+}
+
+demo_operation ()
+{
+  # run_demo demo/base POP
+  # run_demo -F demo/base POP
+  # run_demo demo/base FLUSH
+  # run_demo -F demo/base FLUSH
+  local src=(demo/yz.base INT)
+
+  run_demo source:1d T=3 $src        =
+  run_demo sub/P     T=3 $src X=2:5  =
+  run_demo sub/F -F  T=4 $src X=3:5  =
+  run_demo ext       T=3 $src X=6:10 =
+
+  src=(T=3 demo/x.base INT)
+  run_demo source:2d $src                 =
+  run_demo perm:2d/c   $src X=lev         =
+  run_demo perm:3d+1/c $src Z=lat         =
+  run_demo perm:3d+0/c $src Y=lat Z=lev   =
+  run_demo perm:2d/o   $src PERM=lev      =
+  run_demo perm:3d+1/o $src PERM=,,lat    =
+  run_demo perm:3d+0/o $src PERM=,lat,lev =
+
+  run_demo_add add:1d    demo/yz.base T=3 demo/sub3.yz.base T=3
+  run_demo_add add:1d    demo/zx.base T=3 demo/sub2.zx.base T=5
+  run_demo_add add:2d+1d demo/z.base  T=3 demo/sub2.zx.base T=0
+
+  run_demo_add fail/add:2d    demo/zx.base T=3       demo/yz.base  T=3
+  run_demo_add auto/add:2d    demo/zx.base T=5       demo/yz.base  T=3
+  run_demo_add manual/add:2d  demo/zx.base T=3 Y=lat demo/yz.base  T=3
+
+  src=(demo/sub5.yz.base INT demo/sub3.yz.base INT)
+  run_demo compromise:source   -NOCOL    T=3 $src FLUSH
+  run_demo compromise:source/F -NOCOL -F T=4 $src FLUSH
+  run_demo compromise:i                  T=3 $src FLUSH -i
+  run_demo compromise:x                  T=3 $src FLUSH -x
+  run_demo compromise:l                  T=3 $src FLUSH -l
+
+  # permutation
+  src=(T=0 demo/base INT)
+  run_demo source:3d     -n $src =
+
+  run_demo perm:3d/102a  -n $src PERM=lat  =
+  run_demo perm:3d/102b  -n $src PERM=,lon =
+
+  run_demo perm:3d/201   -n $src PERM=lev =
+  run_demo perm:3d/210a  -n $src PERM=lev,lat =
+  run_demo perm:3d/210b  -n $src PERM=lev,/   =
+
+  run_demo perm:3d/.012        -n $src PERM=+       =
+  run_demo perm:3d/s012        -n $src PERM=set     =
+  run_demo perm:3d/0s12        -n $src PERM=,set    =
+  run_demo perm:3d/012s        -n $src PERM=,,,set  =
+  run_demo perm:3d/s012:error  -n $src PERM=set/    =
+
+  run_demo perm:3d/r2          -n $src PERM=lon/glon   =
+  run_demo perm:3d/r2          -n $src PERM=,,lon/glon =
+  run_demo perm:3d/r2          -n $src PERM=,,lon/lat  =
+
+  src=(T=5 demo/zx.base INT)
+  run_demo source:y      -n $src =
+  run_demo perm:y+x      -n $src PERM=lon =
+  run_demo perm:y+s      -n $src PERM=+ =
+  run_demo perm:y+sx     -n $src PERM=lon,+ =
+  run_demo perm:y+y      -n $src PERM=,set =
+  run_demo perm:y+sy     -n $src PERM=+,set =
+  run_demo perm:y+z      -n $src PERM=,,lev =
+  run_demo perm:y+z:keep -n $src PERM=/,/,lev =
+
+  return 0
+}
+
+run_demo_add ()
+{
+  local tag=$1; shift
+  local op0=($1); shift
+  while [[ $# -gt 0 ]]
+  do
+    [[ -e $1 ]] && break
+    op0+=($1)
+    shift
+  done
+  local op1=("$@")
+  run_demo "$tag/op0" $op0 INT FLUSH
+  run_demo "$tag/op1" $op1 INT FLUSH
+  run_demo "$tag" $op0 INT $op1 INT REPEAT ADD FLUSH -i
+}
+run_demo ()
+{
+  local tag=$1; shift
+  local col=T
+  case $1 in 
+  (-NOCOL) col=; shift;;
+  esac
+  local err=
+  local args=("$@")
+  local tmp=$(mktemp); log=$(mktemp)
+  $chak "${(@)args}" > $tmp 2> $log; err=$?
+  print "# ## $tag"
+  {
+    print "% $chak:t $args"
+    if [[ $err -eq 0 ]]; then
+      sed -e  '/^[0-9]/,$d' $tmp
+      if [[ -z $col ]]; then
+        sed -ne '/^[0-9]/,$p' $tmp
+      else
+        sed -ne '/^[0-9]/,$p' $tmp | column -t
+      fi
+    else
+      cat $tmp
+      cat $log
+    fi
+  } | sed -e 's/^/: /'
+  print
+  rm -f $tmp $log
+}
+
+demo_inputs ()
+{
+  local outd=$1
+  local nx=8 ny=4 nz=3 nt=3
+  [[ -z $outd ]] && outd=.
+  mkdir -p $outd || return $?
+  local base=$outd/base
+  gen_source bs $base $nt :$nx :$ny :$nz || return $?
+
+  gen_mean -mX x:bs $outd/x.base $base || return $?
+  gen_mean -mY y:bs $outd/y.base $base || return $?
+  gen_mean -mZ z:bs $outd/z.base $base || return $?
+
+  gen_mean -mXY xy:bs $outd/xy.base $base || return $?
+  gen_mean -mYZ yz:bs $outd/yz.base $base || return $?
+  gen_mean -mZX zx:bs $outd/zx.base $base || return $?
+
+  gen_subr subx:bs $outd/sub2.yz.base $outd/yz.base lon 0:2 || return $?
+  gen_subr subx:bs $outd/sub5.yz.base $outd/yz.base lon 0:5 || return $?
+  gen_subr subx:bs $outd/sub3.yz.base $outd/yz.base lon 4:6 || return $?
+  gen_subr subx:bs $outd/sub1.yz.base $outd/yz.base lon 5:5 || return $?
+
+  gen_subr suby:bs $outd/sub2.zx.base $outd/zx.base lat 2:3 || return $?
+  gen_subr suby:bs $outd/sub1.zx.base $outd/zx.base lat 1:1 || return $?
+
+  return 0
+}
+
+gen_source ()
+{
+  local item=$1 ofile=$2; shift 2
+  local nt=$1 nx=$2 ny=$3 nz=$4
+  local jt=
+
+  local E=()
+  local C=()
+  [[ x${nx:--} != x- ]] && C+=(X=$nx) E+=(-e"aitm1:clon")
+  [[ x${ny:--} != x- ]] && C+=(Y=$ny) E+=(-e"aitm2:clat")
+  [[ x${nz:--} != x- ]] && C+=(Z=$nz) E+=(-e"aitm3:clev")
+
+  local opr=(0 $C X AND Y 10 MUL ADD Z 100 MUL ADD INT)
+
+  $chak -H0 -f $opr = $ofile || return $?
+  jt=1
+  while [[ $jt -lt $nt ]]
+  do
+    $chak -a -H0 $opr $jt 1000 MUL ADD = $ofile || return $?
+    let jt++
+  done
+
+  jt=0 
+  local tm=
+  while [[ $jt -lt $nt ]]
+  do
+    tm="$(printf '%02d' $jt)0000"
+    $ngted -t $((jt+1)) \
+           -e "dset:ctouza-jmz" \
+           -e "title:cdemonstration source" \
+           -e "unit:cshaku" \
+           -e "item:c$item" \
+           -e "time:c$((jt+100))" \
+           -e "date:c19730130 $tm" $E $ofile
+    let jt++
+  done
+  local tmp=$(mktemp)
+  cp $ofile $tmp
+  cat $tmp >> $ofile
+  rm -f $tmp
+
+  return 0
+}
+
+gen_mean ()
+{
+  local mopts=($1); shift
+  local item=$1 ofile=$2; shift 2
+  local ifile=$1
+    
+  local copts=(-t 1)
+  $ngtmean $copts $mopts       -o $ofile $ifile || return $?
+  $ngtmean $copts $mopts -n -a -o $ofile $ifile || return $?
+  $ngtmean $copts $mopts -n -a -o $ofile $ifile || return $?
+  $ngtmean $copts $mopts    -a -o $ofile $ifile || return $?
+  $ngtmean $copts $mopts -n -a -o $ofile $ifile || return $?
+  $ngtmean $copts $mopts -n -a -o $ofile $ifile || return $?
+
+  $ngted -e "item:c$item" $ofile || return $?
+
+  local a= arange= t=
+  local j= aopts=()
+  for t in 3 6
+  do
+    arange=($($ngtls -t $t -n $ofile)) || return $?
+    j=0
+    aopts=()
+    for a in ${arange: -3}
+    do
+      let j++
+      [[ $a != 1:1 ]] && continue
+      aopts+=(-e"aitm${j}:c")
+    done
+    $ngted -t $t $aopts $ofile || return $?
+  done
+
+  for t in {4..6}
+  do
+    arange=($($ngtls -t $t -n $ofile)) || return $?
+    j=0
+    aopts=()
+    for a in ${arange: -3}
+    do
+      let j++
+      [[ $a != 1:1 ]] && continue
+      aopts+=(-e"astr${j}:c0" -e"aend${j}:c0")
+    done
+    $ngted -t $t $aopts $ofile || return $?
+  done
+
+  # local arange=($($ngtls -t 1 -n $ofile)) || return $?
+  # local a= j=
+
+  # local aopts=()
+  # local ropts=()
+  # for a in ${arange: -3}
+  # do
+  #   let j++
+  #   [[ $a != 1:1 ]] && continue
+  #   aopts+=(-e"aitm${j}:c")
+  #   ropts+=(-e"astr${j}:c0" -e"aend${j}:c0")
+  # done
+  # $ngted -t 3,6 $aopts $ofile || return $?
+  # $ngted -t 4:6 $ropts $ofile || return $?
+
+  return 0
+}
+
+gen_subr ()
+{
+  local item=$1 ofile=$2; shift 2
+  local ifile=$1; shift
+  local co=$1 reg=$2
+  local mopts=()
+
+  local line= cset= jc=
+  local t=0
+  while true
+  do
+    let t++
+    line=($($ngtls -t $t $ifile))
+    [[ -z $line ]] && break
+    cset=("${(@s:,:)line[-1]}")
+    jc="$cset[(i)$co]"
+    case $jc in
+    (1) mopts=(-x $reg);;
+    (2) mopts=(-y $reg);;
+    (3) mopts=(-z $reg);;
+    (*) print -u2 - "panic."; return 1;;
+    esac
+    [[ $t -gt 1 ]] && mopts+=(-a)
+    # print -u2 - "$co $jc ${(@q-)cset}"
+    $ngtconv -t $t $mopts $ifile $ofile || return $?
+  done
+  $ngted -e "item:c$item" $ofile || return $?
+  return 0
+}
+
+
+main "$@"; err=$?
+exit $err

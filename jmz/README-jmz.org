@@ -1,0 +1,1642 @@
+#+title: TOUZA/Jmz guide
+#+author: SAITO Fuyuki
+#+date: <2022-06-26 Sun>
+
+* Introduction
+*TOUZA/Jmz (持物)* is a collection of example implementation of
+*TOUZA* libraries, as well as some helper utilities.
+
+*TOUZA/Jmz* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+DOT go DOT jp>.
+
+*TOUZA (楊座)*, MIROC base infrastructure, is a collection of
+FORTRAN procedures mainly adopted in MIROC.  See *TOUZA* README
+(expected to be in the parent directory) for general instruction of
+*TOUZA* collection.
+* Build and installation
+* Brief description of *TOUZA/Jmz* commands
+** chak - CH(Swiss) Army Knife for gtool-3.5 format files
+*** introduction
+chak is a Reverse Polish Notation (RPN) calculator for gtool-3.5
+format data files.
+
+The goal of chak development is to replace all the filter commands of
+gtool-3.5 commands.
+
+chak is not a complete replacement of gtool commands.  At the moment
+on this alpha version, it can emulate some of the original commands
+partially.
+
+Unary operator filters:
+- =gtabs= --- absolute value of data
+- =gtatan= --- arctangent value of data
+- =gtcos= --- cosine of data
+- =gtexp= --- exponent of data
+- =gtinv= --- inverse of data
+- =gtlog= --- logarithm of data
+- =gtlog10= --- base-10 logarithm of data
+- =gtsin= --- sine of data
+- =gtsqr= --- square of data
+- =gtsqrt= --- square root of data
+- =gttan= --- tangent of data
+- =gttanh= --- hyperbolic tangent of data
+
+Binary operator filters:
+- =gtadd= --- addition of two files
+- =gtsub= --- subtraction of two files
+- =gtmlt= --- multiplication of two files
+- =gtdiv= --- division of two files
+- =gtpow= --- power (exponent)
+- =gtmod= --- remainder
+
+Other general filters:
+- =gtext= --- spreading
+- =gtmask= --- masking of missing value
+- =gtset= --- several tweaking of data file
+
+Format conversion utilities:
+- =gtrdir= --- conversion from plain binary file to gtool-3.5 format file
+- =gtwdir= --- conversion from gtool-3.5 format file to plain binary file
+
+The following are not implemented but reserved for future extensions:
+- =gtshift= --- spatial shift of data
+- =gtintrp= --- spatial interpolation (i)
+- =gtintrp2= --- spatial interpolation (ii)
+- =gtimis= --- spatial interpolation on missing values
+
+The following are out of the scope of chak development, because ngt
+series do much better job:
+
+- =gtsel= --- extraction of subregion
+- =gtavr= --- averaging
+- =gthead= --- edit header (metadata)
+
+Other general filters (gtseq, gtedy, etc) are under consideration.
+
+Following Some special filters are reserved for next developments:
+
+- =gts2p= --- sigma to p transformation
+- =gtz2p= --- z to p transformation
+- =gthdiv= --- divergence computation on spherical domain
+- =gthvor= --- vorticity computation on spherical domain
+- =gtxdf= --- flux differential along longitude
+- =gtxdv= --- differential along longitude
+- =gtydf= --- flux differential along latitude
+- =gtydv= --- differential along latitude
+
+*** usage
+: chak [<option>]... [<operand>|<operator>|<option>]... [{=|:=} <output>] ....
+
+Arguments:
+
+: = <output>
+Write the *top* stack result on the file =<output>= and pops it off the stack.
+
+: := <output>
+Write the *top* stack result on the file =<output>= and leave it.
+
+=<operator>=
+
+There are two kinds of operators: stack operator and queue operator.
+The former works on the stack --- Pop required number of operands from
+the stack, which depends on the operator; operate; and push the result
+on the top stack.
+The latter works on the queue (typically last operator) to change
+the behavior of the operator.
+
+=<operand>=
+
+Any items other than the operators and output symbols.  Operands include
+gtool-format files, the literal (integer or float number), and the symbols.
+A filename to conflict with a defined operator cannot be parsed as a
+file.  You can avoid the feature with specifying relative or absolute
+path  (e.g., file ADD can be accessed with ./ADD).
+*** gtool command equivalence table --- for impatients
+Note i: chak operators are case DEPENDENT.
+
+Note ii: the order of chak arguments is important.  Changing the
+argument order may cause undesired results.
+
+| gtool-3.5 commands                          | chak commands                                        |
+|---------------------------------------------+------------------------------------------------------|
+| gtadd a b out:c                             | chak a b ADD = c                                     |
+| gtadd a b                                   | chak a b ADD = gtool.out                             |
+| gtadd a b fact1=f1 ofs1=o1 fact2=f2 ofs2=f2 | chak a f1 MUL o1 ADD b f2 MUL o2 ADD ADD = gtool.out |
+| gtadd a b out:c title:'foobar'              | chak a b ADD = c TITLE='foobar'                      |
+|---------------------------------------------+------------------------------------------------------|
+| gtsub a b                                   | chak a b SUB = gtool.out                             |
+| gtmlt a b                                   | chak a b MUL = gtool.out                             |
+| gtdiv a b                                   | chak a b DIV = gtool.out                             |
+| gtpow a b                                   | chak a b POW = gtool.out                             |
+| gtmod a b                                   | chak a b MOD = gtool.out                             |
+|---------------------------------------------+------------------------------------------------------|
+| gtset a fact=f ofs=o                        | chak a f MUL o ADD = gtool.out                       |
+| gtset a rmin=l                              | chak a l GEF = gtool.out                             |
+| gtset a rmin=l vmin=l                       | chak a l MAX = gtool.out                             |
+| gtset a rmin=l vmin=v                       | chak a DUP l GEF v OR AND = gtool.out                |
+| gtset a rset=o vmin=v                       | chak a DUP o NEF v OR AND = gtool.out                |
+|---------------------------------------------+------------------------------------------------------|
+| gtmask a b                                  | chak a b MASK = gtool.out                            |
+| gtmask a b rmin=L                           | chak a b L GEF MASK = gtool.out                      |
+|---------------------------------------------+------------------------------------------------------|
+| gtcon a val=c                               | chak c a OR = gtool.out                              |
+|                                             | chak a c ROR = gtool.out                             |
+|---------------------------------------------+------------------------------------------------------|
+| gtlog a                                     | chak a LOG = gtool.out                               |
+| gtsqrt a                                    | chak a SQRT = gtool.out                              |
+| gtcos a                                     | chak a D2R COS = gtool.out                           |
+| gtcos a deg=F                               | chak a COS = gtool.out                               |
+| gtsin a deg=F                               | chak a SIN = gtool.out                               |
+| gttan a deg=F                               | chak a TAN = gtool.out                               |
+
+*** Tutorial --- for (less) impatients
+Longer examples are append later.  These are minimum examples.
+In the following, a, b ,... are example gtool files.
+**** index flag
+Default coordinate (or range, dimension, etc) counting follows python
+style: the beginning is counted from 0, and the ending is not included.
+You can change this behaviour with global -F option, to follow FORTRAN style.
+
+: % chak demo/base POP   # default, count from 0
+: ## record: 0
+:   read:F0 bs T = 100 DATE = 1973/1/30 00:00:00
+: ## record: 1
+:   read:F0 bs T = 101 DATE = 1973/1/30 01:00:00
+: ## record: 2
+:   read:F0 bs T = 102 DATE = 1973/1/30 02:00:00
+: :
+
+: % chak -F demo/base POP   # count from 1
+: ## record: 1
+:   read:F1 bs T = 100 DATE = 1973/1/30 00:00:00
+: ## record: 2
+:   read:F1 bs T = 101 DATE = 1973/1/30 01:00:00
+: ## record: 3
+:   read:F1 bs T = 102 DATE = 1973/1/30 02:00:00
+: :
+
+As shown above, record counting and file tag index (=F0= or =F1=) are
+affected.
+
+**** Add two gtool files
+: % chak a b ADD = x       # write a+b on new file x, which must not exist.
+: % chak -f a b ADD = x    # force overwrite x even if exists
+: % chak -a a b ADD = x    # append the result on the file x
+**** The other arithmetic operations
+: % chak a b SUB = x       # a - b
+: % chak a b MUL = x       # a * b
+: % chak a b DIV = x       # a / b
+**** Arithmetic operations with literal (number)
+: % chak a 10.0 ADD = x       # x = a + 10.0
+: % chak 20.0 b SUB = x       # x = 20.0 - b
+**** Multiple operations at once
+: % chak a 100. MUL 10. ADD = x   # x = a * 100. + 10.
+: % chak a b c ADD MUL      = x   # x = a * (b + c)
+
+The latter example is somewhat confusing for those who are not
+familiar with the reverse Polish notation.  It can be decomposed step
+by step.
+
+: % chak a                # push a on stack         {(a)}
+: % chak a b              # push b on stack         {(a)  (b)}
+: % chak a b c            # push c on stack         {(a)  (b)  (c)}
+: % chak a b c ADD        # pop top two, ADD, push  {(a)  (b+c)}
+: % chak a b c ADD MUL    # pop top two, MUL, push  {(a*(b+c))}
+**** Multiple output files
+Normal output is done for the top stack.  Multiple outputs can be
+performed for each top stack.
+
+: % chak a b ADD c d SUB = x = y    #  x = c - d   (c - d on the top stack at = x)
+:                                   #  y = a + b
+: % chak a b ADD = x c d SUB = y    #  x = a + b
+:                                   #  y = c - d
+
+You can use ':=' instead of '=' to keep the top stack at write:
+
+: % chak a b ADD := x c ADD = y    #  x = a + b
+:                                  #  y = (a + b) + c   (a + b is not popped)
+**** Stack manipulation
+Operator DUP duplicates the top stack:
+
+: chak a DUP b ADD MUL = x         #  x = a * (a + b)
+
+Operator EXCH exchanges the top two stacks:
+
+: chak a b EXCH DIV = x            #  x = b / a
+
+Operator POP throws away the top stack:
+
+: chak a b c POP ADD = x           # x = a + b  (c is discarded)
+
+Operator POP can name the top stack (buffer) for later recall, using
+an optional argument.  The named buffer can be reused even if thrown
+by POP.  Name is specified by POP=NAME operation, (no space before and
+after equal).
+
+: chak a b ADD POP=sum c sum ADD = x   #   x = c + sum = c + (a + b)
+
+**** Frequently used operators
+: % chak a NEG = x        # x = -a
+: % chak a INV = x        # x = 1/a
+: % chak a SQRT = x       # x = a ** (1/2)
+: % chak a b POW = x      # x = a ** b   (of course a or b can be literal)
+: % chak a b MIN = x      # x = min(a,b)
+: % chak a b MAX = x      # x = max(a,b)
+**** Conditional operators
+: % chak a 20. EQ  = x      # (normal) set x = 1, 0, MISS where a == 20., not, MISS.
+: % chak a 20. GTF = x      # (filter) set x = 20.f, MISS where a > 20., otherwise
+: % chak a 20. LEB = x      # (binary) set x = 1, 0 where a <= 20., otherwise
+**** logical operators
+: % chak a b OR  = x       # a if defined, b if defined, else MISS
+: % chak a b ROR = x       # b if defined, a if defined, else MISS
+: % chak a b AND = x       # b if both defined, else MISS
+: % chak a b MASK = x      # a if both defined, else MISS
+
+: % chak a b 10. NEF MASK = x    # extract a where b != 10.
+
+**** flushing to stdout
+Omitting the file after equal symbol emits the top stack on terminal.
+
+: % chak a =                        # ascii output of file a
+: % chak a NEG b ADD 10. DIV SQRT = # ascii output of sqrt((-a+b)/10.)
+
+A special operator FLUSH emits all the stack on terminal, and pop them:
+
+: % chak a b FLUSH     # ascii output of file a and b sequentially
+: % chak a b FLUSH -i  # ascii output of file a and b horizontally, on inclusive domain
+: % chak a b FLUSH -x  # ascii output of file a and b horizontally, on intersect domain
+: % chak a b FLUSH -l  # ascii output of file a and b horizontally, on first (a) domain
+
+As commented above, indexing follows python style by default.
+
+: % chak demo/base FLUSH    # record, stack, coordinate count from 0
+: ## record: 0
+: # stack[0] bs
+: #      [lon/0:8 lat/0:4 lev/0:3]
+: #   >  [:]
+: #   >> [lon/0:8 lat/0:4 lev/0:3]
+: 0 0 0  0.000000E+00
+: 1 0 0  1.000000E+00
+: 2 0 0  2.000000E+00
+: 3 0 0  3.000000E+00
+: :
+: ## record: 1
+: # stack[0] bs
+: #      [lon/0:8 lat/0:4 lev/0:3]
+: #   >  [:]
+: #   >> [lon/0:8 lat/0:4 lev/0:3]
+: 0 0 0  1.000000E+03
+: 1 0 0  1.001000E+03
+: 2 0 0  1.002000E+03
+: 3 0 0  1.003000E+03
+: :
+
+: % chak -F demo/base FLUSH    # record, stack, coordinate count from 1
+: ## record: 1
+: # stack[1] bs
+: #      [lon/1:8 lat/1:4 lev/1:3]
+: #   >  [:]
+: #   >> [lon/1:8 lat/1:4 lev/1:3]
+: 1 1 1  0.000000E+00
+: 2 1 1  1.000000E+00
+: 3 1 1  2.000000E+00
+: 4 1 1  3.000000E+00
+: :
+: ## record: 2
+: # stack[1] bs
+: #      [lon/1:8 lat/1:4 lev/1:3]
+: #   >  [:]
+: #   >> [lon/1:8 lat/1:4 lev/1:3]
+: 1 1 1  1.000000E+03
+: 2 1 1  1.001000E+03
+: 3 1 1  1.002000E+03
+: 4 1 1  1.003000E+03
+: :
+
+*** Terminology
+**** queue, stack, buffer
+**** coordinate, dimension, logical/physical index
+*** options summary
+**** Global options
+- =-v= :: verbose
+- =-vv= :: more verbose
+- =-vvv= :: even more verbose
+- =-q= :: quiet
+- =-qq= :: more quiet
+- =-qqq= :: even more quiet
+- =-n= :: (Reserved) dry-run
+**** Indexing style
+- =-P= :: Python-like indexing mode (default)
+- =-F= :: Fortran-like indexing mode
+
+In default python-like mode, coordinate, record etc index is counted
+from 0.  When to specify range, the second index corresponds to the
+one to stop (exclusive).   Thus range 2:5 corresponds to 2,3,4.
+Unlike python, at the moment the negative index cannot be used.
+
+In fortran-like mode index counted from 1 and the second index
+corresponds to the one to stop (inclusive).  Thus range 3:5
+corresponds to 3,4,5, which is equivalent to 2:5 in python-like mode.
+
+**** File write access
+- =-k= :: Keep mode (write).  Raise an error if output file exists (default)
+- =-f= :: Overwrite mode (write).  Force overwrite even the output file exists
+- =-a= :: Append mode (write).  Output is appended to the file
+
+- =-Hn=, =-H n= :: Set header edit level to integer /n/ (default=9)
+
+Header edit levels
+|    n |                       | default              |
+|------+-----------------------+----------------------|
+|   -1 | keep reference        |                      |
+|    0 | set [CM]DATE,[CM]SIGN | date and user        |
+|    1 | set 0 + EDIT,ETTL     | RPN, infix notations |
+|    2 | set 1 + TITLE         | infix notation       |
+|    3 | set 2 + ITEM          | RPN                  |
+| more | set 3                 |                      |
+
+Options ITEM=STRING, EDIT=STRING etc precede the above editing level,
+to explicitly set the header items.
+
+**** File read access
+- =-s= :: Terminate mode (read).  Stop if eof reached (default)
+- =-c= :: Cyclic mode (read).   Rewind input file if eof reached
+- =-p= :: Persistent mode (read).  Keep final record if eof reached
+
+In default terminate mode, the chak operation stops when one or more
+shortest input file reaches eof.  If some files still remains records,
+an error is raised.
+
+In the other two modes, the chak operation stops when one or more
+longest input file reaches eof.  If some files reach eof during
+operation, rewind to the first record when cyclic mode, while keep the
+final record when persistent mode.
+
+Read access option can be set either globally or per each file.
+The option is set to the last input file argument, or globally if no
+input file before the option.
+
+(ex) globally cyclic mode except for file2 with persistent mode.
+
+: chak -c file0 file1 file2 -p file3 ...
+
+Specially, if single record selection is used for an input, it is
+automatically set as persistent mode (otherwise it is useless).
+
+(ex) globally cyclic mode except for file2 (record 3 only) with
+persistent mode.
+
+: chak -c file0 file1 file2 T=3 file3 ...
+
+**** Coordinate parser flag
+- =-N=, =+N= :: turn on strict null-dimension mode
+
+Original idea of the array in gtool-3.5 format is a fixed
+rank-3 (or dimension) design. Arrays with one or two ranks are stored
+with dummy rank(s) of size 1 inserted at any rank (typically append at
+the final rank, and less typically inserted at the first rank).
+However, the property for such dummy rank is not well-defined.
+
+Often such dummy rank is expressed with blank name and range 1 to 1
+(Fortran style notation):
+: # {AITM1, ASTR1, AEND1} = {(blank), 1, 1}
+: % ngtls sample
+:   1 sample          0H     0   UR4 19730130 000000 ,lat,lev
+: % ngtls -n sample
+:   1 sample          0H     0   UR4 19730130 000000  1:1      1:4      1:3
+Averaging along a rank may also introduce dummy rank with different style:
+: # {AITM1, ASTR1, AEND1} = {lon, 0, 0}
+: % ngtls sample
+:   1 sample          0H     0   UR4 19730130 000000  lon,lat,lev
+: % ngtls -n sample
+:   1 sample          0H     0   UR4 19730130 000000  0:0      1:4      1:3
+: # sample created with gtsel x=0 -n
+
+Internally, =chak= distinguish the range =1:1= and =0:0=
+(Fortran-style).  They are parsed as the range =0:1= and =0:0=
+(Python-style), respectively.  The former has definite range of size
+1, while the latter size 0.  In other words, the original range =1:1=
+is regarded similarly as =1:3=, =4:7= etc.
+This difference influences at binary operations, for example, to
+compute compromise (result) domain.
+
+:   A[lon,0:3]   B[lon,0:1]    ADD
+: 0 a0           b0            a0+b0
+: 1 a1           undef         undef
+: 2 a2           undef         undef
+
+:   A[lon,0:3]   B[lon,0:0]    ADD
+: 0 a0           b0            a0+b0
+: 1 a1           b0            a1+b0
+: 2 a2           b0            a2+b0
+
+The former operations are performed only at the definite range, while
+the latter spread along the null rank value.
+
+In order to avoid confusing, chak parser style is *TOGGLED OFF* at
+read/write of gtool-3.5 format files by default.
+At read, if a coordinate name is blank and its corresponding size is 1
+or less, then the coordinate is parsed as a dummy rank internally.
+At write, if a coordinate is blank dummy rank internally,
+then the coordinate is recorded as blank name with range =1:1=.
+
+You can revert this feature to =chak= parser mode using '-N' or '+N'
+option, either globally or per each file.
+If there are no input/output file before the options, '-N' set strict
+=chak= mode on read, and '+N' set on write.  If there is an input or
+output file, the both options work identically, to set strict =chak=
+mode on the file.
+
+**** Record format flag
+- =-X[<flags>]=, =+X[<flags>]= :: set record format options.
+
+**** Compromise domain policy
+- =-i= :: Inclusive domain mode for operation (default)
+- =-x= :: Intersect domain mode for operation
+- =-l= :: First domain mode for operation
+*** number type
+Internally all the numbers are stored as so-called double precision.
+All the operation are performed as floating-point values.
+One exception may occur at the final output: if all the operands are
+integer-like, and if the operation is integer-preserving type, then
+the output is treated as integer.
+
+*** symbols and literals
+Numbers are usually stored as floating-point numbers,
+but when without decimal point), they are regarded as integer-like
+type.
+In order to avoid unexpected behavior, at least decimal point must be
+added for normal mathematics operations, or truncate to integer by INT
+operator.
+
+: % chak -qq 1 =       # treated as integer
+: 1
+: % chak -qq 1. =      # treated as floating-point number
+:  1.000000000000000E+00
+
+: % chak -qq 1 2 DIV 2 MUL =
+: 1
+: % chak -qq 1 2. DIV 2 MUL =
+:  1.000000000000000E+00
+: % chak -qq 1 2 DIV INT 2 MUL =
+: 0
+
+Some numbers are prepared with special symbols.
+| symbols | definition     |
+|---------+----------------|
+| PI      | ATAN2(0,-1.D0) |
+| E       | EXP(1.D0)      |
+| TINY    | TINY(0.D0)     |
+| HUGE    | HUGE(0.D0)     |
+
+: % chak -qq PI E TINY HUGE FLUSH
+:  3.141592653589793E+00
+:  2.718281828459045E+00
+:  2.225073858507201-308
+:  1.797693134862316+308
+
+*** input-file formats
+**** gtool-3.5 format (default)
+Default input is gtool-3.5 format.  If not =FMT= properties set after
+the input file, then it is accessed as the gtool-3.5 format.
+
+**** ascii input
+Input file can be one-column ascii file.  Optionally the array shape
+can be set, which enable multiple record contents in the file.
+
+: chak ... <file> FMT=a[,<shape>]
+
+=<shape>= =[[LOW:]HIGH],[[LOW:]HIGH],....=
+
+: chak x FMT=a        # input x, auto-shaped; one-record, total lines = total elements
+: chak x FMT=a,7      # input x with shape (0:7); possibly multiple records
+: chak x FMT=a,3:8    # input x with shape (3:8)
+: chak x FMT=a,5,,7   # input x with shape (0:5, -, 0:7), null second coordinate.
+
+**** binary input
+: chak ... <file> FMT=b<type>[:<byte-order>][,<shape>]
+
+=<type>=         ={i4|r4|r8}=
+=<byte-order>=  ={n|s|b|l}=     native, swap, big, little
+
+: chak x FMT=br4      # input x, float, native byte-order, auto-shaped; one-record, total size = total elements
+: chak x FMT=br8:s,7  # input x, double, swap byte-order, with shape (0:7); possibly multiple records
+
+*** output-file formats
+**** gtool-3.5 format (default)
+**** simple netCDF (in preparation)
+**** ascii output
+: chak ... = <file> FMT=a[<format>]
+
+: chak ... = x FMT=a        # write with default(*) format
+: chak ... = x FMT=aG10.3   # write with G10.3 format
+
+**** binary output
+: chak ... = <file> FMT=b<type>[:<byte-order>]
+
+*** operators summary
+Operators are case dependent.
+Files to conflict with operators cannot be accessed as they are.  You
+can force to access such files by using relative or absolute path.
+
+The operators of =chak= follows partially those of gmtmath and grdmath
+in GMT (General Mapping Tools) package, but not all the operators are
+equivalent.  For example, operators =AND= and =OR= operations are
+completely different between =chak= and GMT implementation.
+
+**** operators on stacks
+| operator   | pop |   push | description                                                      |
+|------------+-----+--------+------------------------------------------------------------------|
+| ABS        |   1 |      1 | abs(A)                                                           |
+| ACOS       |   1 |      1 | arccos(A)                                                        |
+| ADD        |   2 |      1 | A+B                                                              |
+| AND        |   2 |      1 | logical and; B if both A and B are defined, else MISS            |
+| ASIN       |   1 |      1 | arcsin(A)                                                        |
+| ATAN2      |   2 |      1 | arctan(A/B)                                                      |
+| BDIFF      |   2 |      1 | backward difference                                              |
+| BIN        |   1 |      1 | binary; 1 if defined, else 0                                     |
+| BITAND     |   2 |      1 | bitwise AND                                                      |
+| BITNOT     |   1 |      1 | bitwise NOT                                                      |
+| BITOR      |   2 |      1 | bitwise OR                                                       |
+| BITXOR     |   2 |      1 | bitwise XOR                                                      |
+| BOOL       |   1 |      1 | boolean; 1 if defined, else MISS                                 |
+| C0         |   0 |      1 | put top stack coordinate[0] index                                |
+| C1         |   0 |      1 | put top stack coordinate[1] index                                |
+| C2         |   0 |      1 | put top stack coordinate[2] index                                |
+| C3         |   0 |      1 | put top stack coordinate[3] index                                |
+| CDIFF      |   2 |      1 | central difference                                               |
+| CEIL       |   1 |      1 | smallest integer >=A                                             |
+| CLONE      |   1 |      1 | copy top stack on new buffer and discard the original            |
+| COPY       |   1 |      2 | copy top stack on new buffer                                     |
+| COS        |   1 |      1 | cos(A)                                                           |
+| COSH       |   1 |      1 | cosh(A)                                                          |
+| D2R        |   1 |      1 | Convert degree to radian                                         |
+| DIST       |   m | 2(m-1) | distribute top stack for every stack from last anchor            |
+| DIV        |   2 |      1 | A/B                                                              |
+| DUP        |   1 |      2 | duplicate top stack                                              |
+| EQ EQU     |   2 |      1 | 1, 0, MISS for A==B, not, either MISS                            |
+| EQB        |   2 |      1 | 1 if A==B, else 0                                                |
+| EQF        |   2 |      1 | A if A==B, else MISS                                             |
+| EXCH       |   2 |      2 | B A; exchange two top stacks                                     |
+| EXP        |   1 |      1 | exp(A)                                                           |
+| EXPONENT   |   1 |      1 | exponent(A)                                                      |
+| EXTR       |   2 |      1 | extraction                                                       |
+| FDIFF      |   2 |      1 | forward difference                                               |
+| FLOOR      |   1 |      1 | largest integer <= A                                             |
+| FLUSH      |   m |      0 | flush-out from last anchor                                       |
+| FRACTION   |   1 |      1 | fraction(A)                                                      |
+| GE GEU     |   2 |      1 | 1, 0, MISS for A>=B, not, either MISS                            |
+| GEB        |   2 |      1 | 1 if A>=B, else 0                                                |
+| GEF        |   2 |      1 | A if A>=B, else MISS                                             |
+| GT GTU     |   2 |      1 | 1, 0, MISS for A>B, not, either MISS                             |
+| GTB        |   2 |      1 | 1 if A>B, else 0                                                 |
+| GTF        |   2 |      1 | A if A>B, else MISS                                              |
+| HYPOT      |   2 |      1 | sqrt(A * A + B * B)                                              |
+| IDIV       |   2 |      1 | A//B                                                             |
+| INSERT     |   m |      m | move top stack after last anchor                                 |
+| INT        |   1 |      1 | truncate toward 0 and convert                                    |
+| INV        |   1 |      1 | 1/A                                                              |
+| LADD       |   2 |      1 | lazy ADD                                                         |
+| LAND       |   2 |      1 | lazy AND                                                         |
+| LDIV       |   2 |      1 | lazy DIV                                                         |
+| LE LEU     |   2 |      1 | 1, 0, MISS for A<=B, not, either MISS                            |
+| LEB        |   2 |      1 | 1 if A<=B, else 0                                                |
+| LEF        |   2 |      1 | A if A<=B, else MISS                                             |
+| LMASK      |   2 |      1 | lazy MASK                                                        |
+| LMAX       |   2 |      1 | lazy MAX                                                         |
+| LMIN       |   2 |      1 | lazy MIN                                                         |
+| LMUL       |   2 |      1 | lazy MUL                                                         |
+| LOG        |   1 |      1 | log(A)                                                           |
+| LOG10      |   1 |      1 | log10(A)                                                         |
+| LSHIFT     |   2 |      1 | bitwise left shift                                               |
+| LSUB       |   2 |      1 | lazy SUB                                                         |
+| LT LTU     |   2 |      1 | 1, 0, MISS for A<B, not, either MISS                             |
+| LTB        |   2 |      1 | 1 if A<B, else 0                                                 |
+| LTF        |   2 |      1 | A if A<B, else MISS                                              |
+| MASK       |   2 |      1 | A if both A and B are defined, else MISS                         |
+| MAX        |   2 |      1 | max(A,B)                                                         |
+| MIN        |   2 |      1 | min(A,B)                                                         |
+| MOD        |   2 |      1 | mod(A,B)                                                         |
+| MUL        |   2 |      1 | A*B                                                              |
+| NE NEU     |   2 |      1 | 1, 0, MISS for A!=B, not, either MISS                            |
+| NEB        |   2 |      1 | 1 if A!=B, else 0                                                |
+| NEF        |   2 |      1 | A if not A==B, else MISS                                         |
+| NEG        |   1 |      1 | -A                                                               |
+| NOP        |   0 |      0 | no operation; do nothing                                         |
+| NOT        |   1 |      1 | logical not; 1 if undefined, else MISS                           |
+| OR LOR     |   2 |      1 | logical or; A if defined, else B if defined, else MISS           |
+| POP[=NAME] |   1 |      0 | discard top stack and optionally tag                             |
+| POW        |   2 |      1 | pow(A,B)                                                         |
+| R2D        |   1 |      1 | Convert radian to degree                                         |
+| REPEAT     |   m |     2m | repeat from last non-adjacent anchor                             |
+| ROR        |   2 |      1 | logical or (reverse); B if defined, else A if defined, else MISS |
+| ROUND      |   1 |      1 | nearest integer of A                                             |
+| RSHIFT     |   2 |      1 | bitwise right shift                                              |
+| SCALE      |   2 |      1 | scale(A,B)                                                       |
+| SIGN       |   1 |      1 | copy A sign on 1                                                 |
+| SIN        |   1 |      1 | sin(A)                                                           |
+| SINH       |   1 |      1 | sinh(A)                                                          |
+| SQR        |   1 |      1 | A*A                                                              |
+| SQRT       |   1 |      1 | square root                                                      |
+| SUB        |   2 |      1 | A-B                                                              |
+| TAN        |   1 |      1 | tan(A)                                                           |
+| TANH       |   1 |      1 | tanh(A)                                                          |
+| TRUNC      |   1 |      1 | truncate toward 0                                                |
+| X          |   0 |      1 | put top stack coordinate[0] index                                |
+| XOR        |   2 |      1 | logical exclusive-or; A or B if B or A undefined, else MISS      |
+| Y          |   0 |      1 | put top stack coordinate[1] index                                |
+| Z          |   0 |      1 | put top stack coordinate[2] index                                |
+| ZSIGN      |   1 |      1 | -1,0,+1 if negative,zero,positive                                |
+
+**** operators on stack anchors
+| operator | description                             |
+|----------+-----------------------------------------+
+| GO       | remove last anchor                      |
+| MARK     | fragile anchor (removed by first touch) |
+| STOP     | robust anchor (removed by GO)           |
+**** operators on queues
+| operator | description                                               |
+|----------+-----------------------------------------------------------|
+| CUM      | apply last queue non-unary operator from last anchor      |
+| ITER     | iterate last queue operator for each set from last anchor |
+| MAP      | reserved; DIST ITER                                       |
+
+**** operators on buffers
+| operator           | argument           | description                       |
+|--------------------+--------------------+-----------------------------------|
+| C0[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[0] index |
+| C1[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[1] index |
+| C2[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[2] index |
+| C3[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[3] index |
+| DUR[=ARG]          | UNIT               | duration                          |
+| MISS=ARG           | VALUE              | replace missing value             |
+| PERM=ARG SHAPE=ARG | NAME/REPL/RANGE,.. | array shape permutatation         |
+| TAG=ARG            | NAME               |                                   |
+| X[=ARG]            | NAME/REPL/RANGE    | put top stack coordinate[0] index |
+| Y[=ARG]            | NAME/REPL/RANGE    | put top stack coordinate[1] index |
+| Z[=ARG]            | NAME/REPL/RANGE    | put top stack coordinate[2] index |
+
+**** operators on files
+| operator  | argument | description            |
+|-----------+----------+------------------------|
+| DSET=ARG  | STRING   |                        |
+| DUR[=ARG] | UNIT     | duration               |
+| EDIT=ARG  | STRING   |                        |
+| FMT=ARG   | FORMAT   | set output data format |
+| ITEM=ARG  | STRING   | replace item name      |
+| MISS=ARG  | VALUE    | replace missing value  |
+| T=ARG     | LIST     |                        |
+| TITLE=ARG | STRING   |                        |
+| UNIT=ARG  | STRING   |                        |
+
+*** logical operators cheat sheet
+**** unary operators
+|        | defined | undefined | outside |
+|--------+---------+-----------+---------|
+| a NOT  |    MISS |         1 | MISS    |
+| a BOOL |       1 |      MISS | MISS    |
+| a BIN  |       1 |         0 | 0       |
+**** binary operators
+Symbols d, u and x correspond to defined, undefined, and outside,
+respectively.
+
+|           | d d  | d u  | d x  | u d  | u u  | u x  | x d  | x u  | x x  |
+|-----------+------+------+------+------+------+------+------+------+------|
+| a b AND   | b    | MISS | MISS | MISS | MISS | MISS | MISS | MISS | MISS |
+| a b MASK  | a    | MISS | MISS | MISS | MISS | MISS | MISS | MISS | MISS |
+|-----------+------+------+------+------+------+------+------+------+------|
+| a b OR    | a    | a    | a    | b    | MISS | MISS | b    | MISS | MISS |
+| a b ROR   | b    | a    | a    | b    | MISS | MISS | b    | MISS | MISS |
+| a b XOR   | MISS | a    | a    | b    | MISS | MISS | b    | MISS | MISS |
+
+AND operator evaluates the operands sequentially, stop when undefined,
+return the last evaluation.
+
+OR operator evaluates the operands sequentially, stop when defined,
+return the last evaluation.
+*** conditional operators cheat sheet
+There are three kinds of conditional operators: normal, filter-like,
+and binary.  They have a suffix U, F, and B respectively, so for
+example, EQU, EQF, EQB are normal, filter-like and binary
+conditionals, respectively.  Also no-suffix operators like EQ are
+prepared which are alias of normal operators.
+
+ |                  | EQU EQ | EQF  | EQB |
+ |------------------+--------+------+-----|
+ | a==b defined     | 1      | a    |   1 |
+ | a!=b defined     | 0      | MISS |   0 |
+ | either undefined | MISS   | MISS |   0 |
+
+*** buffer recalls
+| TAG=NAME       | tag the top stack as NAME for later recall          |
+| POP[=NAME]     | tag the top stack as NAME for later recall, and pop |
+| Ln (integer n) | reuse literal with tag Ln                           |
+| Fn             | reuse read file with tag Fn                         |
+| Wn             | reuse write file with tag Wn                        |
+
+*** stack marker manipulation
+*** buffer stack manipulation
+| operator | example             | stack image |
+|----------+---------------------+-------------|
+| DIST     | STOP a b c x DIST   | a x b x c x |
+| INSERT   | STOP a b c x INSERT | x a b c     |
+| REPEAT   | STOP a b c REPEAT   | a b c a b c |
+
+*** operation queue manipulation
+| operator | example               | queue image             |             |
+|----------+-----------------------+-------------------------+-------------|
+| ITER     | STOP a b c d OPR ITER | a OPR b OPR c OPR d OPR | if unary    |
+|          | STOP a b c d OPR ITER | a b OPR c d OPR         | if binary   |
+| CUM      | STOP a b c d OPR CUM  | a b OPR c OPR d OPR     | only binary |
+
+examples
+|                       | interpreted as          | stack       |
+| STOP 1 2 3 4 NEG ITER | 1 NEG 2 NEG 3 NEG 4 NEG | -1 -2 -3 -4 |
+| STOP 1 2 3 4 ADD ITER | 1 2 ADD  3 4 ADD        | 3     7     |
+| STOP 1 2 3 4 ADD CUM  | 1 2 ADD 3 ADD 4 ADD     | 10          |
+
+*** special cases for successive operation
+| arguments                     | stack image               |                                     |
+|-------------------------------+---------------------------+-------------------------------------|
+| a DUP                         | a a                       |                                     |
+| a DUP DUP                     | a a a                     |                                     |
+| STOP a b c DUP ITER           | a a b b c c               |                                     |
+| STOP a b c DUP DUP ITER       | a a a b b b c c c         | iterate DUP-DUP on each stack       |
+|-------------------------------+---------------------------+-------------------------------------|
+| STOP a b c d e DIST           | a e  b e  c e  d e        | distribute top stack                |
+| STOP a b c d e DIST DIST      | a d e  b d e  c d e       | distribute top two stacks           |
+| STOP a b c d e DIST DIST DIST | a c d e   b c d e         | distribute top tree stacks          |
+|-------------------------------+---------------------------+-------------------------------------|
+| STOP a b c d DIST DIST        | a c d b c d               |                                     |
+| STOP a b c d DIST NOP DIST    | a d d d b d d d c d       | NOP separate two DIST               |
+|-------------------------------+---------------------------+-------------------------------------|
+| STOP a b c REPEAT             | STOP  a b c  a b c        |                                     |
+| STOP a b c REPEAT REPEAT      | STOP  a b c  a b c  a b c |                                     |
+| STOP a b c STOP REPEAT        | STOP  a b c STOP  a b c   | marker is inserted before repeating |
+
+*** file properties
+**** gtool format header
+A gtool-format header in new file to write follows that of the first
+input file on the stack, *just at the operation*.  The entries =ITEM=,
+=TITLE=, =CDATE=, =MDATE=, =CSIGN=, =MSIGN=, =EDIT=, and =ETTL= are
+set for new files, and the other entries such as DATE, TIME, MISS are
+copied from the reference file.
+
+: chak a  b      ADD = x   #  ref=a   (x=a+b)
+: chak 10 b      ADD = x   #  ref=b   (x=10+b)
+: chak a  b EXCH ADD = x   #  ref=b   (x=b+a)
+: chak a  b c    ADD = x   #  ref=b   (x=b+c)
+
+If there is no input gtool files (created from literal only), a set of
+minimum default entries is adopted.
+
+You can control by command line argument -Hn what to keep the
+entries of the reference file.
+**** header entries of new output file
+| entries     | new property   | example   |
+|-------------+----------------+-----------|
+| ITEM EDITn  | RPN            | aa bb ADD |
+| TITLn ETTLn | infix notation | aa+bb     |
+
+=ITEM= entries are used as operands in the notation (not filenames).
+
+The entries =EDITn= =TITLn= =ETTLn= are regarded as concatenated long
+entries.  Longer notation is truncated.
+
+: chak a b c d f ADD MUL ADD CUM SQRT = x
+
+:  3 ITEM    (MARK aa bb cc dd)       # truncated
+:  4 EDIT1   (MARK aa bb cc dd)       # EDIT[1-3] contains full notation
+:  5 EDIT2   ( ff ADD MUL ADD )
+:  6 EDIT3   (CUM SQRT        )
+: 14 TITL1   (SQRT(aa+bb+cc*(d)       # TITL[1-2] contains full notation
+: 15 TITL2   (d+ff))          )       # SQRT(aa+bb+cc*(dd+ff))
+: 17 ETTL1   (SQRT(aa+bb+cc*(d)
+: 18 ETTL2   (d+ff))          )
+
+To build infix notation from RPN queue is much easier than the opposite......
+
+You can force overwrite the =ITEM=, =TITLn= entries by special
+operators =ITEM=, =TITLE=, respectively.
+
+: chak .. = x ITEM='xx'
+: chak .. = x TITLE='new title for xx'
+: chak .. = x ITEM='xx' TITLE='new title for xx'
+
+=ITEM=, =TITLE= operators apply on the adjacent file argument before the operator.
+
+**** record selection
+Specific record extraction can be operated by ~T=<list>~.
+
+=<list>= is a sequence of comma separated items which is either range
+or explicit records.
+
+- =<list>= :: =<range|records>[,<range|records>[,<range|records>]...]=
+- =<range>= :: =[<begin>][:[<end>][:[<step>][:[<number>]]]]=
+- =<records>= ::  =<record>[/<record>[/<record>...]]=
+
+Some typical usages are as follows:
+: chak FILE T=2      # extract record 2 only
+: chak FILE T=1,5    # extract record 1,5 only
+: chak FILE T=:3     # extract 0,1,2
+: chak FILE T=4:     # extract 4,5,...
+: chak FILE T=1:4    # extract 1,2,3
+: chak FILE T=1:7:2  # extract 1,3,5
+: chak FILE T=1::2   # extract 1,3,5,7,...
+
+With =-F= option, index can be FORTRAN style:
+
+: chak -F FILE T=2    # extract record 2 only
+: chak -F FILE T=1,5  # extract record 1,5 only
+: chak -F FILE T=:3   # extract 1,2,3
+: chak -F FILE T=4:   # extract 4,5,...
+: chak -F FILE T=1:4  # extract 1,2,3,4
+: chak -F FILE T=1:7:2  # extract 1,3,5,7
+: chak -F FILE T=1::2   # extract 1,3,5,7,...
+
+=T= operator applies on the adjacent file argument.
+
+: chak a T=2   b T=3 ADD =   # a[2]+b[3]
+: chak a T=2,3 b T=0 ADD =   # output a[2]+b[0], a[3]+b[0]
+: chak a 0   T=1             # ERROR (not a file operand before T)
+: chak a NEG T=1             # ERROR (not a file operand before T)
+
+=T= operator before any file operands works as default selections.
+
+: chak T=2 a b     c ADD ADD =   # a[2]+b[2]+c[2]
+: chak T=2 a b T=3 c ADD ADD =   # a[2]+b[3]+c[2]
+
+Multiple record stacking from one file can be specified in several ways.
+
+A most simple method is to apply file operand twice:
+: chak a T=3 a T=4 ADD =        # a[3]+a[4]
+Internally, the first and second file operands are dealt as if they
+are different files, so explicit control on each operand can be
+utilized.
+
+Also, the list specification has another field to set number of
+records to push on the stack:
+
+: chak a T=0::12:2   # put two records at every 12 strides
+:   # loop 0   a[0]  a[1]
+:   # loop 1   a[12] a[13]
+:   # loop 2   a[24] a[25]
+:   :
+
+By setting 0 as the number of records, all the record of the strides
+are pushed:
+
+: chak a T=::3:0   # put 3 records at every 3 strides
+:   # loop 0   a[0] a[1] a[2]
+:   # loop 1   a[3] a[4] a[5]
+:   :
+
+With null strides and explicit end and 0 number, all the record from
+begin to end are pushed:
+: chak a T=3:7::0   # put 3:7
+:   # a[3] a[4] a[5] a[6]
+
+The other two methods below are special extension on the ~T~ operator.
+One method is to apply ~T~ operator successively:
+: chak a T=3 T=4 ADD =        # a[3]+a[4]
+Internally, the first and second file operands share the file object.
+Another method is to use ~/~ separator to force multiple selection:
+: chak a T=3/4 ADD =          # a[3]+a[4]
+Successive ~T~ operator and multiple selection can be combined with
+list and range selections.
+
+: chak a T=1/2,3/4,5/6 ADD =
+:   # loop 0 a[1] a[2] ADD
+:   # loop 1 a[3] a[4] ADD
+:   # loop 2 a[5] a[6] ADD
+
+: chak a T=1/2,3/4 T=5,6 ADD =
+:   # loop 0  a[1] a[2] a[5]  ADD
+:   # loop 1  a[3] a[4] a[6]  ADD
+
+*** buffer properties
+**** reshaping
+There are several kinds of array transformation: slicing, permutation,
+spreading, etc:
+All the related operations are collectedly called as `reshaping' hereinafter.
+
+Reshaping can be set by operator =PERM= or its alias =SHAPE= for one
+or more coordinates at once by comma-separated list.
+In addition, separate configuration for each coordinate can be done by
+a different way.  Operators =C0=, =C1=, =C2= act on 0th, 1st, 2nd
+coordinate.  In FORTRAN-style (=-F=) mode, =C1=, =C2=, =C3= are used
+instead. Operators =X=, =Y=, =Z= are alias of the three, ignoring the style.
+The following examples are identical:
+
+: chak ...    SHAPE=<xset>,<yset>,<zset>
+: chak ...    X=<xset> Y=<yset> Z=<zset>
+: chak ...    C0=<xset> C1=<yset> C2=<zset>
+: chak -F ... C1=<xset> C2=<yset> C3=<zset>
+
+Any of them can be left as they are.  If only the second coordinate
+needs to be edited, the following operations work.
+: chak ...    SHAPE=,<yset>
+: chak ...    Y=<yset>
+: chak ...    C1=<yset>
+: chak -F ... C2=<yset>
+
+Reshaping configuration is relatively complex.
+The full syntax is documented here, however, some simple cases,
+subregion extracting and coordinate permutation are
+documented in the following sections.
+
+As noted, the argument of operator =SHAPE= is comma separated list of
+sets of coordinate property modifiers.
+: SHAPE=<set-0>[,[<set-1>][,[]...]]
+A set is a compound of old coordinate name or index, new name, and the new
+range or element separated by slashes:
+: <name|index>[/[<replace>][/]][/<range|element>]
+Empty set means to leave as it is.
+Concrete examples are helpful rather than to provide the abstract rule.
+
+- ~<name>~ :: move =<name>= coordinate to the specific
+  rank.  If =<name>= coordinate is not found, a new coordinate <name> is
+  inserted.  For example, the argument ~SHAPE=,lon~ (or ~Y=lon~) moves
+  the coordinate =lon= to the second rank if found, or insert =lon= if
+  not found.
+
+- ~<name>/~ (e.g., ~lon/~) ::  move =<name>= coordinate to the specific
+  rank.  An error is raised if =<name>= coordinate is not found.
+  The slash after =<name>= is a symbol to mean to force the existence
+  (slash after =<name>= policy).
+
+- ~<index>/~ (e.g., ~2/~) :: move =<index>=-th coordinate to the
+  specific rank.  The slash after index is mandatory, otherwise it is
+  parsed as an element extraction below.  For example, ~SHAPE=,,1~ moves the
+  first coordinate to the second.
+
+- ~<name|index>/<replace>[​/]~ :: move =<name>= or =<index>=-th
+  coordinate to the specific rank, with renaming as =<replace>=, which
+  must be non-empty.  The final slash is optional to be neglected.
+  If =<replace>= is empty and no bottom slash, the set is interpreted
+  as =~<name>/~ as already noted above
+  (e.g., ~SHAPE=,lon/glon~; ~Z=1/lev/~).
+  An error is raised if =<name>= coordinate is not found (slash after
+  =<name>= policy).
+
+- ~<name|index>//~ :: move =<name>= or =<index>=-th coordinate to the
+  specific rank, with renaming as empty.
+  (e.g., ~lon//~, ~1//~).
+  An error is raised if =<name>= coordinate is not found (slash after
+  =<name>= policy).
+
+- ~/~ :: keep the specific rank as it is.
+
+- ~/<replace>[​/]~ :: keep the specific rank, with renaming to
+  =<replace>=.  For example, ~SHAPE=,/glon~ change the name of the
+  second coordinate to =glon=.
+
+- ~//~ :: keep the specific rank, with renaming to empty.
+
+- ~-~ :: (*Incompatible with revision 1.05.6 or before*) delete the
+  specific rank coordinate only if it is empty-name coordinate.
+  Leave as it is if normal (named) or wild-card one.
+
+- ~--~ :: delete consecutive the empty-name coordinates from the
+  specific rank. For example, ~SHAPE=--~ deletes the head empty
+  coordinates and shift remaining.
+
+- ~---~ :: delete all the empty-name coordinates
+
+- ~+~ :: (*Incompatible with revision 1.05.6 or before*) insert the new
+  empty-name coordinate to the specific rank.  ~SHAPE=+~ insert the
+  null coordinate at the first, and shift all the old coordinate by 1.
+
+- ~+/<replace>[​/]~ :: (*Incompatible with revision 1.05.6 or before*)
+  insert the new coordinate with name =<replace>=
+  to the specific rank.
+  ~SHAPE=+/lon~ insert the =<lon>= coordinate at the first, and shift
+  all the old coordinate by 1.
+  This means to increase the number of rank.
+  This set may have different behaviour with ~<name>~ set above,
+  which may not increase the total ranks.
+
+- ~+<replace>[​/]~ :: same as above
+
+- ~<integer>~ :: Extract a value at specific element index along
+  the specific coordinate (e.g., ~5~, non-negative integer).
+
+- ~[<integer>]:[<integer>]~  :: Extract values of specific range along
+  the specific coordinate (e.g., ~3:5~, ~:7~, ~2:~).
+
+- ~<name|index>/<range|element>~ ::
+  move =<name>= or =<index>=-th coordinate to the specific rank, with
+  extracting subregion =<range>= or =<element>=.
+  A special rule is applied that, if =<name|index>= and
+  =<range|element>= are both set at the same time, the slash before
+  =<range>= is absorbed (slash before range policy).
+  By this rule, the slash in between disappears, and slash after
+  =<name>= policy is ineffective.
+  In other word, the argument is decomposed into ~<name|index>~ and
+  ~<range|element>~.
+  Thus =<name>= is created if not
+  found. (e.g., ~SHAPE=,lev/3:5~; ~Y=0/:2~)
+
+- ~<name|index>//<range|element>~ ::
+  move =<name>= or =<index>=-th coordinate to the specific rank, with
+  extracting subregion =<range>= or =<element>=.
+  An error is raised if =<name>= is not found.  With the slash
+  before/after rule the argument is decomposed into ~<name|index>/~ and
+  ~<range|element>~.  (e.g., ~lev//3:5~, ~0//:2~)
+
+- ~<name|index>///<range|element>~ ::
+  move =<name>= or =<index>=-th coordinate to the specific rank, with
+  extracting subregion =<range>= or =<element>=, and with renaming to
+  empty.
+  An error is raised if =<name>= is not found.  With the slash
+  before/after rule the argument is decomposed into ~<name|index>//~ and
+  ~<range|element>~.  (e.g., ~lev///3:5~, ~0///:2~)
+
+- ~<name|index>/<replace>/[​/]<range|element>~ ::
+  move =<name>= or =<index>=-th coordinate to the specific rank, with
+  extracting subregion =<range>= or =<element>=, and with renaming to
+  =<replace>=.
+  An error is raised if =<name>= is not found.  With the slash
+  before/after rule the argument is decomposed into
+  ~<name|index>/<replace>~ and ~<range|element>~ (e.g.,
+  ~lev/glev/0:5~)
+
+**** (sub)region selection
+*WARNING: spatial averaging is NOT IMPLEMENTED.*
+Only cutting and spreading can be executed.
+
+The following is an example source file, whose shape is {8}.
+# source:1d
+: % chak T=3 demo/yz.base INT =
+: ## record: 0
+: # stack[0] yz:bs INT
+: #      [lon/0:8]
+: #   >  [:]
+: #   >> [lon/0:8]
+: 0  115
+: 1  116
+: 2  117
+: 3  118
+: 4  119
+: 5  120
+: 6  121
+: 7  122
+: # T=3 and INT operator are merely to get simple result
+
+Subregion can be specified with Cn=[LOW]:[HIGH] argument:
+# sub/P
+: % chak T=3 demo/yz.base INT X=2:5 =
+: # (or) chak T=3 demo/yz.base INT SHAPE=2:5 =
+: ## record: 0
+: # stack[0] yz:bs INT
+: #      [lon/0:8]
+: #   >  [2:5]
+: #   >> [lon/2:5]
+: 2  117
+: 3  118
+: 4  119
+
+# sub/F
+: % chak -F T=4 demo/yz.base INT X=3:5 =
+: # (or) chak -F T=4 demo/yz.base INT SHAPE=3:5 =
+: ## record: 1
+: # stack[1] yz:bs INT
+: #      [lon/1:8]
+: #   >  [3:5]
+: #   >> [lon/3:5]
+: 3  117
+: 4  118
+: 5  119
+: # with FORTRAN style counting
+
+Outside of the source domain is filled with missing value.
+# ext
+: % chak T=3 demo/yz.base INT X=6:10 =
+: # (or) chak T=3 demo/yz.base INT SHAPE=6:10 =
+: ## record: 0
+: # stack[0] yz:bs INT
+: #      [lon/0:8]
+: #   >  [6:10]
+: #   >> [lon/6:10]
+: 6  121
+: 7  122
+: 8  .
+: 9  .
+
+**** coordinate permutation
+Coordinate permutation can be also specified.
+# source:2d
+: % chak T=3 demo/x.base INT =
+: ## record: 0
+: # stack[0] x:bs INT
+: #      [lat/0:4 lev/0:3]
+: #   >  [:]
+: #   >> [lat/0:4 lev/0:3]
+: 0  0  3
+: 1  0  13
+: 2  0  23
+: 3  0  33
+: 0  1  103
+: 1  1  113
+: 2  1  123
+: 3  1  133
+: 0  2  203
+: 1  2  213
+: 2  2  223
+: 3  2  233
+
+# perm:2d/c
+: % chak T=3 demo/x.base INT X=lev =
+: # (or) chak T=3 demo/x.base INT SHAPE=lev =
+: ## record: 0
+: # stack[0] x:bs INT
+: #      [lat/0:4 lev/0:3]
+: #   >  [lev/:]
+: #   >> [lev/0:3 lat/0:4]
+: 0  0  3
+: 1  0  103
+: 2  0  203
+: 0  1  13
+: 1  1  113
+: 2  1  213
+: 0  2  23
+: 1  2  123
+: 2  2  223
+: 0  3  33
+: 1  3  133
+: 2  3  233
+
+A basic of coordinate permutation of chak is to pad unspecified
+coordinates, and keep the number of ranks as far as possible.
+In the above example, =lat= and =lev= order
+is exchanged.  If =Z=lat= is specified, coordinate is rotated as follows:
+# perm:3d+1/c
+: % chak T=3 demo/x.base INT Z=lat =
+: # (or) chak T=3 demo/x.base INT SHAPE=,,lat =
+: ## record: 0
+: # stack[0] x:bs INT
+: #      [lat/0:4 lev/0:3]
+: #   >  [: : lat/:]
+: #   >> [lev/0:3 <>/: lat/0:4]
+: 0  0  0  3
+: 1  0  0  103
+: 2  0  0  203
+: 0  0  1  13
+: 1  0  1  113
+: 2  0  1  213
+: 0  0  2  23
+: 1  0  2  123
+: 2  0  2  223
+: 0  0  3  33
+: 1  0  3  133
+: 2  0  3  233
+
+In order to insert blank coordinate at beginning needs two
+explicit transformation:
+# perm:3d+0/c
+: % chak T=3 demo/x.base INT Y=lat Z=lev =
+: # (or) chak T=3 demo/x.base INT SHAPE=,lat,lev =
+: ## record: 0
+: # stack[0] x:bs INT
+: #      [lat/0:4 lev/0:3]
+: #   >  [: lat/: lev/:]
+: #   >> [<>/: lat/0:4 lev/0:3]
+: 0  0  0  3
+: 0  1  0  13
+: 0  2  0  23
+: 0  3  0  33
+: 0  0  1  103
+: 0  1  1  113
+: 0  2  1  123
+: 0  3  1  133
+: 0  0  2  203
+: 0  1  2  213
+: 0  2  2  223
+: 0  3  2  233
+In the above example, =lat=, =lev= order are shifted by 1.
+Vacant coordinate is automatically filled with blank name, null range.
+
+**** avant-garde solution for automatic coordinate matching
+*Disclaimer*
+Automatic coordinate matching is, unfortunately, still buggy,
+in particular when a coordinate with definite range has a blank name.
+Please do not depend on this function too much.
+It is always better idea to name all of such coordinates.
+
+For binary operation, array shapes of two inputs are significant.
+chak tries its best to guess how to match them under a rule.
+It is non unusual to fail the matching.  For such case, users need to
+edit the gtool headers manually before chak execution.
+The primitive rule is `the coordinate name is significant.'
+
+If the coordinate names match, then different array range can be adjusted.
+
+In the following demonstration, a special operation sequence is
+examined to present the results.
+Operator =REPEAT= before =ADD= push the two stack (operands) again.
+At the operator =FLUSH -i=, there are three stacks remaining, integer
+conversion of the first file, the second file, and the result of operator =ADD=.
+# add:1d
+: % chak demo/yz.base T=3 INT demo/sub3.yz.base T=3 INT REPEAT ADD FLUSH -i
+: ## record: 0
+: ## 0 {2053} [lon/0:8] yz:bs INT
+: ## 1 {2055} [lon/3:6] subx:bs INT
+: ## 2 {2056} [lon/0:8] yz:bs INT subx:bs INT ADD
+: #lon/0:8 {2053} {2055} {2056}
+: 0  115  .    _
+: 1  116  .    _
+: 2  117  .    _
+: 3  118  118  236
+: 4  119  119  238
+: 5  120  120  240
+: 6  121  .    _
+: 7  122  .    _
+
+In the example, two operands share same rank design with different ranges:
+# add:1d/op0
+: % chak demo/yz.base T=3 INT FLUSH
+: ## record: 0
+: # stack[0] yz:bs INT
+: #      [lon/0:8]
+: #   >  [:]
+: #   >> [lon/0:8]
+: 0  115
+: 1  116
+: 2  117
+: 3  118
+: 4  119
+: 5  120
+: 6  121
+: 7  122
+
+# add:1d/op1
+: % chak demo/sub3.yz.base T=3 INT FLUSH
+: ## record: 0
+: # stack[0] subx:bs INT
+: #      [lon/3:6]
+: #   >  [:]
+: #   >> [lon/3:6]
+: 3  118
+: 4  119
+: 5  120
+
+If the coordinate match on different rank, they may be shifted,
+rotated, expanded.
+For example, the first operand shape is ={lat}=, 1 rank.
+# add:1d/op0
+: % chak demo/zx.base T=3 INT FLUSH
+: ## record: 0
+: # stack[0] zx:bs INT
+: #      [lat/0:4]
+: #   >  [:]
+: #   >> [lat/0:4]
+: 0  103
+: 1  113
+: 2  123
+: 3  133
+
+while, the second operand shape is ={-,lat}=, 2 rank.
+# add:1d/op1
+: % chak demo/sub2.zx.base T=5 INT FLUSH
+: ## record: 0
+: # stack[0] suby:bs INT
+: #      [- lat/1:3]
+: #   >  [:]
+: #   >> [/: lat/1:3]
+: 0  1  113
+: 0  2  123
+
+Add operation automatically adjust the latter domain:
+# add:1d
+: % chak demo/zx.base T=3 INT demo/sub2.zx.base T=5 INT REPEAT ADD FLUSH -i
+: ## record: 0
+: ## 0 {2053} [lat/0:4] zx:bs INT
+: ## 1 {2055} [lat/1:3] suby:bs INT
+: ## 2 {2056} [lat/0:4] zx:bs INT suby:bs INT ADD
+: #lat/0:4 {2053} {2055} {2056}
+: 0  103  .    _
+: 1  113  113  226
+: 2  123  123  246
+: 3  133  .    _
+
+The primary policy of the automatic coordinate tweaking is to adjust
+to the first operand at the operation.
+Please check by yourself if the two operands are exchanged:
+: % chak demo/zx.base T=3 INT demo/sub2.zx.base T=5 INT EXCH REPEAT ADD FLUSH -i
+
+If the same rank has different coordinate name, then either of them
+must have different rank candidate for automatic tweaking.
+# add:2d+1d/op0
+: % chak demo/z.base T=3 INT FLUSH
+: ## record: 0
+: # stack[0] z:bs INT
+: #      [lon/0:8 lat/0:4]
+: #   >  [:]
+: #   >> [lon/0:8 lat/0:4]
+: 0  0  100
+: 1  0  101
+: 2  0  102
+: 3  0  103
+: 4  0  104
+: 5  0  105
+: 6  0  106
+: 7  0  107
+: 0  1  110
+: 1  1  111
+: :
+
+# add:2d+1d/op1
+: % chak demo/sub2.zx.base T=0 INT FLUSH
+: ## record: 0
+: # stack[0] suby:bs INT
+: #      [lat/1:3]
+: #   >  [:]
+: #   >> [lat/1:3]
+: 1  113
+: 2  123
+
+# add:2d+1d
+: % chak demo/z.base T=3 INT demo/sub2.zx.base T=0 INT REPEAT ADD FLUSH -i
+: ## record: 0
+: ## 0 {2053} [lon/0:8 lat/0:4] z:bs INT
+: ## 1 {2055} [*/: lat/1:3] suby:bs INT
+: ## 2 {2056} [lon/0:8 lat/0:4] z:bs INT suby:bs INT ADD
+: #lon/0:8 lat/0:4 {2053} {2055} {2056}
+: 0  0  100  .    _
+: 1  0  101  .    _
+: 2  0  102  .    _
+: 3  0  103  .    _
+: 4  0  104  .    _
+: 5  0  105  .    _
+: 6  0  106  .    _
+: 7  0  107  .    _
+: 0  1  110  113  223
+: 1  1  111  113  224
+: 2  1  112  113  225
+: :
+: 5  2  125  123  248
+: 6  2  126  123  249
+: 7  2  127  123  250
+: 0  3  130  .    _
+: 1  3  131  .    _
+: 2  3  132  .    _
+: 3  3  133  .    _
+: 4  3  134  .    _
+: 5  3  135  .    _
+: 6  3  136  .    _
+: 7  3  137  .    _
+On the above case, the latter spread the data on a missing dimension lon.
+
+If the same rank has different coordinate name with no additional
+information, matching is failed.
+# fail/add:2d/op0
+: % chak demo/zx.base T=3 INT FLUSH
+: ## record: 0
+: # stack[0] zx:bs INT
+: #      [lat/0:4]
+: #   >  [:]
+: #   >> [lat/0:4]
+: 0  103
+: 1  113
+: 2  123
+: 3  133
+
+# fail/add:2d/op1
+: % chak demo/yz.base T=3 INT FLUSH
+: ## record: 0
+: # stack[0] yz:bs INT
+: #      [lon/0:8]
+: #   >  [:]
+: #   >> [lon/0:8]
+: 0  115
+: 1  116
+: 2  117
+: 3  118
+: 4  119
+: 5  120
+: 6  121
+: 7  122
+
+# fail/add:2d
+: % chak demo/zx.base T=3 INT demo/yz.base T=3 INT REPEAT ADD FLUSH -i
+: ## record: 0
+: perm:collision: 0 0 lat
+: perm:collision: 0 1 lon
+: topo:final:0      lat -1 >  -1  -1
+: topo:final:1      lon -1 >  -1  -1
+:  exit =          -39
+Since =lon= and =lat= share the same rank, chak has never chance to
+determine which comes earlier.
+
+On the other hand, if different coordinates do not share the same rank,
+and each opposite is blank, then they succeed to match.
+# auto/add:2d/op0
+: % chak demo/zx.base T=5 INT FLUSH
+: ## record: 0
+: # stack[0] zx:bs INT
+: #      [- lat/0:4]
+: #   >  [:]
+: #   >> [/: lat/0:4]
+: 0  0  103
+: 0  1  113
+: 0  2  123
+: 0  3  133
+
+# auto/add:2d/op1
+: % chak demo/yz.base T=3 INT FLUSH
+: ## record: 0
+: # stack[0] yz:bs INT
+: #      [lon/0:8]
+: #   >  [:]
+: #   >> [lon/0:8]
+: 0  115
+: 1  116
+: 2  117
+: 3  118
+: 4  119
+: 5  120
+: 6  121
+: 7  122
+
+# auto/add:2d
+: % chak demo/zx.base T=5 INT demo/yz.base T=3 INT REPEAT ADD FLUSH -i
+: ## record: 0
+: ## 0 {2053} [*/: lat/0:4] zx:bs INT
+: ## 1 {2055} [lon/0:8 */:] yz:bs INT
+: ## 2 {2056} [lon/0:8 lat/0:4] zx:bs INT yz:bs INT ADD
+: #lon/0:8 lat/0:4 {2053} {2055} {2056}
+: 0  0  103  115  218
+: 1  0  103  116  219
+: 2  0  103  117  220
+: 3  0  103  118  221
+: 4  0  103  119  222
+: 5  0  103  120  223
+: 6  0  103  121  224
+: 7  0  103  122  225
+: 0  1  113  115  228
+: 1  1  113  116  229
+: :
+Both files spread the blank coordinates.
+
+You can overcome the former failed operation by tweaking the explicit
+coordinates:
+# manual/add:2d
+: % chak demo/zx.base T=3 Y=lat INT demo/yz.base T=3 INT REPEAT ADD FLUSH -i
+: ## record: 0
+: ## 0 {2053} [*/: lat/0:4] zx:bs INT
+: ## 1 {2055} [lon/0:8 */:] yz:bs INT
+: ## 2 {2056} [lon/0:8 lat/0:4] zx:bs INT yz:bs INT ADD
+: #lon/0:8 lat/0:4 {2053} {2055} {2056}
+: 0  0  103  115  218
+: 1  0  103  116  219
+: 2  0  103  117  220
+: 3  0  103  118  221
+: 4  0  103  119  222
+: 5  0  103  120  223
+: 6  0  103  121  224
+: 7  0  103  122  225
+: 0  1  113  115  228
+: :
+*** flushing
+# compromise:source
+: % chak T=3 demo/sub5.yz.base INT demo/sub3.yz.base INT FLUSH
+: ## record: 0
+: # stack[0] subx:bs INT
+: #      [lon/0:5]
+: #   >  [:]
+: #   >> [lon/0:5]
+: 0 115
+: 1 116
+: 2 117
+: 3 118
+: 4 119
+: # stack[1] subx:bs INT
+: #      [lon/3:6]
+: #   >  [:]
+: #   >> [lon/3:6]
+: 3 118
+: 4 119
+: 5 120
+Default coordinate index follows python style: the beginning is counted
+from 0, and the ending is not included.  You can change this behaviour
+with global -F option, to follow FORTRAN style:
+
+# compromise:source/F
+: % chak -F T=4 demo/sub5.yz.base INT demo/sub3.yz.base INT FLUSH
+: ## record: 1
+: # stack[1] subx:bs INT
+: #      [lon/1:5]
+: #   >  [:]
+: #   >> [lon/1:5]
+: 1 115
+: 2 116
+: 3 117
+: 4 118
+: 5 119
+: # stack[2] subx:bs INT
+: #      [lon/4:6]
+: #   >  [:]
+: #   >> [lon/4:6]
+: 4 118
+: 5 119
+: 6 120
+
+Appending -i option to FLUSH operator changes the behavior to
+horizontal pasting of all the stack.  Inclusive domain of all the
+stack is adopted.
+Automatic coordinates matching is examined.  You may need to adjust
+them manually.  In the following example all the files share the same
+shape and coordinates.
+# compromise:i
+: % chak T=3 demo/sub5.yz.base INT demo/sub3.yz.base INT FLUSH -i
+: ## record: 0
+: ## 0 {2053} [lon/0:5] subx:bs INT
+: ## 1 {2055} [lon/3:6] subx:bs INT
+: #lon/0:6 {2053} {2055}
+: 0  115  .
+: 1  116  .
+: 2  117  .
+: 3  118  118
+: 4  119  119
+: 5  .    120
+: # horizontal output (inclusive)
+
+The option -x changes the output domain as the intersects.
+# compromise:x
+: % chak T=3 demo/sub5.yz.base INT demo/sub3.yz.base INT FLUSH -x
+: ## record: 0
+: ## 0 {2053} [lon/0:5] subx:bs INT
+: ## 1 {2055} [lon/3:6] subx:bs INT
+: #lon/3:5 {2053} {2055}
+: 3  118  118
+: 4  119  119
+
+The option -l changes the output domain as the first stack.
+# compromise:l
+: % chak T=3 demo/sub5.yz.base INT demo/sub3.yz.base INT FLUSH -l
+: ## record: 0
+: ## 0 {2053} [lon/0:5] subx:bs INT
+: ## 1 {2055} [lon/3:6] subx:bs INT
+: #lon/0:5 {2053} {2055}
+: 0  115  .
+: 1  116  .
+: 2  117  .
+: 3  118  118
+: 4  119  119
+
+*** Recipes
+**** Constant definition
+Operator =POP= can name the last buffer for later recall.
+: % chak 9.8 POP=GRAV 1004.6 POP=CP 273.15 POP=TMELT GRAV CP TMELT FLUSH -i
+: ## 0 {GRAV}  9.8
+: ## 1 {CP}  1004.6
+: ## 2 {TMELT}  273.15
+: # {GRAV} {CP} {TMELT}
+:  9.800000000000001E+00  1.004600000000000E+03  2.731500000000000E+02
+
+**** =gttv= alternative
+Specify corresponding files at =<Q>=, =<T>= and =<TV>= as
+specific humidity(input), temperature(input) and virtiual temperature(output).
+
+: # RAIR = 287.04
+: # RVAP = 461.0
+: # EPSV = RAIR / RVAP
+: # EPSVT = 1.0 / EPSV - 1.0
+: # TV = T * (1 + EPSVT * Q)
+: % chak <T> <Q> 1.0 287.04 461. DIV DIV 1.0 SUB MUL 1.0 ADD MUL = <TV>
+
+More verbose way, which define named constants before the core equation:
+: % chak <T> <Q> 287.04 POP=RAIR 461.0 POP=RVAP RAIR RVAP DIV POP=EPSV 1.0 EPSV DIV 1.0 SUB POP=EPSVT \
+:        EPSVT MUL 1 ADD MUL = <TV>
+
+There are no single sequence to apply the equivalent operation, but
+for scripting, it is better to put all the operands (in this case
+=<T>= and =<Q>=) before any items.
+
+This is equivalent to gtool-3.5 command =gttv= as follows:
+: % gttv t:<T> q:<Q> out:<TV>
+**** =gtext= alternative
+
+* Copyright and license
+Copyright 2022-2023 Japan Agency for Marine-Earth Science and Technology
+Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)
+
+#  LocalWords:  TOUZA Jmz SAITO Fuyuki saitofuyuki jamstec jp MIROC
+#  LocalWords:  README chak gtool RPN Unary gtabs gtatan arctangent
+#  LocalWords:  gtcos gtexp gtinv gtlog gtsin gtsqr gtsqrt gttan ngt
+#  LocalWords:  gttanh gtadd gtsub gtmlt gtdiv gtpow gtmod gtext gts
+#  LocalWords:  gtmask gtset gtshift gtintrp gtimis gtsel subregion
+#  LocalWords:  gtavr gthead gtseq gtedy gtz gthdiv gthvor vorticity
+#  LocalWords:  gtxdf gtxdv gtydf gtydv impatients ofs MUL rmin GEF
+#  LocalWords:  vmin DUP rset NEF gtcon ROR SQRT ggg EXCH INV EQ GTF
+#  LocalWords:  LEB stdout ascii sqrt aa yy ACOS arccos UNDEF ASIN Bn
+#  LocalWords:  arcsin ATAN arctan BOOL boolean CEIL EQU EQB EQF GEU
+#  LocalWords:  GEB GTU GTB IDIV LADD LDIV LEU LEF LMASK LMAX LMIN Fn
+#  LocalWords:  LMUL LSUB LTU LTB LTF NEU NOP LOR SQR TANH tanh TRUNC
+#  LocalWords:  ZSIGN unary Wn ITER OPR qss pss lon sps tps avant bb
+#  LocalWords:  garde ee ARG REPL FMT th nd Cn vv vvv qq qqq Fortran
+#  LocalWords:  fortran eof Hn ETTL CDATE MDATE CSIGN MSIGN gmtmath
+#  LocalWords:  grdmath EDITn TITLn ETTLn TITL AITM ASTR AEND ngtls
+#  LocalWords:  lev undef br aG bs yz subx zx suby xset yset zset
+#  LocalWords:  glon BITAND BITNOT BITOR BITXOR LSHIFT RSHIFT bitwise

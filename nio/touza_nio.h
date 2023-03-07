@@ -1,31 +1,31 @@
-/* touza_nng.h - TOUZA/Nng common definition */
+/* touza_nio.h - TOUZA/Nio common definition */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Oct 11 2021 */
-/* Time-stamp: <2021/12/24 08:56:00 fuyuki touza_nng.h> */
-/* Copyright (C) 2021 */
+/* Time-stamp: <2023/02/16 20:32:50 fuyuki touza_nio.h> */
+/* Copyright (C) 2021, 2022 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
 /*   (https://www.apache.org/licenses/LICENSE-2.0) */
 
 #include "touza.h"
-#ifndef    _TOUZA_NNG_H
-#  define  _TOUZA_NNG_H 1
+#ifndef    _TOUZA_NIO_H
+#  define  _TOUZA_NIO_H 1
 
 #  ifdef TOUZA_TRANSFORM
-#    define TOUZA_Nng       TOUZA_TRANSFORM(Nng)
+#    define TOUZA_Nio       TOUZA_TRANSFORM(Nio)
 #  endif
 #  ifdef TOUZA_TRANSFORM_MDL
 #  endif
 
 #  ifndef GROUP_TAG
-#  define GROUP_TAG 'nng'
+#  define GROUP_TAG 'Nio'
 #  endif
 #  ifndef __GRP__
 #  define __GRP__ GROUP_TAG
 #  endif
 
-#ifndef    NNG_MSG_LEVEL
-#  define  NNG_MSG_LEVEL 0
+#ifndef    NIO_MSG_LEVEL
+#  define  NIO_MSG_LEVEL 0
 #endif
 
 #define ERR_HITEM_INVALID               (ERR_MASK_SPECIFIC-1)   /* invalid header item */
@@ -34,5 +34,12 @@
 
 #define ERR_UNKNOWN_FORMAT              (ERR_MASK_SPECIFIC-11)  /* cannot parse as a gtool format */
 #define ERR_NOT_GTOOL_FORMAT            (ERR_MASK_SPECIFIC-12)  /* cannot parse as a gtool record */
+#define ERR_DEPRECATED_FORMAT           (ERR_MASK_SPECIFIC-13)  /* depreacted gtool format */
 
-#endif /* not _TOUZA_NNG_H */
+#define ERR_SIZE_MISMATCH               (ERR_MASK_SPECIFIC-14)  /* data length mismatch */
+
+#ifndef   OPT_PATH_LEN
+#  define OPT_PATH_LEN 1024 /* file path limit length */
+#endif
+
+#endif /* not _TOUZA_NIO_H */

@@ -30,6 +30,9 @@ You need following tools to generate the autotool scripts.
 - GNU autoconf (2.71 or later)
 - GNU automake (1.16.5 or later)
 - GNU libtool (2.4.6 or later)
+- GNU autoconf archive (2022-09-03 or later)
+  - Small changes in ax_lib_netcdf4.m4 was necessary, which was
+    already included in the vendor package after 2022-07-28.
 
 ** build
 For generic installation instructions please see the =INSTALL= file.
@@ -69,7 +72,15 @@ which are necessary to be installed somewhere the compiler can
 find (e.g., gfortran).  If configure is successful, =*.mod= files
 are installed into =$(includedir)= (default is =PREFIX/include/touza=).
 
+** system-dependent features
+*** ifort
+Need =-heap-arrays= option in =FCFLAGS= and =FFLAGS=, which must be
+set at configure.  An example follows:
+
+: % ./configure FCFLAGS='-g -O2 -heap-arrays' FFLAGS='-g -O2 -heap-arrays'
+
+
 * Copyright and license
-Copyright 2020-2022 Japan Agency for Marine-Earth Science and Technology
+Copyright 2020-2023 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)
