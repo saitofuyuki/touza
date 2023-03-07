@@ -1,7 +1,7 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2023/02/18 21:04:22 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/07 14:00:08 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -1310,6 +1310,8 @@ contains
           endif
        else if (itmp.ge.item.and.itmp.le.jend) then
           ierr = iteme
+       else if (itmp.lt.0) then
+          ierr = 0
        else
           ierr = _ERROR(ERR_HITEM_INVALID_RANGE)
        endif

@@ -1,7 +1,7 @@
 /* touza_nio_interface.h - TOUZA/Nio c interfaces */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Feb 16 2023 */
-/* Time-stamp: <2023/02/22 07:18:09 fuyuki touza_nio_interface.h> */
+/* Time-stamp: <2023/03/07 14:11:01 fuyuki touza_nio_interface.h> */
 /* Copyright (C) 2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -29,7 +29,11 @@ extern int tni_var_name(const char *name,
 extern int tni_var_nco(const int handle, const int gid, const int vid);
 extern int tni_var_id(const int handle, const int gid, const char *name);
 extern int tni_get_attr(char * const attr, const char *item,
-                        const int handle, const int gid, const int vid);
+                        const int handle, const int gid, const int vid,
+                        const int rec);
+extern int tni_get_attr_float(float * const attr, const char *item,
+                              const int handle, const int gid, const int vid,
+                              const int rec);
 extern int tni_co_size(const int handle, const int gid, const int vid,
                        const int cid);
 extern int tni_co_idx(const int handle, const int gid, const int vid,

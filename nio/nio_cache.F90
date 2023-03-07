@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2023/02/22 09:47:06 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/07 14:10:15 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -106,7 +106,8 @@ module TOUZA_Nio_cache
      module procedure show_cache_t, show_cache_h
   end interface show_cache
   interface cache_get_attr
-     module procedure cache_get_attr_i, cache_get_attr_n
+     module procedure cache_geti_attr_a, cache_getn_attr_a
+     module procedure cache_geti_attr_f, cache_getn_attr_f
   end interface cache_get_attr
 
   interface cache_var_read
@@ -495,8 +496,10 @@ contains
   end function cache_co_idx
 
 !!!_  - cache_get_attr
-  subroutine cache_get_attr_i(ierr, attr, item, handle, gid, vid)
+  subroutine cache_geti_attr_a(ierr, attr, item, handle, gid, vid, rec)
+    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_header,only: get_item
+    use TOUZA_Nio_record,only: nio_read_header
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: attr
@@ -504,19 +507,35 @@ contains
     integer,         intent(in)  :: handle
     integer,optional,intent(in)  :: gid
     integer,optional,intent(in)  :: vid
-    integer jc
+    integer,optional,intent(in)  :: rec
+    character(len=litem) :: h(nitem)
+    type(group_t),pointer :: g
+    integer jc, r
+    integer ufile, krect
+    integer(kind=KIOFS) jpos
+
     jc = cache_is_valid(handle, gid, vid)
     ierr = min(0, jc)
     if (ierr.eq.0) then
        if (.not.present(gid)) ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-       if (present(vid)) ierr = _ERROR(ERR_NOT_IMPLEMENTED)
     endif
     if (ierr.eq.0) then
-       call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+       if (present(vid)) then
+          ufile = cache_h2unit(handle)
+          r = max(0, choice(0, rec))
+          g => ctables(jc)%g(gid)
+          jpos = g%o(r, vid) + 1
+          call nio_read_header(ierr, h, krect, ufile, jpos)
+          call get_item(ierr, h, attr, item)
+       else
+          call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+       endif
     endif
-  end subroutine cache_get_attr_i
-  subroutine cache_get_attr_n(ierr, attr, item, handle, gid, vid)
+  end subroutine cache_geti_attr_a
+  subroutine cache_getn_attr_a(ierr, attr, item, handle, gid, vid, rec)
+    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_header,only: get_item
+    use TOUZA_Nio_record,only: nio_read_header
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: attr
@@ -524,17 +543,106 @@ contains
     integer,         intent(in)  :: handle
     integer,optional,intent(in)  :: gid
     integer,optional,intent(in)  :: vid
-    integer jc
+    integer,optional,intent(in)  :: rec
+    integer jc, r
+    character(len=litem) :: h(nitem)
+    type(group_t),pointer :: g
+    integer ufile, krect
+    integer(kind=KIOFS) jpos
+
     jc = cache_is_valid(handle, gid, vid)
     ierr = min(0, jc)
     if (ierr.eq.0) then
        if (.not.present(gid)) ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-       if (present(vid)) ierr = _ERROR(ERR_NOT_IMPLEMENTED)
     endif
     if (ierr.eq.0) then
-       call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+       if (present(vid)) then
+          ufile = cache_h2unit(handle)
+          r = max(0, choice(0, rec))
+          g => ctables(jc)%g(gid)
+          jpos = g%o(r, vid) + 1
+          call nio_read_header(ierr, h, krect, ufile, jpos)
+          if (ierr.eq.0) call get_item(ierr, h, attr, item)
+       else
+          call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+       endif
     endif
-  end subroutine cache_get_attr_n
+  end subroutine cache_getn_attr_a
+
+  subroutine cache_geti_attr_f(ierr, attr, item, handle, gid, vid, rec)
+    use TOUZA_Nio_std,only: KTGT=>KFLT
+    use TOUZA_Nio_std,only: choice
+    use TOUZA_Nio_header,only: get_item
+    use TOUZA_Nio_record,only: nio_read_header
+    implicit none
+    integer,         intent(out) :: ierr
+    real(kind=KTGT), intent(out) :: attr
+    integer,         intent(in)  :: item
+    integer,         intent(in)  :: handle
+    integer,optional,intent(in)  :: gid
+    integer,optional,intent(in)  :: vid
+    integer,optional,intent(in)  :: rec
+    character(len=litem) :: h(nitem)
+    type(group_t),pointer :: g
+    integer jc, r
+    integer ufile, krect
+    integer(kind=KIOFS) jpos
+
+    jc = cache_is_valid(handle, gid, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       if (.not.present(gid)) ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    endif
+    if (ierr.eq.0) then
+       if (present(vid)) then
+          ufile = cache_h2unit(handle)
+          r = max(0, choice(0, rec))
+          g => ctables(jc)%g(gid)
+          jpos = g%o(r, vid) + 1
+          call nio_read_header(ierr, h, krect, ufile, jpos)
+          call get_item(ierr, h, attr, item)
+       else
+          call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+       endif
+    endif
+  end subroutine cache_geti_attr_f
+  subroutine cache_getn_attr_f(ierr, attr, item, handle, gid, vid, rec)
+    use TOUZA_Nio_std,only: KTGT=>KFLT
+    use TOUZA_Nio_std,only: choice
+    use TOUZA_Nio_header,only: get_item
+    use TOUZA_Nio_record,only: nio_read_header
+    implicit none
+    integer,         intent(out) :: ierr
+    real(kind=KTGT), intent(out) :: attr
+    character(len=*),intent(in)  :: item
+    integer,         intent(in)  :: handle
+    integer,optional,intent(in)  :: gid
+    integer,optional,intent(in)  :: vid
+    integer,optional,intent(in)  :: rec
+    integer jc, r
+    character(len=litem) :: h(nitem)
+    type(group_t),pointer :: g
+    integer ufile, krect
+    integer(kind=KIOFS) jpos
+
+    jc = cache_is_valid(handle, gid, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       if (.not.present(gid)) ierr = _ERROR(ERR_NOT_IMPLEMENTED)
+    endif
+    if (ierr.eq.0) then
+       if (present(vid)) then
+          ufile = cache_h2unit(handle)
+          r = max(0, choice(0, rec))
+          g => ctables(jc)%g(gid)
+          jpos = g%o(r, vid) + 1
+          call nio_read_header(ierr, h, krect, ufile, jpos)
+          if (ierr.eq.0) call get_item(ierr, h, attr, item)
+       else
+          call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+       endif
+    endif
+  end subroutine cache_getn_attr_f
 
 !!!_  - cache_is_valid()
   integer function cache_is_valid (handle, gid, vid) result(jc)

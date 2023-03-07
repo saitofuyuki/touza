@@ -1,7 +1,7 @@
 !!!_! nio_intfc.F90 - TOUZA/Nio c interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2023
-#define TIME_STAMP 'Time-stamp: <2023/02/22 08:09:57 fuyuki nio_intfc.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/07 14:05:09 fuyuki nio_intfc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -294,7 +294,7 @@ contains
     if (ns.eq.0) then
        jco = nco - 1 - int(cid)
        jco = cache_co_idx(int(handle), int(gid), int(vid), buf)
-       if (jco.ge.0) cid = nco - 1 - jco 
+       if (jco.ge.0) cid = nco - 1 - jco
     endif
   end function tni_co_idx
 
@@ -320,7 +320,7 @@ contains
 
 !!!_  - tni_get_attr()
   integer(kind=C_INT) function tni_get_attr &
-       & (attr, item, handle, gid, vid) BIND(C) result(ierr)
+       & (attr, item, handle, gid, vid, rec) BIND(C) result(ierr)
     use TOUZA_Nio_header,only: litem, nitem
     use TOUZA_Nio_cache,only: cache_get_attr
     implicit none
@@ -329,6 +329,7 @@ contains
     integer(kind=C_INT),         intent(in),value :: handle
     integer(kind=C_INT),         intent(in),value :: gid
     integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
     character(len=litem*nitem) :: buf
     character(len=litem) :: ibuf
     integer jerr
@@ -338,8 +339,10 @@ contains
        call cache_get_attr(jerr, buf, ibuf, int(handle))
     else if (vid.lt.0) then
        call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid))
-    else
+    else if (rec.lt.0) then
        call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid), int(vid))
+    else
+       call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid), int(vid), int(rec))
     endif
     if (jerr.eq.0) then
        call f2c_string(attr, buf)
@@ -348,6 +351,34 @@ contains
     endif
     ierr = jerr
   end function tni_get_attr
+
+!!!_  - tni_get_attr_float()
+  integer(kind=C_INT) function tni_get_attr_float &
+       & (attr, item, handle, gid, vid, rec) BIND(C) result(ierr)
+    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_cache,only: cache_get_attr
+    implicit none
+    real(kind=C_FLOAT),          intent(out)      :: attr
+    character(len=1,kind=C_CHAR),intent(in)       :: item(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: gid
+    integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
+    character(len=litem) :: ibuf
+    integer jerr
+    ierr = 0
+    call c2f_string(ibuf, item)
+    if (gid.lt.0) then
+       call cache_get_attr(jerr, attr, ibuf, int(handle))
+    else if (vid.lt.0) then
+       call cache_get_attr(jerr, attr, ibuf, int(handle), int(gid))
+    else if (rec.lt.0) then
+       call cache_get_attr(jerr, attr, ibuf, int(handle), int(gid), int(vid))
+    else
+       call cache_get_attr(jerr, attr, ibuf, int(handle), int(gid), int(vid), int(rec))
+    endif
+    ierr = jerr
+  end function tni_get_attr_float
 
 !!!_  - tni_var_read_float()
   integer(kind=C_INT) function tni_var_read_float &
@@ -368,8 +399,8 @@ contains
     jerr = min(0, nco)
     do jeff = 0, nco - 1
        jco = nco - 1 - jeff
-       st(jco) = start(jeff)
-       co(jco) = count(jeff)
+       st(jco) = int(start(jeff))
+       co(jco) = int(count(jeff))
     enddo
 
     if (jerr.eq.0) then

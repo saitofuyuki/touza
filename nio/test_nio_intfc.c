@@ -1,7 +1,7 @@
 /* test_nio_intfc.c - test TOUZA/Nio c interfaces */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Feb 16 2023 */
-/* Time-stamp: <2023/02/20 13:39:40 fuyuki test_nio_intfc.c> */
+/* Time-stamp: <2023/03/07 13:24:26 fuyuki test_nio_intfc.c> */
 /* Copyright (C) 2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -49,7 +49,7 @@ int main (int argc, char **argv)
           nrecs = tni_group_recs(nioh, jg);
           printf("  vars[%d]: %d\n", jg, nvars);
           printf("  recs[%d]: %d\n", jg, nrecs);
-          ierr = tni_get_attr(attr, "UTIM", nioh, jg, -1);
+          ierr = tni_get_attr(attr, "UTIM", nioh, jg, -1, -1);
           printf("  utime[%d]: %s\n", jg, attr);
           for (jv = 0; jv < nvars; jv++)
             {
