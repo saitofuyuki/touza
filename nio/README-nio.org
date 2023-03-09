@@ -16,7 +16,15 @@
   (expected to be in the parent directory) for general instruction of
   *TOUZA* collection.
 
+** Notice
+The design of MRT-format is incompatible from TOUZA version 1.07.
+
 * Build and installation
+* Nio-format, as gtool-3.5 extensions
+** URT - arbitrary precision floating-point packing using TOUZA/Trapiche
+** MRT - URT with mask
+** P[IR]n - list-based packed array format
+** XA16 - Cache record
 * Brief description of *TOUZA/Nio* modules
 ** =TOUZA_Nio_header=
 *** =show_header=

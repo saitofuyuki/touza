@@ -1,6 +1,6 @@
 #+title: TOUZA guide
 #+author: SAITO Fuyuki
-#+date: <2020-06-07 Sun>
+#+date: <2023-03-09>
 #+email: saitofuyuki AT jamstec DOT go DOT jp
 
 * Introduction
@@ -17,15 +17,20 @@ Unless the package contains configuration file such as =configure=,
 is a typical case when you are using a git version of the source.
 =autogen.sh= in this package can help you generate them.
 
-: % sh ./autogen.sh   ## dry-run
+: % sh ./autogen.sh -h       ## show help
+: ./autogen.sh: batch to generate auto-files
+: :
+: :
+: % sh ./autogen.sh          ## dry-run
 : ./autogen.sh: dry-run
 : If you are sure, run as ./autogen.sh -y
 : :
-: % sh ./autogen.sh -y    ## wet-run
-: :
-: % sh ./autogen.sh -y -c ## wet-run (clear old files)
+: % sh ./autogen.sh -y       ## wet-run
+: % sh ./autogen.sh -y -c    ## wet-run; clear old files
+: % sh ./autogen.sh -y -c -m ## wet-run; clear old files; copy missing files
 
-You need following tools to generate the autotool scripts.
+You need following tools to generate the autotool scripts.  Older
+versions of these tools may work as expected, though not checked.
 
 - GNU autoconf (2.71 or later)
 - GNU automake (1.16.5 or later)
@@ -33,6 +38,8 @@ You need following tools to generate the autotool scripts.
 - GNU autoconf archive (2022-09-03 or later)
   - Small changes in ax_lib_netcdf4.m4 was necessary, which was
     already included in the vendor package after 2022-07-28.
+- pkgconf (1.8.1 or later)
+  - pkg-config may work
 
 ** build
 For generic installation instructions please see the =INSTALL= file.
@@ -43,34 +50,49 @@ In short:
 
 to read the usage, and:
 
-: % ./configure
+: % ./configure --with-build-jmz --enable-nctcdf
 : % make
 : % make install
 
-for typical installation.  After a series of commands, a script,
-library, and headers will be installed under =PREFIX=.
+for typical installation.  With the argument =--with-build-jmz= you
+can build sample program to use =TOUZA= such as =chak=.
+With the =--enable-nctcdf= very simple NetCDF output feature is
+included.
+
+After a series of commands, a script, library, and headers will be
+installed under =PREFIX= and =EPREFIX=.
 
 : PREFIX
-: |-- bin
-: |   `-- makeshift
 : |-- include
-: |   |-- touza
-: |   |   |-- touza.mod
-: |   |   `-- :
 : |   |-- touza.h
-: |   `-- :
-: |-- lib
-: |   |-- libtouza.a
-: |   `-- libtouza.la
+: |   |-- :         header files
 : `-- share
 :     `-- touza
-:         |-- mt_init.m4
-:         `-- :
+:         |-- ax_lib_netcdf4.m4
+:         |-- :                      m4 macro files
+:         |-- calendar_coco.F90      switcher sources to export to MIROC, COCO
+:         |-- calendar_miroc.F90
+:         |-- div_miroc.F90
+:         |-- nio_miroc.F90
+:         `-- ppp_miroc.F90
+: EPREFIX
+: |-- bin
+: |   `-- chak
+: |-- include
+: |   `-- touza
+: |       |-- test_div_layout_utils.mod
+: |       |   :                     module files (compiler dependent)
+: `-- lib
+:     |-- libtouza.a
+:     |-- libtouza.la
+:     `-- pkgconfig
+:         `-- touza.pc
 
 Depending on compiler, =*.mod= files are generated for each module,
 which are necessary to be installed somewhere the compiler can
 find (e.g., gfortran).  If configure is successful, =*.mod= files
-are installed into =$(includedir)= (default is =PREFIX/include/touza=).
+are installed into =EPREFIX/include/touza=, which can be controlled
+with =--enable-install-modules= at =configure=.
 
 ** system-dependent features
 *** ifort
@@ -79,6 +101,13 @@ set at configure.  An example follows:
 
 : % ./configure FCFLAGS='-g -O2 -heap-arrays' FFLAGS='-g -O2 -heap-arrays'
 
+*** some pkgconf quotes the output
+Old pkgconf quotes the output, which leads to error at compilation.
+
+If you found something like below in Makefile,
+: NETCDF4_LDFLAGS = "-L/usr/lib/x86_64-linux-gnu/hdf5/serial -L/usr/lib/x86_64-linux-gnu"
+please manually remove the quotation, such as:
+: NETCDF4_LDFLAGS = -L/usr/lib/x86_64-linux-gnu/hdf5/serial -L/usr/lib/x86_64-linux-gnu
 
 * Copyright and license
 Copyright 2020-2023 Japan Agency for Marine-Earth Science and Technology
