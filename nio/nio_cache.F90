@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/16 14:40:34 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/16 17:11:24 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -123,6 +123,10 @@ module TOUZA_Nio_cache
   interface cache_var_read
      module procedure cache_var_read_f
   end interface cache_var_read
+
+  interface cache_rec_id
+     module procedure cache_rec_id_d
+  end interface cache_rec_id
 !!!_  - public procedures
   public init, diag, finalize
   public init_group
@@ -135,7 +139,7 @@ module TOUZA_Nio_cache
   public cache_var_name,  cache_var_nco, cache_var_id
   public cache_co_name,   cache_co_size, cache_co_idx
   public cache_var_read
-
+  public cache_rec_id
   public cache_get_attr
 !!!_  - public shared
 contains
@@ -465,6 +469,54 @@ contains
     endif
   end function cache_var_id
 
+!!!_  - cache_rec_id - return record id filtered by time range
+  integer function cache_rec_id_d &
+       & (handle, gid, vid, timel, timeh, func, init) result(ridx)
+    use TOUZA_Nio_std,only: KTGT=>KDBL
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,         intent(in) :: handle
+    integer,         intent(in) :: gid
+    integer,         intent(in) :: vid
+    real(kind=KTGT), intent(in) :: timel, timeh
+    integer,optional,intent(in) :: init     ! for variable duplication
+    interface
+       logical function func(dstr, tstr, timel, timeh)
+         use TOUZA_Nio_std,only: KTGT=>KDBL
+         implicit none
+         character(len=*),intent(in) :: dstr ! date string
+         character(len=*),intent(in) :: tstr ! time string
+         real(kind=KTGT), intent(in) :: timel, timeh
+       end function func
+    end interface
+
+    integer jc, jg, jv, jr
+    integer jerr
+    integer rbgn, rend, rofs
+
+    ridx = -1
+    jc = cache_is_valid(handle, gid)
+    jerr = min(0, jc)
+    if (jerr.eq.0) then
+       jg = cache_gv2gindex(handle, gid, vid)
+       jv = cache_gv2vindex(handle, gid, vid)
+       jerr = min(0, jg, jv)
+    endif
+    if (jerr.eq.0) then
+       rofs = cache_gvr2rindex(handle, gid, vid, 0)
+       rbgn = choice(rofs, init) - rofs
+       rend = ctables(jc)%g(jg)%nrec
+       do jr = rbgn, rend
+          if (func(ctables(jc)%g(jg)%d(jr), ctables(jc)%g(jg)%t(jr), timel, timeh)) then
+             ridx = jr
+             exit
+          endif
+       enddo
+    endif
+    if (jerr.eq.0) then
+       if (ridx.ge.0) ridx = ridx + rofs
+    endif
+  end function cache_rec_id_d
 !!!_  - cache_var_nco - return number of effective dimensions
   integer function cache_var_nco(handle, gid, vid) result(ndim)
     implicit none
@@ -1303,7 +1355,7 @@ contains
              jre = jrb + nr
              c%rpos(jro+jrb:jro+jre-1) = c%g(jg)%rpos(0:nr-1, jv)
              c%rlen(jro+jrb:jro+jre-1) = c%g(jg)%rlen(0:nr-1, jv)
-             c%g(jg)%v(jv)%rofs = jro + jrb  ! copied below
+             c%g(jg)%v(jv)%rofs = jro + jrb  ! set here and copied below
           enddo
           jro = jro + nv * nr
        enddo
@@ -1571,7 +1623,6 @@ contains
     character(len=litem) :: name
     integer irange(2)
     ierr = 0
-    jvar = -1
     loop_var: do j = 0, grp%nvar - 1
        ! write(*, *) 'search_var', j, trim(grp%v(j)%item)
        if (grp%v(j)%item.ne.head(hi_ITEM)) cycle loop_var
@@ -1586,6 +1637,7 @@ contains
        jvar = j
        return
     enddo loop_var
+    jvar = -1
   end subroutine group_search_var
 
 !!!_  - group_search_rec
@@ -1598,14 +1650,16 @@ contains
     type(group_t),   intent(in)  :: grp
     character(len=*),intent(in)  :: head(*)
     integer j
+
+    ! used only for cache builds
     ierr = 0
-    jrec = -1
     loop_rec: do j = 0, grp%nrec - 1
        if (grp%d(j).ne.head(hi_DATE)) cycle loop_rec
        if (grp%t(j).ne.head(hi_TIME)) cycle loop_rec
        jrec = j
        return
     enddo loop_rec
+    jrec = -1
   end subroutine group_search_rec
 
 !!!_  & free_cache
