@@ -1,7 +1,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2023/03/03 17:59:38 fuyuki Makefile.am>
+# Time-stamp: <2023/03/16 20:22:14 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022, 2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -110,7 +110,7 @@ test_nio_miroc_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_NIO_MIROC=1 $(FC_INCLUDE_touza_c
 test_nio_miroc_FCFLAGS = $(AM_FCFLAGS) $(FC_MODULE_touza_cal) $(FC_MODULE_touza_ppp)
 
 test_nio_nctcdf_SOURCES = $(TEST_COMMON_SOURCES) nio_nctcdf.F90
-test_nio_nctcdf_LDADD = $(TEST_COMMON_LIBS) 
+test_nio_nctcdf_LDADD = $(TEST_COMMON_LIBS)
 test_nio_nctcdf_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_NCTCDF=1
 test_nio_nctcdf_FCFLAGS = $(AM_FCFLAGS)
 

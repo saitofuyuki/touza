@@ -1,5 +1,5 @@
 #!@ZSH@
-# Time-stamp: <2022/10/07 10:09:51 fuyuki genx.sh.in>
+# Time-stamp: <2023/03/16 20:21:29 fuyuki genx.sh.in>
 
 main ()
 {
@@ -76,7 +76,7 @@ main ()
         sfx=$xsfx$ysfx$zsfx
         for nt in $NT
         do
-          ofile=${base}-${nt}_$sfx 
+          ofile=${base}-${nt}_$sfx
           if [[ ! -e $ofile ]]; then
             wrap_jmzex $jopts T=$nt "${(@)args}" $ofile $fmt TITLE="$sfx" || return $?
           fi

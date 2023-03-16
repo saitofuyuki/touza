@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/11/04 22:20:56 fuyuki demo-chak.sh.in>
+# Time-stamp: <2023/03/16 20:21:19 fuyuki demo-chak.sh.in>
 
 main ()
 {
@@ -105,7 +105,7 @@ run_demo ()
 {
   local tag=$1; shift
   local col=T
-  case $1 in 
+  case $1 in
   (-NOCOL) col=; shift;;
   esac
   local err=
@@ -181,7 +181,7 @@ gen_source ()
     let jt++
   done
 
-  jt=0 
+  jt=0
   local tm=
   while [[ $jt -lt $nt ]]
   do
@@ -208,7 +208,7 @@ gen_mean ()
   local mopts=($1); shift
   local item=$1 ofile=$2; shift 2
   local ifile=$1
-    
+
   local copts=(-t 1)
   $ngtmean $copts $mopts       -o $ofile $ifile || return $?
   $ngtmean $copts $mopts -n -a -o $ofile $ifile || return $?
