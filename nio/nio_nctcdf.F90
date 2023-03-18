@@ -1,7 +1,7 @@
 !!!_! nio_nctcdf.F90 - TOUZA/Nio nanchatte netcdf interface
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 28 2022
-#define TIME_STAMP 'Time-stamp: <2023/01/22 21:32:15 fuyuki nio_nctcdf.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/20 21:54:00 fuyuki nio_nctcdf.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -222,15 +222,16 @@ contains
   end subroutine nct_open_read
 !!!_  - nct_open_write
   subroutine nct_open_write &
-       & (ierr, handle, path, status, type_time)
+       & (ierr, handle, path, status, type_time, iomsg)
     use TOUZA_Nio_header,only: nitem, litem
     use TOUZA_Nio_std,only: sus_is_status_new, choice
     implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: handle
-    character(len=*),intent(in)  :: path
-    character(len=*),intent(in)  :: status
-    integer,optional,intent(in)  :: type_time
+    integer,         intent(out)            :: ierr
+    integer,         intent(out)            :: handle
+    character(len=*),intent(in)             :: path
+    character(len=*),intent(in)             :: status
+    integer,         intent(in),   optional :: type_time
+    character(len=*),intent(inout),optional :: iomsg
     integer istt
     integer ncid
     integer vhid, vtid
@@ -280,6 +281,11 @@ contains
        istt = nf90_def_var(ncid, var_time, tt, (/dim_rec/), vtid)
        if (istt.ne.NF90_NOERR) ierr = _ERROR(ERR_PANIC)
        if (ierr.eq.0) ncfiles(handle)%vtid = vtid
+    endif
+    if (istt.ne.NF90_NOERR) then
+       if (present(iomsg)) then
+          iomsg = trim(nf90_strerror(istt))
+       endif
     endif
   end subroutine nct_open_write
 
@@ -488,9 +494,9 @@ contains
 
     ierr = 0
     ncid = ncfiles(handle)%ncid
-    if (ierr.eq.0) call nct_define_dim(ierr, dimid(1), ndim(1), handle, head, hi_AITM1, hi_ASTR1, hi_AEND1)
-    if (ierr.eq.0) call nct_define_dim(ierr, dimid(2), ndim(2), handle, head, hi_AITM2, hi_ASTR2, hi_AEND2)
-    if (ierr.eq.0) call nct_define_dim(ierr, dimid(3), ndim(3), handle, head, hi_AITM3, hi_ASTR3, hi_AEND3)
+    if (ierr.eq.0) call nct_define_dim(ierr, dimid(1), ndim(1), handle, head, 1, hi_AITM1, hi_ASTR1, hi_AEND1)
+    if (ierr.eq.0) call nct_define_dim(ierr, dimid(2), ndim(2), handle, head, 2, hi_AITM2, hi_ASTR2, hi_AEND2)
+    if (ierr.eq.0) call nct_define_dim(ierr, dimid(3), ndim(3), handle, head, 3, hi_AITM3, hi_ASTR3, hi_AEND3)
 
     if (ierr.eq.0) ncfiles(handle)%dimid(1:3) = dimid(1:3)
     if (ierr.eq.0) ncfiles(handle)%ndim(1:3) = ndim(1:3)
@@ -547,7 +553,7 @@ contains
 
 !!!_  - nct_define_dim
   subroutine nct_define_dim &
-       & (ierr, dimid, ndim, handle, head, hax, hmin, hmax)
+       & (ierr, dimid, ndim, handle, head, cidx, hax, hmin, hmax)
     use TOUZA_Nio_header,only: litem, get_item
     implicit none
     integer,         intent(out) :: ierr
@@ -555,6 +561,7 @@ contains
     integer,         intent(out) :: ndim
     integer,         intent(in)  :: handle
     character(len=*),intent(in)  :: head(*)
+    integer,         intent(in)  :: cidx
     integer,         intent(in)  :: hax, hmin, hmax
 
     integer ncid
@@ -570,6 +577,8 @@ contains
     if (ierr.eq.0) call get_item(ierr, head, jmax, hmax)
 
     if (ierr.eq.0) then
+101    format('COOR', I3.3)
+       if (xname.eq.' ') write(xname, 101) cidx
        ndim = jmax - jmin + 1
        istt = nf90_def_dim(ncid, xname, ndim, dimid)
        if (istt.ne.NF90_NOERR) ierr = _ERROR(ERR_PANIC)
