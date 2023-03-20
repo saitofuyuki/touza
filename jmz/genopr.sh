@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/02/21 09:57:30 fuyuki genopr.sh>
+# Time-stamp: <2023/03/21 21:41:02 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -113,6 +113,7 @@ register_all ()
   register -g stack +n m,m         INSERT   'move top stack after last anchor'
   register -g stack +n m,'2m'      REPEAT   'repeat from last non-adjacent anchor'
   register -g stack +n m,0         FLUSH    'flush-out from last anchor'
+  register -g stack +n m,0         DFLUSH   'flush-out from last anchor (defined only)'
 
   # queue manipulation
   register -g queue ITER   'iterate last queue operator for each set from last anchor'
@@ -197,9 +198,12 @@ register_all ()
   register -n 2,1 -i shift,'>>' RSHIFT   'bitwise right shift'
 
   # floating-point operation
-  register -g float -n 1,1 -i call EXPONENT 'exponent(A)'
-  register -g float -n 1,1 -i call FRACTION 'fraction(A)'
-  register -g float -n 2,1 -i call SCALE    'scale(A,B)'
+  register -g float -n 1,1 -i call EXPONENT  'exponent(A)'
+  register -g float -n 1,1 -i call FRACTION  'fraction(A)'
+  register -g float -n 2,1 -i call SCALE     'scale(A,B)'
+  register -g float -n 2,1 -i call NEAREST   'nearest(A,B)'
+  register -g float -n 1,1 -i call SPACING   'spacing(A)'
+  register -g float -n 1,1 -i call RRSP      'rrspacing(A)'
 
   # other operation
   register         -n 2,1 -i call             MIN    'min(A,B)'
@@ -272,6 +276,10 @@ register_all ()
   register -g buffer,index -o NAME/REPL/RANGE    X   'put top stack coordinate[0] index'
   register -g buffer,index -o NAME/REPL/RANGE    Y   'put top stack coordinate[1] index'
   register -g buffer,index -o NAME/REPL/RANGE    Z   'put top stack coordinate[2] index'
+
+  register -g index        -o NAME,...           FLAT  'flat index'
+  register -a FLAT INDEX
+
   # register -g buffer -p VALUE                 MISS    "replace missing value"
 
   register -g header        -p FORMAT      FMT     "set output data format"
@@ -753,6 +761,7 @@ output_table ()
   local nstack=() push= pop=
   local sym= alias= opt=
   local candi=(unary binary lazy ubool bool stack index float)
+  local aapp=
   for grp in "$@"
   do
     [[ $candi[(I)$grp] -eq 0 ]] && continue
@@ -765,15 +774,29 @@ output_table ()
       desc="$DESCR[$key]"
 
       sym=$SYM[$key]
-      alias=(${(k)ALIAS[(R)$key]})
-      syms=($sym $alias)
       opt=$OPT[$key]
 
-      [[ $grp == index ]] && pop=0 push=1 opt=''
+      if [[ $grp == index ]]; then
+         pop=0 push=1
+         [[ $grp == $SUBG[$key] ]] && opt=''
+      fi
 
+      alias=(${(k)ALIAS[(R)$key]})
+      aapp=
+      if [[ -n $alias && -n $opt ]]; then
+        syms=($sym)
+        aapp=T
+      else
+        syms=($sym $alias)
+      fi
       [[ -n $opt ]] && syms=(${^syms}"[=$opt]")
       print - "| $syms | $pop | $push | $desc | "
+      if [[ -n $aapp ]]; then
+        [[ -n $opt ]] && syms=(${^alias}"[=$opt]")
+        print - "| $syms | $pop | $push | (alias of $sym) $desc | "
+      fi
     done
+
   done | sort | column -s '|' -o '|' -t
   print -
 
@@ -828,12 +851,12 @@ output_f90_header ()
   local date=$(date -Iseconds)
   base=${base#./}
   cat <<HEADER
-!!!_! $base - TOUZA/Jmz swiss(CH) army knife $desc
+!!!_! $base - TOUZA/Jmz CH(swiss) army knife $desc
 ! Maintainer: SAITO Fuyuki
 ! Created by $this at $date
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0

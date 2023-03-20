@@ -3,14 +3,14 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Nov 24 2021
-# Time-stamp: <2023/01/10 13:42:13 fuyuki configure.ac>
+# Time-stamp: <2023/03/21 21:57:18 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
-AC_INIT([touza-jmz],[1.00],[saitofuyuki@jamstec.go.jp])
+AC_INIT([touza-jmz],[1.1.0],[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
-Copyright (C) 2022 Japan Agency for Marine-Earth Science and Technology
+Copyright (C) 2022,2023 Japan Agency for Marine-Earth Science and Technology
 
 This is TOUZA/Jmz (Ji-Mo-Tsu), a collection of sample programs using TOUZA.
 
