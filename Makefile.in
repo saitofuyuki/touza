@@ -26,7 +26,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Tue Mar  7 21:53:11 JST 2023
+# from AX_AM_MACROS_STATIC on Thu Mar 23 21:48:08 JST 2023
 
 
 
@@ -1312,6 +1312,8 @@ echo-top_srcdir:
 	@echo $(top_srcdir)
 echo-top_builddir:
 	@echo $(top_builddir)
+echo-build_aux:
+	@echo $(BUILD_AUX)
 
 lib:
 	@if test "$(top_builddir)" = "$(builddir)"; then :; \

@@ -17,7 +17,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2023/03/03 17:59:38 fuyuki Makefile.am>
+# Time-stamp: <2023/03/19 13:44:42 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022, 2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -25,7 +25,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Tue Mar  7 21:53:11 JST 2023
+# from AX_AM_MACROS_STATIC on Thu Mar 23 21:48:08 JST 2023
 
 
 
@@ -120,7 +120,7 @@ check_PROGRAMS = test_nio_header$(EXEEXT) test_nio_record$(EXEEXT) \
 	test_nio_cache$(EXEEXT) $(am__EXEEXT_1) \
 	test_nio_control$(EXEEXT) test_nio$(EXEEXT) \
 	test_nio_miroc$(EXEEXT) $(am__EXEEXT_2) \
-	test_nio_intfc$(EXEEXT)
+	test_nio_bindc$(EXEEXT)
 @BUILD_div_TRUE@am__append_9 = test_nio_division
 @with_nctcdf_TRUE@am__append_10 = test_nio_nctcdf
 @with_nctcdf_TRUE@am__append_11 = $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
@@ -145,11 +145,11 @@ LTLIBRARIES = $(noinst_LTLIBRARIES)
 libtouza_local_la_LIBADD =
 am__libtouza_local_la_SOURCES_DIST = nio_std.F90 nio_header.F90 \
 	nio_record.F90 nio_cache.F90 nio_nctcdf.F90 nio_control.F90 \
-	nio_intfc.F90 nio.F90 touza_nio.h touza_nio_interface.h
+	nio_bindc.F90 nio.F90 touza_nio.h touza_nio_interface.h
 @with_nctcdf_TRUE@am__objects_1 = nio_nctcdf.lo
 am__objects_2 =
 am_libtouza_local_la_OBJECTS = nio_std.lo nio_header.lo nio_record.lo \
-	nio_cache.lo $(am__objects_1) nio_control.lo nio_intfc.lo \
+	nio_cache.lo $(am__objects_1) nio_control.lo nio_bindc.lo \
 	nio.lo $(am__objects_2) $(am__objects_2)
 libtouza_local_la_OBJECTS = $(am_libtouza_local_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -169,6 +169,10 @@ am__DEPENDENCIES_3 = $(noinst_LTLIBRARIES) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_2)
 test_nio_DEPENDENCIES = $(am__DEPENDENCIES_3)
+am_test_nio_bindc_OBJECTS = test_nio_bindc.$(OBJEXT)
+test_nio_bindc_OBJECTS = $(am_test_nio_bindc_OBJECTS)
+test_nio_bindc_DEPENDENCIES = $(am__DEPENDENCIES_3) \
+	$(am__DEPENDENCIES_1)
 am_test_nio_cache_OBJECTS = test_nio_cache-nio_cache.$(OBJEXT)
 test_nio_cache_OBJECTS = $(am_test_nio_cache_OBJECTS)
 test_nio_cache_DEPENDENCIES = $(am__DEPENDENCIES_3)
@@ -184,10 +188,6 @@ test_nio_division_OBJECTS = $(am_test_nio_division_OBJECTS)
 am_test_nio_header_OBJECTS = test_nio_header-nio_header.$(OBJEXT)
 test_nio_header_OBJECTS = $(am_test_nio_header_OBJECTS)
 test_nio_header_DEPENDENCIES = $(am__DEPENDENCIES_3)
-am_test_nio_intfc_OBJECTS = test_nio_intfc.$(OBJEXT)
-test_nio_intfc_OBJECTS = $(am_test_nio_intfc_OBJECTS)
-test_nio_intfc_DEPENDENCIES = $(am__DEPENDENCIES_3) \
-	$(am__DEPENDENCIES_1)
 am_test_nio_miroc_OBJECTS = test_nio_miroc-nio_miroc.$(OBJEXT)
 am__objects_3 = test_nio_miroc-calendar_miroc.$(OBJEXT)
 nodist_test_nio_miroc_OBJECTS = $(am__objects_3)
@@ -224,7 +224,7 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/test_nio_intfc.Po
+am__depfiles_remade = ./$(DEPDIR)/test_nio_bindc.Po
 am__mv = mv -f
 PPFCCOMPILE = $(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS)
@@ -264,18 +264,18 @@ am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libtouza_local_la_SOURCES) \
 	$(EXTRA_libtouza_local_la_SOURCES) $(test_nio_SOURCES) \
-	$(test_nio_cache_SOURCES) $(test_nio_control_SOURCES) \
-	$(test_nio_division_SOURCES) $(test_nio_header_SOURCES) \
-	$(test_nio_intfc_SOURCES) $(test_nio_miroc_SOURCES) \
+	$(test_nio_bindc_SOURCES) $(test_nio_cache_SOURCES) \
+	$(test_nio_control_SOURCES) $(test_nio_division_SOURCES) \
+	$(test_nio_header_SOURCES) $(test_nio_miroc_SOURCES) \
 	$(nodist_test_nio_miroc_SOURCES) $(test_nio_nctcdf_SOURCES) \
 	$(test_nio_record_SOURCES)
 DIST_SOURCES = $(am__libtouza_local_la_SOURCES_DIST) \
 	$(EXTRA_libtouza_local_la_SOURCES) $(test_nio_SOURCES) \
-	$(test_nio_cache_SOURCES) $(test_nio_control_SOURCES) \
+	$(test_nio_bindc_SOURCES) $(test_nio_cache_SOURCES) \
+	$(test_nio_control_SOURCES) \
 	$(am__test_nio_division_SOURCES_DIST) \
-	$(test_nio_header_SOURCES) $(test_nio_intfc_SOURCES) \
-	$(test_nio_miroc_SOURCES) $(test_nio_nctcdf_SOURCES) \
-	$(test_nio_record_SOURCES)
+	$(test_nio_header_SOURCES) $(test_nio_miroc_SOURCES) \
+	$(test_nio_nctcdf_SOURCES) $(test_nio_record_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -596,7 +596,7 @@ switch_DATA = nio_miroc.F90
 include_HEADERS = touza_nio.h touza_nio_interface.h
 noinst_LTLIBRARIES = libtouza_local.la
 libtouza_local_la_SOURCES = nio_std.F90 nio_header.F90 nio_record.F90 \
-	nio_cache.F90 $(am__append_4) nio_control.F90 nio_intfc.F90 \
+	nio_cache.F90 $(am__append_4) nio_control.F90 nio_bindc.F90 \
 	nio.F90 $(include_HEADERS) $(libtouza_APPENDS)
 libtouza_local_la_LDFLAGS = 
 EXTRA_libtouza_local_la_SOURCES = nio_miroc.F90
@@ -606,21 +606,27 @@ TEST_COMMON_LIBS = $(noinst_LTLIBRARIES) $(am__append_8) \
 test_nio_header_SOURCES = $(TEST_COMMON_SOURCES) nio_header.F90
 test_nio_header_LDADD = $(TEST_COMMON_LIBS)
 test_nio_header_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_HEADER=1
+EXTRA_test_nio_header_DEPENDENCIES = $(test_nio_header_LDADD)
 test_nio_record_SOURCES = $(TEST_COMMON_SOURCES) nio_record.F90
 test_nio_record_LDADD = $(TEST_COMMON_LIBS)
 test_nio_record_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_RECORD=1
+EXTRA_test_nio_record_DEPENDENCIES = $(test_nio_record_LDADD)
 test_nio_cache_SOURCES = $(TEST_COMMON_SOURCES) nio_cache.F90
 test_nio_cache_LDADD = $(TEST_COMMON_LIBS)
 test_nio_cache_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_CACHE=1
+EXTRA_test_nio_cache_CPPDEPENDENCIES = $(test_nio_cache_LDADD)
 test_nio_control_SOURCES = $(TEST_COMMON_SOURCES) nio_control.F90
 test_nio_control_LDADD = $(TEST_COMMON_LIBS)
 test_nio_control_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_CONTROL=1
+EXTRA_test_nio_control_DEPENDENCIES = $(test_nio_control_LDADD)
 @BUILD_div_TRUE@test_nio_division_SOURCES = $(TEST_COMMON_SOURCES) nio_division.F90
 @BUILD_div_TRUE@test_nio_division_LDADD = $(TEST_COMMON_LIBS)
 @BUILD_div_TRUE@test_nio_division_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_DIVISION=1
+@BUILD_div_TRUE@EXTRA_test_nio_division_DEPENDENCIES = $(test_nio_division_LDADD)
 test_nio_SOURCES = $(TEST_COMMON_SOURCES) nio.F90
 test_nio_LDADD = $(TEST_COMMON_LIBS)
 test_nio_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO=1
+EXTRA_test_nio_LDEPENDENCIES = $(test_nio_LDADD)
 CAL_SWITCH = calendar_miroc.F90
 test_nio_miroc_SOURCES = $(TEST_COMMON_SOURCES) nio_miroc.F90
 nodist_test_nio_miroc_SOURCES = $(CAL_SWITCH)
@@ -628,11 +634,11 @@ test_nio_miroc_LDADD = $(FC_LDADD_touza_cal) $(TEST_COMMON_LIBS)
 test_nio_miroc_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_MIROC=1 $(FC_INCLUDE_touza_cal)
 test_nio_miroc_FCFLAGS = $(AM_FCFLAGS) $(FC_MODULE_touza_cal) $(FC_MODULE_touza_ppp)
 test_nio_nctcdf_SOURCES = $(TEST_COMMON_SOURCES) nio_nctcdf.F90
-test_nio_nctcdf_LDADD = $(TEST_COMMON_LIBS) 
+test_nio_nctcdf_LDADD = $(TEST_COMMON_LIBS)
 test_nio_nctcdf_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_NCTCDF=1
 test_nio_nctcdf_FCFLAGS = $(AM_FCFLAGS)
-test_nio_intfc_SOURCES = test_nio_intfc.c touza_nio_interface.h
-test_nio_intfc_LDADD = $(TEST_COMMON_LIBS) $(FCLIBS)
+test_nio_bindc_SOURCES = test_nio_bindc.c touza_nio_interface.h
+test_nio_bindc_LDADD = $(TEST_COMMON_LIBS) $(FCLIBS)
 test_helpd = bin
 @enable_module_dependencies_TRUE@calendar_miroc_o_MODULE_DEPS = $(top_builddir)/cal/touza_cal.$(FC_MODEXT) $(top_builddir)/cal/touza_cal_primitive.$(FC_MODEXT) $(builddir)/touza_cal_miroc.$(FC_MODEXT) $(top_builddir)/cal/touza_cal_core.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@nio_lo_MODULE_DEPS = $(builddir)/touza_nio_std.$(FC_MODEXT) $(builddir)/touza_nio_header.$(FC_MODEXT) $(builddir)/touza_nio_record.$(FC_MODEXT)
@@ -717,6 +723,10 @@ test_nio$(EXEEXT): $(test_nio_OBJECTS) $(test_nio_DEPENDENCIES) $(EXTRA_test_nio
 	@rm -f test_nio$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_nio_OBJECTS) $(test_nio_LDADD) $(LIBS)
 
+test_nio_bindc$(EXEEXT): $(test_nio_bindc_OBJECTS) $(test_nio_bindc_DEPENDENCIES) $(EXTRA_test_nio_bindc_DEPENDENCIES) 
+	@rm -f test_nio_bindc$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_nio_bindc_OBJECTS) $(test_nio_bindc_LDADD) $(LIBS)
+
 test_nio_cache$(EXEEXT): $(test_nio_cache_OBJECTS) $(test_nio_cache_DEPENDENCIES) $(EXTRA_test_nio_cache_DEPENDENCIES) 
 	@rm -f test_nio_cache$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_nio_cache_OBJECTS) $(test_nio_cache_LDADD) $(LIBS)
@@ -732,10 +742,6 @@ test_nio_division$(EXEEXT): $(test_nio_division_OBJECTS) $(test_nio_division_DEP
 test_nio_header$(EXEEXT): $(test_nio_header_OBJECTS) $(test_nio_header_DEPENDENCIES) $(EXTRA_test_nio_header_DEPENDENCIES) 
 	@rm -f test_nio_header$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_nio_header_OBJECTS) $(test_nio_header_LDADD) $(LIBS)
-
-test_nio_intfc$(EXEEXT): $(test_nio_intfc_OBJECTS) $(test_nio_intfc_DEPENDENCIES) $(EXTRA_test_nio_intfc_DEPENDENCIES) 
-	@rm -f test_nio_intfc$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(test_nio_intfc_OBJECTS) $(test_nio_intfc_LDADD) $(LIBS)
 
 test_nio_miroc$(EXEEXT): $(test_nio_miroc_OBJECTS) $(test_nio_miroc_DEPENDENCIES) $(EXTRA_test_nio_miroc_DEPENDENCIES) 
 	@rm -f test_nio_miroc$(EXEEXT)
@@ -755,7 +761,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_nio_intfc.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_nio_bindc.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -1098,7 +1104,7 @@ clean-am: clean-checkPROGRAMS clean-generic clean-libtool \
 	clean-noinstLTLIBRARIES mostlyclean-am
 
 distclean: distclean-recursive
-		-rm -f ./$(DEPDIR)/test_nio_intfc.Po
+		-rm -f ./$(DEPDIR)/test_nio_bindc.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -1146,7 +1152,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-recursive
-		-rm -f ./$(DEPDIR)/test_nio_intfc.Po
+		-rm -f ./$(DEPDIR)/test_nio_bindc.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -1200,6 +1206,8 @@ echo-top_srcdir:
 	@echo $(top_srcdir)
 echo-top_builddir:
 	@echo $(top_builddir)
+echo-build_aux:
+	@echo $(BUILD_AUX)
 
 lib:
 	@if test "$(top_builddir)" = "$(builddir)"; then :; \

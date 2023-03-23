@@ -17,15 +17,15 @@
 # TOUZA/Trp Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Feb 26 2021
-# Time-stamp: <2022/10/20 07:47:55 fuyuki Makefile.am>
+# Time-stamp: <2023/03/18 17:48:48 fuyuki Makefile.am>
 
-# Copyright (C) 2021,2022
+# Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Tue Mar  7 21:53:11 JST 2023
+# from AX_AM_MACROS_STATIC on Thu Mar 23 21:48:08 JST 2023
 
 
 
@@ -112,9 +112,9 @@ target_triplet = @target@
 check_PROGRAMS = test_trapiche_std$(EXEEXT) \
 	test_trapiche_pack_32$(EXEEXT) test_trapiche_pack_64$(EXEEXT) \
 	test_trapiche_float$(EXEEXT) test_trapiche_ctl$(EXEEXT) \
-	test_trapiche$(EXEEXT) $(am__EXEEXT_1) $(am__EXEEXT_2)
-@BUILD_WITH_MPI_TRUE@am__append_5 = test_trapiche_transfer
-@MAINTAINER_MODE_TRUE@am__append_6 = test_trapiche_pack_uip
+	$(am__EXEEXT_1) $(am__EXEEXT_2) test_trapiche$(EXEEXT)
+@MAINTAINER_MODE_TRUE@am__append_5 = test_trapiche_pack_uip
+@BUILD_WITH_MPI_TRUE@am__append_6 = test_trapiche_transfer
 subdir = trp
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
@@ -130,8 +130,8 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/touza_config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-@BUILD_WITH_MPI_TRUE@am__EXEEXT_1 = test_trapiche_transfer$(EXEEXT)
-@MAINTAINER_MODE_TRUE@am__EXEEXT_2 = test_trapiche_pack_uip$(EXEEXT)
+@MAINTAINER_MODE_TRUE@am__EXEEXT_1 = test_trapiche_pack_uip$(EXEEXT)
+@BUILD_WITH_MPI_TRUE@am__EXEEXT_2 = test_trapiche_transfer$(EXEEXT)
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libtouza_local_la_LIBADD =
 am__libtouza_local_la_SOURCES_DIST = trapiche_std.F90 \
@@ -585,35 +585,43 @@ libtouza_local_la_SOURCES = trapiche_std.F90 trapiche_pack.F90 \
 	trapiche_float.F90 trapiche_ctl.F90 $(am__append_4) \
 	trapiche.F90 $(include_HEADERS)
 TEST_COMMON_LIBS = $(noinst_LTLIBRARIES) $(FC_LDADD_touza_std)
-# TEST_COMMON_SOURCES	=	div_test.F90
+# TEST_COMMON_SOURCES = div_test.F90
 test_helpd = bin
 UINTPACK = uintpack.F
 MIROCH = miroc.h
 test_trapiche_std_SOURCES = $(TEST_COMMON_SOURCES) trapiche_std.F90
 test_trapiche_std_LDADD = $(FC_LDADD_touza_std)
 test_trapiche_std_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_STD=1
-test_trapiche_SOURCES = $(TEST_COMMON_SOURCES) trapiche.F90
-test_trapiche_LDADD = $(TEST_COMMON_LIBS)
-test_trapiche_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE=1
-test_trapiche_ctl_SOURCES = $(TEST_COMMON_SOURCES) trapiche_ctl.F90
-test_trapiche_ctl_LDADD = $(TEST_COMMON_LIBS)
-test_trapiche_ctl_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_CTL=1
+EXTRA_test_trapiche_std_DEPENDENCIES = $(test_trapiche_std_LDADD)
 test_trapiche_pack_32_SOURCES = $(TEST_COMMON_SOURCES) trapiche_pack.F90
 test_trapiche_pack_32_LDADD = $(TEST_COMMON_LIBS)
 test_trapiche_pack_32_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_PACK=32
+EXTRA_test_trapiche_pack_32_aDEPENDENCIES = $(test_trapiche_pack_32_LDADD)
 test_trapiche_pack_64_SOURCES = $(test_trapiche_pack_32_SOURCES)
 test_trapiche_pack_64_LDADD = $(test_trapiche_pack_32_LDADD)
 test_trapiche_pack_64_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_PACK=64
-test_trapiche_pack_uip_SOURCES = $(TEST_COMMON_SOURCES) trapiche_pack.F90
-test_trapiche_pack_uip_LDADD = $(TEST_COMMON_LIBS)
-test_trapiche_pack_uip_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_PACK=32 -DTEST_UINTPACK=1
-nodist_test_trapiche_pack_uip_SOURCES = $(UINTPACK)
+EXTRA_test_trapiche_pack_64_DEPENDENCIES = $(test_trapiche_pack_64_LDADD)
+test_trapiche_ctl_SOURCES = $(TEST_COMMON_SOURCES) trapiche_ctl.F90
+test_trapiche_ctl_LDADD = $(TEST_COMMON_LIBS)
+test_trapiche_ctl_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_CTL=1
+EXTRA_test_trapiche_ctl_DEPENDENCIES = $(test_trapiche_ctl_LDADD)
 test_trapiche_float_SOURCES = $(TEST_COMMON_SOURCES) trapiche_float.F90
 test_trapiche_float_LDADD = $(TEST_COMMON_LIBS)
 test_trapiche_float_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_FLOAT=1
+EXTRA_test_trapiche_float_DEPENDENCIES = $(test_trapiche_float_LDADD)
+test_trapiche_pack_uip_SOURCES = $(TEST_COMMON_SOURCES) trapiche_pack.F90
+test_trapiche_pack_uip_LDADD = $(TEST_COMMON_LIBS)
+test_trapiche_pack_uip_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_PACK=32 -DTEST_UINTPACK=1
+EXTRA_test_trapiche_pack_uip_DEPENDENCIES = $(test_trapiche_pack_uip_LDADD)
+nodist_test_trapiche_pack_uip_SOURCES = $(UINTPACK)
 test_trapiche_transfer_SOURCES = $(TEST_COMMON_SOURCES) trapiche_transfer.F90
 test_trapiche_transfer_LDADD = $(TEST_COMMON_LIBS)
 test_trapiche_transfer_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_TRANSFER=1
+EXTRA_test_trapiche_transfer_DEPENDENCIES = $(test_trapiche_transfer_LDADD)
+test_trapiche_SOURCES = $(TEST_COMMON_SOURCES) trapiche.F90
+test_trapiche_LDADD = $(TEST_COMMON_LIBS)
+test_trapiche_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE=1
+EXTRA_test_trapiche_DEPENDENCIES = $(test_trapiche_LDADD)
 @enable_module_dependencies_TRUE@test_trapiche_trapiche_o_MODULE_DEPS = $(builddir)/touza_trp_std.$(FC_MODEXT) $(builddir)/touza_trp_pack.$(FC_MODEXT) $(builddir)/touza_trp_float.$(FC_MODEXT) $(builddir)/touza_trp_ctl.$(FC_MODEXT) $(builddir)/touza_trp.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@test_trapiche_ctl_trapiche_ctl_o_MODULE_DEPS = $(builddir)/touza_trp_std.$(FC_MODEXT) $(builddir)/touza_trp_ctl.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@test_trapiche_float_trapiche_float_o_MODULE_DEPS = $(builddir)/touza_trp_std.$(FC_MODEXT) $(builddir)/touza_trp_pack.$(FC_MODEXT) $(top_builddir)/std/touza_std_arg.$(FC_MODEXT) $(top_builddir)/std/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_trp_float.$(FC_MODEXT)
@@ -1160,6 +1168,8 @@ echo-top_srcdir:
 	@echo $(top_srcdir)
 echo-top_builddir:
 	@echo $(top_builddir)
+echo-build_aux:
+	@echo $(BUILD_AUX)
 
 lib:
 	@if test "$(top_builddir)" = "$(builddir)"; then :; \

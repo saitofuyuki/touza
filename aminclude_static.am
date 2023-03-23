@@ -1,6 +1,6 @@
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Tue Mar  7 21:53:11 JST 2023
+# from AX_AM_MACROS_STATIC on Thu Mar 23 21:48:10 JST 2023
 
 BUILD_AUX  =    $(top_srcdir)/build-aux
 CLEANFILES =
@@ -39,6 +39,8 @@ echo-top_srcdir:
 	@echo $(top_srcdir)
 echo-top_builddir:
 	@echo $(top_builddir)
+echo-build_aux:
+	@echo $(BUILD_AUX)
 
 lib:
 	@if test "$(top_builddir)" = "$(builddir)"; then :; \
