@@ -3,17 +3,22 @@
 # Created: Jun 7 2020
 # Time-stamp: <2022/11/02 08:02:02 fuyuki autogen.sh>
 
-# Copyright (C) 2020, 2021
+# Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
+
+set -u
 
 DRY=T
 OPTS=''
 CLEAR=''
 VERBOSE=''
 copy_missing=''
+help=
+err=0
+args="$*"
 while test $# -gt 0
 do
   case $1 in
@@ -21,18 +26,42 @@ do
   -c) CLEAR=T;;
   -m) copy_missing=-c;;
   -y) DRY=;;
-  -I) OPTS="$OPTS $1 $2"; shift;;
+  -I) OPTS="$OPTS $1 $2"; shift || exit $?;;
+  -h) help=T;;
   *)  break;;
   esac
   shift
 done
+
+if test x"$help" != x; then
+  echo "$0: batch to generate auto-files"
+  echo ""
+  echo "Usage: $0 [OPTIONS] [SEARCH PATH...]"
+  echo "   -h      show this help"
+  echo "   -v      verbose"
+  echo "   -c      clear old files"
+  echo "   -m      copy missing files"
+  echo "   -y      wet-run"
+  echo "   -I DIR  pass as aclocal arguments (multiple)"
+  echo ""
+  echo "Examples:"
+  echo "  $0 -c -m     # typical case. dry-run"
+  echo "  $0 -c -m -y  # typical case. wet-run"
+  exit 0
+fi
+
+for x in realpath autoconf automake libtoolize aclocal autoheader
+do
+  type "$x" > /dev/null 2>&1 || { echo "Need $x to run $0" >&2; err=1; }
+done
+test $err -gt 0 && exit 1
 
 thisd="$(dirname "$0")"
 thisd="$(realpath $thisd)" || exit $?
 
 if test x"$DRY" != x; then
   echo "$0: dry-run"
-  echo "If you are sure, run as $0 -y [ARGS...]"
+  echo "If you are sure, run as $0 -y $args"
 fi
 
 run ()
@@ -55,7 +84,7 @@ do
 done
 if test x"$stdm4d" = x; then
   echo "$0: not found $stdm4f." >&2
-  echo "$0: rerun as $0 SEARCH-PATH" >&2
+  echo "$0: rerun as $0 $args SEARCH-PATH" >&2
   exit 1
 fi
 stdm4d="$(realpath $stdm4d)" || exit $?
@@ -63,6 +92,7 @@ stdm4d="$(realpath $stdm4d)" || exit $?
 for dir in jmz .
 do
   cd "$thisd/$dir" || exit $?
+  echo "# Entering $thisd/$dir"
   TMP=
   # fake automake
   for t in COPYING
@@ -100,3 +130,6 @@ do
 
   run autoconf $VERBOSE || exit $?
 done
+
+echo "# Done."
+exit $err

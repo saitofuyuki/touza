@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/02/05 21:23:43 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/14 13:08:11 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020,2021,2022,2023
@@ -97,7 +97,6 @@ module TOUZA_Std_utl
   interface inrange
      module procedure inrange_i
   end interface inrange
-
 !!!_  - public
   public init, diag, finalize
   public choice, choice_a
@@ -547,7 +546,7 @@ contains
     return
   end function condop_l
 
-!!!_  & chcount - count character(s) occurrence
+!!!_  & chcount() - count character(s) occurrence
   integer function chcount (str, chs) &
        & result(n)
     implicit none
@@ -638,6 +637,7 @@ contains
     endif
     r = sign(r, n)
   end function ndigits_i
+
 !!!_  & compact_format
   subroutine compact_format_i(npos, str, v, nrep, pad, fmt, sep, clipl, cliph)
     implicit none
@@ -839,6 +839,7 @@ contains
        write(str, fmt, IOSTAT=jerr) num
     endif
   end subroutine compact_format_item_i
+
 !!!_  & parse_number - safely parse number from string
 !!!_   . Note
   !!     It seems surprizing that read statement with fmt=* is actually
@@ -1103,6 +1104,7 @@ contains
 !!!_  & split_heads - split string and return head-array
   subroutine split_heads &
        & (n, h, str, sep, lim, empty)
+    implicit none
     integer,          intent(out)         :: n         ! number of elements or error code
     integer,          intent(out)         :: h(0:)
     character(len=*), intent(in)          :: str
@@ -1381,7 +1383,7 @@ contains
     return
   end subroutine split_list_d
 
-!!!_  & find_first_range - find first occurence of array within range (inclusive)
+!!!_  & find_first_range() - find first occurence of array within range (inclusive)
   integer function find_first_range_i &
        & (list, low, high, start, back, offset, no) &
        & result(n)
@@ -1425,7 +1427,7 @@ contains
     endif
   end function find_first_range_i
 
-!!!_  & find_first - find first occurence of array
+!!!_  & find_first() - find first occurence of array
   integer function find_first_i &
        & (list, val, start, back, offset, no) &
        & result(n)
@@ -1506,7 +1508,7 @@ contains
     endif
   end function find_first_a
 
-!!!_  - jot
+!!!_  & jot
   subroutine jot(v, n, b, e, s)
     implicit none
     integer,intent(out)         :: v(0:*)
@@ -1555,14 +1557,14 @@ contains
     enddo
   end subroutine jot
 
-!!!_  - inrange - return true if l<=v<=h
+!!!_  & inrange() - return true if l<=v<=h
   ELEMENTAL logical function inrange_i (v, l, h) result (b)
     implicit none
     integer,intent(in) :: v, l, h
     b = (l.le.v .and. v.le.h)
   end function inrange_i
 
-!!!_  - begin_with - return true if STR begins with SUB
+!!!_  & begin_with() - return true if STR begins with SUB
   PURE logical function begin_with(str, sub) result (b)
     implicit none
     character(len=*),intent(in) :: str
@@ -1577,7 +1579,7 @@ contains
   end function begin_with
 
 !!!_ + (system) control procedures
-!!!_  - is_first_force () - check if first time or force
+!!!_  & is_first_force () - check if first time or force
   logical function is_first_force(n, mode) result(b)
     implicit none
     integer,intent(in)          :: n
@@ -1585,7 +1587,8 @@ contains
     b = (n.eq.0) .or. (IAND(choice(0, mode), MODE_FORCE).gt.0)
     return
   end function is_first_force
-!!!_  - control_mode () - set init/diag/finalize mode
+
+!!!_  & control_mode () - set init/diag/finalize mode
   integer function control_mode(mode, def) result(n)
     implicit none
     integer,intent(in),optional :: mode
@@ -1596,7 +1599,8 @@ contains
     n = IAND(n, mskl)
     return
   end function control_mode
-!!!_  - control_deep () - set init/diag/finalize mode at deep level
+
+!!!_  & control_deep () - set init/diag/finalize mode at deep level
   integer function control_deep(mode, arg) result(n)
     implicit none
     integer,intent(in)          :: mode
@@ -1611,7 +1615,7 @@ contains
     return
   end function control_deep
 
-!!!_  - control_lev () - set init/diag/finalize verbose level
+!!!_  & control_lev () - set init/diag/finalize verbose level
   integer function control_lev(lev, ref, def) result(n)
     implicit none
     integer,intent(in) :: lev  ! target level
@@ -1625,8 +1629,9 @@ contains
     endif
     return
   end function control_lev
-
+!!!_ + end module TOUZA_Std_utl
 end module TOUZA_Std_utl
+
 
 !!!_@ test_std_utl - test program
 #if TEST_STD_UTL
@@ -1870,7 +1875,7 @@ contains
     integer v(0:lim-1)
     integer def(0:lim-1)
     integer j
-    integer n
+    integer n, m
     do j = 0, lim - 1
        def(j) = - (j + 1)
     enddo
@@ -1883,11 +1888,12 @@ contains
        write(*, 101) 'c', empty, n, trim(str), lim
     else
        call split_list(n, v, str, ':', lim, def, empty=empty)
-       write(*, 101) 'd', empty, n, trim(str), lim, v(0:lim-1)
-
+       m = min(n, lim)
+       write(*, 101) 'd', empty, n, trim(str), lim, v(0:m-1)
        v = def
        call split_list(n, v, str, ':', lim, empty=empty)
-       write(*, 101) 'n', empty, n, trim(str), lim, v(0:lim-1)
+       m = min(n, lim)
+       write(*, 101) 'n', empty, n, trim(str), lim, v(0:m-1)
     endif
   end subroutine test_split_sub
 
@@ -1910,10 +1916,12 @@ contains
     integer m, n
 
     call split_heads(m, h, str, sep, -1, empty)
-    if (m.ge.0) call split_heads(n, h, str, sep, 0,  empty)
-
 101 format('split_heads/', L1, ':', I0, 1x, '[', A, ']', 16(1x, I0))
-    write(*, 101) empty, n, trim(str), h(0:n)
+    write(*, 101) empty, m, trim(str)
+    if (m.ge.0) then
+       call split_heads(n, h, str, sep, 0,  empty)
+       write(*, 101) empty, n, trim(str), h(0:n-1)
+    endif
   end subroutine test_split_heads_sub
 
   subroutine test_find(v)

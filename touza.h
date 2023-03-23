@@ -1,7 +1,7 @@
 /* touza.h - touza definitions */
 /*    Maintainer: SAITO Fuyuki */
 /*    Created: Jun 5 2020 */
-/*     Time-stamp: <2023/02/16 18:00:21 fuyuki touza.h> */
+/*     Time-stamp: <2023/03/20 21:29:29 fuyuki touza.h> */
 
 /* Copyright (C) 2020-2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
@@ -74,6 +74,10 @@
 #define ERR_STALE               -45 /* something is already initilaized */
 #define ERR_INVALID_ITEM        -46 /* wrong item */
 #define ERR_NOT_FOUND           -47 /* search failed */
+#define ERR_FEW_ARGUMENTS       -48 /* insufficient arguments  */
+#define ERR_IO_GENERAL          -49 /* general error at io operation */
+#define ERR_FILE_EXISTS         -50 /* file exists */
+#define ERR_FILE_NOT_EXISTS     -51 /* file not exists */
 
 /* module specific errors */
 
@@ -117,8 +121,9 @@
 #define ERR_MASK_NIO_RECORD   (ERR_MASK_NIO + ERR_MASK_MODULE * 3)
 #define ERR_MASK_NIO_DIVISION (ERR_MASK_NIO + ERR_MASK_MODULE * 4)
 #define ERR_MASK_NIO_NCTCDF   (ERR_MASK_NIO + ERR_MASK_MODULE * 5)
-#define ERR_MASK_NIO_INTFC    (ERR_MASK_NIO + ERR_MASK_MODULE * 6)
+#define ERR_MASK_NIO_BINDC    (ERR_MASK_NIO + ERR_MASK_MODULE * 6)
 #define ERR_MASK_NIO_CACHE    (ERR_MASK_NIO + ERR_MASK_MODULE * 7)
+#define ERR_MASK_NIO_CTRL     (ERR_MASK_NIO + ERR_MASK_MODULE * 8)
 
 #define ERR_MASK_TRP          (ERR_MASK_GROUP * 5)
 #define ERR_MASK_TRP_STD      (ERR_MASK_TRP + ERR_MASK_MODULE * 1)

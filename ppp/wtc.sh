@@ -1,6 +1,6 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2022/02/08 09:50:52 fuyuki wtc.sh>
+# Time-stamp: <2023/03/16 20:22:22 fuyuki wtc.sh>
 
 # Copyright (C) 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -22,11 +22,11 @@ main ()
     (-r) rainbow=$2; shift;;
     (-t) exp=$2; shift;;
     (-d) testd=$2; shift;;
-    (-*) echo "unknown argument $1" >&2; return 1;;    
+    (-*) echo "unknown argument $1" >&2; return 1;;
     (*)  break
     esac
     shift
-  done        
+  done
   # parameters (executables)
   test x${testd-} = x && testd=out$root.$$
   mkdir -p $testd
@@ -103,9 +103,9 @@ run ()
            cp $sfile SYSIN.CL$rr
            r=$(expr $r + 1)
          done
-         test $exp -eq 0 && cp $sfile SYSIN         
+         test $exp -eq 0 && cp $sfile SYSIN
        else
-         cp $sfile SYSIN         
+         cp $sfile SYSIN
        fi;;
     esac
 

@@ -1,6 +1,6 @@
 #+title: TOUZA/Std guide
 #+author: SAITO Fuyuki
-#+date: <2020-06-07 Sun>
+#+date: <2023-03-09>
 
 * Introduction
 *TOUZA/Std* is a collection of Fortran subroutines for typical
@@ -14,70 +14,278 @@ DOT go DOT jp>.
 Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
 (expected to be in the parent directory) for general instruction of
 *TOUZA* collection.
-* Build and installation
+* Description of *TOUZA/Std* modules
+** ~TOUZA_Std~  (=std.F90=)
+*** Public procedures
+**** ~init~
+**** ~diag~
+**** ~finalize~
 
-* Brief description of *TOUZA/Std* modules
-** =TOUZA_Std=  (std.F90)
+** ~TOUZA_Std_prc~  (=std_prc.F90=) - precision management
+~TOUZA_Std_prc~ is an abstract layer of various (numeric) types and
+their properties.
+Although there are very few exceptions, kind type parameters and
+number properties are processor dependent.  This module provides some
+helps to encapsulate such situation.  It may be not perfect.
 
-** =TOUZA_Std_prc=  (std_prc.F90) - precision management
-*** constants
+*** Constants for ~kind~ parameters (public)
+
 | name   | type    | description                 |
 |--------+---------+-----------------------------|
-| =KFLT= | integer | real kind (float or single) |
-| =KDBL= | integer | real kind (double)          |
-| =KI32= | integer | integer kind (32bit signed) |
-| =KI64= | integer | integer kind (64bit signed) |
+| ~KFLT~ | integer | real kind (binary32)        |
+| ~KDBL~ | integer | real kind (binary64)        |
+| ~KI8~  | integer | integer kind (8bit signed)  |
+| ~KI32~ | integer | integer kind (32bit signed) |
+| ~KI64~ | integer | integer kind (64bit signed) |
 
+Properties of real kinds, ~KFLT~ and ~KDBL~, can be specified at compile time,
+to tweak the following CPP macros:
+| name                     | default | description                                  |
+|--------------------------+---------+----------------------------------------------|
+| ~OPT_REAL_SINGLE_DIGITS~ |       6 | least decimal precision for ~KFLT~ kind      |
+| ~OPT_REAL_SINGLE_EXP~    |      37 | least decimal exponent range for ~KFLT~ kind |
+| ~OPT_REAL_DOUBLE_DIGITS~ |      15 | least decimal precision for ~KDBL~ kind      |
+| ~OPT_REAL_DOUBLE_EXP~    |     307 | least decimal exponent range for ~KDBL~ kind |
+The default values correspond to binary32 and binary64 of IEEE 754, respectively.
+These parameters are just passed to ~SELECTED_REAL_KIND()~.
 
-** =TOUZA_Std_utl=  (std_utl.F90) - small utilities
-*** functions
-**** choice()
+Integer kinds, ~KI8~, ~KI32~, ~KI64~ can be specified directly at
+compile time by CPP macros ~OPT_INTEGER_8_KIND~,
+~OPT_INTEGER_32_KIND~, ~OPT_INTEGER_64_KIND~, respectively.
+When the macro value is =0= (default), kind parameters are internally
+detected.  Use ~ISO_FORTRAN_ENV~ module if available.  If not, use
+~ISO_C_BINDING~ module if available.
+Otherwise they are declared with ~SELECTED_INT_KIND()~ with hard-coded
+magnitude parameters.
+
+*** Public procedures
+**** ~init~
 #+begin_src f90
-  integer    function choice(d, a)
-  logical    function choice(d, a)
-  real(KFLT) function choice(d, a)
-  real(KDBL) function choice(d, a)
+  subroutine init(ierr, u, levv, mode, inf, dnm)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+    logical,intent(in),optional :: inf,  dnm
+#+end_src
+**** ~diag~
+#+begin_src f90
+  subroutine diag(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+#+end_src
+**** ~finalize~
+#+begin_src f90
+  subroutine finalize(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+#+end_src
+**** ~init_set_switches~
+:PROPERTIES:
+:ID:       cb813afa-4a3b-48d8-a9b2-21203f7b9ddf
+:END:
+#+begin_src f90
+  subroutine init_set_switches(ierr, inf, dnm)
+    integer,intent(out)         :: ierr
+    logical,intent(in),optional :: inf
+    logical,intent(in),optional :: dnm
+#+end_src
+**** ~diag_abstract~ - brief diagnosis of standard kinds
+#+begin_src f90
+  subroutine diag_abstract (ierr, u)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+#+end_src
+Show brief diagnosis of real and integer kinds to i/o unit ~u~.
+If ~u~ is absent or =-1=, standard output is used.
+: [TOUZA/Std/prc] single = 4  6,37
+: [TOUZA/Std/prc] double = 8  15,307
+: [TOUZA/Std/prc] quadruple = -1  -1,4931
+: [TOUZA/Std/prc] int8 = 1  8
+: [TOUZA/Std/prc] int16 = 2  16
+: [TOUZA/Std/prc] int32 = 4  32
+: [TOUZA/Std/prc] int64 = 8  64
+Negative kind in the diagnosis means that it is skipped in
+~TOUZA_Std_prc~ module.
+**** ~diag_real_kinds~
+#+begin_src f90
+  subroutine diag_real_kinds (ierr, u, maxp, minp)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: maxp, minp
+#+end_src
+Show properties of real kinds of specific decimal precision range from
+~minp~ (default 1) to ~maxp~ (default 128).
+: [TOUZA/Std/prc] real:4 = 6,37
+: [TOUZA/Std/prc] real:8 = 15,307
+: [TOUZA/Std/prc] real:10 = 18,4931
+: [TOUZA/Std/prc] real:16 = 33,4931
+**** ~diag_int_kinds~
+#+begin_src f90
+  subroutine diag_int_kinds (ierr, u, maxr, minr)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: maxr, minr
+#+end_src
+Show properties of integer kinds of specific magnitude range from
+~minr~ (default 1) to ~maxr~ (default 128).
+: [TOUZA/Std/prc] integer:1 = 2
+: [TOUZA/Std/prc] integer:2 = 4
+: [TOUZA/Std/prc] integer:4 = 9
+: [TOUZA/Std/prc] integer:8 = 18
+: [TOUZA/Std/prc] integer:16 = 38
+
+**** ~diag_real_props~
+#+begin_src f90
+  subroutine diag_real_props (ierr, mold, u)
+    integer,   intent(out)         :: ierr
+    real(kind),intent(in)          :: mold
+    integer,   intent(in),optional :: u
+#+end_src
+Show various properties of real-kind of ~mold~.
+: # call diag_real_props(ierr, 1.0_KDBL)
+: [TOUZA/Std/prc] real:8 fraction = 2 53
+: [TOUZA/Std/prc] real:8 exponent = -1021 1024
+: [TOUZA/Std/prc] real:8 precision = 15 307
+: [TOUZA/Std/prc] real:8 exponent(1 epsilon) = 1 -51
+
+**** ~check_real_props~
+#+begin_src f90
+  subroutine check_real_props (kx, mold, u, levv)
+    integer,   intent(out)         :: kx
+    real(kind),intent(in)          :: mold
+    integer,   intent(in),optional :: u
+    integer,   intent(in),optional :: levv
+#+end_src
+Batch property checker of real-kind of ~mold~, to successively call
+~check_real_zero~, ~check_real_one~, ~check_real_inf~ and
+~check_real_dnm~.
+The former two are called unconditionally, while the latter two are
+called only when switches are set at ~init~.
+
+**** ~check_real_zero~
+#+begin_src f90
+  subroutine check_real_zero (kx, mold, u, levv)
+    integer,   intent(out)         :: kx
+    real(kind),intent(in)          :: mold
+    integer,   intent(in),optional :: u
+    integer,   intent(in),optional :: levv
+#+end_src
+Check real(0.0) properties of the same kind as ~mold~,
+and return its exponent as ~kx~.
+**** ~check_real_one~
+#+begin_src f90
+  subroutine check_real_one (kx, mold, u, levv)
+    integer,   intent(out)         :: kx
+    real(kind),intent(in)          :: mold
+    integer,   intent(in),optional :: u
+    integer,   intent(in),optional :: levv
+#+end_src
+Check real(1.0) properties of the same kind as ~mold~,
+and return its exponent as ~kx~.
+**** ~check_real_inf~
+#+begin_src f90
+  subroutine check_real_inf (kx, mold, u, levv)
+    integer,   intent(out)         :: istt
+    real(kind),intent(in)          :: mold
+    integer,   intent(in),optional :: u
+    integer,   intent(in),optional :: levv
+#+end_src
+Check real infinity properties of the same kind as ~mold~.
+It raises a floating-point exception, IEEE_OVERFLOW_FLAG, so default
+is disabled.
+: # call check_real_inf(kx, 1.0_KDBL)
+: [TOUZA/Std/prc] real:8 inf = 0 (2147483647 1024 1024)
+**** ~check_real_dnm~
+#+begin_src f90
+  subroutine check_real_dnm (kx, mold, u, levv)
+    integer,   intent(out)         :: istt
+    real(kind),intent(in)          :: mold
+    integer,   intent(in),optional :: u
+    integer,   intent(in),optional :: levv
+#+end_src
+Check real denormalized properties of the same kind as ~mold~.
+It raises floating-point exceptions, IEEE_UNDERFLOW_FLAG
+IEEE_DENORMAL, so default is disabled.
+: # call check_real_dnm(kx, 1.0_KDBL)
+: [TOUZA/Std/prc] real:8 1 -1022
+: [TOUZA/Std/prc] real:8 2 -1023
+: :
+: [TOUZA/Std/prc] real:8 51 -1072
+: [TOUZA/Std/prc] real:8 52 -1073
+: [TOUZA/Std/prc] real:8 53 0
+: [TOUZA/Std/prc] real:8 dnm = -52  0.5 0.0
+**** ~check_real_mantissa~
+#+begin_src f90
+  integer function check_real_mantissa_d (mold)
+    real(kind),intent(in) :: mold
+#+end_src
+** ~TOUZA_Std_utl~  (=std_utl.F90=) - small utilities
+*** functions
+**** ~choice()~
+#+begin_src f90
+  <type>     function choice(d, a)
     <type>,intent(in)          :: d
     <type>,intent(in),optional :: a
+
+  <type> (:) function choice(d, a)
+    <type>,intent(in)          :: d(:)
+    <type>,intent(in),optional :: a(:)
 #+end_src
 If =a= is present return =a=, otherwise return =d=.
 =<type>= is the same type and kind as returned value.
-**** chcount()
+Both arguments cant be either array or scalar..
+If array arguments are used, returned array size is smaller size of
+the two arguments.
+Integer kinds KI32, KI64, Real kinds KFLT, KDBL, and logical is
+prepared for =<type>=.
+**** ~chcount()~
 #+begin_src f90
   integer function chcount(str, chs)
     character(len=*),intent(in) :: str
     character(len=*),intent(in) :: chs
 #+end_src
-Count occurences of characters in =chs= in string =str=.
-**** condop()
+Count occurrences of characters in =chs= in string =str=.
+**** ~condop()~
 #+begin_src f90
-  integer    function condop(l, vt, vf)
-  logical    function condop(l, vt, vf)
-  real(KFLT) function condop(l, vt, vf)
-  real(KDBL) function condop(l, vt, vf)
+  <type>     function condop(l, vt, vf)
     logical,intent(in) :: l
     <type>, intent(in) :: vt
     <type>, intent(in) :: vf
 #+end_src
 So called conditional (ternary) operator.
 Return =VT= if =L= is true, or =VT= otherwise.
-**** ndigits()
+**** ~ndigits()~
 #+begin_src f90
   integer function ndigits(n)
     integer,intent(in) :: n
 #+end_src
-Count number of non-zero digits.  Return 0 if n equails zero.
-
+Count number of non-zero digits.  Return 0 if n equals zero.
+**** ~inrange()~
+#+begin_src f90
+  ELEMENTAL logical function inrange (v, l, h)
+    integer,intent(in) :: v, l, h
+#+end_src
+Return true if =v= is between =l= and =h=, inclusive.
+**** ~begin_width()~
+#+begin_src f90
+  PURE logical function begin_with(str, sub)
+    character(len=*),intent(in) :: str
+    character(len=*),intent(in) :: sub
+#+end_src
+Return tru if string =str= begin with substring =sub=.
 *** subroutines
-**** choice_a
+**** ~choice_a~
 #+begin_src f90
   subroutine choice_a (v, d, a)
     character(len=*),intent(inout)       :: v
     character(len=*),intent(in),optional :: d
     character(len=*),intent(in),optional :: a
 #+end_src
-If =a= is present assign =a= for =v=, else if =d= is present, assign =d=.
-**** set_if_present
+If =a= is present assign =a= for =v=, else if =d= is present, assign
+=d=, else =v= is untouched.
+**** ~set_if_present~
 #+begin_src f90
   subroutine set_if_present(var, val)
     <type>,intent(out),optional :: var
@@ -85,7 +293,7 @@ If =a= is present assign =a= for =v=, else if =d= is present, assign =d=.
 #+end_src
 =<type>= is either integer, real, logical or character(len=*).
 if =var= is present assign =var= for =val=, otherwise do nothing.
-**** downcase
+**** ~downcase~
  #+begin_src f90
    subroutine downcase(S)
      character(len=*),intent(inout) :: S
@@ -94,7 +302,7 @@ if =var= is present assign =var= for =val=, otherwise do nothing.
      character(len=*),intent(in)  :: SI
  #+end_src
 Lower case conversion of input string S (to modify), or SI onto SO.
-**** upcase
+**** ~upcase~
  #+begin_src f90
    subroutine upcase(S)
      character(len=*),intent(inout) :: S
@@ -103,9 +311,137 @@ Lower case conversion of input string S (to modify), or SI onto SO.
      character(len=*),intent(in)  :: SI
  #+end_src
 Upper case conversion of input string S (to modify), or SI onto SO.
+**** ~parse_number~ - safer number parser from string
+#+begin_src f90
+  subroutine parse_number (ierr, num, str, def)
+    integer,         intent(out)   :: ierr
+    <type>,          intent(inout) :: num
+    character(len=*),intent(in)    :: str
+    <type>, optional,intent(in)    :: def
+#+end_src
+Safely convert ~str~ to number as ~num~.
+When parsing fails, set =num= as =def= if presents, with still return non-success.
+**** ~compact_format~
+#+begin_src f90
+  subroutine compact_format(npos, str, v, nrep, pad, fmt, sep, clipl, cliph)
+    integer,         intent(out)         :: npos   ! next position
+    character(len=*),intent(out)         :: str
+    integer,         intent(in)          :: v(0:)
+    integer,         intent(in),optional :: nrep
+    integer,         intent(in),optional :: pad
+    character(len=*),intent(in),optional :: fmt
+    character(len=*),intent(in),optional :: sep
+    integer,         intent(in),optional :: clipl, cliph
+#+end_src
+**** ~join_list~
+#+begin_src f90
+  subroutine join_list(ierr, str, v, fmt, sep, ldelim, rdelim)
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(out)         :: str
+    <type>,          intent(in)          :: v(:)
+    character(len=*),intent(in),optional :: fmt
+    character(len=*),intent(in),optional :: sep, ldelim, rdelim
+    logical,         intent(in),optional :: mask(:)
+    character(len=*),intent(in),optional :: skip
+#+end_src
+Create a string ~str~ which is the concatenation of list ~v~,
+where each element is converted into string using ~fmt~ format if
+present, or ~*~ otherwise.
+Optional ~sep~ is adopted for separators, or blank if not present.
+Optional ~ldelim~ and ~rdelim~ are inserted at begin and end,
+respectively if present.
+When optional =mask(:)= is present, elements with =mask= as =.TRUE.=
+are represented by character =_= or argument =skip= if presents.
 
+**** ~split_list~
+#+begin_src f90
+  subroutine split_list(n, v, str, sep, lim, def, empty)
+    integer,          intent(out)         :: n         ! number of elements or error code
+    <type>,           intent(inout)       :: v(0:)
+    character(len=*), intent(in)          :: str
+    character(len=*), intent(in)          :: sep
+    integer,          intent(in),optional :: lim       ! negative to count only; 0 to inifinite
+    <type>,           intent(in),optional :: def(0:*)  ! no bound check
+    logical,          intent(in),optional :: empty     ! allow empty element (ignored if def present)
+#+end_src
+**** ~split_heads~
+#+begin_src f90
+  subroutine split_heads &
+       & (n, h, str, sep, lim, empty)
+    integer,          intent(out)         :: n         ! number of elements or error code
+    integer,          intent(out)         :: h(0:)
+    character(len=*), intent(in)          :: str
+    character(len=*), intent(in)          :: sep
+    integer,          intent(in),optional :: lim       ! negative to count only; 0 to infinite
+    logical,          intent(in),optional :: empty     ! allow empty element (ignored if present)
+#+end_src
+Split the input string =str= by separator =sep=, and generate array of
+head positions of the result as argument =h=, with size =n=.
+Note that the heading positions are counted from =0=, so need =+1= to
+get substrings.  Substrings are accessed by either
+=str(h(i)+1:h(i+1)-len_trim(sep))= (non blank =sep=) or
+=str(h(i)+1:h(i+1)-1)= (blank =sep=).
+Separator =sep= are trimmed in the subroutine, but set as single blank
+if null.
+Optional argument =lim= can control limit size of output array.
+Assuming no limit when =lim= is 0.  When =lim= is negative=, output
+array is not created but only count the elements.
+If optional argument =empty= is =TRUE=, then separation also performs
+for empty elements.  For example in the case of separator =/=,
+=/a/b//c/= is separated as null, =a=, =b=, null, =c=, null when
+=empty= is TRUE, otherwise as =a=, =b=, =c=.
 
-** =TOUZA_Std_env=  (std_env.F90) - standard environments
+**** ~find_first_range~
+#+begin_src f90
+  integer function find_first_range &
+       & (list, low, high, start, back, offset, no)
+    integer,intent(in)          :: list(0:)
+    integer,intent(in),optional :: low
+    integer,intent(in),optional :: high
+    integer,intent(in),optional :: start
+    logical,intent(in),optional :: back
+    integer,intent(in),optional :: offset
+    integer,intent(in),optional :: no
+#+end_src
+Find first occurrence of the value between =low= and =high= (inclusive)
+from the argument array =list=, and return its index.
+Default index starts from =0=, which can be override by optional
+argument =offset=.  Searching starts from the head of list by default,
+and from =start= (along =offset=) if present.  Searching starts from
+the bottom if optional =back= argument is =TRUE=.
+If search fails, return value is =no= if present, otherwise smaller
+value of -1 and =offset-1=.
+
+**** ~find_first~
+#+begin_src f90
+  integer function find_first &
+       & (list, val, start, back, offset, no)
+    implicit none
+    <type>, intent(in)          :: list(0:)
+    <type>, intent(in)          :: val
+    integer,intent(in),optional :: start
+    logical,intent(in),optional :: back
+    integer,intent(in),optional :: offset
+    integer,intent(in),optional :: no
+#+end_src
+Find first occurrence of the value =val= from the argument array
+=list=, and return its index.
+The other arguments are the same as =find_first_range()=.
+
+**** ~jot~
+#+begin_src f90
+  subroutine jot(v, n, b, e, s)
+    integer,intent(out)         :: v(0:*)
+    integer,intent(in),optional :: n, b, e, s
+#+end_src
+Generate sequential data array of =n= member, from =b= (inclusive)
+to =e= (exclusive) with =s= strides.
+It is possible to have inconsistencies among the arguments.
+In the implementation, any three of these arguments determines the
+fourth, and =s= is ignored if all the four are specified (which
+may conflict with jot(1) design).
+
+** ~TOUZA_Std_env~  (=std_env.F90=) - standard environments
 *** constants
 | name   | type    | description          |
 |--------+---------+----------------------|
@@ -121,6 +457,7 @@ Upper case conversion of input string S (to modify), or SI onto SO.
 |-----------------+---------+------------------|
 | =endian_BIG=    | integer | big-endian id    |
 | =endian_LITTLE= | integer | little-endian id |
+| =endian_OTHER=  | integer | multiple         |
 
 *** variables
 | name         | type    | description       |
@@ -129,7 +466,33 @@ Upper case conversion of input string S (to modify), or SI onto SO.
 | =kendi_file= | integer | file byte-order   |
 
 *** subroutines
-**** init_unfmtd_recl
+**** ~init~
+#+begin_src f90
+  subroutine init(ierr, u, levv, mode, levtry, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u      ! log unit
+    integer,intent(in),optional :: levv   ! verbose level
+    integer,intent(in),optional :: mode   ! initialization flag
+    integer,intent(in),optional :: levtry ! brute-force level
+    integer,intent(in),optional :: icomm  ! mwe argument
+#+end_src
+**** ~diag~
+#+begin_src f90
+  subroutine diag(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: mode
+#+end_src
+**** ~finalize~
+#+begin_src f90
+  subroutine finalize(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: mode
+#+end_src
+**** ~init_unfmtd_recl~ - initialize unformatted direct access
 #+begin_src f90
   subroutine init_unfmtd_recl &
        & (ierr, u, levv, levtry, iroot, icomm)
@@ -139,8 +502,17 @@ Upper case conversion of input string S (to modify), or SI onto SO.
     integer,intent(in),optional :: levtry
     integer,intent(in),optional :: iroot, icomm
 #+end_src
+This subroutine identifies the processor-dependent record length units
+of a file connected for unformatted direct access.
+Target types are KI32, KI64, KFLT and KDBL.
 
-**** init_unfmtd_strm
+If MPI usage is enabled, a single rank tries to compute the results
+which are broadcasted.  The optional arguments =iroot= and =icomm=
+controls the root rank and MPI communicator, respectively.
+
+This subroutine is a on-demand environment checker, not automatically
+invoked at subroutine ~init()~.
+**** ~init_unfmtd_strm~
 #+begin_src f90
   subroutine init_unfmtd_strm &
        & (ierr, u, levv, levtry, iroot, icomm)
@@ -150,7 +522,31 @@ Upper case conversion of input string S (to modify), or SI onto SO.
     integer,intent(in),optional :: levtry
     integer,intent(in),optional :: iroot, icomm
 #+end_src
-**** init_file_bodr
+This subroutine identifies the processor-dependent stream io units
+(file storage unit) of a file connected for unformatted stream access.
+Target types are KI32, KI64, KFLT and KDBL.
+
+If MPI usage is enabled, a single rank tries to compute the results
+which are broadcasted.  The optional arguments =iroot= and =icomm=
+controls the root rank and MPI communicator, respectively.
+
+This subroutine is a on-demand environment checker, not automatically
+invoked at subroutine ~init()~.
+**** ~init_io_status~
+#+begin_src f90
+  subroutine init_io_status &
+       & (ierr, u, levv, iroot, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: iroot, icomm
+#+end_src
+This subroutine identifies the processor-dependent error code to
+represent End-of-File (EOF).
+
+This subroutine is a on-demand environment checker, not automatically
+invoked at subroutine ~init()~.
+**** ~init_file_bodr~
 #+begin_src f90
   subroutine init_file_bodr &
        & (ierr, u, levv, ubgn, uend, ustp, iroot, icomm)
@@ -160,17 +556,23 @@ Upper case conversion of input string S (to modify), or SI onto SO.
     integer,intent(in),optional :: ubgn,  uend, ustp
     integer,intent(in),optional :: iroot, icomm
 #+end_src
+This subroutine identifies the byte-order of external files for
+a (optionally) given range of io units.
 
-**** init_io_status
-#+begin_src f90
-  subroutine init_io_status &
-       & (ierr, u, levv, iroot, icomm)
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: u
-    integer,intent(in),optional :: levv
-    integer,intent(in),optional :: iroot, icomm
-#+end_src
-**** check_byte_order
+Actually, the design is a compromise, thus users should not depend on
+it too much.
+Several compilers/processors can control the byte-order for each unit
+separately at run-time, it is very difficult to detect the byte-order
+for a wide range.
+User can specify io-unit range by optional arguments =ubgn= and =uend=.
+Every =ustp= unit (1 if not present) is checked among the range.
+If io-unit range is not specified, one arbitrary unit is used for check.
+If a target unit in the range is already used, then it is simply skipped.
+
+This subroutine is a on-demand environment checker, not automatically
+invoked at subroutine ~init()~.  On the other hand, subroutine
+~init_file_mem~ is automatically invoked at ~init~.
+**** ~check_byte_order~
 #+begin_src f90
   subroutine check_byte_order &
        & (ierr, KENDI, utest, force, u, levv)
@@ -181,7 +583,14 @@ Upper case conversion of input string S (to modify), or SI onto SO.
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
 #+end_src
-**** check_bodr_unit
+Examine byte-order test on single io-unit of a file.
+If the common byte-order (caution, it might be wrong) for files is
+already detected, it is returned without actual experiment.
+You can force to run by setting optional argument =force= as =.TRUE.=.
+
+If the target unit =utest= is already connected to a file, it return
+with error code =PANIC=.
+**** ~check_bodr_unit~
 #+begin_src f90
   subroutine check_bodr_unit &
     & (ierr, kendi, utest, jrec, u, levv)
@@ -192,89 +601,295 @@ Upper case conversion of input string S (to modify), or SI onto SO.
     integer,intent(in),optional :: u      ! log unit
     integer,intent(in),optional :: levv
 #+end_src
+Examine byte-order test on single io-unit of a file, which must be
+connected before this subroutine.
+
+*CAUTION* the byte-order experiment is performed with overwriting the
+input file.  It is user responsibility to set experiment access
+position before call.
+
+If argument =jrec= is positive, then direct access experiment is
+performed at record =jrec=.  Enough record length is required for the target file.
+
+If argument =jrec= is negative, then sequential access experiment is
+performed at the current position.  Record position is reverted after
+the experiment.  By nature of sequential access, file is truncated
+after the record position.
+
+If argument =jrec= is zero, then stream access experiment is
+performed at the final position.  The experiment writing is truncated
+after call.
+
+If =jrec= is absent, the stream access experiment is performed.
+
+This is another compromise to detect the byte-order at run-time for
+given io-unit.
+**** ~get_login_name~
+#+begin_src f90
+  subroutine get_login_name (ierr, name)
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: name
+#+end_src
+Gets the username under which the program is running.
+If function =GETLOG= is not found, then blank is returned without error.
+
+**** ~get_host_name~
+#+begin_src f90
+  subroutine get_host_name (ierr, name)
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: name
+#+end_src
+Retrieves the host name of the system on which the program is
+running.
+If function =HOSTNM= is not found, then blank is returned without
+error.
+
 *** functions
-**** get_size_ufd
+**** ~get_size_ufd~
 #+begin_src f90
-  integer function get_size_ufd (V)
-    real(kind=KDBL),   intent(in) :: V
-    real(kind=KFLT),   intent(in) :: V
-    integer(kind=KI32),intent(in) :: V
-    integer(kind=KI64),intent(in) :: V
+  integer function get_size_ufd (mold)
+    <type>,intent(in) :: mold
 #+end_src
-**** get_size_strm
+Return unit record-length corresponding to type =mold= in unformatted
+direct access.
+**** ~get_unit_strm~
 #+begin_src f90
-  integer function get_size_strm (V)
-    real(kind=KDBL),   intent(in) :: V
-    real(kind=KFLT),   intent(in) :: V
-    integer(kind=KI32),intent(in) :: V
-    integer(kind=KI64),intent(in) :: V
+  integer function get_unit_strm (mold)
+    <type>,intent(in) :: mold
 #+end_src
-**** get_size_bytes
+Return unit stream-io length corresponding to type =mold= in stream access.
+**** ~get_size_strm~
 #+begin_src f90
-  integer(kind=KMEM) function get_size_bytes(V, n)
-    real(kind=KDBL),   intent(in)          :: V
-    real(kind=KFLT),   intent(in)          :: V
-    integer(kind=KI32),intent(in)          :: V
-    integer(kind=KI64),intent(in)          :: V
+  integer(kind=KMEM) function get_size_strm (mold, n)
+    <type>,            intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
 #+end_src
-**** conv_b2strm
+Return total stream-io length corresponding to size =n= of type =mold=
+in stream access.
+**** ~get_size_bytes~
 #+begin_src f90
-  integer(KIND=KI32) function conv_b2strm(nb)
-    integer(KIND=KI32),intent(in) :: nb
-  integer(KIND=KI64) function conv_b2strm(nb)
-    integer(KIND=KI64),intent(in) :: nb
+  integer(kind=KMEM) function get_size_bytes (mold, n)
+    <type>,            intent(in)          :: mold
+    integer(KIND=KMEM),intent(in),optional :: n
 #+end_src
-**** get_mems_bytes
+Return total bytes corresponding to size =n= of type =mold=.
+**** ~conv_b2strm~
 #+begin_src f90
-  integer(kind=KMEM) function get_mems_bytes (l, V)
-    character(len=*),  intent(in) :: V
-    integer(KIND=KI32),intent(in) :: V
-    integer(KIND=KI64),intent(in) :: V
-    real(kind=KDBL),   intent(in) :: V
-    real(kind=KFLT),   intent(in) :: V
+  integer(<type>) function conv_b2strm(nb)
+    integer(<type>),intent(in) :: nb
+#+end_src
+Convert bytes to stream-io unit length.
+**** ~get_mems_bytes~
+#+begin_src f90
+  integer(kind=KMEM) function get_mems_bytes (l, mold)
     integer(KIND=KMEM),intent(in) :: l
+    <type>,            intent(in) :: mold
 #+end_src
-**** is_eof_ss
+Get size of array of type =mold= from =l= bytes.
+**** ~is_eof_ss~
 #+begin_src f90
   logical function is_eof_ss(e)
     integer,intent(in) :: e
 #+end_src
+Check is error code of IOSTAT corresponds to End-of-File.
+Not perfect, but practically few problem.
 
-** =TOUZA_Std_fun=  (std_fun.F90) - file units management
+** ~TOUZA_Std_fun~  (=std_fun.F90=) - file units management
+*** description
+~TOUZA_Std_fun~ manages io-unit allocation.
+In principle, the module provides similar functions which can be
+achieved by =NEWUNIT= specifier in =OPEN= statement in the Fortran
+2008 standards.  In addition, the module provides a control on the
+range of io-units to include/exclude for the selection.
+
+By default, all the non-negative integers are categorized as either
+black- or white-list members.  The integers in the black list are
+excluded white those in the white list included for the selection of
+new io-unit.  The former as identified as category -1, while the
+latter as category 0, respectively.
+With standard configuration integers from 10 to 2048 belong to the
+whitelist (category 0), and all the other integers to the black list
+(category -1).
+User can divide the whitelist into multiple categories with continuous
+integers, such as 10 to 100, 101 to 500, 501 to 2048 as category 0, 1,
+2, respectively.
+With this category system, user can force to allocate an io-unit
+within the specific category.
+For example, a situation is supposed to define GFORTRAN_CONVERT_UNIT
+environment variables for different byte-order representation for
+only a limited range of io-units.
+*** macros
+| name                   | type      | description                                           |
+| =OPT_MIN_FILE_UNIT=    | integer   | Default limits of io-units range for the whitelist    |
+| =OPT_MAX_FILE_UNIT=    | integer   |                                                       |
+| =OPT_TEMPORARY_FORMAT= | character | temporary file name template used in ~new_unit_tmp()~ |
+
 *** constants
 | name             | type    | description                                              |
+|------------------+---------+----------------------------------------------------------|
 | search_from_head | integer | new_unit() special, to search from category head         |
 | search_from_last | integer | new_unit() special, to search from last unit             |
 | search_from_next | integer | new_unit() special, to search from next unit of the last |
 
 *** functions
-**** new_unit()
+**** ~new_unit()~
 #+begin_src f90
-  integer function new_unit (ubase, kcat)
-    integer,intent(in),optional :: ubase
-    integer,intent(in),optional :: kcat
+  integer function new_unit (base, category)
+    integer,intent(in),optional :: base
+    integer,intent(in),optional :: category
 #+end_src
-If =ubase= is 0 or positive, teturn unused i/o unit number, searched
-from =ubase=.
-If =ubase= < 0, special treatment is performed to search from.
+Return new io-unit under the category ~category~, or default category
+if not present.  Argument =base= control how to search unused io-unit.
+If =base= is non-negative, return unused io unit number searched
+from =base=.
+If =base= is either =search_from_head=, =search_from_last=,
+=search_from_next=, then unused io-unit is searched from the lowest
+range of the target category, last allocated io-unit, or the next unit
+of last allocated one, respectively.
 
-Return -1 if units are exhausted or an error occurs.
+Return negative value if units are exhausted or an error occurs.
+**** ~new_unit_tmp()~
+#+begin_src f90
+  subroutine new_unit_tmp(unit, file, base, category)
+    integer,         intent(out)         :: unit
+    character(len=*),intent(out)         :: file
+    integer,         intent(in),optional :: base
+    integer,         intent(in),optional :: category
+#+end_src
+Return new io-unit as =unit= and generate temporary file name =file=
+which does not exists.  Arguments =base= and =category= are passed to
+function ~new_unit()~.
+
+File name is generated using =OPT_TEMPORARY_FORMAT= as a template,
+which can be override by calling ~set_tempfile~ or ~set_tmptmpl~.
 *** subroutines
+**** ~init~
+#+begin_src f90
+  subroutine init(ierr, u, levv, mode, ubgn, uend, cdef, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+    integer,intent(in),optional :: ubgn, uend ! service unit boundaries (to override OPT_*_FILE_UNIT)
+    integer,intent(in),optional :: cdef       ! unit category default
+    integer,intent(in),optional :: icomm      ! mwe argument
+#+end_src
+Initialize ~TOUZA_Std_fun~ to configure file-units.
+Optional arguments ~ubgn~ and ~uend~ control the i/o unit range to
+manage under this module, in other words,
+the users can freely use i/o unit of the numbers less than =ubgn= or
+more than ~uend~ are beyond the control without worrying about conflicts.
+
+Optional arguments =ubgn= and =uend= can override compile-time
+whitelist range.
+
+Optional argument =cdef= can change the default category,
+used in function ~new_unit()~.
+
+**** ~diag~
+#+begin_src f90
+  subroutine diag(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: levv, mode
+    integer,intent(in),optional :: u
+#+end_src
+**** ~finalize~
+#+begin_src f90
+  subroutine finalize(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: levv, mode
+    integer,intent(in),optional :: u
+#+end_src
+**** ~set_category_bound~
+#+begin_src f90
+  subroutine set_category_bound (ierr, category, uend)
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: category
+    integer,intent(in)  :: uend
+#+end_src
+Set upper bound of io-units corresponding category =category= as
+=uend=.  The io-units equal to or more than =uend= become the member of
+category =category+1=.
+**** ~set_category_default~
+#+begin_src f90
+  subroutine set_category_default (ierr, category)
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: category
+#+end_src
+Set default category as =category=, which is used in function ~new_unit()~
+without category argument.
+
+**** ~brute_force_check_units~
+#+begin_src f90
+  subroutine brute_force_check_units (ierr, limit, ulog)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: limit
+    integer,intent(in),optional :: ulog
+#+end_src
+Check available numbers for io-unit.  Try to open =limit= number of
+scratch files at the same time, count the success open, and report to
+=ulog= io-unit.  If a io-unit is already opened, it is not touched but
+increments the success count.  At exit, all the scratch files opened
+in this subroutine are closed (again, the files already opened are not
+touched).
+If =limit= is absent, =OPT_MAX_FILE_UNIT= is adopted.
+if =ulog= is absent, it reports to the standard output.
+
+**** ~set_tempfile~
+#+begin_src f90
+  subroutine set_tempfile (fmt, id)
+    character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: id
+#+end_src
+Override temporary filename template as =fmt= with arbitrary integer =id=.
+If =fmt= is absent or blank, it reverts to the default template.
+**** ~set_tmptmpl~
+#+begin_src f90
+  subroutine set_tmptmpl(ierr, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: icomm
+#+end_src
+Wrapper for subroutine ~set_tempfile~.  The MPI rank corresponding the
+communicator =icomm= is passed as =id= of subroutine ~set_tempfile~.
 
 
-** =TOUZA_Std_log=  (std_log.F90) - simple logging helper
+** ~TOUZA_Std_log~  (=std_log.F90=) - simple logging helper
 *** constants
-| name        | type    | description             |
-|-------------+---------+-------------------------|
-| unit_star   | integer | special unit for *      |
-| unit_global | integer | special unit for global |
-| unit_none   | integer | special unit to null    |
+| name          | type    | description             |
+|---------------+---------+-------------------------|
+| ~unit_star~   | integer | special unit for *      |
+| ~unit_global~ | integer | special unit for global |
+| ~unit_none~   | integer | special unit to null    |
 
 
-** =TOUZA_Std_mwe=  (std_mwe.F90) - MPI wrapper/emulator
+** ~TOUZA_Std_mwe~  (=std_mwe.F90=) - MPI wrapper/emulator
 *** subroutines
-**** get_ni - return rank and size with =MPI_COMM_NULL= guard
+**** ~init~
+#+begin_src f90
+  subroutine init(ierr, u, levv, mode, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: mode
+    integer,intent(in),optional :: icomm   ! communicator to apply among TOUZA system
+#+end_src
+**** ~diag~
+#+begin_src f90
+  subroutine diag(ierr, u, levv, mode, icomm)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: mode
+    integer,intent(in),optional :: icomm
+#+end_src
+**** ~finalize~
+#+begin_src f90
+  subroutine finalize(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: mode
+#+end_src
+**** ~get_ni~ - return rank and size with =MPI_COMM_NULL= guard
 #+begin_src f90
   subroutine get_ni (ierr, nrank, irank, icomm)
     integer,intent(out)         :: ierr
@@ -282,10 +897,10 @@ Return -1 if units are exhausted or an error occurs.
     integer,intent(out)         :: irank
     integer,intent(in),optional :: icomm
 #+end_src
-Return the rank and size of in the commnunicator ICOMM group.
+Return the rank and size of in the communicator ICOMM group.
 If ICOMM is missing, default communicator is used (usually
 =MPI_COMM_WORLD=).
-**** get_ni_safe - return rank and size with =MPI_COMM_NULL= guard, checking mpi activation
+**** ~get_ni_safe~ - return rank and size with =MPI_COMM_NULL= guard, checking mpi activation
 #+begin_src f90
   subroutine get_ni_safe &
        & (ierr, nrank, irank, icomm)
@@ -294,7 +909,10 @@ If ICOMM is missing, default communicator is used (usually
     integer,intent(out)         :: irank
     integer,intent(in),optional :: icomm
 #+end_src
-**** get_wni - return world rank and size
+The same procedure as ~get_ni~ except that it avoid the error when the
+communicator argument =icomm= is =MPI_COMM_NULL=.
+For such cases it return both =nrank= and =irank= as =-1=.
+**** ~get_wni~ - return world rank, size, and communicator.
 #+begin_src f90
   subroutine get_wni &
        & (ierr, nrank, irank, icomm)
@@ -303,7 +921,7 @@ If ICOMM is missing, default communicator is used (usually
     integer,intent(out),optional :: irank
     integer,intent(out),optional :: icomm
 #+end_src
-**** get_wni_safe - return world rank and size, checking mpi activation
+**** ~get_wni_safe~ - return world rank and size, checking mpi activation
 #+begin_src f90
   subroutine get_wni_safe &
        & (ierr, nrank, irank, icomm)
@@ -312,7 +930,7 @@ If ICOMM is missing, default communicator is used (usually
     integer,intent(out),optional :: irank
     integer,intent(out),optional :: icomm
 #+end_src
-**** get_gni - return rank and size from group with =MPI_GROUP_NULL= guard
+**** ~get_gni~ - return rank and size from group with =MPI_GROUP_NULL= guard
 #+begin_src f90
   subroutine get_gni &
        & (ierr, igrp, nrank, irank)
@@ -321,7 +939,7 @@ If ICOMM is missing, default communicator is used (usually
     integer,intent(out),optional :: nrank
     integer,intent(out),optional :: irank
 #+end_src
-**** set_comm - set default communicator
+**** ~set_comm~ - set default communicator
 #+begin_src f90
   subroutine set_comm(ierr, icomm, u, levv)
     implicit none
@@ -330,66 +948,128 @@ If ICOMM is missing, default communicator is used (usually
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
 #+end_src
-**** get_comm - get default communicator
+**** ~get_comm~ - get default communicator
 #+begin_src f90
   subroutine get_comm &
        & (ierr, icomm)
     integer,intent(out) :: ierr
     integer,intent(out) :: icomm
 #+end_src
+**** ~show_mpi_type~
+#+begin_src f90
+  subroutine show_mpi_type(ierr, mt, tag, u)
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: mt
+    character(len=*),intent(in)  :: tag
+    integer,optional,intent(in)  :: u
+#+end_src
+Show properties of mpi derived type =mt= to io-unit =u= or standard output.
 *** functions
-**** is_mpi_activated() - check if during =MPI_Init= and =MPI_Finalize=
+**** ~is_mpi_activated()~ - check if during =MPI_Init= and =MPI_Finalize=
 #+begin_src f90
   logical function is_mpi_activated ()
 #+end_src
-** =TOUZA_Std_arg=  (std_arg.F90) - run-time argument parser
+Check if the current status is during =MPI_Init()= and =MPI_Finalize=.
+
+** ~TOUZA_Std_arg~  (=std_arg.F90=) - run-time argument parser
 *** description
 *** constants
-*** functions
-**** check_param()
-#+begin_src f90
-  integer function check_param (param, str, num, swch, ndef)
-    character(len=*),intent(in)         :: param
-    character(len=*),intent(in)         :: str
-    integer,         intent(in)         :: num
-    logical,         intent(in),optional:: swch
-    integer,         intent(in),optional:: ndef
-#+end_src
-**** inq_end_flags()
-#+begin_src f90
-  integer function inq_end_flags ()
-#+end_src
 *** subroutines
-**** decl_pos_arg
+**** ~init~
+#+begin_src f90
+  subroutine init &
+       &  (ierr, &
+       &   u,    levv, mode, &
+       &   lrec, cha,  chs, tagf, kmode, icomm)
+    integer,         intent(out)         :: ierr
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv
+    integer,         intent(in),optional :: mode
+    integer,         intent(in),optional :: lrec       ! recursive limit
+    character(len=*),intent(in),optional :: cha, chs   ! characters for assignment, separator
+    character(len=*),intent(in),optional :: tagf       ! FILE tag
+    integer,         intent(in),optional :: kmode
+    integer,         intent(in),optional :: icomm
+#+end_src
+**** ~diag~
+#+begin_src f90
+  subroutine diag (ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: mode
+#+end_src
+**** ~finalize~
+#+begin_src f90
+  subroutine finalize(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: levv
+    integer,intent(in),optional :: mode
+    integer,intent(in),optional :: u
+#+end_src
+**** ~decl_pos_arg~
 #+begin_src f90
   subroutine decl_pos_arg (ierr, tag, jpos)
     integer,         intent(out)         :: ierr
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: jpos  ! start from 1
 #+end_src
-**** parse
+**** ~parse~
 #+begin_src f90
   subroutine parse (ierr)
     integer,intent(out) :: ierr
 #+end_src
-**** get_param
+**** ~get_param~
 #+begin_src f90
-  subroutine get_param (ierr, val, jpos, def)
+  subroutine get_param (ierr, val, jpos, def, unset)
     integer,intent(out)         :: ierr
     <type>, intent(inout)       :: val
     integer,intent(in)          :: jpos
     <type>, intent(in),optional :: def
+    logical,intent(in),optional :: unset
+
+  subroutine get_param (ierr, vals, jpos, def, sep, unset)
+    integer,         intent(out)         :: ierr
+    <type>,          intent(inout)       :: vals(:)
+    integer,         intent(in)          :: jpos
+    <type>,          intent(in),optional :: def
+    character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
 #+end_src
-**** get_option
+**** ~get_array~
 #+begin_src f90
-  subroutine get_option (ierr, val, tag, def, idx)
+  subroutine get_array &
+       & (ierr, nitem, vals, jpos, def, sep, unset)
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: nitem
+    <type>,          intent(inout)       :: vals(:)
+    integer,         intent(in)          :: jpos
+    <type>,          intent(in),optional :: def
+    character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
+#+end_src
+**** ~get_option~
+#+begin_src f90
+  subroutine get_option (ierr, val, tag, def, idx, unset)
     integer,         intent(out)         :: ierr
     <type>,          intent(inout)       :: val
     character(len=*),intent(in)          :: tag
     <type>,          intent(in),optional :: def
     integer,         intent(in),optional :: idx
+    logical,         intent(in),optional :: unset
+
+  subroutine get_option &
+       & (ierr, vals, tag, def, idx, sep, unset)
+    implicit none
+    integer,         intent(out)         :: ierr
+    <type>,          intent(inout)       :: vals(:)
+    character(len=*),intent(in)          :: tag
+    <type>,          intent(in),optional :: def
+    integer,         intent(in),optional :: idx
+    character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
 #+end_src
-**** get_arg
+**** ~get_arg~
 #+begin_src f90
   subroutine get_arg (ierr, tag, val, jentr)
     implicit none
@@ -398,16 +1078,116 @@ If ICOMM is missing, default communicator is used (usually
     <type>,          intent(out)   :: val
     integer,         intent(inout) :: jentr
 #+end_src
+**** ~get_key~
+#+begin_src f90
+  subroutine get_key &
+       & (ierr, tag, jentr)
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(out)   :: tag
+    integer,         intent(inout) :: jentr
+#+end_src
+**** ~get_value~
+#+begin_src f90
+  subroutine get_value &
+       & (ierr, val, jentr)
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(out)   :: val
+    integer,         intent(inout) :: jentr
+#+end_src
+**** ~get_value_seq~
+#+begin_src f90
+  subroutine get_value_seq_a &
+       & (ierr, val, num, jentr)
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(out)   :: val(*)
+    integer,         intent(in)    :: num
+    integer,         intent(inout) :: jentr
+#+end_src
+**** ~parse_param~
+#+begin_src f90
+  subroutine parse_param &
+       & (ierr, vals, str, def, sep, unset, nitem)
+    implicit none
+    integer,         intent(out)          :: ierr
+    <type>,          intent(inout)        :: vals(:)
+    character(len=*),intent(in)           :: str
+    <type>,          intent(in),optional  :: def
+    character(len=*),intent(in),optional  :: sep
+    logical,         intent(in),optional  :: unset
+    integer,         intent(out),optional :: nitem
+#+end_src
+**** ~cmdline_arg_wrap~
+#+begin_src f90
+  subroutine cmdline_arg_wrap (n, v, l, s)
+    integer,         intent(in)  :: n
+    character(len=*),intent(out) :: v
+    integer,optional,intent(out) :: l
+    integer,optional,intent(out) :: s
+#+end_src
+*** functions
+**** ~get_nparam()~
+**** ~check_param()~
+#+begin_src f90
+  integer function check_param (param, str, num, swch, ndef)
+    character(len=*),intent(in)         :: param
+    character(len=*),intent(in)         :: str
+    integer,         intent(in)         :: num
+    logical,         intent(in),optional:: swch
+    integer,         intent(in),optional:: ndef
+#+end_src
+**** ~inq_end_flags()~
+#+begin_src f90
+  integer function inq_end_flags ()
+#+end_src
 
-** =TOUZA_Std_bld=  (std_bld.F90) - build information
+**** ~cmdline_count_wrap~
+#+begin_src f90
+  integer function cmdline_count_wrap()
+#+end_src
 
-** =TOUZA_Std_sus=  (std_sus.F90) - emulation of (typical) unformatted sequential access
+
+** ~TOUZA_Std_bld~  (=std_bld.F90=) - build information
+
+
+** ~TOUZA_Std_sus~  (=std_sus.F90=) - emulation of (typical) unformatted sequential access
+*** De facto standard sequential unformatted access
+Details are described in, e.g.,
+[[https://gcc.gnu.org/onlinedocs/gfortran/File-format-of-unformatted-sequential-files.html][File format of unformatted sequential files (The GNU Fortran Compiler)]][[https://gcc.gnu.org/onlinedocs/gfortran/File-format-of-unformatted-sequential-files.html][File format of unformatted sequential files (The GNU Fortran Compiler)]].
+
+*** parameters
+**** ~WHENCE_*~ family
+:PROPERTIES:
+:ID:       4b22327e-da30-4129-942e-cb2f251f35eb
+:END:
+#+begin_src f90
+integer :: WHENCE_BEGIN
+integer :: WHENCE_CURRENT
+integer :: WHENCE_END
+integer :: WHENCE_ABS
+#+end_src
+Flags for the file position origin, used in =whence= argument in
+subroutines [[id:b7dbbbe1-f896-4a86-a451-b06d7293bc01][sus_rseek]], [[id:b40ddbc3-a9b7-4c36-b35f-b4a858a17de4][sus_skip_irec]], [[id:a5937599-3297-4014-be10-0fe75d2d77d8][sus_skip_lrec]].
+**** dummy 32-bit separator
+| def_block     | default                                          |
+| ignore_small  | apply dummy separator for small-size markers     |
+| ignore_bigger | apply dummy separator when bigger than the limit |
+| ignore_always | ignore recorded separator always                 |
+**** suspend mode orders
+| suspend_begin | initiate suspend-mode access         |
+| suspend_mid   | keep current suspend-mode access     |
+| suspend_end   | finalize current suspend-mode access |
+
 *** subroutines
-**** sus_open
+**** ~sus_open~
+:PROPERTIES:
+:ID:       de7bc455-5bfb-44c0-9984-3194938aea9d
+:END:
 #+begin_src f90
   subroutine sus_open &
        & (ierr, u,      file, &
-       &  form, status, action, position)
+       &  form, status, action, position, access)
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: u
     character(len=*),intent(in)          :: file
@@ -415,98 +1195,466 @@ If ICOMM is missing, default communicator is used (usually
     character(len=*),intent(in),optional :: status
     character(len=*),intent(in),optional :: action
     character(len=*),intent(in),optional :: position
+    character(len=*),intent(in),optional :: access
 #+end_src
-**** sus_close
+Intrinsic =open= statement wrapper, to connect file =file= to unit =u=
+using /stream/ access, with modes by optional =form=, =status=, =action=,
+=position= and/or =access= arguments.
+Each specifier accepts abbreviated value.
+
+If =status= matches with =U*=, =O*=, =N*=, or =R*=, it is interpreted as
+=UNKNOWN=, =OLD=, =NEW=, or =REPLACE= respectively.  Otherwise it is
+used as is.  The default or blank status corresponds to =UNKNOWN=.
+
+If =action= matches with =RW*=, =R*=,or =W*=, it is interpreted as
+=READWRITE=, =READ=, or =WRITE= respectively.  Otherwise it is
+used as is.  The default or blank action corresponds to =READ=.
+
+If =format= matches with =U*=, or =F*=, it is interpreted as
+=UNFORMATTED=, or =FORMATTED= respectively.  Otherwise it is
+used as is.  The default or blank format corresponds to =UNFORMATTED=.
+
+If =position= matches with =AP*=, or =R*=, it is interpreted as
+=APPEND=, or =REWIND= respectively.  Otherwise, including blank
+position, it is interpreted as =ASIS=.
+
+For completeness, =access= is provided to control the file access
+method.  If absent or it matches with =ST*=, naturally choose the
+stream access.  Direct (=D*=) and sequential (otherwise) are also
+prepared, although rarely used.
+**** ~sus_close~
 #+begin_src f90
   subroutine sus_close(ierr, u, file)
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: u
     character(len=*),intent(in)  :: file
 #+end_src
-**** sus_write_irec
+Intrinsic =close= statement wrapper, to disconnect file =file= from
+unit =u= using /stream/ access.
+At the moment, it is merely prepared as a counterpart of [[id:de7bc455-5bfb-44c0-9984-3194938aea9d][sus_open]],
+to simply call close statement.
+
+**** ~sus_spec_form~
+#+begin_src f90
+  subroutine sus_spec_form(form, def, str)
+    character(len=*),intent(out)         :: form
+    character(len=*),intent(in)          :: def
+    character(len=*),intent(in),optional :: str
+#+end_src
+Return appropriate FORM specifier.
+**** ~sus_spec_action~
+#+begin_src 90
+  subroutine sus_spec_action(action, def, str)
+    character(len=*),intent(out)         :: action
+    character(len=*),intent(in)          :: def
+    character(len=*),intent(in),optional :: str
+#+end_src
+Return appropriate ACTION specifier.
+**** ~sus_spec_status~
+#+begin_src 90
+  subroutine sus_spec_status(status, def, str)
+    character(len=*),intent(out)         :: status
+    character(len=*),intent(in)          :: def
+    character(len=*),intent(in),optional :: str
+#+end_src
+Return appropriate STATUS specifier.
+**** ~sus_spec_position~
+#+begin_src 90
+  subroutine sus_spec_position(position, def, str)
+    character(len=*),intent(out)         :: position
+    character(len=*),intent(in)          :: def
+    character(len=*),intent(in),optional :: str
+#+end_src
+Return appropriate POSITION specifier.
+**** ~sus_spec_access~
+#+begin_src f90
+  subroutine sus_spec_access(access, def, str)
+    character(len=*),intent(out)         :: access
+    character(len=*),intent(in)          :: def
+    character(len=*),intent(in),optional :: str
+#+end_src
+Return appropriate ACCESS specifier.
+**** ~sus_write_irec~
 #+begin_src f90
   subroutine sus_write_irec &
        & (ierr, u, v, n, swap, pre, post)
-  integer,           intent(out)         :: ierr
-  integer,           intent(in)          :: u
-  integer,           intent(in)          :: n
-  logical,           intent(in),optional :: swap
-  logical,           intent(in),optional :: pre, post
-
-  integer(KIND=KI32),intent(in)          :: V(*)
-  integer(KIND=KI64),intent(in)          :: V(*)
-  integer(KIND=KFLT),intent(in)          :: V(*)
-  integer(KIND=KDBL),intent(in)          :: V(*)
-  character(LEN=*),  intent(in)          :: V(*)
+  integer,intent(out)         :: ierr
+  integer,intent(in)          :: u         ! i/o unit
+  <type>, intent(in)          :: V(*)      ! array to write
+  integer,intent(in)          :: n         ! number of elements of V
+  logical,intent(in),optional :: swap      ! byte-swapping boolean
+  logical,intent(in),optional :: pre, post ! subrecord flags
+  integer,intent(in),optional :: dummy     ! dummy separator
 #+end_src
+Write array ~V~ of ~n~ elements to external file of unit ~u~,
+emulating (de facto standard) unformatted sequential access.
+32-bit record markers are used before and after data to write.
 
-**** sus_read_irec
+If optional =pre= presents and true, the record is marked as next
+subrecord of previous one.
+If optional =post= presents and true, the record is marked to have
+next subrecord to follow.
+
+**** ~sus_read_irec~
 #+begin_src f90
   subroutine sus_read_irec &
        & (ierr, u, v, n, swap, sub)
-    integer,           intent(out)            :: ierr
-    integer,           intent(in)             :: u
-    integer,           intent(in)             :: n
-    logical,           intent(in),   optional :: swap
-    logical,           intent(inout),optional :: sub
-
-    integer(KIND=KI32),intent(out)            :: V(*)
-    integer(KIND=KI64),intent(out)            :: V(*)
-    integer(KIND=KFLT),intent(out)            :: V(*)
-    integer(KIND=KDBL),intent(out)            :: V(*)
-    character(LEN=*),  intent(out)            :: V(*)
+    integer,intent(out)            :: ierr
+    integer,intent(in)             :: u      ! i/o unit
+    <type>, intent(out)            :: V(*)   ! array to read
+    integer,intent(in)             :: n      ! number of elements of V
+    logical,intent(in),   optional :: swap   ! number of elements of V
+    logical,intent(inout),optional :: sub    ! subrecord flag, to update
+    integer,intent(in),   optional :: div    ! separator treatment
+    integer,intent(in),   optional :: lmem   ! expected total members in the current record
 #+end_src
-**** sus_skip_irec
+Read array ~V~ of ~n~ elements from external file of unit ~u~,
+emulating (de facto standard) unformatted sequential access.
+32-bit record markers are used before and after data to read.
+
+Data is read until ~v~ array is filled (i.e., ~n~ elements).
+
+If optional =sub= presents and true,
+when there is still a subrecord to follow, =sub= is kept true
+and the file position is set to next subrecord head.
+Otherwise updated to false.
+
+If optional =sub= does not present or false, file position is set to
+next (non-sub) record head.
+
+**** ~sus_skip_irec~
+:PROPERTIES:
+:ID:       b40ddbc3-a9b7-4c36-b35f-b4a858a17de4
+:END:
 #+begin_src f90
   subroutine sus_skip_irec &
        & (ierr, u, n, whence, swap)
     integer,intent(out)         :: ierr
-    integer,intent(in)          :: u
-    integer,intent(in),optional :: n
-    integer,intent(in),optional :: whence
-    logical,intent(in),optional :: swap
+    integer,intent(in)          :: u        ! i/o unit
+    integer,intent(in),optional :: n        ! number of records
+    integer,intent(in),optional :: whence   ! origin flag
+    logical,intent(in),optional :: swap     ! byte-order boolean
 #+end_src
-**** sus_write_lrec
-**** sus_read_lrec
-**** sus_skip_lrec
-**** sus_write_isep
-**** sus_read_isep
-**** sus_write_lsep
-**** sus_read_lsep
-**** sus_rseek
+**** ~sus_check_irec~
 #+begin_src f90
-  subroutine sus_rseek &
-       & (ierr, u, step, whence)
+  subroutine sus_check_irec &
+       & (ierr, u, swap, dir, jopos)
+    integer,            intent(out)          :: ierr
+    integer,            intent(in)           :: u
+    logical,            intent(in), optional :: swap
+    integer,            intent(in), optional :: dir    ! negative to check backward
+    integer(KIND=KIOFS),intent(out),optional :: jopos  ! file position of the opposite end
+#+end_src
+**** ~sus_pad_irec~
+#+begin_src f90
+  subroutine sus_pad_irec &
+       & (ierr, u, v, n, swap, pre, post, dummy)
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: u           ! file unit
+    <type>, intent(in)          :: V           ! single value to pad
+    integer,intent(in)          :: n           ! size of V (no check)
+    logical,intent(in),optional :: swap        ! byte-order switch
+    logical,intent(in),optional :: pre, post   ! continuation flag
+    integer,intent(in),optional :: dummy       ! dummy separator
+#+end_src
+**** ~sus_blank_irec~
+#+begin_src f90
+  subroutine sus_blank_irec &
+       & (ierr, u, mold, n, swap, pre, post, dummy)
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: u           ! file unit
+    <type>, intent(in)          :: mold        ! placeholder
+    integer,intent(in)          :: n           ! size of blank
+    logical,intent(in),optional :: swap        ! byte-order switch
+    logical,intent(in),optional :: pre, post   ! continuation flag
+    integer,intent(in),optional :: dummy       ! dummy separator
+#+end_src
+**** ~sus_suspend_write_irec~
+#+begin_src f90
+  subroutine sus_suspend_write_irec &
+       & (ierr, u, v, n, sw, swap, dummy)
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: u           ! file unit
+    <type>, intent(in)          :: V(0:*)      ! data array
+    integer,intent(in)          :: n           ! size of V (no check)
+    integer,intent(in)          :: sw          ! positive/negative for head/foot
+    logical,intent(in),optional :: swap        ! byte-order switch
+    integer,intent(in),optional :: dummy       ! dummy separator
+#+end_src
+**** ~sus_suspend_read_irec~
+#+begin_src f90
+  subroutine sus_suspend_read_irec &
+       & (ierr, u, v, n, sw, swap, div, lstrm, nskip)
     integer,            intent(out)         :: ierr
     integer,            intent(in)          :: u
-    integer(KIND=KIOFS),intent(in),optional :: step
-    integer,            intent(in),optional :: whence
+    <type>,             intent(out)         :: V(0:*)
+    integer,            intent(in)          :: n
+    integer,            intent(in)          :: sw
+    logical,            intent(in),optional :: swap
+    integer,            intent(in),optional :: div    ! separator treatment
+    integer(kind=KIOFS),intent(in),optional :: lstrm  ! total length in stream io unit
+    integer,            intent(in),optional :: nskip
 #+end_src
+**** ~sus_edit_slice_irec~
+#+begin_src f90
+  subroutine sus_edit_slice_irec &
+       & (ierr, u, v, bes, r, swap, sub, div, lmem)
+    integer,intent(out)            :: ierr        !
+    integer,intent(in)             :: u           ! file unit
+    <type>, intent(in)             :: V(0:*)      ! data array
+    integer,intent(in)             :: bes(3, 0:*) ! begin/end/stride triplet
+    integer,intent(in)             :: r           ! ranks of bes
+    logical,intent(in),   optional :: swap        ! byte-order switch
+    logical,intent(inout),optional :: sub         ! subrecord mode switch (may be updated)
+    integer,intent(in),   optional :: div         ! separator treatment
+    integer,intent(in),   optional :: lmem        ! expected total members in the current record
+#+end_src
+**** ~sus_slice_read_irec~
+#+begin_src f90
+  subroutine sus_slice_read_irec &
+       & (ierr, u, v, bes, r, swap, sub, div, lmem)
+    integer,intent(out)            :: ierr
+    integer,intent(in)             :: u
+    <type>, intent(out)            :: V(0:*)
+    integer,intent(in)             :: bes(3, 0:*) ! begin/end/stride triplet
+    integer,intent(in)             :: r           ! ranks
+    logical,intent(in),   optional :: swap
+    logical,intent(inout),optional :: sub
+    integer,intent(in),   optional :: div
+    integer,intent(in),   optional :: lmem        ! total members
+#+end_src
+Read (sub)array ~V~ from one record of external file of unit ~u~,
+emulating (de facto standard) unformatted sequential access.
+32-bit record markers are used before and after data to read.
+The array shape in the external file is specified with arguments ~r~
+and ~bes~, where ~r~ is the rank of data object and ~bes(3,*)~ is the
+extent along each dimension.  Slices can be specified using ~bes(1,*)~
+and ~bes(2,*)~, which are begin and end index along each dimension,
+respectively.  Index is counted from 0, and the end index corresponds
+to the first index to exclude (as python slice).  For example, a
+fortran-style array section 3:6 corresponds to 2 and 6, respectively.
+
+**** ~sus_runl_read_irec~
+#+begin_src f90
+  subroutine sus_runl_read_irec &
+       & (ierr, u, v, runl, n, swap, sub, div, lmem)
+    integer,intent(out)            :: ierr
+    integer,intent(in)             :: u
+    <type>, intent(out)            :: V(0:*)
+    integer,intent(in)             :: runl(0:*) ! run-length list {skip,read,...}
+    integer,intent(in)             :: n         ! size of runl
+    logical,intent(in),   optional :: swap
+    logical,intent(inout),optional :: sub
+    integer,intent(in),   optional :: div
+    integer,intent(in),   optional :: lmem      ! total members
+#+end_src
+**** ~sus_list_read_irec~
+#+begin_src f90
+  subroutine sus_list_read_irec &
+       & (ierr, u, v, list, n, swap, sub, div, lmem)
+    integer,intent(out)            :: ierr
+    integer,intent(in)             :: u
+    <type>, intent(out)            :: V(0:*)
+    integer,intent(in)             :: list(0:*) ! index list (must be ascending sorted)
+    integer,intent(in)             :: n         ! size of list
+    logical,intent(in),   optional :: swap
+    logical,intent(inout),optional :: sub
+    integer,intent(in),   optional :: div
+    integer,intent(in),   optional :: lmem        ! total members
+#+end_src
+**** ~sus_write_lrec~
+**** ~sus_read_lrec~
+**** ~sus_skip_lrec~
+:PROPERTIES:
+:ID:       a5937599-3297-4014-be10-0fe75d2d77d8
+:END:
+**** ~sus_check_lrec~
+**** ~sus_write_isep~
+#+begin_src f90
+  subroutine sus_write_isep (ierr, u, sep, sub, swap, pos)
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    integer(<type>),    intent(in)          :: sep
+    logical,            intent(in),optional :: sub
+    logical,            intent(in),optional :: swap
+    integer(KIND=KIOFS),intent(in),optional :: pos
+#+end_src
+**** ~sus_read_isep~
+#+begin_src f90
+!!!_  & sus_read_isep - read 32-bit separator
+  subroutine sus_read_isep (ierr, u, sep, pos, swap)
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    integer(<type>),    intent(out)         :: sep
+    integer(KIND=KIOFS),intent(in),optional :: pos
+    logical,            intent(in),optional :: swap
+#+end_src
+**** ~sus_write_lsep~
+**** ~sus_read_lsep~
+**** ~sus_read~
+#+begin_src f90
+  subroutine sus_read &
+       & (ierr, u, v, n, swap, pos)
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    <type>,             intent(out)         :: V(*)
+    integer,            intent(in)          :: n
+    logical,            intent(in),optional :: swap
+    integer(kind=KIOFS),intent(in),optional :: pos
+#+end_src
+**** ~sus_write~
+#+begin_src f90
+  subroutine sus_write &
+       & (ierr, u, v, n, swap, pos)
+    integer,             intent(out)         :: ierr
+    integer,             intent(in)          :: u
+    integer(<type>),     intent(in)          :: V(*)
+    integer,             intent(in)          :: n
+    logical,             intent(in),optional :: swap
+    integer(kind=KIOFS), intent(in),optional :: pos
+#+end_src
+**** ~sus_rseek~
+:PROPERTIES:
+:ID:       b7dbbbe1-f896-4a86-a451-b06d7293bc01
+:END:
+#+begin_src f90
+  subroutine sus_rseek &
+       & (ierr, u, step, whence, fmt)
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u        ! file unit number
+    integer(KIND=KIOFS),intent(in),optional :: step     ! position
+    integer,            intent(in),optional :: whence   ! position flag
+    logical,            intent(in),optional :: fmt      ! (reserved) formatted or not
+#+end_src
+=sus_rseek= set current file (to read) position as the arguments set.
+Optional =whence= argument controls how to interpret =step= argument.
+Choice of =whence= is limited to the public parameters in [[id:4b22327e-da30-4129-942e-cb2f251f35eb][~WHENCE_*~ family]].
+If =whence= is set to
+=WHENCE_BEGIN=, =WHENCE_END=, or =WHENCE_CURRENT=,
+=step= interpreted as the  offset relative to  the start of the file,
+the current position, or end-of-file, respectively.  Therefore,
+~step=0~ and ~whence=WHENCE_BEGIN~ corresponds to the start of the
+file.
+If =whence= is set to =WHENCE_ABS=, =step= is instead interpreted as
+absolute position, which corresponds to the value of =POS= argument in
+=read= or =write= statement.  Therefore, ~step=1~ and
+~whence=WHENCE_ABS~ corresponds to the start of the file.
+The unit of =step= is the same as system dependent file storage unit.
+
+The default values for =step= and =whence= are 0 and =WHENCE_CURRENT=,
+respectively.
+**** ~sus_pad~
+#+begin_src f90
+  subroutine sus_pad &
+       & (ierr, u, v, n, swap, pos)
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u
+    <type>,             intent(in)          :: V
+    integer,            intent(in)          :: n
+    logical,            intent(in),optional :: swap
+    integer(kind=KIOFS),intent(in),optional :: pos
+#+end_src
+Write =v= scalar =n= times.
+
+**** ~sus_record_mems_irec~
+#+begin_src f90
+  subroutine sus_record_mems_irec &
+       & (ierr, n, u, mold, swap, sub)
+    integer,intent(out)            :: ierr
+    integer,intent(out)            :: n
+    integer,intent(in)             :: u
+    <type>, intent(in)             :: mold
+    logical,intent(in),   optional :: swap
+    logical,intent(inout),optional :: sub
+#+end_src
+Return size (number of elements) of current record, in terms of =mold=
+array as output argument =n=.  If optional argument =sub= is absent or
+FALSE, return total size of the logical record (sum of subrecords).
+If TRUE, return size of the current subrecord.  In addition, =sub= is
+updated to FALSE when there is no more subrecords.
+
+At return, file position is reverted to one at entrance of this procedure.
+
 *** functions
-**** sus_eswap ()
+**** ~sus_is_status_new()~
+#+begin_src f90
+  logical function sus_is_status_new(str, def)
+    character(len=*),intent(in)          :: str
+    character(len=*),intent(in),optional :: def
+#+end_src
+Helper function to check whether STR is regarded as NEW for status specifier.
+**** ~sus_eswap ()~
 #+begin_src f90
   ELEMENTAL integer(KIND=KI32) function sus_eswap(V)
     integer(kind=KI32),intent(in) :: V
   ELEMENTAL integer(KIND=KI64) function sus_eswap(V)
     integer(kind=KI64),intent(in) :: V
 #+end_src
-** =TOUZA_Std_htb=  (std_htb.F90) - hash-table management
+
+**** ~max_members()~
+#+begin_src f90
+  integer function max_members_a (mold) result(m)
+    character(len=*),intent(in) :: mold
+#+end_src
+Return the largest size of =mold= array which can be recorded in single
+32-bit record (without subrecord division).
+**** ~is_irec_overflow()~
+#+begin_src f90
+  logical function is_irec_overflow(m, mold)
+    integer,intent(in) :: m
+    <type>, intent(in) :: mold
+#+end_src
+Check if record size of =mold= array of =m= elements is more than
+the maximum size of 32-bit marker record.
+**** ~is_irec_overflow_mix()~
+#+begin_src f90
+!!!_  & is_irec_overflow_mix
+  logical function is_irec_overflow_mix(ni, nl, nf, nd)
+    integer,intent(in),optional :: ni  ! size of integer
+    integer,intent(in),optional :: nl  ! size of long integer
+    integer,intent(in),optional :: nf  ! size of float
+    integer,intent(in),optional :: nd  ! size of double
+#+end_src
+Check if record size of for different-mold arrays of =ni=, =nl=, =nf=,
+=nd= (can be 0) elements is more than the maximum size of 32-bit
+marker record.
+
+**** ~sus_size_irec()~
+#+begin_src f90
+  integer(kind=KMEM) function sus_size_irec (mold, n) result(l)
+    <type>,         intent(in) :: mold
+    integer(<KMEM>),intent(in) :: n
+  end function sus_size_irec_li
+#+end_src
+Return record size of =mold= array of =m= elements, plus two 32-bit
+record markers, in terms of stream-io units.
+**** ~sus_is_stream_unit()~
+#+begin_src f90
+  logical function sus_is_stream_unit(u)
+    integer,intent(in) :: u
+#+end_src
+Check if io-unit =u= is connected to stream access.
+
+** ~TOUZA_Std_htb~  (=std_htb.F90=) - hash-table management
 *** description
 *** constants
 *** procedures
-**** new_htable
+**** ~new_htable~
 #+begin_src f90
   integer function new_htable &
-       & (name, lkey, mem, base, def, width, grow)
+       & (name, lkey, mem, def, ntag, ktag, nstt, base, width, grow)
     character(len=*),intent(in) :: name     ! name of the hash-table
     integer,         intent(in) :: lkey     ! maximum key-length
     integer,optional,intent(in) :: mem      ! size of the hash-table
     integer,optional,intent(in) :: def      ! default status
+    integer,optional,intent(in) :: ntag     ! size of hash-table associates for collation
+    integer,optional,intent(in) :: ktag     ! size of hash-table associates for key generation
+    integer,optional,intent(in) :: nstt     ! size of hash-table associates for properties
     integer,optional,intent(in) :: base     ! base to compute hash number
     integer,optional,intent(in) :: width    ! number of characters to compute hash number
     logical,optional,intent(in) :: grow     ! switch to enable growable hash table
 #+end_src
-**** new_entry
+**** ~new_entry~
 #+begin_src f90
   integer function new_entry(name, hh)
   integer function new_entry(name, hh, func)
@@ -514,7 +1662,7 @@ If ICOMM is missing, default communicator is used (usually
     integer,         intent(in) :: hh       ! hash-table (handle)
     external                    :: func
 #+end_src
-**** reg_entry
+**** ~reg_entry~
 #+begin_src f90
   integer function reg_entry(name, hh, status)
   integer function reg_entry(name, hh, status, func)
@@ -523,7 +1671,7 @@ If ICOMM is missing, default communicator is used (usually
     integer,optional,intent(in) :: status   ! status
     external                    :: func
 #+end_src
-**** settle_entry
+**** ~settle_entry~
 #+begin_src f90
   subroutine settle_entry &
        & (ierr, entr, hh, status)
@@ -532,7 +1680,7 @@ If ICOMM is missing, default communicator is used (usually
     integer,         intent(in)  :: hh      ! hash-table(handle)
     integer,optional,intent(in)  :: status  ! status
 #+end_src
-**** query_entry
+**** ~query_entry~
 #+begin_src f90
   integer function query_entry(name, hh)
   integer function query_entry(name, hh, func)
@@ -540,7 +1688,7 @@ If ICOMM is missing, default communicator is used (usually
     integer,         intent(in) :: hh
     external                    :: func
 #+end_src
-**** query_name
+**** ~query_name~
 #+begin_src f90
   subroutine query_name &
        & (ierr, name, entr, hh)
@@ -549,7 +1697,7 @@ If ICOMM is missing, default communicator is used (usually
     integer,         intent(in)  :: entr
     integer,         intent(in)  :: hh
 #+end_src
-**** query_status
+**** ~query_status~
 #+begin_src f90
   integer function query_status(name, hh)
   integer function query_status(name, hh, func)
@@ -559,10 +1707,32 @@ If ICOMM is missing, default communicator is used (usually
     integer,         intent(in) :: hh
     external                    :: func
 #+end_src
+
+
+** ~TOUZA_Std_ipc~  (=std_ipc.F90=) - intrinsic procedure compatible gallery
+
 * Test suites
 
 
 * Copyright and license
-Copyright 2020-2022 Japan Agency for Marine-Earth Science and Technology
+Copyright 2020-2023 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)
+
+#  LocalWords:  TOUZA SAITO Fuyuki Fortran saitofuyuki jamstec jp prc
+#  LocalWords:  MIROC README KFLT KDBL KI utl src chcount str chs len
+#  LocalWords:  condop vt vf ndigits inout downcase upcase env uin io
+#  LocalWords:  uout uerr KIOFS endian kendi mem init unfmtd recl ufd
+#  LocalWords:  ierr levv levtry iroot icomm strm bodr ubgn uend ustp
+#  LocalWords:  utest jrec KMEM conv nb mems eof ss ubase kcat mwe ni
+#  LocalWords:  MPI nrank irank mpi wni gni igrp arg param num swch
+#  LocalWords:  ndef inq decl pos jpos idx jentr bld sus unformatted
+#  LocalWords:  da cb eb dbbbe bc rseek RW READWRITE ASIS irec pre hh
+#  LocalWords:  lrec isep lsep fmt eswap htb htable lkey growable De
+#  LocalWords:  func entr facto ddbc de fe bfb aea subrecord boolean
+#  LocalWords:  bes fortran NEWUNIT GFORTRAN tmp tempfile tmptmpl CPP
+#  LocalWords:  cdef diag ulog dnm afa ddf maxp minp maxr minr kx tru
+#  LocalWords:  istt denormalized DENORMAL inrange substring npos sep
+#  LocalWords:  nrep clipl cliph ldelim rdelim lim inifinite lmem dir
+#  LocalWords:  substrings Substrings broadcasted jopos sw lstrm runl
+#  LocalWords:  nskip KARG nl nf nd li ntag ktag nstt ipc

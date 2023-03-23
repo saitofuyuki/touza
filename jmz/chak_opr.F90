@@ -1,7 +1,7 @@
-!!!_! chak_opr.F90 - TOUZA/Jmz swiss(CH) army knife operation primitives
+!!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/02/21 10:05:08 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/21 21:59:58 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1834,6 +1834,27 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_lazy_LMAX
+!!!_   . apply_BINARY_NEAREST
+  subroutine apply_BINARY_NEAREST &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_NEAREST(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_NEAREST
+
 !!!_   . apply_UNARY_BITNOT
   subroutine apply_UNARY_BITNOT &
        & (ierr, Z, domZ, X, domX, F)
@@ -1854,6 +1875,47 @@ contains
        endif
     enddo
   end subroutine apply_UNARY_BITNOT
+!!!_   . apply_UNARY_SPACING
+  subroutine apply_UNARY_SPACING &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_SPACING(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_SPACING
+!!!_   . apply_UNARY_RRSP
+  subroutine apply_UNARY_RRSP &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_RRSP(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_RRSP
+
 !!!_   . apply_BINARY_BITAND
   subroutine apply_BINARY_BITAND &
        & (ierr, Z, domZ, FZ, X, domX, FX)
@@ -1954,6 +2016,7 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_RSHIFT
+
 !!!_  - elemental operatior templates
 !!!_   . elem_UNARY_template()
   ELEMENTAL &
@@ -2338,6 +2401,30 @@ contains
        Z = AINT(X)
     endif
   end function elem_TRUNC
+!!!_    * elem_SPACING ()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_SPACING (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = SPACING(X)
+    endif
+  end function elem_SPACING
+!!!_    * elem_RRSP ()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_RRSP (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = RRSPACING(X)
+    endif
+  end function elem_RRSP
 !!!_  - elemental binary operators
 !!!_   & elem_ADD() - X + Y
   ELEMENTAL &
@@ -2959,6 +3046,19 @@ contains
        Z = REAL(ISHFT(INT(X), -INT(Y)), kind=KBUF)
     endif
   end function elem_RSHIFT
+!!!_    * elem_NEAREST()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_NEAREST (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else
+       Z = NEAREST(X, Y)
+    endif
+  end function elem_NEAREST
+
 !!!_ + end chak_opr
 end module chak_opr
 !!!_! FOOTER

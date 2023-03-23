@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2022/11/04 22:20:56 fuyuki demo-chak.sh.in>
+# Time-stamp: <2023/03/23 14:52:23 fuyuki demo-chak.sh.in>
 
 main ()
 {
@@ -83,6 +83,29 @@ demo_operation ()
   run_demo perm:y+z      -n $src PERM=,,lev =
   run_demo perm:y+z:keep -n $src PERM=/,/,lev =
 
+  # flat index
+  src=(T=0 demo/base INT)
+
+  run_demo flat:flat/s   -TRIM 3:3   $src FLAT         = POP
+  run_demo flat:flat/s0  -TRIM 9     $src FLAT=0       = POP
+  run_demo flat:flat/s1  -TRIM 9     $src FLAT=1       = POP
+  run_demo flat:flat/s01 -TRIM 3:3   $src FLAT=0,1     = POP
+  run_demo flat:flat/s10 -TRIM 9     $src FLAT=1,0     = POP
+  run_demo flat:flat/s02 -TRIM 9     $src FLAT=0,2     = POP
+  run_demo flat:flat/s20 -TRIM 9     $src FLAT=2,0     = POP
+
+  run_demo flat:flat     -TRIM 3:3   $src FLAT         FLUSH -i
+  run_demo flat:flat/0   -TRIM 9     $src FLAT=0       FLUSH -i
+  run_demo flat:flat/1   -TRIM 9     $src FLAT=1       FLUSH -i
+  run_demo flat:flat/01  -TRIM 3:3   $src FLAT=0,1     FLUSH -i
+  run_demo flat:flat/10  -TRIM 9     $src FLAT=1,0     FLUSH -i
+  run_demo flat:flat/02  -TRIM 3:3   $src FLAT=0,2     FLUSH -i
+  run_demo flat:flat/20  -TRIM 3:3   $src FLAT=2,0     FLUSH -i
+  run_demo flat:flat/x   -TRIM 9     $src FLAT=lon     FLUSH -i
+  run_demo flat:flat/zy  -TRIM 9     $src FLAT=lev,lat FLUSH -i
+
+  run_demo flat:flat/0+1 -TRIM 9     $src FLAT=0 FLAT=1 FLUSH -i
+
   return 0
 }
 
@@ -104,23 +127,36 @@ run_demo_add ()
 run_demo ()
 {
   local tag=$1; shift
-  local col=T
-  case $1 in 
+  local col=T trim=
+  case $1 in
   (-NOCOL) col=; shift;;
+  (-TRIM)  trim=$2; shift 2;;
   esac
   local err=
   local args=("$@")
-  local tmp=$(mktemp); log=$(mktemp)
+  local tmp=$(mktemp) tmp2=$(mktemp) tmp3=$(mktemp) log=$(mktemp)
   $chak "${(@)args}" > $tmp 2> $log; err=$?
+  [[ -n $trim ]] && trim=(${(s/:/)trim})
   print "# ## $tag"
   {
     print "% $chak:t $args"
     if [[ $err -eq 0 ]]; then
       sed -e  '/^[0-9]/,$d' $tmp
+      sed -ne '/^[0-9]/,$p' $tmp > $tmp2
+      if [[ $#trim -eq 1 ]]; then
+        head --lines=$trim $tmp2 > $tmp3
+        print - ":" >> $tmp3
+        mv $tmp3 $tmp2
+      elif [[ $#trim -eq 2 ]]; then
+        head --lines=$trim[1] $tmp2 > $tmp3
+        print - ":" >> $tmp3
+        tail --lines=$trim[2] $tmp2 >> $tmp3
+        mv $tmp3 $tmp2
+      fi
       if [[ -z $col ]]; then
-        sed -ne '/^[0-9]/,$p' $tmp
+        cat $tmp2
       else
-        sed -ne '/^[0-9]/,$p' $tmp | column -t
+        column -t $tmp2
       fi
     else
       cat $tmp
@@ -128,7 +164,7 @@ run_demo ()
     fi
   } | sed -e 's/^/: /'
   print
-  rm -f $tmp $log
+  rm -f $tmp $tmp2 $tmp3 $log
 }
 
 demo_inputs ()
@@ -181,7 +217,7 @@ gen_source ()
     let jt++
   done
 
-  jt=0 
+  jt=0
   local tm=
   while [[ $jt -lt $nt ]]
   do
@@ -208,7 +244,7 @@ gen_mean ()
   local mopts=($1); shift
   local item=$1 ofile=$2; shift 2
   local ifile=$1
-    
+
   local copts=(-t 1)
   $ngtmean $copts $mopts       -o $ofile $ifile || return $?
   $ngtmean $copts $mopts -n -a -o $ofile $ifile || return $?

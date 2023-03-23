@@ -1,5 +1,5 @@
 #!@ZSH@
-# Time-stamp: <2022/10/17 21:56:55 fuyuki genx2.sh.in>
+# Time-stamp: <2023/03/16 20:21:36 fuyuki genx2.sh.in>
 
 main ()
 {
@@ -35,7 +35,7 @@ xadd ()
              REPEAT ADD TAG="$z" FLUSH -i)
 
   $chak $copts $cmd | sed -n -e '/^##/p'
-  $chak -q $cmd | sed -e '/^##/d' | column -t 
+  $chak -q $cmd | sed -e '/^##/d' | column -t
 }
 
 
@@ -46,7 +46,7 @@ gen_files ()
   local copts=(-vvvv -f)
   local post=(MISS=-999)
   local of=$outd/$fname
-  
+
   [[ ! -e $of ]] && $chak $copts "$@" $post = $of ITEM=$fname
 }
 

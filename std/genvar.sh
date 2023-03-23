@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/03/05 21:12:44 fuyuki genvar.sh>
+# Time-stamp: <2023/03/16 20:22:29 fuyuki genvar.sh>
 
 this="$0"
 
@@ -14,7 +14,7 @@ main ()
 
   while [[ $# -gt 0 ]]
   do
-    case $1 in      
+    case $1 in
     (-o) ovw=$1;;
     (-r) aref=$2; shift || return $?;;
     (-r*) aref=${1: 2};;
@@ -29,12 +29,12 @@ main ()
 
   local file=$1; shift
   local sub=
-  
+
   local tmp=$(mktemp)
   local src=$(mktemp)
   local mod=$(mktemp)
 
-  local bpat= epat= 
+  local bpat= epat=
   local xpat=() x=
   local var=() ref= base= v=
   local rtype=
@@ -119,7 +119,7 @@ main ()
       (diff)   diff $file $tmp;;
       (xxdiff) xxdiff $file $tmp;;
       (*) print -u2 - "Unknown filter $filter"; return 1;;
-      esac    
+      esac
     fi
   done
 

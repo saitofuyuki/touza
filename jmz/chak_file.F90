@@ -1,7 +1,7 @@
-!!!_! chak_file.F90 - TOUZA/Jmz swiss(CH) army knife file interfaces
+!!!_! chak_file.F90 - TOUZA/Jmz CH(swiss) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/01/22 21:37:57 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/21 21:59:33 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -705,6 +705,9 @@ contains
     integer,         intent(out)   :: ierr
     type(file_t),    intent(inout) :: file
     type(file_t),    intent(in)    :: def
+
+    character(len=128) :: iomsg
+
     ierr = 0
 
     if (file%u.lt.0) then
@@ -726,7 +729,7 @@ contains
           else if (file%kfmt.eq.cfmt_cdf) then
              ierr = ERR_NOT_IMPLEMENTED
           else
-             call sus_open(ierr, file%u, file%name, ACTION='R', STATUS='O')
+             call sus_open(ierr, file%u, file%name, ACTION='R', STATUS='O', IOMSG=iomsg)
              if (ierr.eq.0) then
                 if (file%kfmt.ge.cfmt_binary) call open_read_binary(ierr, file)
              else
@@ -745,7 +748,8 @@ contains
           file%rgrp(:)%term_flag = mode_read
        endif
        if (ierr.ne.0) then
-          call message(ierr, 'failed to read open:'// trim(file%name))
+          call message(ierr, trim(iomsg))
+          call message(ierr, 'failed to read open: ' // trim(file%name))
           return
        endif
     endif
@@ -1036,8 +1040,10 @@ end subroutine cue_read_file
     integer,     intent(out)   :: ierr
     type(file_t),intent(inout) :: file
     character(len=16) :: stt, pos
+    character(len=128) :: iomsg
 
     ierr = 0
+    iomsg = ' '
 
     if (file%u.lt.0) then
        file%u = new_unit()
@@ -1075,7 +1081,8 @@ end subroutine cue_read_file
                 stt = ' '
                 pos = ' '
              end select
-             call sus_open(ierr, file%u, file%name, ACTION='W', STATUS=stt, POSITION=pos)
+             call sus_open &
+                  & (ierr, file%u, file%name, ACTION='W', STATUS=stt, POSITION=pos, IOMSG=iomsg)
           else if (file%kfmt.eq.cfmt_cdf) then
 #if OPT_WITH_NCTCDF
              select case (file%mode)
@@ -1088,16 +1095,15 @@ end subroutine cue_read_file
              case default
                 stt = ' '
              end select
-             call nct_open_write(ierr, file%u, file%name, status=stt)
+             call nct_open_write(ierr, file%u, file%name, status=stt, iomsg=iomsg)
 #else /* not OPT_WITH_NCTCDF */
              ierr = ERR_NOT_IMPLEMENTED
 #endif /* not OPT_WITH_NCTCDF */
           else
              ierr = ERR_NOT_IMPLEMENTED
-             continue
           endif
           if (ierr.ne.0) then
-             write(*, *) 'failed to write open:', trim(file%name)
+             call message(ierr, iomsg)
              return
           endif
        endif

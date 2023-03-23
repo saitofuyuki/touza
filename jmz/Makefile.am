@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/02/05 20:34:18 fuyuki Makefile.am>
+# Time-stamp: <2023/03/20 12:56:58 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -31,6 +31,8 @@ jmzcmp_SOURCES = jmzcmp.F90 jmz.h
 bin_PROGRAMS = chak
 chak_SOURCES = chak.F90 jmz.h
 chak_to_include = chak_decl.F90 chak_reg.F90
+EXTRA_chak_DEPENDENCIES = $(TOUZA_LIBS)
+
 noinst_SCRIPTS += demo-chak.sh
 
 noinst_PYTHON = jmznml.py
