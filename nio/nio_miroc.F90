@@ -1,10 +1,10 @@
 !!!_! nio_miroc.F90 - TOUZA/Nio MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2023/01/08 11:20:59 fuyuki nio_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/16 12:17:15 fuyuki nio_miroc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022
+! Copyright (C) 2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -219,7 +219,7 @@ contains
 !!!_ + user subroutines
 !!!_  - put_item_time
   subroutine put_item_time(ierr, head, time, kentr)
-    use TOUZA_Nio_header,only: put_item
+    use TOUZA_Nio_header,only: put_item_date
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: head(*)
@@ -228,7 +228,7 @@ contains
     integer idate(6)
     ierr = 0
     call css2yh(idate, time)
-    call put_item(ierr, head, idate, kentr)
+    call put_item_date(ierr, head, idate, kentr)
   end subroutine put_item_time
 !!!_  - nio_tell - return file position (ciof_tell emulation)
   subroutine nio_tell(u, jpos)
@@ -783,10 +783,9 @@ subroutine GTZRDZ &
      &  ISTA,  IEND,  JSTA,  JEND,  KSTA, KEND, &
      &  IFILE, HITEM, HDFMT, HCLAS, &
      &  DSIZE)
-  use TOUZA_Nio,only: &
-       & nio_msg=>msg,    get_item, &
-       & nio_read_header, parse_header_size, nio_read_data, &
-       & hi_ASTR1, hi_ASTR2, hi_ASTR3, hi_AEND1, hi_AEND2, hi_AEND3
+  use TOUZA_Nio,only: nio_msg=>msg,    get_item
+  use TOUZA_Nio,only: nio_read_header, parse_header_size, nio_read_data
+  use TOUZA_Nio,only: hi_ASTR1, hi_ASTR2, hi_ASTR3, hi_AEND1, hi_AEND2, hi_AEND3
   use TOUZA_Nio_miroc,only: KMD, NCC, NDC, init_common
   implicit none
   integer,            intent(in)  :: DSIZE
@@ -915,22 +914,20 @@ subroutine GTZWRZ &
      &  ISTA,  IEND,  JSTA,  JEND,  KSTA,  KEND, &
      &  DSIZE)
   use TOUZA_Nio,only: nio_msg=>msg
-  use TOUZA_Nio_miroc,only:  &
-       & vmiss_def, &
-       & put_item_time, init_common
-  use TOUZA_Nio_header,only: litem, nitem, put_item, &
-       & hi_DSET,  hi_ITEM,  hi_TITL1, hi_TITL2, &
-       & hi_UNIT,  hi_TIME,  hi_TDUR,  hi_DFMT,  &
-       & hi_DATE,  hi_DATE1, hi_DATE2, &
-       & hi_CDATE, hi_MDATE, hi_SIZE,  &
-       & hi_AITM1, hi_AITM2, hi_AITM3, &
-       & hi_ASTR1, hi_AEND1, hi_ASTR2, hi_AEND2, hi_ASTR3, hi_AEND3,  &
-       & hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL,  &
-       & hi_EDIT1, hi_EDIT2, hi_EDIT3, &
-       & hi_ETTL1, hi_ETTL2, hi_ETTL3
-  use TOUZA_Nio_record,only: &
-       & get_default_header, nio_write_header, nio_write_data, &
-       & REC_DEFAULT
+  use TOUZA_Nio_miroc,only:  vmiss_def
+  use TOUZA_Nio_miroc,only:  put_item_time, init_common
+  use TOUZA_Nio_header,only: litem, nitem, put_item, put_item_date
+  use TOUZA_Nio_header,only: hi_DSET,  hi_ITEM,  hi_TITL1, hi_TITL2
+  use TOUZA_Nio_header,only: hi_UNIT,  hi_TIME,  hi_TDUR,  hi_DFMT
+  use TOUZA_Nio_header,only: hi_DATE,  hi_DATE1, hi_DATE2
+  use TOUZA_Nio_header,only: hi_CDATE, hi_MDATE, hi_SIZE
+  use TOUZA_Nio_header,only: hi_AITM1, hi_AITM2, hi_AITM3
+  use TOUZA_Nio_header,only: hi_ASTR1, hi_AEND1, hi_ASTR2, hi_AEND2, hi_ASTR3, hi_AEND3
+  use TOUZA_Nio_header,only: hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL
+  use TOUZA_Nio_header,only: hi_EDIT1, hi_EDIT2, hi_EDIT3
+  use TOUZA_Nio_header,only: hi_ETTL1, hi_ETTL2, hi_ETTL3
+  use TOUZA_Nio_record,only: get_default_header, nio_write_header, nio_write_data
+  use TOUZA_Nio_record,only: REC_DEFAULT
 # if OPT_WITH_NCTCDF
   use TOUZA_Nio_nctcdf,only: nct_define_write, nct_write_data
 # endif
@@ -979,8 +976,8 @@ subroutine GTZWRZ &
   if (TIME .ge. TIME_PREV + LAZINESS) then
      call date_and_time(values=idtv(:))
      idtv(4:6) = idtv(5:7)
-     call put_item(jerr, hdefv, idtv(1:6), hi_CDATE)
-     call put_item(jerr, hdefv, idtv(1:6), hi_MDATE)
+     call put_item_date(jerr, hdefv, idtv(1:6), hi_CDATE)
+     call put_item_date(jerr, hdefv, idtv(1:6), hi_MDATE)
      TIME_PREV = TIME
   endif
 

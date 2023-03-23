@@ -1,5 +1,5 @@
 #!@ZSH@
-# Time-stamp: <2022/06/27 11:53:42 fuyuki jmzdepf90.sh.in>
+# Time-stamp: <2023/03/16 20:21:45 fuyuki jmzdepf90.sh.in>
 
 # main DIRECTORY.......
 #   parse DIRECTORY/*.dep and create DIRECTORY/Makedep.inc
@@ -156,7 +156,7 @@ gen_makedep ()
         (mod) mods+=("${s:r}$modx");;
         (*)   srcs+=($s);;
         esac
-      done  
+      done
       oo="${o/%.mod/$modx}"
 
       print - "$oo: $srcs"

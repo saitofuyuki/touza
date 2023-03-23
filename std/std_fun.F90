@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2023/02/05 21:28:58 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/13 09:21:15 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020,2021,2022,2023
@@ -78,7 +78,7 @@ module TOUZA_Std_fun
 !!!_ + common interfaces
 contains
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, ubgn, uend, ucdef, icomm)
+  subroutine init(ierr, u, levv, mode, ubgn, uend, cdef, icomm)
     use TOUZA_Std_utl,only: utl_init=>init, choice
     use TOUZA_Std_log,only: log_init=>init
     use TOUZA_Std_mwe,only: mwe_init=>init
@@ -87,7 +87,7 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
     integer,intent(in),optional :: ubgn, uend ! service unit boundaries (to override OPT_*_FILE_UNIT)
-    integer,intent(in),optional :: ucdef      ! unit category default
+    integer,intent(in),optional :: cdef       ! unit category default
     integer,intent(in),optional :: icomm      ! mwe argument
     integer md, lv, lmd
     integer jc
@@ -112,8 +112,8 @@ contains
        endif
        if (is_first_force(init_counts, mode)) then
           if (ierr.eq.0) call set_tmptmpl(ierr)
-          if (ierr.eq.0) call set_category_default(ierr, choice(kucat_def, ucdef))
-          if (ierr.eq.0) call set_category_bound(ierr, kucat_black, choice(OPT_MIN_FILE_UNIT, ubgn) - 1)
+          if (ierr.eq.0) call set_category_default(ierr, choice(kucat_def, cdef))
+          if (ierr.eq.0) call set_category_bound(ierr, kucat_black, choice(OPT_MIN_FILE_UNIT, ubgn))
           do jc = 0, lucat - 1
              if (ierr.eq.0) call set_category_bound(ierr, jc, choice(OPT_MAX_FILE_UNIT, uend))
           enddo
@@ -211,35 +211,35 @@ contains
     if (ierr.eq.0) call set_tempfile(' ', ir)
   end subroutine set_tmptmpl
 !!!_  & set_category_bound - set i/o unit range limit
-  subroutine set_category_bound (ierr, jc, uend)
+  subroutine set_category_bound (ierr, category, uend)
     use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,intent(out) :: ierr
-    integer,intent(in)  :: jc
+    integer,intent(in)  :: category
     integer,intent(in)  :: uend
     ierr = 0
-    if (jc.lt.kucat_black .or. jc.ge.lucat) then
+    if (category.lt.kucat_black .or. category.ge.lucat) then
        ierr = _ERROR(ERR_INVALID_PARAMETER)
-       call msg_mdl('(''invalid unit category = '', I0)', (/ jc /), __MDL__)
+       call msg_mdl('(''invalid unit category = '', I0)', (/category/), __MDL__)
        return
     endif
-    ucend(jc) = uend
+    ucend(category) = uend
     return
   end subroutine set_category_bound
 
 !!!_  & set_category_default - set default category
-  subroutine set_category_default (ierr, jc)
+  subroutine set_category_default (ierr, category)
     use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,intent(out) :: ierr
-    integer,intent(in)  :: jc
+    integer,intent(in)  :: category
     ierr = 0
-    if (jc.lt.kucat_black .or. jc.ge.lucat) then
+    if (category.lt.kucat_black .or. category.ge.lucat) then
        ierr = _ERROR(ERR_INVALID_PARAMETER)
-       call msg_mdl('(''invalid unit category = '', I0)', (/ jc /), __MDL__)
+       call msg_mdl('(''invalid unit category = '', I0)', (/category/), __MDL__)
        return
     endif
-    kucat_def = jc
+    kucat_def = category
     return
   end subroutine set_category_default
 
@@ -286,12 +286,12 @@ contains
 !!!_ + unit number
 !!!_  & new_unit () - return unbound i/o unit number
   integer function new_unit &
-       & (ubase, kcat) &
+       & (base, category) &
        & result(un)
     use TOUZA_Std_utl,only: choice
     implicit none
-    integer,intent(in),optional :: ubase  ! unit base to search
-    integer,intent(in),optional :: kcat   ! category
+    integer,intent(in),optional :: base     ! unit base to search
+    integer,intent(in),optional :: category ! category
     integer :: ui
     integer :: uoff
     integer :: ub, ue
@@ -301,14 +301,14 @@ contains
 
     un = -1
 
-    uoff = choice(search_from_next, ubase)
+    uoff = choice(search_from_next, base)
 
-    kc = choice(kucat_def, kcat)
+    kc = choice(kucat_def, category)
     if (kc.le.kucat_black .or. kc.ge.lucat) return
 
-    ub = ucend(kc-1) + 1
+    ub = ucend(kc-1)
     ue = ucend(kc)
-    if (ub.gt.ue .or. ue.lt.0) return
+    if (ub.ge.ue .or. ue.le.0) return
 
     if (uoff.eq.search_from_head) then
        uoff = ub
@@ -316,16 +316,16 @@ contains
        uoff = max(ub, ulast(kc))
     else if (uoff.eq.search_from_next) then
        uoff = max(ub, ulast(kc) + 1)
-    else if (uoff.lt.ub .or. uoff.gt.ue) then
+    else if (uoff.lt.ub .or. uoff.ge.ue) then
        ! category unmatch
        return
     endif
 
-    do ui = uoff, ue
+    do ui = uoff, ue - 1
        inquire(UNIT=ui, IOSTAT=jerr, OPENED=opnd)
        if (jerr.eq.0 .and. .not.opnd) then
           un = ui
-          ulast = un
+          ulast(kc) = un
           return
        endif
     enddo
@@ -333,7 +333,7 @@ contains
        inquire(UNIT=ui, IOSTAT=jerr, OPENED=opnd)
        if (jerr.eq.0 .and. .not.opnd) then
           un = ui
-          ulast = un
+          ulast(kc) = un
           return
        endif
     enddo
@@ -342,29 +342,29 @@ contains
 
 !!!_  & new_unit_tmp () - return unbound i/o unit number and temporal file name
   subroutine new_unit_tmp &
-       & (un, fn, ubase, kcat)
+       & (unit, file, base, category)
     implicit none
-    integer,         intent(out)         :: un
-    character(len=*),intent(out)         :: fn
-    integer,         intent(in),optional :: ubase
-    integer,         intent(in),optional :: kcat
+    integer,         intent(out)         :: unit
+    character(len=*),intent(out)         :: file
+    integer,         intent(in),optional :: base
+    integer,         intent(in),optional :: category
     integer jerr
     integer jc
-    fn = ' '
-    un = new_unit(ubase, kcat)
-    if (un.lt.0) return
+    file = ' '
+    unit = new_unit(base, category)
+    if (unit.lt.0) return
 
     do jc = 0, ltry_newu
-       write(fn, tmp_fmt, IOSTAT=jerr) tmp_id, jc
-       if (jerr.eq.0) open(UNIT=un, FILE=fn, STATUS='NEW', IOSTAT=jerr)
+       write(file, tmp_fmt, IOSTAT=jerr) tmp_id, jc
+       if (jerr.eq.0) open(UNIT=unit, FILE=file, STATUS='NEW', IOSTAT=jerr)
        if (jerr.eq.0) then
-          close(UNIT=un, IOSTAT=jerr)   ! not delete but keep
+          close(UNIT=unit, IOSTAT=jerr)   ! not delete but keep
           return
        endif
-       close(UNIT=un, IOSTAT=jerr)
+       close(UNIT=unit, IOSTAT=jerr)
     enddo
-    un = -1
-    fn = ' '
+    unit = -1
+    file = ' '
     return
   end subroutine new_unit_tmp
 
@@ -488,7 +488,7 @@ program test_std_fun
   if (ierr.eq.0) then
      do jc = 0, 1
         do n = 0, 30
-           un = new_unit(kcat=jc)
+           un = new_unit(category=jc)
            write(*, *) 'new unit: ', jc, n, un
         enddo
      enddo

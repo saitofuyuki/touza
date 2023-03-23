@@ -1,7 +1,7 @@
-!!!_! nio_intfc.F90 - TOUZA/Nio c interfaces
+!!!_! nio_bindc.F90 - TOUZA/Nio bind(c) interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2023
-#define TIME_STAMP 'Time-stamp: <2023/03/07 14:05:09 fuyuki nio_intfc.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/19 14:15:25 fuyuki nio_bindc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -15,8 +15,8 @@
 #endif
 #include "touza_nio.h"
 !!!_* macros
-!!!_@ TOUZA_Nio_intfc - nio record interfaces
-module TOUZA_Nio_intfc
+!!!_@ TOUZA_Nio_bindc - nio record interfaces
+module TOUZA_Nio_bindc
 !!!_ = declaration
   use ISO_C_BINDING
   use TOUZA_Nio_std,only: KI32, KI64, KDBL, KFLT
@@ -39,23 +39,24 @@ module TOUZA_Nio_intfc
   integer,save :: lev_verbose = NIO_MSG_LEVEL
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
-#define __MDL__ 'i'
-#define _ERROR(E) (E - ERR_MASK_NIO_INTFC)
+#define __MDL__ 'b'
+#define _ERROR(E) (E - ERR_MASK_NIO_BINDC)
 !!!_  - interfaces
 !!!_  - public procedures
-  public :: tni_init,        tni_diag,       tni_finalize
-  public :: tni_file_is_nio, tni_file_open,  tni_file_diag
-  public :: tni_file_groups, tni_group_vars, tni_group_recs
-  public :: tni_var_nco
-  public :: tni_var_name,    tni_var_id
-  public :: tni_co_name,     tni_co_size,    tni_co_idx
-  public :: tni_get_attr
-  public :: init,            diag,          finalize
+  public :: tnb_init,          tnb_diag,       tnb_finalize
+  public :: tnb_file_is_nio,   tnb_file_open,  tnb_file_diag
+  public :: tnb_file_groups,   tnb_group_vars, tnb_group_recs
+  public :: tnb_var_nco
+  public :: tnb_var_name,      tnb_var_id
+  public :: tnb_co_name,       tnb_co_size,    tnb_co_idx
+  public :: tnb_get_attr,      tnb_get_attr_float
+  public :: tnb_get_attr_byid, tnb_get_attr_name
+  public :: init,              diag,           finalize
 !!!_  - public shared
 contains
 !!!_ + c interfaces for internal
-!!!_  & tni_init()
-  integer(kind=C_INT) function tni_init &
+!!!_  & tnb_init()
+  integer(kind=C_INT) function tnb_init &
        & (levv, mode) BIND(C) result(ierr)
     implicit none
     integer(kind=C_INT),intent(in),value :: levv, mode
@@ -65,28 +66,28 @@ contains
     if (levv.gt.9) stdv = int(levv)
     call init(jerr, levv=int(levv), mode=int(mode), stdv=stdv)
     ierr = jerr
-  end function tni_init
-!!!_  & tni_diag()
-  integer(kind=C_INT) function tni_diag &
+  end function tnb_init
+!!!_  & tnb_diag()
+  integer(kind=C_INT) function tnb_diag &
        & (levv, mode) BIND(C) result(ierr)
     implicit none
     integer(kind=C_INT),intent(in),value :: levv, mode
     integer jerr
     call diag(jerr, levv=int(levv), mode=int(mode))
     ierr = jerr
-  end function tni_diag
-!!!_  & tni_finalize()
-  integer(kind=C_INT) function tni_finalize &
+  end function tnb_diag
+!!!_  & tnb_finalize()
+  integer(kind=C_INT) function tnb_finalize &
        & (levv, mode) BIND(C) result(ierr)
     implicit none
     integer(kind=C_INT),intent(in),value :: levv, mode
     integer jerr
     call finalize(jerr, levv=int(levv), mode=int(mode))
     ierr = jerr
-  end function tni_finalize
+  end function tnb_finalize
 !!!_ + c interfaces for modules
-!!!_  & tni_file_is_nio() - wrapper for nio_check_magic_file
-  integer(kind=C_INT) function tni_file_is_nio &
+!!!_  & tnb_file_is_nio() - wrapper for nio_check_magic_file
+  integer(kind=C_INT) function tnb_file_is_nio &
        & (path) BIND(C) result(krect)
     ! return non-negative if gtool-format.
     use TOUZA_Nio_record,only: nio_check_magic_file
@@ -115,9 +116,9 @@ contains
        endif
     endif
     if (jerr.lt.0) krect = jerr
-  end function tni_file_is_nio
-!!!_  & tni_file_open()
-  integer(kind=C_INT) function tni_file_open &
+  end function tnb_file_is_nio
+!!!_  & tnb_file_open()
+  integer(kind=C_INT) function tnb_file_open &
        & (path, flag) BIND(C) result(handle)
     use TOUZA_Nio_cache,only: cache_open_read
     implicit none
@@ -130,10 +131,10 @@ contains
     call cache_open_read(jerr, h, buf, int(flag))
     handle = h
     if (jerr.lt.0) handle = jerr
-  end function tni_file_open
+  end function tnb_file_open
 
-!!!_  & tni_file_diag()
-  integer(kind=C_INT) function tni_file_diag &
+!!!_  & tnb_file_diag()
+  integer(kind=C_INT) function tnb_file_diag &
        & (handle, lev) BIND(C) result(ierr)
     use TOUZA_Nio_cache,only: show_cache
     implicit none
@@ -142,19 +143,19 @@ contains
     integer jerr
     call show_cache(jerr, int(handle), levv=int(lev))
     ierr = jerr
-  end function tni_file_diag
+  end function tnb_file_diag
 
-!!!_  & tni_file_groups()
-  integer(kind=C_INT) function tni_file_groups &
+!!!_  & tnb_file_groups()
+  integer(kind=C_INT) function tnb_file_groups &
        & (handle) BIND(C) result(n)
     use TOUZA_Nio_cache,only: cache_groups
     implicit none
     integer(kind=C_INT),intent(in),value :: handle
     n = cache_groups(int(handle))
-  end function tni_file_groups
+  end function tnb_file_groups
 
-!!!_  & tni_group_vars()
-  integer(kind=C_INT) function tni_group_vars &
+!!!_  & tnb_group_vars()
+  integer(kind=C_INT) function tnb_group_vars &
        & (handle, gid) BIND(C) result(n)
     use TOUZA_Nio_cache,only: cache_vars
     implicit none
@@ -165,10 +166,10 @@ contains
     else
        n = cache_vars(int(handle))
     endif
-  end function tni_group_vars
+  end function tnb_group_vars
 
-!!!_  - tni_group_recs()
-  integer(kind=C_INT) function tni_group_recs &
+!!!_  - tnb_group_recs()
+  integer(kind=C_INT) function tnb_group_recs &
        & (handle, gid) BIND(C) result(nrecs)
     use TOUZA_Nio_cache,only: cache_group_recs
     implicit none
@@ -177,10 +178,10 @@ contains
     integer n
     n = cache_group_recs(int(handle), int(gid))
     nrecs = n
-  end function tni_group_recs
+  end function tnb_group_recs
 
-!!!_  - tni_var_name()
-  integer(kind=C_INT) function tni_var_name &
+!!!_  - tnb_var_name()
+  integer(kind=C_INT) function tnb_var_name &
        & (name, handle, gid, vid) BIND(C) result(ierr)
     use TOUZA_Nio_cache,only: cache_var_name
     implicit none
@@ -195,10 +196,10 @@ contains
     else
        call f2c_string(name)
     endif
-  end function tni_var_name
+  end function tnb_var_name
 
-!!!_  - tni_var_id()
-  integer(kind=C_INT) function tni_var_id &
+!!!_  - tnb_var_id()
+  integer(kind=C_INT) function tnb_var_id &
        & (handle, gid, name) BIND(C) result(vid)
     use TOUZA_Nio_cache,only: cache_var_id
     implicit none
@@ -210,10 +211,10 @@ contains
     call c2f_string(buf, name)
     jv = cache_var_id(buf, int(handle), int(gid))
     vid = jv
-  end function tni_var_id
+  end function tnb_var_id
 
-!!!_  - tni_var_nco()
-  integer(kind=C_INT) function tni_var_nco &
+!!!_  - tnb_var_nco()
+  integer(kind=C_INT) function tnb_var_nco &
        & (handle, gid, vid) BIND(C) result(nco)
     use TOUZA_Nio_cache,only: cache_var_nco
     implicit none
@@ -223,10 +224,10 @@ contains
     integer n
     n = cache_var_nco(int(handle), int(gid), int(vid))
     nco = n
-  end function tni_var_nco
+  end function tnb_var_nco
 
-!!!_  - tni_co_name()
-  integer(kind=C_INT) function tni_co_name &
+!!!_  - tnb_co_name()
+  integer(kind=C_INT) function tnb_co_name &
        & (name, handle, gid, vid, cid) BIND(C) result(ierr)
     use TOUZA_Nio_cache,only: cache_co_name, cache_var_nco
     use TOUZA_Nio_header,only: litem
@@ -251,10 +252,10 @@ contains
        call f2c_string(name)
     endif
     ierr = jerr
-  end function tni_co_name
+  end function tnb_co_name
 
-!!!_  - tni_co_size()
-  integer(kind=C_INT) function tni_co_size &
+!!!_  - tnb_co_size()
+  integer(kind=C_INT) function tnb_co_size &
        & (handle, gid, vid, cid) BIND(C) result(nsize)
     use TOUZA_Nio_cache,only: cache_co_size, cache_var_nco
     implicit none
@@ -271,10 +272,10 @@ contains
        ns = cache_co_size(int(handle), int(gid), int(vid), jco)
     endif
     nsize = ns
-  end function tni_co_size
+  end function tnb_co_size
 
-!!!_  - tni_co_idx()
-  integer(kind=C_INT) function tni_co_idx &
+!!!_  - tnb_co_idx()
+  integer(kind=C_INT) function tnb_co_idx &
        & (handle, gid, vid, name) BIND(C) result(cid)
     use TOUZA_Nio_cache,only: cache_co_idx, cache_var_nco
     use TOUZA_Nio_header,only: litem
@@ -296,10 +297,10 @@ contains
        jco = cache_co_idx(int(handle), int(gid), int(vid), buf)
        if (jco.ge.0) cid = nco - 1 - jco
     endif
-  end function tni_co_idx
+  end function tnb_co_idx
 
-! !!!_  - tni_var_dims()
-!   integer(kind=C_INT) function tni_var_dims &
+! !!!_  - tnb_var_dims()
+!   integer(kind=C_INT) function tnb_var_dims &
 !        & (dims, handle, gid, vid) BIND(C) result(ndims)
 !     use TOUZA_Nio_cache,only: cache_var_dims
 !     implicit none
@@ -316,10 +317,10 @@ contains
 !        ndims = n
 !        dims(n-1:0:-1) = d(0:n-1)
 !     endif
-!   end function tni_var_dims
+!   end function tnb_var_dims
 
-!!!_  - tni_get_attr()
-  integer(kind=C_INT) function tni_get_attr &
+!!!_  - tnb_get_attr()
+  integer(kind=C_INT) function tnb_get_attr &
        & (attr, item, handle, gid, vid, rec) BIND(C) result(ierr)
     use TOUZA_Nio_header,only: litem, nitem
     use TOUZA_Nio_cache,only: cache_get_attr
@@ -350,10 +351,10 @@ contains
        call f2c_string(attr)
     endif
     ierr = jerr
-  end function tni_get_attr
+  end function tnb_get_attr
 
-!!!_  - tni_get_attr_float()
-  integer(kind=C_INT) function tni_get_attr_float &
+!!!_  - tnb_get_attr_float()
+  integer(kind=C_INT) function tnb_get_attr_float &
        & (attr, item, handle, gid, vid, rec) BIND(C) result(ierr)
     use TOUZA_Nio_header,only: litem, nitem
     use TOUZA_Nio_cache,only: cache_get_attr
@@ -378,10 +379,59 @@ contains
        call cache_get_attr(jerr, attr, ibuf, int(handle), int(gid), int(vid), int(rec))
     endif
     ierr = jerr
-  end function tni_get_attr_float
+  end function tnb_get_attr_float
 
-!!!_  - tni_var_read_float()
-  integer(kind=C_INT) function tni_var_read_float &
+!!!_  - tnb_get_attr_byid()
+  integer(kind=C_INT) function tnb_get_attr_byid &
+       & (attr, item, handle, gid, vid, rec) BIND(C) result(ierr)
+    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_cache,only: cache_get_attr
+    implicit none
+    character(len=1,kind=C_CHAR),intent(out)      :: attr(*)
+    integer(kind=C_INT),         intent(in),value :: item
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: gid
+    integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
+    character(len=litem*nitem) :: buf
+    integer ibuf
+    integer jerr
+    ierr = 0
+    ibuf = item
+    if (gid.lt.0) then
+       call cache_get_attr(jerr, buf, ibuf, int(handle))
+    else if (vid.lt.0) then
+       call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid))
+    else if (rec.lt.0) then
+       call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid), int(vid))
+    else
+       call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid), int(vid), int(rec))
+    endif
+    if (jerr.eq.0) then
+       call f2c_string(attr, buf)
+    else
+       call f2c_string(attr)
+    endif
+    ierr = jerr
+  end function tnb_get_attr_byid
+
+!!!_  - tnb_get_attr_name()
+  integer(kind=C_INT) function tnb_get_attr_name &
+       & (name, item) BIND(C) result(ierr)
+    use TOUZA_Nio_header,only: get_hitem
+    implicit none
+    character(len=1,kind=C_CHAR),intent(out)      :: name(*)
+    integer(kind=C_INT),         intent(in),value :: item
+    character(len=6) :: buf
+    integer ibuf
+    ierr = 0
+    ibuf = item
+    call get_hitem(buf, ibuf)
+    call f2c_string(name, buf)
+  end function tnb_get_attr_name
+
+!!!_  - tnb_var_read_float()
+  integer(kind=C_INT) function tnb_var_read_float &
        & (d, rec, start, count, handle, gid, vid) BIND(C) result(ierr)
     use TOUZA_Nio_cache,only: cache_var_read, cache_var_nco
     implicit none
@@ -410,7 +460,7 @@ contains
             &  int(rec),    st(0:nco-1), co(0:nco-1))
     endif
     ierr = jerr
-  end function tni_var_read_float
+  end function tnb_var_read_float
 
 !!!_ + common interfaces
 !!!_  & init
@@ -568,12 +618,12 @@ contains
     endif
   end subroutine f2c_string
 !!!_ + end module
-end module TOUZA_Nio_intfc
+end module TOUZA_Nio_bindc
 
-!!!_@ test_nio_intfc - test program
-#ifdef TEST_NIO_INTFC
-program test_nio_intfc
-  use TOUZA_Nio_intfc
+!!!_@ test_nio_bindc - test program
+#ifdef TEST_NIO_BINDC
+program test_nio_bindc
+  use TOUZA_Nio_bindc
   implicit none
   integer ierr
 
@@ -586,9 +636,9 @@ program test_nio_intfc
   stop
 contains
 
-end program test_nio_intfc
+end program test_nio_bindc
 
-#endif /* TEST_NIO_INTFC */
+#endif /* TEST_NIO_BINDC */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:
