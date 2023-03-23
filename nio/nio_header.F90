@@ -1,7 +1,7 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/07 14:00:08 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/19 14:05:45 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -120,9 +120,17 @@ module TOUZA_Nio_header
 
   character(len=*),parameter :: def_fmt_I = '(I16)'
   character(len=*),parameter :: def_fmt_R = '(E16.7)'
-  character(len=*),parameter :: def_fmt_date_trad = '(I4.4,I2.2,I2.2,1X,I2.2,I2.2,I2.2)'
-  character(len=*),parameter :: def_fmt_date_long = '(I5.5,I2.2,I2.2,1X,I2.2,I2.2,I2.2)'
-  character(len=*),parameter :: def_fmt_date_full = '(I6.6,I2.2,I2.2,   I2.2,I2.2,I2.2)'
+                                                                                          ! 01234567890123456
+  character(len=*),parameter :: def_fmt_date_trad = '(I4.4,I2.2,I2.2,1X,I2.2,I2.2,I2.2)'  ! yyyymmdd HHMMSS
+  character(len=*),parameter :: def_fmt_date_long = '(I5.5,I2.2,I2.2,1X,I2.2,I2.2,I2.2)'  ! yyyyymmdd HHMMSS
+  character(len=*),parameter :: def_fmt_date_full = '(I6.6,I2.2,I2.2,   I2.2,I2.2,I2.2)'  ! yyyyyymmddHHMMSS
+  ! If need more, a candiate is '(I7.7, A1, I2.2,   I2.2,I2.2,I2.2)',
+  ! where month is represented by single character (A=1, B=2, ...).
+  ! Note that a hexadecimal representation of month is rejected because
+  ! it cannot be ditinguished with the other representation.
+  ! For example, 1234560101 is 123456/01/01? Or 1234560/1/01?
+  ! Another candidate is to discard the second part,
+  ! such as '(I7.7,I2.2,I2.2, 1X, I2.2,I2.2)', == yyyyyyymmdd HHMM.
 
   integer,parameter :: ht_str    = 0
   integer,parameter :: ht_int    = 1
@@ -149,39 +157,49 @@ module TOUZA_Nio_header
      module procedure put_item_i,    put_item_ni
      module procedure put_item_f,    put_item_nf
      module procedure put_item_d,    put_item_nd
-     module procedure put_item_date, put_item_ndate
   end interface put_item
+  interface put_item_date
+     module procedure put_item_jdate, put_item_ndate
+  end interface put_item_date
 
   interface get_item
      module procedure get_item_a,    get_item_na
      module procedure get_item_i,    get_item_ni
      module procedure get_item_f,    get_item_nf
      module procedure get_item_d,    get_item_nd
-     module procedure get_item_date, get_item_ndate
   end interface get_item
+  interface get_item_date
+     module procedure get_item_jdate, get_item_ndate
+  end interface get_item_date
 
   interface store_item
      module procedure store_item_a,    store_item_na
      module procedure store_item_i,    store_item_ni
      module procedure store_item_f,    store_item_nf
      module procedure store_item_d,    store_item_nd
-     module procedure store_item_date, store_item_ndate
   end interface store_item
+  interface store_item_date
+     module procedure store_item_jdate, store_item_ndate
+  end interface store_item_date
 
   interface restore_item
      module procedure restore_item_a,    restore_item_na
      module procedure restore_item_i,    restore_item_ni
      module procedure restore_item_f,    restore_item_nf
      module procedure restore_item_d,    restore_item_nd
-     module procedure restore_item_date, restore_item_ndate
   end interface restore_item
+  interface restore_item_date
+     module procedure restore_item_jdate, restore_item_ndate
+  end interface restore_item_date
 
 !!!_  - public procedures
   public init, diag, finalize
-  public put_item,   put_item_date, store_item
-  public get_item,   get_item_date, restore_item
+  public put_item,       get_item,       store_item,       restore_item
+  public put_item_date,  get_item_date,  store_item_date,  restore_item_date
   public fill_header
   public show_header
+  public parse_date_tuple, unparse_date_tuple
+  public get_hitem
 !!!_  - todo notes
   ! subroutine append_item
 contains
@@ -405,7 +423,7 @@ contains
     if (ierr.eq.0) call store_item(ierr, head, v, item, fmt, tol)
     return
   end subroutine put_item_d
-  subroutine put_item_date &
+  subroutine put_item_jdate &
        & (ierr, head, dt, item, fmt, tol)
     implicit none
     integer,         intent(out)         :: ierr
@@ -415,9 +433,9 @@ contains
     character(len=*),intent(in),optional :: fmt
     integer,         intent(in),optional :: tol   ! tolerance
     ierr = check_hitem_types(item, (/ht_date, ht_str/))
-    if (ierr.eq.0) call store_item(ierr, head, dt, item, fmt, tol)
+    if (ierr.eq.0) call store_item_date(ierr, head, dt, item, fmt, tol)
     return
-  end subroutine put_item_date
+  end subroutine put_item_jdate
 
 !!!_  - get_item - get entry (with type check)
   subroutine get_item_a &
@@ -486,7 +504,7 @@ contains
     if (ierr.eq.0) call restore_item(ierr, head, v, item, fmt, def)
     return
   end subroutine get_item_d
-  subroutine get_item_date &
+  subroutine get_item_jdate &
        & (ierr, head, dt, item, fmt)
     implicit none
     integer,         intent(out)         :: ierr
@@ -495,9 +513,9 @@ contains
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
     ierr = check_hitem_types(item, (/ht_date, ht_str/))
-    if (ierr.eq.0) call restore_item(ierr, head, dt, item, fmt)
+    if (ierr.eq.0) call restore_item_date(ierr, head, dt, item, fmt)
     return
-  end subroutine get_item_date
+  end subroutine get_item_jdate
 
 !!!_  - put_item_n - set entry (with type check) by name
   subroutine put_item_na &
@@ -592,7 +610,7 @@ contains
     call get_hindex(ji, je, item)
     ierr = min(0, ji)
     if (ierr.eq.0) then
-       call put_item_date(ierr, head, dt, ji, fmt=fmt, tol=tol)
+       call put_item_jdate(ierr, head, dt, ji, fmt=fmt, tol=tol)
     endif
     return
   end subroutine put_item_ndate
@@ -684,7 +702,7 @@ contains
     call get_hindex(ji, je, item)
     ierr = min(0, ji)
     if (ierr.eq.0) then
-       call get_item_date(ierr, head, dt, ji, fmt)
+       call get_item_jdate(ierr, head, dt, ji, fmt)
     endif
   end subroutine get_item_ndate
 
@@ -817,7 +835,7 @@ contains
     if (choice(0, tol).gt.0) ierr = 0
     return
   end subroutine store_item_d
-  subroutine store_item_date &
+  subroutine store_item_jdate &
        & (ierr, head, dt, item, fmt, tol)
     use TOUZA_Nio_std,only: choice_a, choice
     implicit none
@@ -827,25 +845,11 @@ contains
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
     integer,         intent(in),optional :: tol   ! tolerance
-    character(len=128) f
     ierr = 0
-    call choice_a(f, ' ', fmt)
-    if (f.eq.' ') then
-       if (dt(1).lt.10000) then
-          write(head(item), def_fmt_date_trad, IOSTAT=ierr) dt(1:6)
-       else if (dt(1).lt.100000) then
-          write(head(item), def_fmt_date_long, IOSTAT=ierr) dt(1:6)
-       else
-          write(head(item), def_fmt_date_full, IOSTAT=ierr) dt(1:6)
-       endif
-    else if (f.eq.'*') then
-       write(head(item), def_fmt_date_trad, IOSTAT=ierr) dt(1:6)
-    else
-       write(head(item), f, IOSTAT=ierr) dt(1:6)
-    endif
+    call unparse_date_tuple(ierr, head(item), dt, fmt)
     if (choice(0, tol).gt.0) ierr = 0
     return
-  end subroutine store_item_date
+  end subroutine store_item_jdate
 
 !!!_  - restore_item - get entry (no type/range check)
   subroutine restore_item_a &
@@ -988,7 +992,7 @@ contains
     endif
     return
   end subroutine restore_item_d
-  subroutine restore_item_date &
+  subroutine restore_item_jdate &
        & (ierr, head, dt, item, fmt)
     use TOUZA_Nio_std,only: choice_a
     implicit none
@@ -997,35 +1001,10 @@ contains
     integer,         intent(out)         :: dt(*)
     integer,         intent(in)          :: item
     character(len=*),intent(in),optional :: fmt
-    character(len=128) f
-    integer je, j
     ierr = 0
-    call choice_a(f, ' ', fmt)
-    if (f.eq.' ') then
-       je = INDEX(head(item), ' ')
-       !! not perfect, though...
-       if (je.gt.0) then
-          if (ierr.eq.0) read(head(item)(je-2:je-1), *, IOSTAT=ierr) dt(3)
-          if (ierr.eq.0) read(head(item)(je-4:je-3), *, IOSTAT=ierr) dt(2)
-          if (ierr.eq.0) read(head(item)(1:je-5),    *, IOSTAT=ierr) dt(1)
-          if (ierr.eq.0) read(head(item)(je+1:je+2), *, IOSTAT=ierr) dt(4)
-          if (ierr.eq.0) read(head(item)(je+3:je+4), *, IOSTAT=ierr) dt(5)
-          if (ierr.eq.0) read(head(item)(je+5:je+6), *, IOSTAT=ierr) dt(6)
-       else
-          je=len_trim(head(item))
-          do j = 6, 2, -1
-             if (ierr.eq.0) read(head(item)(je-1:je), *, IOSTAT=ierr) dt(j)
-             je = je - 2
-          enddo
-          if (ierr.eq.0) read(head(item)(1:je), *, IOSTAT=ierr) dt(1)
-       endif
-    else if (f.eq.'*') then
-       read(head(item), def_fmt_date_trad, IOSTAT=ierr) dt(1:6)
-    else
-       read(head(item), f, IOSTAT=ierr) dt(1:6)
-    endif
+    call parse_date_tuple(ierr, dt, head(item), fmt)
     return
-  end subroutine restore_item_date
+  end subroutine restore_item_jdate
 !!!_  - store_item_na
   subroutine store_item_na &
        & (ierr, head, v, item, fmt, tol)
@@ -1115,7 +1094,7 @@ contains
     call get_hindex(ji, je, item)
     ierr = min(0, ji)
     if (ierr.eq.0) then
-       call store_item_date(ierr, head, dt, ji, fmt=fmt, tol=tol)
+       call store_item_jdate(ierr, head, dt, ji, fmt=fmt, tol=tol)
     endif
   end subroutine store_item_ndate
 !!!_  - restore_item_n
@@ -1205,7 +1184,7 @@ contains
     call get_hindex(ji, je, item)
     ierr = min(0, ji)
     if (ierr.eq.0) then
-       call restore_item_date(ierr, head, dt, ji, fmt)
+       call restore_item_jdate(ierr, head, dt, ji, fmt)
     endif
   end subroutine restore_item_ndate
 
@@ -1253,6 +1232,73 @@ contains
        enddo
     endif
   end subroutine fill_header
+
+!!!_  - parse_date_tuple
+  subroutine parse_date_tuple &
+       & (ierr, dt, str, fmt)
+    use TOUZA_Nio_std,only: choice_a
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: dt(*)
+    character(len=*),intent(in)          :: str
+    character(len=*),intent(in),optional :: fmt
+    character(len=128) f
+    integer je, j, ls
+    ierr = 0
+    call choice_a(f, ' ', fmt)
+    if (f.eq.' ') then
+       ls = len_trim(str)
+       je = INDEX(str(1:ls), ' ')
+       !! not perfect, though...
+       if (je.gt.0) then
+          if (ierr.eq.0) read(str(je-2:je-1), *, IOSTAT=ierr) dt(3)
+          if (ierr.eq.0) read(str(je-4:je-3), *, IOSTAT=ierr) dt(2)
+          if (ierr.eq.0) read(str(1:je-5),    *, IOSTAT=ierr) dt(1)
+          if (ierr.eq.0) read(str(je+1:je+2), *, IOSTAT=ierr) dt(4)
+          if (ierr.eq.0) read(str(je+3:je+4), *, IOSTAT=ierr) dt(5)
+          if (ierr.eq.0) read(str(je+5:je+6), *, IOSTAT=ierr) dt(6)
+       else
+          je = ls
+          do j = 6, 2, -1
+             if (ierr.eq.0) read(str(je-1:je), *, IOSTAT=ierr) dt(j)
+             je = je - 2
+          enddo
+          if (ierr.eq.0) read(str(1:je), *, IOSTAT=ierr) dt(1)
+       endif
+    else if (f.eq.'*') then
+       read(str, def_fmt_date_trad, IOSTAT=ierr) dt(1:6)
+    else
+       read(str, f, IOSTAT=ierr) dt(1:6)
+    endif
+    return
+  end subroutine parse_date_tuple
+!!!_  - unparse_date_tuple
+  subroutine unparse_date_tuple &
+       & (ierr, str, dt, fmt)
+    use TOUZA_Nio_std,only: choice_a, choice
+    implicit none
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(inout)       :: str
+    integer,         intent(in)          :: dt(:)
+    character(len=*),intent(in),optional :: fmt
+    character(len=128) f
+
+    ierr = 0
+    call choice_a(f, ' ', fmt)
+    if (f.eq.' ') then
+       if (dt(1).lt.10000) then
+          write(str, def_fmt_date_trad, IOSTAT=ierr) dt(1:6)
+       else if (dt(1).lt.100000) then
+          write(str, def_fmt_date_long, IOSTAT=ierr) dt(1:6)
+       else
+          write(str, def_fmt_date_full, IOSTAT=ierr) dt(1:6)
+       endif
+    else if (f.eq.'*') then
+       write(str, def_fmt_date_trad, IOSTAT=ierr) dt(1:6)
+    else
+       write(str, f, IOSTAT=ierr) dt(1:6)
+    endif
+  end subroutine unparse_date_tuple
 
 !!!_ + private interfaces
 !!!_  & check_hitem_type - check against header-item default type
@@ -1481,6 +1527,18 @@ contains
     endif
   end subroutine get_hindex
 
+!!!_  - get_hitem
+  subroutine get_hitem(name, item)
+    implicit none
+    character(len=*),intent(out) :: name
+    integer,         intent(in)  :: item
+    if (item.lt.1 .or. item.gt.nitem) then
+       name = ' '
+    else
+       name = hf_names(item)
+    endif
+  end subroutine get_hitem
+
 !!!_ + end TOUZA_Nio_header
 end module TOUZA_Nio_header
 
@@ -1507,8 +1565,8 @@ program test_nio_header
   if (ierr.eq.0) call put_item(ierr, ha, 'item 1', hi_ITEM)
   if (ierr.eq.0) call put_item(ierr, ha, -999.9d9, hi_MISS)
   if (ierr.eq.0) call store_item(ierr, ha, -999.9d9, hi_DNUM)  ! ignore type
-  if (ierr.eq.0) call put_item(ierr, ha, (/ 1973 , 1, 30, 12, 34, 56 /), hi_DATE)
-  if (ierr.eq.0) call put_item(ierr, ha, (/ 31973, 1, 30, 12, 34, 56 /), hi_CDATE)
+  if (ierr.eq.0) call put_item_date(ierr, ha, (/ 1973 , 1, 30, 12, 34, 56 /), hi_DATE)
+  if (ierr.eq.0) call put_item_date(ierr, ha, (/ 31973, 1, 30, 12, 34, 56 /), hi_CDATE)
   if (ierr.eq.0) call put_item(ierr, ha, 'THIS IS VERY LONG TITLE TO BE SPLITTED', hi_TITL1, hi_TITL2)
   if (ierr.eq.0) call put_item(ierr, ha, 'THIS IS VERY LONG TITLE TO BE SPLITTED', hi_MEMO1, 0)
 

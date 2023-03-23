@@ -1,7 +1,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2023/03/03 17:59:38 fuyuki Makefile.am>
+# Time-stamp: <2023/03/19 13:44:42 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022, 2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -28,7 +28,7 @@ libtouza_local_la_SOURCES += nio_nctcdf.F90
 endif
 libtouza_local_la_SOURCES += nio_control.F90
 
-libtouza_local_la_SOURCES += nio_intfc.F90
+libtouza_local_la_SOURCES += nio_bindc.F90
 
 libtouza_local_la_SOURCES += nio.F90 $(include_HEADERS)
 libtouza_local_la_LDFLAGS =
@@ -72,33 +72,39 @@ check_PROGRAMS+= test_nio_nctcdf
 TEST_COMMON_LIBS += $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 endif
 
-check_PROGRAMS += test_nio_intfc
+check_PROGRAMS += test_nio_bindc
 
 test_nio_header_SOURCES = $(TEST_COMMON_SOURCES) nio_header.F90
 test_nio_header_LDADD = $(TEST_COMMON_LIBS)
 test_nio_header_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_HEADER=1
+EXTRA_test_nio_header_DEPENDENCIES = $(test_nio_header_LDADD)
 
 test_nio_record_SOURCES = $(TEST_COMMON_SOURCES) nio_record.F90
 test_nio_record_LDADD = $(TEST_COMMON_LIBS)
 test_nio_record_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_RECORD=1
+EXTRA_test_nio_record_DEPENDENCIES = $(test_nio_record_LDADD)
 
 test_nio_cache_SOURCES = $(TEST_COMMON_SOURCES) nio_cache.F90
 test_nio_cache_LDADD = $(TEST_COMMON_LIBS)
 test_nio_cache_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_CACHE=1
+EXTRA_test_nio_cache_CPPDEPENDENCIES = $(test_nio_cache_LDADD)
 
 test_nio_control_SOURCES = $(TEST_COMMON_SOURCES) nio_control.F90
 test_nio_control_LDADD = $(TEST_COMMON_LIBS)
 test_nio_control_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_CONTROL=1
+EXTRA_test_nio_control_DEPENDENCIES = $(test_nio_control_LDADD)
 
 if BUILD_div
 test_nio_division_SOURCES = $(TEST_COMMON_SOURCES) nio_division.F90
 test_nio_division_LDADD = $(TEST_COMMON_LIBS)
 test_nio_division_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_DIVISION=1
+EXTRA_test_nio_division_DEPENDENCIES = $(test_nio_division_LDADD)
 endif
 
 test_nio_SOURCES = $(TEST_COMMON_SOURCES) nio.F90
 test_nio_LDADD = $(TEST_COMMON_LIBS)
 test_nio_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO=1
+EXTRA_test_nio_LDEPENDENCIES = $(test_nio_LDADD)
 
 CAL_SWITCH = calendar_miroc.F90
 CLEANFILES += $(CAL_SWITCH)
@@ -110,12 +116,12 @@ test_nio_miroc_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_NIO_MIROC=1 $(FC_INCLUDE_touza_c
 test_nio_miroc_FCFLAGS = $(AM_FCFLAGS) $(FC_MODULE_touza_cal) $(FC_MODULE_touza_ppp)
 
 test_nio_nctcdf_SOURCES = $(TEST_COMMON_SOURCES) nio_nctcdf.F90
-test_nio_nctcdf_LDADD = $(TEST_COMMON_LIBS) 
+test_nio_nctcdf_LDADD = $(TEST_COMMON_LIBS)
 test_nio_nctcdf_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_NCTCDF=1
 test_nio_nctcdf_FCFLAGS = $(AM_FCFLAGS)
 
-test_nio_intfc_SOURCES = test_nio_intfc.c touza_nio_interface.h
-test_nio_intfc_LDADD = $(TEST_COMMON_LIBS) $(FCLIBS)
+test_nio_bindc_SOURCES = test_nio_bindc.c touza_nio_interface.h
+test_nio_bindc_LDADD = $(TEST_COMMON_LIBS) $(FCLIBS)
 
 $(CAL_SWITCH):
 	@cp $(srcdir)/../cal/$@ .
