@@ -1,10 +1,22 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2023/01/30 17:47:55 fuyuki NEWS>
+# Time-stamp: <2023/03/23 16:58:10 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.10.0 from 1.09.0
+** Major changes
+- (jmz/chak) [SEVERE] file-open errors message improved.
+- (jmz/chak) Use Bn notation by default and handle if debug.
+- (nio_cache) cache attributes redesigned.
+- (nio_control) open/close/search dispatcher templates.
+- (jmz/chak) version increased.
+
+** Bug fixes
+- [SEVERE] fix urt reading, etc
+- [severe] fix ulast recording at new_unit().
 
 * Changes in 1.09.0 from 1.08.1
 ** Major changes

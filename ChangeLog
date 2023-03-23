@@ -1,3 +1,17 @@
+Release-1.10.0 / 2023-03-23
+===========================
+
+  * jmz: (build) required TOUZA version.
+  * nio: cache_search draft, to redesign.
+  * doc: updated
+  * jmz: (chak) squash imports of development branch.
+  * touza.h: new error codes added.
+  * nio: squash imports of development branch.
+  * trp: [severe] fix allocation probelm in test_trapiche_pack.
+  * source cleaning (trimming accidental trailing spaces).
+  * m4c: echo-build_aux target introduced.
+  * std: squash imports of development branch
+
 Release-1.09.0 / 2023-03-07
 ===========================
 
