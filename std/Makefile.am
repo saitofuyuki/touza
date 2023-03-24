@@ -1,7 +1,7 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2023/03/19 22:47:32 fuyuki Makefile.am>
+# Time-stamp: <2023/03/24 20:15:27 fuyuki Makefile.am>
 #
 # Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -29,6 +29,16 @@ MOSTLYCLEANFILES += fort.*
 
 TEST_COMMON_LIBS = $(noinst_LTLIBRARIES)
 
+CLEANFILES		+=	$(noinst_SCRIPTS)
+
+noinst_SCRIPTS =
+
+WTE_LOGDIR = log
+WTE = wte.sh
+WTEin = $(WTE).in
+noinst_SCRIPTS += $(WTE)
+EXTRA_DIST += $(WTEin)
+
 check_PROGRAMS =
 
 check_PROGRAMS += test_std_prc
@@ -55,11 +65,25 @@ test_std_fun_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_FUN=1
 test_std_fun_LDADD = $(TEST_COMMON_LIBS)
 EXTRA_test_std_fun_DEPENDENCIES = $(test_std_fun_LDADD)
 
+TEST_FILE_UNIT_BGN = 10
+TEST_FILE_UNIT_END = 20
 check_PROGRAMS += test_std_env
 test_std_env_SOURCES = std_env.F90
 test_std_env_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_ENV=1
+test_std_env_CPPFLAGS += -DTEST_FILE_UNIT_BGN=$(TEST_FILE_UNIT_BGN)
+test_std_env_CPPFLAGS += -DTEST_FILE_UNIT_END=$(TEST_FILE_UNIT_END)
 test_std_env_LDADD = $(TEST_COMMON_LIBS)
 EXTRA_test_std_env_DEPENDENCIES = $(test_std_env_LDADD)
+
+$(WTE): $(srcdir)/$(WTEin)
+	@if sed -e 's!@XENV@!$(builddir)/test_stdenv!g' \
+		-e 's!@TEST_FILE_UNIT_BGN@!$(TEST_FILE_UNIT_BGN)!g'  \
+		-e 's!@TEST_FILE_UNIT_END@!$(TEST_FILE_UNIT_END)!g' \
+		$(srcdir)/$(WTEin) > $@; \
+	then chmod +x $@; \
+	else rm -f $@; fi
+
+
 
 check_PROGRAMS += test_std_sus
 test_std_sus_SOURCES = std_sus.F90

@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2023/02/05 21:52:06 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/24 20:16:37 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2023
@@ -2499,6 +2499,15 @@ program test_std_env
   integer kendi
   character(len=128) :: str
 
+#ifndef   TEST_FILE_UNIT_BGN
+#  define TEST_FILE_UNIT_BGN 10
+#endif
+#ifndef   TEST_FILE_UNIT_END
+#  define TEST_FILE_UNIT_END 20
+#endif
+  integer,parameter :: ubgn = TEST_FILE_UNIT_BGN
+  integer,parameter :: uend = TEST_FILE_UNIT_END
+
   ierr = 0
   ut=10
 
@@ -2521,11 +2530,11 @@ program test_std_env
      write(*, *) 'ENDIANNESS(mem) = ', kendi, ierr
   endif
   if (ierr.eq.0) then
-     call init_file_bodr (ierr, u=uo, levv=+10, ubgn=10, uend=20, ustp=3)
+     call init_file_bodr (ierr, u=uo, levv=+10, ubgn=ubgn, uend=uend, ustp=3)
   endif
   kendi = endian_ERROR
   if (ierr.eq.0) then
-     do ut = 10, 20, 1
+     do ut = ubgn, uend - 1
         if (ierr.eq.0) call check_byte_order(ierr, kendi, ut)
         write(*, *) 'ENDIANNESS(unit) = ', ut, kendi, ierr
      enddo
