@@ -1,7 +1,7 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2023/03/24 20:15:27 fuyuki Makefile.am>
+# Time-stamp: <2023/03/24 21:22:08 fuyuki Makefile.am>
 #
 # Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -82,8 +82,6 @@ $(WTE): $(srcdir)/$(WTEin)
 		$(srcdir)/$(WTEin) > $@; \
 	then chmod +x $@; \
 	else rm -f $@; fi
-
-
 
 check_PROGRAMS += test_std_sus
 test_std_sus_SOURCES = std_sus.F90

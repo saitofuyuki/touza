@@ -1,0 +1,135 @@
+#!/bin/sh
+# Maintainer: SAITO Fuyuki
+# Time-stamp: <2023/03/24 22:28:04 fuyuki wtest.sh.in>
+
+# Copyright (C) 2023
+#           Japan Agency for Marine-Earth Science and Technology
+# Licensed under the Apache License, Version 2.0
+#   (https://www.apache.org/licenses/LICENSE-2.0)
+
+this=$0
+
+## usage
+usage ()
+{
+  echo "$this - TOUZA/Nio test wrapper"
+  echo "Usage"
+  echo "  $this [OPTIONS] TEST-ID"
+  return 0
+}
+
+tstt=0 tstp=0
+logd=.
+while test $# -gt 0
+do
+  case $1 in
+  -i) tstt=$2; shift;;
+  -e) tstp=$2; shift;;
+  -t) tstt=$2; tstp=$2; shift;;
+  -l) logd=$2; shift;;
+  -*) echo "$this: unknown argument $1"; usage >&2; exit 1;;
+  *)  break;;
+  esac
+  shift
+done
+
+test $# -eq 0 && usage >&2 && exit 0
+
+temp=$(mktemp)
+
+do_exit='rm -f $temp; exit $err'
+
+mkdir -p $logd || exit $?
+
+trap "$do_exit" 0 1 2 3 15
+
+chk_cmds ()
+{
+  for c in "$@"
+  do
+    test ! -x $c && echo "$this: Aborts. Cannot execute $c." && exit 1
+  done
+  return 0
+}
+
+chk_plan ()
+{
+  echo "$1..$2" ## plan
+}
+
+# ---------------------------------------- nio_record
+chk_record ()
+{
+  tlow=1 thigh=9
+  test $tstt -eq 0 && tstt=$tlow
+  test $tstp -eq 0 && tstp=$thigh
+
+  cmd=test_nio_record
+  chk_cmds $cmd || return $?
+  test -e "./$cmd" && cmd="./$cmd"
+
+  testid=10
+
+  chk_plan ${tstt} ${tstp}
+  ref=''
+  for t in $(seq $tstt $tstp)
+  do
+    mod=$(expr $t % 3)
+    if   test $t -ge 1 -a $t -lt 4; then
+      opt=n
+    elif test $t -ge 4 -a $t -lt 7; then
+      opt=b
+    elif test $t -ge 7 -a $t -lt 10; then
+      opt=l
+    else
+      echo "$this: invalid test id" >&2; return 1
+    fi
+    if test $mod -eq 0; then
+      env="GFORTRAN_CONVERT_UNIT=native F_UFMTENDIAN="
+      sfx=n
+    elif test $mod -eq 1; then
+      env="GFORTRAN_CONVERT_UNIT=big_endian F_UFMTENDIAN=big"
+      sfx=b
+    else
+      env="GFORTRAN_CONVERT_UNIT=little_endian F_UFMTENDIAN=little"
+      sfx=l
+    fi
+    log=$logd/x$sub.t$t
+    out=$logd/o$sub.t${t}.${sfx}-$opt
+    eval env $env $cmd $testid $out $opt > $log 2>&1 || return $?
+    eval set - $(od -Ax -N4 -tx1 $out)
+    res="$2$3$4$5"
+    chk=F
+    case $opt in
+    b) test "$res" = 00000400 && chk=T;;
+    l) test "$res" = 00040000 && chk=T;;
+    n) case $sfx in
+       b) test "$res" = 00000400 && chk=T;;
+       l) test "$res" = 00040000 && chk=T;;
+       n) chk=T;;
+       esac;;
+    esac
+
+    descr="byte-order $opt (env $sfx) == $res"
+    if test "$chk" = F; then
+      echo "not ok $t - $descr"
+    else        
+      echo "ok $t - $descr"
+    fi
+  done
+
+  return 0
+}
+
+# ---------------------------------------- dispatcher
+for sub in $@
+do
+  sub=$(basename "$sub")
+  case $sub in
+  *record*) chk_record || exit $?;;
+  *) echo "$this: Aborts. Unknown test $sub." >&2; exit 1;;
+  esac
+done
+# ----------------------------------------
+eval "$do_exit"
+exit $?
