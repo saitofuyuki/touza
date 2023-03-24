@@ -13,6 +13,8 @@ ACLOCAL_AMFLAGS	=	-I m4c
 EXTRA_DIST	=	autogen.sh README-touza.org LICENSE NOTICE
 include $(top_srcdir)/aminclude_static.am
 
+lib@TOUZA_NAME@_la_LDFLAGS = -version-info 1:0:0
+
 noinst_SCRIPTS 	= makeshift
 CLEANFILES += $(noinst_bin_SCRIPTS)
 
