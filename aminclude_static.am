@@ -1,6 +1,6 @@
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Thu Mar 23 21:48:10 JST 2023
+# from AX_AM_MACROS_STATIC on Fri Mar 24 16:09:40 JST 2023
 
 BUILD_AUX  =    $(top_srcdir)/build-aux
 CLEANFILES =

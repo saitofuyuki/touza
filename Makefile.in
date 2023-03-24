@@ -26,7 +26,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Thu Mar 23 21:48:08 JST 2023
+# from AX_AM_MACROS_STATIC on Fri Mar 24 16:09:38 JST 2023
 
 
 
@@ -195,6 +195,10 @@ AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+lib@TOUZA_NAME@_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=FC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(FCLD) \
+	$(AM_FCFLAGS) $(FCFLAGS) $(lib@TOUZA_NAME@_la_LDFLAGS) \
+	$(LDFLAGS) -o $@
 @NEVER_TRUE@nodist_dummy_never_built_OBJECTS =  \
 @NEVER_TRUE@	dummy_never_built.$(OBJEXT)
 dummy_never_built_OBJECTS = $(nodist_dummy_never_built_OBJECTS)
@@ -579,6 +583,7 @@ AM_FCFLAGS_MODULE = $(FC_MODULE_touza_std) $(am__append_6) \
 COPY_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=copy-%)
 DIFF_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=diff-%)
 switch_DATA = 
+lib@TOUZA_NAME@_la_LDFLAGS = -version-info 1:0:0
 noinst_SCRIPTS = makeshift
 SUBDIRS = std $(am__append_4) $(am__append_7) $(am__append_10) \
 	$(am__append_13) $(am__append_16) $(am__append_19) m4c . \
@@ -709,7 +714,7 @@ clean-libLTLIBRARIES:
 	}
 
 lib@TOUZA_NAME@.la: $(lib@TOUZA_NAME@_la_OBJECTS) $(lib@TOUZA_NAME@_la_DEPENDENCIES) $(EXTRA_lib@TOUZA_NAME@_la_DEPENDENCIES) 
-	$(AM_V_FCLD)$(FCLINK) -rpath $(libdir) $(lib@TOUZA_NAME@_la_OBJECTS) $(lib@TOUZA_NAME@_la_LIBADD) $(LIBS)
+	$(AM_V_FCLD)$(lib@TOUZA_NAME@_la_LINK) -rpath $(libdir) $(lib@TOUZA_NAME@_la_OBJECTS) $(lib@TOUZA_NAME@_la_LIBADD) $(LIBS)
 
 dummy_never_built$(EXEEXT): $(dummy_never_built_OBJECTS) $(dummy_never_built_DEPENDENCIES) $(EXTRA_dummy_never_built_DEPENDENCIES) 
 	@rm -f dummy_never_built$(EXEEXT)
