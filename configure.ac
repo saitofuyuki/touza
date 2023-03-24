@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2023/01/10 12:24:26 fuyuki configure.ac>
+# Time-stamp: <2023/03/24 17:22:02 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -11,7 +11,7 @@ MT_INIT()
 AC_INIT([touza],MT_VERSION,[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
-Copyright (C) 2020-2022 Japan Agency for Marine-Earth Science and Technology
+Copyright (C) 2020-2023 Japan Agency for Marine-Earth Science and Technology
 
 This is TOUZA, a collection of MIROC base infrastructure.
 
@@ -155,7 +155,8 @@ AX_SUBDIRS_CONFIGURE([jmz],
      [TOUZA_VERSION="${PACKAGE_VERSION}"],
      [TOUZA_NAME="${PACKAGE_NAME}"],
      [TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}],
-     [TOUZA_LIBS=${ac_top_build_prefix}lib${with_touza_name}.la ${NETCDF4_FLIBS} ${NETCDF4_LIBS}],
+     [TOUZA_LIBRARY=${ac_top_build_prefix}lib${with_touza_name}.la],
+     [TOUZA_LIBS=${NETCDF4_FLIBS} ${NETCDF4_LIBS}],
      [TOUZA_LDFLAGS=${NETCDF4_LDFLAGS}]],
     [[--enable-nctcdf="[$]jmz_nctcdf"]],
     [--with-build-jmz])])
@@ -174,6 +175,15 @@ install-data-hook: install-switchDATA
 switchdir     = @switchdir@
 switch_DATA   =
 ])
+
+AC_ARG_ENABLE([follow-revision],
+[AS_HELP_STRING([--enable-follow-revision], [follow git revision updates @<:@default=no@:>@])],
+ [use_follow_revision=$enableval],
+ [use_follow_revision=def])
+AS_IF([test x"$use_follow_revision" = xdef],
+      [use_follow_revision=$enable_maintainer_mode])
+AM_CONDITIONAL([autorevision],
+[test x"$use_follow_revision" != xno])
 
 AC_PATH_PROGS([AUTOREVISION], [autorevision], [:])
 AC_PATH_PROGS([REALPATH], [realpath], [false])
