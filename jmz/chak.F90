@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/24 23:34:40 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 08:50:38 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -167,6 +167,7 @@ contains
 !!!_   . init
   subroutine init(ierr)
     use TOUZA_Nio,only: nio_init=>init, nr_init
+    use TOUZA_Nio,only: set_bodr_wnative, BODR_CHECK_VERBOSE
     implicit none
     integer,intent(out) :: ierr
 
@@ -177,6 +178,7 @@ contains
     if (ierr.eq.0) call register_predefined(ierr)
     if (ierr.eq.0) call init_sub(ierr)
     if (ierr.eq.0) call nio_init(ierr, levv=dbgv, stdv=stdv)
+    if (ierr.eq.0) call set_bodr_wnative(ierr, BODR_CHECK_VERBOSE, levv=dbgv)
     if (ierr.eq.0) call nr_init(ierr, lazy=+1)
 
     if (ierr.eq.0) call reset_file(ierr, ofile(def_read),  ' ', mode_terminate, hflag_default)
@@ -207,7 +209,7 @@ contains
 
 !!!_   . finalize
   subroutine finalize(ierr, u)
-    use TOUZA_Std,only: env_finalize
+    use TOUZA_Std,only: env_diag, env_finalize
     use TOUZA_Nio,only: nio_diag=>diag, nio_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -221,9 +223,9 @@ contains
     if (is_msglev_DETAIL(lev_verbose)) then
        if (ierr.eq.0) call show_buffers(ierr, u)
     endif
+    if (ierr.eq.0) call env_diag(ierr, levv=dbgv)
     if (ierr.eq.0) call opr_diag(ierr, u, levv=dbgv)
     if (ierr.eq.0) call nio_diag(ierr, levv=dbgv)
-    if (ierr.eq.0) call env_diag(ierr, levv=dbgv)
 
     if (ierr.eq.0) call opr_finalize(ierr, u, levv=dbgv)
     if (ierr.eq.0) call nio_finalize(ierr, levv=dbgv)
@@ -542,6 +544,7 @@ contains
 !!!_  - argument parser
 !!!_   . parse_args
   subroutine parse_args(ierr)
+    use TOUZA_Nio,only: nio_init=>init
     use TOUZA_Std,only: arg_init, arg_diag, parse, get_param
     implicit none
     integer,intent(out) :: ierr
@@ -607,6 +610,9 @@ contains
     ! if (ierr.eq.0) call set_rec_filter(ierr)
     ! if (ierr.eq.0) call settle_read_files(ierr)
     if (ierr.eq.0) call set_write_format(ierr)
+    if (dbgv.gt.0) then
+       if (ierr.eq.0) call nio_init(ierr, levv=dbgv, mode=MODE_SHALLOW+MODE_FORCE)
+    endif
   end subroutine parse_args
 
 !!!_   . parse_option
