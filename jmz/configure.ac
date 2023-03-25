@@ -3,11 +3,11 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Nov 24 2021
-# Time-stamp: <2023/03/24 17:15:10 fuyuki configure.ac>
+# Time-stamp: <2023/03/25 21:01:32 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
-AC_INIT([touza-jmz],[1.1.0],[saitofuyuki@jamstec.go.jp])
+AC_INIT([touza-jmz],[1.2.0],[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
 Copyright (C) 2022,2023 Japan Agency for Marine-Earth Science and Technology
@@ -63,7 +63,7 @@ AC_CONFIG_FILES([Makefile])
 
 PKG_PROG_PKG_CONFIG()
 PKG_PREREQ([0.29])
-PKG_CHECK_MODULES_STATIC([TOUZA], [touza >= 1.10])
+PKG_CHECK_MODULES_STATIC([TOUZA], [touza >= 1.11])
 
 AC_ARG_VAR([TOUZA_NAME], [touza package name])
 AC_ARG_VAR([TOUZA_VERSION], [touza package version])
