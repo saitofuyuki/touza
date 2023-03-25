@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/20 16:01:19 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 09:50:45 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -18,7 +18,6 @@
 module TOUZA_Nio_record
 !!!_ = declaration
   use TOUZA_Nio_std,only: KI32, KI64, KDBL, KFLT
-  use TOUZA_Nio_std,only: control_mode,  control_deep, is_first_force
   use TOUZA_Nio_std,only: get_logu,      unit_global,  trace_fine,    trace_control
   use TOUZA_Nio_std,only: ignore_bigger, ignore_small, ignore_always, def_block
   use TOUZA_Nio_std,only: search_from_last
@@ -397,6 +396,7 @@ module TOUZA_Nio_record
   public switch_urt_diag
   public set_switch_subrec,  nio_allow_sub
   public review_mtn
+  public set_bodr_wnative
 
   public nio_count_defined
 !!!_  - public shared
@@ -414,6 +414,7 @@ contains
        & (ierr,   u,      levv,   mode,  stdv,  &
        &  bodrw,  krectw, subrec, klenc, kldec, knenc, kndec, lazy, &
        &  vmiss,  utime,  csign,  msign, icomm)
+    use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,   only: ns_init=>init, choice, get_size_bytes, KDBL, max_members
     use TOUZA_Nio_header,only: nh_init=>init, litem, nitem
     use TOUZA_Trp,       only: trp_init=>init
@@ -442,11 +443,11 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
           if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
@@ -479,6 +480,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
     use TOUZA_Nio_std,   only: gen_tag
     use TOUZA_Nio_header,only: nh_diag=>diag, show_header
@@ -500,7 +502,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
              if (is_msglev_normal(lv)) call msg('(''byte-order assumption = '', I0)', bodr_wnative, __MDL__, utmp)
@@ -531,7 +533,7 @@ contains
              endif
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
@@ -546,6 +548,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,   only: ns_finalize=>finalize, choice
     use TOUZA_Nio_header,only: nh_finalize=>finalize
     use TOUZA_Trp,       only: trp_finalize=>finalize
@@ -562,12 +565,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
@@ -591,24 +594,28 @@ contains
     integer,intent(in),optional :: bodrw
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
+    integer lv
+
     ierr = 0
+    lv = choice(lev_verbose, levv)
+
     bodr_wnative = choice(bodr_wnative, bodrw)
     select case (bodr_wnative)
     case (BODR_ASSUME_SYSTEM)
-       if (is_msglev_info(levv)) then
+       if (is_msglev_info(lv)) then
           call msg('(''assume system byte-order when write = '', I0)', kendi_mem, __MDL__, u)
        endif
     case (BODR_ASSUME_FILE)
-       if (is_msglev_info(levv)) then
+       if (is_msglev_info(lv)) then
           call msg('(''assume estimated file byte-order when write = '', I0)', kendi_file, __MDL__, u)
        endif
     case (BODR_CHECK_VERBOSE)
-       if (is_msglev_info(levv)) then
+       if (is_msglev_info(lv)) then
           call msg('check file byte-order when write',  __MDL__, u)
        endif
     case default
        ierr = -1
-       if (is_msglev_fatal(levv)) then
+       if (is_msglev_fatal(lv)) then
           call msg('(''invalid byte-order switch = '', I0)', bodr_wnative, __MDL__, u)
        endif
     end select
@@ -1774,7 +1781,7 @@ contains
        kdmyf = GFMT_LPAD
        call nio_read_data_set(ierr, ndata, mfull, kaxs, laxs, kdmyf, ldata)
     endif
-    
+
     if (ierr.eq.0) then
        select case (kfmt)
        case (GFMT_UR4)
@@ -1854,7 +1861,7 @@ contains
     if (ierr.eq.0) then
        call nio_read_data_set(ierr, ndata, mfull, kaxs, laxs, kfmt, ldata)
     endif
-    
+
     if (ierr.eq.0) then
        select case (kfmt)
        case (GFMT_UR4)
@@ -1934,7 +1941,7 @@ contains
     if (ierr.eq.0) then
        call nio_read_data_set(ierr, ndata, mfull, kaxs, laxs, kfmt, ldata)
     endif
-    
+
     if (ierr.eq.0) then
        select case (kfmt)
        case (GFMT_UR4)
@@ -5254,7 +5261,7 @@ contains
     end select
     return
   end subroutine restore_mi4_packed_f
-  
+
 !!!_ + gtool-3 discarded extension
 !!!_  - JRn
 !!!_  - ZRn
@@ -7238,16 +7245,17 @@ contains
 
 !!!_  & set_wrecord_prop - set sequential record properties to write (byte-order and separator size)
   subroutine set_wrecord_prop &
-       & (ierr, krect, u, kendi)
+       & (ierr, krect, ufile, kendi)
     use TOUZA_Nio_std,only: choice, check_bodr_unit, KIOFS, kendi_mem, kendi_file, endian_OTHER
-    use TOUZA_Nio_std,only: sus_getpos
+    use TOUZA_Nio_std,only: sus_getpos, msg, is_msglev_DEBUG
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(inout)       :: krect
-    integer,intent(in)          :: u
+    integer,intent(in)          :: ufile
     integer,intent(in),optional :: kendi
     integer ke, kr
     integer(kind=KIOFS) :: apos
+    integer jerr
 
     ierr = err_default
 
@@ -7266,15 +7274,19 @@ contains
        end select
     endif
     if (ke.eq.endian_OTHER) then
-       if (ierr.eq.0) call sus_getpos(ierr, apos, u)
-       if (ierr.eq.0) call check_bodr_unit(ierr, ke, utest=u, jrec=0)
-       if (ierr.eq.0) write(UNIT=u, IOSTAT=ierr, POS=apos)
+       if (ierr.eq.0) call sus_getpos(ierr, apos, ufile)
+       if (ierr.eq.0) call check_bodr_unit(ierr, ke, utest=ufile, jrec=0)
+       if (ierr.eq.0) write(UNIT=ufile, IOSTAT=ierr, POS=apos)
     endif
     if (ierr.eq.0) then
        call get_switch(kr, ke, krect)
        krect = kr
     endif
-
+    if (is_msglev_DEBUG(lev_verbose)) then
+       if (ierr.eq.0) then
+          call msg('(''byte-order assumption['', I0, ''] = '', I0)', (/ufile, ke/), __MDL__)
+       endif
+    endif
     return
   end subroutine set_wrecord_prop
 
@@ -9676,7 +9688,7 @@ contains
     endif
     if (ierr.eq.0) allocate(worki(0:n-1), STAT=ierr)
   end subroutine alloc_worki
-   
+
 !!!_  - alloc_workf
   subroutine alloc_workf(ierr, n)
     implicit none
@@ -10114,6 +10126,7 @@ end module TOUZA_Nio_record
 #ifdef TEST_NIO_RECORD
 program test_nio_record
   use TOUZA_Std,       only: parse, get_param, arg_diag, arg_init
+  use TOUZA_Std,       only: MPI_COMM_NULL
   use TOUZA_Nio_std,   only: KDBL,  KIOFS, sus_write_irec, sus_write_lrec
   use TOUZA_Nio_header,only: nitem, litem
   use TOUZA_Nio_record
@@ -10125,7 +10138,7 @@ program test_nio_record
   ierr = 0
   jarg = 0
 101 format(A,' = ', I0)
-  call init(ierr, stdv=-9)
+  call init(ierr, stdv=-9, icomm=MPI_COMM_NULL)
   ! if (ierr.eq.0) call diag(ierr, u=-1, levv=+99)
   if (ierr.eq.0) call diag(ierr, levv=+9)
   if (ierr.eq.0) call arg_init(ierr, levv=-9)
@@ -10168,6 +10181,9 @@ program test_nio_record
      case (9)
         write(*, 201) ktest, 'packed storage'
         call test_batch_read_packed(ierr, jarg)
+     case (10)
+        write(*, 201) ktest, 'byte order'
+        call test_batch_byte_order(ierr, jarg)
      case default
         write(*, *) 'INVALID TEST = ', ktest
         ierr = -1
@@ -11252,6 +11268,88 @@ contains
     if (ierr.eq.0) deallocate(ends, STAT=ierr)
     return
   end subroutine test_batch_read_packed
+
+!!!_ + test_batch_byte_order - write extreme data
+  subroutine test_batch_byte_order &
+       & (ierr, jarg)
+    use TOUZA_Std,only: endian_LITTLE, endian_BIG
+    use TOUZA_Nio_std,only: KBUF=>KDBL
+    use TOUZA_Std_sus,only: sus_open,  sus_close
+    use TOUZA_Nio_header
+    implicit none
+    integer,intent(out)   :: ierr
+    integer,intent(inout) :: jarg
+    integer nx, ny, nz, nn
+    real(kind=KBUF) :: vmiss = -999.0_KBUF
+    real(kind=KBUF),allocatable :: v(:)
+    integer krect
+    integer ufile
+    character(len=1024) :: wfile
+    character(len=litem) :: hd(nitem)
+    character(len=128)  :: tswap
+    integer krectw
+
+    ierr = 0
+    ufile = 41
+
+    if (ierr.eq.0) call set_bodr_wnative(ierr, BODR_CHECK_VERBOSE, levv=+9)
+
+    if (ierr.eq.0) then
+       jarg = jarg + 1
+       call get_param(ierr, wfile, jarg, ' ')
+       if (wfile.eq.' ') then
+          write(*, *) 'need file to write.'
+          ierr = -1
+          return
+       endif
+    endif
+    krect = 0
+    if (ierr.eq.0) then
+       jarg = jarg + 1
+       call get_param(ierr, tswap, jarg, ' ')
+       select case (tswap(1:1))
+       case ('B', 'b') ! big
+          krect = REC_BIG
+       case ('L', 'l') ! little
+          krect = REC_LITTLE
+       case ('S', 's') ! swap
+          krect = REC_SWAP
+       case default
+          krect = 0
+       end select
+       call set_default_switch(ierr, krect)
+    endif
+
+    nx = 5
+    ny = 1
+    nz = 2
+    nn = nx * ny * nz
+
+    allocate(v(1:nn), STAT=ierr)
+
+    hd(:) = ' '
+    if (ierr.eq.0) call put_item(ierr, hd, 9010,   hi_IDFM)
+    if (ierr.eq.0) call put_item(ierr, hd, 1,      hi_ASTR1)
+    if (ierr.eq.0) call put_item(ierr, hd, nx,     hi_AEND1)
+    if (ierr.eq.0) call put_item(ierr, hd, 'x',    hi_AITM1)
+    if (ierr.eq.0) call put_item(ierr, hd, 1,      hi_ASTR2)
+    if (ierr.eq.0) call put_item(ierr, hd, ny,     hi_AEND2)
+    if (ierr.eq.0) call put_item(ierr, hd, 'y',    hi_AITM2)
+    if (ierr.eq.0) call put_item(ierr, hd, 1,      hi_ASTR3)
+    if (ierr.eq.0) call put_item(ierr, hd, nz,     hi_AEND3)
+    if (ierr.eq.0) call put_item(ierr, hd, 'z',    hi_AITM3)
+    if (ierr.eq.0) call put_item(ierr, hd, vmiss,  hi_MISS)
+    if (ierr.eq.0) call put_item(ierr, hd, 'UR4',  hi_DFMT)
+
+    if (ierr.eq.0) call sus_open(ierr, ufile, wfile, ACTION='RW', STATUS='R')
+
+    krectw = REC_ASIS
+    if (ierr.eq.0) v(:) = +1.0_KBUF
+    if (ierr.eq.0) call nio_write_header(ierr, hd, krectw, ufile)
+    if (ierr.eq.0) call nio_write_data(ierr, v, nn, hd, krectw, ufile)
+    if (ierr.eq.0) call sus_close(ierr, ufile, wfile)
+
+  end subroutine test_batch_byte_order
 
 end program test_nio_record
 #endif /* TEST_NIO_RECORD */

@@ -1,10 +1,10 @@
 !!!_! trapiche.F90 - TOUZA/Trapiche manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2022/02/02 08:52:47 fuyuki trapiche.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 13:32:48 fuyuki trapiche.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022
+! Copyright (C) 2021,2022,2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -51,11 +51,11 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ts_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
           if (ierr.eq.0) call tp_init(ierr, u=ulog, levv=lv, mode=lmd)
@@ -88,12 +88,12 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, u=utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ts_diag(ierr, utmp, lv, lmd)
           if (ierr.eq.0) call tp_diag(ierr, utmp, lv, lmd)
@@ -121,12 +121,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ts_finalize(ierr, utmp, lv, lmd)
           if (ierr.eq.0) call tp_finalize(ierr, utmp, lv, lmd)

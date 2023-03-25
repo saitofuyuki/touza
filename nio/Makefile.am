@@ -1,7 +1,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2023/03/19 13:44:42 fuyuki Makefile.am>
+# Time-stamp: <2023/03/24 23:19:36 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022, 2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -55,6 +55,10 @@ if with_nctcdf
 AM_FCFLAGS_MODULE += $(NETCDF4_FFLAGS)
 endif
 
+CLEANFILES += $(noinst_SCRIPTS)
+noinst_SCRIPTS =
+TESTS=
+
 TEST_COMMON_LIBS = $(noinst_LTLIBRARIES)
 if BUILD_div
 TEST_COMMON_LIBS += $(FC_LDADD_touza_div)
@@ -83,6 +87,39 @@ test_nio_record_SOURCES = $(TEST_COMMON_SOURCES) nio_record.F90
 test_nio_record_LDADD = $(TEST_COMMON_LIBS)
 test_nio_record_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_RECORD=1
 EXTRA_test_nio_record_DEPENDENCIES = $(test_nio_record_LDADD)
+
+WTEST_LOGDIR = log
+WTEST = wtest.sh
+WTESTin = $(WTEST).in
+noinst_SCRIPTS += $(WTEST)
+EXTRA_DIST += $(WTESTin)
+
+LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(BUILD_AUX)/tap-driver.sh
+LOG_DRIVER_FLAGS='--comments'
+
+LOG_COMPILER = $(builddir)/$(WTEST)
+TEST_NUM = 0
+AM_LOG_FLAGS = -l $(WTEST_LOGDIR) -t $(TEST_NUM)
+TESTS += record
+
+$(TESTS):
+
+check_targets_all = check-record
+
+distclean-local: distclean-logdir
+
+distclean-logdir:
+	@if test -d $(WTEST_LOGDIR); then rm -rf $(WTEST_LOGDIR); else :; fi
+
+$(check_targets_all):
+	echo TESTS=`echo "$@" | sed -e 's/^check-//'` >&2
+	$(MAKE) check TESTS=`echo "$@" | sed -e 's/^check-//'`
+
+$(WTEST): $(srcdir)/$(WTESTin)
+	@if sed -e 's!@srcdir@!$(srcdir)!g' \
+		$(srcdir)/$(WTESTin) > $@; \
+	then chmod +x $@; \
+	else rm -f $@; fi
 
 test_nio_cache_SOURCES = $(TEST_COMMON_SOURCES) nio_cache.F90
 test_nio_cache_LDADD = $(TEST_COMMON_LIBS)

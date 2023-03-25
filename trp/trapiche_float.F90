@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2023/02/25 22:22:54 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 13:35:22 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -50,9 +50,8 @@
 !!!_@ TOUZA_Trp_float - trapiche floating-point manager
 module TOUZA_Trp_float
 !!!_ = declaration
-  use TOUZA_Trp_std,only: KI32, KDBL, KFLT, &
-       & control_mode, control_deep, is_first_force, &
-       & unit_global,  trace_fine,   trace_control
+  use TOUZA_Trp_std,only: KI32, KDBL, KFLT
+  use TOUZA_Trp_std,only: unit_global,  trace_fine,   trace_control
 #if OPT_USE_IPC_IBITS
   use TOUZA_Trp_std,only: ipc_IBITS
 #endif
@@ -314,6 +313,7 @@ contains
        & (ierr, &
        &  u,     levv,  mode,  stdv, &
        &  minbs, mwork, hch)
+    use TOUZA_Trp_std, only: control_mode, control_deep, is_first_force
     use TOUZA_Trp_std, only: choice
     use TOUZA_Trp_pack,only: tp_init=>init
     implicit none
@@ -333,18 +333,18 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call tp_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
        endif
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           if (ierr.eq.0) call init_batch(ierr, minbs, mwork, ulog, lv)
        endif
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           if (present(hch)) then
              force_health_check = hch
           endif
@@ -358,6 +358,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Trp_std, only: control_mode, control_deep, is_first_force
     use TOUZA_Trp_std, only: choice, msg, is_msglev_normal
     use TOUZA_Trp_pack,only: tp_diag=>diag
     implicit none
@@ -376,7 +377,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) then
                 call msg(TIME_STAMP, __MDL__, utmp)
@@ -400,7 +401,7 @@ contains
              if (ierr.eq.0) call health_check(ierr, 0.0_KFLT, utmp, levv=lv)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call tp_diag(ierr, utmp, lv, mode=lmd)
        endif
@@ -411,7 +412,8 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Trp_std,only: choice
+    use TOUZA_Trp_std, only: control_mode, control_deep, is_first_force
+    use TOUZA_Trp_std, only: choice
     use TOUZA_Trp_pack,only: tp_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -426,7 +428,7 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
@@ -434,7 +436,7 @@ contains
        if (ierr.eq.0) then
           if (allocated(wibuf)) deallocate(wibuf, STAT=ierr)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call tp_finalize (ierr, utmp, levv, mode=lmd)
        endif

@@ -1,6 +1,6 @@
 #+title: TOUZA/Jmz guide
 #+author: SAITO Fuyuki
-#+date: <2022-06-26 Sun>
+#+date: <2023-03-25 Sat>
 
 * Introduction
 *TOUZA/Jmz (持物)* is a collection of example implementation of
@@ -1240,7 +1240,6 @@ list and range selections.
 :   # loop 0  a[1] a[2] a[5]  ADD
 :   # loop 1  a[3] a[4] a[6]  ADD
 
-
 *** buffer properties
 **** reshaping
 There are several kinds of array transformation: slicing, permutation,
@@ -1945,6 +1944,15 @@ The option -l changes the output domain as the first stack.
 : 2  117  .
 : 3  118  118
 : 4  119  119
+
+*** Emergency
+=chak= tries its best to detect the file byte-order, but still
+possibly fails.  For such cases, please first try to undefine the
+environment variables such as =GFORTRAN_CONVERT_UNIT= (gcc),
+=F_UFMTENDIAN= (intel) etc.
+As far as the maintainer tried, =chak= (indeed, =TOUZA=)
+succeeded to detect the file byte-order precisely, even when
+these variables are set for either all or partial io-unit range.
 
 *** Recipes
 **** Constant definition

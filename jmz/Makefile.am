@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/03/20 12:56:58 fuyuki Makefile.am>
+# Time-stamp: <2023/03/24 17:21:51 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -24,14 +24,15 @@ libjmz_local_la_SOURCES = jmzlib.F90 chak_lib.F90 chak_opr.F90 chak_file.F90
 
 jmzex_SOURCES = jmzex.F90 jmz.h
 jmzconv_SOURCES = jmzconv.F90 jmz.h
-# jmzconv_DEPENDENCIES  =   $(TOUZA_LIBS)
 jmzcmp_SOURCES = jmzcmp.F90 jmz.h
-# jmzcmp_DEPENDENCIES   =   $(TOUZA_LIBS)
+
+TOUZA_LIBS	=	$(TOUZA_LIBRARY) @TOUZA_LIBS@
+TOUZA_LIBRARY = @TOUZA_LIBRARY@
 
 bin_PROGRAMS = chak
 chak_SOURCES = chak.F90 jmz.h
 chak_to_include = chak_decl.F90 chak_reg.F90
-EXTRA_chak_DEPENDENCIES = $(TOUZA_LIBS)
+EXTRA_chak_DEPENDENCIES = $(TOUZA_LIBRARY)
 
 noinst_SCRIPTS += demo-chak.sh
 

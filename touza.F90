@@ -1,10 +1,10 @@
 !!!_! touza.F90 - touza administration
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2022/07/20 15:38:38 fuyuki touza.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 14:00:56 fuyuki touza.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021, 2022
+! Copyright (C) 2020, 2021, 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -79,11 +79,11 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call std_init(ierr, u=ulog, levv=lv, mode=lmd, icomm=icomm)
 #if ENABLE_TOUZA_PPP
@@ -124,12 +124,12 @@ contains
 
     if (md.ge.MODE_SURFACE) then
        call trace_control(ierr, md, pkg=__PKG__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __PKG__, u=utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call std_diag(ierr, utmp, levv, mode=lmd)
 #if ENABLE_TOUZA_PPP
@@ -178,12 +178,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
 #if ENABLE_TOUZA_NIO
           if (ierr.eq.0) call nio_finalize(ierr, utmp, levv, mode=lmd)

@@ -1,7 +1,7 @@
 !!!_! std.F90 - touza/std interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/02/25 22:17:20 fuyuki std.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 13:22:04 fuyuki std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022, 2023
@@ -78,7 +78,7 @@ contains
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_init(ierr, u=ulog, levv=lv, mode=lmd)
 
@@ -132,7 +132,7 @@ contains
              if (VCHECK_NORMAL(lv)) call msg(TIME_STAMP, tagmsg, u=utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=MODE_SURFACE)
@@ -172,7 +172,7 @@ contains
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=MODE_SURFACE)

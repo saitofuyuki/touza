@@ -1,10 +1,10 @@
 !!!_! ppp_comm.F90 - TOUZA/ppp communication
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/10/20 07:00:15 fuyuki ppp_comm.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 13:43:23 fuyuki ppp_comm.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 #ifdef HAVE_CONFIG_H
@@ -18,9 +18,7 @@
 !!!_@ TOUZA_Ppp_comm - MPI collective communication manager
 module TOUZA_Ppp_comm
 !!!_ + modules
-  use TOUZA_Ppp_std,only: &
-       & control_mode, control_deep, is_first_force, &
-       & get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Ppp_std,only: get_logu,     unit_global,  trace_fine,   trace_control
 !!!_ + default
   implicit none
   private
@@ -52,6 +50,7 @@ module TOUZA_Ppp_comm
 contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
+    use TOUZA_Ppp_std, only: control_mode, control_deep, is_first_force
     use TOUZA_Ppp_std, only: ps_init=>init, choice
     use TOUZA_Ppp_amng,only: pa_init=>init
     implicit none
@@ -69,16 +68,16 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ps_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
           if (ierr.eq.0) call pa_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           continue
        endif
        init_counts = init_counts + 1
@@ -89,6 +88,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Ppp_std, only: control_mode, control_deep, is_first_force
     use TOUZA_Ppp_std, only: choice, msg, ps_diag=>diag, is_msglev_normal
     use TOUZA_Ppp_amng,only: pa_diag=>diag
     implicit none
@@ -106,7 +106,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
           endif
@@ -114,7 +114,7 @@ contains
              continue
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ps_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call pa_diag(ierr, utmp, levv=lv, mode=lmd)
@@ -126,6 +126,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Ppp_std, only: control_mode, control_deep, is_first_force
     use TOUZA_Ppp_std, only: ps_finalize=>finalize, choice
     use TOUZA_Ppp_amng,only: pa_finalize=>finalize
     implicit none
@@ -141,12 +142,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ps_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call pa_finalize(ierr, utmp, levv=lv, mode=lmd)

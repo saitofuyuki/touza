@@ -1,7 +1,7 @@
 !!!_! std_bld.F90 - touza/std build environments
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 27 2021
-#define TIME_STAMP 'Time-stamp: <2023/02/05 22:09:31 fuyuki std_bld.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 10:00:45 fuyuki std_bld.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023
@@ -18,7 +18,6 @@
 #include "autorevision.h"
 !!!_@ TOUZA_Std_bld - build environments
 module TOUZA_Std_bld
-  use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
   use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
 !!!_ + default
   implicit none
@@ -47,6 +46,7 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_init=>init, choice
     use TOUZA_Std_log,only: log_init=>init
     implicit none
@@ -69,7 +69,7 @@ contains
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
@@ -83,6 +83,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl, only: utl_diag=>diag, choice
     use TOUZA_Std_log, only: log_diag=>diag, msg_mdl
     implicit none
@@ -112,7 +113,7 @@ contains
              if (ierr.eq.0) call check_all(ierr, utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
@@ -124,8 +125,9 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std_utl, only: utl_diag=>diag, choice
-    use TOUZA_Std_log, only: log_diag=>diag, msg_mdl
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
+    use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -145,7 +147,7 @@ contains
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           continue
        endif
