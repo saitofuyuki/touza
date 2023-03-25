@@ -17,7 +17,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/03/20 12:56:58 fuyuki Makefile.am>
+# Time-stamp: <2023/03/24 17:21:51 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -132,24 +132,25 @@ am_chak_OBJECTS = chak.$(OBJEXT)
 chak_OBJECTS = $(am_chak_OBJECTS)
 chak_LDADD = $(LDADD)
 am__DEPENDENCIES_1 =
-chak_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_1)
+am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
+chak_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_2)
 am_jmzcmp_OBJECTS = jmzcmp.$(OBJEXT)
 jmzcmp_OBJECTS = $(am_jmzcmp_OBJECTS)
 jmzcmp_LDADD = $(LDADD)
-jmzcmp_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_1)
+jmzcmp_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_2)
 am_jmzconv_OBJECTS = jmzconv.$(OBJEXT)
 jmzconv_OBJECTS = $(am_jmzconv_OBJECTS)
 jmzconv_LDADD = $(LDADD)
-jmzconv_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_1)
+jmzconv_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_2)
 am_jmzex_OBJECTS = jmzex.$(OBJEXT)
 jmzex_OBJECTS = $(am_jmzex_OBJECTS)
 jmzex_LDADD = $(LDADD)
-jmzex_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_1)
+jmzex_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_2)
 am_test_chak_file_OBJECTS = test_chak_file-chak_file.$(OBJEXT)
 test_chak_file_OBJECTS = $(am_test_chak_file_OBJECTS)
-am__DEPENDENCIES_2 = libjmz_local.la $(am__DEPENDENCIES_1)
+am__DEPENDENCIES_3 = libjmz_local.la $(am__DEPENDENCIES_2)
 test_chak_file_DEPENDENCIES = $(TEST_COMMON_LIBS) \
-	$(am__DEPENDENCIES_2)
+	$(am__DEPENDENCIES_3)
 SCRIPTS = $(noinst_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -386,7 +387,8 @@ SHELL = @SHELL@
 STRIP = @STRIP@
 TOUZA_CFLAGS = @TOUZA_CFLAGS@
 TOUZA_LDFLAGS = @TOUZA_LDFLAGS@
-TOUZA_LIBS = @TOUZA_LIBS@
+TOUZA_LIBRARY = @TOUZA_LIBRARY@
+TOUZA_LIBS = $(TOUZA_LIBRARY) @TOUZA_LIBS@
 TOUZA_NAME = @TOUZA_NAME@
 TOUZA_VERSION = @TOUZA_VERSION@
 TOUZA_top_builddir = @TOUZA_top_builddir@
@@ -461,11 +463,10 @@ noinst_LTLIBRARIES = libjmz_local.la
 libjmz_local_la_SOURCES = jmzlib.F90 chak_lib.F90 chak_opr.F90 chak_file.F90
 jmzex_SOURCES = jmzex.F90 jmz.h
 jmzconv_SOURCES = jmzconv.F90 jmz.h
-# jmzconv_DEPENDENCIES  =   $(TOUZA_LIBS)
 jmzcmp_SOURCES = jmzcmp.F90 jmz.h
 chak_SOURCES = chak.F90 jmz.h
 chak_to_include = chak_decl.F90 chak_reg.F90
-EXTRA_chak_DEPENDENCIES = $(TOUZA_LIBS)
+EXTRA_chak_DEPENDENCIES = $(TOUZA_LIBRARY)
 noinst_PYTHON = jmznml.py
 TEST_COMMON_LIBS = $(noinst_LTLIBRARIES)
 test_chak_file_SOURCES = chak_file.F90

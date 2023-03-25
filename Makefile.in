@@ -17,7 +17,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2023/01/24 21:17:30 fuyuki Makefile.am>
+# Time-stamp: <2023/03/24 17:28:42 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -26,7 +26,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Fri Mar 24 16:09:38 JST 2023
+# from AX_AM_MACROS_STATIC on Sat Mar 25 22:02:47 JST 2023
 
 
 
@@ -603,7 +603,7 @@ test_touza_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TOUZA=1
 @NEVER_TRUE@nodist_dummy_never_built_SOURCES = dummy_never_built.c
 AUTOREVISION_h = autorevision.h
 AUTOREVISION_cache = autorevision.cache
-AM_DISTCHECK_CONFIGURE_FLAGS = --with-build-jmz
+AM_DISTCHECK_CONFIGURE_FLAGS = --with-build-jmz --enable-shared
 BUILT_SOURCES = autorevision-cache $(AUTOREVISION_h)
 EXPORT = 
 @enable_module_dependencies_TRUE@test_touza_touza_o_MODULE_DEPS = $(builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/cal/touza_cal.$(FC_MODEXT) $(builddir)/trp/touza_trp.$(FC_MODEXT) $(builddir)/nio/touza_nio.$(FC_MODEXT) $(builddir)/ppp/touza_ppp.$(FC_MODEXT) $(builddir)/touza.$(FC_MODEXT)
@@ -1436,11 +1436,12 @@ $(AUTOREVISION_h): $(top_srcdir)/$(AUTOREVISION_cache)
 
 # only update when top_srcdir is the top-level directory in git work-tree
 autorevision-cache:
-	@if cd $(top_srcdir); then \
-		top=`git rev-parse --show-cdup` || exit 0; \
-		if test x$${top} != x; then :; else \
-			$(AUTOREVISION) -t h -o $(AUTOREVISION_cache) > /dev/null; \
-		fi; fi
+@autorevision_TRUE@	@if cd $(top_srcdir); then \
+@autorevision_TRUE@		top=`git rev-parse --show-cdup` || exit 0; \
+@autorevision_TRUE@		if test x$${top} != x; then :; else \
+@autorevision_TRUE@			$(AUTOREVISION) -t h -o $(AUTOREVISION_cache) > /dev/null; \
+@autorevision_TRUE@		fi; fi
+@autorevision_FALSE@	@:
 
 export: $(AUTOREVISION_h)
 	@if test x"$(EXPORT)" = x; then \
