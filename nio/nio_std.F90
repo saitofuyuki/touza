@@ -1,7 +1,7 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/19 22:50:50 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 09:34:39 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -128,11 +128,11 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           lev_stdv = choice(lev_stdv, stdv)
           if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
@@ -165,12 +165,12 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, u=utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call bld_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
@@ -198,12 +198,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call bld_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)

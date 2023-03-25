@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/24 22:12:08 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 09:50:45 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -18,7 +18,6 @@
 module TOUZA_Nio_record
 !!!_ = declaration
   use TOUZA_Nio_std,only: KI32, KI64, KDBL, KFLT
-  use TOUZA_Nio_std,only: control_mode,  control_deep, is_first_force
   use TOUZA_Nio_std,only: get_logu,      unit_global,  trace_fine,    trace_control
   use TOUZA_Nio_std,only: ignore_bigger, ignore_small, ignore_always, def_block
   use TOUZA_Nio_std,only: search_from_last
@@ -415,6 +414,7 @@ contains
        & (ierr,   u,      levv,   mode,  stdv,  &
        &  bodrw,  krectw, subrec, klenc, kldec, knenc, kndec, lazy, &
        &  vmiss,  utime,  csign,  msign, icomm)
+    use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,   only: ns_init=>init, choice, get_size_bytes, KDBL, max_members
     use TOUZA_Nio_header,only: nh_init=>init, litem, nitem
     use TOUZA_Trp,       only: trp_init=>init
@@ -443,11 +443,11 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
           if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
@@ -480,6 +480,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
     use TOUZA_Nio_std,   only: gen_tag
     use TOUZA_Nio_header,only: nh_diag=>diag, show_header
@@ -501,7 +502,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
              if (is_msglev_normal(lv)) call msg('(''byte-order assumption = '', I0)', bodr_wnative, __MDL__, utmp)
@@ -532,7 +533,7 @@ contains
              endif
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
@@ -547,6 +548,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,   only: ns_finalize=>finalize, choice
     use TOUZA_Nio_header,only: nh_finalize=>finalize
     use TOUZA_Trp,       only: trp_finalize=>finalize
@@ -563,12 +565,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
@@ -7243,16 +7245,17 @@ contains
 
 !!!_  & set_wrecord_prop - set sequential record properties to write (byte-order and separator size)
   subroutine set_wrecord_prop &
-       & (ierr, krect, u, kendi)
+       & (ierr, krect, ufile, kendi)
     use TOUZA_Nio_std,only: choice, check_bodr_unit, KIOFS, kendi_mem, kendi_file, endian_OTHER
-    use TOUZA_Nio_std,only: sus_getpos
+    use TOUZA_Nio_std,only: sus_getpos, msg, is_msglev_DEBUG
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(inout)       :: krect
-    integer,intent(in)          :: u
+    integer,intent(in)          :: ufile
     integer,intent(in),optional :: kendi
     integer ke, kr
     integer(kind=KIOFS) :: apos
+    integer jerr
 
     ierr = err_default
 
@@ -7271,15 +7274,19 @@ contains
        end select
     endif
     if (ke.eq.endian_OTHER) then
-       if (ierr.eq.0) call sus_getpos(ierr, apos, u)
-       if (ierr.eq.0) call check_bodr_unit(ierr, ke, utest=u, jrec=0)
-       if (ierr.eq.0) write(UNIT=u, IOSTAT=ierr, POS=apos)
+       if (ierr.eq.0) call sus_getpos(ierr, apos, ufile)
+       if (ierr.eq.0) call check_bodr_unit(ierr, ke, utest=ufile, jrec=0)
+       if (ierr.eq.0) write(UNIT=ufile, IOSTAT=ierr, POS=apos)
     endif
     if (ierr.eq.0) then
        call get_switch(kr, ke, krect)
        krect = kr
     endif
-
+    if (is_msglev_DEBUG(lev_verbose)) then
+       if (ierr.eq.0) then
+          call msg('(''byte-order assumption['', I0, ''] = '', I0)', (/ufile, ke/), __MDL__)
+       endif
+    endif
     return
   end subroutine set_wrecord_prop
 

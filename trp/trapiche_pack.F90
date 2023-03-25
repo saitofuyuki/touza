@@ -1,7 +1,7 @@
 !!!_! trapiche_pack.F90 - TOUZA/Trapiche integer packing/unpacking
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/18 15:09:32 fuyuki trapiche_pack.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 13:36:25 fuyuki trapiche_pack.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023
@@ -20,9 +20,8 @@
 !!!_@ TOUZA_Trp_pack - trapiche packing manager
 module TOUZA_Trp_pack
 !!!_ = declaration
-  use TOUZA_Trp_std,only: KI8, KI32, KI64, &
-       & control_mode, control_deep, is_first_force, &
-       & unit_global,  trace_fine,   trace_control
+  use TOUZA_Trp_std,only: KI8, KI32, KI64
+  use TOUZA_Trp_std,only: unit_global,  trace_fine,   trace_control
 #if OPT_USE_IPC_IBITS
   use TOUZA_Trp_std,only: ipc_IBITS
 #endif
@@ -205,6 +204,7 @@ module TOUZA_Trp_pack
 contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv)
+    use TOUZA_Trp_std,only: control_mode, control_deep, is_first_force
     use TOUZA_Trp_std,only: choice, ts_init=>init
     implicit none
     integer,intent(out)         :: ierr
@@ -220,11 +220,11 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ts_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
        endif
@@ -236,6 +236,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Trp_std,only: control_mode, control_deep, is_first_force
     use TOUZA_Trp_std,only: choice, msg, ts_diag=>diag, is_msglev_normal
     implicit none
     integer,intent(out)         :: ierr
@@ -253,12 +254,12 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ts_diag(ierr, utmp, lv, mode=lmd)
        endif
@@ -269,6 +270,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Trp_std,only: control_mode, control_deep, is_first_force
     use TOUZA_Trp_std,only: ts_finalize=>finalize, choice
     implicit none
     integer,intent(out)         :: ierr
@@ -284,12 +286,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ts_finalize (ierr, utmp, levv, mode=lmd)
        endif

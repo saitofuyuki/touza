@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/14 13:08:11 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 09:56:03 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020,2021,2022,2023
@@ -145,11 +145,11 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
        endif
@@ -188,7 +188,7 @@ contains
           endif
           ierr = 0
        endif
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
 101          format(__TAG__, A)
 102          format(__TAG__, 'with elemental = ', I0)
@@ -216,7 +216,7 @@ contains
              endif
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
        endif
@@ -242,7 +242,7 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           if (VCHECK_DEBUG(lv)) then
 311          format(STD_FORMAT_FUN(__MDL__, 'finalize'), 'fine: ', I0, 1x, I0, 1x, I0, 1x, I0)
              if (utmp.ge.0) then
@@ -263,7 +263,7 @@ contains
           endif
           ierr = 0
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
        endif

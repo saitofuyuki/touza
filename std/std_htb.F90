@@ -1,7 +1,7 @@
 !!!_! std_htb.F90 - touza/std simple hash table manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2023/02/18 20:46:42 fuyuki std_htb.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 10:01:41 fuyuki std_htb.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -73,7 +73,6 @@
 #endif
 !!!_@ TOUZA_Std_htb - simple hash table
 module TOUZA_Std_htb
-  use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
   use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
 !!!_ = declaration
 !!!_  - default
@@ -250,6 +249,7 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, numw, numk, numc)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_init=>init, choice
     use TOUZA_Std_log,only: log_init=>init
     implicit none
@@ -275,7 +275,7 @@ contains
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
@@ -292,8 +292,9 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std_utl, only: utl_diag=>diag, choice
-    use TOUZA_Std_log, only: log_diag=>diag, msg_mdl
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
+    use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -330,7 +331,7 @@ contains
              continue
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
@@ -342,6 +343,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
     use TOUZA_Std_log,only: log_finalize=>finalize
     implicit none
@@ -370,7 +372,7 @@ contains
           if (ierr.eq.0) call free_wtable_t(ierr, ksystem)
           if (ierr.eq.0) call free_wtable_t(ierr, wsystem)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)

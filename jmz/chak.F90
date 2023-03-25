@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/23 14:16:06 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/24 23:34:40 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -223,6 +223,7 @@ contains
     endif
     if (ierr.eq.0) call opr_diag(ierr, u, levv=dbgv)
     if (ierr.eq.0) call nio_diag(ierr, levv=dbgv)
+    if (ierr.eq.0) call env_diag(ierr, levv=dbgv)
 
     if (ierr.eq.0) call opr_finalize(ierr, u, levv=dbgv)
     if (ierr.eq.0) call nio_finalize(ierr, levv=dbgv)

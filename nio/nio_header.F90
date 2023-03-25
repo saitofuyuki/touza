@@ -1,7 +1,7 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/19 14:05:45 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 09:36:26 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -18,7 +18,6 @@
 module TOUZA_Nio_header
 !!!_ = declaration
   use TOUZA_Nio_std,only: KFLT, KDBL
-  use TOUZA_Nio_std,only: control_mode, control_deep, is_first_force
   use TOUZA_Nio_std,only: get_logu,     unit_global,  trace_fine,   trace_control
   implicit none
   private
@@ -206,6 +205,7 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
+    use TOUZA_Nio_std,only: control_mode, control_deep, is_first_force
     use TOUZA_Nio_std,only: choice, ns_init=>init
     implicit none
     integer,intent(out)         :: ierr
@@ -222,15 +222,15 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           if (ierr.eq.0) call set_def_types(ierr, hitypes)
           if (ierr.eq.0) call set_def_ranges(ierr, hiends)
           if (ierr.eq.0) call set_def_tables(ierr, hiends)
@@ -243,6 +243,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Nio_std,only: control_mode, control_deep, is_first_force
     use TOUZA_Nio_std,only: choice, msg, ns_diag=>diag, is_msglev_normal
     implicit none
     integer,intent(out)         :: ierr
@@ -259,12 +260,12 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
        endif
@@ -275,6 +276,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Nio_std,only: control_mode, control_deep, is_first_force
     use TOUZA_Nio_std,only: ns_finalize=>finalize, choice
     implicit none
     integer,intent(out)         :: ierr
@@ -289,12 +291,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
        endif

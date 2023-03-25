@@ -1,7 +1,7 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2023/02/15 16:35:49 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 09:57:17 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2023
@@ -22,7 +22,6 @@
 !!!_@ TOUZA_Std_log - simple logging
 module TOUZA_Std_log
 !!!_ = declaration
-  use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
 !!!_  - default
   implicit none
   private
@@ -108,8 +107,9 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode)
-    use TOUZA_Std_prc,only: prc_init=>init
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_init=>init, choice
+    use TOUZA_Std_prc,only: prc_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u             ! global log unit (untouch if unit_global)
@@ -130,7 +130,7 @@ contains
           if (utmp.ne.unit_global) default_unit = utmp
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_init(ierr, default_unit, levv=lv, mode=lmd)
           if (ierr.eq.0) call utl_init(ierr, default_unit, levv=lv, mode=lmd)
@@ -144,8 +144,9 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std_prc,only: prc_diag=>diag
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    use TOUZA_Std_prc,only: prc_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -166,7 +167,7 @@ contains
              if (is_msglev_NORMAL(lv)) call msg_mdl_txt(TIME_STAMP, __MDL__, utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
@@ -178,8 +179,9 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std_prc,only: prc_finalize=>finalize
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
+    use TOUZA_Std_prc,only: prc_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -197,7 +199,7 @@ contains
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)

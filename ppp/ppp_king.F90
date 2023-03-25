@@ -1,7 +1,7 @@
 !!!_! ppp_king.F90 - TOUZA/ppp king control (xmcomm/xmking replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2023/02/05 22:15:54 fuyuki ppp_king.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 13:44:26 fuyuki ppp_king.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -33,9 +33,7 @@
 !!!_@ TOUZA_Ppp_king - MPI king-rank control
 module TOUZA_Ppp_king
 !!!_ + modules
-  use TOUZA_Ppp_std,only: &
-       & control_mode, control_deep, is_first_force, &
-       & get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Ppp_std,only: get_logu,     unit_global,  trace_fine,   trace_control
 !!!_ + default
   implicit none
   private
@@ -81,7 +79,8 @@ module TOUZA_Ppp_king
 contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm, nking)
-    use TOUZA_Ppp_std,only: choice, ps_init=>init
+    use TOUZA_Ppp_std, only: control_mode, control_deep, is_first_force
+    use TOUZA_Ppp_std, only: choice, ps_init=>init
     use TOUZA_Ppp_amng,only: pc_init=>init
     implicit none
     integer,intent(out)         :: ierr
@@ -99,16 +98,16 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ps_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
           if (ierr.eq.0) call pc_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           if (ierr.eq.0) call init_table(ierr, nking)
        endif
        init_counts = init_counts + 1
@@ -119,7 +118,8 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Ppp_std,only: choice, msg, ps_diag=>diag, is_msglev_normal
+    use TOUZA_Ppp_std, only: control_mode, control_deep, is_first_force
+    use TOUZA_Ppp_std, only: choice, msg, ps_diag=>diag, is_msglev_normal
     use TOUZA_Ppp_amng,only: pc_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
@@ -136,7 +136,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
           endif
@@ -144,7 +144,7 @@ contains
              if (is_msglev_normal(lv)) call diag_cache(ierr, utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ps_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call pc_diag(ierr, utmp, levv=lv, mode=lmd)
@@ -156,7 +156,8 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Ppp_std,only: ps_finalize=>finalize, choice
+    use TOUZA_Ppp_std, only: control_mode, control_deep, is_first_force
+    use TOUZA_Ppp_std, only: ps_finalize=>finalize, choice
     use TOUZA_Ppp_amng,only: pc_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -171,12 +172,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call pc_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call ps_finalize(ierr, utmp, levv=lv, mode=lmd)
