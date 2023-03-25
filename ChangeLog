@@ -1,3 +1,9 @@
+Release-1.11.0 / 2023-03-25
+===========================
+
+  * [FATAL] Import fixes around byte-order detection.
+  * [severe] control functions usage corrected.
+
 Release-1.10.0 / 2023-03-23
 ===========================
 
