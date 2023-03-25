@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2023/02/05 21:40:06 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 09:59:15 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2023
@@ -45,7 +45,6 @@
 #endif
 !!!_@ TOUZA_Std_arg - argument parser by command-line and/or input file
 module TOUZA_Std_arg
-  use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
   use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control,  get_logu
 !!!_ + default
   implicit none
@@ -156,6 +155,7 @@ contains
        &  (ierr, &
        &   u,    levv, mode, &
        &   lrec, cha,  chs, tagf, kmode, icomm)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_prc,only: prc_init=>init
     use TOUZA_Std_env,only: env_init=>init
     use TOUZA_Std_fun,only: fun_init=>init
@@ -186,7 +186,7 @@ contains
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
@@ -209,6 +209,7 @@ contains
 
 !!!_  & diag
   subroutine diag (ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_diag=>diag, choice
     use TOUZA_Std_prc,only: prc_diag=>diag
     use TOUZA_Std_fun,only: fun_diag=>diag
@@ -243,7 +244,7 @@ contains
              endif
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
@@ -258,6 +259,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
     use TOUZA_Std_prc,only: prc_finalize=>finalize
     use TOUZA_Std_log,only: log_finalize=>finalize
@@ -282,7 +284,7 @@ contains
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)

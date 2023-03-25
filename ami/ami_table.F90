@@ -1,10 +1,10 @@
 !!!_! ami_table.F90. - TOUZA/Ami/table amida-coupler table procedures
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/05/02 16:14:25 fuyuki ami_table.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 13:59:18 fuyuki ami_table.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 !!!_* include
@@ -19,8 +19,7 @@
 !!!_@ TOUZA_Ami_table - ami-da utilities
 module TOUZA_Ami_table
 !!!_ + modules
-  use TOUZA_Ami_std, &
-       & as_init=>init, as_diag=>diag, as_finalize=>finalize
+  use TOUZA_Ami_std, as_init=>init, as_diag=>diag, as_finalize=>finalize
 !!!_ + default
   implicit none
   private
@@ -65,15 +64,15 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call as_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           continue
        endif
        init_counts = init_counts + 1
@@ -99,12 +98,12 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call as_diag(ierr, utmp, levv=lv, mode=lmd)
        endif
@@ -128,12 +127,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call as_finalize(ierr, utmp, levv=lv, mode=lmd)
        endif

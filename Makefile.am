@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2023/01/24 21:17:30 fuyuki Makefile.am>
+# Time-stamp: <2023/03/24 17:28:42 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -92,7 +92,7 @@ EXTRA_DIST += $(AUTOREVISION_cache) $(AUTOREVISION_h)
 AUTOREVISION_h = autorevision.h
 AUTOREVISION_cache = autorevision.cache
 
-AM_DISTCHECK_CONFIGURE_FLAGS = --with-build-jmz
+AM_DISTCHECK_CONFIGURE_FLAGS = --with-build-jmz --enable-shared
 
 BUILT_SOURCES = autorevision-cache $(AUTOREVISION_h)
 
@@ -107,11 +107,15 @@ $(AUTOREVISION_h): $(top_srcdir)/$(AUTOREVISION_cache)
 
 # only update when top_srcdir is the top-level directory in git work-tree
 autorevision-cache:
+if autorevision
 	@if cd $(top_srcdir); then \
 		top=`git rev-parse --show-cdup` || exit 0; \
 		if test x$${top} != x; then :; else \
 			$(AUTOREVISION) -t h -o $(AUTOREVISION_cache) > /dev/null; \
 		fi; fi
+else
+	@:
+endif
 
 EXPORT=
 

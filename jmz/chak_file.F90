@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz CH(swiss) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/21 21:59:33 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 15:03:07 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -699,12 +699,14 @@ contains
 
 !!!_   . open_read_file
   subroutine open_read_file &
-       & (ierr, file, def)
+       & (ierr, file, def, levv)
     use TOUZA_Std,only: new_unit, sus_open, is_error_match, upcase
+    use TOUZA_Std,only: check_byte_order
     implicit none
-    integer,         intent(out)   :: ierr
-    type(file_t),    intent(inout) :: file
-    type(file_t),    intent(in)    :: def
+    integer,     intent(out)         :: ierr
+    type(file_t),intent(inout)       :: file
+    type(file_t),intent(in)          :: def
+    integer,     intent(in),optional :: levv
 
     character(len=128) :: iomsg
 
@@ -729,12 +731,16 @@ contains
           else if (file%kfmt.eq.cfmt_cdf) then
              ierr = ERR_NOT_IMPLEMENTED
           else
-             call sus_open(ierr, file%u, file%name, ACTION='R', STATUS='O', IOMSG=iomsg)
-             if (ierr.eq.0) then
-                if (file%kfmt.ge.cfmt_binary) call open_read_binary(ierr, file)
-             else
-                ierr = ERR_INVALID_PARAMETER
+             if (file%kfmt.ge.cfmt_binary) then
+                if (ierr.eq.0) call check_byte_order(ierr, file%t, file%u, force=.TRUE., levv=levv)
              endif
+             if (ierr.eq.0) then
+                call sus_open(ierr, file%u, file%name, ACTION='R', STATUS='O', IOMSG=iomsg)
+             endif
+             if (file%kfmt.ge.cfmt_binary) then
+                if (ierr.eq.0) call open_read_binary(ierr, file)
+             endif
+             if (ierr.ne.0) ierr = ERR_INVALID_PARAMETER
           endif
        endif
        if (ierr.eq.0) call clone_default_rgroup(ierr, file, def)
@@ -1031,15 +1037,17 @@ end subroutine cue_read_file
 
 !!!_   . open_write_file
   subroutine open_write_file &
-       & (ierr, file)
+       & (ierr, file, levv)
     use TOUZA_Std,only: new_unit, sus_open, is_error_match, upcase
+    use TOUZA_Std,only: check_byte_order
 #if OPT_WITH_NCTCDF
     use TOUZA_Nio,only: nct_open_write
 #endif
     implicit none
-    integer,     intent(out)   :: ierr
-    type(file_t),intent(inout) :: file
-    character(len=16) :: stt, pos
+    integer,         intent(out)   :: ierr
+    type(file_t),    intent(inout) :: file
+    integer,optional,intent(in)    :: levv
+    character(len=16) :: stt, pos, act
     character(len=128) :: iomsg
 
     ierr = 0
@@ -1081,8 +1089,16 @@ end subroutine cue_read_file
                 stt = ' '
                 pos = ' '
              end select
-             call sus_open &
-                  & (ierr, file%u, file%name, ACTION='W', STATUS=stt, POSITION=pos, IOMSG=iomsg)
+             if (is_cfmt_binary(file%kfmt)) then
+                act = 'W'
+                call check_byte_order(ierr, file%t, file%u, force=.TRUE., levv=levv)
+             else
+                act = 'RW'
+             endif
+             if (ierr.eq.0) then
+                call sus_open &
+                  & (ierr, file%u, file%name, ACTION=act, STATUS=stt, POSITION=pos, IOMSG=iomsg)
+             endif
           else if (file%kfmt.eq.cfmt_cdf) then
 #if OPT_WITH_NCTCDF
              select case (file%mode)
@@ -1173,19 +1189,20 @@ end subroutine cue_read_file
   end subroutine write_file_data
 
 !!!_   . get_swap_switch
-  logical function get_swap_switch (flag) result(b)
-    use TOUZA_Std,only: kendi_mem, endian_BIG, endian_LITTLE
+  logical function get_swap_switch (flag, ref) result(b)
+    use TOUZA_Std,only: endian_BIG, endian_LITTLE
     implicit none
     integer,intent(in) :: flag
+    integer,intent(in) :: ref   ! reference byte_order detected by check_byte_order
     select case(flag)
     case(cfmt_flag_native)
        b = .FALSE.
     case(cfmt_flag_swap)
        b = .TRUE.
     case(cfmt_flag_little)
-       b = kendi_mem.eq.endian_BIG
+       b = ref.eq.endian_BIG
     case(cfmt_flag_big)
-       b = kendi_mem.eq.endian_LITTLE
+       b = ref.eq.endian_LITTLE
     case default
        b = .FALSE.
     end select
@@ -1958,7 +1975,7 @@ end subroutine cue_read_file
     usize = usize_binary(file%kfmt)
     select case(file%kfmt)
     case(cfmt_binary_i4:cfmt_binary_i4+cfmt_flags_bo-1)
-       swap = get_swap_switch(file%kfmt - cfmt_binary_i4)
+       swap = get_swap_switch(file%kfmt - cfmt_binary_i4, file%t)
        if (.not.allocated(bufi)) then
           allocate(bufi(0:n-1), STAT=ierr)
        else if (size(bufi).lt.n) then
@@ -1970,7 +1987,7 @@ end subroutine cue_read_file
           v(0:n-1) = real(bufi(0:n-1), kind=KBUF)
        endif
     case(cfmt_binary_r4:cfmt_binary_r4+cfmt_flags_bo-1)
-       swap = get_swap_switch(file%kfmt - cfmt_binary_r4)
+       swap = get_swap_switch(file%kfmt - cfmt_binary_r4, file%t)
        if (.not.allocated(buff)) then
           allocate(buff(0:n-1), STAT=ierr)
        else if (size(buff).lt.n) then
@@ -1982,7 +1999,7 @@ end subroutine cue_read_file
           v(0:n-1) = real(buff(0:n-1), kind=KBUF)
        endif
     case(cfmt_binary_r8:cfmt_binary_r8+cfmt_flags_bo-1)
-       swap = get_swap_switch(file%kfmt - cfmt_binary_r8)
+       swap = get_swap_switch(file%kfmt - cfmt_binary_r8, file%t)
        if (.not.allocated(bufd)) then
           allocate(bufd(0:n-1), STAT=ierr)
        else if (size(bufd).lt.n) then
@@ -2017,7 +2034,7 @@ end subroutine cue_read_file
 
     select case(file%kfmt)
     case(cfmt_binary_i4:cfmt_binary_i4+cfmt_flags_bo-1)
-       swap = get_swap_switch(file%kfmt - cfmt_binary_i4)
+       swap = get_swap_switch(file%kfmt - cfmt_binary_i4, file%t)
        if (ierr.eq.0) then
           if (.not.allocated(bufi)) then
              allocate(bufi(0:n-1), STAT=ierr)
@@ -2031,7 +2048,7 @@ end subroutine cue_read_file
           if (ierr.eq.0) call sus_write(ierr, file%u, bufi, n, swap)
        endif
     case(cfmt_binary_r4:cfmt_binary_r4+cfmt_flags_bo-1)
-       swap = get_swap_switch(file%kfmt - cfmt_binary_r4)
+       swap = get_swap_switch(file%kfmt - cfmt_binary_r4, file%t)
        if (ierr.eq.0) then
           if (.not.allocated(buff)) then
              allocate(buff(0:n-1), STAT=ierr)
@@ -2045,7 +2062,7 @@ end subroutine cue_read_file
           if (ierr.eq.0) call sus_write(ierr, file%u, buff, n, swap)
        endif
     case(cfmt_binary_r8:cfmt_binary_r8+cfmt_flags_bo-1)
-       swap = get_swap_switch(file%kfmt - cfmt_binary_r8)
+       swap = get_swap_switch(file%kfmt - cfmt_binary_r8, file%t)
        if (ierr.eq.0) then
           if (.not.allocated(bufd)) then
              allocate(bufd(0:n-1), STAT=ierr)
@@ -2085,6 +2102,34 @@ end subroutine cue_read_file
 #endif /* not OPT_WITH_NCTCDF */
 
   end subroutine write_data_cdf
+!!!_  - is_cfmt_ascii()
+  PURE &
+  logical function is_cfmt_ascii(cfmt) result(b)
+    implicit none
+    integer,intent(in) :: cfmt
+    b = cfmt.eq.cfmt_ascii
+  end function is_cfmt_ascii
+!!!_  - is_cfmt_binary()
+  PURE &
+  logical function is_cfmt_binary(cfmt) result(b)
+    implicit none
+    integer,intent(in) :: cfmt
+    b = (cfmt_binary.le.cfmt) .and. (cfmt.lt.cfmt_cdf)
+  end function is_cfmt_binary
+!!!_  - is_cfmt_nio()
+  PURE &
+  logical function is_cfmt_nio(cfmt) result(b)
+    implicit none
+    integer,intent(in) :: cfmt
+    b = cfmt .le. GFMT_END
+  end function is_cfmt_nio
+!!!_  - is_cfmt_cdf()
+  PURE &
+  logical function is_cfmt_cdf(cfmt) result(b)
+    implicit none
+    integer,intent(in) :: cfmt
+    b = cfmt.eq.cfmt_cdf
+  end function is_cfmt_cdf
 !!!_ + end chak_file
 end module chak_file
 !!!_@ test_chak_file

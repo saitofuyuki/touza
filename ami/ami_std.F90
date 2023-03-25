@@ -1,10 +1,10 @@
 !!!_! ami_std.F90 - TOUZA/Ami bridge to Std
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2022/05/02 14:16:03 fuyuki ami_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 14:03:21 fuyuki ami_std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -19,14 +19,12 @@ module TOUZA_Ami_std
 !!!_ = declaration
 !!!_  - modules
   use TOUZA_Std_prc,only: KDBL
-  use TOUZA_Std_utl,only: &
-       & choice,       choice_a,     set_if_present, &
-       & control_deep, control_mode, is_first_force
-  use TOUZA_Std_log,only: &
-       & is_msglev, &
-       & is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail, &
-       & is_msglev_severe, is_msglev_fatal,  &
-       & get_logu,         unit_global,      trace_fine,       trace_control
+  use TOUZA_Std_utl,only: choice,       choice_a,     set_if_present
+  use TOUZA_Std_utl,only: control_deep, control_mode, is_first_force
+  use TOUZA_Std_log,only: is_msglev
+  use TOUZA_Std_log,only: is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
+  use TOUZA_Std_log,only: is_msglev_severe, is_msglev_fatal
+  use TOUZA_Std_log,only: get_logu,         unit_global,      trace_fine,       trace_control
 !!!_  - default
   implicit none
   private
@@ -79,11 +77,11 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           lev_stdv = choice(lev_stdv, stdv)
           if (ierr.eq.0) call mwe_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
@@ -115,12 +113,12 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call mwe_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
@@ -147,12 +145,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call mwe_finalize(ierr, utmp, lev_stdv, mode=lmd)

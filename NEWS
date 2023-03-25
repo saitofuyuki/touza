@@ -1,10 +1,15 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2023/03/23 16:58:10 fuyuki NEWS>
+# Time-stamp: <2023/03/25 21:32:12 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.11.0 from 1.10.0
+- [FATAL] Import fixes around byte-order detection.
+- As far as tested, the byte-order test passes even when environment
+  variables (GFORTRAN_CONVERT_UNIT, etc) is set.
 
 * Changes in 1.10.0 from 1.09.0
 ** Major changes

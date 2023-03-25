@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2023/02/05 21:52:06 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 09:58:20 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2023
@@ -69,7 +69,6 @@
 !!!_@ TOUZA_Std_env - standard environments
 module TOUZA_Std_env
   use TOUZA_Std_prc,only: KI32, KI64
-  use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
   use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
 !!!_ = declaration
 !!!_  - ISO_FORTRAN_ENV module
@@ -286,6 +285,7 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, levtry, icomm)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_init=>init, choice
     use TOUZA_Std_log,only: log_init=>init
     use TOUZA_Std_prc,only: prc_init=>init
@@ -313,7 +313,7 @@ contains
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
@@ -336,11 +336,12 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std_utl, only: utl_diag=>diag, choice
-    use TOUZA_Std_log, only: log_diag=>diag, msg_mdl
-    use TOUZA_Std_prc, only: prc_diag=>diag
-    use TOUZA_Std_fun, only: fun_diag=>diag
-    use TOUZA_Std_mwe, only: mwe_diag=>diag
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
+    use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
+    use TOUZA_Std_prc,only: prc_diag=>diag
+    use TOUZA_Std_fun,only: fun_diag=>diag
+    use TOUZA_Std_mwe,only: mwe_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -375,7 +376,7 @@ contains
              if (ierr.eq.0) call diag_stat(ierr, utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
@@ -390,6 +391,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
     use TOUZA_Std_log,only: log_finalize=>finalize
     use TOUZA_Std_prc,only: prc_finalize=>finalize
@@ -414,7 +416,7 @@ contains
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
@@ -2499,6 +2501,15 @@ program test_std_env
   integer kendi
   character(len=128) :: str
 
+#ifndef   TEST_FILE_UNIT_BGN
+#  define TEST_FILE_UNIT_BGN 10
+#endif
+#ifndef   TEST_FILE_UNIT_END
+#  define TEST_FILE_UNIT_END 20
+#endif
+  integer,parameter :: ubgn = TEST_FILE_UNIT_BGN
+  integer,parameter :: uend = TEST_FILE_UNIT_END
+
   ierr = 0
   ut=10
 
@@ -2521,11 +2532,11 @@ program test_std_env
      write(*, *) 'ENDIANNESS(mem) = ', kendi, ierr
   endif
   if (ierr.eq.0) then
-     call init_file_bodr (ierr, u=uo, levv=+10, ubgn=10, uend=20, ustp=3)
+     call init_file_bodr (ierr, u=uo, levv=+10, ubgn=ubgn, uend=uend, ustp=3)
   endif
   kendi = endian_ERROR
   if (ierr.eq.0) then
-     do ut = 10, 20, 1
+     do ut = ubgn, uend - 1
         if (ierr.eq.0) call check_byte_order(ierr, kendi, ut)
         write(*, *) 'ENDIANNESS(unit) = ', ut, kendi, ierr
      enddo
