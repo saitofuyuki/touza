@@ -1,0 +1,112 @@
+#!/bin/sh
+# Maintainer: SAITO Fuyuki
+# Time-stamp: <2023/03/24 20:18:00 fuyuki wte.sh.in>
+
+# Copyright (C) 2023
+#           Japan Agency for Marine-Earth Science and Technology
+# Licensed under the Apache License, Version 2.0
+#   (https://www.apache.org/licenses/LICENSE-2.0)
+
+this=$0
+
+UBGN=@TEST_FILE_UNIT_BGN@
+UEND=@TEST_FILE_UNIT_END@
+
+## usage
+usage ()
+{
+  echo "$this - std_env test wrapper"
+  echo "Usage"
+  echo "  $this [OPTIONS] TEST-ID"
+  return 0
+}
+
+tstt=0 tstp=0
+logd=.
+while test $# -gt 0
+do
+  case $1 in
+  -i) tstt=$2; shift;;
+  -e) tstp=$2; shift;;
+  -t) tstt=$2; tstp=$2; shift;;
+  -l) logd=$2; shift;;
+  -*) echo "$this: unknown argument $1"; usage >&2; exit 1;;
+  *)  break;;
+  esac
+  shift
+done
+
+test $# -eq 0 && usage >&2 && exit 0
+
+temp=$(mktemp)
+
+do_exit='rm -f $temp; exit $err'
+
+mkdir -p $logd || exit $?
+
+trap "$do_exit" 0 1 2 3 15
+
+chk_cmds ()
+{
+  for c in "$@"
+  do
+    test ! -x $c && echo "$this: Aborts. Cannot execute $c." && exit 1
+  done
+  return 0
+}
+
+chk_plan ()
+{
+  echo "$1..$2" ## plan
+}
+
+# ---------------------------------------- stdenv
+chk_stdenv ()
+{
+  tbgn=1 tend=5
+  test $tstt -eq 0 && tstt=$tbgn
+  test $tstp -eq 0 && tstp=$tend
+
+  cmd=test_std_env
+  chk_cmds $cmd || return $?
+  test -e "./$cmd" && cmd="./$cmd"
+
+  umid=$(expr '(' $UBGN + $UEND ')' / 2 - 1)
+
+  chk_plan ${tbgn} ${tend}
+  for t in $(seq $tbgn $tend)
+  do
+    if   test $t -ge 1 -a $t -lt 2; then
+      env="GFORTRAN_CONVERT_UNIT=native F_UFMTENDIAN="
+    elif test $t -ge 2 -a $t -lt 3; then
+      env="GFORTRAN_CONVERT_UNIT=big_endian F_UFMTENDIAN=big"
+    elif test $t -ge 3 -a $t -lt 4; then
+      env="GFORTRAN_CONVERT_UNIT=little_endian F_UFMTENDIAN=little"
+    elif test $t -ge 4 -a $t -lt 5; then
+      env="GFORTRAN_CONVERT_UNIT=big_endian:$UBGN-$umid F_UFMTENDIAN=big:$UBGN-$umid"
+    elif test $t -ge 5 -a $t -lt 6; then
+      env="GFORTRAN_CONVERT_UNIT=little_endian:$UBGN-$umid F_UFMTENDIAN=little:$UBGN-$umid"
+    else
+      echo "$this: invalid test id" >&2; return 1
+    fi
+    log=$logd/x$sub.t$t
+    eval env $env $cmd > $log 2>&1
+    descr="consistent"
+    echo "ok $t - $descr"
+  done
+
+  return 0
+}
+
+# ---------------------------------------- dispatcher
+for sub in $@
+do
+  sub=$(basename "$sub")
+  case $sub in
+  *stdenv*) chk_stdenv || exit $?;;
+  *) echo "$this: Aborts. Unknown test $sub." >&2; exit 1;;
+  esac
+done
+# ----------------------------------------
+eval "$do_exit"
+exit $?

@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2023/02/05 22:07:11 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 10:03:03 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020,2021,2022,2023
@@ -22,7 +22,6 @@ module TOUZA_Std_mwe
 #if OPT_USE_MPI
   use mpi
 #endif
-  use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
   use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
 !!!_  - default
   implicit none
@@ -83,6 +82,7 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, icomm)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_log,only: log_init=>init
     use TOUZA_Std_utl,only: utl_init=>init, choice
     implicit none
@@ -105,7 +105,7 @@ contains
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
@@ -120,6 +120,7 @@ contains
   end subroutine init
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode, icomm)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_diag=>diag, choice
     use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
     implicit none
@@ -163,7 +164,7 @@ contains
              endif
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
@@ -175,6 +176,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
     use TOUZA_Std_log,only: log_finalize=>finalize
     implicit none
@@ -205,7 +207,7 @@ contains
           endif
        endif
 #endif /* OPT_USE_MPI */
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)

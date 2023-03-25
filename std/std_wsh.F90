@@ -1,7 +1,7 @@
 !!!_! std_wsh.F90 - touza/std standard work-sharing
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2023/02/05 22:08:24 fuyuki std_wsh.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 10:04:29 fuyuki std_wsh.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023
@@ -19,7 +19,6 @@
 !!!_@ TOUZA_Std_env - standard environments
 module TOUZA_Std_wsh
   use TOUZA_Std_prc,only: KI32, KI64, KFLT, KDBL
-  use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
 !!!_ = declaration
 !!!_  - default
   implicit none
@@ -76,6 +75,7 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_init=>init, choice
     use TOUZA_Std_prc,only: prc_init=>init
     implicit none
@@ -98,7 +98,7 @@ contains
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
@@ -112,8 +112,9 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std_utl, only: utl_diag=>diag, choice
-    use TOUZA_Std_prc, only: prc_diag=>diag
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
+    use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    use TOUZA_Std_prc,only: prc_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -151,7 +152,7 @@ contains
              endif
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
@@ -163,6 +164,7 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
     use TOUZA_Std_prc,only: prc_finalize=>finalize
     implicit none
@@ -204,7 +206,7 @@ contains
           endif
           ierr = 0
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)

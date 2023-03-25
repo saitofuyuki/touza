@@ -1,10 +1,10 @@
 !!!_! emu.F90 - touza/emu interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2022/02/07 16:48:08 fuyuki emu.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 13:31:10 fuyuki emu.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020,2021,2022
+! Copyright (C) 2020-2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -20,9 +20,7 @@
 !!!_@ TOUZA_Emu - touza/emu interfaces
 module TOUZA_Emu
   use TOUZA_Emu_usi, usi_init=>init, usi_diag=>diag, usi_finalize=>finalize
-  use TOUZA_Std,only: &
-       & control_mode, control_deep, is_first_force, &
-       & get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Std,only: get_logu,     unit_global,  trace_fine,   trace_control
 !!!_  - default
   implicit none
   public
@@ -38,6 +36,7 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
+    use TOUZA_Std,only: control_mode, control_deep, is_first_force
     use TOUZA_Std,only: msg_grp, choice
     implicit none
     integer,intent(out)         :: ierr
@@ -55,13 +54,13 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call usi_init(ierr, ulog, lv, mode=md, stdv=stdv, icomm=icomm)
+          if (ierr.eq.0) call usi_init(ierr, ulog, lv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -70,6 +69,7 @@ contains
   end subroutine init
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Std,only: control_mode, control_deep, is_first_force
     use TOUZA_Std,only: choice, is_msglev_NORMAL, msg
     implicit none
     integer,intent(out)         :: ierr
@@ -86,12 +86,12 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (is_msglev_NORMAL(lv)) then
              if (ierr.eq.0) call msg(TIME_STAMP, __GRP__, utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call usi_diag(ierr, utmp, mode=lmd)
        endif
@@ -103,6 +103,7 @@ contains
   end subroutine diag
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std,only: control_mode, control_deep, is_first_force
     use TOUZA_Std,only: choice, is_msglev_NORMAL, msg_grp
     implicit none
     integer,intent(out)         :: ierr
@@ -117,12 +118,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call usi_finalize(ierr, utmp, lmd)
        endif

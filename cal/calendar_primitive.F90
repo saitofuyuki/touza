@@ -1,10 +1,10 @@
 !!!_! calendar_primitive.F90 - TOUZA/Cal primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 22 2011
-#define TIME_STAMP 'Time-stamp: <2021/11/15 13:09:14 fuyuki calendar_primitive.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 13:26:13 fuyuki calendar_primitive.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2011-2021
+! Copyright (C) 2011-2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -143,16 +143,16 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           lev_stdv = choice(lev_stdv, stdv)
           if (ierr.eq.0) call std_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
        endif
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           do im = p_error, p_user
              call init_prop(props(im), im)
           enddo
@@ -181,12 +181,12 @@ contains
     if (md.ge.MODE_SURFACE) then
        call trace_control &
             & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, mdl=__MDL__, fun='diag', u=utmp, levv=lv)
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
              call msg(msglev_normal, TIME_STAMP, __MDL__, utmp)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call std_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
        endif
@@ -212,12 +212,12 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call std_finalize(ierr, utmp, levv=lev_stdv, mode=lmd)
        endif

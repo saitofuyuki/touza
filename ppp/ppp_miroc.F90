@@ -1,10 +1,10 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2023/01/17 15:15:50 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/25 13:48:23 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -158,8 +158,9 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm, affils, greeting)
-    use TOUZA_Ppp,only: ppp_init=>init, choice, &
-         & control_mode, control_deep, is_first_force, is_msglev_NORMAL
+    use TOUZA_Ppp,only: ppp_init=>init
+    use TOUZA_Ppp,only: control_mode, control_deep, is_first_force
+    use TOUZA_Ppp,only: choice, is_msglev_NORMAL
     use TOUZA_Std,only: mwe_init, bld_init
     use TOUZA_Emu,only: usi_init
     implicit none
@@ -185,18 +186,18 @@ contains
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
        lv = choice(lev_verbose, levv)
-       if (is_first_force(init_counts, md)) then
+       if (is_first_force(init_counts, mode)) then
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call mwe_init(ierr, u, stdv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call usi_init(ierr, u, levv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call bld_init(ierr, u, levv, mode=lmd)
-          if (ierr.eq.0) call ppp_init(ierr, u, levv, mode=md, stdv=stdv, icomm=icomm)
+          if (ierr.eq.0) call ppp_init(ierr, u, levv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
        if (present(affils)) then
           if (ierr.eq.0) call init_batch(ierr, affils(:), greeting)
@@ -210,7 +211,8 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Ppp,only: ppp_diag=>diag, ppp_msg=>msg
-    use TOUZA_Std,only: mwe_diag, control_mode, control_deep, get_logu, choice, is_first_force, is_msglev_NORMAL
+    use TOUZA_Std,only: control_mode, control_deep, is_first_force
+    use TOUZA_Std,only: mwe_diag, get_logu, choice, is_msglev_NORMAL
     use TOUZA_Std,only: bld_diag
     use TOUZA_Emu,only: usi_diag
     implicit none
@@ -227,15 +229,15 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(diag_counts, md)) then
+       if (is_first_force(diag_counts, mode)) then
           if (is_msglev_normal(lv)) then
              if (ierr.eq.0) call ppp_msg(TIME_STAMP, __MDL__, u)
           endif
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ppp_diag(ierr, u, levv, md)
-          if (ierr.eq.0) call bld_diag(ierr, u, levv, md)
+          if (ierr.eq.0) call ppp_diag(ierr, u, levv, lmd)
+          if (ierr.eq.0) call bld_diag(ierr, u, levv, lmd)
        endif
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call mwe_diag(ierr, u, levv, lmd)
@@ -249,9 +251,9 @@ contains
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std,only: mwe_finalize, bld_finalize
-    use TOUZA_Ppp,only: ppp_finalize=>finalize, &
-         & control_mode, control_deep, get_logu, choice, &
-         & is_first_force, trace_fine
+    use TOUZA_Ppp,only: ppp_finalize=>finalize
+    use TOUZA_Ppp,only: control_mode, control_deep, is_first_force
+    use TOUZA_Ppp,only: get_logu, choice, trace_fine
     use TOUZA_Emu,only: usi_finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -266,14 +268,14 @@ contains
     lv = choice(lev_verbose, levv)
 
     if (md.ge.MODE_SURFACE) then
-       if (is_first_force(fine_counts, md)) then
+       if (is_first_force(fine_counts, mode)) then
           call trace_fine &
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  grp=__GRP__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md)
+       lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call ppp_finalize(ierr, u, levv, md)
+          if (ierr.eq.0) call ppp_finalize(ierr, u, levv, lmd)
        endif
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call usi_finalize(ierr, u, levv, mode=lmd)
