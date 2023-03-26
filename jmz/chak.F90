@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/25 08:50:38 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/27 08:22:51 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -55,56 +55,15 @@ program chak
   integer,parameter :: stt_none   = 0
   integer,parameter :: stt_free   = 1
   integer,parameter :: stt_locked = -1
-
-  ! domain compromise mode for non-unary operations
-  integer,parameter :: cmode_null      = 0
-  integer,parameter :: cmode_inclusive = 1
-  integer,parameter :: cmode_intersect = 2
-  integer,parameter :: cmode_first     = 3
-
-  integer,parameter :: cmode_compromize = 3  ! mask
-
-  integer,parameter :: cmode_xundef     = 4  ! exclude undefined at flushing
-
 !!!_  - buffers
   integer,save      :: lcount = 0   ! literal count
   integer,save      :: consts=0     ! predefine constants
-  type buffer_t
-     character(len=lname)    :: name              ! buffer name
-     character(len=ldesc)    :: desc              ! description
-     character(len=ldesc)    :: desc2             ! description (infix notation)
-     integer                 :: ilev              ! infix notation level
-     integer                 :: k = kv_null
-     integer                 :: stt
-     integer                 :: ncoor             ! (reserved) number of coordinate
-     integer                 :: ci(0:lcoor-1)
-     integer                 :: reff              ! reference file handle
-     type(loop_t)            :: pcp(0:lcoor-1)    ! physical (source) coordinate properties
-     real(kind=KBUF)         :: undef
-     real(kind=KBUF),pointer :: vd(:) => NULL()
-     integer,pointer         :: vi(:)
-  end type buffer_t
   type(buffer_t),target :: obuffer(0:lbuffer-1)
 !!!_  - buffer stack
-  type stack_t
-     integer      :: bh
-     type(loop_t) :: lcp(0:lcoor-1) ! logical (destination) coordinate properties
-  end type stack_t
-
   integer           :: mstack
   integer,parameter :: lstack=OPT_CHAK_STACKS
   type(stack_t)     :: bstack(0:lstack-1)
 !!!_  - argument queue
-  type queue_t
-     integer :: term = -1            ! term handle
-     integer :: nopr                 ! number of operands
-     integer :: iter                 ! number of iterates etc
-     integer :: cmode = cmode_null   ! operation mode
-     character(len=ldesc)  :: desci
-     character(len=ldesc)  :: desco
-     type(stack_t),pointer :: lefts(:)       ! result stack to push
-     integer :: opt                  ! option for any use
-  end type queue_t
   integer           :: mqueue
   integer,parameter :: lqueue=OPT_CHAK_QUEUE
   type(queue_t)     :: aqueue(0:lqueue-1)
@@ -1221,7 +1180,7 @@ contains
           ierr = ERR_INSUFFICIENT_BUFFER
           call message(ierr, 'too many ranks to SHAPE:' // trim(arg))
        else
-          call decompose_coordinate_mod(ierr, jrep, arg=arg(jpb+1:jpe-1))
+          call decompose_coordinate_mod(ierr, jrep, arg=arg(jpb+1:jpe-1), hopr=hopr)
           if (ierr.eq.0) then
              aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
              aqueue(jq)%lefts(:)%lcp(jc)%bgn  = null_range
@@ -1262,7 +1221,7 @@ contains
              obuffer(jb)%stt  = stt_locked
              call reg_fake_opr(ierr, hbuf, obuffer(jb)%name)
           endif
-       case(opr_PERM)
+       case(opr_PERM,opr_SIZE)
           call parse_buffer_shape(ierr, arg(jpar:), hopr)
        case(opr_MISS)
           if (jpar.lt.jend) then
@@ -1355,7 +1314,7 @@ contains
           ierr = ERR_INSUFFICIENT_BUFFER
           call message(ierr, 'too many ranks to SHAPE:' // trim(arg))
        else
-          call decompose_coordinate_mod(ierr, jrep, b, e, s, arg(jpb+1:jpe-1))
+          call decompose_coordinate_mod(ierr, jrep, b, e, s, arg(jpb+1:jpe-1), hopr)
           if (ierr.eq.0) then
              aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
              aqueue(jq)%lefts(:)%lcp(jc)%bgn  = b
@@ -1408,7 +1367,7 @@ contains
        endif
     endif
     if (ierr.eq.0) then
-       call decompose_coordinate_mod(ierr, jrep, b, e, s, arg)
+       call decompose_coordinate_mod(ierr, jrep, b, e, s, arg, hopr)
        ! write(*, *) ierr, b, e, s, arg(1:jrep)
     endif
     if (ierr.eq.0) then
@@ -1427,13 +1386,14 @@ contains
 
 !!!_   . decompose_coordinate_mod
   subroutine decompose_coordinate_mod &
-       & (ierr, jrep, b, e, s, arg)
-    use TOUZA_Std,only: split_list
+       & (ierr, jrep, b, e, s, arg, hopr)
+    use TOUZA_Std,only: split_list, condop
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: jrep     ! name/rename as (1:jrep)
     integer,optional,intent(out) :: b, e, s  ! either all or none specified
     character(len=*),intent(in)  :: arg
+    integer,         intent(in)  :: hopr
     integer larg, lsep
     integer js0, js1
     integer rpos(2)
@@ -1509,11 +1469,17 @@ contains
     else if (nc.eq.0) then
        b = system_index_bgn(rpos(1))
        e = system_index_end(rpos(2))
-       continue
     else if (nc.eq.1) then
-       b = system_index_bgn(rpos(1))
-       e = b + 1
-       s = 1
+       if (hopr.eq.opr_SIZE) then
+          ! force null coordinate if size==0
+          b = 0
+          e = rpos(1)
+          s = condop(rpos(1).eq.0, 0, 1)
+       else
+          b = system_index_bgn(rpos(1))
+          e = b + 1
+          s = 1
+       endif
     else if (nc.eq.2) then
        b = system_index_bgn(rpos(1))
        e = system_index_end(rpos(2))
@@ -4081,6 +4047,8 @@ contains
        else if (handle.eq.opr_TRANSF) then
           continue
        else if (handle.eq.opr_PERM) then
+          continue
+       else if (handle.eq.opr_SIZE) then
           continue
 !!!_    * index
        else if (handle.ge.opr_C0.and.handle.lt.opr_C3) then
