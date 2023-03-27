@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/03/16 20:22:29 fuyuki genvar.sh>
+# Time-stamp: <2023/03/28 21:30:07 fuyuki genvar.sh>
 
 this="$0"
 
@@ -7,6 +7,7 @@ main ()
 {
   local ovw=
   local aref= avar= filter=
+  local sed=ssed
   if [[ $# -eq 0 ]]; then
     print -u2 - "Usage: $this [-o] SOURCE PROCEDURE_i ..."
     return 0
@@ -57,7 +58,7 @@ main ()
     bpat="^[^!]*\\(subroutine\\|function\\) *$sub"
     epat="^[^!]*end .*\\(subroutine\\|function\\) *$sub"
 
-    sed -ne "/$bpat/,/$epat/p" < $file > $src
+    $sed -ne "/$bpat/,/$epat/p" < $file > $src
 
     karg=KARG
     case $ref in
@@ -75,25 +76,25 @@ main ()
       fi
       rep=${base}$v
       case $v in
-      (i) sed -e "1s/$sub/$rep/" -e "\$s/$sub/$rep/" \
-              -e "s/\\($karg *= *\\)[^ ]*\\>/\\1KI32/" \
-              -e "s/^\\( *\\)$rtype\\((KIND=$karg),\\)/\\1integer\\2   /" \
-              < $src >> $mod;;
-      (l) sed -e "1s/$sub/$rep/" -e "\$s/$sub/$rep/" \
-              -e "s/\\($karg *= *\\)[^ ]*\\>/\\1KI64/" \
-              -e "s/^\\( *\\)$rtype\\((KIND=$karg),\\)/\\1integer\\2   /" \
-              < $src >> $mod;;
-      (f) sed -e "1s/$sub/$rep/" -e "\$s/$sub/$rep/" \
-              -e "s/\\($karg *= *\\)[^ ]*\\>/\\1KFLT/" \
-              -e "s/^\\( *\\)$rtype\\((KIND=$karg),\\)/\\1real\\2   /" \
-              < $src >> $mod;;
-      (d) sed -e "1s/$sub/$rep/" -e "\$s/$sub/$rep/" \
-              -e "s/\\($karg *= *\\)[^ ]*\\>/\\1KDBL/" \
-              -e "s/^\\( *\\)$rtype\\((KIND=$karg),\\)/\\1real\\2   /" \
-              < $src >> $mod;;
-      (a) sed -e "1s/$sub/$rep/" -e "\$s/$sub/$rep/" \
-              -e "s/^\\( *\\)$rtype\\((KIND=$karg),\\)/\\1character(len=*),  /" \
-              < $src >> $mod;;
+      (i) $sed -e "1s/$sub/$rep/" -e "\$s/$sub/$rep/" \
+               -e "s/\\($karg *= *\\)[^ ]*\\>/\\1KI32/" \
+               -e "s/^\\( *\\)$rtype\\((KIND=$karg),\\)/\\1integer\\2   /I" \
+               < $src >> $mod;;
+      (l) $sed -e "1s/$sub/$rep/" -e "\$s/$sub/$rep/" \
+               -e "s/\\($karg *= *\\)[^ ]*\\>/\\1KI64/" \
+               -e "s/^\\( *\\)$rtype\\((KIND=$karg),\\)/\\1integer\\2   /I" \
+               < $src >> $mod;;
+      (f) $sed -e "1s/$sub/$rep/" -e "\$s/$sub/$rep/" \
+               -e "s/\\($karg *= *\\)[^ ]*\\>/\\1KFLT/" \
+               -e "s/^\\( *\\)$rtype\\((KIND=$karg),\\)/\\1real\\2   /I" \
+               < $src >> $mod;;
+      (d) $sed -e "1s/$sub/$rep/" -e "\$s/$sub/$rep/" \
+               -e "s/\\($karg *= *\\)[^ ]*\\>/\\1KDBL/" \
+               -e "s/^\\( *\\)$rtype\\((KIND=$karg),\\)/\\1real\\2   /I" \
+               < $src >> $mod;;
+      (a) $sed -e "1s/$sub/$rep/" -e "\$s/$sub/$rep/" \
+               -e "s/^\\( *\\)$rtype\\((KIND=$karg),\\)/\\1character(len=*),  /I" \
+               < $src >> $mod;;
       esac
     done
     xpat=()
@@ -104,10 +105,10 @@ main ()
     done
     # output
     {
-      sed -e "/$bpat/,\$d" "${(@)xpat}" $file
+      $sed -e "/$bpat/,\$d" "${(@)xpat}" $file
       [[ ${var[(I)$ref]} -eq 0 ]] && cat $src
       cat $mod
-      sed -e "1,/$epat/d" "${(@)xpat}" $file
+      $sed -e "1,/$epat/d" "${(@)xpat}" $file
     } > $tmp
     if [[ -n $ovw ]]; then
       mv $file $file.org

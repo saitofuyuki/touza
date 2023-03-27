@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/03/27 15:12:44 fuyuki Makefile.am>
+# Time-stamp: <2023/03/30 11:35:35 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -9,6 +9,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 ACLOCAL_AMFLAGS = -I ../m4c
+EXTRA_DIST =
 
 AM_FCFLAGS += $(AM_FCFLAGS_MODULE)
 AM_FCFLAGS_MODULE = $(DEBUG) $(TOUZA_CFLAGS)
@@ -35,6 +36,8 @@ chak_to_include = chak_decl.F90 chak_reg.F90
 EXTRA_chak_DEPENDENCIES = $(TOUZA_LIBRARY)
 
 noinst_SCRIPTS += demo-chak.sh
+noinst_SCRIPTS += ocheck.sh
+EXTRA_DIST += ocheck.sh.in
 
 noinst_PYTHON = jmznml.py
 
@@ -57,8 +60,11 @@ jmzdepf90: jmzdepf90.sh.in
 	chmod +x $@
 
 demo-chak.sh: demo-chak.sh.in
-	sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@
-	chmod +x $@
+	@sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@; chmod +x $@
+
+ocheck.sh: ocheck.sh.in
+	@sed -e 's,[@]CHAK[@],$(abs_builddir)/chak,g' \
+		 -e 's,[@]CHAK_OPTS[@],$(CHAK_OPTS),g' < $< >$@; chmod +x $@
 
 genx.sh: genx.sh.in
 	if test -e $<; then \
@@ -72,7 +78,7 @@ genx2.sh: genx2.sh.in
 		chmod +x $@; \
 	fi
 
-EXTRA_DIST = jmzdepf90.sh.in demo-chak.sh.in $(chak_to_include)
+EXTRA_DIST += jmzdepf90.sh.in demo-chak.sh.in $(chak_to_include)
 EXTRA_DIST += README-jmz.org
 
 MOSTLYCLEANFILES =
