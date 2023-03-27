@@ -17,7 +17,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2023/03/24 23:19:36 fuyuki Makefile.am>
+# Time-stamp: <2023/03/26 11:50:59 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022, 2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -25,7 +25,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Sat Mar 25 22:02:47 JST 2023
+# from AX_AM_MACROS_STATIC on Mon Mar 27 11:42:46 JST 2023
 
 
 
@@ -111,20 +111,21 @@ target_triplet = @target@
 @gcc_dependencies_TRUE@am__append_3 = *.dep
 # libtouza_local_la_SOURCES += nio_division.F90
 @with_nctcdf_TRUE@am__append_4 = nio_nctcdf.F90
-@BUILD_div_TRUE@am__append_5 = $(FC_MODULE_touza_div)
-@BUILD_div_TRUE@am__append_6 = $(FC_INCLUDE_touza_div)
+@have_iso_c_binding_TRUE@am__append_5 = nio_bindc.F90
+@BUILD_div_TRUE@am__append_6 = $(FC_MODULE_touza_div)
+@BUILD_div_TRUE@am__append_7 = $(FC_INCLUDE_touza_div)
 
 # AM_LDFLAGS = $(NETCDF4_LDFLAGS)
-@with_nctcdf_TRUE@am__append_7 = $(NETCDF4_FFLAGS)
-@BUILD_div_TRUE@am__append_8 = $(FC_LDADD_touza_div)
+@with_nctcdf_TRUE@am__append_8 = $(NETCDF4_FFLAGS)
+@BUILD_div_TRUE@am__append_9 = $(FC_LDADD_touza_div)
 check_PROGRAMS = test_nio_header$(EXEEXT) test_nio_record$(EXEEXT) \
 	test_nio_cache$(EXEEXT) $(am__EXEEXT_1) \
 	test_nio_control$(EXEEXT) test_nio$(EXEEXT) \
-	test_nio_miroc$(EXEEXT) $(am__EXEEXT_2) \
-	test_nio_bindc$(EXEEXT)
-@BUILD_div_TRUE@am__append_9 = test_nio_division
-@with_nctcdf_TRUE@am__append_10 = test_nio_nctcdf
-@with_nctcdf_TRUE@am__append_11 = $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
+	test_nio_miroc$(EXEEXT) $(am__EXEEXT_2) $(am__EXEEXT_3)
+@BUILD_div_TRUE@am__append_10 = test_nio_division
+@with_nctcdf_TRUE@am__append_11 = test_nio_nctcdf
+@with_nctcdf_TRUE@am__append_12 = $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
+@have_iso_c_binding_TRUE@am__append_13 = test_nio_bindc
 subdir = nio
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
@@ -142,16 +143,18 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 @BUILD_div_TRUE@am__EXEEXT_1 = test_nio_division$(EXEEXT)
 @with_nctcdf_TRUE@am__EXEEXT_2 = test_nio_nctcdf$(EXEEXT)
+@have_iso_c_binding_TRUE@am__EXEEXT_3 = test_nio_bindc$(EXEEXT)
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libtouza_local_la_LIBADD =
 am__libtouza_local_la_SOURCES_DIST = nio_std.F90 nio_header.F90 \
 	nio_record.F90 nio_cache.F90 nio_nctcdf.F90 nio_control.F90 \
 	nio_bindc.F90 nio.F90 touza_nio.h touza_nio_interface.h
 @with_nctcdf_TRUE@am__objects_1 = nio_nctcdf.lo
-am__objects_2 =
+@have_iso_c_binding_TRUE@am__objects_2 = nio_bindc.lo
+am__objects_3 =
 am_libtouza_local_la_OBJECTS = nio_std.lo nio_header.lo nio_record.lo \
-	nio_cache.lo $(am__objects_1) nio_control.lo nio_bindc.lo \
-	nio.lo $(am__objects_2) $(am__objects_2)
+	nio_cache.lo $(am__objects_1) nio_control.lo $(am__objects_2) \
+	nio.lo $(am__objects_3) $(am__objects_3)
 libtouza_local_la_OBJECTS = $(am_libtouza_local_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -190,8 +193,8 @@ am_test_nio_header_OBJECTS = test_nio_header-nio_header.$(OBJEXT)
 test_nio_header_OBJECTS = $(am_test_nio_header_OBJECTS)
 test_nio_header_DEPENDENCIES = $(am__DEPENDENCIES_3)
 am_test_nio_miroc_OBJECTS = test_nio_miroc-nio_miroc.$(OBJEXT)
-am__objects_3 = test_nio_miroc-calendar_miroc.$(OBJEXT)
-nodist_test_nio_miroc_OBJECTS = $(am__objects_3)
+am__objects_4 = test_nio_miroc-calendar_miroc.$(OBJEXT)
+nodist_test_nio_miroc_OBJECTS = $(am__objects_4)
 test_nio_miroc_OBJECTS = $(am_test_nio_miroc_OBJECTS) \
 	$(nodist_test_nio_miroc_OBJECTS)
 test_nio_miroc_DEPENDENCIES = $(am__DEPENDENCIES_1) \
@@ -762,28 +765,28 @@ CLEANFILES = $(noinst_SCRIPTS) $(CAL_SWITCH)
 MOSTLYCLEANFILES = $(am__append_1) $(am__append_3)
 LIST_MODFILES = .modfiles
 DEBUG = 
-AM_CPPFLAGS = -I$(top_srcdir) $(am__append_6) $(FC_INCLUDE_touza_std) \
+AM_CPPFLAGS = -I$(top_srcdir) $(am__append_7) $(FC_INCLUDE_touza_std) \
 	$(FC_INCLUDE_touza_trp)
 
 # no blank between -MT and NAME
 AM_FCFLAGS_DEP = '-MT$@' -MD -MP -MF $*.dep
-AM_FCFLAGS_MODULE = $(am__append_5) $(FC_MODULE_touza_std) \
-	$(FC_MODULE_touza_trp) $(am__append_7)
+AM_FCFLAGS_MODULE = $(am__append_6) $(FC_MODULE_touza_std) \
+	$(FC_MODULE_touza_trp) $(am__append_8)
 COPY_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=copy-%)
 DIFF_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=diff-%)
 switch_DATA = nio_miroc.F90
 include_HEADERS = touza_nio.h touza_nio_interface.h
 noinst_LTLIBRARIES = libtouza_local.la
 libtouza_local_la_SOURCES = nio_std.F90 nio_header.F90 nio_record.F90 \
-	nio_cache.F90 $(am__append_4) nio_control.F90 nio_bindc.F90 \
+	nio_cache.F90 $(am__append_4) nio_control.F90 $(am__append_5) \
 	nio.F90 $(include_HEADERS) $(libtouza_APPENDS)
 libtouza_local_la_LDFLAGS = 
 EXTRA_libtouza_local_la_SOURCES = nio_miroc.F90
 libtouza_APPENDS = 
 noinst_SCRIPTS = $(WTEST)
 TESTS = record
-TEST_COMMON_LIBS = $(noinst_LTLIBRARIES) $(am__append_8) \
-	$(FC_LDADD_touza_trp) $(FC_LDADD_touza_std) $(am__append_11)
+TEST_COMMON_LIBS = $(noinst_LTLIBRARIES) $(am__append_9) \
+	$(FC_LDADD_touza_trp) $(FC_LDADD_touza_std) $(am__append_12)
 test_nio_header_SOURCES = $(TEST_COMMON_SOURCES) nio_header.F90
 test_nio_header_LDADD = $(TEST_COMMON_LIBS)
 test_nio_header_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_HEADER=1
