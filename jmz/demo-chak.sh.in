@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/03/28 07:17:22 fuyuki demo-chak.sh.in>
+# Time-stamp: <2023/03/27 22:33:29 fuyuki demo-chak.sh.in>
 
 main ()
 {
@@ -167,9 +167,9 @@ run_demo ()
   local args=("$@")
   local tmp=$(mktemp) tmp2=$(mktemp) tmp3=$(mktemp) log=$(mktemp)
   if [[ -n $edup ]]; then
-    $chak --demo "${(@)args}" > $tmp 2>&1; err=$?
+    $chak "${(@)args}" > $tmp 2>&1; err=$?
   else
-    $chak        "${(@)args}" > $tmp 2> $log; err=$?
+    $chak "${(@)args}" > $tmp 2> $log; err=$?
   fi
   [[ -n $trim ]] && trim=(${(s/:/)trim})
   # print - "--- tmp"
