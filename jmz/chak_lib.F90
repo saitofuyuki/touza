@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/23 14:22:03 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/27 08:25:17 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -140,6 +140,16 @@ module chak_lib
   integer,parameter :: ofs_buffer = lmodule * hk_buffer
   integer,parameter :: ofs_anchor = lmodule * hk_anchor
 
+!!!_  - domain compromise mode for non-unary operations
+  integer,parameter :: cmode_null      = 0
+  integer,parameter :: cmode_inclusive = 1
+  integer,parameter :: cmode_intersect = 2
+  integer,parameter :: cmode_first     = 3
+
+  integer,parameter :: cmode_compromize = 3  ! mask
+
+  integer,parameter :: cmode_xundef     = 4  ! exclude undefined at flushing
+
 !!!_  - global flags
   integer,save :: lev_verbose = 0
   integer,save :: dbgv = -1
@@ -170,6 +180,41 @@ module chak_lib
   end type loop_t
 
   type(loop_t),save :: def_loop  = loop_t(null_range, null_range, -1, ' ')
+
+!!!_  - buffer property
+  type buffer_t
+     character(len=lname)    :: name              ! buffer name
+     character(len=ldesc)    :: desc              ! description
+     character(len=ldesc)    :: desc2             ! description (infix notation)
+     integer                 :: ilev              ! infix notation level
+     integer                 :: k = kv_null
+     integer                 :: stt
+     integer                 :: ncoor             ! (reserved) number of coordinate
+     integer                 :: ci(0:lcoor-1)
+     integer                 :: reff              ! reference file handle
+     type(loop_t)            :: pcp(0:lcoor-1)    ! physical (source) coordinate properties
+     real(kind=KBUF)         :: undef
+     real(kind=KBUF),pointer :: vd(:) => NULL()
+     integer,pointer         :: vi(:)
+  end type buffer_t
+
+!!!_  - buffer stack
+  type stack_t
+     integer      :: bh
+     type(loop_t) :: lcp(0:lcoor-1) ! logical (destination) coordinate properties
+  end type stack_t
+
+!!!_  - argument queue
+  type queue_t
+     integer :: term = -1            ! term handle
+     integer :: nopr                 ! number of operands
+     integer :: iter                 ! number of iterates etc
+     integer :: cmode = cmode_null   ! operation mode
+     character(len=ldesc)  :: desci
+     character(len=ldesc)  :: desco
+     type(stack_t),pointer :: lefts(:)       ! result stack to push
+     integer :: opt                  ! option for any use
+  end type queue_t
 
 !!!_ + Procedures
 contains

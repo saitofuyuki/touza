@@ -1,3 +1,11 @@
+Release-1.11.1 / 2023-03-27
+===========================
+
+  * jmz: (chak) [FATAL] parse_option failed to detect non-option arguments.
+  * jmz: (chak) [CRITICAL] CUM failed with anchor.
+  * jmz: (chak) output infix description according to verbose level.
+  * jmz: (chak) SIZE operator introduced.
+
 Release-1.11.0 / 2023-03-25
 ===========================
 

@@ -1,10 +1,19 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2023/03/25 21:32:12 fuyuki NEWS>
+# Time-stamp: <2023/03/27 11:18:28 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.11.1 from 1.11.0
+** Bug fixes
+- (chak) [FATAL] parse_option failed to detect non-option arguments.
+- (chak) [CRITICAL] CUM failed with anchor.
+
+** Changes
+- (chak) output infix description according to verbose level.
+- (chak) SIZE operator introduced.
 
 * Changes in 1.11.0 from 1.10.0
 - [FATAL] Import fixes around byte-order detection.
