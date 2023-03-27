@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/03/30 11:35:35 fuyuki Makefile.am>
+# Time-stamp: <2023/03/27 15:12:44 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
