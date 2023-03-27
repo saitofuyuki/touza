@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/03/24 17:21:51 fuyuki Makefile.am>
+# Time-stamp: <2023/03/27 15:12:44 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -12,7 +12,7 @@ ACLOCAL_AMFLAGS = -I ../m4c
 
 AM_FCFLAGS += $(AM_FCFLAGS_MODULE)
 AM_FCFLAGS_MODULE = $(DEBUG) $(TOUZA_CFLAGS)
-# AM_LDFLAGS = $(TOUZA_LDFLAGS)
+AM_LDFLAGS = $(TOUZA_LDFLAGS)
 LDADD = libjmz_local.la $(TOUZA_LIBS)
 
 noinst_SCRIPTS = jmzdepf90
