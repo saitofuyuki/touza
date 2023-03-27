@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/27 10:08:51 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/27 10:47:03 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -4930,14 +4930,14 @@ contains
 
     do jout = ninp - 1, 0, -1
        jinp = ofsi + jout
-       ptmp = mstack - ninp + jout
+       ptmp(nb) = mstack - ninp + jout
        if (ierr.eq.0) then
           hbL = lefts(jout)%bh
           hbR = bufi(jinp)
           jbL = buf_h2item(hbL)
           jbR = buf_h2item(hbR)
           fillR = obuffer(jbR)%undef
-          btmp = hbR
+          btmp(nb) = hbR
           if (check.and. (fillR.eq.TRUE.or.fillR.eq.FALSE)) then
              ierr = ERR_PANIC
              call message(ierr, 'MISS value cannot be 1 nor 0')
@@ -5041,7 +5041,7 @@ contains
           m = buffer_vmems(obuffer(jbR))
           if (m.ge.0) then
              btmp(ntmp) = hbR
-             ptmp(ntmp) = pstk(jj)
+             ptmp(ntmp) = pstk(jj-ofsi)
              ntmp = ntmp + 1
           endif
        enddo
@@ -5145,6 +5145,7 @@ contains
        ofsi = ofsi + 1
     endif
     call jot(pstk, ninp, e=mstack)
+    ! write(*, *) 'jot', ninp, ofsi, pstk(0:ninp-1)
     nout = size(lefts)
     nopr = ninp / nout
     ! Reduce every (ninp / nout) buffer to nout.
@@ -5165,9 +5166,10 @@ contains
           hbR = bufi(jj)
           jbR = buf_h2item(hbR)
           m = buffer_vmems(obuffer(jbR))
+          ! write(*, *) 'tmp', jout, jinp, jj, bufi(jj), m
           if (m.ge.0) then
              btmp(ntmp) = hbR
-             ptmp(ntmp) = pstk(jj)
+             ptmp(ntmp) = pstk(jj-ofsi)
              ntmp = ntmp + 1
           endif
        enddo
@@ -5427,9 +5429,12 @@ contains
     integer ctype(0:lcoor-1, 0:nbuf-1)
 
     ierr = 0
+    ! write(*, *) 'tc:0', pstk(0:nbuf-1)
+    ! write(*, *) 'tc:1', bufh(0:nbuf-1)
     do j = 0, nbuf - 1
        jb = buf_h2item(bufh(j))
        js = pstk(j)
+       ! write(*, *) 'tc:', j, bufh(j), pstk(j), jb, js
        if (ierr.eq.0) then
           call get_logical_shape &
                & (ierr, nameR(:,j), ctype(:,j), cpidx(:,j), bstack(js)%lcp, obuffer(jb)%pcp, lcoor)
