@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/27 11:01:37 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/28 07:15:52 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -608,29 +608,29 @@ contains
        return
     endif
     if      (abuf(1:2).eq.'-v') then
-       n = verify(trim(abuf), 'v', .TRUE.)
-       if (n.ne.1) then
-          ierr = ERR_INVALID_ITEM
+       n = count_option_levels(abuf(3:), 'v')
+       if (n.lt.0) then
+          ierr = n
        else
-          lev_verbose = + (len_trim(abuf) - 1)
+          lev_verbose = + n
        endif
     else if (abuf.eq.'+v') then
        lev_verbose = +999
     else if (abuf(1:2).eq.'-q') then
-       n = verify(trim(abuf), 'q', .TRUE.)
-       if (n.ne.1) then
-          ierr = ERR_INVALID_ITEM
+       n = count_option_levels(abuf(3:), 'q')
+       if (n.lt.0) then
+          ierr = n
        else
-          lev_verbose = - (len_trim(abuf) - 1)
+          lev_verbose = - n
        endif
     else if (abuf.eq.'+q') then
        lev_verbose = -999
     else if (abuf(1:2).eq.'-d') then
-       n = verify(trim(abuf), 'd', .TRUE.)
-       if (n.ne.1) then
-          ierr = ERR_INVALID_ITEM
+       n = count_option_levels(abuf(3:), 'd')
+       if (n.lt.0) then
+          ierr = n
        else
-          dbgv = + (len_trim(abuf) - 1)
+          dbgv = + n
        endif
     else if (abuf.eq.'+d') then
        dbgv = +999
@@ -682,6 +682,8 @@ contains
     else if (abuf(1:2).eq.'-H') then
        call parse_number(ierr, ntmp, abuf(3:))
        if (ierr.eq.0) hmd = ntmp
+    else if (abuf.eq.'--demo') then
+       if (ierr.eq.0) uerr = ulog
     else
        ierr = ERR_INVALID_ITEM
     endif
@@ -702,6 +704,23 @@ contains
        if (ierr.eq.0) call parse_operator_option(ierr, cmd)
     endif
   end subroutine parse_option
+!!!_    * count_option_levels
+  integer function count_option_levels(str, ch) result(n)
+    use TOUZA_Std,only: parse_number
+    implicit none
+    character(len=*),intent(in) :: str
+    character(len=1),intent(in) :: ch
+    integer jerr
+    call parse_number(jerr, n, str)
+    if (jerr.ne.0) then
+       n = verify(trim(str), ch, .TRUE.)
+       if (n.ne.0) then
+          n = ERR_INVALID_ITEM
+       else
+          n = len_trim(str) + 1
+       endif
+    endif
+  end function count_option_levels
 !!!_    * check_only_global
   subroutine check_only_global(ierr, arg)
     implicit none
