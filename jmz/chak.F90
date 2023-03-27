@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/27 10:47:03 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/27 11:01:37 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -585,7 +585,6 @@ contains
     character(len=*),intent(in)    :: arg
     character(len=lpath) :: abuf
     integer n
-    integer jval, jvar
 
     integer md, cmd, hmd
     integer ntmp
@@ -604,113 +603,103 @@ contains
     xsub = 0
     xopts = ' '
 
-    jvar = index(abuf, param_sep)
-    if (jvar.eq.1) then
-       ierr = ERR_INVALID_PARAMETER
-       call message(ierr, 'invalid option ' // trim(abuf), (/japos/))
+    if (index('-+', abuf(1:1)).eq.0) then
+       ierr = ERR_NO_CANDIDATE   ! not error
        return
-    else if (jvar.gt.0) then
-       jval = jvar + 1
-       jvar = jvar - 1
-    else
-       if (index('-+', abuf(1:1)).eq.0) then
-          ierr = ERR_NO_CANDIDATE   ! not error
-          return
-       endif
-       if      (abuf(1:2).eq.'-v') then
-          n = verify(trim(abuf), 'v', .TRUE.)
-          if (n.ne.1) then
-             ierr = ERR_INVALID_ITEM
-          else
-             lev_verbose = + (len_trim(abuf) - 1)
-          endif
-       else if (abuf.eq.'+v') then
-          lev_verbose = +999
-       else if (abuf(1:2).eq.'-q') then
-          n = verify(trim(abuf), 'q', .TRUE.)
-          if (n.ne.1) then
-             ierr = ERR_INVALID_ITEM
-          else
-             lev_verbose = - (len_trim(abuf) - 1)
-          endif
-       else if (abuf.eq.'+q') then
-          lev_verbose = -999
-       else if (abuf(1:2).eq.'-d') then
-          n = verify(trim(abuf), 'd', .TRUE.)
-          if (n.ne.1) then
-             ierr = ERR_INVALID_ITEM
-          else
-             dbgv = + (len_trim(abuf) - 1)
-          endif
-       else if (abuf.eq.'+d') then
-          dbgv = +999
-       else if (abuf.eq.'-h') then
-          stat = stat_help
-       else if (abuf.eq.'-n') then
-          dryrun = 1
-       else if (abuf.eq.'-f') then   ! write-mode
-          md = mode_write
-       else if (abuf.eq.'-a') then
-          md = mode_append
-       else if (abuf.eq.'-k') then
-          md = mode_new
-       else if (abuf.eq.'-c') then   ! read-mode
-          md = mode_cycle
-       else if (abuf.eq.'-s') then
-          md = mode_terminate
-       else if (abuf.eq.'-p') then
-          md = mode_persistent
-       else if (abuf.eq.'-i') then   ! compromise mode
-          cmd = cmode_inclusive
-       else if (abuf.eq.'-x') then
-          cmd = cmode_intersect
-       else if (abuf.eq.'-l') then
-          cmd = cmode_first
-       else if (abuf.eq.'-N') then
-          hflag = hflag_nulld        ! file or default read
-          hsub = -1
-       else if (abuf.eq.'+N') then
-          hflag = hflag_nulld        ! special for default write
-          hsub = +1
-       else if (abuf(1:2).eq.'-X') then
-          xsub = -1
-          xopts = trim(abuf(3:))     ! file or default read
-       else if (abuf(1:2).eq.'+X') then
-          xsub = +1
-          xopts = trim(abuf(3:))     ! special for default write
-       else if (abuf.eq.'-P') then
-          call check_only_global(ierr, abuf)
-          if (ierr.eq.0) call set_user_offsets(ierr, 0, 0)
-       else if (abuf.eq.'-F') then
-          call check_only_global(ierr, abuf)
-          if (ierr.eq.0) call set_user_offsets(ierr, 1, 0)
-       else if (abuf.eq.'-H') then
-          japos = japos + 1
-          call get_param(ierr, abuf, japos)
-          if (ierr.eq.0) call parse_number(ierr, ntmp, abuf)
-          if (ierr.eq.0) hmd = ntmp
-       else if (abuf(1:2).eq.'-H') then
-          call parse_number(ierr, ntmp, abuf(3:))
-          if (ierr.eq.0) hmd = ntmp
-       else
+    endif
+    if      (abuf(1:2).eq.'-v') then
+       n = verify(trim(abuf), 'v', .TRUE.)
+       if (n.ne.1) then
           ierr = ERR_INVALID_ITEM
+       else
+          lev_verbose = + (len_trim(abuf) - 1)
        endif
-       if (ierr.eq.ERR_INVALID_ITEM) then
-          call message(ierr, 'invalid option ' // trim(abuf), (/japos/))
-       else if (ierr.ne.0) then
-          call message(ierr, 'argument parser fails ' // trim(abuf), (/japos/))
+    else if (abuf.eq.'+v') then
+       lev_verbose = +999
+    else if (abuf(1:2).eq.'-q') then
+       n = verify(trim(abuf), 'q', .TRUE.)
+       if (n.ne.1) then
+          ierr = ERR_INVALID_ITEM
+       else
+          lev_verbose = - (len_trim(abuf) - 1)
        endif
-       if (md.ne.mode_unset) then
-          if (ierr.eq.0) call parse_file_option(ierr, md)
-       else if (hmd.ne.hedit_unset) then
-          if (ierr.eq.0) call parse_hedit_option(ierr, hmd)
-       else if (hflag.ne.hflag_unset) then
-          if (ierr.eq.0) call parse_hflag_option(ierr, hflag, hsub)
-       else if (xsub.ne.0) then
-          if (ierr.eq.0) call parse_xflag_option(ierr, xopts, xsub)
-       else if (cmd.ne.mode_unset) then
-          if (ierr.eq.0) call parse_operator_option(ierr, cmd)
+    else if (abuf.eq.'+q') then
+       lev_verbose = -999
+    else if (abuf(1:2).eq.'-d') then
+       n = verify(trim(abuf), 'd', .TRUE.)
+       if (n.ne.1) then
+          ierr = ERR_INVALID_ITEM
+       else
+          dbgv = + (len_trim(abuf) - 1)
        endif
+    else if (abuf.eq.'+d') then
+       dbgv = +999
+    else if (abuf.eq.'-h') then
+       stat = stat_help
+    else if (abuf.eq.'-n') then
+       dryrun = 1
+    else if (abuf.eq.'-f') then   ! write-mode
+       md = mode_write
+    else if (abuf.eq.'-a') then
+       md = mode_append
+    else if (abuf.eq.'-k') then
+       md = mode_new
+    else if (abuf.eq.'-c') then   ! read-mode
+       md = mode_cycle
+    else if (abuf.eq.'-s') then
+       md = mode_terminate
+    else if (abuf.eq.'-p') then
+       md = mode_persistent
+    else if (abuf.eq.'-i') then   ! compromise mode
+       cmd = cmode_inclusive
+    else if (abuf.eq.'-x') then
+       cmd = cmode_intersect
+    else if (abuf.eq.'-l') then
+       cmd = cmode_first
+    else if (abuf.eq.'-N') then
+       hflag = hflag_nulld        ! file or default read
+       hsub = -1
+    else if (abuf.eq.'+N') then
+       hflag = hflag_nulld        ! special for default write
+       hsub = +1
+    else if (abuf(1:2).eq.'-X') then
+       xsub = -1
+       xopts = trim(abuf(3:))     ! file or default read
+    else if (abuf(1:2).eq.'+X') then
+       xsub = +1
+       xopts = trim(abuf(3:))     ! special for default write
+    else if (abuf.eq.'-P') then
+       call check_only_global(ierr, abuf)
+       if (ierr.eq.0) call set_user_offsets(ierr, 0, 0)
+    else if (abuf.eq.'-F') then
+       call check_only_global(ierr, abuf)
+       if (ierr.eq.0) call set_user_offsets(ierr, 1, 0)
+    else if (abuf.eq.'-H') then
+       japos = japos + 1
+       call get_param(ierr, abuf, japos)
+       if (ierr.eq.0) call parse_number(ierr, ntmp, abuf)
+       if (ierr.eq.0) hmd = ntmp
+    else if (abuf(1:2).eq.'-H') then
+       call parse_number(ierr, ntmp, abuf(3:))
+       if (ierr.eq.0) hmd = ntmp
+    else
+       ierr = ERR_INVALID_ITEM
+    endif
+    if (ierr.eq.ERR_INVALID_ITEM) then
+       call message(ierr, 'invalid option ' // trim(abuf), (/japos/))
+    else if (ierr.ne.0) then
+       call message(ierr, 'argument parser fails ' // trim(abuf), (/japos/))
+    endif
+    if (md.ne.mode_unset) then
+       if (ierr.eq.0) call parse_file_option(ierr, md)
+    else if (hmd.ne.hedit_unset) then
+       if (ierr.eq.0) call parse_hedit_option(ierr, hmd)
+    else if (hflag.ne.hflag_unset) then
+       if (ierr.eq.0) call parse_hflag_option(ierr, hflag, hsub)
+    else if (xsub.ne.0) then
+       if (ierr.eq.0) call parse_xflag_option(ierr, xopts, xsub)
+    else if (cmd.ne.mode_unset) then
+       if (ierr.eq.0) call parse_operator_option(ierr, cmd)
     endif
   end subroutine parse_option
 !!!_    * check_only_global
