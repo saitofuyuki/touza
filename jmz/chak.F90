@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/25 08:50:38 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/27 11:01:37 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -55,56 +55,15 @@ program chak
   integer,parameter :: stt_none   = 0
   integer,parameter :: stt_free   = 1
   integer,parameter :: stt_locked = -1
-
-  ! domain compromise mode for non-unary operations
-  integer,parameter :: cmode_null      = 0
-  integer,parameter :: cmode_inclusive = 1
-  integer,parameter :: cmode_intersect = 2
-  integer,parameter :: cmode_first     = 3
-
-  integer,parameter :: cmode_compromize = 3  ! mask
-
-  integer,parameter :: cmode_xundef     = 4  ! exclude undefined at flushing
-
 !!!_  - buffers
   integer,save      :: lcount = 0   ! literal count
   integer,save      :: consts=0     ! predefine constants
-  type buffer_t
-     character(len=lname)    :: name              ! buffer name
-     character(len=ldesc)    :: desc              ! description
-     character(len=ldesc)    :: desc2             ! description (infix notation)
-     integer                 :: ilev              ! infix notation level
-     integer                 :: k = kv_null
-     integer                 :: stt
-     integer                 :: ncoor             ! (reserved) number of coordinate
-     integer                 :: ci(0:lcoor-1)
-     integer                 :: reff              ! reference file handle
-     type(loop_t)            :: pcp(0:lcoor-1)    ! physical (source) coordinate properties
-     real(kind=KBUF)         :: undef
-     real(kind=KBUF),pointer :: vd(:) => NULL()
-     integer,pointer         :: vi(:)
-  end type buffer_t
   type(buffer_t),target :: obuffer(0:lbuffer-1)
 !!!_  - buffer stack
-  type stack_t
-     integer      :: bh
-     type(loop_t) :: lcp(0:lcoor-1) ! logical (destination) coordinate properties
-  end type stack_t
-
   integer           :: mstack
   integer,parameter :: lstack=OPT_CHAK_STACKS
   type(stack_t)     :: bstack(0:lstack-1)
 !!!_  - argument queue
-  type queue_t
-     integer :: term = -1            ! term handle
-     integer :: nopr                 ! number of operands
-     integer :: iter                 ! number of iterates etc
-     integer :: cmode = cmode_null   ! operation mode
-     character(len=ldesc)  :: desci
-     character(len=ldesc)  :: desco
-     type(stack_t),pointer :: lefts(:)       ! result stack to push
-     integer :: opt                  ! option for any use
-  end type queue_t
   integer           :: mqueue
   integer,parameter :: lqueue=OPT_CHAK_QUEUE
   type(queue_t)     :: aqueue(0:lqueue-1)
@@ -626,7 +585,6 @@ contains
     character(len=*),intent(in)    :: arg
     character(len=lpath) :: abuf
     integer n
-    integer jval, jvar
 
     integer md, cmd, hmd
     integer ntmp
@@ -645,113 +603,103 @@ contains
     xsub = 0
     xopts = ' '
 
-    jvar = index(abuf, param_sep)
-    if (jvar.eq.1) then
-       ierr = ERR_INVALID_PARAMETER
-       call message(ierr, 'invalid option ' // trim(abuf), (/japos/))
+    if (index('-+', abuf(1:1)).eq.0) then
+       ierr = ERR_NO_CANDIDATE   ! not error
        return
-    else if (jvar.gt.0) then
-       jval = jvar + 1
-       jvar = jvar - 1
-    else
-       if (index('-+', abuf(1:1)).eq.0) then
-          ierr = ERR_NO_CANDIDATE   ! not error
-          return
-       endif
-       if      (abuf(1:2).eq.'-v') then
-          n = verify(trim(abuf), 'v', .TRUE.)
-          if (n.ne.1) then
-             ierr = ERR_INVALID_ITEM
-          else
-             lev_verbose = + (len_trim(abuf) - 1)
-          endif
-       else if (abuf.eq.'+v') then
-          lev_verbose = +999
-       else if (abuf(1:2).eq.'-q') then
-          n = verify(trim(abuf), 'q', .TRUE.)
-          if (n.ne.1) then
-             ierr = ERR_INVALID_ITEM
-          else
-             lev_verbose = - (len_trim(abuf) - 1)
-          endif
-       else if (abuf.eq.'+q') then
-          lev_verbose = -999
-       else if (abuf(1:2).eq.'-d') then
-          n = verify(trim(abuf), 'd', .TRUE.)
-          if (n.ne.1) then
-             ierr = ERR_INVALID_ITEM
-          else
-             dbgv = + (len_trim(abuf) - 1)
-          endif
-       else if (abuf.eq.'+d') then
-          dbgv = +999
-       else if (abuf.eq.'-h') then
-          stat = stat_help
-       else if (abuf.eq.'-n') then
-          dryrun = 1
-       else if (abuf.eq.'-f') then   ! write-mode
-          md = mode_write
-       else if (abuf.eq.'-a') then
-          md = mode_append
-       else if (abuf.eq.'-k') then
-          md = mode_new
-       else if (abuf.eq.'-c') then   ! read-mode
-          md = mode_cycle
-       else if (abuf.eq.'-s') then
-          md = mode_terminate
-       else if (abuf.eq.'-p') then
-          md = mode_persistent
-       else if (abuf.eq.'-i') then   ! compromise mode
-          cmd = cmode_inclusive
-       else if (abuf.eq.'-x') then
-          cmd = cmode_intersect
-       else if (abuf.eq.'-l') then
-          cmd = cmode_first
-       else if (abuf.eq.'-N') then
-          hflag = hflag_nulld        ! file or default read
-          hsub = -1
-       else if (abuf.eq.'+N') then
-          hflag = hflag_nulld        ! special for default write
-          hsub = +1
-       else if (abuf(1:2).eq.'-X') then
-          xsub = -1
-          xopts = trim(abuf(3:))     ! file or default read
-       else if (abuf(1:2).eq.'+X') then
-          xsub = +1
-          xopts = trim(abuf(3:))     ! special for default write
-       else if (abuf.eq.'-P') then
-          call check_only_global(ierr, abuf)
-          if (ierr.eq.0) call set_user_offsets(ierr, 0, 0)
-       else if (abuf.eq.'-F') then
-          call check_only_global(ierr, abuf)
-          if (ierr.eq.0) call set_user_offsets(ierr, 1, 0)
-       else if (abuf.eq.'-H') then
-          japos = japos + 1
-          call get_param(ierr, abuf, japos)
-          if (ierr.eq.0) call parse_number(ierr, ntmp, abuf)
-          if (ierr.eq.0) hmd = ntmp
-       else if (abuf(1:2).eq.'-H') then
-          call parse_number(ierr, ntmp, abuf(3:))
-          if (ierr.eq.0) hmd = ntmp
-       else
+    endif
+    if      (abuf(1:2).eq.'-v') then
+       n = verify(trim(abuf), 'v', .TRUE.)
+       if (n.ne.1) then
           ierr = ERR_INVALID_ITEM
+       else
+          lev_verbose = + (len_trim(abuf) - 1)
        endif
-       if (ierr.eq.ERR_INVALID_ITEM) then
-          call message(ierr, 'invalid option ' // trim(abuf), (/japos/))
-       else if (ierr.ne.0) then
-          call message(ierr, 'argument parser fails ' // trim(abuf), (/japos/))
+    else if (abuf.eq.'+v') then
+       lev_verbose = +999
+    else if (abuf(1:2).eq.'-q') then
+       n = verify(trim(abuf), 'q', .TRUE.)
+       if (n.ne.1) then
+          ierr = ERR_INVALID_ITEM
+       else
+          lev_verbose = - (len_trim(abuf) - 1)
        endif
-       if (md.ne.mode_unset) then
-          if (ierr.eq.0) call parse_file_option(ierr, md)
-       else if (hmd.ne.hedit_unset) then
-          if (ierr.eq.0) call parse_hedit_option(ierr, hmd)
-       else if (hflag.ne.hflag_unset) then
-          if (ierr.eq.0) call parse_hflag_option(ierr, hflag, hsub)
-       else if (xsub.ne.0) then
-          if (ierr.eq.0) call parse_xflag_option(ierr, xopts, xsub)
-       else if (cmd.ne.mode_unset) then
-          if (ierr.eq.0) call parse_operator_option(ierr, cmd)
+    else if (abuf.eq.'+q') then
+       lev_verbose = -999
+    else if (abuf(1:2).eq.'-d') then
+       n = verify(trim(abuf), 'd', .TRUE.)
+       if (n.ne.1) then
+          ierr = ERR_INVALID_ITEM
+       else
+          dbgv = + (len_trim(abuf) - 1)
        endif
+    else if (abuf.eq.'+d') then
+       dbgv = +999
+    else if (abuf.eq.'-h') then
+       stat = stat_help
+    else if (abuf.eq.'-n') then
+       dryrun = 1
+    else if (abuf.eq.'-f') then   ! write-mode
+       md = mode_write
+    else if (abuf.eq.'-a') then
+       md = mode_append
+    else if (abuf.eq.'-k') then
+       md = mode_new
+    else if (abuf.eq.'-c') then   ! read-mode
+       md = mode_cycle
+    else if (abuf.eq.'-s') then
+       md = mode_terminate
+    else if (abuf.eq.'-p') then
+       md = mode_persistent
+    else if (abuf.eq.'-i') then   ! compromise mode
+       cmd = cmode_inclusive
+    else if (abuf.eq.'-x') then
+       cmd = cmode_intersect
+    else if (abuf.eq.'-l') then
+       cmd = cmode_first
+    else if (abuf.eq.'-N') then
+       hflag = hflag_nulld        ! file or default read
+       hsub = -1
+    else if (abuf.eq.'+N') then
+       hflag = hflag_nulld        ! special for default write
+       hsub = +1
+    else if (abuf(1:2).eq.'-X') then
+       xsub = -1
+       xopts = trim(abuf(3:))     ! file or default read
+    else if (abuf(1:2).eq.'+X') then
+       xsub = +1
+       xopts = trim(abuf(3:))     ! special for default write
+    else if (abuf.eq.'-P') then
+       call check_only_global(ierr, abuf)
+       if (ierr.eq.0) call set_user_offsets(ierr, 0, 0)
+    else if (abuf.eq.'-F') then
+       call check_only_global(ierr, abuf)
+       if (ierr.eq.0) call set_user_offsets(ierr, 1, 0)
+    else if (abuf.eq.'-H') then
+       japos = japos + 1
+       call get_param(ierr, abuf, japos)
+       if (ierr.eq.0) call parse_number(ierr, ntmp, abuf)
+       if (ierr.eq.0) hmd = ntmp
+    else if (abuf(1:2).eq.'-H') then
+       call parse_number(ierr, ntmp, abuf(3:))
+       if (ierr.eq.0) hmd = ntmp
+    else
+       ierr = ERR_INVALID_ITEM
+    endif
+    if (ierr.eq.ERR_INVALID_ITEM) then
+       call message(ierr, 'invalid option ' // trim(abuf), (/japos/))
+    else if (ierr.ne.0) then
+       call message(ierr, 'argument parser fails ' // trim(abuf), (/japos/))
+    endif
+    if (md.ne.mode_unset) then
+       if (ierr.eq.0) call parse_file_option(ierr, md)
+    else if (hmd.ne.hedit_unset) then
+       if (ierr.eq.0) call parse_hedit_option(ierr, hmd)
+    else if (hflag.ne.hflag_unset) then
+       if (ierr.eq.0) call parse_hflag_option(ierr, hflag, hsub)
+    else if (xsub.ne.0) then
+       if (ierr.eq.0) call parse_xflag_option(ierr, xopts, xsub)
+    else if (cmd.ne.mode_unset) then
+       if (ierr.eq.0) call parse_operator_option(ierr, cmd)
     endif
   end subroutine parse_option
 !!!_    * check_only_global
@@ -1221,7 +1169,7 @@ contains
           ierr = ERR_INSUFFICIENT_BUFFER
           call message(ierr, 'too many ranks to SHAPE:' // trim(arg))
        else
-          call decompose_coordinate_mod(ierr, jrep, arg=arg(jpb+1:jpe-1))
+          call decompose_coordinate_mod(ierr, jrep, arg=arg(jpb+1:jpe-1), hopr=hopr)
           if (ierr.eq.0) then
              aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
              aqueue(jq)%lefts(:)%lcp(jc)%bgn  = null_range
@@ -1262,7 +1210,7 @@ contains
              obuffer(jb)%stt  = stt_locked
              call reg_fake_opr(ierr, hbuf, obuffer(jb)%name)
           endif
-       case(opr_PERM)
+       case(opr_PERM,opr_SIZE)
           call parse_buffer_shape(ierr, arg(jpar:), hopr)
        case(opr_MISS)
           if (jpar.lt.jend) then
@@ -1355,7 +1303,7 @@ contains
           ierr = ERR_INSUFFICIENT_BUFFER
           call message(ierr, 'too many ranks to SHAPE:' // trim(arg))
        else
-          call decompose_coordinate_mod(ierr, jrep, b, e, s, arg(jpb+1:jpe-1))
+          call decompose_coordinate_mod(ierr, jrep, b, e, s, arg(jpb+1:jpe-1), hopr)
           if (ierr.eq.0) then
              aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
              aqueue(jq)%lefts(:)%lcp(jc)%bgn  = b
@@ -1408,7 +1356,7 @@ contains
        endif
     endif
     if (ierr.eq.0) then
-       call decompose_coordinate_mod(ierr, jrep, b, e, s, arg)
+       call decompose_coordinate_mod(ierr, jrep, b, e, s, arg, hopr)
        ! write(*, *) ierr, b, e, s, arg(1:jrep)
     endif
     if (ierr.eq.0) then
@@ -1427,13 +1375,14 @@ contains
 
 !!!_   . decompose_coordinate_mod
   subroutine decompose_coordinate_mod &
-       & (ierr, jrep, b, e, s, arg)
-    use TOUZA_Std,only: split_list
+       & (ierr, jrep, b, e, s, arg, hopr)
+    use TOUZA_Std,only: split_list, condop
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: jrep     ! name/rename as (1:jrep)
     integer,optional,intent(out) :: b, e, s  ! either all or none specified
     character(len=*),intent(in)  :: arg
+    integer,         intent(in)  :: hopr
     integer larg, lsep
     integer js0, js1
     integer rpos(2)
@@ -1509,11 +1458,17 @@ contains
     else if (nc.eq.0) then
        b = system_index_bgn(rpos(1))
        e = system_index_end(rpos(2))
-       continue
     else if (nc.eq.1) then
-       b = system_index_bgn(rpos(1))
-       e = b + 1
-       s = 1
+       if (hopr.eq.opr_SIZE) then
+          ! force null coordinate if size==0
+          b = 0
+          e = rpos(1)
+          s = condop(rpos(1).eq.0, 0, 1)
+       else
+          b = system_index_bgn(rpos(1))
+          e = b + 1
+          s = 1
+       endif
     else if (nc.eq.2) then
        b = system_index_bgn(rpos(1))
        e = system_index_end(rpos(2))
@@ -4082,6 +4037,8 @@ contains
           continue
        else if (handle.eq.opr_PERM) then
           continue
+       else if (handle.eq.opr_SIZE) then
+          continue
 !!!_    * index
        else if (handle.ge.opr_C0.and.handle.lt.opr_C3) then
           call apply_INDEX(ierr, handle, lefts(1:push))
@@ -4377,6 +4334,7 @@ contains
     skip_undef = IAND(cmode, cmode_xundef).ne.0
 
 212 format('## stack[', I0, '] ', A, 1x, A)
+213 format('## stack[', I0, '] ', A, 1x, A, ' // ', A)
 
 231 format('##      ', A)
 232 format('##   >  ', A)
@@ -4405,8 +4363,14 @@ contains
        endif
        if (ierr.eq.0) call get_obj_string(ierr, val, hb)
 
+       if (is_msglev(lev_verbose, -levq_rec)) then
+          if (ierr.eq.0) write(utmp, 213) &
+               & user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc), trim(obuffer(jb)%desc2)
+       else if (is_msglev(lev_verbose, -levq_stack)) then
+          if (ierr.eq.0) write(utmp, 212) &
+               & user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc)
+       endif
        if (is_msglev(lev_verbose, -levq_stack)) then
-          if (ierr.eq.0) write(utmp, 212) user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc)
           if (ierr.eq.0) call get_domain_string(ierr, lcstr, bstack(js)%lcp)
           if (ierr.eq.0) call get_domain_string(ierr, pcstr, obuffer(jb)%pcp)
           if (ierr.eq.0) then
@@ -4555,12 +4519,20 @@ contains
              hb = bufh(j)
              js = pstk(j)
 202          format('## ', I0, 1x, A, 1x, A, 1x, A)
+203          format('## ', I0, 1x, A, 1x, A, 1x, A, ' // ', A)
              if (ierr.eq.0) then
                 call get_domain_shape(ierr, dstr, domr(j), obuffer(jb)%pcp, bstack(js)%lcp, doml)
              endif
-             if (ierr.eq.0) then
-                write(utmp, 202) user_index_bgn(j), trim(vals(j)), &
-                     & trim(dstr), trim(obuffer(jb)%desc)
+             if (lev_verbose.ge.levq_rec) then
+                if (ierr.eq.0) then
+                   write(utmp, 203) user_index_bgn(j), trim(vals(j)), &
+                        & trim(dstr), trim(obuffer(jb)%desc), trim(obuffer(jb)%desc2)
+                endif
+             else
+                if (ierr.eq.0) then
+                   write(utmp, 202) user_index_bgn(j), trim(vals(j)), &
+                        & trim(dstr), trim(obuffer(jb)%desc)
+                endif
              endif
           enddo
        endif
@@ -4947,14 +4919,14 @@ contains
 
     do jout = ninp - 1, 0, -1
        jinp = ofsi + jout
-       ptmp = mstack - ninp + jout
+       ptmp(nb) = mstack - ninp + jout
        if (ierr.eq.0) then
           hbL = lefts(jout)%bh
           hbR = bufi(jinp)
           jbL = buf_h2item(hbL)
           jbR = buf_h2item(hbR)
           fillR = obuffer(jbR)%undef
-          btmp = hbR
+          btmp(nb) = hbR
           if (check.and. (fillR.eq.TRUE.or.fillR.eq.FALSE)) then
              ierr = ERR_PANIC
              call message(ierr, 'MISS value cannot be 1 nor 0')
@@ -5058,7 +5030,7 @@ contains
           m = buffer_vmems(obuffer(jbR))
           if (m.ge.0) then
              btmp(ntmp) = hbR
-             ptmp(ntmp) = pstk(jj)
+             ptmp(ntmp) = pstk(jj-ofsi)
              ntmp = ntmp + 1
           endif
        enddo
@@ -5162,6 +5134,7 @@ contains
        ofsi = ofsi + 1
     endif
     call jot(pstk, ninp, e=mstack)
+    ! write(*, *) 'jot', ninp, ofsi, pstk(0:ninp-1)
     nout = size(lefts)
     nopr = ninp / nout
     ! Reduce every (ninp / nout) buffer to nout.
@@ -5182,9 +5155,10 @@ contains
           hbR = bufi(jj)
           jbR = buf_h2item(hbR)
           m = buffer_vmems(obuffer(jbR))
+          ! write(*, *) 'tmp', jout, jinp, jj, bufi(jj), m
           if (m.ge.0) then
              btmp(ntmp) = hbR
-             ptmp(ntmp) = pstk(jj)
+             ptmp(ntmp) = pstk(jj-ofsi)
              ntmp = ntmp + 1
           endif
        enddo
@@ -5444,9 +5418,12 @@ contains
     integer ctype(0:lcoor-1, 0:nbuf-1)
 
     ierr = 0
+    ! write(*, *) 'tc:0', pstk(0:nbuf-1)
+    ! write(*, *) 'tc:1', bufh(0:nbuf-1)
     do j = 0, nbuf - 1
        jb = buf_h2item(bufh(j))
        js = pstk(j)
+       ! write(*, *) 'tc:', j, bufh(j), pstk(j), jb, js
        if (ierr.eq.0) then
           call get_logical_shape &
                & (ierr, nameR(:,j), ctype(:,j), cpidx(:,j), bstack(js)%lcp, obuffer(jb)%pcp, lcoor)

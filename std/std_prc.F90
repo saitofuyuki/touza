@@ -1,7 +1,7 @@
 !!!_! std_prc.F90 - TOUZA/Std precision(kind) manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Sep 6 2020
-#define TIME_STAMP 'Time-stamp: <2023/01/08 16:57:01 fuyuki std_prc.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/26 12:04:57 fuyuki std_prc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2023
@@ -102,6 +102,9 @@ module TOUZA_Std_prc
 #endif
 #if HAVE_FORTRAN_IEEE_ARITMETIC
   use IEEE_ARITHMETIC
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING
+  use ISO_C_BINDING
 #endif
   implicit none
   private
@@ -377,18 +380,66 @@ contains
        write(utmp, 201) 'single',    KFLT, dflt, xflt
        write(utmp, 201) 'double',    KDBL, ddbl, xdbl
        write(utmp, 201) 'quadruple', KQPL, dqpl, xqpl
+#if HAVE_FORTRAN_ISO_C_BINDING_C_FLOAT
+       write(utmp, 201) 'c_float',   C_FLOAT, DIGITS(0.0_C_FLOAT), RANGE(0.0_C_FLOAT)
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_DOUBLE
+       write(utmp, 201) 'c_double',  C_DOUBLE, DIGITS(0.0_C_DOUBLE), RANGE(0.0_C_DOUBLE)
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_LONG_DOUBLE
+       write(utmp, 201) 'c_long_double',  C_LONG_DOUBLE, DIGITS(0.0_C_LONG_DOUBLE), RANGE(0.0_C_LONG_DOUBLE)
+#endif
        write(utmp, 202) 'int8',   KI8,  BIT_SIZE(INT(0, KIND=KI8))
        write(utmp, 202) 'int16',  KI16, BIT_SIZE(INT(0, KIND=KI16))
        write(utmp, 202) 'int32',  KI32, BIT_SIZE(INT(0, KIND=KI32))
        write(utmp, 202) 'int64',  KI64, BIT_SIZE(INT(0, KIND=KI64))
+#if HAVE_FORTRAN_ISO_C_BINDING_C_SIZE_T
+       write(utmp, 202) 'c_size_t', C_SIZE_T,  BIT_SIZE(INT(0, KIND=C_SIZE_T))
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_INT8_T
+       write(utmp, 202) 'c_int8_t', C_INT8_T,  BIT_SIZE(INT(0, KIND=C_INT8_T))
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_INT16_T
+       write(utmp, 202) 'c_int16_t', C_INT16_T,  BIT_SIZE(INT(0, KIND=C_INT16_T))
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_INT32_T
+       write(utmp, 202) 'c_int32_t', C_INT32_T,  BIT_SIZE(INT(0, KIND=C_INT32_T))
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_INT64_T
+       write(utmp, 202) 'c_int64_t', C_INT64_T,  BIT_SIZE(INT(0, KIND=C_INT64_T))
+#endif
     else
        write(*,    201) 'single',    KFLT, dflt, xflt
        write(*,    201) 'double',    KDBL, ddbl, xdbl
        write(*,    201) 'quadruple', KQPL, dqpl, xqpl
+#if HAVE_FORTRAN_ISO_C_BINDING_C_FLOAT
+       write(*,    201) 'c_float',   C_FLOAT, DIGITS(0.0_C_FLOAT), RANGE(0.0_C_FLOAT)
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_DOUBLE
+       write(*,    201) 'c_double',  C_DOUBLE, DIGITS(0.0_C_DOUBLE), RANGE(0.0_C_DOUBLE)
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_LONG_DOUBLE
+       write(*,    201) 'c_long_double',  C_LONG_DOUBLE, DIGITS(0.0_C_LONG_DOUBLE), RANGE(0.0_C_LONG_DOUBLE)
+#endif
        write(*,    202) 'int8',   KI8,  BIT_SIZE(INT(0, KIND=KI8))
        write(*,    202) 'int16',  KI16, BIT_SIZE(INT(0, KIND=KI16))
        write(*,    202) 'int32',  KI32, BIT_SIZE(INT(0, KIND=KI32))
        write(*,    202) 'int64',  KI64, BIT_SIZE(INT(0, KIND=KI64))
+#if HAVE_FORTRAN_ISO_C_BINDING_C_SIZE_T
+       write(*,    202) 'c_size_t', C_SIZE_T,  BIT_SIZE(INT(0, KIND=C_SIZE_T))
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_INT8_T
+       write(*,    202) 'c_int8_t', C_INT8_T,  BIT_SIZE(INT(0, KIND=C_INT8_T))
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_INT16_T
+       write(*,    202) 'c_int16_t', C_INT16_T,  BIT_SIZE(INT(0, KIND=C_INT16_T))
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_INT32_T
+       write(*,    202) 'c_int32_t', C_INT32_T,  BIT_SIZE(INT(0, KIND=C_INT32_T))
+#endif
+#if HAVE_FORTRAN_ISO_C_BINDING_C_INT64_T
+       write(*,    202) 'c_int64_t', C_INT64_T,  BIT_SIZE(INT(0, KIND=C_INT64_T))
+#endif
     endif
   end subroutine diag_abstract
 !!!_  & diag_int_kinds - brute-force checker of integer kinds

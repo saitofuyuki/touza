@@ -1,7 +1,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2023/03/24 23:19:36 fuyuki Makefile.am>
+# Time-stamp: <2023/03/26 11:50:59 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022, 2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -28,7 +28,9 @@ libtouza_local_la_SOURCES += nio_nctcdf.F90
 endif
 libtouza_local_la_SOURCES += nio_control.F90
 
+if have_iso_c_binding
 libtouza_local_la_SOURCES += nio_bindc.F90
+endif
 
 libtouza_local_la_SOURCES += nio.F90 $(include_HEADERS)
 libtouza_local_la_LDFLAGS =
@@ -76,7 +78,9 @@ check_PROGRAMS+= test_nio_nctcdf
 TEST_COMMON_LIBS += $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 endif
 
+if have_iso_c_binding
 check_PROGRAMS += test_nio_bindc
+endif
 
 test_nio_header_SOURCES = $(TEST_COMMON_SOURCES) nio_header.F90
 test_nio_header_LDADD = $(TEST_COMMON_LIBS)
