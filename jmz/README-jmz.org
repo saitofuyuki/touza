@@ -16,7 +16,7 @@ FORTRAN procedures mainly adopted in MIROC.  See *TOUZA* README
 * Build and installation
 * Brief description of *TOUZA/Jmz* commands
 ** chak - CH(Swiss) Army Knife for gtool-3.5 format files
-*** introduction
+*** Introduction
 chak is a Reverse Polish Notation (RPN) calculator for gtool-3.5
 format data files.
 
@@ -84,7 +84,7 @@ Following Some special filters are reserved for next developments:
 - =gtydf= --- flux differential along latitude
 - =gtydv= --- differential along latitude
 
-*** usage
+*** Usage
 : chak [<option>]... [<operand>|<operator>|<option>]... [{=|:=} <output>] ....
 
 Arguments:
@@ -382,7 +382,7 @@ therefore only the stacked elements are shown.
 *** Terminology
 **** queue, stack, buffer
 **** coordinate, dimension, logical/physical index
-*** options summary
+*** Options summary
 **** Global options
 - =-v= :: verbose
 - =-vv= :: more verbose
@@ -522,14 +522,15 @@ mode on the file.
 - =-i= :: Inclusive domain mode for operation (default)
 - =-x= :: Intersect domain mode for operation
 - =-l= :: First domain mode for operation
-*** number type
-Internally all the numbers are stored as so-called double precision.
+*** Number type
+Internally all the numbers are stored as /binary64/ of IEEE 754
+(so-called double precision).
 All the operation are performed as floating-point values.
 One exception may occur at the final output: if all the operands are
 integer-like, and if the operation is integer-preserving type, then
 the output is treated as integer.
 
-*** symbols and literals
+*** Symbols and literals
 Numbers are usually stored as floating-point numbers,
 but when without decimal point), they are regarded as integer-like
 type.
@@ -563,7 +564,7 @@ Some numbers are prepared with special symbols.
 :  2.225073858507201-308
 :  1.797693134862316+308
 
-*** input-file formats
+*** Input-file formats
 **** gtool-3.5 format (default)
 Default input is gtool-3.5 format.  If not =FMT= properties set after
 the input file, then it is accessed as the gtool-3.5 format.
@@ -590,7 +591,7 @@ can be set, which enable multiple record contents in the file.
 : chak x FMT=br4      # input x, float, native byte-order, auto-shaped; one-record, total size = total elements
 : chak x FMT=br8:s,7  # input x, double, swap byte-order, with shape (0:7); possibly multiple records
 
-*** output-file formats
+*** Output-file formats
 **** gtool-3.5 format (default)
 **** simple netCDF (in preparation)
 **** ascii output
@@ -602,7 +603,7 @@ can be set, which enable multiple record contents in the file.
 **** binary output
 : chak ... = <file> FMT=b<type>[:<byte-order>]
 
-*** operators summary
+*** Operators summary
 Operators are case dependent.
 Files to conflict with operators cannot be accessed as they are.  You
 can force to access such files by using relative or absolute path.
@@ -755,6 +756,7 @@ Following table is not complete, and some operators are not yet implemented.
 | DUR[=ARG]          | UNIT               | duration              |
 | MISS=ARG           | VALUE              | replace missing value |
 | PERM=ARG SHAPE=ARG | NAME/REPL/RANGE,.. | array reshaping       |
+| SIZE=ARG           | NAME/REPL/RANGE,.. | array reshaping       |
 | TAG=ARG            | NAME               |                       |
 | X=ARG              | NAME/REPL/RANGE    | array reshaping       |
 | Y=ARG              | NAME/REPL/RANGE    | array reshaping       |
@@ -784,7 +786,7 @@ index operators.
 | UNIT=ARG  | STRING   |                            |
 |-----------+----------+----------------------------|
 
-*** (flat-)index operator =FLAT= family
+*** (Flat-)index operator =FLAT= family
 In the following examples, the source array shape
 is =(i,j,k)=(lon/0:8,lat/0:4,lev/0:3)=.
 
@@ -1015,7 +1017,7 @@ then the second =FLAT= operator fails to extract the expected
 coordinate because only the first coordinate is remained on the
 previous stack.
 
-*** logical operators cheat sheet
+*** Logical operators cheat sheet
 **** unary operators
 |        | defined | undefined | outside |
 |--------+---------+-----------+---------|
@@ -1040,7 +1042,7 @@ return the last evaluation.
 
 OR operator evaluates the operands sequentially, stop when defined,
 return the last evaluation.
-*** conditional operators cheat sheet
+*** Conditional operators cheat sheet
 There are three kinds of conditional operators: normal, filter-like,
 and binary.  They have a suffix U, F, and B respectively, so for
 example, EQU, EQF, EQB are normal, filter-like and binary
@@ -1053,22 +1055,22 @@ prepared which are alias of normal operators.
  | a!=b defined     | 0      | MISS |   0 |
  | either undefined | MISS   | MISS |   0 |
 
-*** buffer recalls
+*** Buffer recalls
 | TAG=NAME       | tag the top stack as NAME for later recall          |
 | POP[=NAME]     | tag the top stack as NAME for later recall, and pop |
 | Ln (integer n) | reuse literal with tag Ln                           |
 | Fn             | reuse read file with tag Fn                         |
 | Wn             | reuse write file with tag Wn                        |
 
-*** stack marker manipulation
-*** buffer stack manipulation
+*** Stack marker manipulation
+*** Buffer stack manipulation
 | operator | example             | stack image |
 |----------+---------------------+-------------|
 | DIST     | STOP a b c x DIST   | a x b x c x |
 | INSERT   | STOP a b c x INSERT | x a b c     |
 | REPEAT   | STOP a b c REPEAT   | a b c a b c |
 
-*** operation queue manipulation
+*** Operation queue manipulation
 | operator | example               | queue image             |             |
 |----------+-----------------------+-------------------------+-------------|
 | ITER     | STOP a b c d OPR ITER | a OPR b OPR c OPR d OPR | if unary    |
@@ -1081,7 +1083,7 @@ examples
 | STOP 1 2 3 4 ADD ITER | 1 2 ADD  3 4 ADD        | 3     7     |
 | STOP 1 2 3 4 ADD CUM  | 1 2 ADD 3 ADD 4 ADD     | 10          |
 
-*** special cases for successive operation
+*** Special cases for successive operation
 | arguments                     | stack image               |                                     |
 |-------------------------------+---------------------------+-------------------------------------|
 | a DUP                         | a a                       |                                     |
@@ -1100,7 +1102,7 @@ examples
 | STOP a b c REPEAT REPEAT      | STOP  a b c  a b c  a b c |                                     |
 | STOP a b c STOP REPEAT        | STOP  a b c STOP  a b c   | marker is inserted before repeating |
 
-*** file properties
+*** File properties
 **** gtool format header
 A gtool-format header in new file to write follows that of the first
 input file on the stack, *just at the operation*.  The entries =ITEM=,
@@ -1240,7 +1242,7 @@ list and range selections.
 :   # loop 0  a[1] a[2] a[5]  ADD
 :   # loop 1  a[3] a[4] a[6]  ADD
 
-*** buffer properties
+*** Buffer properties
 **** reshaping
 There are several kinds of array transformation: slicing, permutation,
 spreading, etc:
@@ -1248,6 +1250,8 @@ All the related operations are collectedly called as `reshaping' hereinafter.
 
 Reshaping can be set by operator =PERM= or its alias =SHAPE= for one
 or more coordinates at once by comma-separated list.
+Operator =SIZE= is introduced from version 1.2.1, which is a minor
+variation of =PERM=.
 In addition, separate configuration for each coordinate can be done by
 a different way.  Operators =C0=, =C1=, =C2= act on 0th, 1st, 2nd
 coordinate.  In FORTRAN-style (=-F=) mode, =C1=, =C2=, =C3= are used
@@ -1271,8 +1275,8 @@ The full syntax is documented here, however, some simple cases,
 subregion extracting and coordinate permutation are
 documented in the following sections.
 
-As noted, the argument of operator =SHAPE= is comma separated list of
-sets of coordinate property modifiers.
+As noted, the argument of operator =SHAPE= (and =PERM=) is
+comma separated list of sets of coordinate property modifiers.
 : SHAPE=<set-0>[,[<set-1>][,[]...]]
 A set is a compound of old coordinate name or index, new name, and the new
 range or element separated by slashes:
@@ -1386,6 +1390,17 @@ Concrete examples are helpful rather than to provide the abstract rule.
   before/after rule the argument is decomposed into
   ~<name|index>/<replace>~ and ~<range|element>~ (e.g.,
   ~lev/glev/0:5~)
+
+Operator =SIZE= follows most of =SHAPE= arguments, except for two
+minor difference to parse integer.  While a single integer is parsed
+as either coordinate index or coordinate element for =SHAPE=
+arguments, =SIZE= parses it as the size of coordinate.  For example,
+while ~SHAPE=1~ is parsed as to move 1st coordinate, ~SIZE=1~ as to set
+0th coordinate size as 1 (range =0:1=), which corresponds to
+specification of ~SHAPE=:1~.  Also, while ~SHAPE=lon/10~
+is parsed as to extract element 10 along =lon=, ~SIZE=lon/10~ as to
+set =lon= coordinate size as 10 (range =0:10=), which corresponds to
+~SHAPE=lon/:10~.
 
 **** (sub)region selection
 *WARNING: spatial averaging is NOT IMPLEMENTED.*
@@ -1854,7 +1869,7 @@ coordinates:
 : 0  1  113  115  228
 : :
 
-*** flushing
+*** Flushing
 # ## compromise:source
 : % chak T=3 demo/sub5.yz.base INT demo/sub3.yz.base INT FLUSH
 : ### record: 0
@@ -1947,7 +1962,7 @@ The option -l changes the output domain as the first stack.
 
 *** Emergency
 =chak= tries its best to detect the file byte-order, but still
-possibly fails.  For such cases, please first try to undefine the
+possibly fails.  For such cases, please first try to undefined the
 environment variables such as =GFORTRAN_CONVERT_UNIT= (gcc),
 =F_UFMTENDIAN= (intel) etc.
 As far as the maintainer tried, =chak= (indeed, =TOUZA=)
@@ -2012,4 +2027,5 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  glon BITAND BITNOT BITOR BITXOR LSHIFT RSHIFT bitwise
 #  LocalWords:  gtrdir gtwdir netCDF BDIFF CDIFF DFLUSH EXTR FDIFF CP
 #  LocalWords:  HYPOT RRSP rrspacing SINH sinh DSET GRAV TMELT gttv
-#  LocalWords:  RAIR RVAP EPSV EPSVT qqqq qqqqq vvvv
+#  LocalWords:  RAIR RVAP EPSV EPSVT qqqq qqqqq vvvv deda fd ae da io
+#  LocalWords:  GFORTRAN gcc UFMTENDIAN
