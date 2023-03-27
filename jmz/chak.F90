@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/27 08:22:51 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/27 10:08:51 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -4345,6 +4345,7 @@ contains
     skip_undef = IAND(cmode, cmode_xundef).ne.0
 
 212 format('## stack[', I0, '] ', A, 1x, A)
+213 format('## stack[', I0, '] ', A, 1x, A, ' // ', A)
 
 231 format('##      ', A)
 232 format('##   >  ', A)
@@ -4373,8 +4374,14 @@ contains
        endif
        if (ierr.eq.0) call get_obj_string(ierr, val, hb)
 
+       if (is_msglev(lev_verbose, -levq_rec)) then
+          if (ierr.eq.0) write(utmp, 213) &
+               & user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc), trim(obuffer(jb)%desc2)
+       else if (is_msglev(lev_verbose, -levq_stack)) then
+          if (ierr.eq.0) write(utmp, 212) &
+               & user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc)
+       endif
        if (is_msglev(lev_verbose, -levq_stack)) then
-          if (ierr.eq.0) write(utmp, 212) user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc)
           if (ierr.eq.0) call get_domain_string(ierr, lcstr, bstack(js)%lcp)
           if (ierr.eq.0) call get_domain_string(ierr, pcstr, obuffer(jb)%pcp)
           if (ierr.eq.0) then
@@ -4523,12 +4530,20 @@ contains
              hb = bufh(j)
              js = pstk(j)
 202          format('## ', I0, 1x, A, 1x, A, 1x, A)
+203          format('## ', I0, 1x, A, 1x, A, 1x, A, ' // ', A)
              if (ierr.eq.0) then
                 call get_domain_shape(ierr, dstr, domr(j), obuffer(jb)%pcp, bstack(js)%lcp, doml)
              endif
-             if (ierr.eq.0) then
-                write(utmp, 202) user_index_bgn(j), trim(vals(j)), &
-                     & trim(dstr), trim(obuffer(jb)%desc)
+             if (lev_verbose.ge.levq_rec) then
+                if (ierr.eq.0) then
+                   write(utmp, 203) user_index_bgn(j), trim(vals(j)), &
+                        & trim(dstr), trim(obuffer(jb)%desc), trim(obuffer(jb)%desc2)
+                endif
+             else
+                if (ierr.eq.0) then
+                   write(utmp, 202) user_index_bgn(j), trim(vals(j)), &
+                        & trim(dstr), trim(obuffer(jb)%desc)
+                endif
              endif
           enddo
        endif
