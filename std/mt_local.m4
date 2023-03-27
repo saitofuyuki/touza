@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2023/01/08 16:56:32 fuyuki mt_local.m4>
+dnl Time-stamp: <2023/03/26 11:50:15 fuyuki mt_local.m4>
 
 dnl Copyright: 2020-2023 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -50,6 +50,9 @@ MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_INT64_T])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_FLOAT])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_DOUBLE])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_c_binding], [C_LONG_DOUBLE])
+
+AM_CONDITIONAL([have_iso_c_binding],
+[test x"$mt_cv_fortran_iso_c_binding" = xyes])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([ieee_arithmetic])
 
