@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/30 10:39:40 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/29 14:05:00 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -118,11 +118,16 @@ module TOUZA_Nio_record
   integer,parameter,public :: lopts = 6
 
 !!!_   . data reviewing flag
-  integer,parameter,public :: keep_pos = 1   ! rewind to data heads at exis
+  integer,parameter,public :: rev_pos_dhead = 1   ! rewind to data heads at exit
+  integer,parameter,public :: rev_pos_leave = 0   ! leave position at exit
 !!!_   . packed data expansion flag
   integer,parameter,public :: packed_ignore = -1
   integer,parameter,public :: packed_read   = 0
   integer,parameter,public :: packed_check  = 1
+
+  integer,parameter :: packed_ends_coordinate = 3
+
+  character,parameter,public :: sep_subvitem = ' '
 !!!_  - private parameter
   integer,parameter :: GPROP_NUMX  = 1
   integer,parameter :: GPROP_NUMY  = 2
@@ -350,6 +355,16 @@ module TOUZA_Nio_record
      module procedure restore_mi4_packed_d, restore_mi4_packed_f, restore_mi4_packed_i
   end interface restore_mi4_packed
 
+  interface restore_pr8_packed
+     module procedure restore_pr8_packed_d, restore_pr8_packed_f, restore_pr8_packed_i
+  end interface restore_pr8_packed
+  interface restore_pr4_packed
+     module procedure restore_pr4_packed_d, restore_pr4_packed_f, restore_pr4_packed_i
+  end interface restore_pr4_packed
+  interface restore_pi4_packed
+     module procedure restore_pi4_packed_d, restore_pi4_packed_f, restore_pi4_packed_i
+  end interface restore_pi4_packed
+
   interface normalize_xry
      module procedure normalize_xry_d
   end interface normalize_xry
@@ -395,10 +410,10 @@ module TOUZA_Nio_record
   public set_urt_defs,       parse_urt_options,  show_urt_options
   public switch_urt_diag
   public set_switch_subrec,  nio_allow_sub
-  public review_mtn
+  public review_mtn,         review_ptn
   public set_bodr_wnative
 
-  public nio_count_defined
+  public nio_count_defined, decompose_packed_item
 !!!_  - public shared
 !!!_   . from Std
   public ignore_bigger, ignore_small, ignore_always, def_block
@@ -1813,18 +1828,27 @@ contains
        case (GFMT_MRT)
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
           mk = max(1, kaxs(3))
-       case (GFMT_PR8)
-          mk = max(1, kaxs(3))
-          call get_data_pr8 &
-               & (ierr, d, ndata, u, krect, vmiss, kfmt, mk, ends(0:mk-1))
-       case (GFMT_PR4)
-          mk = max(1, kaxs(3))
-          call get_data_pr4 &
-               & (ierr, d, ndata, u, krect, vmiss, kfmt, mk, ends(0:mk-1))
-       case (GFMT_PI4)
-          mk = max(1, kaxs(3))
-          call get_data_pi4 &
-               & (ierr, d, ndata, u, krect, vmiss, kfmt, mk, ends(0:mk-1))
+       case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
+          if (is_packed_subv(head)) then
+             call restore_ptn_packed_subv &
+                     & (ierr, &
+                     &  subv, ldata, ends, u, krect, kfmt, mfull, kaxs, citer)
+          else
+             select case(kfmt)
+             case (GFMT_PR8)
+                call restore_pr8_packed &
+                     & (ierr, &
+                     &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+             case (GFMT_PR4)
+                call restore_pr4_packed &
+                     & (ierr, &
+                     &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+             case (GFMT_PI4)
+                call restore_pi4_packed &
+                     & (ierr, &
+                     &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+             end select
+          endif
        case default
           ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
@@ -1893,18 +1917,27 @@ contains
        case (GFMT_MRT)
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
           mk = max(1, kaxs(3))
-       case (GFMT_PR8)
-          mk = max(1, kaxs(3))
-          call get_data_pr8 &
-               & (ierr, d, ndata, u, krect, vmiss, kfmt, mk, ends(0:mk-1))
-       case (GFMT_PR4)
-          mk = max(1, kaxs(3))
-          call get_data_pr4 &
-               & (ierr, d, ndata, u, krect, vmiss, kfmt, mk, ends(0:mk-1))
-       case (GFMT_PI4)
-          mk = max(1, kaxs(3))
-          call get_data_pi4 &
-               & (ierr, d, ndata, u, krect, vmiss, kfmt, mk, ends(0:mk-1))
+       case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
+          if (is_packed_subv(head)) then
+             call restore_ptn_packed_subv &
+                     & (ierr, &
+                     &  subv, ldata, ends, u, krect, kfmt, mfull, kaxs, citer)
+          else
+             select case(kfmt)
+             case (GFMT_PR8)
+                call restore_pr8_packed &
+                     & (ierr, &
+                     &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+             case (GFMT_PR4)
+                call restore_pr4_packed &
+                     & (ierr, &
+                     &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+             case (GFMT_PI4)
+                call restore_pi4_packed &
+                     & (ierr, &
+                     &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+             end select
+          endif
        case default
           ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
@@ -1973,18 +2006,27 @@ contains
        case (GFMT_MRT)
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
           mk = max(1, kaxs(3))
-       case (GFMT_PR8)
-          mk = max(1, kaxs(3))
-          call get_data_pr8 &
-               & (ierr, d, ndata, u, krect, vmiss, kfmt, mk, ends(0:mk-1))
-       case (GFMT_PR4)
-          mk = max(1, kaxs(3))
-          call get_data_pr4 &
-               & (ierr, d, ndata, u, krect, vmiss, kfmt, mk, ends(0:mk-1))
-       case (GFMT_PI4)
-          mk = max(1, kaxs(3))
-          call get_data_pi4 &
-               & (ierr, d, ndata, u, krect, vmiss, kfmt, mk, ends(0:mk-1))
+       case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
+          if (is_packed_subv(head)) then
+             call restore_ptn_packed_subv &
+                     & (ierr, &
+                     &  subv, ldata, ends, u, krect, kfmt, mfull, kaxs, citer)
+          else
+             select case(kfmt)
+             case (GFMT_PR8)
+                call restore_pr8_packed &
+                     & (ierr, &
+                     &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+             case (GFMT_PR4)
+                call restore_pr4_packed &
+                     & (ierr, &
+                     &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+             case (GFMT_PI4)
+                call restore_pi4_packed &
+                     & (ierr, &
+                     &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+             end select
+          endif
        case default
           ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
@@ -4010,19 +4052,21 @@ contains
     ! note: position must be just after gtool header part
 
     ! Typical usage:
-    !   call inquire_mtn_sizes(..., nmask=nmask, ndata)
+    !   call review_mtn(..., nmask=nmask, ndata)
     !   allocate cmask(nmask)
     !   allocate subv(ndata), d(ndata)
     !   call restore_mr8_packed_d(...)
+    f = choice(-1, flag)
+    if (f.lt.0) f = rev_pos_dhead
 
-    if (ierr.eq.0) call pre_review(ierr, apini, u, flag)
+    if (ierr.eq.0) call pre_review(ierr, apini, u, f)
     ! packed data array size
     if (ierr.eq.0) call get_data_record(ierr, ndata, u, krect)
     if (ierr.eq.0) then
        mfull = parse_header_size(head, 0, 1)
        nmask = count_packed(1, mfull, mold)
     endif
-    if (ierr.eq.0) call post_review(ierr, apini, u, flag)
+    if (ierr.eq.0) call post_review(ierr, apini, u, f)
   end subroutine review_mtn
 
 !!!_  - restore_mr8_plain_d - restore MR8 data to plain (full) array
@@ -4586,7 +4630,7 @@ contains
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
-    integer ndata, mdata, nsub
+    integer mdata
     integer ch
     integer mi, mo, ci, mp
 
@@ -4664,7 +4708,7 @@ contains
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
-    integer ndata, mdata, nsub
+    integer mdata
     integer ch
     integer mi, mo, ci, mp
 
@@ -4742,7 +4786,7 @@ contains
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
-    integer ndata, mdata, nsub
+    integer mdata
     integer ch
     integer mi, mo, ci, mp
 
@@ -4821,7 +4865,7 @@ contains
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
-    integer ndata, mdata, nsub
+    integer mdata
     integer ch
     integer mi, mo, ci, mp
 
@@ -4899,7 +4943,7 @@ contains
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
-    integer ndata, mdata, nsub
+    integer mdata
     integer ch
     integer mi, mo, ci, mp
 
@@ -4977,7 +5021,7 @@ contains
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
-    integer ndata, mdata, nsub
+    integer mdata
     integer ch
     integer mi, mo, ci, mp
 
@@ -5057,7 +5101,7 @@ contains
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
-    integer ndata, mdata, nsub
+    integer mdata
     integer ch
     integer mi, mo, ci, mp
 
@@ -5135,7 +5179,7 @@ contains
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
-    integer ndata, mdata, nsub
+    integer mdata
     integer ch
     integer mi, mo, ci, mp
 
@@ -5212,7 +5256,7 @@ contains
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
     integer kpack
-    integer ndata, mdata, nsub
+    integer mdata
     integer ch
     integer mi, mo, ci, mp
 
@@ -6371,6 +6415,480 @@ contains
   end subroutine show_urt_options
 
 !!!_ + gtool extenstion (P[IR]n)
+!!!_  - review_ptn - review P[RI]n data
+  subroutine review_ptn &
+       & (ierr,  ndata, &
+       &  head,  u,     krect, ends, flag)
+    use TOUZA_Nio_std,only: KIOFS, sus_getpos, sus_rseek, WHENCE_ABS
+    use TOUZA_Nio_std,only: choice
+    use TOUZA_Trp,    only: count_packed
+    implicit none
+    integer,parameter :: KISRC=KI32
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: ndata       ! (physical) size of data part
+    character(len=*),intent(in)  :: head(*)
+    integer,         intent(in)  :: u
+    integer,         intent(in)  :: krect
+    integer,optional,intent(out) :: ends(*)
+    integer,optional,intent(in)  :: flag
+    integer nk
+
+    ierr = 0
+    nk = parse_header_size(head, packed_ends_coordinate)
+    call review_ptn_core(ierr, ndata, nk, u, krect, ends, flag)
+  end subroutine review_ptn
+!!!_  - review_ptn_core - review P[RI]n data
+  subroutine review_ptn_core &
+       & (ierr,  ndata, &
+       &  mk,    u,     krect, ends, flag)
+    use TOUZA_Nio_std,only: KIOFS, sus_getpos, sus_rseek, WHENCE_ABS
+    use TOUZA_Nio_std,only: choice
+    use TOUZA_Trp,    only: count_packed
+    implicit none
+    integer,parameter :: KISRC=KI32
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: ndata       ! (physical) size of data part
+    integer,         intent(in)  :: mk
+    integer,         intent(in)  :: u
+    integer,         intent(in)  :: krect
+    integer,optional,intent(out) :: ends(*)
+    integer,optional,intent(in)  :: flag
+
+    integer(kind=KIOFS) :: apini
+    integer f
+    logical cont
+    integer,parameter :: nfil = 2
+    integer :: rfil(0:nfil)
+    integer :: d(1)
+
+    ierr = 0
+    ndata = -1
+    ! note: position must be just after gtool header part
+    f = choice(-1, flag)
+    if (f.lt.0) then
+       if (present(ends)) then
+          f = 0
+       else
+          f = rev_pos_dhead
+       endif
+    endif
+    if (ierr.eq.0) call pre_review(ierr, apini, u, f)
+    cont = .TRUE.
+    if (present(ends)) then
+       if (ierr.eq.0) call get_data_record(ierr, ends(1:mk), mk, u, krect, sub=cont)
+       if (ierr.eq.0) ndata = ends(mk)
+    else
+       if (ierr.eq.0) then
+          rfil(0) = mk - 1
+          rfil(1) = 1
+          rfil(2) = 0
+       endif
+       if (ierr.eq.0) call get_data_record_runl(ierr, d, 1, u, krect, rfil, nfil, sub=cont)
+       if (ierr.eq.0) ndata = d(1)
+    endif
+    if (ierr.eq.0) call post_review(ierr, apini, u, f)
+  end subroutine review_ptn_core
+
+!!!_  - restore_pr8_plain_d - restore PR8 data to plain (full) array
+  subroutine restore_pr8_plain_d &
+       & (ierr, &
+       &  d,    ldata, u, krect, vmiss, mfull, subv, bes, nr)
+    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
+    implicit none
+    integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(out) :: d(0:*)
+    integer,         intent(in)  :: ldata        ! limit size of of d
+    integer,         intent(in)  :: u
+    integer,         intent(in)  :: krect
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: mfull        ! (logical) full data size
+    integer,optional,intent(in)  :: subv(0:*)
+    integer,optional,intent(in)  :: bes(3, *)
+    integer,optional,intent(in)  :: nr
+
+  end subroutine restore_pr8_plain_d
+
+!!!_  - restore_ptn_check
+  subroutine restore_ptn_check &
+       & (ierr,  &
+       &  ndata, ends, u, krect, kaxs, citer, check)
+    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
+    integer,         intent(out)   :: ierr
+    integer,         intent(out)   :: ndata
+    integer,         intent(inout) :: ends(0:*)
+    integer,         intent(in)    :: u
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: kaxs(*)
+    integer,optional,intent(in)    :: citer        ! iteration index
+    integer,optional,intent(in)    :: check
+
+    integer mo, ms
+    integer mfk
+    integer ch, ci
+    logical cont
+
+    ierr = 0
+    ndata = 0
+    ch = choice(packed_read, check)
+    ci = choice(0, citer)
+    mfk = max(1, product(max(1, kaxs(packed_ends_coordinate:laxs))))
+    cont = .TRUE.
+
+    select case(ch)
+    case(packed_check)
+       if (ierr.eq.0) call alloc_wsubv(ierr, mfk)
+       if (ierr.eq.0) then
+          call review_ptn_core(ierr, ndata, mfk, u, krect, ends=wssubv(0:mfk-1), flag=rev_pos_leave)
+       endif
+       if (ierr.eq.0) then
+          ci = choice(0, citer)
+          if (ci.le.0.or.ci.gt.laxs) then
+             mo = 1
+          else
+             mo = max(1, product(max(1, kaxs(ci:laxs))))
+          endif
+          if (mfk.eq.mo) then
+             if (ANY(ends(0:mo-1).ne.wssubv(0:mfk-1))) ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+          else if (mfk.gt.mo) then
+             if (mod(mfk, mo).eq.0) then
+                ms = mfk / mo
+                if (ANY(ends(0:mo-1).ne.wssubv(ms-1:mfk-1:ms))) ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+             else
+                ierr = _ERROR(ERR_INVALID_PARAMETER)
+             endif
+          else
+             if (mod(mo, mfk).eq.0) then
+                ms = mo / mfk
+                if (ANY(ends(ms-1:mo-1:ms).ne.wssubv(0:mfk-1))) ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+             else
+                ierr = _ERROR(ERR_INVALID_PARAMETER)
+             endif
+          endif
+       endif
+    case(packed_read)
+       !!! must adjust by later call
+       if (ierr.eq.0) then
+          call get_data_irecord(ierr, ends(0:mfk-1), mfk, u, krect, sub=cont)
+       endif
+       if (ierr.eq.0) ndata = ends(mfk-1)
+    case(packed_ignore)
+       if (ierr.eq.0) &
+            & call review_ptn_core(ierr, ndata, mfk, u, krect, flag=rev_pos_leave)
+    case default
+       ierr = _ERROR(ERR_INVALID_SWITCH)
+    end select
+
+  end subroutine restore_ptn_check
+!!!_  - restore_ptn_packed_subv - restore P[IR]n data to subscript vector
+  subroutine restore_ptn_packed_subv &
+       & (ierr, &
+       &  subv, ldata, ends, u, krect, kfmt, mfull, kaxs, citer)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: subv(0:*)
+    integer,         intent(in)  :: ldata        ! limit size of of d
+    integer,         intent(out) :: ends(0:*)
+    integer,         intent(in)  :: u
+    integer,         intent(in)  :: krect
+    integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: mfull        ! (logical) full data size
+    integer,         intent(in)  :: kaxs(*)
+    integer,optional,intent(in)  :: citer        ! iteration index
+
+    integer mi, mo, ci, mp, ms
+    integer mfh, mfk
+    integer ndata
+
+    ierr = 0
+
+    ci = choice(0, citer)
+    if (ci.le.0.or.ci.gt.laxs) then
+       mo = 1
+       mi = product(max(1, kaxs(1:laxs)))
+    else
+       mo = max(1, product(max(1, kaxs(ci:laxs))))
+       mi = max(1, product(max(1, kaxs(1:ci-1))))
+    endif
+
+    mfh = max(1, product(max(1, kaxs(1:packed_ends_coordinate-1))))
+    mfk = max(1, product(max(1, kaxs(packed_ends_coordinate:laxs))))
+
+    if (mfk.eq.mo) then
+       if (ierr.eq.0) then
+          select case (kfmt)
+          case (GFMT_PI4)
+             call restore_pi4_packed &
+                  & (ierr, subv, ndata, ends, u, krect, mfull, kaxs, citer, packed_read)
+          case (GFMT_PR4)
+             call restore_pr4_packed &
+                  & (ierr, subv, ndata, ends, u, krect, mfull, kaxs, citer, packed_read)
+          case (GFMT_PR8)
+             call restore_pr8_packed &
+                  & (ierr, subv, ndata, ends, u, krect, mfull, kaxs, citer, packed_read)
+          case default
+             ierr = _ERROR(ERR_INVALID_SWITCH)
+          end select
+       endif
+    else
+       if (ierr.eq.0) call alloc_wsubv(ierr, mfk)
+       !! [CAUTION] wssubv confliction never occurs when packed_read
+       if (ierr.eq.0) then
+          select case (kfmt)
+          case (GFMT_PI4)
+             call restore_pi4_packed &
+                  & (ierr, subv, ndata, wssubv, u, krect, mfull, kaxs, citer, packed_read)
+          case (GFMT_PR4)
+             call restore_pr4_packed &
+                  & (ierr, subv, ndata, wssubv, u, krect, mfull, kaxs, citer, packed_read)
+          case (GFMT_PR8)
+             call restore_pr8_packed &
+                  & (ierr, subv, ndata, wssubv, u, krect, mfull, kaxs, citer, packed_read)
+          case default
+             ierr = _ERROR(ERR_INVALID_SWITCH)
+          end select
+       endif
+       if (ierr.eq.0) then
+          call tweak_subv(ierr, subv, ends, mi, mo, wssubv, mfh, mfk)
+       endif
+    endif
+  end subroutine restore_ptn_packed_subv
+
+!!!_  - restore_pr8_packed_d - restore PR8 data to packed array
+  subroutine restore_pr8_packed_d &
+       & (ierr, &
+       &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
+    integer,         intent(out)   :: ierr
+    real(kind=KARG), intent(out)   :: d(0:*)
+    integer,         intent(in)    :: ldata        ! limit size of of d
+    integer,         intent(inout) :: ends(0:*)
+    integer,         intent(in)    :: u
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: mfull        ! (logical) full data size
+    integer,         intent(in)    :: kaxs(*)
+    integer,optional,intent(in)    :: citer        ! iteration index
+    integer,optional,intent(in)    :: check
+
+    integer l
+
+    ierr = 0
+    call restore_ptn_check(ierr, l, ends, u, krect, kaxs, citer, check)
+    if (ierr.eq.0) call get_data_drecord(ierr, d(0:l-1), l, u, krect)
+  end subroutine restore_pr8_packed_d
+  subroutine restore_pr8_packed_f &
+       & (ierr, &
+       &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KDBL
+    integer,         intent(out)   :: ierr
+    real(kind=KARG),    intent(out)   :: d(0:*)
+    integer,         intent(in)    :: ldata        ! limit size of of d
+    integer,         intent(inout) :: ends(0:*)
+    integer,         intent(in)    :: u
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: mfull        ! (logical) full data size
+    integer,         intent(in)    :: kaxs(*)
+    integer,optional,intent(in)    :: citer        ! iteration index
+    integer,optional,intent(in)    :: check
+
+    integer l
+
+    ierr = 0
+    call restore_ptn_check(ierr, l, ends, u, krect, kaxs, citer, check)
+    if (ierr.eq.0) call get_data_drecord(ierr, d(0:l-1), l, u, krect)
+  end subroutine restore_pr8_packed_f
+  subroutine restore_pr8_packed_i &
+       & (ierr, &
+       &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KI32, KISRC=KI32, KRSRC=KDBL
+    integer,         intent(out)   :: ierr
+    integer(kind=KARG),    intent(out)   :: d(0:*)
+    integer,         intent(in)    :: ldata        ! limit size of of d
+    integer,         intent(inout) :: ends(0:*)
+    integer,         intent(in)    :: u
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: mfull        ! (logical) full data size
+    integer,         intent(in)    :: kaxs(*)
+    integer,optional,intent(in)    :: citer        ! iteration index
+    integer,optional,intent(in)    :: check
+
+    integer l
+
+    ierr = 0
+    call restore_ptn_check(ierr, l, ends, u, krect, kaxs, citer, check)
+    if (ierr.eq.0) call get_data_drecord(ierr, d(0:l-1), l, u, krect)
+  end subroutine restore_pr8_packed_i
+!!!_  - restore_pr4_packed_d - restore PR4 data to packed array
+  subroutine restore_pr4_packed_d &
+       & (ierr, &
+       &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KFLT
+    integer,         intent(out)   :: ierr
+    real(kind=KARG), intent(out)   :: d(0:*)
+    integer,         intent(in)    :: ldata        ! limit size of of d
+    integer,         intent(inout) :: ends(0:*)
+    integer,         intent(in)    :: u
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: mfull        ! (logical) full data size
+    integer,         intent(in)    :: kaxs(*)
+    integer,optional,intent(in)    :: citer        ! iteration index
+    integer,optional,intent(in)    :: check
+
+    integer l
+
+    ierr = 0
+    call restore_ptn_check(ierr, l, ends, u, krect, kaxs, citer, check)
+    if (ierr.eq.0) call get_data_frecord(ierr, d(0:l-1), l, u, krect)
+  end subroutine restore_pr4_packed_d
+  subroutine restore_pr4_packed_f &
+       & (ierr, &
+       &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
+    integer,         intent(out)   :: ierr
+    real(kind=KARG),    intent(out)   :: d(0:*)
+    integer,         intent(in)    :: ldata        ! limit size of of d
+    integer,         intent(inout) :: ends(0:*)
+    integer,         intent(in)    :: u
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: mfull        ! (logical) full data size
+    integer,         intent(in)    :: kaxs(*)
+    integer,optional,intent(in)    :: citer        ! iteration index
+    integer,optional,intent(in)    :: check
+
+    integer l
+
+    ierr = 0
+    call restore_ptn_check(ierr, l, ends, u, krect, kaxs, citer, check)
+    if (ierr.eq.0) call get_data_frecord(ierr, d(0:l-1), l, u, krect)
+  end subroutine restore_pr4_packed_f
+  subroutine restore_pr4_packed_i &
+       & (ierr, &
+       &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KI32, KISRC=KI32, KRSRC=KFLT
+    integer,         intent(out)   :: ierr
+    integer(kind=KARG),    intent(out)   :: d(0:*)
+    integer,         intent(in)    :: ldata        ! limit size of of d
+    integer,         intent(inout) :: ends(0:*)
+    integer,         intent(in)    :: u
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: mfull        ! (logical) full data size
+    integer,         intent(in)    :: kaxs(*)
+    integer,optional,intent(in)    :: citer        ! iteration index
+    integer,optional,intent(in)    :: check
+
+    integer l
+
+    ierr = 0
+    call restore_ptn_check(ierr, l, ends, u, krect, kaxs, citer, check)
+    if (ierr.eq.0) call get_data_frecord(ierr, d(0:l-1), l, u, krect)
+  end subroutine restore_pr4_packed_i
+!!!_  - restore_pi4_packed_d - restore PI4 data to packed array
+  subroutine restore_pi4_packed_d &
+       & (ierr, &
+       &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KDBL, KISRC=KI32
+    integer,         intent(out)   :: ierr
+    real(kind=KARG), intent(out)   :: d(0:*)
+    integer,         intent(in)    :: ldata        ! limit size of of d
+    integer,         intent(inout) :: ends(0:*)
+    integer,         intent(in)    :: u
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: mfull        ! (logical) full data size
+    integer,         intent(in)    :: kaxs(*)
+    integer,optional,intent(in)    :: citer        ! iteration index
+    integer,optional,intent(in)    :: check
+
+    integer l
+
+    ierr = 0
+    call restore_ptn_check(ierr, l, ends, u, krect, kaxs, citer, check)
+    if (ierr.eq.0) call get_data_irecord(ierr, d(0:l-1), l, u, krect)
+  end subroutine restore_pi4_packed_d
+  subroutine restore_pi4_packed_f &
+       & (ierr, &
+       &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KFLT, KISRC=KI32
+    integer,         intent(out)   :: ierr
+    real(kind=KARG),    intent(out)   :: d(0:*)
+    integer,         intent(in)    :: ldata        ! limit size of of d
+    integer,         intent(inout) :: ends(0:*)
+    integer,         intent(in)    :: u
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: mfull        ! (logical) full data size
+    integer,         intent(in)    :: kaxs(*)
+    integer,optional,intent(in)    :: citer        ! iteration index
+    integer,optional,intent(in)    :: check
+
+    integer l
+
+    ierr = 0
+    call restore_ptn_check(ierr, l, ends, u, krect, kaxs, citer, check)
+    if (ierr.eq.0) call get_data_irecord(ierr, d(0:l-1), l, u, krect)
+  end subroutine restore_pi4_packed_f
+  subroutine restore_pi4_packed_i &
+       & (ierr, &
+       &  d,    ldata, ends, u, krect, mfull, kaxs, citer, check)
+    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KI32, KISRC=KI32
+    integer,         intent(out)   :: ierr
+    integer(kind=KARG),    intent(out)   :: d(0:*)
+    integer,         intent(in)    :: ldata        ! limit size of of d
+    integer,         intent(inout) :: ends(0:*)
+    integer,         intent(in)    :: u
+    integer,         intent(in)    :: krect
+    integer,         intent(in)    :: mfull        ! (logical) full data size
+    integer,         intent(in)    :: kaxs(*)
+    integer,optional,intent(in)    :: citer        ! iteration index
+    integer,optional,intent(in)    :: check
+
+    integer l
+
+    ierr = 0
+    call restore_ptn_check(ierr, l, ends, u, krect, kaxs, citer, check)
+    if (ierr.eq.0) call get_data_irecord(ierr, d(0:l-1), l, u, krect)
+  end subroutine restore_pi4_packed_i
+
 !!!_  - get_data_pr8 - PR8: list-based packed array
   subroutine get_data_pr8_d &
        & (ierr, &
@@ -7130,7 +7648,7 @@ contains
     return
   end subroutine put_data_mi4_d
 
-!!!_  - MRT
+!!!_ + gtool extension MRT
 
 !!!_ + utilities
 !!!_  & get_record_prop - get sequential record properties (byte-order and separator size)
@@ -7261,7 +7779,6 @@ contains
     integer,intent(in),optional :: kendi
     integer ke, kr
     integer(kind=KIOFS) :: apos
-    integer jerr
 
     ierr = err_default
 
@@ -8629,9 +9146,12 @@ contains
     integer,         intent(out) :: kfmt
     character(len=*),intent(in)  :: str
     integer kk
+    integer je
 
     ierr = 0
     kfmt = 0
+    je = index(str, sep_subvitem)
+    if (je.eq.0) je = len_trim(str) + 1
 
     select case (str(1:1))
     case ('U')
@@ -8660,7 +9180,7 @@ contains
              endif
           case ('Y', 'X')
              kfmt = kfmt + GFMT_URY
-             call parse_number(ierr, kk, str(4:), -1)
+             call parse_number(ierr, kk, str(4:je-1), -1)
              if (ierr.eq.0) then
                 if (kk.gt.(GFMT_URYend - GFMT_URY)) ierr = -1
                 if (kk.lt.1) ierr = _ERROR(ERR_UNKNOWN_FORMAT)
@@ -8675,7 +9195,7 @@ contains
              !    ierr = 0
              ! endif
           case default
-             call parse_number(ierr, kk, str(3:), -1)
+             call parse_number(ierr, kk, str(3:je-1), -1)
              if (ierr.eq.0) then
                 if (kk.eq.4) then
                    kfmt = kfmt + GFMT_UR4
@@ -8689,7 +9209,7 @@ contains
              endif
           end select
        case ('I')
-          call parse_number(ierr, kk, str(3:), -1)
+          call parse_number(ierr, kk, str(3:je-1), -1)
           if (ierr.eq.0) then
              if (kk.eq.1) then
                 kfmt = kfmt + GFMT_UI1
@@ -8710,6 +9230,33 @@ contains
     if (ierr.ne.0) kfmt = GFMT_ERR
 
   end subroutine parse_record_fmt
+
+!!!_  & is_packed_subv()
+  logical function is_packed_subv(hd) result(b)
+    use TOUZA_Nio_header,only: hi_DFMT
+    implicit none
+    character(len=*),intent(in) :: hd(*)
+    integer jc
+    jc = index(hd(hi_DFMT), sep_subvitem)
+    if (jc.eq.0) then
+       b = .TRUE.
+    else
+       b = hd(hi_DFMT)(jc+1:).eq.' '
+    endif
+  end function is_packed_subv
+!!!_  & decompose_packed_item
+  subroutine decompose_packed_item (svitem, dfmt)
+    implicit none
+    character(len=*),intent(out) :: svitem
+    character(len=*),intent(in)  :: dfmt
+    integer jc
+    jc = index(dfmt, sep_subvitem)
+    if (jc.eq.0) then
+       svitem = ' '
+    else
+       svitem = dfmt(jc+1:)
+    endif
+  end subroutine decompose_packed_item
 
 !!!_  & parse_record_cmem - parse coordinate members
   subroutine parse_record_cmem &
@@ -9525,6 +10072,40 @@ contains
     return
   end subroutine subv_decode_ii
 
+!!!_  & tweak_subv - mask decoding
+  subroutine tweak_subv &
+       & (ierr,  &
+       &  subv,  ends,  mi, mo, &
+       &  srcd,  mh,    mk)
+    implicit none
+    integer,intent(out)   :: ierr
+    integer,intent(inout) :: subv(0:*)
+    integer,intent(out)   :: ends(0:*)
+    integer,intent(in)    :: mi, mo
+    integer,intent(in)    :: srcd(0:*)
+    integer,intent(in)    :: mh, mk
+    integer jk, jvg, jvi, jvo
+    integer js, jsb, jse
+    ierr = 0
+    ! NOTE: must be sorted (no check)
+    jsb = 0
+    ends(0:mo-1) = 0
+    do jk = 0, mk - 1
+       jse = srcd(jk)
+       do js = jsb, jse - 1
+          jvg = subv(js) + mh * jk
+          jvi = mod(jvg, mi)
+          jvo = jvg / mi
+          ends(jvo) = ends(jvo) + 1
+          subv(js) = jvi
+       enddo
+       jsb = jse
+    enddo
+    do jvo = 1, mo - 1
+       ends(jvo) = ends(jvo) + ends(jvo-1)
+    enddo
+  end subroutine tweak_subv
+
 !!!_  & normalize_xry - ury core
   subroutine normalize_xry_d &
        & (ierr, idec, dma, d, nh, imiss, vmiss)
@@ -9783,6 +10364,7 @@ contains
     ierr = 0
     if (present(flag)) continue     ! dummy
     if (ierr.eq.0) call sus_getpos(ierr, apini, u, WHENCE_ABS)
+    ! write(*, *) 'pre  = ', apini - 1
   end subroutine pre_review
 !!!_  & post_review
   subroutine post_review &
@@ -9796,8 +10378,9 @@ contains
     integer f
     ierr = 0
     f = choice(0, flag)
-    if (IAND(f, keep_pos).eq.0) then
+    if (IAND(f, rev_pos_dhead).ne.0) then
        if (ierr.eq.0) call sus_rseek(ierr, u, apini, whence=WHENCE_ABS)
+       ! write(*, *) 'post  = ', apini - 1
     endif
   end subroutine post_review
 
@@ -10060,7 +10643,7 @@ contains
        enddo
     endif
     f = choice(0, flag)
-    if (IAND(f, keep_pos).ne.0) then
+    if (IAND(f, rev_pos_dhead).ne.0) then
        if (ierr.eq.0) call sus_rseek(ierr, u, jpos, whence=WHENCE_ABS)
     endif
   end subroutine nio_count_defined_urn
@@ -10085,7 +10668,6 @@ contains
 
     integer bes(3, nr)
     integer jx
-    integer mh
     integer(kind=KIOFS) :: jpos
     integer ncom
     integer kpack
@@ -10119,7 +10701,7 @@ contains
        enddo
     endif
     f = choice(0, flag)
-    if (IAND(f, keep_pos).ne.0) then
+    if (IAND(f, rev_pos_dhead).ne.0) then
        if (ierr.eq.0) call sus_rseek(ierr, u, jpos, whence=WHENCE_ABS)
     else
        if (ierr.eq.0) call nio_skip_prec(ierr, u, 1, krect)   ! data
@@ -11160,8 +11742,8 @@ contains
     real(kind=KBUF),allocatable :: v(:)
     integer,allocatable :: ends(:), subv(:)
     integer nx
-    character(len=litem) :: dfmt, item
-    integer nmask, ndata
+    character(len=litem) :: dfmt, item, item_sv
+    integer nmask, ndata, nchk
     integer,parameter :: laxs = 3
     integer :: kaxs(laxs)
     integer jc
@@ -11169,6 +11751,7 @@ contains
     integer jz
     integer jv, jvb, jve
     integer check
+    integer idummy(1)
 
     ierr = 0
 
@@ -11249,24 +11832,68 @@ contains
                      &  v,   ndata, subv, ends(1:), hd, krect, uread, &
                      &  cid, check)
              endif
-             write(*, *) 'read_packed = ', ierr, check
+             write(*, *) 'read_packed/mask = ', ierr, check, ndata
           else if (dfmt(1:1).eq.'P') then
-             niter = 0
-             call nio_skip_records(ierr, 1, uread, head=hd, krect=krect)
+             call decompose_packed_item(item_sv, dfmt)
+             if (item_sv.eq.' ') then
+                check = 0
+                call review_ptn(ierr, ndata, hd, uread, krect)
+                if (ndata.gt.size(subv)) then
+                   deallocate(subv)
+                   allocate(subv(0:ndata-1), STAT=ierr)
+                endif
+                if (ierr.eq.0) then
+                   call nio_read_data_packed &
+                        & (ierr, &
+                        &  idummy, -1, subv, ends(1:), hd, krect, uread, &
+                        &  cid,    check)
+                endif
+                niter = 0
+             else
+                check = 1
+                call review_ptn(ierr, nchk, hd, uread, krect)
+                if (nchk.ne.ndata) ierr = ERR_PANIC
+                if (ierr.eq.0) then
+                   if (ndata.gt.size(v)) then
+                      deallocate(v)
+                      allocate(v(0:ndata-1), STAT=ierr)
+                   endif
+                endif
+                if (ierr.eq.0) then
+                   call nio_read_data_packed &
+                        & (ierr, &
+                        &  v,    ndata, subv, ends(1:), hd, krect, uread, &
+                        &  cid,  check)
+                endif
+             endif
+             write(*, *) 'read_packed/pack = ', ierr, check, ndata, trim(item_sv)
           else
              niter = 0
              call nio_skip_records(ierr, 1, uread, head=hd, krect=krect)
           endif
        endif
        if (ierr.eq.0) then
-          ends(0) = 0
-          do jz = 0, niter - 1
-             jvb = ends(jz)
-             jve = ends(jz+1)
-             do jv = jvb, jve - 1
-                write(*, *) jz, jv, subv(jv), v(jv)
+1001      format(A, 1x, I0, 1x, I0, 1x, I0)
+1002      format(A, 1x, I0, 1x, I0, 1x, E10.3)
+          if (dfmt(2:2).eq.'I') then
+             ends(0) = 0
+             do jz = 0, niter - 1
+                jvb = ends(jz)
+                jve = ends(jz+1)
+                do jv = jvb, jve - 1
+                   write(*, 1001) trim(item), jz, subv(jv), int(v(jv))
+                enddo
              enddo
-          enddo
+          else
+             ends(0) = 0
+             do jz = 0, niter - 1
+                jvb = ends(jz)
+                jve = ends(jz+1)
+                do jv = jvb, jve - 1
+                   write(*, 1002) trim(item), jz, subv(jv), v(jv)
+                enddo
+             enddo
+          endif
        endif
        jrec = jrec + 1
     enddo
