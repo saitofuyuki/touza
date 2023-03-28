@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/03/26 17:40:47 fuyuki genopr.sh>
+# Time-stamp: <2023/03/28 16:17:59 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -31,7 +31,7 @@ main ()
 
   register_all || return $?
 
-  local GODR=(system output anchor stack queue unary ubool bool binary lazy float other)
+  local GODR=(system output anchor stack queue unary ubool bool binary filter lazy float other)
   GODR=($GODR ${(k)GRP})
   GODR=(${(u)GODR})
   local grp=
@@ -46,6 +46,7 @@ main ()
   [[ -z ${(M)call:#s*} ]] || run $opt sub $GODR || return $?
   [[ -z ${(M)call:#e*} ]] || run $opt elem $GODR || return $?
   [[ -z ${(M)call:#t*} ]] || run $opt table $GODR || return $?
+  [[ -z ${(M)call:#l*} ]] || run $opt list $GODR || return $?
   return 0
 }
 
@@ -130,12 +131,15 @@ register_all ()
   register -g ubool -n 1,1 -f -,FALSE -i call     BIN   'binary; 1 if defined, else 0'
 
   # logical operation, inclusive
-  register -g lazy -n 2,1         -i logical,'||'  OR      'logical or; A if defined, else B if defined, else MISS'
-  register -a OR                                   LOR
-  register -g lazy -n 2,1         -i call          ROR     'logical or (reverse); B if defined, else A if defined, else MISS'
-  register -g lazy -n 2,1         -i call          XOR     'logical exclusive-or; A or B if B or A undefined, else MISS'
-  register -g lazy -n 2,1 -f AND  -i call          LAND    'lazy AND'
-  register -g lazy -n 2,1 -f MASK -i call          LMASK   'lazy MASK'
+  register -g lazy -n 2,1            -i logical,'||'  OR      'logical or; A if defined, else B if defined, else MISS'
+  register -a OR                                      LOR
+  register -g lazy -n 2,1            -i call          ROR     'logical or (reverse); B if defined, else A if defined, else MISS'
+  register -g lazy -n 2,1            -i call          XOR     'logical exclusive-or; A or B if B or A undefined, else MISS'
+  register -g lazy -n 2,1 -f AND     -i call          LAND    'lazy AND'
+  register -g lazy -n 2,1 -f MASK    -i call          LMASK   'lazy MASK'
+  register -g lazy -n 2,1 -f LAY,-,T -i call          LLAY    'background layer; B if A outside, else A'
+  register -a LLAY                                    LAY
+  register -g lazy -n 2,1 -f LAY,-,F -i call          RLAY    'background layer; A if B outside, else B'
 
   # primitive binary
   register -n 2,1 -i add,'+'  ADD     'A+B'
@@ -235,12 +239,12 @@ register_all ()
   register -a GE GEU
 
   # conditional operation (filter)
-  register -n 2,1 -i call EQF      'A if A==B, else MISS'
-  register -n 2,1 -i call NEF      'A if not A==B, else MISS'
-  register -n 2,1 -i call LTF      'A if A<B, else MISS'
-  register -n 2,1 -i call GTF      'A if A>B, else MISS'
-  register -n 2,1 -i call LEF      'A if A<=B, else MISS'
-  register -n 2,1 -i call GEF      'A if A>=B, else MISS'
+  register -g filter -n 2,1 -i call EQF      'A if A==B, else MISS'
+  register -g filter -n 2,1 -i call NEF      'A if not A==B, else MISS'
+  register -g filter -n 2,1 -i call LTF      'A if A<B, else MISS'
+  register -g filter -n 2,1 -i call GTF      'A if A>B, else MISS'
+  register -g filter -n 2,1 -i call LEF      'A if A<=B, else MISS'
+  register -g filter -n 2,1 -i call GEF      'A if A>=B, else MISS'
 
   # transform
   register -n 2,1 -i call EXTR            'extraction'
@@ -460,8 +464,9 @@ output_call ()
   local func=()
   local sub= ssfx=
   local apply= afunc=
-  local post=()
+  local post=() ptmp=()
   local args=()
+  local wk=
   for grp in "$@"
   do
     case $grp in
@@ -470,6 +475,7 @@ output_call ()
     (lazy) apply=apply_opr_BINARY_lazy;;
     (ubool) apply=apply_opr_UNARY;;
     (bool)  apply=apply_opr_BINARY;;
+    (filter)  apply=apply_opr_BINARY;;
     (float) apply=;;
     (*)    continue;;
     esac
@@ -490,6 +496,17 @@ output_call ()
       if [[ $grp == bool || $grp == ubool ]]; then
         # ignore post (used in sub template)
         post=('.TRUE.')
+      elif [[ $grp == lazy ]]; then
+        ptmp=("${(@)post}")
+        if [[ -n $ptmp[2] ]]; then
+          if [[ x${ptmp[1]:--} == x- ]]; then
+            case $ptmp[2] in
+            (T) post=(rev=.TRUE.);;
+            (F) post=(rev=.FALSE.);;
+            (*) post=(rev=$ptmp[2]);;
+            esac
+          fi
+        fi
       fi
       afunc=$apply
       if [[ -z $afunc ]]; then
@@ -515,7 +532,7 @@ output_sub ()
   local grp= key=
   local nstack=() push= pop=
   local sub= stype=
-  local candi=(unary binary lazy ubool bool float)
+  local candi=(unary binary lazy ubool bool filter float)
   local elem=
   local DONE=()
   local extval=
@@ -542,6 +559,7 @@ fout -t 0 "!!!_  - $grp operations"
       fi
       [[ $stype == ubool ]] && stype=unary
       [[ $stype == bool ]] && stype=binary
+      [[ $stype == filter ]] && stype=binary
       if [[ $stype == float ]]; then
         if [[ $pop -eq 1 && $push -eq 1 ]]; then
           stype=unary
@@ -635,7 +653,7 @@ output_elem ()
   local grp= key=
   local nstack=() push= pop=
   local sub= stype=
-  local candi=(unary binary lazy ubool bool float)
+  local candi=(unary binary lazy ubool bool filter float)
   local elem=
   local DONE=()
   for grp in "$@"
@@ -652,6 +670,7 @@ output_elem ()
       stype=$grp
       [[ $stype == ubool ]] && stype=unary
       [[ $stype == bool ]] && stype=binary
+      [[ $stype == filter ]] && stype=binary
       if [[ $stype == float ]]; then
         if [[ $pop -eq 1 && $push -eq 1 ]]; then
           stype=unary
@@ -764,7 +783,7 @@ output_table ()
   local grp= key=
   local nstack=() push= pop=
   local sym= alias= opt=
-  local candi=(unary binary lazy ubool bool stack index float)
+  local candi=(unary binary lazy ubool bool filter stack index float)
   local aapp=
   for grp in "$@"
   do
@@ -868,6 +887,30 @@ output_f90_header ()
 !
 HEADER
   return 0
+}
+
+output_list ()
+{
+  local grp= key=
+  local sym= list=()
+  local candi=(unary binary lazy ubool bool filter stack index float)
+
+  for grp in "$@"
+  do
+    [[ $candi[(I)$grp] -eq 0 ]] && continue
+    list=()
+    for key in ${=GRP[$grp]}
+    do
+      sym=$SYM[$key]
+      list+=($sym)
+    done
+    if [[ -n $list ]]; then
+      print - "# $grp"
+      print - "OPRS_$grp='$list'"
+    fi
+  done
+  print -
+
 }
 
 main "$@"; err=$?

@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/28 07:15:52 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/28 13:17:59 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -4180,6 +4180,10 @@ contains
           call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_AND)
        else if (handle.eq.opr_LMASK) then
           call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_MASK)
+       else if (handle.eq.opr_LLAY) then
+          call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_LAY, rev=.TRUE.)
+       else if (handle.eq.opr_RLAY) then
+          call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_LAY, rev=.FALSE.)
        else if (handle.eq.opr_LADD) then
           call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_ADD, ZERO)
        else if (handle.eq.opr_LSUB) then
@@ -4976,7 +4980,7 @@ contains
 
 !!!_   . apply_opr_BINARY_lazy
   subroutine apply_opr_BINARY_lazy &
-       & (ierr, hopr, lefts, bufi, cmode, func, neutral)
+       & (ierr, hopr, lefts, bufi, cmode, func, neutral, rev)
     use TOUZA_std,only: choice, jot
     implicit none
     integer,        intent(out)         :: ierr
@@ -4985,6 +4989,7 @@ contains
     integer,        intent(in)          :: bufi(0:)
     integer,        intent(in)          :: cmode
     real(kind=KBUF),intent(in),optional :: neutral
+    logical,        intent(in),optional :: rev
     interface
        subroutine func &
             & (ierr, Z, domZ, FZ, X, domX, FX)
@@ -5067,30 +5072,54 @@ contains
           call get_compromise_domain &
                & (ierr, domL, domR, btmp(0:ntmp-1), ptmp(0:ntmp-1), ntmp, cmode, obuffer(jbL))
        endif
-       if (ierr.eq.0) then
-          hbR = btmp(0)
-          jbR = buf_h2item(hbR)
-          fillL = obuffer(jbR)%undef
-          fillR = choice(fillL, neutral)
-       endif
-       if (ierr.eq.0) then
-          jset = 0
-          call apply_COPY &
-               & (ierr, &
-               &  obuffer(jbL)%vd, domL, &
-               &  obuffer(jbR)%vd, domR(jset), fillR)
-       endif
-       if (ierr.eq.0) then
-          do jj = 1, ntmp - 1
-             jset = jj
-             hbR = btmp(jj)
+       if (choice(.FALSE., rev)) then
+          if (ierr.eq.0) then
+             jset = ntmp - 1
+             hbR = btmp(jset)
              jbR = buf_h2item(hbR)
-             fillR = obuffer(jbR)%undef
-             call func &
+             fillL = obuffer(jbR)%undef
+             fillR = choice(fillL, neutral)
+             call apply_COPY &
                   & (ierr, &
-                  &  obuffer(jbL)%vd, domL,       fillL, &
+                  &  obuffer(jbL)%vd, domL, &
                   &  obuffer(jbR)%vd, domR(jset), fillR)
-          enddo
+          endif
+          if (ierr.eq.0) then
+             do jj = ntmp - 2, 0, -1
+                jset = jj
+                hbR = btmp(jj)
+                jbR = buf_h2item(hbR)
+                fillR = obuffer(jbR)%undef
+                call func &
+                     & (ierr, &
+                     &  obuffer(jbL)%vd, domL,       fillL, &
+                     &  obuffer(jbR)%vd, domR(jset), fillR)
+             enddo
+          endif
+       else
+          if (ierr.eq.0) then
+             jset = 0
+             hbR = btmp(jset)
+             jbR = buf_h2item(hbR)
+             fillL = obuffer(jbR)%undef
+             fillR = choice(fillL, neutral)
+             call apply_COPY &
+                  & (ierr, &
+                  &  obuffer(jbL)%vd, domL, &
+                  &  obuffer(jbR)%vd, domR(jset), fillR)
+          endif
+          if (ierr.eq.0) then
+             do jj = 1, ntmp - 1
+                jset = jj
+                hbR = btmp(jj)
+                jbR = buf_h2item(hbR)
+                fillR = obuffer(jbR)%undef
+                call func &
+                     & (ierr, &
+                     &  obuffer(jbL)%vd, domL,       fillL, &
+                     &  obuffer(jbR)%vd, domR(jset), fillR)
+             enddo
+          endif
        endif
        if (ierr.eq.0) then
           call set_binary_descr(ierr, hbL, btmp(0:ntmp-1), hopr)
