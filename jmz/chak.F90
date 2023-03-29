@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/28 13:17:59 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/29 14:48:09 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -3479,10 +3479,9 @@ contains
     integer,         intent(in)    :: hflag
 
     integer jerr
-    character(len=128) :: txt
+    character(len=128) :: txt, tsfx
     character(len=litem) :: tstr
     character(len=ldesc) :: tdesc
-    integer :: dt(6)
 
     ierr = 0
     if (ierr.eq.0) call get_item(ierr, head, buf%undef, hi_MISS, def=UNDEF)
@@ -3507,13 +3506,12 @@ contains
     if (ierr.eq.0) call get_header_lprops(ierr, buf%pcp, head, hflag)
 
     if (ierr.eq.0) then
-       call get_item_date(jerr, head, dt(:), hi_DATE)
-       if (jerr.ne.0) dt(:) = -1
-       call restore_item(jerr, head, tstr, hi_TIME)
-       if (jerr.ne.0) tstr = ' '
+       call get_log_suffix(ierr, tsfx, head)
+    else
+       tsfx = ' '
     endif
-101 format('  read:', A, 1x, A, ' T = ', A, ' DATE = ', I0, '/', I0, '/', I0, 1x, I2.2, ':', I2.2, ':', I2.2)
-    write(txt, 101, IOSTAT=jerr) trim(buf%name), trim(buf%desc), trim(adjustl(tstr)), dt(:)
+101 format('  read:', A, 1x, A, A)
+    write(txt, 101, IOSTAT=jerr) trim(buf%name), trim(buf%desc), trim(tsfx)
     call message(ierr, txt, levm=msglev_normal, u=uerr)
     return
   end subroutine set_buffer_attrs
@@ -3539,9 +3537,8 @@ contains
     integer n
     integer jc
     integer jb, jrefh
-    character(len=128) :: txt
+    character(len=128) :: txt, tsfx
     character(len=litem) :: tstr
-    integer :: dt(6)
     integer jerr
     logical :: is_tweak
     type(buffer_t) :: btmp
@@ -3694,13 +3691,12 @@ contains
     endif
 
     if (ierr.eq.0) then
-       call get_item_date(jerr, head, dt(:), hi_DATE)
-       if (jerr.ne.0) dt(:) = -1
-       call restore_item(jerr, head, tstr, hi_TIME)
-       if (jerr.ne.0) tstr = ' '
+       call get_log_suffix(ierr, tsfx, head)
+    else
+       tsfx = ' '
     endif
-101 format('  write:', A, 1x, A, ' T = ', A, ' DATE = ', I0, '/', I0, '/', I0, 1x, I2.2, ':', I2.2, ':', I2.2)
-    write(txt, 101, IOSTAT=jerr) trim(obuffer(jb)%name), trim(obuffer(jb)%desc), trim(adjustl(tstr)), dt(:)
+101 format('  write:', A, 1x, A, A)
+    write(txt, 101, IOSTAT=jerr) trim(obuffer(jb)%name), trim(obuffer(jb)%desc), trim(tsfx)
     call message(ierr, txt, levm=msglev_normal, u=uerr)
 
     if (is_tweak) then
@@ -3710,6 +3706,48 @@ contains
     if (ierr.ne.0) call show_header(ierr, head)
     return
   end subroutine write_file
+
+!!!_   . get_log_suffix
+  subroutine get_log_suffix &
+       & (ierr, txt, head)
+    use TOUZA_Nio,only: hi_DATE, hi_TIME, hi_DFMT
+    use TOUZA_Nio,only: get_item_date, restore_item
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: txt
+    character(len=*),intent(in)  :: head(*)
+
+    character(len=128) :: txtd, txtt
+    character(len=litem) :: tstr
+    integer :: dt(6)
+    integer jerr
+
+    ierr = 0
+    call get_item_date(jerr, head, dt(:), hi_DATE)
+    if (jerr.ne.0) then
+       txtd = ' '
+    else
+102    format(' DATE = ', I0, '/', I0, '/', I0, 1x, I2.2, ':', I2.2, ':', I2.2)
+    write(txtd, 102, IOSTAT=jerr) dt(:)
+    endif
+    call restore_item(jerr, head, tstr, hi_TIME)
+    if (jerr.ne.0) then
+       txtt = ' '
+    else if (tstr.eq.' ') then
+       txtt = ' '
+    else
+103    format(' T = ', A)
+       write(txtt, 103, IOSTAT=jerr) trim(adjustl(tstr))
+    endif
+    txt = trim(txtd) // trim(txtt)
+
+    call restore_item(jerr, head, tstr, hi_DFMT)
+    if (jerr.ne.0) tstr = ' '
+    if (tstr.ne.' ') then
+       txt = trim(txt) // ' [' // trim(tstr) // ']'
+    endif
+    return
+  end subroutine get_log_suffix
 
 !!!_   . tweak_buffer
   subroutine tweak_buffer (ierr, bdest, hsrc, jstk)
