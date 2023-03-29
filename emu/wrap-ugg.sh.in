@@ -1,0 +1,30 @@
+#!@ZSH@ -f
+# Time-stamp: <2023/01/12 16:28:06 fuyuki wrap-ugg.sh.in>
+
+exe=./test_emu_ugg
+
+for lx in 0 1 360
+do
+  for lon in 8 11 256
+  do
+    LDIV=(4 7)
+    [[ $lon == 256 ]] && LDIV=(2 3 7) 
+    for ldiv in $LDIV
+    do
+      for bx in 0 1
+      do
+        print - "-"
+        for mx in 0 1 2 
+        do
+          for ex in 0 1
+          do
+            [[ $ex == 0 && $mx == 2 ]] && continue
+            R=($($exe lat=0 lon=$lon,$ldiv mx=$mx bx=$bx lx=$lx ex=$ex |\
+                     sed -n -e '/^equidistant:.*:/s///p' -e '/^consistency.*:/s///p'))
+            print - "$lx $lon $ldiv $bx $mx $ex $R"
+          done
+        done
+      done
+    done
+  done
+done

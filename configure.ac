@@ -187,6 +187,7 @@ AM_CONDITIONAL([autorevision],
 
 AC_PATH_PROGS([AUTOREVISION], [autorevision], [:])
 AC_PATH_PROGS([REALPATH], [realpath], [false])
+AC_PATH_PROGS([ZSH], [zsh], [:])
 
 dnl dependency hack
 dnl _AM_DEPENDENCIES(FC)
