@@ -1,6 +1,6 @@
 !!!_! jmz/chak_reg.F90 - TOUZA/Jmz CH(swiss) army knife operator registration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-03-26T17:42:39+09:00
+! Created by genopr.sh at 2023-03-28T16:28:06+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -82,22 +82,25 @@
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_RSHIFT, str_RSHIFT, 2, 1, ilev=ilev_shift, istr='>>')
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_MIN, str_MIN, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_MAX, str_MAX, 2, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_EXTR, str_EXTR, 2, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_CDIFF, str_CDIFF, 2, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_FDIFF, str_FDIFF, 2, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_BDIFF, str_BDIFF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_EQF, str_EQF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_NEF, str_NEF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LTF, str_LTF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_GTF, str_GTF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LEF, str_LEF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_GEF, str_GEF, 2, 1, ilev=ilev_call)
-    if (ierr.eq.0) call reg_opr_prop(ierr, opr_EXTR, str_EXTR, 2, 1, ilev=ilev_call)
-    if (ierr.eq.0) call reg_opr_prop(ierr, opr_CDIFF, str_CDIFF, 2, 1, ilev=ilev_call)
-    if (ierr.eq.0) call reg_opr_prop(ierr, opr_FDIFF, str_FDIFF, 2, 1, ilev=ilev_call)
-    if (ierr.eq.0) call reg_opr_prop(ierr, opr_BDIFF, str_BDIFF, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_OR, str_OR, 2, 1, ilev=ilev_logical, istr='||')
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LOR, str_LOR)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_ROR, str_ROR, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_XOR, str_XOR, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LAND, str_LAND, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LMASK, str_LMASK, 2, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_LLAY, str_LLAY, 2, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_LAY, str_LAY)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_RLAY, str_RLAY, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LADD, str_LADD, 2, 1, ilev=ilev_add, istr='+')
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LSUB, str_LSUB, 2, 1, ilev=ilev_add, istr='-')
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_LMUL, str_LMUL, 2, 1, ilev=ilev_mul, istr='*')

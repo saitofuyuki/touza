@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/27 11:01:37 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/29 14:48:09 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -608,29 +608,29 @@ contains
        return
     endif
     if      (abuf(1:2).eq.'-v') then
-       n = verify(trim(abuf), 'v', .TRUE.)
-       if (n.ne.1) then
-          ierr = ERR_INVALID_ITEM
+       n = count_option_levels(abuf(3:), 'v')
+       if (n.lt.0) then
+          ierr = n
        else
-          lev_verbose = + (len_trim(abuf) - 1)
+          lev_verbose = + n
        endif
     else if (abuf.eq.'+v') then
        lev_verbose = +999
     else if (abuf(1:2).eq.'-q') then
-       n = verify(trim(abuf), 'q', .TRUE.)
-       if (n.ne.1) then
-          ierr = ERR_INVALID_ITEM
+       n = count_option_levels(abuf(3:), 'q')
+       if (n.lt.0) then
+          ierr = n
        else
-          lev_verbose = - (len_trim(abuf) - 1)
+          lev_verbose = - n
        endif
     else if (abuf.eq.'+q') then
        lev_verbose = -999
     else if (abuf(1:2).eq.'-d') then
-       n = verify(trim(abuf), 'd', .TRUE.)
-       if (n.ne.1) then
-          ierr = ERR_INVALID_ITEM
+       n = count_option_levels(abuf(3:), 'd')
+       if (n.lt.0) then
+          ierr = n
        else
-          dbgv = + (len_trim(abuf) - 1)
+          dbgv = + n
        endif
     else if (abuf.eq.'+d') then
        dbgv = +999
@@ -682,6 +682,8 @@ contains
     else if (abuf(1:2).eq.'-H') then
        call parse_number(ierr, ntmp, abuf(3:))
        if (ierr.eq.0) hmd = ntmp
+    else if (abuf.eq.'--demo') then
+       if (ierr.eq.0) uerr = ulog
     else
        ierr = ERR_INVALID_ITEM
     endif
@@ -702,6 +704,23 @@ contains
        if (ierr.eq.0) call parse_operator_option(ierr, cmd)
     endif
   end subroutine parse_option
+!!!_    * count_option_levels
+  integer function count_option_levels(str, ch) result(n)
+    use TOUZA_Std,only: parse_number
+    implicit none
+    character(len=*),intent(in) :: str
+    character(len=1),intent(in) :: ch
+    integer jerr
+    call parse_number(jerr, n, str)
+    if (jerr.ne.0) then
+       n = verify(trim(str), ch, .TRUE.)
+       if (n.ne.0) then
+          n = ERR_INVALID_ITEM
+       else
+          n = len_trim(str) + 1
+       endif
+    endif
+  end function count_option_levels
 !!!_    * check_only_global
   subroutine check_only_global(ierr, arg)
     implicit none
@@ -3460,10 +3479,9 @@ contains
     integer,         intent(in)    :: hflag
 
     integer jerr
-    character(len=128) :: txt
+    character(len=128) :: txt, tsfx
     character(len=litem) :: tstr
     character(len=ldesc) :: tdesc
-    integer :: dt(6)
 
     ierr = 0
     if (ierr.eq.0) call get_item(ierr, head, buf%undef, hi_MISS, def=UNDEF)
@@ -3488,13 +3506,12 @@ contains
     if (ierr.eq.0) call get_header_lprops(ierr, buf%pcp, head, hflag)
 
     if (ierr.eq.0) then
-       call get_item_date(jerr, head, dt(:), hi_DATE)
-       if (jerr.ne.0) dt(:) = -1
-       call restore_item(jerr, head, tstr, hi_TIME)
-       if (jerr.ne.0) tstr = ' '
+       call get_log_suffix(ierr, tsfx, head)
+    else
+       tsfx = ' '
     endif
-101 format('  read:', A, 1x, A, ' T = ', A, ' DATE = ', I0, '/', I0, '/', I0, 1x, I2.2, ':', I2.2, ':', I2.2)
-    write(txt, 101, IOSTAT=jerr) trim(buf%name), trim(buf%desc), trim(adjustl(tstr)), dt(:)
+101 format('  read:', A, 1x, A, A)
+    write(txt, 101, IOSTAT=jerr) trim(buf%name), trim(buf%desc), trim(tsfx)
     call message(ierr, txt, levm=msglev_normal, u=uerr)
     return
   end subroutine set_buffer_attrs
@@ -3520,9 +3537,8 @@ contains
     integer n
     integer jc
     integer jb, jrefh
-    character(len=128) :: txt
+    character(len=128) :: txt, tsfx
     character(len=litem) :: tstr
-    integer :: dt(6)
     integer jerr
     logical :: is_tweak
     type(buffer_t) :: btmp
@@ -3675,13 +3691,12 @@ contains
     endif
 
     if (ierr.eq.0) then
-       call get_item_date(jerr, head, dt(:), hi_DATE)
-       if (jerr.ne.0) dt(:) = -1
-       call restore_item(jerr, head, tstr, hi_TIME)
-       if (jerr.ne.0) tstr = ' '
+       call get_log_suffix(ierr, tsfx, head)
+    else
+       tsfx = ' '
     endif
-101 format('  write:', A, 1x, A, ' T = ', A, ' DATE = ', I0, '/', I0, '/', I0, 1x, I2.2, ':', I2.2, ':', I2.2)
-    write(txt, 101, IOSTAT=jerr) trim(obuffer(jb)%name), trim(obuffer(jb)%desc), trim(adjustl(tstr)), dt(:)
+101 format('  write:', A, 1x, A, A)
+    write(txt, 101, IOSTAT=jerr) trim(obuffer(jb)%name), trim(obuffer(jb)%desc), trim(tsfx)
     call message(ierr, txt, levm=msglev_normal, u=uerr)
 
     if (is_tweak) then
@@ -3691,6 +3706,48 @@ contains
     if (ierr.ne.0) call show_header(ierr, head)
     return
   end subroutine write_file
+
+!!!_   . get_log_suffix
+  subroutine get_log_suffix &
+       & (ierr, txt, head)
+    use TOUZA_Nio,only: hi_DATE, hi_TIME, hi_DFMT
+    use TOUZA_Nio,only: get_item_date, restore_item
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: txt
+    character(len=*),intent(in)  :: head(*)
+
+    character(len=128) :: txtd, txtt
+    character(len=litem) :: tstr
+    integer :: dt(6)
+    integer jerr
+
+    ierr = 0
+    call get_item_date(jerr, head, dt(:), hi_DATE)
+    if (jerr.ne.0) then
+       txtd = ' '
+    else
+102    format(' DATE = ', I0, '/', I0, '/', I0, 1x, I2.2, ':', I2.2, ':', I2.2)
+    write(txtd, 102, IOSTAT=jerr) dt(:)
+    endif
+    call restore_item(jerr, head, tstr, hi_TIME)
+    if (jerr.ne.0) then
+       txtt = ' '
+    else if (tstr.eq.' ') then
+       txtt = ' '
+    else
+103    format(' T = ', A)
+       write(txtt, 103, IOSTAT=jerr) trim(adjustl(tstr))
+    endif
+    txt = trim(txtd) // trim(txtt)
+
+    call restore_item(jerr, head, tstr, hi_DFMT)
+    if (jerr.ne.0) tstr = ' '
+    if (tstr.ne.' ') then
+       txt = trim(txt) // ' [' // trim(tstr) // ']'
+    endif
+    return
+  end subroutine get_log_suffix
 
 !!!_   . tweak_buffer
   subroutine tweak_buffer (ierr, bdest, hsrc, jstk)
@@ -4161,6 +4218,10 @@ contains
           call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_AND)
        else if (handle.eq.opr_LMASK) then
           call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_MASK)
+       else if (handle.eq.opr_LLAY) then
+          call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_LAY, rev=.TRUE.)
+       else if (handle.eq.opr_RLAY) then
+          call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_LAY, rev=.FALSE.)
        else if (handle.eq.opr_LADD) then
           call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_ADD, ZERO)
        else if (handle.eq.opr_LSUB) then
@@ -4957,7 +5018,7 @@ contains
 
 !!!_   . apply_opr_BINARY_lazy
   subroutine apply_opr_BINARY_lazy &
-       & (ierr, hopr, lefts, bufi, cmode, func, neutral)
+       & (ierr, hopr, lefts, bufi, cmode, func, neutral, rev)
     use TOUZA_std,only: choice, jot
     implicit none
     integer,        intent(out)         :: ierr
@@ -4966,6 +5027,7 @@ contains
     integer,        intent(in)          :: bufi(0:)
     integer,        intent(in)          :: cmode
     real(kind=KBUF),intent(in),optional :: neutral
+    logical,        intent(in),optional :: rev
     interface
        subroutine func &
             & (ierr, Z, domZ, FZ, X, domX, FX)
@@ -5048,30 +5110,54 @@ contains
           call get_compromise_domain &
                & (ierr, domL, domR, btmp(0:ntmp-1), ptmp(0:ntmp-1), ntmp, cmode, obuffer(jbL))
        endif
-       if (ierr.eq.0) then
-          hbR = btmp(0)
-          jbR = buf_h2item(hbR)
-          fillL = obuffer(jbR)%undef
-          fillR = choice(fillL, neutral)
-       endif
-       if (ierr.eq.0) then
-          jset = 0
-          call apply_COPY &
-               & (ierr, &
-               &  obuffer(jbL)%vd, domL, &
-               &  obuffer(jbR)%vd, domR(jset), fillR)
-       endif
-       if (ierr.eq.0) then
-          do jj = 1, ntmp - 1
-             jset = jj
-             hbR = btmp(jj)
+       if (choice(.FALSE., rev)) then
+          if (ierr.eq.0) then
+             jset = ntmp - 1
+             hbR = btmp(jset)
              jbR = buf_h2item(hbR)
-             fillR = obuffer(jbR)%undef
-             call func &
+             fillL = obuffer(jbR)%undef
+             fillR = choice(fillL, neutral)
+             call apply_COPY &
                   & (ierr, &
-                  &  obuffer(jbL)%vd, domL,       fillL, &
+                  &  obuffer(jbL)%vd, domL, &
                   &  obuffer(jbR)%vd, domR(jset), fillR)
-          enddo
+          endif
+          if (ierr.eq.0) then
+             do jj = ntmp - 2, 0, -1
+                jset = jj
+                hbR = btmp(jj)
+                jbR = buf_h2item(hbR)
+                fillR = obuffer(jbR)%undef
+                call func &
+                     & (ierr, &
+                     &  obuffer(jbL)%vd, domL,       fillL, &
+                     &  obuffer(jbR)%vd, domR(jset), fillR)
+             enddo
+          endif
+       else
+          if (ierr.eq.0) then
+             jset = 0
+             hbR = btmp(jset)
+             jbR = buf_h2item(hbR)
+             fillL = obuffer(jbR)%undef
+             fillR = choice(fillL, neutral)
+             call apply_COPY &
+                  & (ierr, &
+                  &  obuffer(jbL)%vd, domL, &
+                  &  obuffer(jbR)%vd, domR(jset), fillR)
+          endif
+          if (ierr.eq.0) then
+             do jj = 1, ntmp - 1
+                jset = jj
+                hbR = btmp(jj)
+                jbR = buf_h2item(hbR)
+                fillR = obuffer(jbR)%undef
+                call func &
+                     & (ierr, &
+                     &  obuffer(jbL)%vd, domL,       fillL, &
+                     &  obuffer(jbR)%vd, domR(jset), fillR)
+             enddo
+          endif
        endif
        if (ierr.eq.0) then
           call set_binary_descr(ierr, hbL, btmp(0:ntmp-1), hopr)
