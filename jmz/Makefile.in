@@ -17,7 +17,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/03/24 17:21:51 fuyuki Makefile.am>
+# Time-stamp: <2023/03/30 11:35:35 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -455,10 +455,12 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I ../m4c
+EXTRA_DIST = ocheck.sh.in jmzdepf90.sh.in demo-chak.sh.in \
+	$(chak_to_include) README-jmz.org
 AM_FCFLAGS_MODULE = $(DEBUG) $(TOUZA_CFLAGS)
-# AM_LDFLAGS = $(TOUZA_LDFLAGS)
+AM_LDFLAGS = $(TOUZA_LDFLAGS)
 LDADD = libjmz_local.la $(TOUZA_LIBS)
-noinst_SCRIPTS = jmzdepf90 demo-chak.sh
+noinst_SCRIPTS = jmzdepf90 demo-chak.sh ocheck.sh
 noinst_LTLIBRARIES = libjmz_local.la
 libjmz_local_la_SOURCES = jmzlib.F90 chak_lib.F90 chak_opr.F90 chak_file.F90
 jmzex_SOURCES = jmzex.F90 jmz.h
@@ -472,8 +474,6 @@ TEST_COMMON_LIBS = $(noinst_LTLIBRARIES)
 test_chak_file_SOURCES = chak_file.F90
 test_chak_file_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_CHAK_FILE=1
 test_chak_file_LDADD = $(TEST_COMMON_LIBS) $(LDADD)
-EXTRA_DIST = jmzdepf90.sh.in demo-chak.sh.in $(chak_to_include) \
-	README-jmz.org
 MOSTLYCLEANFILES = *.$(FC_MODEXT)
 CLEANFILES = $(bin_SCRIPTS) $(noinst_SCRIPTS)
 SUBDIRS = .
@@ -1115,8 +1115,11 @@ jmzdepf90: jmzdepf90.sh.in
 	chmod +x $@
 
 demo-chak.sh: demo-chak.sh.in
-	sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@
-	chmod +x $@
+	@sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@; chmod +x $@
+
+ocheck.sh: ocheck.sh.in
+	@sed -e 's,[@]CHAK[@],$(abs_builddir)/chak,g' \
+		 -e 's,[@]CHAK_OPTS[@],$(CHAK_OPTS),g' < $< >$@; chmod +x $@
 
 genx.sh: genx.sh.in
 	if test -e $<; then \

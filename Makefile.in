@@ -17,7 +17,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2023/03/24 17:28:42 fuyuki Makefile.am>
+# Time-stamp: <2023/03/30 13:02:35 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -26,7 +26,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Mon Mar 27 11:42:46 JST 2023
+# from AX_AM_MACROS_STATIC on Thu Mar 30 13:03:18 JST 2023
 
 
 
@@ -583,7 +583,7 @@ AM_FCFLAGS_MODULE = $(FC_MODULE_touza_std) $(am__append_6) \
 COPY_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=copy-%)
 DIFF_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=diff-%)
 switch_DATA = 
-lib@TOUZA_NAME@_la_LDFLAGS = -version-info 1:0:0
+lib@TOUZA_NAME@_la_LDFLAGS = -version-info 1:1:0
 noinst_SCRIPTS = makeshift
 SUBDIRS = std $(am__append_4) $(am__append_7) $(am__append_10) \
 	$(am__append_13) $(am__append_16) $(am__append_19) m4c . \
