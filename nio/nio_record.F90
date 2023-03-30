@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:50:45 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/30 10:39:40 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -2738,6 +2738,7 @@ contains
     real(KIND=KRSRC)    :: dma(0:2 * mk - 1)
     integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jde
+    integer             :: jc
     integer,parameter :: cz = 3
     integer kpack
     integer :: dunp(npropd, 0:mh), rfil(0:mh)
@@ -2788,7 +2789,8 @@ contains
        if (ierr.eq.0) call get_data_record(ierr, icom, mcom * mk, u, krect)
        if (ierr.eq.0) then
           do jk = 0, mk - 1
-             call pack_restore(ierr, idec, icom, mh, nbits, kpack)
+             jc = jk * mcom
+             call pack_restore(ierr, idec, icom(jc:), mh, nbits, kpack)
              jdb = mh * jk
              jde = mh * (jk + 1)
              where (idec(0:mh-1).ne.imiss)
@@ -2828,6 +2830,7 @@ contains
     real(KIND=KRSRC)    :: dma(0:2 * mk - 1)
     integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jde
+    integer             :: jc
     integer,parameter :: cz = 3
     integer kpack
     integer :: dunp(npropd, 0:mh), rfil(0:mh)
@@ -2878,7 +2881,8 @@ contains
        if (ierr.eq.0) call get_data_record(ierr, icom, mcom * mk, u, krect)
        if (ierr.eq.0) then
           do jk = 0, mk - 1
-             call pack_restore(ierr, idec, icom, mh, nbits, kpack)
+             jc = jk * mcom
+             call pack_restore(ierr, idec, icom(jc:), mh, nbits, kpack)
              jdb = mh * jk
              jde = mh * (jk + 1)
              where (idec(0:mh-1).ne.imiss)
@@ -2918,6 +2922,7 @@ contains
     real(KIND=KRSRC)    :: dma(0:2 * mk - 1)
     integer,parameter   :: mold = 0_KISRC
     integer             :: jk, jdb, jde
+    integer             :: jc
     integer,parameter :: cz = 3
     integer kpack
     integer :: dunp(npropd, 0:mh), rfil(0:mh)
@@ -2968,7 +2973,8 @@ contains
        if (ierr.eq.0) call get_data_record(ierr, icom, mcom * mk, u, krect)
        if (ierr.eq.0) then
           do jk = 0, mk - 1
-             call pack_restore(ierr, idec, icom, mh, nbits, kpack)
+             jc = jk * mcom
+             call pack_restore(ierr, idec, icom(jc:), mh, nbits, kpack)
              jdb = mh * jk
              jde = mh * (jk + 1)
              where (idec(0:mh-1).ne.imiss)
