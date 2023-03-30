@@ -1,10 +1,17 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2023/03/27 11:18:28 fuyuki NEWS>
+# Time-stamp: <2023/03/30 11:54:41 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.11.2 from 1.11.1
+** Bug fixes
+- (nio) [FATAL] URY decoding fails from z>0 layers, which affects chak
+  and Nnview.
+** Changes
+- (chak) operator LAY family introduced.
 
 * Changes in 1.11.1 from 1.11.0
 ** Bug fixes

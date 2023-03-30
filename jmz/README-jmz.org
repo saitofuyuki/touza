@@ -371,7 +371,7 @@ Argument =-qqqq= refrains in addition the column information.
 : 2  1.235000E+02  1.235000E+02
 : 3  1.335000E+02  1.335000E+02
 
-Finally, argument =-qqqq= further refrains the coordinate columns,
+Finally, argument =-qqqqq= further refrains the coordinate columns,
 therefore only the stacked elements are shown.
 : % chak -qqqqq demo/zx.base T=0 DUP FLUSH -i
 :  1.035000E+02  1.035000E+02
@@ -672,6 +672,7 @@ Following table is not complete, and some operators are not yet implemented.
 | INV              |   1 |      1 | 1/A                                                              |
 | LADD             |   2 |      1 | lazy ADD                                                         |
 | LAND             |   2 |      1 | lazy AND                                                         |
+| LAY LLAY         |   2 |      1 | background layer; B if A outside, else A                         |
 | LDIV             |   2 |      1 | lazy DIV                                                         |
 | LE LEU           |   2 |      1 | 1, 0, MISS for A<=B, not, either MISS                            |
 | LEB              |   2 |      1 | 1 if A<=B, else 0                                                |
@@ -705,6 +706,7 @@ Following table is not complete, and some operators are not yet implemented.
 | POW              |   2 |      1 | pow(A,B)                                                         |
 | R2D              |   1 |      1 | Convert radian to degree                                         |
 | REPEAT           |   m |     2m | repeat from last non-adjacent anchor                             |
+| RLAY             |   2 |      1 | background layer; A if B outside, else B                         |
 | ROR              |   2 |      1 | logical or (reverse); B if defined, else A if defined, else MISS |
 | ROUND            |   1 |      1 | nearest integer of A                                             |
 | RRSP             |   1 |      1 | rrspacing(A)                                                     |
@@ -726,6 +728,45 @@ Following table is not complete, and some operators are not yet implemented.
 | Z                |   0 |      1 | put top stack coordinate[2] index                                |
 | ZSIGN            |   1 |      1 | -1,0,+1 if negative,zero,positive                                |
 |------------------+-----+--------+------------------------------------------------------------------|
+
+| GO   | remove last anchor                      |
+| MARK | fragile anchor (removed by first touch) |
+| STOP | robust anchor (removed by GO)           |
+
+| CUM  | apply last queue non-unary operator from last anchor      |
+| ITER | iterate last queue operator for each set from last anchor |
+| MAP  | reserved; DIST ITER                                       |
+
+| DSET=ARG  | STRING |                            |
+| DUR[=ARG] | UNIT   | duration                   |
+| EDIT=ARG  | STRING |                            |
+| FMT=ARG   | FORMAT | set output data format     |
+| ITEM=ARG  | STRING | item replacement or filter |
+| MISS=ARG  | VALUE  | replace missing value      |
+| R=ARG     | LIST   | record filter              |
+| T=ARG     | LIST   | time filter                |
+| TITLE=ARG | STRING |                            |
+| UNIT=ARG  | STRING |                            |
+
+| C0[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[0] index |
+| C1[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[1] index |
+| C2[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[2] index |
+| C3[=ARG]           | NAME/REPL/RANGE    | put top stack coordinate[3] index |
+| CSHIFT=ARG         | NAME/SHIFT         | circular shift along coordinate   |
+| DUR[=ARG]          | UNIT               | duration                          |
+| EOSHIFT=ARG        | NAME/SHIFT         | end-off shift along coordinate    |
+| MISS=ARG           | VALUE              | replace missing value             |
+| PERM=ARG SHAPE=ARG | NAME/REPL/RANGE,.. | array shape permutatation         |
+| SIZE=ARG           | NAME/REPL/SIZE,..  | array size(shape) permutatation   |
+| TAG=ARG            | NAME               |                                   |
+| X[=ARG]            | NAME/REPL/RANGE    | put top stack coordinate[0] index |
+| Y[=ARG]            | NAME/REPL/RANGE    | put top stack coordinate[1] index |
+| Z[=ARG]            | NAME/REPL/RANGE    | put top stack coordinate[2] index |
+
+
+
+
+
 
 **** operators on stack anchors
 |----------+-----------------------------------------|
@@ -807,6 +848,7 @@ topmost stack.
 : 5  3  2  93
 : 6  3  2  94
 : 7  3  2  95
+# ##DONE flat:flat/s
 The flat index is defined as =i + j * 8 + k * 8 * 4=.
 
 With optional argument, only specific coordinate is applied for flat
@@ -829,6 +871,7 @@ index computation.
 : 7  0  0  7
 : 0  1  0  0
 : :
+# ##DONE flat:flat/s0
 The flat index is defined as =i=, coordinate 0 only.
 It works similarly with the operator =C0= or =X=.
 
@@ -854,6 +897,7 @@ smaller rank, thus =FLAT=1= reshape the result as =(lat, lon, lev)=.
 : 3  1  0  3
 : 0  2  0  0
 : :
+# ##DONE flat:flat/s1
 The flat index is defined as =j=, coordinate 1 only, and coordinate
 permutation is performed as shown above.
 
@@ -874,6 +918,7 @@ coordinates, separated with comma.
 : 5  3  2  29
 : 6  3  2  30
 : 7  3  2  31
+# ##DONE flat:flat/s01
 The flat index is defined as =i + 8 * j=, which corresponding coordinates =0,1=.
 
 Permutation works with arbitrary coordinate order.
@@ -895,6 +940,7 @@ Permutation works with arbitrary coordinate order.
 : 3  1  0  7
 : 0  2  0  8
 : :
+# ##DONE flat:flat/s10
 The flat index is defined as =j + 4 * i=, which corresponding coordinates =1,0=.
 Shape is changed into =(lat,lon,lev)=.
 
@@ -917,6 +963,7 @@ Coordinates not specified are just ignored.
 : 1  2  0  7
 : 2  2  0  8
 : :
+# ##DONE flat:flat/s20
 The flat index is defined as =k + 3 * i=, which corresponding coordinates =2,0=.
 Shape is changed into =(lev,lon,lat)=.
 
@@ -940,6 +987,7 @@ matching, to adjust to the first operand at the operation.
 : 7  0  0  7   0
 : 0  1  0  10  1
 : :
+# ##DONE flat:flat/1
 
 Coordinate can be specified by names.
 # ## flat:flat/x
@@ -958,6 +1006,7 @@ Coordinate can be specified by names.
 : 7  0  0  7   7
 : 0  1  0  10  0
 : :
+# ##DONE flat:flat/x
 
 Permutation also works with coordinate names.
 # ## flat:flat/zy
@@ -976,6 +1025,7 @@ Permutation also works with coordinate names.
 : 7  0  0  7   0
 : 0  1  0  10  3
 : :
+# ##DONE flat:flat/zy
 
 You may notice that the shape of new stack pushed by =FLAT= operator
 inherits the one of previous top stack, where the ranks are the same
@@ -999,19 +1049,21 @@ This behaviour helps successive =FLAT= operators.
 : 7  0  0  7   7  0
 : 0  1  0  10  0  1
 : :
+# ##DONE flat:flat/0+1
 The second =FLAT=1= operator push the coordinate 1 of topmost stack,
 which is virtually =lat/0:4=.  Thus it extracts safely the coordinate 1
 of original =demo/base= as normally desired.
 
 In a draft implementation of index coordinates, the shape does not
 inherits as follows:
-# ## flat:flat/0+1
+# ## dummy/flat:flat/0+1
 : % obsolete-chak T=0 demo/base INT FLAT=0 FLAT=1 FLUSH -i
 : ### record: 0
 : ## 0 {2053} [lon/0:8 lat/0:4 lev/0:3] bs INT
 : ## 1 {2054} [lon/0:8] FLAT
 : ## 2 {2055} [0]       FLAT
 : #lon/0:8 lat/0:4 lev/0:3 {2053} {2054} {2055}
+# ##DONE dummy/flat:flat/0+1
 If the first =FLAT= operator never inherits the shape of =demo/base=,
 then the second =FLAT= operator fails to extract the expected
 coordinate because only the first coordinate is remained on the
@@ -1028,20 +1080,27 @@ previous stack.
 Symbols d, u and x correspond to defined, undefined, and outside,
 respectively.
 
-|           | d d  | d u  | d x  | u d  | u u  | u x  | x d  | x u  | x x  |
-|-----------+------+------+------+------+------+------+------+------+------|
-| a b AND   | b    | MISS | MISS | MISS | MISS | MISS | MISS | MISS | MISS |
-| a b MASK  | a    | MISS | MISS | MISS | MISS | MISS | MISS | MISS | MISS |
-|-----------+------+------+------+------+------+------+------+------+------|
-| a b OR    | a    | a    | a    | b    | MISS | MISS | b    | MISS | MISS |
-| a b ROR   | b    | a    | a    | b    | MISS | MISS | b    | MISS | MISS |
-| a b XOR   | MISS | a    | a    | b    | MISS | MISS | b    | MISS | MISS |
+|          | d d  | d u     | d x  | u d     | u u     | u x     | x d  | x u     | x x     |
+|----------+------+---------+------+---------+---------+---------+------+---------+---------|
+| a b AND  | b    | MISS    | MISS | MISS    | MISS    | MISS    | MISS | MISS    | MISS    |
+| a b MASK | a    | MISS    | MISS | MISS    | MISS    | MISS    | MISS | MISS    | MISS    |
+|----------+------+---------+------+---------+---------+---------+------+---------+---------|
+| a b OR   | a    | a       | a    | b       | MISS    | MISS    | b    | MISS    | MISS    |
+| a b ROR  | b    | a       | a    | b       | MISS    | MISS    | b    | MISS    | MISS    |
+| a b XOR  | MISS | a       | a    | b       | MISS    | MISS    | b    | MISS    | MISS    |
+|----------+------+---------+------+---------+---------+---------+------+---------+---------|
+| a b LLAY | a    | a       | a    | a(MISS) | a(MISS) | a(MISS) | b    | b(MISS) | b(MISS) |
+| a b RLAY | b    | b(MISS) | a    | b       | b(MISS) | a(MISS) | b    | b(MISS) | a(MISS) |
 
-AND operator evaluates the operands sequentially, stop when undefined,
+=AND= operator evaluates the operands sequentially, stop when undefined,
 return the last evaluation.
 
-OR operator evaluates the operands sequentially, stop when defined,
+=OR=(=LOR=) operator evaluates the operands sequentially, stop when defined,
 return the last evaluation.
+
+=LAY=(=LLAY=) operator evaluates the operands sequentally, stop when
+inside, return the last evaluation.
+
 *** Conditional operators cheat sheet
 There are three kinds of conditional operators: normal, filter-like,
 and binary.  They have a suffix U, F, and B respectively, so for
@@ -1391,13 +1450,13 @@ Concrete examples are helpful rather than to provide the abstract rule.
   ~<name|index>/<replace>~ and ~<range|element>~ (e.g.,
   ~lev/glev/0:5~)
 
-Operator =SIZE= follows most of =SHAPE= arguments, except for two
-minor difference to parse integer.  While a single integer is parsed
-as either coordinate index or coordinate element for =SHAPE=
+Operator =SIZE= follows most of =SHAPE= arguments, except for one
+minor difference to parse integer at =<range|element>=.
+While a single integer is parsed as a coordinate element for =SHAPE=
 arguments, =SIZE= parses it as the size of coordinate.  For example,
-while ~SHAPE=1~ is parsed as to move 1st coordinate, ~SIZE=1~ as to set
-0th coordinate size as 1 (range =0:1=), which corresponds to
-specification of ~SHAPE=:1~.  Also, while ~SHAPE=lon/10~
+while ~SHAPE=1~ is parsed to extract element 1 along 0th coordinate,
+~SIZE=1~ as to set 0th coordinate size as 1 (range =0:1=), which
+corresponds to specification of ~SHAPE=:1~.  Also, while ~SHAPE=lon/10~
 is parsed as to extract element 10 along =lon=, ~SIZE=lon/10~ as to
 set =lon= coordinate size as 10 (range =0:10=), which corresponds to
 ~SHAPE=lon/:10~.
@@ -1437,6 +1496,7 @@ Subregion can be specified with Cn=[LOW]:[HIGH] argument:
 : 2  117
 : 3  118
 : 4  119
+# ##DONE sub/P
 
 # ## sub/F
 : % chak -F T=4 demo/yz.base INT X=3:5 =
@@ -1450,6 +1510,7 @@ Subregion can be specified with Cn=[LOW]:[HIGH] argument:
 : 4  118
 : 5  119
 : # with FORTRAN style counting
+# ##DONE sub/F
 
 Outside of the source domain is filled with missing value.
 # ## ext
@@ -1464,6 +1525,7 @@ Outside of the source domain is filled with missing value.
 : 7  122
 : 8  .
 : 9  .
+# ##DONE ext
 
 **** coordinate permutation
 :PROPERTIES:
@@ -1490,6 +1552,7 @@ Coordinate permutation can be also specified.
 : 1  2  213
 : 2  2  223
 : 3  2  233
+# ##DONE source:2d
 
 # ## perm:2d/c
 : % chak T=3 demo/x.base INT X=lev =
@@ -1511,6 +1574,7 @@ Coordinate permutation can be also specified.
 : 0  3  33
 : 1  3  133
 : 2  3  233
+# ##DONE perm:2d/c
 
 A basic of coordinate permutation of chak is to pad unspecified
 coordinates, and keep the number of ranks as far as possible.
@@ -1536,6 +1600,7 @@ is exchanged.  If =Z=lat= is specified, coordinate is rotated as follows:
 : 0  0  3  33
 : 1  0  3  133
 : 2  0  3  233
+# ##DONE perm:3d+1/c
 
 In order to insert blank coordinate at beginning needs two
 explicit transformation:
@@ -1559,6 +1624,7 @@ explicit transformation:
 : 0  1  2  213
 : 0  2  2  223
 : 0  3  2  233
+# ##DONE perm:3d+0/c
 In the above example, =lat=, =lev= order are shifted by 1.
 Vacant coordinate is automatically filled with blank name, null range.
 
@@ -1600,6 +1666,7 @@ conversion of the first file, the second file, and the result of operator =ADD=.
 : 5  120  120  240
 : 6  121  .    _
 : 7  122  .    _
+# ##DONE add:1d
 
 In the example, two operands share same rank design with different ranges:
 # ## add:1d/op0
@@ -1618,6 +1685,7 @@ In the example, two operands share same rank design with different ranges:
 : 5  120
 : 6  121
 : 7  122
+# ##DONE add:1d/op0
 
 # ## add:1d/op1
 : % chak demo/sub3.yz.base T=3 INT FLUSH
@@ -1630,6 +1698,7 @@ In the example, two operands share same rank design with different ranges:
 : 3  118
 : 4  119
 : 5  120
+# ##DONE add:1d/op1
 
 If the coordinate match on different rank, they may be shifted,
 rotated, expanded.
@@ -1646,6 +1715,7 @@ For example, the first operand shape is ={lat}=, 1 rank.
 : 1  113
 : 2  123
 : 3  133
+# ##DONE add:1d/op0
 
 while, the second operand shape is ={-,lat}=, 2 rank.
 # ## add:1d/op1
@@ -1658,6 +1728,7 @@ while, the second operand shape is ={-,lat}=, 2 rank.
 : #/0:1 lat/1:3 {B5}
 : 0  1  113
 : 0  2  123
+# ##DONE add:1d/op1
 
 Add operation automatically adjust the latter domain:
 # ## add:1d
@@ -1671,6 +1742,7 @@ Add operation automatically adjust the latter domain:
 : 1  113  113  226
 : 2  123  123  246
 : 3  133  .    _
+# ##DONE add:1d
 
 The primary policy of the automatic coordinate tweaking is to adjust
 to the first operand at the operation.
@@ -1698,6 +1770,7 @@ must have different rank candidate for automatic tweaking.
 : 0  1  110
 : 1  1  111
 : :
+# ##DONE add:2d+1d/op0
 
 # ## add:2d+1d/op1
 : % chak demo/sub2.zx.base T=0 INT FLUSH
@@ -1709,6 +1782,7 @@ must have different rank candidate for automatic tweaking.
 : #lat/1:3 {B5}
 : 1  113
 : 2  123
+# ##DONE add:2d+1d/op1
 
 # ## add:2d+1d
 : % chak demo/z.base T=3 INT demo/sub2.zx.base T=0 INT REPEAT ADD FLUSH -i
@@ -1740,12 +1814,13 @@ must have different rank candidate for automatic tweaking.
 : 5  3  135  .    _
 : 6  3  136  .    _
 : 7  3  137  .    _
+# ##DONE add:2d+1d
 
 On the above case, the latter spread the data on a missing dimension lon.
 
 If the same rank has different coordinate name with no additional
 information, matching is failed.
-# fail/add:2d/op0
+# ## fail/add:2d/op0
 : % chak demo/zx.base T=3 INT FLUSH
 : ### record: 0
 : ## stack[0] {B5} zx:bs INT
@@ -1757,8 +1832,9 @@ information, matching is failed.
 : 1  113
 : 2  123
 : 3  133
+# ##DONE fail/add:2d/op0
 
-# fail/add:2d/op1
+# ## fail/add:2d/op1
 : % chak demo/yz.base T=3 INT FLUSH
 : ### record: 0
 : ## stack[0] {B5} yz:bs INT
@@ -1774,6 +1850,7 @@ information, matching is failed.
 : 5  120
 : 6  121
 : 7  122
+# ##DONE fail/add:2d/op1
 
 # ## fail/add:2d
 : % chak demo/zx.base T=3 INT demo/yz.base T=3 INT REPEAT ADD FLUSH -i
@@ -1788,6 +1865,7 @@ information, matching is failed.
 : shape:0 [lat,,,,,]
 : shape:1 [lon,,,,,]
 : error:-39: ambiguous fragile coordinates (0)
+# ##DONE fail/add:2d
 Since =lon= and =lat= share the same rank, chak has never chance to
 determine which comes earlier.
 
@@ -1805,6 +1883,7 @@ and each opposite is blank, then they succeed to match.
 : 0  1  113
 : 0  2  123
 : 0  3  133
+# ##DONE auto/add:2d/op0
 
 # ## auto/add:2d/op1
 : % chak demo/yz.base T=3 INT FLUSH
@@ -1822,6 +1901,7 @@ and each opposite is blank, then they succeed to match.
 : 5  120
 : 6  121
 : 7  122
+# ##DONE auto/add:2d/op1
 
 # ## auto/add:2d
 : % chak demo/zx.base T=5 INT demo/yz.base T=3 INT REPEAT ADD FLUSH -i
@@ -1847,6 +1927,7 @@ and each opposite is blank, then they succeed to match.
 : 6  1  113  121  234
 : 7  1  113  122  235
 : :
+# ##DONE auto/add:2d
 Both files spread the blank coordinates.
 
 You can overcome the former failed operation by tweaking the explicit
@@ -1868,6 +1949,7 @@ coordinates:
 : 7  0  103  122  225
 : 0  1  113  115  228
 : :
+# ##DONE manual/add:2d
 
 *** Flushing
 # ## compromise:source
@@ -1891,6 +1973,7 @@ coordinates:
 : 3 118
 : 4 119
 : 5 120
+# ##DONE compromise:source
 Default coordinate index follows python style: the beginning is counted
 from 0, and the ending is not included.  You can change this behaviour
 with global -F option, to follow FORTRAN style:
@@ -1916,6 +1999,7 @@ with global -F option, to follow FORTRAN style:
 : 4 118
 : 5 119
 : 6 120
+# ##DONE compromise:source/F
 
 Appending -i option to FLUSH operator changes the behavior to
 horizontal pasting of all the stack.  Inclusive domain of all the
@@ -1936,6 +2020,7 @@ shape and coordinates.
 : 4  119  119
 : 5  .    120
 : # horizontal output (inclusive)
+# ##DONE compromise:i
 
 The option -x changes the output domain as the intersects.
 # ## compromise:x
@@ -1946,6 +2031,7 @@ The option -x changes the output domain as the intersects.
 : #lon/3:5 {B5} {B7}
 : 3  118  118
 : 4  119  119
+# ##DONE compromise:x
 
 The option -l changes the output domain as the first stack.
 # ## compromise:l
@@ -1959,6 +2045,7 @@ The option -l changes the output domain as the first stack.
 : 2  117  .
 : 3  118  118
 : 4  119  119
+# ##DONE compromise:l
 
 *** Emergency
 =chak= tries its best to detect the file byte-order, but still
