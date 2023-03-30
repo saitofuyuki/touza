@@ -1,0 +1,93 @@
+#!/bin/sh
+# Time-stamp: <2023/03/28 16:41:43 fuyuki ocheck.sh.in>
+
+set -u
+
+this=$0
+
+CHAK=@CHAK@
+CHAK_OPTS=@CHAK_OPTS@
+FORCE=
+test x"$CHAK" = x && echo "CHAK not defined" && exit 1
+test ! -x "$CHAK" && echo "cannot run $CHAK" && exit 1
+
+# stack
+OPRS_stack='DUP COPY CLONE POP EXCH NOP DIST INSERT REPEAT FLUSH DFLUSH'
+# unary
+OPRS_unary='NEG INV ABS SQR SIGN ZSIGN FLOOR CEIL ROUND TRUNC INT BITNOT'
+# ubool
+OPRS_ubool='NOT BOOL BIN'
+# bool
+OPRS_bool='EQB NEB LTB GTB LEB GEB EQ NE LT GT LE GE EQU NEU LTU GTU LEU GEU'
+# binary
+OPRS_binary='AND MASK ADD SUB MUL DIV IDIV MOD POW MODULO BITAND BITOR BITXOR LSHIFT RSHIFT MIN MAX EXTR CDIFF FDIFF BDIFF'
+# filter
+OPRS_filter='EQF NEF LTF GTF LEF GEF'
+# lazy
+OPRS_lazy='OR LOR ROR XOR LAND LMASK LLAY LAY RLAY LADD LSUB LMUL LDIV LMIN LMAX'
+# float
+OPRS_float='SQRT EXP LOG LOG10 SIN COS TAN ASIN ACOS ATAN2 SINH COSH TANH R2D D2R HYPOT EXPONENT FRACTION SCALE NEAREST SPACING RRSP'
+# index
+OPRS_index='C0 C1 C2 C3 X Y Z FLAT INDEX'
+
+gen_input ()
+{
+  CX=xx; CY=yy
+  aa=$1; bb=$2;  shift 2 || return $?
+  cc=$1; shift || return $?
+  ia=$(basename $aa)
+  ib=$(basename $bb)
+  ic=$(basename $cc)
+
+  $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/:3,$CY/:4 X 2 NEF 1 ADD MUL INT = $aa ITEM=$ia FMT=ui4 || return $?
+  $CHAK -H0 $FORCE $CHAK_OPTS 11 SHAPE=$CX/:4,$CY/:3 Y 2 NEF 1 ADD MUL INT = $bb ITEM=$ib FMT=ui4 || return $?
+  $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/:4,$CY/:3 Y 2 NEF 1 ADD MUL INT = $cc ITEM=$ic FMT=ui4 || return $?
+
+  return 0
+}
+
+test_binary ()
+{
+  bin0=$1; bin1=$2; shift 2 || return $?
+  boutd=$1; shift || return $?
+  bcmd=
+  bfile=
+  for bo in "$@"
+  do
+    bout=$boutd/out.$bo
+    bcmd="$CHAK -qq -H0 $FORCE $CHAK_OPTS $bin0 $bin1 MARK REPEAT $bo FLUSH -i"
+    case $TEST in
+    create) test x"$FORCE" != x && rm -f $bout
+            test -e $bout && echo "Exists $bout" >&2 && return 1
+            eval "$bcmd" > $bout
+            ;;
+    compare)
+            test ! -e $bout && echo "Not exists $bout" >&2 && return 1
+            eval "$bcmd" | diff - $bout
+            ;;
+    esac
+  done
+}
+
+
+# ---------------------------------------- dispatcher
+workd=log
+test0=$workd/aa
+test1=$workd/bb
+test00=$workd/cc
+mkdir -p $workd
+force=
+TEST=create
+
+for sub in $@
+do
+  case $sub in
+  -f) FORCE=-f;;
+  -c) TEST=compare;;
+  input)  gen_input $test0 $test1 $test00 || exit $?;;
+  binary) test_binary $test0 $test1  $workd  $OPRS_binary
+          test_binary $test0 $test00 $workd  $OPRS_lazy $OPRS_bool $OPRS_filter
+          ;;
+  *) echo "$this: Aborts. Unknown test $sub." >&2; exit 1;;
+  esac
+done

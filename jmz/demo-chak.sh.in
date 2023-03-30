@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/03/23 14:52:23 fuyuki demo-chak.sh.in>
+# Time-stamp: <2023/03/28 07:17:22 fuyuki demo-chak.sh.in>
 
 main ()
 {
@@ -11,7 +11,29 @@ main ()
   local ngtconv=ngtconv
 
   demo_inputs $demod || return $?
+  demo_tutorial || return $?
   demo_operation || return $?
+  return 0
+}
+
+demo_tutorial ()
+{
+  local src=(demo/base)
+  run_demo tutorial:index0/p -E -C "default, count from 0" --      $src POP
+  run_demo tutorial:index0/f -E -C "count from 1"          --   -F $src POP
+
+  run_demo tutorial:index1/p -E -C "default, count from 0" --   -n    $src =
+  run_demo tutorial:index1/f -E -C "count from 1"          --   -n -F $src =
+
+  src=demo/single
+  local opr=($src DUP 1 ADD FLUSH -i)
+  run_demo tutorial:quiet/0 -E -TRIM 5 --  $opr
+  run_demo tutorial:quiet/1 -TRIM 5 --  -q $opr
+  run_demo tutorial:quiet/2 -TRIM 5 --  -qq $opr
+  run_demo tutorial:quiet/3 -TRIM 5 --  -qqq $opr
+  run_demo tutorial:quiet/4 -TRIM 5 --  -qqqq $opr
+  run_demo tutorial:quiet/5 -TRIM 5 --  -qqqqq $opr
+
   return 0
 }
 
@@ -127,22 +149,42 @@ run_demo_add ()
 run_demo ()
 {
   local tag=$1; shift
-  local col=T trim=
-  case $1 in
-  (-NOCOL) col=; shift;;
-  (-TRIM)  trim=$2; shift 2;;
-  esac
+  local col=T trim= edup=
+  local hcom=
+  while [[ $# -gt 0 ]]
+  do
+    case $1 in
+    (-NOCOL) col=; shift;;
+    (-TRIM)  trim=$2; shift 2;;
+    (-E)     edup=T;;
+    (-C)     hcom="$2"; shift;;
+    (--)     shift; break;;
+    (*) break;;
+    esac
+    shift
+  done
   local err=
   local args=("$@")
   local tmp=$(mktemp) tmp2=$(mktemp) tmp3=$(mktemp) log=$(mktemp)
-  $chak "${(@)args}" > $tmp 2> $log; err=$?
+  if [[ -n $edup ]]; then
+    $chak --demo "${(@)args}" > $tmp 2>&1; err=$?
+  else
+    $chak        "${(@)args}" > $tmp 2> $log; err=$?
+  fi
   [[ -n $trim ]] && trim=(${(s/:/)trim})
+  # print - "--- tmp"
+  # cat $tmp
+  # print - "--- log"
+  # cat $log
+  # print - "---"
   print "# ## $tag"
   {
-    print "% $chak:t $args"
+    print -n - "% $chak:t $args"
+    [[ -n $hcom ]] && print -n - "   # $hcom"
+    print -
     if [[ $err -eq 0 ]]; then
-      sed -e  '/^[0-9]/,$d' $tmp
-      sed -ne '/^[0-9]/,$p' $tmp > $tmp2
+      sed -e  '/^ \?[0-9]/,$d' $tmp
+      sed -ne '/^ \?[0-9]/,$p' $tmp > $tmp2
       if [[ $#trim -eq 1 ]]; then
         head --lines=$trim $tmp2 > $tmp3
         print - ":" >> $tmp3
@@ -163,6 +205,7 @@ run_demo ()
       cat $log
     fi
   } | sed -e 's/^/: /'
+  print "# ##DONE $tag"
   print
   rm -f $tmp $tmp2 $tmp3 $log
 }
@@ -173,6 +216,9 @@ demo_inputs ()
   local nx=8 ny=4 nz=3 nt=3
   [[ -z $outd ]] && outd=.
   mkdir -p $outd || return $?
+  local single=$outd/single
+  gen_source input $single 1 :$nx :$ny :$nz || return $?
+
   local base=$outd/base
   gen_source bs $base $nt :$nx :$ny :$nz || return $?
 
@@ -209,11 +255,14 @@ gen_source ()
 
   local opr=(0 $C X AND Y 10 MUL ADD Z 100 MUL ADD INT)
 
-  $chak -H0 -f $opr = $ofile || return $?
+  local PROPS=(TITLE='demonstration source'
+               UNIT='shaku' ITEM="$item")
+
+  $chak -H0 -f $opr = $ofile $PROPS || return $?
   jt=1
   while [[ $jt -lt $nt ]]
   do
-    $chak -a -H0 $opr $jt 1000 MUL ADD = $ofile || return $?
+    $chak -a -H0 $opr $jt 1000 MUL ADD = $ofile $PROPS || return $?
     let jt++
   done
 
@@ -224,17 +273,10 @@ gen_source ()
     tm="$(printf '%02d' $jt)0000"
     $ngted -t $((jt+1)) \
            -e "dset:ctouza-jmz" \
-           -e "title:cdemonstration source" \
-           -e "unit:cshaku" \
-           -e "item:c$item" \
            -e "time:c$((jt+100))" \
            -e "date:c19730130 $tm" $E $ofile
     let jt++
   done
-  local tmp=$(mktemp)
-  cp $ofile $tmp
-  cat $tmp >> $ofile
-  rm -f $tmp
 
   return 0
 }

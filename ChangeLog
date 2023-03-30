@@ -1,3 +1,12 @@
+Release-1.11.2 / 2023-03-30
+===========================
+
+  * nio: [FATAL] URY decoding fails from z>0 layers.
+  * jmz: (chak) exclude date and time from log when blank.
+  * jmz: (chak) operator LAY family introduced.
+  * jmz: (doc) correct some descripition.
+  * jmz: (build) TOUZA_LDFLAGS activated.
+
 Release-1.11.1 / 2023-03-27
 ===========================
 
