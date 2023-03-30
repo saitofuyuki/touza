@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/30 10:39:40 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/30 16:48:43 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -1795,7 +1795,7 @@ contains
     mw = product(max(1, kaxs(1:nr)))
     call bes_triplet(ierr, bes, kaxs, start, count)
     if (ierr.eq.0) then
-       nd = product(bes(2, 1:nr) - bes(1, 1:nr))
+       nd = count_bes(bes, nr)
        if (IAND(kfmt, GFMT_LPAD).eq.0) then
           if (ld.ge.0.and.nd.gt.ld) then
              ierr = _ERROR(ERR_SIZE_MISMATCH)
@@ -4079,7 +4079,7 @@ contains
        nh = 0
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4177,7 +4177,7 @@ contains
        nh = 0
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4275,7 +4275,7 @@ contains
        nh = 0
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4656,7 +4656,7 @@ contains
     if (present(bes)) then
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4690,7 +4690,7 @@ contains
              call pack_restore_dunp(ierr, idec, icom, nmd, nbits, kpackb, dunp, nunp)
           endif
           if (ierr.eq.0) then
-             nh = product(bes(2, 1:2) - bes(1, 1:2))
+             nh = count_bes(bes, 2)
              jdb = nh * (jk - bes(1, cz))
              jprv = 0
              do jc = 0, nidx - 1
@@ -4799,7 +4799,7 @@ contains
     if (present(bes)) then
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4833,7 +4833,7 @@ contains
              call pack_restore_dunp(ierr, idec, icom, nmd, nbits, kpackb, dunp, nunp)
           endif
           if (ierr.eq.0) then
-             nh = product(bes(2, 1:2) - bes(1, 1:2))
+             nh = count_bes(bes, 2)
              jdb = nh * (jk - bes(1, cz))
              jprv = 0
              do jc = 0, nidx - 1
@@ -4942,7 +4942,7 @@ contains
     if (present(bes)) then
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4976,7 +4976,7 @@ contains
              call pack_restore_dunp(ierr, idec, icom, nmd, nbits, kpackb, dunp, nunp)
           endif
           if (ierr.eq.0) then
-             nh = product(bes(2, 1:2) - bes(1, 1:2))
+             nh = count_bes(bes, 2)
              jdb = nh * (jk - bes(1, cz))
              jprv = 0
              do jc = 0, nidx - 1
@@ -5228,7 +5228,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5299,7 +5299,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5370,7 +5370,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5443,7 +5443,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5514,7 +5514,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5585,7 +5585,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5658,7 +5658,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5729,7 +5729,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5800,7 +5800,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -9258,7 +9258,7 @@ contains
 !!!_  & get_data_record_slice - read data block (slice)
   subroutine get_data_record_slice_i &
        & (ierr, &
-       &  d,  nd, u, krect, md, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, nr, sub)
     use TOUZA_Nio_std,only: sus_slice_read_irec
     implicit none
     integer,parameter :: KARG=KI32
@@ -9269,14 +9269,14 @@ contains
     integer,           intent(in)             :: krect
     integer,           intent(in)             :: md        ! size of data record
     integer,           intent(in)             :: bes(3, *)
-    integer,           intent(in)             :: r
+    integer,           intent(in)             :: nr
     logical,           intent(inout),optional :: sub
 
     logical swap, lrec
     integer div
 
     ierr = 0
-    if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:r)))) then
+    if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
        ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
        return
     endif
@@ -9287,13 +9287,13 @@ contains
        ierr = _ERROR(ERR_NOT_IMPLEMENTED)
     else
        div = read_sep_flag(krect)
-       call sus_slice_read_irec(ierr, u, d, bes, r, swap, sub, div, md)
+       call sus_slice_read_irec(ierr, u, d, bes, nr, swap, sub, div, md)
     endif
     return
   end subroutine get_data_record_slice_i
   subroutine get_data_record_slice_f &
        & (ierr, &
-       &  d,  nd, u, krect, md, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, nr, sub)
     use TOUZA_Nio_std,only: sus_slice_read_irec
     implicit none
     integer,parameter :: KARG=KFLT
@@ -9304,14 +9304,14 @@ contains
     integer,        intent(in)             :: krect
     integer,        intent(in)             :: md        ! size of data record
     integer,        intent(in)             :: bes(3, *)
-    integer,        intent(in)             :: r
+    integer,        intent(in)             :: nr
     logical,        intent(inout),optional :: sub
 
     logical swap, lrec
     integer div
 
     ierr = 0
-    if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:r)))) then
+    if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
        ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
        return
     endif
@@ -9322,13 +9322,13 @@ contains
        ierr = _ERROR(ERR_NOT_IMPLEMENTED)
     else
        div = read_sep_flag(krect)
-       call sus_slice_read_irec(ierr, u, d, bes, r, swap, sub, div, md)
+       call sus_slice_read_irec(ierr, u, d, bes, nr, swap, sub, div, md)
     endif
     return
   end subroutine get_data_record_slice_f
   subroutine get_data_record_slice_d &
        & (ierr, &
-       &  d,  nd, u, krect, md, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, nr, sub)
     use TOUZA_Nio_std,only: sus_slice_read_irec
     implicit none
     integer,parameter :: KARG=KDBL
@@ -9339,14 +9339,14 @@ contains
     integer,        intent(in)             :: krect
     integer,        intent(in)             :: md        ! size of data record
     integer,        intent(in)             :: bes(3, *)
-    integer,        intent(in)             :: r
+    integer,        intent(in)             :: nr
     logical,        intent(inout),optional :: sub
 
     logical swap, lrec
     integer div
 
     ierr = 0
-    if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:r)))) then
+    if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
        ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
        return
     endif
@@ -9357,7 +9357,7 @@ contains
        ierr = _ERROR(ERR_NOT_IMPLEMENTED)
     else
        div = read_sep_flag(krect)
-       call sus_slice_read_irec(ierr, u, d, bes, r, swap, sub, div, md)
+       call sus_slice_read_irec(ierr, u, d, bes, nr, swap, sub, div, md)
     endif
     return
   end subroutine get_data_record_slice_d
@@ -11589,6 +11589,19 @@ contains
     endif
     return
   end function check_id_format
+
+!!!_  & count_bes()
+  PURE &
+  integer function count_bes(bes, nc) result(n)
+    implicit none
+    integer,intent(in)          :: bes(3, *)
+    integer,intent(in),optional :: nc
+    if (present(nc)) then
+       n = max(1, product(max(1, bes(2, 1:nc) - bes(1, 1:nc))))
+    else
+       n = max(1, product(max(1, bes(2, 1:laxs) - bes(1, 1:laxs))))
+    endif
+  end function count_bes
 
 !!!_  & bes_triplet
   subroutine bes_triplet(ierr, bes, kaxs, start, count)
