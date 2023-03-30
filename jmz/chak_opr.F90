@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/21 21:59:58 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/28 12:00:15 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1714,6 +1714,26 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_lazy_MASK
+!!!_   . apply_BINARY_lazy_LAY
+  subroutine apply_BINARY_lazy_LAY &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_LAY(Z(jz), X(jx), FZ, FX)
+       else
+          continue
+       endif
+    enddo
+  end subroutine apply_BINARY_lazy_LAY
 !!!_   . apply_BINARY_lazy_ADD
   subroutine apply_BINARY_lazy_ADD &
        & (ierr, Z, domZ, FZ, X, domX, FX)
@@ -2658,6 +2678,19 @@ contains
        Z = X
     endif
   end function elem_MASK
+!!!_   & elem_LAY()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_LAY (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (Y.eq.FY) then
+       Z = FX
+    else
+       Z = Y
+    endif
+  end function elem_LAY
+
 !!!_   & elem_XOR() - Y if X == NAN, X if Y == NAN, else NAN
   ! (cf. gmtmath) Y if X == NAN, else X (AND identical)
   !    operands  jmz  gmt
