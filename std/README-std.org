@@ -275,7 +275,41 @@ Return true if =v= is between =l= and =h=, inclusive.
     character(len=*),intent(in) :: sub
 #+end_src
 Return tru if string =str= begin with substring =sub=.
+**** ~find_next_sep()~
+#+begin_src f90
+  integer function find_next_sep(str, sep, pos, offset)
+    character(len=*),intent(in) :: str
+    character(len=*),intent(in) :: sep
+    integer,optional,intent(in) :: pos
+    integer,optional,intent(in) :: offset
+#+end_src
+Return position of =sep= occurence in =str= starting from =pos= or head.
+Optional argument =offset= can change the index counting from the module
+default value =0=,
+which can be controled by ~init~ subroutine.
 *** subroutines
+**** ~init~
+#+begin_src f90
+  subroutine init(ierr, u, levv, mode, offset)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+    integer,intent(in),optional :: offset
+#+end_src
+**** ~diag~
+#+begin_src f90
+  subroutine diag(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+#+end_src
+**** ~finalize~
+#+begin_src f90
+  subroutine finalize(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+#+end_src
 **** ~choice_a~
 #+begin_src f90
   subroutine choice_a (v, d, a)
@@ -854,13 +888,251 @@ communicator =icomm= is passed as =id= of subroutine ~set_tempfile~.
 
 ** ~TOUZA_Std_log~  (=std_log.F90=) - simple logging helper
 *** constants
+**** io-units
 | name          | type    | description             |
 |---------------+---------+-------------------------|
 | ~unit_star~   | integer | special unit for *      |
 | ~unit_global~ | integer | special unit for global |
 | ~unit_none~   | integer | special unit to null    |
+**** message levels
+| msglev_panic    |
+| msglev_fatal    |
+| msglev_critical |
+| msglev_severe   |
+| msglev_warning  |
+| msglev_normal   |
+| msglev_info     |
+| msglev_detail   |
+| msglev_debug    |
+*** subroutines
+**** ~init~
+#+begin_src f90
+  subroutine init(ierr, u, levv, mode, bflush)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u             ! global log unit (untouch if unit_global)
+    integer,intent(in),optional :: levv, mode
+    logical,intent(in),optional :: bflush        ! flush (default: T)
+#+end_src
+**** ~diag~
+**** ~finalize~
+**** ~set_defu~
+#+begin_src f90
+  subroutine set_defu(u)
+    integer,intent(in) :: u
+#+end_src
+**** ~trace_err~
+#+begin_src f90
+  subroutine trace_err &
+       & (ierr, pkg, grp, mdl, fun, asfx, isfx, u, levv)
+    integer,         intent(in)          :: ierr
+    character(len=*),intent(in),optional :: pkg, grp, mdl, fun
+    character(len=*),intent(in),optional :: asfx
+    integer,         intent(in),optional :: isfx
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv
+#+end_src
+**** ~trace_control~
+#+begin_src f90
+  subroutine trace_control &
+       & (ierr, mode, pkg, grp, mdl, fun, asfx, isfx, u, levv)
+    integer,         intent(inout)       :: ierr
+    integer,         intent(in)          :: mode
+    character(len=*),intent(in),optional :: pkg, grp, mdl
+    character(len=*),intent(in),optional :: fun
+    character(len=*),intent(in),optional :: asfx
+    integer,         intent(in),optional :: isfx
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv
+#+end_src
+**** ~trace_fine~
+#+begin_src f90
+  subroutine trace_fine &
+       & (ierr, mode, icount, dcount, fcount, &
+       &  pkg,  grp,  mdl,    fun,    asfx,   isfx, u, levv)
+    integer,         intent(inout)       :: ierr
+    integer,         intent(in)          :: mode
+    integer,         intent(in)          :: icount, dcount, fcount
+    character(len=*),intent(in),optional :: pkg, grp, mdl
+    character(len=*),intent(in),optional :: fun
+    character(len=*),intent(in),optional :: asfx
+    integer,         intent(in),optional :: isfx
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv
+#+end_src
+**** ~msg~ - message subroutine with formatted scaler/arrays outputs
+#+begin_src f90
+  subroutine msg(fmt, vv, tag, u)
+  subroutine msg(fmt, v,  tag, u)
+  subroutine msg(txt,     tag, u)
+  subroutine msg(txt,          u)
+    character(len=*),intent(in)          :: txt
+    character(len=*),intent(in)          :: fmt
+    <type>,          intent(in)          :: vv(:)
+    <type>,          intent(in)          :: v
+    character(len=*),intent(in)          :: tag
+    integer,         intent(in),optional :: u
+#+end_src
+The first two interfaces output array ~vv~ or scaler ~v~ using format
+~fmt~ to i/o unit ~u~.  Argument ~tag~ is inserted before the message,
+to help searching.  Nothing is inserted If ~tag~ is blank.
+The other two interfaces just output ~txt~ string to i/o unit ~u~.
+If ~u~ is absent, public parameter ~unit_global~ is adopted as the
+target unit.  Then if the target unit is ~unit_global~, the unit
+configured by the initialization is adopted as the target unit.
+Then if the target unit is the same as public paramet ~unit_star~,
+then ~write~ statement is called with ~format=*~; if the target unit
+is positive, it is used as it is; otherwise logging is skipped.
+The tag is surrounded by =[= and =]= if it is present and non-blank.
 
+Examples of =msg()= family with string arguments.
+#+begin_src f90
+  call msg('(''with format (s) '', A)')
+  call msg('(''with format (s) '', A)',                           'tag')
+  call msg('(''with format (s) '', A)',     'abc',                'tag')
+  call msg('(''with format (a) '', 3A3)',   (/'a ', 'b ', 'cd'/), 'tag')
+#+end_src
 
+#+RESULTS:
+: ('with format (s) ', A)
+: [tag] ('with format (s) ', A)
+: [tag] with format (s) abc
+: [tag] with format (a)   a  b cd
+
+Examples of =msg()= family with integer arguments.
+#+begin_src f90
+  call msg('(''with format (s) '', I0)',    354,          'tag')
+  call msg('(''with format (a) '', 3I3.2)', (/4, 9, 16/), ' ')
+#+end_src
+#+RESULTS:
+: [tag] with format (s) 354
+: with format (a)  04 09 16
+
+**** ~msg_grp~
+#+begin_src f90
+  subroutine msg_grp(fmt, vv, grp, mdl, u)
+  subroutine msg_grp(fmt, v,  grp, mdl, u)
+  subroutine msg_grp(txt,     grp, mdl, u)
+    character(len=*),intent(in)          :: txt
+    character(len=*),intent(in)          :: fmt
+    <type>,          intent(in)          :: vv(:)
+    <type>,          intent(in)          :: v
+    character(len=*),intent(in),optional :: grp
+    character(len=*),intent(in),optional :: mdl
+    integer,         intent(in),optional :: u
+#+end_src
+**** ~msg_mdl~
+#+begin_src f90
+  subroutine msg_mdl(fmt, vv, mdl, u)
+  subroutine msg_mdl(fmt, v,  mdl, u)
+  subroutine msg_mdl(txt,     mdl, u)
+    character(len=*),intent(in)          :: fmt
+    character(len=*),intent(in)          :: txt
+    <type>,          intent(in)          :: vv(:)
+    <type>,          intent(in)          :: v
+    character(len=*),intent(in)          :: mdl
+    integer,         intent(in),optional :: u
+#+end_src
+**** ~msg_fun~
+#+begin_src f90
+  subroutine msg_fun(fmt, vv, mdl, fun, u)
+  subroutine msg_fun(txt,     mdl, fun, u)
+    character(len=*),intent(in)          :: txt
+    character(len=*),intent(in)          :: fmt
+    integer,         intent(in)          :: vv(:)
+    character(len=*),intent(in)          :: mdl
+    character(len=*),intent(in)          :: fun
+    integer,         intent(in),optional :: u
+#+end_src
+**** ~gen_tag~
+#+begin_src f90
+  subroutine gen_tag &
+       & (tag, pkg, grp, mdl, fun, asfx, isfx, label)
+    character(len=*),intent(out)         :: tag
+    character(len=*),intent(in),optional :: pkg, grp, mdl
+    character(len=*),intent(in),optional :: fun
+    character(len=*),intent(in),optional :: asfx
+    integer,         intent(in),optional :: isfx
+    logical,         intent(in),optional :: label  ! boolean to apply format conversion
+#+end_src
+**** ~banner~ - output banner (one-line title bar) string
+#+begin_src f90
+  subroutine banner &
+       & (ierr, txt, u, ch, ww, pat, indent)
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(in)          :: txt
+    integer,         intent(in),optional :: u
+    character(len=*),intent(in),optional :: ch
+    integer,         intent(in),optional :: ww
+    integer,         intent(in),optional :: pat  ! pattern
+    integer,         intent(in),optional :: indent
+#+end_src
+Output one-lie title bar of string ~txt~ argument to io-unit ~u~ or
+standard output.
+The title is surrounded by letter(s) ~ch~ argument, or =+= by default.
+Argument ~ww~ specifies the left and right margin width, (3 by default).
+Argument ~indent~ specifies the amount of indent spaces (or 0).
+Argument ~pat~ specifies the pattern of banner: if ~pat~ is
+non-negative, the upper an lower surrounding lines are outputed in addition.
+*** functions
+**** ~get_logu()~
+**** ~is_msglev()~
+#+begin_src f90
+  logical function is_msglev(levv, cond)
+    integer,intent(in) :: levv
+    integer,intent(in) :: cond
+#+end_src
+**** ~is_msglev_panic()~
+#+begin_src f90
+  logical function is_msglev_panic(levv)
+    integer,intent(in) :: levv
+#+end_src
+**** ~is_msglev_fatal()~
+#+begin_src f90
+  logical function is_msglev_fatal(levv)
+    integer,intent(in) :: levv
+#+end_src
+**** ~is_msglev_critical()~
+#+begin_src f90
+  logical function is_msglev_critical(levv)
+    integer,intent(in) :: levv
+#+end_src
+**** ~is_msglev_severe()~
+#+begin_src f90
+  logical function is_msglev_severe(levv)
+    integer,intent(in) :: levv
+#+end_src
+**** ~is_msglev_warning()~
+#+begin_src f90
+  logical function is_msglev_warning(levv)
+    integer,intent(in) :: levv
+#+end_src
+**** ~is_msglev_normal()~
+#+begin_src f90
+  logical function is_msglev_normal(levv)
+    integer,intent(in) :: levv
+#+end_src
+**** ~is_msglev_info()~
+#+begin_src f90
+  logical function is_msglev_info(levv)
+    integer,intent(in) :: levv
+#+end_src
+**** ~is_msglev_detail()~
+#+begin_src f90
+  logical function is_msglev_detail(levv)
+    integer,intent(in) :: levv
+#+end_src
+**** ~is_msglev_debug()~
+#+begin_src f90
+  logical function is_msglev_debug(levv)
+    integer,intent(in) :: levv
+#+end_src
+**** ~is_error_match()~
+#+begin_src f90
+  logical function is_error_match (ierr, jcode, mdl)
+    integer,intent(in)          :: ierr
+    integer,intent(in)          :: jcode
+    integer,intent(in),optional :: mdl
+#+end_src
 ** ~TOUZA_Std_mwe~  (=std_mwe.F90=) - MPI wrapper/emulator
 *** subroutines
 **** ~init~
@@ -1149,7 +1421,61 @@ Check if the current status is during =MPI_Init()= and =MPI_Finalize=.
 
 
 ** ~TOUZA_Std_bld~  (=std_bld.F90=) - build information
+*** description
+Several kinds of build-time properties are diagnosed by this module.
+*** subroutines
+**** ~init~
+**** ~diag~
+**** ~finalize~
+**** ~check_all~
+#+begin_src f90
+  subroutine check_all(ierr, ulog)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: ulog
+#+end_src
+Output build-time properties to io-unit ~ulog~ or standard output.
+GCC, Intel, and/or NEC compiler properties, set by preprocessor macros
+are outputed.
+Version Control System VCS properties are output by ~check_touza~.
 
+Example output, except for VCS properties as follows:
+: [TOUZA/Std/bld] build info:__GFORTRAN__ 1
+: [TOUZA/Std/bld] build info:__GNUC__ 12
+: [TOUZA/Std/bld] build info:__GNUC_MINOR__ 2
+: [TOUZA/Std/bld] build info:__GNUC_PATCHLEVEL__ 0
+: [TOUZA/Std/bld] build info:__VERSION__ 12.2.0
+: [TOUZA/Std/bld] build info:__OPTIMIZE__ 1
+: [TOUZA/Std/bld] build info:__OPTIMIZE_SIZE__
+: [TOUZA/Std/bld] build info:__NO_INLINE__
+: [TOUZA/Std/bld] build info:__LP64__ 1
+: [TOUZA/Std/bld] build info:__CHAR_BIT__ 8
+: [TOUZA/Std/bld] build info:__BYTE_ORDER__ 1234
+: [TOUZA/Std/bld] build info:__ORDER_LITTLE_ENDIAN__ 1234
+: [TOUZA/Std/bld] build info:__ORDER_BIG_ENDIAN__ 4321
+: [TOUZA/Std/bld] build info:__ORDER_PDP_ENDIAN__ 3412
+: [TOUZA/Std/bld] build info:__NEC__
+: [TOUZA/Std/bld] build info:__INTEL_COMPILER
+
+**** ~check_touza~
+#+begin_src f90
+  subroutine check_touza(ierr, ulog)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: ulog
+#+end_src
+Output =TOUZA= VCS properties to io-unit ~ulog~
+or standard output.
+
+Example output is as follows:
+: [TOUZA/Std/bld] build info:VCS_UUID 6d47ed9b7a64f36f5308ecdc4ea6d33df6884600
+: [TOUZA/Std/bld] build info:VCS_NUM 3678
+: [TOUZA/Std/bld] build info:VCS_DATA 2023-03-30T01:41:10Z
+: [TOUZA/Std/bld] build info:VCS_BRANCH fix/ury-decodes
+: [TOUZA/Std/bld] build info:VCS_TAG release/1.09.0
+: [TOUZA/Std/bld] build info:VCS_TICK 136
+: [TOUZA/Std/bld] build info:VCS_EXTRA
+: [TOUZA/Std/bld] build info:VCS_ACTION_STAMP 2023-03-30T01:41:10Z!saitofuyuki@jamstec.go.jp
+: [TOUZA/Std/bld] build info:VCS_FULL_HASH 9b5dcd8a318da8373d33233aea01aac1aaecd37f
+: [TOUZA/Std/bld] build info:VCS_WC_MODIFIED 1
 
 ** ~TOUZA_Std_sus~  (=std_sus.F90=) - emulation of (typical) unformatted sequential access
 *** De facto standard sequential unformatted access
