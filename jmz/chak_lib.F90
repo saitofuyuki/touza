@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/27 08:25:17 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/07 10:27:02 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -149,6 +149,7 @@ module chak_lib
   integer,parameter :: cmode_compromize = 3  ! mask
 
   integer,parameter :: cmode_xundef     = 4  ! exclude undefined at flushing
+  integer,parameter :: cmode_column     = 8  ! columned
 
 !!!_  - global flags
   integer,save :: lev_verbose = 0
@@ -507,18 +508,20 @@ contains
 
 !!!_   . get_domain_result
   subroutine get_domain_result &
-       & (ierr, str, dom, pcp)
-    use TOUZA_Std,only: join_list
+       & (ierr, str, dom, pcp, cbgn, cend)
+    use TOUZA_Std,only: join_list, choice
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: str
     type(domain_t),  intent(in)  :: dom
     type(loop_t),    intent(in)  :: pcp(0:*)
+    integer,optional,intent(in)  :: cbgn, cend
 
     integer jodr, jphyc
     character(len=lname)   :: cran
     character(len=lname*2) :: cbuf(0:lcoor-1)
     integer b, e, s
+    integer cb, ce
 
     ierr = 0
     str = ' '
@@ -548,23 +551,29 @@ contains
           end select
        endif
     enddo
-    if (ierr.eq.0) call join_list(ierr, str, cbuf(0:dom%mco-1))
+    if (ierr.eq.0) then
+       cb = choice(0, cbgn)
+       ce = choice(dom%mco, cend)
+       call join_list(ierr, str, cbuf(cb:ce-1))
+    endif
   end subroutine get_domain_result
 !!!_   . get_domain_shape
   subroutine get_domain_shape &
-       & (ierr, str, dom, pcp, lcp, ref)
-    use TOUZA_Std,only: join_list
+       & (ierr, str, dom, pcp, lcp, ref, cbgn, cend)
+    use TOUZA_Std,only: join_list, choice
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: str
     type(domain_t),  intent(in)  :: dom
     type(loop_t),    intent(in)  :: pcp(0:*), lcp(0:*)
     type(domain_t),  intent(in)  :: ref
+    integer,optional,intent(in)  :: cbgn, cend
 
     integer jodr, jphyc, jlogc
     character(len=lname)   :: cran
     character(len=lname*2) :: cbuf(0:lcoor-1)
     integer b, e, s
+    integer cb, ce
 
     ierr = 0
     str = ' '
@@ -598,7 +607,11 @@ contains
           end select
        endif
     enddo
-    if (ierr.eq.0) call join_list(ierr, str, cbuf(0:dom%mco-1), ldelim='[', rdelim=']')
+    if (ierr.eq.0) then
+       cb = choice(0, cbgn)
+       ce = choice(dom%mco, cend)
+       call join_list(ierr, str, cbuf(cb:ce-1), ldelim='[', rdelim=']')
+    endif
   end subroutine get_domain_shape
 
 !!!_   . file_h2item()
@@ -781,12 +794,14 @@ contains
   end function physical_index
 
 !!!_   . incr_logical_index
-  subroutine incr_logical_index(idx, dom)
+  subroutine incr_logical_index(idx, dom, step)
+    use TOUZA_Std,only: choice
     implicit none
-    integer,       intent(inout) :: idx(0:*)
-    type(domain_t),intent(in)    :: dom
+    integer,         intent(inout) :: idx(0:*)
+    type(domain_t),  intent(in)    :: dom
+    integer,optional,intent(in)    :: step
     integer jc, k
-    k = 1
+    k = choice(1, step)
     do jc = 0, dom%mco - 1
        idx(jc) = idx(jc) + k
        k = idx(jc) / dom%iter(jc)
