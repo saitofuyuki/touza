@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/29 14:48:09 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/07 10:31:02 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1085,14 +1085,11 @@ contains
           npop = pop + 1
        endif
        if (ierr.eq.0) call stack_POP(ierr, pop, npop, iter, arg=arg)
-    else if (hopr.eq.opr_FLUSH) then
+    else if (ANY(hopr.eq.(/opr_FLUSH, opr_DFLUSH, opr_CFLUSH/))) then
        pop = 0
-       npop = mstack
-       if (ierr.eq.0) call stack_POP(ierr, pop, npop, iter, opr_FLUSH)
-    else if (hopr.eq.opr_DFLUSH) then
-       pop = 0
-       npop = mstack
-       if (ierr.eq.0) call stack_POP(ierr, pop, npop, iter, opr_DFLUSH)
+       ! npop = mstack
+       npop = stacks_above_anchor(pop, 0)
+       if (ierr.eq.0) call stack_POP(ierr, pop, npop, iter, hopr)
 !!!_    * buffer property operator
     else if (grp_buffer_bgn.le.hopr .and. hopr.lt.grp_buffer_end) then
        call parse_buffer_opr(ierr, hopr, arg)
@@ -1785,10 +1782,7 @@ contains
        else if (lasth.eq.opr_EXCH) then
           call stack_EXCH(ierr, lasth, 1)
        else if (lasth.eq.opr_POP) then
-          apos = last_anchor()
-          alev = anchor_level(apos)
-          npop = mstack - (apos + 1) + opop - opush
-          if (alev.gt.0) npop = npop + 1
+          npop = stacks_above_anchor(opop, opush)
           call stack_POP(ierr, opop, npop, 1)
        else if (lasth.eq.opr_DIST) then
           call stack_DIST(ierr, lasth)
@@ -2508,6 +2502,18 @@ contains
        enddo
     endif
   end function last_anchor
+
+!!!_   & stacks_above_anchor ()
+  integer function stacks_above_anchor (pop, push) result(n)
+    use TOUZA_Std,only: choice
+    implicit none
+    integer,intent(in),optional :: pop, push
+    integer apos, alev
+    apos = last_anchor()
+    alev = anchor_level(apos)
+    n = mstack - (apos + 1) + max(0, min(1, alev))
+    n = n + choice(0, pop) - choice(0, push)
+  end function stacks_above_anchor
 
 !!!_  - [a-]queue manager
 !!!_   . append_queue_stack - append queue from top stacks
@@ -3480,7 +3486,6 @@ contains
 
     integer jerr
     character(len=128) :: txt, tsfx
-    character(len=litem) :: tstr
     character(len=ldesc) :: tdesc
 
     ierr = 0
@@ -4089,6 +4094,8 @@ contains
           call flush_stack(ierr, pop, cmode)
        else if (handle.eq.opr_DFLUSH) then
           call flush_stack(ierr, pop, IOR(cmode, cmode_xundef))
+       else if (handle.eq.opr_CFLUSH) then
+          call flush_stack(ierr, pop, IOR(cmode, cmode_column))
 !!!_    * transformation
        else if (handle.eq.opr_TRANSF) then
           continue
@@ -4349,9 +4356,17 @@ contains
 
     select case(IAND(cmode, cmode_compromize))
     case (cmode_null)
-       call flush_buffer_each(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+       if (IAND(cmode, cmode_column).eq.0) then
+          call flush_buffer_each(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+       else
+          call flush_buffer_column(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+       endif
     case default
-       call flush_buffer_horizontally(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+       if (IAND(cmode, cmode_column).eq.0) then
+          call flush_buffer_horizontally(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+       else
+          call flush_buffer_horizontally_column(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+       endif
     end select
   end subroutine flush_stack
 
@@ -4529,6 +4544,211 @@ contains
     enddo
   end subroutine flush_buffer_each
 
+!!!_   . flush_buffer_column - flush out buffers for each (columnized)
+  subroutine flush_buffer_column(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+    use TOUZA_Std,only: choice
+    use TOUZA_Nio,only: show_header, parse_header_size
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: nbuf
+    integer,intent(in)          :: bufh(0:*)
+    integer,intent(in)          :: bufj(0:*)
+    integer,intent(in)          :: pstk(0:*)   ! corresponding stack index for buffer
+    integer,intent(in)          :: cmode
+    integer,intent(in),optional :: u
+
+    integer utmp
+    integer jb, hb
+    integer js
+
+    integer jbuf
+    character(len=64) :: lcstr, pcstr, dstr
+    character(len=64) :: fmt_nline
+    character(len=64) :: fmt_xline
+    character(len=64),allocatable :: vals(:)
+
+    type(domain_t) :: doml, domr(1)
+    type(buffer_t) :: htmp
+    integer mco, nco
+    integer jl, jp
+    integer lidx(0:lcoor-1), pidx(0:lcoor-1)
+    integer nb
+    integer btmp(1), ptmp(1)
+    character(len=256) :: cjoin, val, ccols
+
+    logical skip_undef
+    integer jcolv, ncolv, j
+
+    ierr = 0
+    utmp = choice(ulog, u)
+
+    allocate(vals(1:0), STAT=ierr)
+    if (ierr.ne.0) then
+       ierr = ERR_ALLOCATION
+       return
+    endif
+
+    skip_undef = IAND(cmode, cmode_xundef).ne.0
+
+212 format('## stack[', I0, '] ', A, 1x, A)
+213 format('## stack[', I0, '] ', A, 1x, A, ' // ', A)
+
+231 format('##      ', A)
+232 format('##   >  ', A)
+233 format('##   >> ', A)
+
+201 format('(', I0, '(I0, 1x), ', I0, '(A, 1x))')
+221 format('(', I0, '(A, 1x))')
+211 format('#', A, 1x, A, 1x, A)
+
+    ! write(*, *) def_write%kfmt, trim(def_write%fmt)
+
+    do jbuf = 0, nbuf - 1
+       jb = bufj(jbuf)
+       hb = bufh(jbuf)
+       js = pstk(jbuf)
+       nb = 1
+       btmp(1) = hb
+       ptmp(1) = js
+
+       if (ierr.eq.0) then
+          call get_compromise_domain(ierr, domL, domR, btmp, ptmp, nb, cmode_inclusive, htmp)
+       endif
+       if (ierr.eq.0) call get_obj_string(ierr, val, hb)
+
+       if (is_msglev(lev_verbose, -levq_rec)) then
+          if (ierr.eq.0) write(utmp, 213) &
+               & user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc), trim(obuffer(jb)%desc2)
+       else if (is_msglev(lev_verbose, -levq_stack)) then
+          if (ierr.eq.0) write(utmp, 212) &
+               & user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc)
+       endif
+       if (is_msglev(lev_verbose, -levq_stack)) then
+          if (ierr.eq.0) call get_domain_string(ierr, lcstr, bstack(js)%lcp)
+          if (ierr.eq.0) call get_domain_string(ierr, pcstr, obuffer(jb)%pcp)
+          if (ierr.eq.0) then
+             call get_domain_shape(ierr, dstr, domR(1), obuffer(jb)%pcp, bstack(js)%lcp, domL)
+          endif
+          if (ierr.eq.0) write(utmp, 231) trim(pcstr)
+          if (ierr.eq.0) write(utmp, 232) trim(lcstr)
+          if (ierr.eq.0) write(utmp, 233) trim(dstr)
+       endif
+       if (is_msglev(lev_verbose, -levq_column)) then
+          if (ierr.eq.0) call get_domain_result(ierr, cjoin, domL, htmp%pcp, 1)
+          if (ierr.eq.0) call get_domain_result(ierr, ccols, domL, htmp%pcp, 0, 1)
+          if (ierr.eq.0) write(utmp, 211) trim(cjoin), trim(val), trim(ccols)
+       endif
+       if (ierr.eq.0) then
+          ncolv = doml%end(0) - doml%bgn(0)
+          if (size(vals).lt.ncolv) then
+             deallocate(vals, STAT=ierr)
+             if (ierr.eq.0) allocate(vals(0:ncolv-1), STAT=ierr)
+             if (ierr.ne.0) ierr = ERR_ALLOCATION
+          endif
+       endif
+
+       if (ierr.eq.0) then
+          if (dryrun.gt.0) then
+             write(utmp, '()')
+          else
+             mco = doml%mco
+             nco = 0
+             if (is_msglev(lev_verbose, -levq_coordinate)) nco = mco
+             if (nco.gt.1) then
+                write(fmt_xline, 201, IOSTAT=ierr) nco - 1, ncolv
+             else
+                write(fmt_xline, 221, IOSTAT=ierr) ncolv
+             endif
+             lidx(0:mco-1) = 0
+             doml%bgn(0:mco-1) = user_index_bgn(doml%bgn(0:mco-1))
+             select case(obuffer(jb)%k)
+             case (kv_int)
+                fmt_nline = afmt_int
+                jcolv = 0
+                do jl = 0, doml%n - 1
+                   jp = physical_index(lidx, domr(1))
+                   pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
+                   if (jp.lt.0) then
+                      if (.not. skip_undef) then
+                         vals(jcolv) = '.'
+                         jcolv = jcolv + 1
+                      endif
+                   else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
+                      if (.not. skip_undef) then
+                         vals(jcolv) = '_'
+                         jcolv = jcolv + 1
+                      endif
+                   else
+                      write(vals(jcolv), fmt_nline) INT(obuffer(jb)%vd(jp))
+                      jcolv = jcolv + 1
+                   endif
+                   call incr_logical_index(lidx, doml)
+                   if (lidx(0).eq.0) then
+                      write(utmp, fmt_xline) pidx(1:nco-1), (trim(vals(j)),j=0,jcolv-1)
+                      jcolv = 0
+                   endif
+                enddo
+             case (kv_flt)
+                fmt_nline = afmt_flt
+                jcolv = 0
+                do jl = 0, doml%n - 1
+                   jp = physical_index(lidx, domr(1))
+                   pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
+                   if (jp.lt.0) then
+                      if (.not. skip_undef) then
+                         vals(jcolv) = '.'
+                         jcolv = jcolv + 1
+                      endif
+                   else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
+                      if (.not. skip_undef) then
+                         vals(jcolv) = '_'
+                         jcolv = jcolv + 1
+                      endif
+                   else
+                      write(vals(jcolv), fmt_nline) REAL(obuffer(jb)%vd(jp), kind=KFLT)
+                      jcolv = jcolv + 1
+                   endif
+                   call incr_logical_index(lidx, doml)
+                   if (lidx(0).eq.0) then
+                      write(utmp, fmt_xline) pidx(1:nco-1), (trim(vals(j)),j=0,jcolv-1)
+                      jcolv = 0
+                   endif
+                enddo
+             case (kv_dbl)
+                fmt_nline = afmt_dbl
+                jcolv = 0
+                do jl = 0, doml%n - 1
+                   jp = physical_index(lidx, domr(1))
+                   pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
+                   if (jp.lt.0) then
+                      if (.not. skip_undef) then
+                         vals(jcolv) = '.'
+                         jcolv = jcolv + 1
+                      endif
+                   else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
+                      if (.not. skip_undef) then
+                         vals(jcolv) = '_'
+                         jcolv = jcolv + 1
+                      endif
+                   else
+                      write(vals(jcolv), fmt_nline) REAL(obuffer(jb)%vd(jp), kind=KDBL)
+                      jcolv = jcolv + 1
+                   endif
+                   call incr_logical_index(lidx, doml)
+                   if (lidx(0).eq.0) then
+                      write(utmp, fmt_xline) pidx(1:nco-1), (trim(vals(j)),j=0,jcolv-1)
+                      jcolv = 0
+                   endif
+                enddo
+             end select
+          endif
+       endif
+    enddo
+    if (ierr.eq.0) then
+       if (allocated(vals)) deallocate(vals, STAT=ierr)
+    endif
+  end subroutine flush_buffer_column
+
 !!!_   . flush_buffer_horizontally - flush out buffers with horizontally pasting
   subroutine flush_buffer_horizontally(ierr, nbuf, bufh, bufj, pstk, cmode, u)
     use TOUZA_Std,only: choice, join_list
@@ -4629,7 +4849,6 @@ contains
                 do j = 0, nbuf - 1
                    jb = bufj(j)
                    jp = physical_index(lidx, domr(j))
-                   jp = physical_index(lidx, domr(j))
                    if (jp.lt.0) then
                       nundef = nundef + 1
                    else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
@@ -4666,6 +4885,201 @@ contains
     endif
 
   end subroutine flush_buffer_horizontally
+
+!!!_   . flush_buffer_horizontally_column - flush out buffers with horizontally pasting (columnized)
+  subroutine flush_buffer_horizontally_column(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+    use TOUZA_Std,only: choice, join_list
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: nbuf
+    integer,intent(in)          :: bufh(0:*)
+    integer,intent(in)          :: bufj(0:*)
+    integer,intent(in)          :: pstk(0:*)   ! corresponding stack index for buffer
+    integer,intent(in)          :: cmode
+    integer,intent(in),optional :: u
+
+    integer utmp
+
+    type(domain_t) :: doml
+    type(domain_t) :: domr(0:nbuf)
+
+    integer j, jb, hb
+    integer js
+    integer mco, nco
+    integer jlo, jp, jli
+    integer lidx(0:lcoor-1), pidx(0:lcoor-1)
+    integer vidx(0:lcoor-1)
+    character(len=64),allocatable :: vals(:)
+    character(len=64) :: fmt_xline
+    character(len=256) :: dstr
+    character(len=256) :: cjoin, vjoin
+    type(buffer_t) :: htmp
+    integer ncolv
+    integer joffc(0:nbuf-1), jc
+
+    logical skip_undef
+    integer ccomp
+    integer nundef
+    integer cline, nline
+
+    ierr = 0
+    utmp = choice(ulog, u)
+
+    skip_undef = IAND(cmode, cmode_xundef).ne.0
+    ccomp = IAND(cmode, cmode_compromize)
+    cline = 0
+    ncolv = -1
+
+    if (ierr.eq.0) call get_compromise_domain(ierr, doml, domr, bufh, pstk, nbuf, ccomp, htmp)
+    if (ierr.eq.0) then
+       ncolv = 0
+       joffc(0) = 0
+       do j = 0, nbuf - 1
+          if (domr(j)%strd(cline).gt.0) then
+             ! joffc(j+1) = domr(j)%end(cline) - domr(j)%bgn(cline)
+             joffc(j+1) = domr(j)%iter(cline)
+          else
+             joffc(j+1) = 1
+          endif
+          joffc(j+1) = joffc(j) + joffc(j+1)
+       enddo
+       ncolv = joffc(nbuf)
+       allocate(vals(0:ncolv-1), STAT=ierr)
+       if (ierr.ne.0) then
+          ierr = ERR_ALLOCATION
+          return
+       endif
+       ! nline = doml%end(cline) - doml%bgn(cline)
+       nline = doml%iter(cline)
+    endif
+
+    if (lev_verbose.ge.levq_column) then
+       do j = 0, nbuf - 1
+          hb = bufh(j)
+          if (ierr.eq.0) call get_obj_string(ierr, vals(j), hb)
+       enddo
+       if (lev_verbose.ge.levq_stack) then
+          do j = 0, nbuf - 1
+             jb = bufj(j)
+             hb = bufh(j)
+             js = pstk(j)
+202          format('## ', I0, 1x, A, 1x, A, 1x, A)
+203          format('## ', I0, 1x, A, 1x, A, 1x, A, ' // ', A)
+             if (ierr.eq.0) then
+                call get_domain_shape(ierr, dstr, domr(j), obuffer(jb)%pcp, bstack(js)%lcp, doml)
+             endif
+             if (lev_verbose.ge.levq_rec) then
+                if (ierr.eq.0) then
+                   write(utmp, 203) user_index_bgn(j), trim(vals(j)), &
+                        & trim(dstr), trim(obuffer(jb)%desc), trim(obuffer(jb)%desc2)
+                endif
+             else
+                if (ierr.eq.0) then
+                   write(utmp, 202) user_index_bgn(j), trim(vals(j)), &
+                        & trim(dstr), trim(obuffer(jb)%desc)
+                endif
+             endif
+             if (ierr.eq.0) then
+                call get_domain_shape(ierr, dstr, domr(j), obuffer(jb)%pcp, bstack(js)%lcp, doml, 0, cline + 1)
+             endif
+             if (ierr.eq.0) vals(j) = trim(vals(j)) // trim(dstr)
+          enddo
+       endif
+       if (ierr.eq.0) call get_domain_result(ierr, cjoin, doml, htmp%pcp, cline + 1)
+       if (ierr.eq.0) call join_list(ierr, vjoin, vals(0:nbuf-1))
+211    format('#', A, 1x, A)
+       write(utmp, 211) trim(cjoin), trim(vjoin)
+    endif
+
+    if (ierr.eq.0) then
+       mco = doml%mco
+       nco = mco   ! nco: coordinate to output
+       if (lev_verbose.lt.levq_coordinate) nco = 0
+201    format('(', I0, '(I0, 1x), ', I0, '(A, 1x))')
+221    format('(', I0, '(A, 1x))')
+       if (nco.gt.1) then
+          write(fmt_xline, 201, IOSTAT=ierr) nco - 1, ncolv
+       else
+          write(fmt_xline, 221, IOSTAT=ierr) ncolv
+       endif
+       lidx(0:mco-1) = 0
+       doml%bgn(0:mco-1) = user_index_bgn(doml%bgn(0:mco-1))
+    endif
+
+    if (ierr.eq.0) then
+       if (dryrun.gt.0) then
+          write(utmp, '()')
+       else
+          do jlo = 0, doml%n - 1, nline
+             pidx(0:mco-1) = lidx(0:mco-1) + doml%bgn(0:mco-1)
+             nundef = 0
+             do j = 0, nbuf - 1
+                vidx(0:mco-1) = lidx(0:mco-1)
+                jb = bufj(j)
+                if (domr(j)%strd(cline).eq.0) then
+                   jc = joffc(j)
+                   jp = -1
+                   do jli = 0, nline - 1
+                      jp = physical_index(vidx, domr(j))
+                      if (jp.ge.0) then
+                         if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
+                            vals(jc) = '_'
+                            nundef = nundef + 1
+                         else
+                            select case(obuffer(jb)%k)
+                            case (kv_int)
+                               write(vals(jc), afmt_int, IOSTAT=ierr) INT(obuffer(jb)%vd(jp))
+                            case (kv_flt)
+                               write(vals(jc), afmt_flt, IOSTAT=ierr) REAL(obuffer(jb)%vd(jp), kind=KFLT)
+                            case (kv_dbl)
+                               write(vals(jc), afmt_dbl, IOSTAT=ierr) REAL(obuffer(jb)%vd(jp), kind=KDBL)
+                            case default
+                               vals(jc) = '*'
+                            end select
+                         endif
+                         exit
+                      endif
+                      call incr_logical_index(vidx, doml)
+                   enddo
+                   if (jp.lt.0) then
+                      vals(jc) = '.'
+                      nundef = nundef + 1
+                   endif
+                else
+                   do jli = 0, nline - 1
+                      jp = physical_index(vidx, domr(j))
+                      jc = joffc(j) + jli
+                      if (jp.lt.0) then
+                         vals(jc) = '.'
+                         nundef = nundef + 1
+                      else if (obuffer(jb)%vd(jp).eq.obuffer(jb)%undef) then
+                         vals(jc) = '_'
+                         nundef = nundef + 1
+                      else
+                         select case(obuffer(jb)%k)
+                         case (kv_int)
+                            write(vals(jc), afmt_int, IOSTAT=ierr) INT(obuffer(jb)%vd(jp))
+                         case (kv_flt)
+                            write(vals(jc), afmt_flt, IOSTAT=ierr) REAL(obuffer(jb)%vd(jp), kind=KFLT)
+                         case (kv_dbl)
+                            write(vals(jc), afmt_dbl, IOSTAT=ierr) REAL(obuffer(jb)%vd(jp), kind=KDBL)
+                         case default
+                            vals(jc) = '*'
+                         end select
+                      endif
+                      call incr_logical_index(vidx, doml)
+                   enddo
+                endif
+             enddo
+             if (ierr.eq.0) then
+                write(utmp, fmt_xline, IOSTAT=ierr) pidx(cline+1:nco-1), (trim(vals(jc)),jc=0,ncolv-1)
+             endif
+             call incr_logical_index(lidx, doml, nline)
+          enddo
+       endif
+    endif
+
+  end subroutine flush_buffer_horizontally_column
 
 !!!_   . copy_set_header
   subroutine copy_set_header &
