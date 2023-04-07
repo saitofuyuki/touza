@@ -1,7 +1,7 @@
 !!!_! ami_nio.F90 - TOUZA/Ami/nio-format interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 19 2023
-#define TIME_STAMP 'Time-stamp: <2023/03/28 07:37:55 fuyuki ami_nio.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/05 16:35:25 fuyuki ami_nio.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -264,7 +264,7 @@ contains
        &  ijrecov_a2m, ijc2o,   satm, ru,  rv, rocn, &
        &  ij_ahead,    ij_amax, &
        &  nxygdm,      mxo,     wxo,  myo, wyo, &
-       &  mxc,         pxc,     myc)
+       &  mxc,         pxc,     myc,  offset)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
     integer,         intent(out)   :: ierr
@@ -275,8 +275,13 @@ contains
     integer,         intent(in)    :: ij_amax
     integer,         intent(in)    :: nxygdm, mxo, wxo, myo, wyo
     integer,         intent(in)    :: mxc,    pxc, myc
+    integer,         intent(in)    :: offset
+
+    integer lpack
 
     ierr = 0
+
+    lpack = ij_ahead(ij_amax) - ij_ahead(0)
 
     if (mxo * myo.gt.0) then
        if (ierr.eq.0) call check_remove_wings(ierr, ru,   nxygdm, 1, mxo, wxo, wxo, myo, wyo, 'ru')
@@ -285,16 +290,16 @@ contains
 
        if (ierr.eq.0) then
           call domain_normalize &
-               & (ierr, ijrecov_a2m, ij_ahead(ij_amax) - 1, &
-               &  'ijrecov_a2m', mxo,  myo, wxo, wxo, wyo, 1)
+               & (ierr, ijrecov_a2m,   lpack, &
+               &  'ijrecov_a2m', mxo,  myo,   wxo, wxo, wyo, offset)
        endif
     endif
 
     if (mxc * myc.gt.0) then
        if (ierr.eq.0) then
           call domain_normalize &
-               & (ierr, ijc2o, ij_ahead(ij_amax) - 1, &
-               &  'ijc2o', mxc, myc, 0, pxc, 0, 1)
+               & (ierr, ijc2o,  lpack, &
+               &  'ijc2o', mxc, myc,   0, pxc, 0, offset)
        endif
     endif
 
@@ -307,72 +312,84 @@ contains
 
 !!!_  - normalize_rodata
   subroutine normalize_rodata_d &
-       & (ierr,    &
-       &  ijo2c,   socn, flandg, ruo, rvo, &
-       &  ij_omax, ij_o, &
-       &  mxo,     wxo,  myo,    wyo, &
-       &  ijdim,   mxc,  pxc,    myc, u)
+       & (ierr,        &
+       &  ijrecov_o2c, ijo2c,   socn, ruo, rvo, flandg, &
+       &  ij_ohead,    ij_omax, &
+       &  mxo,         wxo,     myo,  wyo, &
+       &  ijdim,       mxc,     pxc,  myc, offset)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
     integer,         intent(out)   :: ierr
-    integer,         intent(inout) :: ijo2c(*)
+    integer,         intent(inout) :: ijrecov_o2c(*), ijo2c(*)    ! len_o2c
     real(kind=KTGT), intent(inout) :: socn (*)
-    real(kind=KTGT), intent(inout) :: flandg(*), ruo(*), rvo(*)   ! ijdim
-    integer,         intent(inout) :: ij_o(*)                     ! ijdim
+    real(kind=KTGT), intent(inout) :: ruo(*), rvo(*), flandg(*)   ! ijdim
+    integer,         intent(inout) :: ij_ohead(0:*)               ! ij_omax
     integer,         intent(in)    :: ij_omax
-    integer,         intent(in)    :: mxo, wxo, myo, wyo
-    integer,         intent(in)    :: ijdim,  mxc, pxc, myc
-    integer,optional,intent(in)    :: u
+    integer,         intent(in)    :: mxo,   wxo, myo, wyo
+    integer,         intent(in)    :: ijdim, mxc, pxc, myc
+    integer,         intent(in)    :: offset
 
+    integer lpack
     real(kind=KTGT) :: ZERO = 0.0_KTGT
 
-    integer jh, nh
-    integer jz
-    integer jp
-    integer utmp
-    character(len=256) :: txt
 
     ierr = 0
-    utmp = get_logu(u, ulog)
+    lpack = ij_ohead(ij_omax) - ij_ohead(0)
 
     if (ierr.eq.0) call check_remove_wings(ierr, flandg, ijdim, 1, mxc, 0, pxc, myc, 0, 'flandg')
     if (ierr.eq.0) call check_remove_wings(ierr, ruo,    ijdim, 1, mxc, 0, pxc, myc, 0, 'ruo')
     if (ierr.eq.0) call check_remove_wings(ierr, rvo,    ijdim, 1, mxc, 0, pxc, myc, 0, 'rvo')
 
-    if (ierr.eq.0) call check_remove_wings(ierr, socn,   ijdim, ij_omax, mxc, 0, pxc, myc, 0, 'socn')
-    if (ierr.eq.0) call check_remove_wings(ierr, ijo2c,  ijdim, ij_omax, mxc, 0, pxc, myc, 0, 'ijo2c')
-    if (ierr.eq.0) call check_remove_wings(ierr, ij_o,   ijdim, 1,       mxc, 0, pxc, myc, 0, 'ij_o')
     if (ierr.eq.0) then
-       nh = mxc * myc
-       do jh = 1, nh
-          do jz = 0, ij_o(jh) - 1
-             jp = nh * jz + jh
-             if (is_dummy(ijo2c(jp), mxo, myo, wxo, wxo, wyo, 1)) then
-                ierr = -1
-101             format('Invalid dummy data detected: ', I0, 1x, I0, 1x, I0)
-                write(txt, 101) jp, ijo2c(jp), plane_ij(ijo2c(jp), mxo, wxo, wxo, 1)
-                call msg(txt, __MDL__, utmp)
-             else
-                ijo2c(jp) = plane_logical(ijo2c(jp), mxo, wxo, wxo, wyo, 1)
-             endif
-          enddo
-          do jz = ij_o(jh), ij_omax - 1
-             jp = nh * jz + jh
-             if (socn(jp).ne.ZERO) then
-                call msg('(''strange data in SOCN: '', I0, 1x, I0)', (/jh, jz/), &
-                     &   __MDL__, utmp)
-             else
-                socn(jp) = real(vmiss, kind=KTGT)
-             endif
-             if (ijo2c(jp).ne.0) then
-                call msg('(''strange data in IJO2C: '', I0, 1x, I0)', (/jh, jz/), &
-                     &   __MDL__, utmp)
-             else
-                ijo2c(jp) = vmiss
-             endif
-          enddo
-       enddo
+       call domain_normalize &
+            & (ierr, ijrecov_o2c, lpack, &
+            &  'ijrecov_o2c', mxc,  myc, 0, pxc, 0, offset)
     endif
+    if (ierr.eq.0) then
+       call domain_normalize &
+            & (ierr, ijo2c, lpack, &
+            &  'ijo2c', mxo, myo, wxo, wxo, wyo, offset)
+    endif
+
+    if (ierr.eq.0) then
+       ij_ohead(1:ij_omax) = ij_ohead(1:ij_omax) - ij_ohead(0)
+       ij_ohead(0) = 0
+    endif
+
+    ! if (ierr.eq.0) call check_remove_wings(ierr, socn,   ijdim, ij_omax, mxc, 0, pxc, myc, 0, 'socn')
+    ! if (ierr.eq.0) call check_remove_wings(ierr, ijo2c,  ijdim, ij_omax, mxc, 0, pxc, myc, 0, 'ijo2c')
+    ! if (ierr.eq.0) call check_remove_wings(ierr, ij_o,   ijdim, 1,       mxc, 0, pxc, myc, 0, 'ij_o')
+!     if (ierr.eq.0) then
+!        nh = mxc * myc
+!        do jh = 1, nh
+!           do jz = 0, ij_o(jh) - 1
+!              jp = nh * jz + jh
+!              if (is_dummy(ijo2c(jp), mxo, myo, wxo, wxo, wyo, 1)) then
+!                 ierr = -1
+! 101             format('Invalid dummy data detected: ', I0, 1x, I0, 1x, I0)
+!                 write(txt, 101) jp, ijo2c(jp), plane_ij(ijo2c(jp), mxo, wxo, wxo, 1)
+!                 call msg(txt, __MDL__, utmp)
+!              else
+!                 ijo2c(jp) = plane_logical(ijo2c(jp), mxo, wxo, wxo, wyo, 1)
+!              endif
+!           enddo
+!           do jz = ij_o(jh), ij_omax - 1
+!              jp = nh * jz + jh
+!              if (socn(jp).ne.ZERO) then
+!                 call msg('(''strange data in SOCN: '', I0, 1x, I0)', (/jh, jz/), &
+!                      &   __MDL__, utmp)
+!              else
+!                 socn(jp) = real(vmiss, kind=KTGT)
+!              endif
+!              if (ijo2c(jp).ne.0) then
+!                 call msg('(''strange data in IJO2C: '', I0, 1x, I0)', (/jh, jz/), &
+!                      &   __MDL__, utmp)
+!              else
+!                 ijo2c(jp) = vmiss
+!              endif
+!           enddo
+!        enddo
+!     endif
 
   end subroutine normalize_rodata_d
 !!!_  - domain_normalize
@@ -439,7 +456,8 @@ contains
     integer jx, jy
     jy =     (jh - ofs) / (mx + ww + we)  - ww
     jx = mod((jh - ofs),  (mx + ww + we)) - ws
-    n = jy * mx + jx + ofs
+    ! n = jy * mx + jx + ofs
+    n = jy * mx + jx
   end function plane_logical
 
 !!!_  - check_remove_wings
@@ -786,7 +804,7 @@ contains
   subroutine write_rodata_nio_d &
        & (ierr,  krect, &
        &  hd,    u,     fmt,    &
-       &  ijo2c, socn,  flandg, ruo, rvo, ij_omax)
+       &  ijrecov_o2c,  ijo2c, socn,  ruo, rvo, flandg, ij_ohead, ij_omax)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Nio,only: hi_DFMT, hi_ITEM, litem
     use TOUZA_Nio,only: nio_write_header, nio_write_data, put_item
@@ -796,15 +814,19 @@ contains
     integer,         intent(inout) :: krect
     character(len=*),intent(inout) :: hd(*)
     integer,         intent(in)    :: fmt
-    integer,         intent(in)    :: ijo2c(*)
+    integer,         intent(in)    :: ijrecov_o2c(*), ijo2c(*)     ! len_a2m
     real(kind=KTGT), intent(in)    :: socn(*)
     real(kind=KTGT), intent(in)    :: ruo(*), rvo(*), flandg(*)
+    integer,         intent(in)    :: ij_ohead(0:*)
     integer,         intent(in)    :: ij_omax
     integer,         intent(in)    :: u
 
     character(len=litem) :: dummy
     integer r(2)
+    integer len_o2a
     integer lw, lx, ly, lh
+    integer,allocatable :: bi(:)
+    real(kind=KTGT),allocatable :: bb(:)
 
     ierr = 0
     if (ierr.eq.0) call put_header_cprop(ierr, hd, 'omax', (/1, ij_omax/), 3)
@@ -817,15 +839,44 @@ contains
        lw = lh * ij_omax
     endif
 
-    if (ierr.eq.0) call put_item(ierr, hd, 'MI4', hi_DFMT)
-    if (ierr.eq.0) call put_item(ierr, hd, 'IJO2C', hi_ITEM)
-    if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
-    if (ierr.eq.0) call nio_write_data(ierr, ijo2c, lw, hd, krect, u)
+    len_o2a = ij_ohead(ij_omax)
 
-    if (ierr.eq.0) call put_item(ierr, hd, 'MR8', hi_DFMT)
-    if (ierr.eq.0) call put_item(ierr, hd, 'SOCN', hi_ITEM)
-    if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
-    if (ierr.eq.0) call nio_write_data(ierr, socn, lw, hd, krect, u)
+    if (IAND(fmt, fmt_expand).gt.0) then
+       if (ierr.eq.0) allocate(bi(0:lw-1), bb(0:lw-1), STAT=ierr)
+       if (ierr.eq.0) then
+          call unpack_array(ierr, bi, lh, ij_omax, ijo2c,  ijrecov_o2c, ij_ohead, vmiss)
+       endif
+       if (ierr.eq.0) call put_item(ierr, hd, 'MI4', hi_DFMT)
+       if (ierr.eq.0) call put_item(ierr, hd, 'IJO2C', hi_ITEM)
+       if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
+       if (ierr.eq.0) call nio_write_data(ierr, bi, lw, hd, krect, u)
+
+       if (ierr.eq.0) then
+          call unpack_array(ierr, bb, lh, ij_omax, socn, ijrecov_o2c, ij_ohead, real(vmiss, kind=KTGT))
+       endif
+       if (ierr.eq.0) call put_item(ierr, hd, 'MR8', hi_DFMT)
+       if (ierr.eq.0) call put_item(ierr, hd, 'SOCN', hi_ITEM)
+       if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
+       if (ierr.eq.0) call nio_write_data(ierr, bb, lw, hd, krect, u)
+
+       if (ierr.eq.0) deallocate(bi, bb, STAT=ierr)
+    else
+       if (ierr.eq.0) call put_item(ierr, hd, 'PI4', hi_DFMT)
+       if (ierr.eq.0) call put_item(ierr, hd, 'IJRECOV_O2C', hi_ITEM)
+       if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
+       if (ierr.eq.0) call nio_write_data(ierr, ijrecov_o2c, len_o2a, hd, krect, u, kopts=ij_ohead(1:ij_omax))
+
+       if (ierr.eq.0) call put_item(ierr, hd, 'PI4 IJRECOV_O2C', hi_DFMT)
+
+       if (ierr.eq.0) call put_item(ierr, hd, 'IJO2C', hi_ITEM)
+       if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
+       if (ierr.eq.0) call nio_write_data(ierr, ijo2c, len_o2a, hd, krect, u, kopts=ij_ohead(1:ij_omax))
+
+       if (ierr.eq.0) call put_item(ierr, hd, 'PR8 IJRECOV_O2C', hi_DFMT)
+       if (ierr.eq.0) call put_item(ierr, hd, 'SOCN', hi_ITEM)
+       if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
+       if (ierr.eq.0) call nio_write_data(ierr, socn, len_o2a, hd, krect, u, kopts=ij_ohead(1:ij_omax))
+    endif
 
     if (ierr.eq.0) call put_item(ierr, hd, 'UR8', hi_DFMT)
     if (ierr.eq.0) call put_header_cprop(ierr, hd, ' ', (/1, 1/), 3)
@@ -993,12 +1044,9 @@ program test_ami_nio
   integer,       allocatable :: ij_ahead(:), ijrecov_a2m(:), ijc2o(:)
   real(kind=KMD),allocatable :: satm(:), ru(:), rv(:), rocn(:)
 
-  integer ijdim
-  integer ij_omax
-  integer,       allocatable :: ij_o (:)
-  integer,       allocatable :: ijo2c(:)
-  real(kind=KMD),allocatable :: socn (:)
-  real(kind=KMD),allocatable :: ruo(:), rvo(:), flandg(:)
+  integer ij_omax, len_o2a, ijdim
+  integer,       allocatable :: ij_ohead(:), ijrecov_o2c(:), ijo2c(:)
+  real(kind=KMD),allocatable :: socn (:), ruo(:), rvo(:), flandg(:)
 
   integer mdomo, mdoma
 
@@ -1017,6 +1065,8 @@ program test_ami_nio
   integer krect
   character(len=litem) :: hd(nitem)
   character(len=128) :: arg
+
+  integer,parameter :: offset_legacy = 1
 
   ierr = 0
   jarg = 0
@@ -1094,21 +1144,18 @@ program test_ami_nio
 111     format('open/rofile: ', A, 1x, L1, 1x, I0)
         write(*, 111) trim(rofile), swap, ijdim
         if (ierr.eq.0) then
-           allocate(ij_o(1:ijdim), STAT=ierr)
-        endif
-        if (ierr.eq.0) then
-           ij_o(:) = 0
            call read_rofile_legacy1 &
                 & (ierr,     &
-                &  ij_omax,  ij_o, &
-                &  ijdim,    u,    swap)
+                &  ij_omax,  len_o2a, &
+                &  ijdim,    u,       swap)
         endif
 112     format('open/rofile: ', A, 1x, L1, 2(1x, I0), 1x, I0, ' / ', I0)
         mdomo = ijdim * ij_omax
-        write(*, 112) trim(rofile), swap, ij_omax, ijdim, sum(ij_o(1:ijdim)), mdomo
+        write(*, 112) trim(rofile), swap, ij_omax, ijdim, len_o2a, mdomo
         if (ierr.eq.0) then
-           allocate(ijo2c(mdomo), socn(mdomo), &
-                &   ruo(ijdim),   rvo(ijdim),  flandg(ijdim),  &
+           allocate(ij_ohead(0:ij_omax),  &
+                &   ijrecov_o2c(len_o2a), ijo2c(len_o2a), socn(len_o2a), &
+                &   ruo(ijdim),           rvo(ijdim),     flandg(ijdim), &
                 &   STAT=ierr)
         endif
         if (ierr.eq.0) then
@@ -1116,8 +1163,8 @@ program test_ami_nio
            socn(:)  = 0.0_KDBL
            call read_rofile_legacy2 &
                 & (ierr,     &
-                &  ijo2c,  socn,  flandg,  ruo, rvo, &
-                &  ij_o,   ijdim, ij_omax, u,   swap)
+                &  ij_ohead, ijrecov_o2c, ijo2c, socn, flandg, ruo, rvo, &
+                &  ijdim,    ij_omax,     u,     swap)
         endif
      endif
      if (ierr.eq.0) call sus_close(ierr, u, rofile)
@@ -1174,15 +1221,15 @@ program test_ami_nio
           &  ijrecov_a2m, ijc2o,   satm, ru,  rv, rocn, &
           &  ij_ahead,    ij_amax, &
           &  nxygdm,      mxo,     wxo,  myo, wyo, &
-          &  mxc,         pxc,     lyc)
+          &  mxc,         pxc,     lyc,  offset_legacy)
   endif
   if (ierr.eq.0) then
      call normalize_rodata &
-          & (ierr,    &
-          &  ijo2c,   socn, flandg, ruo, rvo, &
-          &  ij_omax, ij_o, &
-          &  mxo,     wxo,  myo,    wyo, &
-          &  ijdim,   mxc,  pxc,    lyc)
+          & (ierr,        &
+          &  ijrecov_o2c, ijo2c,   socn, ruo, rvo, flandg, &
+          &  ij_ohead,    ij_omax, &
+          &  mxo,         wxo,     myo,  wyo, &
+          &  ijdim,       mxc,     pxc,  lyc, offset_legacy)
   endif
 
   if (xfile.ne.' ') then
@@ -1208,7 +1255,7 @@ program test_ami_nio
            call write_rodata_nio &
                 & (ierr,  krect, &
                 &  hd,    u,    kfmt,   &
-                &  ijo2c, socn, flandg, ruo, rvo, ij_omax)
+                &  ijrecov_o2c, ijo2c, socn, ruo, rvo, flandg, ij_ohead, ij_omax)
         endif
      endif
   endif
