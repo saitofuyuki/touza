@@ -1,10 +1,10 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:56:03 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/08 10:59:49 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020,2021,2022,2023
+! Copyright (C) 2020-2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -114,7 +114,7 @@ module TOUZA_Std_utl
   public find_first, find_first_range
   public jot
   public inrange
-  public begin_with
+  public begin_with, find_next_sep
 !!!_  - static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -1578,6 +1578,24 @@ contains
     endif
   end function begin_with
 
+!!!_  & find_next_sep - return separator position or end
+  integer function find_next_sep(str, sep, pos, offset) result(n)
+    implicit none
+    character(len=*),intent(in) :: str
+    character(len=*),intent(in) :: sep   ! use as it is (no trimming)
+    integer,optional,intent(in) :: pos
+    integer,optional,intent(in) :: offset   ! default == find_offset
+    integer p, o
+    o = choice(find_offset, offset)
+    p = choice(o, pos) - o
+    n = index(str(p+1:), sep)
+    if (n.gt.0) then
+       n = n + p + (o - 1)
+    else
+       n = len(str) + o
+    endif
+  end function find_next_sep
+
 !!!_ + (system) control procedures
 !!!_  & is_first_force () - check if first time or force
   logical function is_first_force(n, mode) result(b)
@@ -1745,6 +1763,10 @@ program test_std_utl
   call test_jot(n=10,      e=8)
   call test_jot(      b=1, e=8)
   call test_jot(n=10, b=1, e=8)
+
+  call test_find_next_sep('abcabcabc', 'ab')
+  call test_find_next_sep('abcabcabc', 'ab', 2)
+  call test_find_next_sep('abcabcabc', 'ca', 8)
 
   stop
 contains
@@ -2028,6 +2050,23 @@ contains
        str = '-'
     endif
   end subroutine fmt_or_null
+
+  subroutine test_find_next_sep(str, sep, pos)
+    implicit none
+    character(len=*),intent(in) :: str
+    character(len=*),intent(in) :: sep
+    integer,optional,intent(in) :: pos
+    integer r
+
+101 format('find_next_sep: [', A, '][', A,'] <', A, '> ', 1x, I0)
+102 format('find_next_sep: [', A, '] <', A, '> ', 1x, I0)
+    r = find_next_sep(str, sep, pos)
+    if (present(pos)) then
+       write(*, 101) str(1:pos-1), str(pos:), sep, r
+    else
+       write(*, 102) str, sep, r
+    endif
+  end subroutine test_find_next_sep
 
 end program test_std_utl
 #endif /* TEST_STD_UTL */
