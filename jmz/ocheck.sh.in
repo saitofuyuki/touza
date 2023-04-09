@@ -1,5 +1,5 @@
 #!/bin/sh
-# Time-stamp: <2023/04/06 17:37:46 fuyuki ocheck.sh.in>
+# Time-stamp: <2023/06/20 17:21:57 fuyuki ocheck.sh.in>
 
 set -u
 
@@ -64,7 +64,7 @@ test_binary ()
   for bo in "$@"
   do
     bout=$boutd/out.$bo
-    bcmd="$CHAK -qq -H0 $FORCE $CHAK_OPTS $bin0 $bin1 MARK REPEAT $bo FLUSH -i"
+    bcmd="$CHAK -qq -H0 $FORCE $CHAK_OPTS $bin0 $bin1 REPEAT $bo FLUSH"
     case $TEST in
     create) test x"$FORCE" != x && rm -f $bout
             test -e $bout && echo "Exists $bout" >&2 && return 1

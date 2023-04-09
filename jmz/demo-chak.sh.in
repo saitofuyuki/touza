@@ -106,12 +106,13 @@ demo_operation ()
 
   src=(T=3 demo/x.base INT)
   run_demo source:2d $src                 =
-  run_demo perm:2d/c   $src X=lev         =
-  run_demo perm:3d+1/c $src Z=lat         =
-  run_demo perm:3d+0/c $src Y=lat Z=lev   =
-  run_demo perm:2d/o   $src PERM=lev      =
-  run_demo perm:3d+1/o $src PERM=,,lat    =
-  run_demo perm:3d+0/o $src PERM=,lat,lev =
+  run_demo perm:2d/c    $src X=lev         =
+  run_demo perm:3d+1/c  $src Z=lat         =
+  run_demo perm:3d+0/c  $src Y=lat Z=lev   =
+  run_demo perm:2d/o    $src SHAPE=lev      =
+  run_demo perm:3d+1/o  $src SHAPE=,,lat    =
+  run_demo perm:3d+0/o  $src SHAPE=,lat,lev =
+  run_demo perm:3d+0ins $src SHAPE=+        =
 
   run_demo_add add:1d    -- demo/yz.base T=3 -- demo/sub3.yz.base T=3
   run_demo_add add:1d:zx -- demo/zx.base T=3 -- demo/sub2.zx.base T=5
@@ -139,32 +140,32 @@ demo_operation ()
   src=(T=0 demo/base INT)
   run_demo source:3d     -n $src =
 
-  run_demo perm:3d/102a  -n $src PERM=lat  =
-  run_demo perm:3d/102b  -n $src PERM=,lon =
+  run_demo perm:3d/102a  -n $src SHAPE=lat  =
+  run_demo perm:3d/102b  -n $src SHAPE=,lon =
 
-  run_demo perm:3d/201   -n $src PERM=lev =
-  run_demo perm:3d/210a  -n $src PERM=lev,lat =
-  run_demo perm:3d/210b  -n $src PERM=lev,/   =
+  run_demo perm:3d/201   -n $src SHAPE=lev =
+  run_demo perm:3d/210a  -n $src SHAPE=lev,lat =
+  run_demo perm:3d/210b  -n $src SHAPE=lev,/   =
 
-  run_demo perm:3d/.012        -n $src PERM=+       =
-  run_demo perm:3d/s012        -n $src PERM=+set    =
-  run_demo perm:3d/0s12        -n $src PERM=,+set   =
-  run_demo perm:3d/012s        -n $src PERM=,,,+set =
-  run_demo perm:3d/s012:error  -n $src PERM=set     =
+  run_demo perm:3d/.012        -n $src SHAPE=+       =
+  run_demo perm:3d/s012        -n $src SHAPE=+set    =
+  run_demo perm:3d/0s12        -n $src SHAPE=,+set   =
+  run_demo perm:3d/012s        -n $src SHAPE=,,,+set =
+  run_demo perm:3d/s012:error  -n $src SHAPE=set     =
 
-  run_demo perm:3d/r2          -n $src PERM=lon/glon   =
-  run_demo perm:3d/r2          -n $src PERM=,,lon/glon =
-  run_demo perm:3d/r2          -n $src PERM=,,lon/lat  =
+  run_demo perm:3d/r2          -n $src SHAPE=lon/glon   =
+  run_demo perm:3d/r2          -n $src SHAPE=,,lon/glon =
+  run_demo perm:3d/r2          -n $src SHAPE=,,lon/lat  =
 
   src=(T=5 demo/zx.base INT)
   run_demo source:y      -n $src =
-  run_demo perm:y+x      -n $src PERM=lon =
-  run_demo perm:y+s      -n $src PERM=+ =
-  run_demo perm:y+sx     -n $src PERM=lon,+ =
-  run_demo perm:y+y      -n $src PERM=,+set =
-  run_demo perm:y+sy     -n $src PERM=+,+set =
-  run_demo perm:y+z      -n $src PERM=,,/lev =
-  run_demo perm:y+z:keep -n $src PERM=/,/,/lev =
+  run_demo perm:y+x      -n $src SHAPE=lon =
+  run_demo perm:y+s      -n $src SHAPE=+ =
+  run_demo perm:y+sx     -n $src SHAPE=lon,+ =
+  run_demo perm:y+y      -n $src SHAPE=,+set =
+  run_demo perm:y+sy     -n $src SHAPE=+,+set =
+  run_demo perm:y+z      -n $src SHAPE=,,/lev =
+  run_demo perm:y+z:keep -n $src SHAPE=/,/,/lev =
 
   # flat index
   src=(T=0 demo/base INT)
