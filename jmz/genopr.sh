@@ -992,6 +992,33 @@ output_table ()
   done | sort | column -s '|' -o '|' -t
   print -
 
+  local sweep=
+  candi=(reduce binary lazy)
+  for grp in "$@"
+  do
+    [[ $candi[(I)$grp] -eq 0 ]] && continue
+    for key in ${=GRP[$grp]}
+    do
+      [[ -n $ALIAS[$key] ]] && continue
+      if [[ $grp != reduce ]]; then
+        check_props sweep sweep $key
+        [[ -z $sweep ]] && continue
+        opt='=RANK'
+        desc="$key with sweeping"
+      else
+        opt="[=$OPT[$key]]"
+        desc="$DESCR[$key]"
+      fi
+
+      sym=$SYM[$key]
+      alias=(${(k)ALIAS[(R)$key]})
+      syms=($sym $alias)
+      [[ -n $opt ]] && syms=(${^syms}"$opt")
+      print - "| $syms | $desc | "
+    done | sort | column -s '|' -o '|' -t
+  done
+  print -
+
   candi=(anchor queue)
   for grp in "$@"
   do

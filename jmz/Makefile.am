@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/06/16 09:33:01 fuyuki Makefile.am>
+# Time-stamp: <2023/06/30 07:19:20 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -57,7 +57,9 @@ jmzdepf90: jmzdepf90.sh.in
 	chmod +x $@
 
 demo-chak.sh: demo-chak.sh.in
-	@sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@; chmod +x $@
+	@sed -e 's,[@]ZSH[@],$(ZSH),g' \
+         -e 's,[@]srcdir[@],$(srcdir),g' \
+		$< >$@; chmod +x $@
 
 ocheck.sh: ocheck.sh.in
 	@sed -e 's,[@]CHAK[@],$(abs_builddir)/chak,g' \
