@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/04/08 22:13:58 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/17 21:27:22 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -36,6 +36,7 @@ module chak_lib
   use TOUZA_Std,only: msglev_NORMAL, msglev_INFO, msglev_DEBUG
   use TOUZA_Std,only: msglev_WARNING, msglev_DETAIL
   use TOUZA_Std,only: is_msglev_DETAIL, is_msglev_NORMAL, is_msglev_INFO, is_msglev_DEBUG
+  use TOUZA_Std,only: trace_err
   use TOUZA_Nio,only: litem, nitem, GFMT_END
   implicit none
   public
@@ -146,7 +147,7 @@ module chak_lib
   integer,parameter :: cmode_intersect = 2
   integer,parameter :: cmode_first     = 3
 
-  integer,parameter :: cmode_compromize = 3  ! mask
+  integer,parameter :: cmode_compromise = 3  ! mask
 
   integer,parameter :: cmode_xundef     = 4  ! exclude undefined at flushing
   integer,parameter :: cmode_column     = 8  ! columned
@@ -287,7 +288,7 @@ contains
 
 !!!_   . show_domain
   subroutine show_domain &
-       & (ierr, dom, tag, u, levv)
+       & (ierr, dom, tag, u, levv, indent)
     use TOUZA_Std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
@@ -295,30 +296,33 @@ contains
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv
+    integer,         intent(in),optional :: indent
     integer utmp
     integer lv
+    integer tab
     character(len=64) :: pfx, cran
     integer jc
     ierr = 0
     lv = choice(lev_verbose, levv)
     utmp = choice(ulog, u)
+    tab = choice(0, indent)
     if (present(tag)) then
        pfx = '[' // trim(tag) // ']'
     else
        pfx = ' '
     endif
-102 format('domain', A, ' total = ', I0)
-103 format('domain', A, ': ', I0, ' / = ', 6(1x, I0))
-    write(utmp, 102) trim(pfx), dom%n
-    write(utmp, 103) trim(pfx), dom%mco, dom%cidx(0:dom%mco - 1)
+102 format(A, 'domain', A, ' total = ', I0)
+103 format(A, 'domain', A, ': ', I0, ' / = ', 6(1x, I0))
+    write(utmp, 102) repeat(' ', tab), trim(pfx), dom%n
+    write(utmp, 103) repeat(' ', tab), trim(pfx), dom%mco, dom%cidx(0:dom%mco - 1)
     do jc = 0, dom%mco - 1
-111    format('domain', A, ': ', I0, 1x, A, ' +', I0, '+', I0, ' (', I0, ')')
-112    format('domain', A, ': ', I0, 1x, A, ' +', I0, '+', I0)
+111    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '+', I0, ' (', I0, ')')
+112    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '+', I0)
        call get_range_string(ierr, cran, dom%bgn(jc), dom%end(jc), 1)
        if (dom%ofs(jc).eq.null_range) then
-          write(utmp, 112) trim(pfx), jc, trim(cran), dom%iter(jc), dom%strd(jc)
+          write(utmp, 112) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%iter(jc), dom%strd(jc)
        else
-          write(utmp, 111) trim(pfx), jc, trim(cran), dom%iter(jc), dom%strd(jc), dom%ofs(jc)
+          write(utmp, 111) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%iter(jc), dom%strd(jc), dom%ofs(jc)
        endif
     enddo
   end subroutine show_domain

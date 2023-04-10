@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/28 12:00:15 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/18 09:39:43 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -143,22 +143,21 @@ contains
   end subroutine reg_opr_prop
 !!!_   . reg_fake_opr
   subroutine reg_fake_opr &
-       & (ierr, handle, str)
+       & (entr, handle, str)
     use TOUZA_Std,only: query_entry
     implicit none
-    integer,         intent(out) :: ierr
+    integer,         intent(out) :: entr
     integer,         intent(in)  :: handle
     character(len=*),intent(in)  :: str
-    integer entr, ho
-    ierr = 0
+    integer ho, jerr
     entr = query_entry(htopr, str)
     if (entr.ge.0) then
        ho = query_opr_handle_e(entr)
        if (ho.eq.handle) then
           continue
        else
-          ierr = ERR_DUPLICATE_SET
-          call message(ierr, 'duplicate registration ' // trim(str))
+          entr = ERR_DUPLICATE_SET
+          call message(entr, 'duplicate registration ' // trim(str))
        endif
     else
        entr = reg_opr_core(str, handle)
@@ -254,9 +253,9 @@ contains
        & (ierr, str, handle)
     use TOUZA_Std,only: query_key
     implicit none
-    integer,         intent(out)         :: ierr
-    character(len=*),intent(out)         :: str
-    integer,         intent(in)          :: handle
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: str
+    integer,         intent(in)  :: handle
     if (handle.lt.0.or.handle.ge.mopr) then
        ierr = ERR_INVALID_ITEM
        call message(ierr, 'invalid operator handle', (/handle/))
@@ -264,6 +263,16 @@ contains
     endif
     call query_key(ierr, htopr, oprop(handle)%entr, str)
   end subroutine query_opr_name
+!!!_   . query_opr_name_e - query operator name by entry
+  subroutine query_opr_name_e &
+       & (ierr, str, entr)
+    use TOUZA_Std,only: query_key
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: str
+    integer,         intent(in)  :: entr
+    call query_key(ierr, htopr, entr, str)
+  end subroutine query_opr_name_e
 !!!_   . query_opr_handle_n - query operator handle by name
   integer function query_opr_handle_n &
        & (name) &

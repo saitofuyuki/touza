@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/04/07 22:21:23 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/18 10:03:04 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -75,6 +75,7 @@ program chak
   character(len=lfmt),save :: afmt_int = '(I0)'
   character(len=lfmt),save :: afmt_flt = '(es16.12)'
   character(len=lfmt),save :: afmt_dbl = '(es16.12)'
+
 !!!_  - misc
   integer irecw
 
@@ -85,6 +86,10 @@ program chak
   integer,parameter :: levq_stack = levq_rec - 1
   integer,parameter :: levq_column = levq_stack - 1
   integer,parameter :: levq_coordinate = levq_column - 1
+
+  character(len=*),parameter :: bfmt_write_buf   = '(''W'', I0)'
+  character(len=*),parameter :: bfmt_read_buf    = '(''F'', I0)'
+  character(len=*),parameter :: bfmt_read_filter = '(''F'', I0, ''.'', I0)'
 
 !!!_ + Body
   ierr = 0
@@ -106,17 +111,17 @@ program chak
   if (ierr.eq.0) call finalize(ierr)
 #if HAVE_FORTRAN_EXIT
   if (ierr.ne.0) then
-     write(*, *) 'exit = ', ierr
+     call trace_err(ierr)
      call exit(1)
   endif
 #elif HAVE_FORTRAN_ERROR_STOP
   if (ierr.ne.0) then
-     write(*, *) 'exit = ', ierr
+     call trace_err(ierr)
      error stop 1
   endif
 #else /* not HAVE_FORTRAN_ERROR_STOP */
   if (ierr.ne.0) then
-     write(*, *) 'exit = ', ierr
+     call trace_err(ierr)
   endif
 #endif /* not HAVE_FORTRAN_ERROR_STOP */
   stop
@@ -539,6 +544,11 @@ contains
                 ierr = min(0, ierr)
              endif
              if (ierr.eq.0) then
+                call parse_arg_buffer(ierr, arg)
+                if (ierr.eq.0) exit
+                ierr = min(0, ierr)
+             endif
+             if (ierr.eq.0) then
                 call parse_arg_literal(ierr, arg)
                 if (ierr.eq.0) exit
                 ierr = min(0, ierr)
@@ -877,7 +887,8 @@ contains
     integer lasth
     integer jf
     integer nbufs
-    character(len=lname) :: bname
+    character(len=lname) :: bname, fname
+    integer oentr
     integer jerr
 
     ierr = 0
@@ -901,13 +912,13 @@ contains
           if (ierr.eq.0) then
              jb = buf_h2item(hbuf)
              obuffer(jb)%stt = stt_locked
-             ! ofile(jf)%bh = hbuf
-1011         format('W', I0)
-             write(bname, 1011, IOSTAT=jerr) user_index_bgn(wcount)
-             obuffer(jb)%name = bname
-             wcount = wcount + 1
+             ! fake operator for file handle
+             write(bname, bfmt_write_buf, IOSTAT=jerr) user_index_bgn(wcount)
+             if (ierr.eq.0) call reg_fake_opr(oentr, hfile, bname)
+             if (ierr.eq.0) ofile(jf)%opr = oentr
+             ierr = min(0, oentr)
           endif
-          if (ierr.eq.0) call reg_fake_opr(ierr, hbuf, bname)
+          if (ierr.eq.0) wcount = wcount + 1
        else
           if (.not.associated(ofile(def_read)%rgrp)) then
              call add_default_records(ierr, ofile(def_read))
@@ -919,7 +930,8 @@ contains
              ofile(jf)%mode = mode_read
              ofile(jf)%bigg = ofile(def_read)%bigg
              ofile(jf)%rgrp => ofile(def_read)%rgrp
-             call alloc_file_buffers(ierr, nbufs, rcount-1, 0)
+             call alloc_file_buffers(ierr, oentr, nbufs, rcount-1, 0)
+             if (ierr.eq.0) ofile(jf)%opr = oentr
           endif
           if (ierr.eq.0) then
              call append_queue_stack(ierr, hfile, 0, nbufs)
@@ -929,9 +941,10 @@ contains
   end subroutine parse_arg_file
 
 !!!_   . alloc_file_buffers
-  subroutine alloc_file_buffers(ierr, nbufs, jtag, jsub)
+  subroutine alloc_file_buffers(ierr, entr, nbufs, jtag, jsub)
     implicit none
     integer,intent(out) :: ierr
+    integer,intent(out) :: entr
     integer,intent(in)  :: nbufs
     integer,intent(in)  :: jtag
     integer,intent(in)  :: jsub
@@ -940,14 +953,13 @@ contains
     integer jerr
 
     ierr = 0
-101 format('F', I0)
-102 format('F', I0, '.', I0)
+    entr = -1
     do jj = 0, nbufs - 1
        if (ierr.eq.0) then
           if (nbufs.le.1.and.jsub.lt.1) then
-             write(tag, 101, IOSTAT=jerr) user_index_bgn(jtag)
+             write(tag, bfmt_read_buf, IOSTAT=jerr) user_index_bgn(jtag)
           else
-             write(tag, 102, IOSTAT=jerr) user_index_bgn(jtag), user_index_bgn(jsub + jj)
+             write(tag, bfmt_read_filter, IOSTAT=jerr) user_index_bgn(jtag), user_index_bgn(jsub + jj)
           endif
        endif
        if (ierr.eq.0) call new_buffer(ierr, hbuf, tag)
@@ -956,7 +968,8 @@ contains
           obuffer(jb)%stt = stt_locked
        endif
        if (ierr.eq.0) call push_stack(ierr, hbuf)
-       if (ierr.eq.0) call reg_fake_opr(ierr, hbuf, tag)
+       if (ierr.eq.0) call reg_fake_opr(entr, hbuf, tag)
+       ierr = min(0, entr)
     enddo
   end subroutine alloc_file_buffers
 
@@ -1010,6 +1023,53 @@ contains
     endif
   end subroutine parse_arg_literal
 
+!!!_   . parse_arg_buffer
+  subroutine parse_arg_buffer &
+       & (ierr, arg)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: arg
+    integer hopr,  lasth
+    integer jfile
+    logical cond
+
+    ierr = 0
+    hopr = parse_term_operator(arg)
+    jfile = file_h2item(hopr)
+
+    cond = hopr.ge.0
+    if (cond) cond = .not. is_operator(hopr)
+
+    if (cond) then
+       if (jfile.lt.0) then
+          ! fake operator (== tagged buffer)
+          if (ierr.eq.0) call append_queue(ierr, hopr, 0, 1, (/hopr/))
+          if (ierr.eq.0) call push_stack(ierr, hopr)
+       else
+          if (is_read_mode(ofile(jfile)%mode)) then
+             ierr = ERR_PANIC
+          else
+             ! OUTPUT WRITE-TAG
+             if (ierr.eq.0) call last_queue(ierr, lasth)
+             if (ierr.eq.0) then
+                if (lasth.eq.opr_OUTPUT) then
+                   call pop_queue(ierr)
+                   if (ierr.eq.0) call append_queue(ierr, hopr, pop=1, push=0)
+                   if (ierr.eq.0) call pop_stack(ierr)
+                else
+                   ierr = ERR_PANIC
+                endif
+             endif
+          endif
+       endif
+       if (ierr.ne.0) then
+          call message(ierr, 'panic: ' // trim(arg) // ' cannot be parsed (forget = ?)')
+       endif
+    else
+       ierr = ERR_NO_CANDIDATE   ! not error
+    endif
+  end subroutine parse_arg_buffer
+
 !!!_   . parse_arg_operator
   subroutine parse_arg_operator &
        & (ierr, arg)
@@ -1029,7 +1089,7 @@ contains
 
     hbufo = -1
     hopr = parse_term_operator(arg)
-
+    ! write(*, *) hopr, is_operator(hopr), trim(arg)
     if (is_msglev_info(lev_verbose)) then
        if (hopr.ge.0) then
           inquire(FILE=arg, EXIST=isx, IOSTAT=ierr)
@@ -1103,8 +1163,9 @@ contains
           if (ierr.eq.0) call stack_normal_opr(ierr, 0, 0, hopr, 0)
        else
           ! fake operator
-          if (ierr.eq.0) call append_queue(ierr, hopr, 0, 1, (/hopr/))
-          if (ierr.eq.0) call push_stack(ierr, hopr)
+          ierr = ERR_NO_CANDIDATE   ! not error
+          ! if (ierr.eq.0) call append_queue(ierr, hopr, 0, 1, (/hopr/))
+          ! if (ierr.eq.0) call push_stack(ierr, hopr)
        endif
     else
        ierr = ERR_NO_CANDIDATE   ! not error
@@ -1212,6 +1273,7 @@ contains
     integer hbuf, jb
     integer ci
     real(kind=KBUF) :: undef
+    integer oentr
 
     ierr = 0
     call pop_stack(ierr, hbuf, .TRUE.)
@@ -1226,7 +1288,8 @@ contains
           if (jpar.lt.jend) then
              obuffer(jb)%name = arg(jpar:jend-1)
              obuffer(jb)%stt  = stt_locked
-             call reg_fake_opr(ierr, hbuf, obuffer(jb)%name)
+             call reg_fake_opr(oentr, hbuf, obuffer(jb)%name)
+             ierr = min(0, ierr)
           endif
        case(opr_PERM,opr_SIZE)
           call parse_buffer_shape(ierr, arg(jpar:), hopr)
@@ -1425,6 +1488,7 @@ contains
     integer jitem
     integer nbufs
     integer push
+    integer oentr
     real(kind=KBUF) :: undef
 
     ierr = 0
@@ -1475,7 +1539,7 @@ contains
              if (ierr.eq.0) call parse_rec_filter(ierr, nbufs, ofile(jfr), arg(jpar:))
              ! write(*, *) 'stack/1', push, nbufs
              if (jfr.gt.def_read) then
-                if (ierr.eq.0) call alloc_file_buffers(ierr, nbufs, rcount-1, push)
+                if (ierr.eq.0) call alloc_file_buffers(ierr, oentr, nbufs, rcount-1, push)
                 if (ierr.eq.0) call modify_queue_stack(ierr, push=push+nbufs)
              endif
           else
@@ -2742,7 +2806,12 @@ contains
           acc = 'unknown'
        end select
 201    format('file:', A, 1x, A, '[', A, ']')
-       write(str, 201, IOSTAT=jerr) trim(acc), trim(ofile(jfile)%name), trim(rtmp)
+       call query_opr_name_e(jerr, btmp, ofile(jfile)%opr)
+       if (jerr.eq.0) then
+          write(str, 201, IOSTAT=jerr) trim(acc), trim(btmp), trim(rtmp)
+       else
+          write(str, 201, IOSTAT=jerr) trim(acc), trim(ofile(jfile)%name), trim(rtmp)
+       endif
        if (push.gt.0) then
           if (ierr.eq.0) call get_obj_list(ierr, btmp, aq%lefts, push)
           if (ierr.eq.0) str = trim(str) // ' > ' // trim(btmp)
@@ -3097,6 +3166,7 @@ contains
     integer m
     character(len=lname) :: bname
     integer jerr
+    integer oentr
 
     ierr = 0
     call new_buffer(ierr, handle)
@@ -3106,7 +3176,8 @@ contains
        call alloc_buffer_t(ierr, obuffer(jb), m)
        if (ierr.eq.0) then
           if (present(name)) then
-             call reg_fake_opr(ierr, handle, name)
+             call reg_fake_opr(oentr, handle, name)
+             ierr = min(0, oentr)
              if (ierr.eq.0) obuffer(jb)%name = name
           else
 101          format('L', I0)
@@ -3598,7 +3669,7 @@ contains
     else
        tsfx = ' '
     endif
-101 format('  write:', A, 1x, A, A)
+101 format('    write:', A, 1x, A, A)
     write(txt, 101, IOSTAT=jerr) trim(obuffer(jb)%name), trim(obuffer(jb)%desc), trim(tsfx)
     call message(ierr, txt, levm=msglev_normal, u=uerr)
 
@@ -4252,7 +4323,7 @@ contains
        endif
     enddo
 
-    select case(IAND(cmode, cmode_compromize))
+    select case(IAND(cmode, cmode_compromise))
     case (cmode_null)
        if (IAND(cmode, cmode_column).eq.0) then
           call flush_buffer_each(ierr, nbuf, bufh, bufj, pstk, cmode, u)
@@ -4683,7 +4754,7 @@ contains
     utmp = choice(ulog, u)
 
     skip_undef = IAND(cmode, cmode_xundef).ne.0
-    ccomp = IAND(cmode, cmode_compromize)
+    ccomp = IAND(cmode, cmode_compromise)
 
     if (ierr.eq.0) call get_compromise_domain(ierr, doml, domr, bufh, pstk, nbuf, ccomp, htmp)
 
@@ -4824,7 +4895,7 @@ contains
     utmp = choice(ulog, u)
 
     skip_undef = IAND(cmode, cmode_xundef).ne.0
-    ccomp = IAND(cmode, cmode_compromize)
+    ccomp = IAND(cmode, cmode_compromise)
     cline = 0
     ncolv = -1
 
@@ -5786,9 +5857,9 @@ contains
     endif
 
     if (is_msglev_DEBUG(lev_verbose)) then
-       if (ierr.eq.0) call show_domain(ierr, domL, 'compromise/L')
+       if (ierr.eq.0) call show_domain(ierr, domL, 'compromise/L', indent=6)
        do j = 0, nbuf - 1
-          if (ierr.eq.0) call show_domain(ierr, domR(j), 'compromise/R')
+          if (ierr.eq.0) call show_domain(ierr, domR(j), 'compromise/R', indent=6)
        enddo
     endif
   end subroutine get_compromise_domain
