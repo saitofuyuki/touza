@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geographic geometry
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2023/01/16 17:08:38 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/15 21:25:07 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -15,6 +15,9 @@
 #endif
 #include "touza_emu.h"
 #include "touza_std.h"
+#ifndef TEST_EMU_UGG
+#define TEST_EMU_UGG 0
+#endif  TEST_EMU_UGG 0
 !!!_@ TOUZA_Emu_ugg - Geometry procedures
 module TOUZA_Emu_ugg
 !!!_ = declaration
@@ -32,6 +35,18 @@ module TOUZA_Emu_ugg
   integer,parameter,public :: DIV_EACH_EDGE  = 0          !! divide each cells, accumulate from both edges
   integer,parameter,public :: DIV_EACH_INCR  = 1          !! divide each cells, accumulate from lower edge
   integer,parameter,public :: DIV_ACCUMULATE = 2          !! legacy, accumulate from the origin
+
+!!!_ + cache size and index
+  integer,parameter,public :: ncache_stereog_lo = 2
+  integer,parameter,public :: ncache_stereog_la = 1
+  integer,parameter,public :: ncache_stereog_co = 2
+
+  integer,parameter :: icache_stereog_sindlo = 1
+  integer,parameter :: icache_stereog_cosdlo = 2
+  integer,parameter :: icache_stereog_rho    = 1
+  integer,parameter :: icache_stereog_co     = 1
+  integer,parameter :: icache_stereog_sign   = 2
+
 !!!_  - static
 !!!_  - private static
   integer,save :: init_mode = 0
@@ -69,6 +84,9 @@ module TOUZA_Emu_ugg
   interface mid_latitude
      module procedure mid_latitude_d
   end interface mid_latitude
+  interface div_latitude
+     module procedure div_latitude_d
+  end interface div_latitude
 
   interface array_reverse
      module procedure array_reverse_d
@@ -88,16 +106,90 @@ module TOUZA_Emu_ugg
   interface span_latitude
      module procedure span_latitude_d
   end interface span_latitude
+
+  interface proj_stereog_npset
+     module procedure proj_stereog_npset_d
+  end interface proj_stereog_npset
+  interface proj_stereog_npfwd
+     module procedure proj_stereog_npfwd_d
+  end interface proj_stereog_npfwd
+
+  interface proj_stereog_spset
+     module procedure proj_stereog_spset_d
+  end interface proj_stereog_spset
+  interface proj_stereog_spfwd
+     module procedure proj_stereog_spfwd_d
+  end interface proj_stereog_spfwd
+
+  interface proj_stereog_set
+     module procedure proj_stereog_set_d
+  end interface proj_stereog_set
+  interface proj_stereog_fwd
+     module procedure proj_stereog_fwd_d
+  end interface proj_stereog_fwd
+  interface proj_stereog_xfwd
+     module procedure proj_stereog_xfwd_d
+  end interface proj_stereog_xfwd
+  interface proj_stereog_yfwd
+     module procedure proj_stereog_yfwd_d
+  end interface proj_stereog_yfwd
+
+  interface conformal_latitude
+     module procedure conformal_latitude_d
+  end interface conformal_latitude
+  interface proj_tsfactor
+     module procedure proj_tsfactor_d
+  end interface proj_tsfactor
+  interface flatten_to_ecc
+     module procedure flatten_to_ecc_d
+  end interface flatten_to_ecc
+  interface local_radius
+     module procedure local_radius_d
+  end interface local_radius
+
+  interface proj_pstereog
+     module procedure proj_pstereog_core_d, proj_pstereog_once_d
+  end interface proj_pstereog
+
+  interface proj_pstereog_set
+     module procedure proj_pstereog_set_d
+  end interface proj_pstereog_set
+  interface proj_pstereog_cachelo
+     module procedure proj_pstereog_cachelo_d
+  end interface proj_pstereog_cachelo
+  interface proj_pstereog_cachela
+     module procedure proj_pstereog_cachela_d
+  end interface proj_pstereog_cachela
+
   interface pi_
      module procedure pi_d
   end interface pi_
 
+  interface div_coordinate
+     module procedure div_coordinate_d
+  end interface div_coordinate
+  interface deg2rad
+     module procedure deg2rad_d
+  end interface deg2rad
+  interface rad2deg
+     module procedure rad2deg_d
+  end interface rad2deg
 !!!_  - public
   public init, diag, finalize
   public get_longitude, mid_longitude,  div_longitude
   public check_longitude, check_div_longitude
-  public get_latitude,  gauss_latitude, mid_latitude
+  public get_latitude,  gauss_latitude, mid_latitude, div_latitude
   public check_precision, is_equidistant
+  public deg2rad, rad2deg
+
+  public flatten_to_ecc
+  public conformal_latitude,  local_radius
+  public proj_stereog_set,   proj_stereog_fwd
+  public proj_stereog_npset, proj_stereog_npfwd
+  public proj_stereog_spset, proj_stereog_spfwd
+  public proj_stereog_xfwd,  proj_stereog_yfwd
+  public proj_pstereog, proj_pstereog_set, proj_pstereog_cachelo, proj_pstereog_cachela
+
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -202,7 +294,7 @@ contains
     endif
     return
   end subroutine finalize
-!!!_  - diag_pi
+!!!_  & diag_pi
   subroutine diag_pi(ierr, u)
     use TOUZA_Std,only: KDBL
     implicit none
@@ -372,6 +464,32 @@ contains
     real(kind=KTGT),intent(in) :: x
     z = tan(x)
   end function wtan_d
+!!!_   . deg2rad
+  ELEMENTAL &
+  real(kind=KTGT) function deg2rad_d(deg) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: deg
+    real(kind=KTGT),parameter :: w = 360.0_KTGT
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT) :: s
+    s = sign(ONE, deg)
+    r = s * (modulo(abs(deg), w) / (w / 2.0_KTGT)) * pi_(deg)
+  end function deg2rad_d
+!!!_   . rad2deg
+  ELEMENTAL &
+  real(kind=KTGT) function rad2deg_d(rad) result(d)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: rad
+    real(kind=KTGT),parameter :: w = 360.0_KTGT
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT) :: p2, s
+    p2 = 2.0_KTGT * pi_(rad)
+    s = sign(ONE, rad)
+    d = s * ((modulo(abs(rad), p2)) / p2) * w
+  end function rad2deg_d
+
 !!!_ + user subroutines (longitude)
 !!!_  & get_longitude
   subroutine get_longitude_d &
@@ -476,116 +594,16 @@ contains
     integer,        intent(in)          :: base          ! source array size
     integer,        intent(in),optional :: method
     real(kind=KTGT),intent(in),optional :: span          ! domain width
-
-    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
-    real(kind=KTGT),parameter :: ONE  = 1.0_KTGT
-    real(kind=KTGT),parameter :: HALF = 0.5_KTGT
     real(kind=KTGT) :: sp
-    integer m
-    logical beq
-    real(kind=KTGT) :: dxs, d
-    real(kind=KTGT),allocatable :: dxd(:)
-    integer jd, js, ji
-    integer no
-    real(kind=KTGT) :: o
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
 
-    ierr = 0
-    beq = .FALSE.
-
-    if (ierr.eq.0) allocate(dxd(0:base-1), STAT=ierr)
-    if (ierr.ne.0) ierr = ERR_ALLOCATION
-
-    if (ierr.eq.0) then
-       m = choice(DIV_EACH_EDGE, method)
-       if (present(span)) then
-          sp = span_longitude(span)
-          dxs = sp / real(base, kind=KTGT)
-          if (is_equidistant(longi_b, base + 1, r=dxs)) then
-             beq = .TRUE.
-          else
-             ierr = ERR_INVALID_PARAMETER
-          endif
-       endif
+    if (present(span)) then
+       sp = span_longitude(span)
+    else
+       sp = ZERO
     endif
-
-    if (ierr.eq.0) then
-       if (beq) then
-          dxd(0:base-1) = sp / real(base * div, kind=KTGT)
-       else
-          do js = 0, base - 1
-             dxs = longi_b(js + 1) - longi_b(js)
-             dxd(js) = dxs / real(div, kind=KTGT)
-          enddo
-       endif
-
-       select case(m)
-       case(DIV_EACH_EDGE)
-          if (boundary) then
-             o = ZERO
-             no = 0
-             js = base
-             jd = js * div + 0
-             longi(jd) = longi_b(js)
-          else
-             o = HALF
-             no = 1
-          endif
-          do js = 0, base - 1
-             do ji = 0, div / 2 - no
-                jd = js * div + ji
-                longi(jd) = longi_b(js) + (real(ji, kind=KTGT) + o) * dxd(js)
-             enddo
-             do ji = div / 2 - no + 1, div - 1
-                jd = js * div + ji
-                longi(jd) = longi_b(js + 1) - (real((div - ji), kind=KTGT) - o) * dxd(js)
-             enddo
-          enddo
-          if (mod(div, 2).eq.no) then
-             do js = 0, base - 1
-                jd = js * div + div / 2
-                longi(jd) = longi_c(js)
-             enddo
-          endif
-       case(DIV_EACH_INCR)
-          if (boundary) then
-             o = ZERO
-             js = base
-             jd = js * div + 0
-             longi(jd) = longi_b(js)
-          else
-             o = HALF
-          endif
-          do js = 0, base - 1
-             do ji = 0, div - 1
-                jd = js * div + ji
-                longi(jd) = longi_b(js) + (real(ji, kind=KTGT) + o) * dxd(js)
-             enddo
-          enddo
-       case(DIV_ACCUMULATE)
-          if (present(span)) then
-             ! compute again for compatibility
-             d = dxs / real(div, kind=KTGT)
-             if (boundary) then
-                o = ZERO
-                no = base * div + 1
-             else
-                o = HALF
-                no = base * div
-             endif
-             jd = 0
-             js = 0
-             longi(jd) = longi_b(js) + d * o
-             do jd = 1, no - 1
-                longi(jd) = longi(jd - 1) + d
-             enddo
-          else
-             ierr = ERR_INVALID_PARAMETER
-          endif
-       case default
-          ierr = ERR_INVALID_SWITCH
-       end select
-    endif
-    if (ierr.eq.0) deallocate(dxd, STAT=ierr)
+    call div_coordinate &
+         & (ierr, longi, div, boundary, longi_c, longi_b, base, sp, method)
   end subroutine div_longitude_d
 
 !!!_  - check_longitude
@@ -751,28 +769,7 @@ contains
        enddo
     case default
        ierr = ERR_INVALID_SWITCH
-       ! write(*, *) 'INVALID LATITUDE METHOD = ', method
-       ! ierr = ERR_PANIC
     end select
-    ! if (ierr.eq.0) then
-    !    if (choice(.FALSE., reverse)) then
-    !       call array_reverse(lati, n)
-    !       call array_reverse(weight, n)
-    !    endif
-    ! endif
-
-!     if (present(u)) then
-!        sumgw = ZERO
-!        do j = 1, n
-!           sumgw = sumgw + weight(j)
-!        enddo
-! 101    format(' ### check SUMGW = ', E16.9)
-!        if (u.ge.0) then
-!           write(u, 101) sumgw
-!        else
-!           write(*, 101) sumgw
-!        endif
-!     endif
   end subroutine get_latitude_d
 
 !!!_   & gauss_latitude - compute gauss latitudes (inherit gauss())
@@ -933,6 +930,157 @@ contains
    endif
 
   end subroutine mid_latitude_d
+!!!_  & div_latitude
+  subroutine div_latitude_d &
+       & (ierr, lati, div, boundary, lati_c, lati_b, base, method, span)
+    use TOUZA_Std,only: KTGT=>KDBL, choice
+    implicit none
+    integer,        intent(out)         :: ierr
+    real(kind=KTGT),intent(out)         :: lati(0:*)
+    integer,        intent(in)          :: div           ! division number
+    logical,        intent(in)          :: boundary      ! boundary or center
+    real(kind=KTGT),intent(in)          :: lati_c(0:*)   ! source coordinate (center)     o o
+    real(kind=KTGT),intent(in)          :: lati_b(0:*)   ! source coordinate (boundary)  x x x
+    integer,        intent(in)          :: base          ! source array size
+    integer,        intent(in),optional :: method
+    real(kind=KTGT),intent(in),optional :: span          ! domain width
+
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
+    real(kind=KTGT) :: sp
+
+    if (present(span)) then
+       sp = span_latitude(span)
+    else
+       sp = ZERO
+    endif
+    call div_coordinate &
+         & (ierr, lati, div, boundary, lati_c, lati_b, base, sp, method)
+
+  end subroutine div_latitude_d
+
+!!!_  & div_coordinate
+  subroutine div_coordinate_d &
+       & (ierr, co, div, boundary, cc, cb, base, span, method)
+    use TOUZA_Std,only: KTGT=>KDBL, choice
+    implicit none
+    integer,        intent(out)         :: ierr
+    real(kind=KTGT),intent(out)         :: co(0:*)
+    integer,        intent(in)          :: div           ! division number
+    logical,        intent(in)          :: boundary      ! boundary or center
+    real(kind=KTGT),intent(in)          :: cc(0:*)       ! source coordinate (center)     o o
+    real(kind=KTGT),intent(in)          :: cb(0:*)       ! source coordinate (boundary)  x x x
+    integer,        intent(in)          :: base          ! source array size
+    real(kind=KTGT),intent(in),optional :: span          ! physical domain width (default: pi)
+    integer,        intent(in),optional :: method
+
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
+    real(kind=KTGT),parameter :: ONE  = 1.0_KTGT
+    real(kind=KTGT),parameter :: HALF = 0.5_KTGT
+    integer m
+    logical beq
+    real(kind=KTGT) :: dxs, d
+    real(kind=KTGT),allocatable :: dxd(:)
+    integer jd, js, ji
+    integer no
+    real(kind=KTGT) :: o
+
+    ierr = 0
+    beq = .FALSE.
+
+    if (ierr.eq.0) allocate(dxd(0:base-1), STAT=ierr)
+    if (ierr.ne.0) ierr = ERR_ALLOCATION
+
+    if (ierr.eq.0) then
+       m = choice(DIV_EACH_EDGE, method)
+       dxs = span / real(base, kind=KTGT)
+       if (dxs.eq.ZERO) then
+          beq = .FALSE.
+       else if (is_equidistant(cb, base + 1, r=dxs)) then
+          beq = .TRUE.
+       else
+          ierr = ERR_INVALID_PARAMETER
+       endif
+    endif
+
+    if (ierr.eq.0) then
+       if (beq) then
+          dxd(0:base-1) = span / real(base * div, kind=KTGT)
+       else
+          do js = 0, base - 1
+             dxs = cb(js + 1) - cb(js)
+             dxd(js) = dxs / real(div, kind=KTGT)
+          enddo
+       endif
+
+       select case(m)
+       case(DIV_EACH_EDGE)
+          if (boundary) then
+             o = ZERO
+             no = 0
+             js = base
+             jd = js * div + 0
+             co(jd) = cb(js)
+          else
+             o = HALF
+             no = 1
+          endif
+          do js = 0, base - 1
+             do ji = 0, div / 2 - no
+                jd = js * div + ji
+                co(jd) = cb(js) + (real(ji, kind=KTGT) + o) * dxd(js)
+             enddo
+             do ji = div / 2 - no + 1, div - 1
+                jd = js * div + ji
+                co(jd) = cb(js + 1) - (real((div - ji), kind=KTGT) - o) * dxd(js)
+             enddo
+          enddo
+          if (mod(div, 2).eq.no) then
+             do js = 0, base - 1
+                jd = js * div + div / 2
+                co(jd) = cc(js)
+             enddo
+          endif
+       case(DIV_EACH_INCR)
+          if (boundary) then
+             o = ZERO
+             js = base
+             jd = js * div + 0
+             co(jd) = cb(js)
+          else
+             o = HALF
+          endif
+          do js = 0, base - 1
+             do ji = 0, div - 1
+                jd = js * div + ji
+                co(jd) = cb(js) + (real(ji, kind=KTGT) + o) * dxd(js)
+             enddo
+          enddo
+       case(DIV_ACCUMULATE)
+          if (span.ne.ZERO) then
+             ! compute again for compatibility
+             d = dxs / real(div, kind=KTGT)
+             if (boundary) then
+                o = ZERO
+                no = base * div + 1
+             else
+                o = HALF
+                no = base * div
+             endif
+             jd = 0
+             js = 0
+             co(jd) = cb(js) + d * o
+             do jd = 1, no - 1
+                co(jd) = co(jd - 1) + d
+             enddo
+          else
+             ierr = ERR_INVALID_PARAMETER
+          endif
+       case default
+          ierr = ERR_INVALID_SWITCH
+       end select
+    endif
+    if (ierr.eq.0) deallocate(dxd, STAT=ierr)
+  end subroutine div_coordinate_d
 
 !!!_  & array_reverse
   subroutine array_reverse_d &
@@ -948,6 +1096,331 @@ contains
     enddo
     v(1:n) = b(1:n)
   end subroutine array_reverse_d
+
+!!!_ + stereographic projection
+!!!_  - note
+  ! see Snyder(1987) (https://doi.org/10.3133/pp1395)
+!!!_  - proj_pstereog_set - coeff cache for sterographic projection (pole)
+  subroutine proj_pstereog_set_d &
+    & (cco, ecc, a, latts, pole)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: cco(*)
+    real(kind=KTGT),intent(in)  :: ecc, a, latts
+    integer,        intent(in)  :: pole ! north pole == +1, south pole == -1
+    real(kind=KTGT) :: mc, t, lt
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+
+    if (pole.lt.0) then
+       lt = - latts
+       cco(icache_stereog_sign) = - ONE
+    else
+       lt = + latts
+       cco(icache_stereog_sign) = + ONE
+    endif
+    t  = proj_tsfactor(lt, ecc)
+    mc = local_radius(lt, ecc)
+    cco(icache_stereog_co) = a * mc / t
+  end subroutine proj_pstereog_set_d
+!!!_  - proj_pstereog_cachela - lat cache for sterographic projection (pole)
+  subroutine proj_pstereog_cachela_d &
+    & (cla, lat, cco, ecc)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: cla(*)
+    real(kind=KTGT),intent(in)  :: lat
+    real(kind=KTGT),intent(in)  :: cco(*)
+    real(kind=KTGT),intent(in)  :: ecc
+    real(kind=KTGT) :: lt
+
+    lt = lat * cco(icache_stereog_sign)
+    cla(icache_stereog_rho) = cco(icache_stereog_co) * proj_tsfactor(lt, ecc)
+  end subroutine proj_pstereog_cachela_d
+!!!_  - proj_pstereog_cachela - lon cache for sterographic projection (pole)
+  subroutine proj_pstereog_cachelo_d &
+    & (clo, lon, cco, llorg)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: clo(*)
+    real(kind=KTGT),intent(in)  :: lon
+    real(kind=KTGT),intent(in)  :: cco(*)
+    real(kind=KTGT),intent(in)  :: llorg(*)
+    real(kind=KTGT) :: dlo
+    dlo = (lon - llorg(1)) * cco(icache_stereog_sign)
+    clo(icache_stereog_sindlo) = sin(dlo)
+    clo(icache_stereog_cosdlo) = cos(dlo)
+  end subroutine proj_pstereog_cachelo_d
+
+!!!_  & proj_pstereog_once
+  function proj_pstereog_once_d &
+       & (lon, lat, cco, ecc, llorg) result (xy)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: xy(2)
+    real(kind=KTGT),intent(in) :: lon, lat
+    real(kind=KTGT),intent(in) :: cco(*)
+    real(kind=KTGT),intent(in) :: ecc
+    real(kind=KTGT),intent(in) :: llorg(2)
+
+    real(kind=KTGT) :: tlo(ncache_stereog_la)
+    real(kind=KTGT) :: tla(ncache_stereog_lo)
+
+    call proj_pstereog_cachela(tla, lat, cco, ecc)
+    call proj_pstereog_cachelo(tlo, lon, cco, llorg)
+
+    xy(:) = proj_pstereog_core_d(cco, tlo, tla)
+  end function proj_pstereog_once_d
+
+!!!_  & proj_pstereog_core
+  function proj_pstereog_core_d &
+       & (cco, clo, cla) result (xy)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: xy(2)
+    real(kind=KTGT),intent(in) :: cco(*)
+    real(kind=KTGT),intent(in) :: clo(*)
+    real(kind=KTGT),intent(in) :: cla(*)
+
+    xy(1) = + cla(icache_stereog_rho) * clo(icache_stereog_sindlo)
+    xy(2) = - cla(icache_stereog_rho) * clo(icache_stereog_cosdlo)
+    xy(1:2) = xy(1:2) * cco(icache_stereog_sign)
+  end function proj_pstereog_core_d
+
+!!!_  & proj_stereog_npset
+  subroutine proj_stereog_npset_d &
+       & (cc, ecc, a, latts)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: cc
+    real(kind=KTGT),intent(in)  :: ecc, a, latts
+
+    real(kind=KTGT) :: mc, t
+
+    t  = proj_tsfactor(latts, ecc)
+    mc = local_radius(latts, ecc)
+    cc = a * mc / t
+  end subroutine proj_stereog_npset_d
+
+!!!_  & proj_stereog_npfwd
+  function proj_stereog_npfwd_d &
+       & (ll, ecc, cc, llorg) result (xy)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: xy(2)
+    real(kind=KTGT),intent(in) :: ll(2)
+    real(kind=KTGT),intent(in) :: ecc
+    real(kind=KTGT),intent(in) :: llorg(2)
+    real(kind=KTGT),intent(in) :: cc           ! coefficient cache
+
+    real(kind=KTGT) :: lon, lat
+    real(kind=KTGT) :: rho
+    real(kind=KTGT) :: cdl, sdl
+
+    lon = ll(1)
+    lat = ll(2)
+    sdl = sin(lon - llorg(1))
+    cdl = cos(lon - llorg(1))
+    rho = cc * proj_tsfactor(lat, ecc)
+
+    xy(1) = + rho * sdl
+    xy(2) = - rho * cdl
+  end function proj_stereog_npfwd_d
+
+!!!_  & proj_stereog_spset
+  subroutine proj_stereog_spset_d &
+       & (cc, ecc, a, latts)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: cc
+    real(kind=KTGT),intent(in)  :: ecc, a, latts
+
+    real(kind=KTGT) :: mc, t
+
+    t  = proj_tsfactor(-latts, ecc)
+    mc = local_radius(-latts, ecc)
+    cc = a * mc / t
+  end subroutine proj_stereog_spset_d
+
+!!!_  & proj_stereog_spfwd
+  function proj_stereog_spfwd_d &
+       & (ll, ecc, cc, llorg) result (xy)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: xy(2)
+    real(kind=KTGT),intent(in) :: ll(2)
+    real(kind=KTGT),intent(in) :: ecc
+    real(kind=KTGT),intent(in) :: llorg(2)
+    real(kind=KTGT),intent(in) :: cc           ! coefficient cache
+
+    real(kind=KTGT) :: lon, lat
+    real(kind=KTGT) :: rho
+    real(kind=KTGT) :: cdl, sdl
+
+    lon = -ll(1)
+    lat = -ll(2)
+    sdl = sin(lon + llorg(1))
+    cdl = cos(lon + llorg(1))
+    rho = cc * proj_tsfactor(lat, ecc)
+
+    xy(1) = - rho * sdl
+    xy(2) = + rho * cdl
+  end function proj_stereog_spfwd_d
+
+!!!_  & proj_stereog_set
+  subroutine proj_stereog_set_d &
+       & (cc, sinx1, cosx1, llorg, ecc, a, k0)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: cc, sinx1, cosx1
+    real(kind=KTGT),intent(in)  :: llorg(2)
+    real(kind=KTGT),intent(in)  :: ecc, a, k0
+
+    real(kind=KTGT) :: lc, m1
+
+    lc = conformal_latitude(llorg(2), ecc)
+    cosx1 = cos(lc)
+    sinx1 = sin(lc)
+    m1 = local_radius(llorg(2), ecc)
+    cc = 2.0_KTGT * a * k0 * m1
+  end subroutine proj_stereog_set_d
+
+!!!_  & proj_stereog_fwd
+  function proj_stereog_fwd_d &
+       & (ll, ecc, cc, llorg, sinx1, cosx1) result (xy)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: xy(2)
+    real(kind=KTGT),intent(in) :: ll(2)
+    real(kind=KTGT),intent(in) :: ecc
+    real(kind=KTGT),intent(in) :: llorg(2)
+    real(kind=KTGT),intent(in) :: cc           ! coefficient cache == (2 a m1 k)
+    real(kind=KTGT),intent(in) :: sinx1, cosx1
+
+    real(kind=KTGT) :: lon, lat
+    real(kind=KTGT) :: lc, sx, cx, sdl, cdl, AA
+
+    lon = ll(1)
+    lat = ll(2)
+
+    lc = conformal_latitude(lat, ecc)
+    cx = cos(lc)
+    sx = sin(lc)
+    sdl = sin(lon - llorg(1))
+    cdl = cos(lon - llorg(1))
+
+    AA = cc / (cosx1 * (1.0_KTGT + sinx1 * sx + cosx1 * cx * cdl))
+
+    xy(1) = AA * cx * sdl
+    xy(2) = AA * (cosx1 * sx - sinx1 * cx * cdl)
+  end function proj_stereog_fwd_d
+
+!!!_  & proj_stereog_xfwd
+  ELEMENTAL &
+  real(kind=KTGT) function proj_stereog_xfwd_d &
+       & (lon, lat, ecc, lon0, cc, sinx1, cosx1) result (x)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lon, lat
+    real(kind=KTGT),intent(in) :: ecc
+    real(kind=KTGT),intent(in) :: lon0
+    real(kind=KTGT),intent(in) :: cc, sinx1, cosx1
+
+    real(kind=KTGT) :: lc, sx, cx, sdl, cdl, AA
+    lc = conformal_latitude(lat, ecc)
+    cx = cos(lc)
+    sx = sin(lc)
+    sdl = sin(lon - lon0)
+    cdl = cos(lon - lon0)
+
+    AA = cc / (cosx1 * (1.0_KTGT + sinx1 * sx + cosx1 * cx * cdl))
+
+    x = AA * cx * sdl
+  end function proj_stereog_xfwd_d
+!!!_  & proj_stereog_yfwd
+  ELEMENTAL &
+  real(kind=KTGT) function proj_stereog_yfwd_d &
+       & (lon, lat, ecc, lon0, cc, sinx1, cosx1) result (y)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lon, lat
+    real(kind=KTGT),intent(in) :: ecc
+    real(kind=KTGT),intent(in) :: lon0
+    real(kind=KTGT),intent(in) :: cc, sinx1, cosx1
+
+    real(kind=KTGT) :: lc, sx, cx, cdl, AA
+    lc = conformal_latitude(lat, ecc)
+    cx = cos(lc)
+    sx = sin(lc)
+    cdl = cos(lon - lon0)
+
+    AA = cc / (cosx1 * (1.0_KTGT + sinx1 * sx + cosx1 * cx * cdl))
+
+    y = AA * (cosx1 * sx - sinx1 * cx * cdl)
+  end function proj_stereog_yfwd_d
+
+!!!_  & proj_tsfactor()
+  ELEMENTAL &
+  real(kind=KTGT) function proj_tsfactor_d (lat, ecc) result (x)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lat ! in radius
+    real(kind=KTGT),intent(in) :: ecc
+    ! real(kind=KTGT) :: p
+    real(kind=KTGT) :: esl, thl
+    real(kind=KTGT),parameter :: ONE  = 1.0_KTGT
+    real(kind=KTGT),parameter :: HALF = 0.5_KTGT
+
+    ! tan(a-b)    = (tan(a) - tan(b))/(1 + tan(a)tan(b))
+    ! tan(pi/4-b) = (1      - tan(b))/(1 +       tan(b))
+
+    ! p = pi_(lat)
+    esl = ecc * sin(lat)
+    thl = tan(HALF * lat)
+    x = (ONE - thl) / (ONE + thl) &
+         & / (((ONE - esl) / (ONE + esl)) ** (HALF * ecc))
+    ! x = tan(HALF * (HALF * p - lat)) &
+    !      & / (((ONE - esl) / (ONE + esl)) ** (HALF * ecc))
+    return
+  end function proj_tsfactor_d
+
+!!!_  & flatten_to_ecc ()
+  ELEMENTAL &
+  real(kind=KTGT) function flatten_to_ecc_d (f) result (e)
+    use TOUZA_Std,only: KTGT=>KDBL
+    real(kind=KTGT),intent(in) :: f
+    e = sqrt(2.0_KTGT * f - f * f)
+  end function flatten_to_ecc_d
+
+!!!_  & conformal_latitude()
+  ELEMENTAL &
+  real(kind=KTGT) function conformal_latitude_d (lat, ecc) result (x)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lat ! in radius
+    real(kind=KTGT),intent(in) :: ecc
+    real(kind=KTGT) :: p
+    real(kind=KTGT) :: esl
+    real(kind=KTGT),parameter :: TWO  = 2.0_KTGT
+    real(kind=KTGT),parameter :: ONE  = 1.0_KTGT
+    real(kind=KTGT),parameter :: HALF = 0.5_KTGT
+
+    p = pi_(lat)
+    esl = ecc * sin(lat)
+    x = tan(HALF * (HALF * p + lat)) &
+         & * (((ONE - esl) / (ONE + esl)) ** (HALF * ecc))
+    x = TWO * atan(x) - HALF * p
+    return
+  end function conformal_latitude_d
+
+!!!_  & local_radius() - return local radius factor (m)
+  ELEMENTAL &
+  real(kind=KTGT) function local_radius_d(lat, ecc) result (m)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lat ! in radius
+    real(kind=KTGT),intent(in) :: ecc
+    m = cos(lat) / sqrt(1.0_KTGT - (ecc * sin(lat))**2.0_KTGT)
+  end function local_radius_d
 
 !!!_ + private procedures
 !!!_  - is_equidistant - check if the array is equidistant under tolerance
@@ -1135,50 +1608,64 @@ end module TOUZA_Emu_ugg
 !!!_* non-module Procedures
 
 !!!_@ test_emu_usi - test program
-#ifdef TEST_EMU_UGG
+#if TEST_EMU_UGG
 program test_emu_ugg
   use TOUZA_Emu_ugg
   use TOUZA_Std,only: KFLT, KDBL
   use TOUZA_Std,only: KTGT=>KDBL
   use TOUZA_Std,only: arg_init, arg_diag, parse, get_option
+  use TOUZA_Std,only: condop
   implicit none
   integer ierr
-  integer nlat
+  integer nlat(2)
   integer nlon(2)
+  integer stereo
+  integer levv
 
   real(kind=KDBL) :: PI = ATAN2(0.0_KDBL, -1.0_KDBL)
 
   ierr = 0
 101 format(A, ' = ', I0)
 
-  call init(ierr, u=-1, levv=9, stdv=-1)
-  call diag(ierr)
-
   if (ierr.eq.0) call arg_init(ierr)
   if (ierr.eq.0) call parse(ierr)
   if (ierr.eq.0) call arg_diag(ierr)
-  if (ierr.eq.0) call get_option(ierr, nlat, 'lat', -1)
-  if (ierr.eq.0) then
-     if (nlat.lt.0) nlat = 128
-  endif
+
+  ! test arguments
+  !   lat=NUMBER[,DIV]  simple latitude test.   skipped if NUMBER==0.  default=128,1
+  !   lon=NUMBER[,DIV]  simple longitude test.  skipped if NUMBER==0.  default=128,1
+  !   stereo=FLAG       simple north/south polar stereographic projection test,
+
+  if (ierr.eq.0) call get_option(ierr, levv, 'v', 0)
+  if (ierr.eq.0) call init(ierr, u=-1, levv=levv, stdv=-1)
+  if (ierr.eq.0) call diag(ierr)
+
+  if (ierr.eq.0) call get_option(ierr, nlat(:), 'lat', -1)
+  if (ierr.eq.0) nlat(1) = condop((nlat(1).lt.0), 128, nlat(1))
+
   if (ierr.eq.0) call get_option(ierr, nlon(:), 'lon', -1)
-  if (ierr.eq.0) then
-     if (nlon(1).lt.0) nlon(1) = 128
-  endif
+  if (ierr.eq.0) nlon(1) = condop((nlon(1).lt.0), 128, nlon(1))
+
+  if (ierr.eq.0) call get_option(ierr, stereo, 'stereo', 0)
+
+  if (ierr.eq.0) call test_ugg_prec(ierr)
 
   if (ierr.eq.0) then
-     call test_ugg_prec(ierr)
-  endif
-  if (ierr.eq.0) then
-     if (nlat.gt.0) call test_ugg_lat(ierr, nlat)
+     if (nlat(1).gt.0) call test_ugg_lat(ierr, nlat(1), nlat(2))
   endif
   if (ierr.eq.0) then
      if (nlon(1).gt.0) call test_ugg_lon(ierr, nlon(1), nlon(2))
   endif
+
+  if (ierr.eq.0) then
+     if (stereo.ge.0) call batch_test_stereog(ierr, stereo)
+  endif
+
   call finalize(ierr)
   write(*, 101) 'fine', ierr
   stop
 contains
+!!!_ + test_ugg_prec
   subroutine test_ugg_prec(ierr)
     integer,intent(out) :: ierr
     real(kind=KFLT) :: epsf
@@ -1200,13 +1687,18 @@ contains
     write(*, 102) epsf, epsd
     return
   end subroutine test_ugg_prec
-  subroutine test_ugg_lat(ierr, nlat)
+!!!_ + test_ugg_lat
+  subroutine test_ugg_lat(ierr, nlat, mdiv)
     implicit none
     integer,intent(out) :: ierr
     integer,intent(in)  :: nlat
+    integer,intent(in)  :: mdiv
     real(kind=KTGT) :: glat(nlat),  wlat(nlat)
     real(kind=KTGT) :: glat2(nlat), wlat2(nlat)
     real(kind=KTGT) :: glatm(nlat+1)
+
+    real(kind=KTGT) :: ylatc(nlat*mdiv)
+    real(kind=KTGT) :: ylatb(nlat*mdiv+1)
 
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
     real(kind=KTGT),parameter :: ONE =  1.0_KTGT
@@ -1214,6 +1706,7 @@ contains
 
     real(kind=KTGT) :: span = ZERO
     real(kind=KTGT) :: wnml = ONE
+    integer deq
 
     integer j
     integer method
@@ -1230,7 +1723,7 @@ contains
     if (ierr.eq.0) call gauss_latitude(ierr, glat2, wlat2, nlat, span, wnml, prec=-1.0_KTGT)
     if (ierr.eq.0) glat2(1:nlat) = asin(glat2(1:nlat))
 
-201 format('lat:', I0, 1x, F9.3, 1x, 2E24.16, 2x, 2E24.16, 1x, L1, 1x, E9.3, 1x, 2E16.8)
+201 format('lat:', I0, 1x, F9.3, 1x, 2E10.3, 2x, 2E10.3, 1x, L1, 1x, E10.3, 1x, 2E10.3)
 202 format('latm:', I0, 1x, F9.3, 1x, E16.8)
     if (ierr.eq.0) then
        do j = 1, nlat
@@ -1243,7 +1736,35 @@ contains
           write(*, 202) j, glatm(j) * 180.0_KTGT / PI, glatm(j)
        enddo
     endif
+
+    if (mdiv.gt.0) then
+       deq = 0
+       if (ANY(method.eq.(/LAT_LINEAR, LAT_LINEAR_COMPATIBLE/))) deq = 1
+       if (deq.eq.0) then
+          if (ierr.eq.0)then
+             call div_latitude(ierr, ylatc, mdiv, .FALSE., glat, glatm, nlat, method=method)
+          endif
+          if (ierr.eq.0)then
+             call div_latitude(ierr, ylatb, mdiv, .TRUE., glat, glatm, nlat, method=method)
+          endif
+       else
+          if (ierr.eq.0)then
+             call div_latitude(ierr, ylatc, mdiv, .FALSE., glat, glatm, nlat, span=span, method=method)
+          endif
+          if (ierr.eq.0)then
+             call div_latitude(ierr, ylatb, mdiv, .TRUE., glat, glatm, nlat, span=span, method=method)
+          endif
+       endif
+       if (ierr.eq.0) then
+203 format('laty:', I0, 1x, F9.3, 1x, F9.3)
+          do j = 1, nlat * mdiv
+             write(*, 203) j, rad2deg(ylatc(j)), rad2deg(ylatb(j))
+          enddo
+       endif
+    endif
+
   end subroutine test_ugg_lat
+!!!_ + test_ugg_lon
   subroutine test_ugg_lon(ierr, nlon, mdiv)
     implicit none
     integer,intent(out) :: ierr
@@ -1351,6 +1872,79 @@ contains
 101 format('equidistant:', A, ': ', L1, 1x, E10.3)
     write(*, 101) trim(tag), b, e
   end subroutine test_equidistant
+
+!!!_ + batch_test_stereog
+  subroutine batch_test_stereog(ierr, test)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: test
+    real(kind=KTGT) :: a, e, latts, lon0
+
+    ierr = 0
+    if (test.lt.0) return ! dummy procedure
+
+    a = 6378388.0_KTGT
+    e = 0.0819919_KTGT
+    latts = -71.0_KTGT
+    lon0  = -100.0_KTGT
+    call test_stereog_single(ierr, a, e, latts, lon0, (/150.0_KTGT, -75.0_KTGT/))
+    latts = +71.0_KTGT
+    lon0  = +100.0_KTGT
+    call test_stereog_single(ierr, a, e, latts, lon0, (/-150.0_KTGT, +75.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/-150.0_KTGT, -75.0_KTGT/))
+
+    a = 6378137.0_KTGT
+    e = flatten_to_ecc(1.0_KTGT/298.257223563_KTGT)
+    ! latts = 0.0_KTGT
+    latts = +70.0_KTGT
+    lon0  = -45.0_KTGT
+    call test_stereog_single(ierr, a, e, latts, lon0, (/-55.7362542291_KTGT, 59.0479222286_KTGT/))
+  end subroutine batch_test_stereog
+
+  subroutine test_stereog_single(ierr, a, e, latts, lon0, ll)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    real(kind=KTGT),intent(in) :: a, e, latts, lon0
+    real(kind=KTGT),intent(in) :: ll(2)
+    real(kind=KTGT) :: cc
+    real(kind=KTGT) :: rr(2), rts, llorg(2)
+    real(kind=KTGT) :: xx(2), xxo(2), xxc(2)
+    real(kind=KTGT) :: cco(2), clo(2), cla(2)
+    integer pole
+    ierr = 0
+    rts = deg2rad(latts)
+    rr(1:2) = deg2rad(ll(1:2))
+    if (latts.ge.0.0_KTGT) then
+       llorg(1:2) = deg2rad((/lon0, 90.0_KTGT/))
+       call proj_stereog_npset(cc, e, a,  rts)
+       xx = proj_stereog_npfwd(rr, e, cc, llorg)
+    else
+       llorg(1:2) = deg2rad((/lon0, -90.0_KTGT/))
+       call proj_stereog_spset(cc, e, a,  rts)
+       xx = proj_stereog_spfwd(rr, e, cc, llorg)
+    endif
+101 format('stereog[', 2F9.1, '] ', '(', 2E16.8, ') >> (', 2E16.8, ')')
+102 format('  pstereog[', A, '] ', L1, 1x, ' >> (', 2E16.8, ')')
+    write(*, 101) lon0, latts, ll, xx
+    ! test cache once
+    if (latts.ge.0.0_KTGT) then
+       pole = +1
+    else
+       pole = -1
+    endif
+    call proj_pstereog_set(cco, e, a, rts, pole)
+    ! write(*, *) cc.eq.cco(1), cc, cco
+    xxo = proj_pstereog(rr(1), rr(2), cco, e, llorg)
+    write(*, 102) 'once', ALL(xxo(:).eq.xx(:)), xxo
+    ! test cache core
+    call proj_pstereog_cachela(cla, rr(2), cco, e)
+    call proj_pstereog_cachelo(clo, rr(1), cco, llorg)
+    xxc = proj_pstereog(cco, clo, cla)
+    write(*, 102) 'cache', ALL(xxc(:).eq.xx(:)), xxc
+
+  end subroutine test_stereog_single
 
 end program test_emu_ugg
 
