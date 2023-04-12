@@ -1,7 +1,7 @@
 # touza/ami Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 2 2022
-# Time-stamp: <2023/04/03 14:59:54 fuyuki Makefile.am>
+# Time-stamp: <2023/04/11 22:12:20 fuyuki Makefile.am>
 
 # Copyright (C) 2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -31,16 +31,16 @@ EXTRA_libtouza_local_la_SOURCES = ami_miroc.F90
 
 TEST_COMMON_LIBS =  $(noinst_LTLIBRARIES)
 TEST_COMMON_LIBS += $(FC_LDADD_touza_nio) $(FC_LDADD_touza_trp)
+TEST_COMMON_LIBS += $(FC_LDADD_touza_emu)
 TEST_COMMON_LIBS += $(FC_LDADD_touza_std)
-# TEST_COMMON_LIBS  += $(FC_LDADD_touza_emu)
 
 if with_nctcdf
 TEST_COMMON_LIBS += $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 endif
 
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_nio)
+AM_FCFLAGS_MODULE += $(FC_MODULE_touza_emu)
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_std)
-# AM_FCFLAGS += $(FC_MODULE_touza_emu)
 
 check_PROGRAMS = test_ami_table
 test_ami_table_SOURCES  = $(TEST_COMMON_SOURCES) ami_table.F90
