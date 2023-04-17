@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:59:15 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/17 14:27:50 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2023
@@ -18,7 +18,7 @@
 #include "touza_std.h"
 !!!_! Macros
 #ifndef   ARG_ENTRY_LIM
-#  define ARG_ENTRY_LIM 128 /* entry limit */
+#  define ARG_ENTRY_LIM 512 /* entry limit */
 #endif
 #ifndef   ARG_TAG_LEN
 #  define ARG_TAG_LEN 32    /* tag length */
