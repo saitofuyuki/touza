@@ -1,6 +1,6 @@
 !!!_! jmz/chak_reg.F90 - TOUZA/Jmz CH(swiss) army knife operator registration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-04-17T15:57:15+09:00
+! Created by genopr.sh at 2023-05-19T08:59:13+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -117,6 +117,7 @@
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_TAN, str_TAN, 1, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_ASIN, str_ASIN, 1, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_ACOS, str_ACOS, 1, 1, ilev=ilev_call)
+    if (ierr.eq.0) call reg_opr_prop(ierr, opr_ATAN, str_ATAN, 1, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_ATAN2, str_ATAN2, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_SINH, str_SINH, 1, 1, ilev=ilev_call)
     if (ierr.eq.0) call reg_opr_prop(ierr, opr_COSH, str_COSH, 1, 1, ilev=ilev_call)

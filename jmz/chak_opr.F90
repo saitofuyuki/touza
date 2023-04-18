@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/28 12:00:15 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/19 09:00:46 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -143,22 +143,21 @@ contains
   end subroutine reg_opr_prop
 !!!_   . reg_fake_opr
   subroutine reg_fake_opr &
-       & (ierr, handle, str)
+       & (entr, handle, str)
     use TOUZA_Std,only: query_entry
     implicit none
-    integer,         intent(out) :: ierr
+    integer,         intent(out) :: entr
     integer,         intent(in)  :: handle
     character(len=*),intent(in)  :: str
-    integer entr, ho
-    ierr = 0
+    integer ho, jerr
     entr = query_entry(htopr, str)
     if (entr.ge.0) then
        ho = query_opr_handle_e(entr)
        if (ho.eq.handle) then
           continue
        else
-          ierr = ERR_DUPLICATE_SET
-          call message(ierr, 'duplicate registration ' // trim(str))
+          entr = ERR_DUPLICATE_SET
+          call message(entr, 'duplicate registration ' // trim(str))
        endif
     else
        entr = reg_opr_core(str, handle)
@@ -254,9 +253,9 @@ contains
        & (ierr, str, handle)
     use TOUZA_Std,only: query_key
     implicit none
-    integer,         intent(out)         :: ierr
-    character(len=*),intent(out)         :: str
-    integer,         intent(in)          :: handle
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: str
+    integer,         intent(in)  :: handle
     if (handle.lt.0.or.handle.ge.mopr) then
        ierr = ERR_INVALID_ITEM
        call message(ierr, 'invalid operator handle', (/handle/))
@@ -264,6 +263,16 @@ contains
     endif
     call query_key(ierr, htopr, oprop(handle)%entr, str)
   end subroutine query_opr_name
+!!!_   . query_opr_name_e - query operator name by entry
+  subroutine query_opr_name_e &
+       & (ierr, str, entr)
+    use TOUZA_Std,only: query_key
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: str
+    integer,         intent(in)  :: entr
+    call query_key(ierr, htopr, entr, str)
+  end subroutine query_opr_name_e
 !!!_   . query_opr_handle_n - query operator handle by name
   integer function query_opr_handle_n &
        & (name) &
@@ -728,6 +737,26 @@ contains
        endif
     enddo
   end subroutine apply_UNARY_ACOS
+!!!_   . apply_UNARY_ATAN
+  subroutine apply_UNARY_ATAN &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_ATAN(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_ATAN
 !!!_   . apply_UNARY_SINH
   subroutine apply_UNARY_SINH &
        & (ierr, Z, domZ, X, domX, F)
@@ -2253,6 +2282,18 @@ contains
        Z = ACOS(X)
     endif
   end function elem_ACOS
+!!!_   & elem_ATAN()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_ATAN (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = ATAN(X)
+    endif
+  end function elem_ATAN
 !!!_   & elem_SINH ()
   ELEMENTAL &
   real(kind=KBUF) function elem_SINH (X, F) result(Z)

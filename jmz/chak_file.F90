@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz CH(swiss) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/04/09 20:02:49 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/24 07:15:17 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -115,14 +115,17 @@ module chak_file
      integer                :: hflag = hflag_unset ! header parser flag
      type(rgroup_t),pointer :: rgrp(:) => NULL()
      integer                :: bigg
+     integer                :: opr       ! fake entry as operator
   end type file_t
 !!!_ + Procedures
 contains
 !!!_  - init
   subroutine init(ierr)
+    use TOUZA_Std_env,only: init_file_bodr
     implicit none
     integer,intent(out) :: ierr
     ierr = 0
+    call init_file_bodr(ierr)
   end subroutine init
 
 !!!_  - reset_file
@@ -149,6 +152,7 @@ contains
     file%mode  = choice(mode_unset, mode)
     file%hflag = choice(hflag_unset, flag)
     file%bigg  = choice(bigg_on, bigg)
+    file%opr = -1
     ! file%bh = -1
 
     if (present(name)) then

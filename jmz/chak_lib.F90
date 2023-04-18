@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/04/17 14:30:06 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/17 21:27:22 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -147,7 +147,7 @@ module chak_lib
   integer,parameter :: cmode_intersect = 2
   integer,parameter :: cmode_first     = 3
 
-  integer,parameter :: cmode_compromize = 3  ! mask
+  integer,parameter :: cmode_compromise = 3  ! mask
 
   integer,parameter :: cmode_xundef     = 4  ! exclude undefined at flushing
   integer,parameter :: cmode_column     = 8  ! columned

@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/04/17 15:53:43 fuyuki genopr.sh>
+# Time-stamp: <2023/05/19 08:57:49 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -184,6 +184,7 @@ register_all ()
   register -g float -n 1,1 -i call TAN      'tan(A)'
   register -g float -n 1,1 -i call ASIN     'arcsin(A)'
   register -g float -n 1,1 -i call ACOS     'arccos(A)'
+  register -g float -n 1,1 -i call ATAN     'arctan(A)'
   register -g float -n 2,1 -i call ATAN2    'arctan(A/B)'
   register -g float -n 1,1 -i call SINH     'sinh(A)'
   register -g float -n 1,1 -i call COSH     'cosh(A)'

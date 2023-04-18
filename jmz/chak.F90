@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/04/17 14:31:02 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/19 08:59:54 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -888,6 +888,7 @@ contains
     integer jf
     integer nbufs
     character(len=lname) :: bname, fname
+    integer oentr
     integer jerr
 
     ierr = 0
@@ -911,14 +912,11 @@ contains
           if (ierr.eq.0) then
              jb = buf_h2item(hbuf)
              obuffer(jb)%stt = stt_locked
-             ! ofile(jf)%bh = hbuf
              ! fake operator for file handle
              write(bname, bfmt_write_buf, IOSTAT=jerr) user_index_bgn(wcount)
-             if (ierr.eq.0) then
-                ! obuffer(jb)%name = bname
-                ! call reg_fake_opr(ierr, hbuf, bname)
-                call reg_fake_opr(ierr, hfile, bname)
-             endif
+             if (ierr.eq.0) call reg_fake_opr(oentr, hfile, bname)
+             if (ierr.eq.0) ofile(jf)%opr = oentr
+             ierr = min(0, oentr)
           endif
           if (ierr.eq.0) wcount = wcount + 1
        else
@@ -932,7 +930,8 @@ contains
              ofile(jf)%mode = mode_read
              ofile(jf)%bigg = ofile(def_read)%bigg
              ofile(jf)%rgrp => ofile(def_read)%rgrp
-             call alloc_file_buffers(ierr, nbufs, rcount-1, 0)
+             call alloc_file_buffers(ierr, oentr, nbufs, rcount-1, 0)
+             if (ierr.eq.0) ofile(jf)%opr = oentr
           endif
           if (ierr.eq.0) then
              call append_queue_stack(ierr, hfile, 0, nbufs)
@@ -942,9 +941,10 @@ contains
   end subroutine parse_arg_file
 
 !!!_   . alloc_file_buffers
-  subroutine alloc_file_buffers(ierr, nbufs, jtag, jsub)
+  subroutine alloc_file_buffers(ierr, entr, nbufs, jtag, jsub)
     implicit none
     integer,intent(out) :: ierr
+    integer,intent(out) :: entr
     integer,intent(in)  :: nbufs
     integer,intent(in)  :: jtag
     integer,intent(in)  :: jsub
@@ -953,6 +953,7 @@ contains
     integer jerr
 
     ierr = 0
+    entr = -1
     do jj = 0, nbufs - 1
        if (ierr.eq.0) then
           if (nbufs.le.1.and.jsub.lt.1) then
@@ -967,7 +968,8 @@ contains
           obuffer(jb)%stt = stt_locked
        endif
        if (ierr.eq.0) call push_stack(ierr, hbuf)
-       if (ierr.eq.0) call reg_fake_opr(ierr, hbuf, tag)
+       if (ierr.eq.0) call reg_fake_opr(entr, hbuf, tag)
+       ierr = min(0, entr)
     enddo
   end subroutine alloc_file_buffers
 
@@ -1271,6 +1273,7 @@ contains
     integer hbuf, jb
     integer ci
     real(kind=KBUF) :: undef
+    integer oentr
 
     ierr = 0
     call pop_stack(ierr, hbuf, .TRUE.)
@@ -1285,7 +1288,8 @@ contains
           if (jpar.lt.jend) then
              obuffer(jb)%name = arg(jpar:jend-1)
              obuffer(jb)%stt  = stt_locked
-             call reg_fake_opr(ierr, hbuf, obuffer(jb)%name)
+             call reg_fake_opr(oentr, hbuf, obuffer(jb)%name)
+             ierr = min(0, ierr)
           endif
        case(opr_PERM,opr_SIZE)
           call parse_buffer_shape(ierr, arg(jpar:), hopr)
@@ -1484,6 +1488,7 @@ contains
     integer jitem
     integer nbufs
     integer push
+    integer oentr
     real(kind=KBUF) :: undef
 
     ierr = 0
@@ -1534,7 +1539,7 @@ contains
              if (ierr.eq.0) call parse_rec_filter(ierr, nbufs, ofile(jfr), arg(jpar:))
              ! write(*, *) 'stack/1', push, nbufs
              if (jfr.gt.def_read) then
-                if (ierr.eq.0) call alloc_file_buffers(ierr, nbufs, rcount-1, push)
+                if (ierr.eq.0) call alloc_file_buffers(ierr, oentr, nbufs, rcount-1, push)
                 if (ierr.eq.0) call modify_queue_stack(ierr, push=push+nbufs)
              endif
           else
@@ -2801,7 +2806,12 @@ contains
           acc = 'unknown'
        end select
 201    format('file:', A, 1x, A, '[', A, ']')
-       write(str, 201, IOSTAT=jerr) trim(acc), trim(ofile(jfile)%name), trim(rtmp)
+       call query_opr_name_e(jerr, btmp, ofile(jfile)%opr)
+       if (jerr.eq.0) then
+          write(str, 201, IOSTAT=jerr) trim(acc), trim(btmp), trim(rtmp)
+       else
+          write(str, 201, IOSTAT=jerr) trim(acc), trim(ofile(jfile)%name), trim(rtmp)
+       endif
        if (push.gt.0) then
           if (ierr.eq.0) call get_obj_list(ierr, btmp, aq%lefts, push)
           if (ierr.eq.0) str = trim(str) // ' > ' // trim(btmp)
@@ -3156,6 +3166,7 @@ contains
     integer m
     character(len=lname) :: bname
     integer jerr
+    integer oentr
 
     ierr = 0
     call new_buffer(ierr, handle)
@@ -3165,7 +3176,8 @@ contains
        call alloc_buffer_t(ierr, obuffer(jb), m)
        if (ierr.eq.0) then
           if (present(name)) then
-             call reg_fake_opr(ierr, handle, name)
+             call reg_fake_opr(oentr, handle, name)
+             ierr = min(0, oentr)
              if (ierr.eq.0) obuffer(jb)%name = name
           else
 101          format('L', I0)
@@ -4216,6 +4228,8 @@ contains
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_ASIN)
        else if (handle.eq.opr_ACOS) then
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_ACOS)
+       else if (handle.eq.opr_ATAN) then
+          call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_ATAN)
        else if (handle.eq.opr_ATAN2) then
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_ATAN2)
        else if (handle.eq.opr_SINH) then
@@ -4311,7 +4325,7 @@ contains
        endif
     enddo
 
-    select case(IAND(cmode, cmode_compromize))
+    select case(IAND(cmode, cmode_compromise))
     case (cmode_null)
        if (IAND(cmode, cmode_column).eq.0) then
           call flush_buffer_each(ierr, nbuf, bufh, bufj, pstk, cmode, u)
@@ -4742,7 +4756,7 @@ contains
     utmp = choice(ulog, u)
 
     skip_undef = IAND(cmode, cmode_xundef).ne.0
-    ccomp = IAND(cmode, cmode_compromize)
+    ccomp = IAND(cmode, cmode_compromise)
 
     if (ierr.eq.0) call get_compromise_domain(ierr, doml, domr, bufh, pstk, nbuf, ccomp, htmp)
 
@@ -4883,7 +4897,7 @@ contains
     utmp = choice(ulog, u)
 
     skip_undef = IAND(cmode, cmode_xundef).ne.0
-    ccomp = IAND(cmode, cmode_compromize)
+    ccomp = IAND(cmode, cmode_compromise)
     cline = 0
     ncolv = -1
 
@@ -5845,9 +5859,9 @@ contains
     endif
 
     if (is_msglev_DEBUG(lev_verbose)) then
-       if (ierr.eq.0) call show_domain(ierr, domL, 'compromise/L', indent=4)
+       if (ierr.eq.0) call show_domain(ierr, domL, 'compromise/L', indent=6)
        do j = 0, nbuf - 1
-          if (ierr.eq.0) call show_domain(ierr, domR(j), 'compromise/R', indent=4)
+          if (ierr.eq.0) call show_domain(ierr, domR(j), 'compromise/R', indent=6)
        enddo
     endif
   end subroutine get_compromise_domain
