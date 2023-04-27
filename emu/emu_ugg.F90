@@ -1,7 +1,7 @@
-!!!_! emu_ugg.F90 - touza/emu geographic geometry
+!!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2023/04/15 21:25:07 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/19 08:53:04 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -10,6 +10,7 @@
 ! Licensed under the Apache License, Version 2.0
 !   (https://www.apache.org/licenses/LICENSE-2.0)
 !
+!!!_* Macros
 #ifdef HAVE_CONFIG_H
 #  include "touza_config.h"
 #endif
@@ -18,11 +19,32 @@
 #ifndef TEST_EMU_UGG
 #define TEST_EMU_UGG 0
 #endif  TEST_EMU_UGG 0
+!!!_ + hypot
+#ifndef   OPT_UGG_HYPOT_INTRINSIC
+#  define OPT_UGG_HYPOT_INTRINSIC 1
+#endif
+#if   OPT_UGG_HYPOT_INTRINSIC
+#  if HAVE_FORTRAN_HYPOT
+#  else
+#    warning "intrinsic hypot not avaiable"
+#    undef  OPT_UGG_HYPOT_INTRINSIC
+#    define OPT_UGG_HYPOT_INTRINSIC 0
+#  endif
+#endif
+#if   OPT_UGG_HYPOT_INTRINSIC
+#  define _hypot HYPOT
+#else
+#  define _hypot ipc_HYPOT
+#endif
+#ifndef   OPT_PSGINV_ITER_LIMIT
+#  define OPT_PSGINV_ITER_LIMIT 30
+#endif
 !!!_@ TOUZA_Emu_ugg - Geometry procedures
 module TOUZA_Emu_ugg
 !!!_ = declaration
 !!!_  - modules
   use TOUZA_Std,only: get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Std,only: ipc_HYPOT
 !!!_  - default
   implicit none
   private
@@ -38,15 +60,24 @@ module TOUZA_Emu_ugg
 
 !!!_ + cache size and index
   integer,parameter,public :: ncache_stereog_lo = 2
-  integer,parameter,public :: ncache_stereog_la = 1
-  integer,parameter,public :: ncache_stereog_co = 2
+  integer,parameter,public :: ncache_stereog_la = 2
+  integer,parameter,public :: ncache_stereog_co = 6
 
   integer,parameter :: icache_stereog_sindlo = 1
   integer,parameter :: icache_stereog_cosdlo = 2
-  integer,parameter :: icache_stereog_rho    = 1
-  integer,parameter :: icache_stereog_co     = 1
-  integer,parameter :: icache_stereog_sign   = 2
 
+  integer,parameter :: icache_stereog_xrho   = 1
+  integer,parameter :: icache_stereog_yrho   = 2
+
+  integer,parameter :: icache_stereog_xco    = 1
+  integer,parameter :: icache_stereog_yco    = 2
+  integer,parameter :: icache_stereog_sign   = 3
+  integer,parameter :: icache_stereog_ecc    = 4
+  integer,parameter :: icache_stereog_olon   = 5
+  integer,parameter :: icache_stereog_tcf    = 6
+  integer,parameter :: icache_stereog_tol    = 7
+
+  integer,parameter :: lim_psginv = OPT_PSGINV_ITER_LIMIT
 !!!_  - static
 !!!_  - private static
   integer,save :: init_mode = 0
@@ -160,6 +191,9 @@ module TOUZA_Emu_ugg
   interface proj_pstereog_cachela
      module procedure proj_pstereog_cachela_d
   end interface proj_pstereog_cachela
+  interface proj_pstereog_inv
+     module procedure proj_pstereog_inv_d
+  end interface proj_pstereog_inv
 
   interface pi_
      module procedure pi_d
@@ -174,6 +208,63 @@ module TOUZA_Emu_ugg
   interface rad2deg
      module procedure rad2deg_d
   end interface rad2deg
+
+  interface reduced_lat_tan
+     module procedure reduced_lat_tan_d
+  end interface reduced_lat_tan
+  interface reduced_lat
+     module procedure reduced_lat_d
+  end interface reduced_lat
+  interface aux_dspherical_lon_cos
+     module procedure aux_dspherical_lon_cos_d
+  end interface aux_dspherical_lon_cos
+  interface aux_dspherical_lon
+     module procedure aux_dspherical_lon_d
+  end interface aux_dspherical_lon
+  interface aux_arcl_eetri_trig
+     module procedure aux_arcl_eetri_trig_d
+  end interface aux_arcl_eetri_trig
+  interface aux_arcl_eetri
+     module procedure aux_arcl_eetri_d
+  end interface aux_arcl_eetri
+  interface aux_azimuth1_etri_trig
+     module procedure aux_azimuth1_etri_trig_d
+  end interface aux_azimuth1_etri_trig
+  interface aux_azimuth1_etri
+     module procedure aux_azimuth1_etri_d
+  end interface aux_azimuth1_etri
+
+  interface azimuth0_eetri_trig
+     module procedure azimuth0_eetri_trig_d
+  end interface azimuth0_eetri_trig
+  interface azimuth0_eetri
+     module procedure azimuth0_eetri_d
+  end interface azimuth0_eetri
+  interface arcl_eetri_trig
+     module procedure arcl_eetri_trig_d
+  end interface arcl_eetri_trig
+  interface arcl_eetri
+     module procedure arcl_eetri_d
+  end interface arcl_eetri
+  interface sphlon_eetri_trig
+     module procedure sphlon_eetri_trig_d
+  end interface sphlon_eetri_trig
+  interface sphlon_eetri
+     module procedure sphlon_eetri_d
+  end interface sphlon_eetri
+  interface azimuth2cos_eetri_trig
+     module procedure azimuth2cos_eetri_trig_d
+  end interface azimuth2cos_eetri_trig
+  interface azimuth2cos_eetri
+     module procedure azimuth2cos_eetri_d
+  end interface azimuth2cos_eetri
+  interface expparam_trig
+     module procedure expparam_trig_d
+  end interface expparam_trig
+  interface expparam
+     module procedure expparam_d
+  end interface expparam
+
 !!!_  - public
   public init, diag, finalize
   public get_longitude, mid_longitude,  div_longitude
@@ -189,6 +280,16 @@ module TOUZA_Emu_ugg
   public proj_stereog_spset, proj_stereog_spfwd
   public proj_stereog_xfwd,  proj_stereog_yfwd
   public proj_pstereog, proj_pstereog_set, proj_pstereog_cachelo, proj_pstereog_cachela
+  public proj_pstereog_inv
+  public reduced_lat, reduced_lat_tan
+  public aux_dspherical_lon, aux_dspherical_lon_cos
+  public aux_arcl_eetri, aux_arcl_eetri_trig
+  public aux_azimuth1_etri,  aux_azimuth1_etri_trig
+  public azimuth0_eetri, azimuth0_eetri_trig
+  public arcl_eetri, arcl_eetri_trig
+  public sphlon_eetri, sphlon_eetri_trig
+  public azimuth2cos_eetri, azimuth2cos_eetri_trig
+  public expparam, expparam_trig
 
 contains
 !!!_ + common interfaces
@@ -1097,19 +1198,23 @@ contains
     v(1:n) = b(1:n)
   end subroutine array_reverse_d
 
-!!!_ + stereographic projection
+!!!_ + polar stereographic projection
 !!!_  - note
   ! see Snyder(1987) (https://doi.org/10.3133/pp1395)
 !!!_  - proj_pstereog_set - coeff cache for sterographic projection (pole)
   subroutine proj_pstereog_set_d &
-    & (cco, ecc, a, latts, pole)
-    use TOUZA_Std,only: KTGT=>KDBL
+    & (cco, ecc, a, latts, lonorg, pole, xs, ys, tol)
+    use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
-    real(kind=KTGT),intent(out) :: cco(*)
-    real(kind=KTGT),intent(in)  :: ecc, a, latts
-    integer,        intent(in)  :: pole ! north pole == +1, south pole == -1
-    real(kind=KTGT) :: mc, t, lt
-    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+    real(kind=KTGT),intent(out)         :: cco(*)
+    real(kind=KTGT),intent(in)          :: ecc, a, latts
+    real(kind=KTGT),intent(in)          :: lonorg
+    integer,        intent(in)          :: pole    ! north pole == +1, south pole == -1
+    real(kind=KTGT),intent(in),optional :: xs, ys  ! scale for x,y (default == 1)
+    real(kind=KTGT),intent(in),optional :: tol
+
+    real(kind=KTGT) :: mc, tc, lt, c, s
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT, ZERO=0.0_KTGT
 
     if (pole.lt.0) then
        lt = - latts
@@ -1118,74 +1223,126 @@ contains
        lt = + latts
        cco(icache_stereog_sign) = + ONE
     endif
-    t  = proj_tsfactor(lt, ecc)
+    tc = proj_tsfactor(lt, ecc)
     mc = local_radius(lt, ecc)
-    cco(icache_stereog_co) = a * mc / t
+
+    c = a * mc / tc
+    s = choice(ONE, xs)
+    if (s.le.ZERO) s = ONE
+    cco(icache_stereog_xco)  = c / s
+    s = choice(ONE, ys)
+    if (s.le.ZERO) s = ONE
+    cco(icache_stereog_yco)  = c / s
+
+    cco(icache_stereog_ecc)  = ecc
+    cco(icache_stereog_olon) = lonorg
+
+    ! for inversion
+    cco(icache_stereog_tcf) = tc / (a * mc)
+    cco(icache_stereog_tol) = choice(1.0_KTGT, tol)
   end subroutine proj_pstereog_set_d
 !!!_  - proj_pstereog_cachela - lat cache for sterographic projection (pole)
   subroutine proj_pstereog_cachela_d &
-    & (cla, lat, cco, ecc)
+    & (cla, lat, cco)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(out) :: cla(*)
     real(kind=KTGT),intent(in)  :: lat
     real(kind=KTGT),intent(in)  :: cco(*)
-    real(kind=KTGT),intent(in)  :: ecc
+    real(kind=KTGT) :: ecc, es
     real(kind=KTGT) :: lt
 
+    ecc = cco(icache_stereog_ecc)
     lt = lat * cco(icache_stereog_sign)
-    cla(icache_stereog_rho) = cco(icache_stereog_co) * proj_tsfactor(lt, ecc)
+    es = proj_tsfactor(lt, ecc) * cco(icache_stereog_sign)
+    cla(icache_stereog_xrho) = cco(icache_stereog_xco) * es
+    cla(icache_stereog_yrho) = cco(icache_stereog_yco) * es
   end subroutine proj_pstereog_cachela_d
-!!!_  - proj_pstereog_cachela - lon cache for sterographic projection (pole)
+!!!_  - proj_pstereog_cachelo - lon cache for sterographic projection (pole)
   subroutine proj_pstereog_cachelo_d &
-    & (clo, lon, cco, llorg)
+    & (clo, lon, cco)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(out) :: clo(*)
     real(kind=KTGT),intent(in)  :: lon
     real(kind=KTGT),intent(in)  :: cco(*)
-    real(kind=KTGT),intent(in)  :: llorg(*)
+
+    real(kind=KTGT) :: lonorg
     real(kind=KTGT) :: dlo
-    dlo = (lon - llorg(1)) * cco(icache_stereog_sign)
+    lonorg = cco(icache_stereog_olon)
+    dlo = (lon - lonorg) * cco(icache_stereog_sign)
     clo(icache_stereog_sindlo) = sin(dlo)
     clo(icache_stereog_cosdlo) = cos(dlo)
   end subroutine proj_pstereog_cachelo_d
 
 !!!_  & proj_pstereog_once
   function proj_pstereog_once_d &
-       & (lon, lat, cco, ecc, llorg) result (xy)
+       & (lon, lat, cco) result (xy)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT) :: xy(2)
     real(kind=KTGT),intent(in) :: lon, lat
     real(kind=KTGT),intent(in) :: cco(*)
-    real(kind=KTGT),intent(in) :: ecc
-    real(kind=KTGT),intent(in) :: llorg(2)
-
     real(kind=KTGT) :: tlo(ncache_stereog_la)
     real(kind=KTGT) :: tla(ncache_stereog_lo)
 
-    call proj_pstereog_cachela(tla, lat, cco, ecc)
-    call proj_pstereog_cachelo(tlo, lon, cco, llorg)
+    call proj_pstereog_cachela(tla, lat, cco)
+    call proj_pstereog_cachelo(tlo, lon, cco)
 
-    xy(:) = proj_pstereog_core_d(cco, tlo, tla)
+    xy(:) = proj_pstereog_core_d(tlo, tla)
   end function proj_pstereog_once_d
 
 !!!_  & proj_pstereog_core
   function proj_pstereog_core_d &
-       & (cco, clo, cla) result (xy)
+       & (clo, cla) result (xy)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT) :: xy(2)
-    real(kind=KTGT),intent(in) :: cco(*)
     real(kind=KTGT),intent(in) :: clo(*)
     real(kind=KTGT),intent(in) :: cla(*)
 
-    xy(1) = + cla(icache_stereog_rho) * clo(icache_stereog_sindlo)
-    xy(2) = - cla(icache_stereog_rho) * clo(icache_stereog_cosdlo)
-    xy(1:2) = xy(1:2) * cco(icache_stereog_sign)
+    xy(1) = + cla(icache_stereog_xrho) * clo(icache_stereog_sindlo)
+    xy(2) = - cla(icache_stereog_yrho) * clo(icache_stereog_cosdlo)
+    ! xy(1:2) = xy(1:2) * cco(icache_stereog_sign)
   end function proj_pstereog_core_d
 
+!!!_  & proj_pstereog_inv
+  function proj_pstereog_inv_d &
+       & (x, y, cco) result(ll)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: ll(2)
+    real(kind=KTGT),intent(in) :: x, y
+    real(kind=KTGT),intent(in) :: cco(*)
+    real(kind=KTGT) :: rho, t, e,   he, lo,  la
+    real(kind=KTGT) :: HPI, z, esl, p,  tol, s
+    integer j
+
+    HPI = pi_(0.0_KTGT) * 0.5_KTGT
+    e   = cco(icache_stereog_ecc)
+    tol = cco(icache_stereog_tol)
+    s   = cco(icache_stereog_sign)
+    he = e * 0.5_KTGT
+
+    rho = _hypot(x, y)
+    t = cco(icache_stereog_tcf) * rho
+    p = t
+    la = hpi - 2.0_KTGT * atan(p)
+
+    do j = 0, lim_psginv
+       esl = e * sin(p)
+       z = ((1.0_KTGT - esl) / (1.0_KTGT + esl)) ** he
+       la = hpi - 2.0_KTGT * atan(t * z)
+       if (abs(p-la).le.spacing(la) * tol) exit
+       p = la
+    enddo
+    ll(2) = la * s
+
+    lo = s * cco(icache_stereog_olon) + atan2(x * s, - y * s)
+    ll(1) = lo * s
+  end function proj_pstereog_inv_d
+
+!!!_ + stereographic projection (reserved)
 !!!_  & proj_stereog_npset
   subroutine proj_stereog_npset_d &
        & (cc, ecc, a, latts)
@@ -1363,7 +1520,7 @@ contains
   real(kind=KTGT) function proj_tsfactor_d (lat, ecc) result (x)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(in) :: lat ! in radius
+    real(kind=KTGT),intent(in) :: lat ! in radian
     real(kind=KTGT),intent(in) :: ecc
     ! real(kind=KTGT) :: p
     real(kind=KTGT) :: esl, thl
@@ -1396,7 +1553,7 @@ contains
   real(kind=KTGT) function conformal_latitude_d (lat, ecc) result (x)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(in) :: lat ! in radius
+    real(kind=KTGT),intent(in) :: lat ! in radian
     real(kind=KTGT),intent(in) :: ecc
     real(kind=KTGT) :: p
     real(kind=KTGT) :: esl
@@ -1417,10 +1574,259 @@ contains
   real(kind=KTGT) function local_radius_d(lat, ecc) result (m)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(in) :: lat ! in radius
+    real(kind=KTGT),intent(in) :: lat ! in radian
     real(kind=KTGT),intent(in) :: ecc
     m = cos(lat) / sqrt(1.0_KTGT - (ecc * sin(lat))**2.0_KTGT)
   end function local_radius_d
+
+!!!_ + geodesy
+!!!_  !  notes
+  !   algorithms based on Karney (2013, 2022)
+
+  !   glat:   (phi)     geographic latitude
+  !   glon:   (lambda)  longitude
+  !   azim:   (alpha)   azimuth of the geodesic
+  !   eazim:  (alpha_0) azimuth at the node
+  !   gdis:   (s)       distance along the geodesic
+  !   plat:   (beta)    parametric latitude
+  !   alon:   (omega)   longitude on the auxiliary sphere
+  !   aarc:   (sigma)   arc length on the auxiliary sphere
+  !   earea:  (S)       the area between the geodesic and the equator
+
+  !   node == the point where the geodesic crosses the equator
+!!!_  & reduced_lat_tan() -  tan(beta)
+  ELEMENTAL &
+  real(kind=KTGT) function reduced_lat_tan_d(lat, f) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lat ! in radian
+    real(kind=KTGT),intent(in) :: f   ! flattening
+    r = (1.0_KTGT - f) * tan(lat)
+  end function reduced_lat_tan_d
+!!!_  & reduced_lat() -  beta
+  ELEMENTAL &
+  real(kind=KTGT) function reduced_lat_d(lat, f) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lat ! in radian
+    real(kind=KTGT),intent(in) :: f   ! flattening
+    r = atan(reduced_lat_tan(lat, f))
+  end function reduced_lat_d
+
+!!!_  & aux_dspherical_lon_cos - omega_12
+  ELEMENTAL &
+  real(kind=KTGT) function aux_dspherical_lon_cos_d(dlon, cb1, cb2, e2) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: dlon ! lambda_12 in radian
+    real(kind=KTGT),intent(in) :: cb1  ! cos beta_1
+    real(kind=KTGT),intent(in) :: cb2  ! cos beta_2
+    real(kind=KTGT),intent(in) :: e2   ! e^2
+    real(kind=KTGT) :: wt ! tilde omega
+    wt = sqrt(1.0_KTGT - (((cb1 + cb2) * 0.5_KTGT)**2) * e2)
+    r  = dlon / wt
+  end function aux_dspherical_lon_cos_d
+!!!_  & aux_dspherical_lon - omega_12
+  ELEMENTAL &
+  real(kind=KTGT) function aux_dspherical_lon_d(dlon, b1, b2, e2) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: dlon ! lambda_12 in radian
+    real(kind=KTGT),intent(in) :: b1   ! beta_1 in radian
+    real(kind=KTGT),intent(in) :: b2   ! beta_2
+    real(kind=KTGT),intent(in) :: e2   ! e^2
+    r = aux_dspherical_lon_cos(dlon, cos(b1), cos(b2), e2)
+  end function aux_dspherical_lon_d
+
+!!!_  & aux_arcl_eetri_trig - sigma_12, spher. arc length of the third side of the elem. ellips. triangle [NEP]
+  ELEMENTAL &
+  real(kind=KTGT) function aux_arcl_eetri_trig_d &
+       & (sb1, cb1, sb2, cb2, sw12, cw12) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: sb1,  cb1      ! sin,cos beta_1
+    real(kind=KTGT),intent(in) :: sb2,  cb2      ! sin,cos beta_2
+    real(kind=KTGT),intent(in) :: sw12, cw12     ! sin,cos omega_12
+
+    real(kind=KTGT) :: z1r, z1i
+    real(kind=KTGT) :: y,   x
+
+    z1r = cb1 * sb2 - sb1 * cb2 * cw12
+    z1i = cb2 * sw12
+    y = _hypot(z1r, z1i)
+    x = sb1 * sb2 + cb1 * cb2 * cw12
+    r = atan2(y, x)
+  end function aux_arcl_eetri_trig_d
+
+!!!_  & aux_arcl_eetri - sigma_12, spher. arc length of the third side of the elem. ellips. triangle [NEP]
+  ELEMENTAL &
+  real(kind=KTGT) function aux_arcl_eetri_d &
+       & (b1, b2, w12) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: b1  ! in radian
+    real(kind=KTGT),intent(in) :: b2
+    real(kind=KTGT),intent(in) :: w12
+
+    r = aux_arcl_eetri_trig(sin(b1), cos(b1), sin(b2), cos(b2), sin(w12), cos(w12))
+  end function aux_arcl_eetri_d
+
+!!!_  & aux_azimuth1_etri_trig - alpha_1, azimuth of ellips. triangle [NAB]
+  ELEMENTAL &
+  real(kind=KTGT) function aux_azimuth1_etri_trig_d &
+       & (sb1, cb1, sb2, cb2, sw12, cw12) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: sb1,  cb1      ! sin,cos beta_1
+    real(kind=KTGT),intent(in) :: sb2,  cb2      ! sin,cos beta_2
+    real(kind=KTGT),intent(in) :: sw12, cw12     ! sin,cos omega_12
+
+    real(kind=KTGT) :: z1r, z1i
+
+    z1r = cb1 * sb2 - sb1 * cb2 * cw12
+    z1i = cb2 * sw12
+    r = atan2(z1i, z1r)
+  end function aux_azimuth1_etri_trig_d
+
+!!!_  & aux_azimuth1_etri - alpha_1, azimth of ellips. triangle [NAB]
+  ELEMENTAL &
+  real(kind=KTGT) function aux_azimuth1_etri_d &
+       & (b1, b2, w12) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: b1
+    real(kind=KTGT),intent(in) :: b2
+    real(kind=KTGT),intent(in) :: w12
+    r = aux_azimuth1_etri_trig(sin(b1), cos(b1), sin(b2), cos(b2), sin(w12), cos(w12))
+  end function aux_azimuth1_etri_d
+
+!!!_  & azimuth0_eetri_trig - alpha_0, azimuth of elem. ellips. triangle [NEP]
+  ELEMENTAL &
+  real(kind=KTGT) function azimuth0_eetri_trig_d &
+       & (sb, cb, sa, ca) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: sb,  cb      ! sin,cos beta
+    real(kind=KTGT),intent(in) :: sa,  ca      ! sin,cos alpha
+
+    real(kind=KTGT) :: y,   x
+
+    x = _hypot(ca, sa * sb)
+    y = sa * cb
+    r = atan2(y, x)
+  end function azimuth0_eetri_trig_d
+
+!!!_  & azimuth0_eetri - alpha_0, azimuth of elem. ellips. triangle [NEP]
+  ELEMENTAL &
+  real(kind=KTGT) function azimuth0_eetri_d &
+       & (b, a) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: b
+    real(kind=KTGT),intent(in) :: a
+
+    r = azimuth0_eetri_trig(sin(b), cos(b), sin(a), cos(a))
+  end function azimuth0_eetri_d
+
+!!!_  & azimuth2cos_eetri_trig - cos(alpha_2), azimuth of elem. ellips. triangle [NEP]
+  ELEMENTAL &
+  real(kind=KTGT) function azimuth2cos_eetri_trig_d &
+       & (cb1, cb2, ca1) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: cb1, cb2     ! cos beta_1, beta_2
+    real(kind=KTGT),intent(in) :: ca1          ! cos alpha_1
+
+    r = sqrt((ca1 * cb1) ** 2 + (cb2*cb2 - cb1*cb1)) / cb2
+  end function azimuth2cos_eetri_trig_d
+
+!!!_  & azimuth2cos_eetri - cos(alpha_2), azimuth of elem. ellips. triangle [NEP]
+  ELEMENTAL &
+  real(kind=KTGT) function azimuth2cos_eetri_d &
+       & (b1, b2, a1) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: b1, b2     ! beta_1, beta_2
+    real(kind=KTGT),intent(in) :: a1         ! alpha_1
+
+    r = azimuth2cos_eetri_trig(cos(b1), cos(b2), cos(a1))
+  end function azimuth2cos_eetri_d
+
+!!!_  & arcl_eetri_trig - sigma, spher. arc length of the third side of the elem. ellips. triangle [NEP]
+  ELEMENTAL &
+  real(kind=KTGT) function arcl_eetri_trig_d &
+       & (sb, cb, ca) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: sb, cb   ! sin,cos beta
+    real(kind=KTGT),intent(in) :: ca       ! cos alpha
+
+    r = atan2(sb, ca * cb)
+  end function arcl_eetri_trig_d
+!!!_  & arcl_eetri - sigma, spher. arc length of the third side of the elem. ellips. triangle [NEP]
+  ELEMENTAL &
+  real(kind=KTGT) function arcl_eetri_d &
+       & (b, a) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: b
+    real(kind=KTGT),intent(in) :: a
+
+    r = arcl_eetri_trig(sin(b), cos(b), cos(a))
+  end function arcl_eetri_d
+
+!!!_  & sphlon_eetri_trig - omega
+  ELEMENTAL &
+  real(kind=KTGT) function sphlon_eetri_trig_d &
+       & (ss, cs, sa) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: ss, cs   ! sin,cos sigma
+    real(kind=KTGT),intent(in) :: sa       ! sin alpha_0
+
+    r = atan2(sa * ss, cs)
+  end function sphlon_eetri_trig_d
+
+!!!_  & sphlon_eetri - omega
+  ELEMENTAL &
+  real(kind=KTGT) function sphlon_eetri_d &
+       & (s, a) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: s
+    real(kind=KTGT),intent(in) :: a
+
+    r = sphlon_eetri_trig(sin(s), cos(s), sin(a))
+  end function sphlon_eetri_d
+
+!!!_  & expparam_trig - epsilon, expansion parameter
+  ELEMENTAL &
+  real(kind=KTGT) function expparam_trig_d &
+       & (ca, ep2) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: ca       ! cos alpha_0
+    real(kind=KTGT),intent(in) :: ep2      ! e prime ** 2
+
+    real(kind=KTGT) kk, t
+
+    kk = ep2 * (ca ** 2)
+
+    t = sqrt(1.0_KTGT + kk)
+    r = (t - 1.0_KTGT) / (t + 1.0_KTGT)
+  end function expparam_trig_d
+
+!!!_  & expparam - epsilon, expansion parameter
+  ELEMENTAL &
+  real(kind=KTGT) function expparam_d &
+       & (a, ep2) result(r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: a        ! alpha_0
+    real(kind=KTGT),intent(in) :: ep2      ! e prime ** 2
+
+    r = expparam_trig(cos(a), ep2)
+  end function expparam_d
 
 !!!_ + private procedures
 !!!_  - is_equidistant - check if the array is equidistant under tolerance
@@ -1619,7 +2025,7 @@ program test_emu_ugg
   integer ierr
   integer nlat(2)
   integer nlon(2)
-  integer stereo
+  integer stereo,  geod
   integer levv
 
   real(kind=KDBL) :: PI = ATAN2(0.0_KDBL, -1.0_KDBL)
@@ -1647,6 +2053,7 @@ program test_emu_ugg
   if (ierr.eq.0) nlon(1) = condop((nlon(1).lt.0), 128, nlon(1))
 
   if (ierr.eq.0) call get_option(ierr, stereo, 'stereo', 0)
+  if (ierr.eq.0) call get_option(ierr, geod,   'geod', 0)
 
   if (ierr.eq.0) call test_ugg_prec(ierr)
 
@@ -1659,6 +2066,9 @@ program test_emu_ugg
 
   if (ierr.eq.0) then
      if (stereo.ge.0) call batch_test_stereog(ierr, stereo)
+  endif
+  if (ierr.eq.0) then
+     if (geod.ge.0) call batch_test_geod(ierr, geod)
   endif
 
   call finalize(ierr)
@@ -1900,6 +2310,7 @@ contains
     latts = +70.0_KTGT
     lon0  = -45.0_KTGT
     call test_stereog_single(ierr, a, e, latts, lon0, (/-55.7362542291_KTGT, 59.0479222286_KTGT/))
+
   end subroutine batch_test_stereog
 
   subroutine test_stereog_single(ierr, a, e, latts, lon0, ll)
@@ -1910,8 +2321,8 @@ contains
     real(kind=KTGT),intent(in) :: ll(2)
     real(kind=KTGT) :: cc
     real(kind=KTGT) :: rr(2), rts, llorg(2)
-    real(kind=KTGT) :: xx(2), xxo(2), xxc(2)
-    real(kind=KTGT) :: cco(2), clo(2), cla(2)
+    real(kind=KTGT) :: xx(2), xxo(2), xxc(2), lli(2)
+    real(kind=KTGT) :: cco(ncache_stereog_co), clo(ncache_stereog_lo), cla(ncache_stereog_la)
     integer pole
     ierr = 0
     rts = deg2rad(latts)
@@ -1927,6 +2338,7 @@ contains
     endif
 101 format('stereog[', 2F9.1, '] ', '(', 2E16.8, ') >> (', 2E16.8, ')')
 102 format('  pstereog[', A, '] ', L1, 1x, ' >> (', 2E16.8, ')')
+103 format('  inverse', 2E16.8, 1x, 2E16.8, 2E16.8)
     write(*, 101) lon0, latts, ll, xx
     ! test cache once
     if (latts.ge.0.0_KTGT) then
@@ -1934,17 +2346,139 @@ contains
     else
        pole = -1
     endif
-    call proj_pstereog_set(cco, e, a, rts, pole)
+    call proj_pstereog_set(cco, e, a, rts, llorg(1), pole)
     ! write(*, *) cc.eq.cco(1), cc, cco
-    xxo = proj_pstereog(rr(1), rr(2), cco, e, llorg)
+    xxo = proj_pstereog(rr(1), rr(2), cco)
     write(*, 102) 'once', ALL(xxo(:).eq.xx(:)), xxo
     ! test cache core
-    call proj_pstereog_cachela(cla, rr(2), cco, e)
-    call proj_pstereog_cachelo(clo, rr(1), cco, llorg)
-    xxc = proj_pstereog(cco, clo, cla)
+    call proj_pstereog_cachela(cla, rr(2), cco)
+    call proj_pstereog_cachelo(clo, rr(1), cco)
+    xxc = proj_pstereog(clo, cla)
     write(*, 102) 'cache', ALL(xxc(:).eq.xx(:)), xxc
 
+    lli = proj_pstereog_inv(xxc(1), xxc(2), cco)
+
+    write(*, 103) rad2deg(lli(:)), rad2deg(rr(:)), rad2deg(rr(:) - lli(:))
+
   end subroutine test_stereog_single
+
+!!!_ + batch_test_geod
+  subroutine batch_test_geod(ierr, test)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: test
+    real(kind=KTGT) :: a, e2, ep2, f
+    ierr = 0
+    if (test.lt.0) return ! dummy procedure
+
+    a = 6378137.0_KTGT
+    f = 1.0_KTGT /298.257223563_KTGT
+    e2 = 0.00669437999014132_KTGT
+    ep2 = 0.00673949674227643_KTGT
+
+    call test_geod_inv &
+         & (ierr, -30.12345_KTGT, -30.12344_KTGT, 0.00005_KTGT, &
+         &  -30.03999083821_KTGT, -30.03998085491_KTGT, &
+         &  0.00005012589_KTGT,   0.00004452641_KTGT,   77.04353354237_KTGT, &
+         &  a, f, e2)
+
+    call test_geod_inv_ap &
+         & (ierr, &
+         &  -30.0_KTGT, +29.9_KTGT, 179.8_KTGT, 161.914_KTGT, &
+         &  a, f, e2, ep2)
+
+  end subroutine batch_test_geod
+
+  subroutine test_geod_inv &
+       & (ierr, &
+       &  phi1d,  phi2d,  lambda12d, &
+       &  beta1d, beta2d, omega12d, sigma12d, alpha1d, &
+       &  a,      f,      e2)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    real(kind=KTGT),intent(in) :: a, e2, f
+    real(kind=KTGT),intent(in) :: phi1d,  phi2d,  lambda12d
+    real(kind=KTGT),intent(in) :: beta1d, beta2d, omega12d, sigma12d
+    real(kind=KTGT),intent(in) :: alpha1d
+
+    real(kind=KTGT) :: phi1,  phi2,  lambda12
+    real(kind=KTGT) :: beta1, beta2, omega12, sigma12
+    real(kind=KTGT) :: alpha1
+
+    ierr = 0
+
+    phi1 = deg2rad(phi1d)
+    phi2 = deg2rad(phi2d)
+    lambda12 = deg2rad(lambda12d)
+
+    beta1 = reduced_lat(phi1, f)
+    beta2 = reduced_lat(phi2, f)
+    omega12 = aux_dspherical_lon(lambda12, beta1, beta2, e2)
+    sigma12 = aux_arcl_eetri(beta1, beta2, omega12)
+    alpha1 = aux_azimuth1_etri(beta1, beta2, omega12)
+
+    write(*, *) 'beta_1 = ',   rad2deg(beta1),   beta1d, beta1
+    write(*, *) 'beta_2 = ',   rad2deg(beta2),   beta2d, beta2
+    write(*, *) 'omega_12 = ', rad2deg(omega12), omega12d, omega12
+    write(*, *) 'sigma_12 = ', rad2deg(sigma12), sigma12d, sigma12
+    write(*, *) 'alpha_1 = ',  rad2deg(alpha1),  alpha1d, alpha1
+
+  end subroutine test_geod_inv
+
+  subroutine test_geod_inv_ap &
+       & (ierr, &
+       &  phi1d,  phi2d,  lambda12d, alpha1dini, &
+       &  a,      f,      e2,        ep2)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    real(kind=KTGT),intent(in) :: a, e2, ep2, f
+    real(kind=KTGT),intent(in) :: phi1d,  phi2d,  lambda12d
+    real(kind=KTGT),intent(in) :: alpha1dini
+
+    real(kind=KTGT) :: phi1, phi2, lambda12
+
+    real(kind=KTGT) :: alpha0
+    real(kind=KTGT) :: beta1, alpha1, sigma1, omega1
+    real(kind=KTGT) :: beta2, alpha2, sigma2, omega2
+    real(kind=KTGT) :: kk
+    real(kind=KTGT) :: xparam
+
+    ierr = 0
+
+    phi1 = deg2rad(phi1d)
+    phi2 = deg2rad(phi2d)
+    lambda12 = deg2rad(lambda12d)
+
+    alpha1 = deg2rad(alpha1dini)
+    ! NEA
+    beta1  = reduced_lat(phi1, f)
+    alpha0 = azimuth0_eetri(beta1, alpha1)
+    sigma1 = arcl_eetri(beta1, alpha1)
+    omega1 = sphlon_eetri(sigma1, alpha0)
+    write(*, *) 'beta1 = ', rad2deg(beta1)
+    write(*, *) 'alpha0 = ', rad2deg(alpha0)
+    write(*, *) 'sigma1 = ', rad2deg(sigma1)
+    write(*, *) 'omega1 = ', rad2deg(omega1)
+    ! NAB
+    beta2  = reduced_lat(phi2, f)
+    alpha2 = acos(azimuth2cos_eetri(beta1, beta2, alpha1))
+    sigma2 = arcl_eetri(beta2, alpha2)
+    omega2 = sphlon_eetri(sigma2, alpha0)
+    write(*, *) 'beta2 = ', rad2deg(beta2)
+    write(*, *) 'alpha2 = ', rad2deg(alpha2)
+    write(*, *) 'sigma2 = ', rad2deg(sigma2)
+    write(*, *) 'omega2 = ', rad2deg(omega2)
+
+    ! lambda12
+    kk = ep2 * (cos(alpha0) ** 2)
+    xparam = expparam(alpha0, ep2)
+
+    write(*, *) 'kk = ', kk
+    write(*, *) 'epsilon = ', xparam
+  end subroutine test_geod_inv_ap
 
 end program test_emu_ugg
 
