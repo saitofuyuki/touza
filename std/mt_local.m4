@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2023/03/26 11:50:15 fuyuki mt_local.m4>
+dnl Time-stamp: <2023/05/08 21:55:13 fuyuki mt_local.m4>
 
 dnl Copyright: 2020-2023 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
