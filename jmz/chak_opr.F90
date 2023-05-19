@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/04/18 09:39:43 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/19 09:00:46 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -737,6 +737,26 @@ contains
        endif
     enddo
   end subroutine apply_UNARY_ACOS
+!!!_   . apply_UNARY_ATAN
+  subroutine apply_UNARY_ATAN &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_ATAN(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_ATAN
 !!!_   . apply_UNARY_SINH
   subroutine apply_UNARY_SINH &
        & (ierr, Z, domZ, X, domX, F)
@@ -2262,6 +2282,18 @@ contains
        Z = ACOS(X)
     endif
   end function elem_ACOS
+!!!_   & elem_ATAN()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_ATAN (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = ATAN(X)
+    endif
+  end function elem_ATAN
 !!!_   & elem_SINH ()
   ELEMENTAL &
   real(kind=KBUF) function elem_SINH (X, F) result(Z)
