@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz CH(swiss) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/04/17 22:03:54 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/24 07:15:17 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -121,9 +121,11 @@ module chak_file
 contains
 !!!_  - init
   subroutine init(ierr)
+    use TOUZA_Std_env,only: init_file_bodr
     implicit none
     integer,intent(out) :: ierr
     ierr = 0
+    call init_file_bodr(ierr)
   end subroutine init
 
 !!!_  - reset_file
