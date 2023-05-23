@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:58:20 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/24 07:13:12 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2023
@@ -1940,7 +1940,12 @@ contains
           call msg_mdl &
                & ('(''endianness:'', I0, 1x, I0)', (/utest, kendi/), __MDL__, ul)
        endif
-       if (kendi.ne.kendi_file) then
+       if (kendi_file.eq.endian_UNKNOWN) then
+          if (VCHECK_SEVERE(lv)) then
+             call msg_mdl &
+                  & ('file endianness not set', __MDL__, ul)
+          endif
+       else if (kendi.ne.kendi_file) then
           if (VCHECK_SEVERE(lv)) then
              call msg_mdl &
                   & ('(''endianness incompatible:'', I0, 1x, I0)', (/utest, kendi/), __MDL__, ul)
