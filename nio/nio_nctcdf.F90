@@ -1,7 +1,7 @@
 !!!_! nio_nctcdf.F90 - TOUZA/Nio nanchatte netcdf interface
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 28 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:38:42 fuyuki nio_nctcdf.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/01 21:32:52 fuyuki nio_nctcdf.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -34,7 +34,7 @@ module TOUZA_Nio_nctcdf
   integer,parameter :: status_data = 2
 
   character(len=*),parameter :: var_header='gtheader'
-  character(len=*),parameter :: var_time='time'
+  character(len=*),parameter :: var_time='rec'
 !!!_  - private static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -46,6 +46,8 @@ module TOUZA_Nio_nctcdf
 #define __MDL__ 'n'
 #define _ERROR(E) (E - ERR_MASK_NIO_NCTCDF)
 !!!_  - type
+  integer,parameter :: maxdim = 3
+
   type nctcdf_t
      integer :: ncid
      integer :: status
@@ -54,8 +56,10 @@ module TOUZA_Nio_nctcdf
      integer :: nrec      ! record
      integer :: varid
      integer :: vtid      ! time variable
-     integer :: dimid(3)
-     integer :: ndim(3)
+     integer :: ndim
+     integer :: dimid(0:maxdim)
+     integer :: dimvid(0:maxdim)
+     integer :: nmem(0:maxdim)
   end type nctcdf_t
 !!!_  - static
   integer,save :: mncf=-1, lncf=-1
@@ -261,7 +265,8 @@ contains
     if (ierr.eq.0) then
        ncfiles(handle)%ncid = ncid
        ncfiles(handle)%status = status_define
-       ncfiles(handle)%ndim(:) = 0
+       ncfiles(handle)%ndim = 0
+       ncfiles(handle)%nmem(:) = 0
 
        ncfiles(handle)%nrec = 0
        istt = nf90_def_dim(ncid, 'rec', nf90_unlimited, dim_rec)
@@ -364,23 +369,32 @@ contains
     character(len=*),intent(in)  :: head(*)
     logical,optional,intent(in)  :: sync
 
-    integer ncid, varid
-    integer ofs(4), dims(4)
+    integer ncid, varid, vtid
+    integer ofs(0:maxdim), dims(0:maxdim)
     integer istt
+    integer nd
+    integer tv(1)
 
     ierr = 0
     ncid = ncfiles(handle)%ncid
     varid = ncfiles(handle)%varid
+    nd = ncfiles(handle)%ndim
 
-    ofs(1:3) = (/1, 1, 1/)
-    ofs(4) = ncfiles(handle)%nrec + 1
-    dims(1:3) = ncfiles(handle)%ndim(1:3)
-    dims(4) = 1
+    ofs(0:nd-1) = 1
+    dims(0:nd-1) = ncfiles(handle)%nmem(0:nd-1)
+    ofs(nd) = ncfiles(handle)%nrec + 1
+    dims(nd) = 1
 
-    istt = nf90_put_var(ncid, varid, d(1:ld), ofs(:), dims(:))
+    istt = nf90_put_var(ncid, varid, d(1:ld), ofs(0:nd), dims(0:nd))
     if (istt.ne.NF90_NOERR) ierr = _ERROR(ERR_PANIC)
+    if (ierr.eq.0) then
+       vtid = ncfiles(handle)%vtid
+       tv(1) = ofs(nd) - 1
+       istt = nf90_put_var(ncid, vtid, tv, ofs(nd:nd))
+       if (istt.ne.NF90_NOERR) ierr = _ERROR(ERR_PANIC)
+    endif
 
-    if (ierr.eq.0) ncfiles(handle)%nrec = ofs(4)
+    if (ierr.eq.0) ncfiles(handle)%nrec = ofs(nd)
 
     if (ierr.eq.0) then
        if (choice(.TRUE., sync)) then
@@ -404,22 +418,24 @@ contains
     logical,optional,intent(in)  :: sync
 
     integer ncid, varid
-    integer ofs(4), dims(4)
+    integer ofs(0:maxdim), dims(0:maxdim)
     integer istt
+    integer nd
 
     ierr = 0
     ncid = ncfiles(handle)%ncid
     varid = ncfiles(handle)%varid
+    nd = ncfiles(handle)%ndim
 
-    ofs(1:3) = (/1, 1, 1/)
-    ofs(4) = ncfiles(handle)%nrec + 1
-    dims(1:3) = ncfiles(handle)%ndim(1:3)
-    dims(4) = 1
+    ofs(0:nd-1) = 1
+    dims(0:nd-1) = ncfiles(handle)%nmem(0:nd-1)
+    ofs(nd) = ncfiles(handle)%nrec + 1
+    dims(nd) = 1
 
-    istt = nf90_put_var(ncid, varid, d(1:ld), ofs(:), dims(:))
+    istt = nf90_put_var(ncid, varid, d(1:ld), ofs(0:nd), dims(0:nd))
     if (istt.ne.NF90_NOERR) ierr = _ERROR(ERR_PANIC)
 
-    if (ierr.eq.0) ncfiles(handle)%nrec = ofs(4)
+    if (ierr.eq.0) ncfiles(handle)%nrec = ofs(nd)
 
     if (ierr.eq.0) then
        if (choice(.TRUE., sync)) then
@@ -434,6 +450,7 @@ contains
        &  d,    ld, handle, head, sync)
     use TOUZA_Nio_std,only: choice
     implicit none
+    integer,parameter :: KARG=KFLT
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: d(*)
     integer,         intent(in)  :: ld
@@ -442,22 +459,24 @@ contains
     logical,optional,intent(in)  :: sync
 
     integer ncid, varid
-    integer ofs(4), dims(4)
+    integer ofs(0:maxdim), dims(0:maxdim)
     integer istt
+    integer nd
 
     ierr = 0
     ncid = ncfiles(handle)%ncid
     varid = ncfiles(handle)%varid
+    nd = ncfiles(handle)%ndim
 
-    ofs(1:3) = (/1, 1, 1/)
-    ofs(4) = ncfiles(handle)%nrec + 1
-    dims(1:3) = ncfiles(handle)%ndim(1:3)
-    dims(4) = 1
+    ofs(0:nd-1) = 1
+    dims(0:nd-1) = ncfiles(handle)%nmem(0:nd-1)
+    ofs(nd) = ncfiles(handle)%nrec + 1
+    dims(nd) = 1
 
-    istt = nf90_put_var(ncid, varid, d(1:ld), ofs(:), dims(:))
+    istt = nf90_put_var(ncid, varid, d(1:ld), ofs(0:nd), dims(0:nd))
     if (istt.ne.NF90_NOERR) ierr = _ERROR(ERR_PANIC)
 
-    if (ierr.eq.0) ncfiles(handle)%nrec = ofs(4)
+    if (ierr.eq.0) ncfiles(handle)%nrec = ofs(nd)
 
     if (ierr.eq.0) then
        if (choice(.TRUE., sync)) then
@@ -484,8 +503,8 @@ contains
 
     integer istt
     integer ncid
-    integer dimid(4)
-    integer ndim(3)
+    integer dimid(0:maxdim), dimvid(0:maxdim)
+    integer nmem(0:maxdim)
     integer nfmt
     character(len=litem) :: hitm, hfmt
     character(len=3) :: f
@@ -493,15 +512,20 @@ contains
     real(kind=KFLT) vmiss_f
     real(kind=KDBL) vmiss_d
     integer fill
+    integer nd
+    integer j, m
+    integer,allocatable :: co(:)
 
     ierr = 0
     ncid = ncfiles(handle)%ncid
-    if (ierr.eq.0) call nct_define_dim(ierr, dimid(1), ndim(1), handle, head, 1, hi_AITM1, hi_ASTR1, hi_AEND1)
-    if (ierr.eq.0) call nct_define_dim(ierr, dimid(2), ndim(2), handle, head, 2, hi_AITM2, hi_ASTR2, hi_AEND2)
-    if (ierr.eq.0) call nct_define_dim(ierr, dimid(3), ndim(3), handle, head, 3, hi_AITM3, hi_ASTR3, hi_AEND3)
+    nd = 0
+    if (ierr.eq.0) call nct_define_dim(ierr, nd, dimid, dimvid, nmem, handle, head, 1, hi_AITM1, hi_ASTR1, hi_AEND1)
+    if (ierr.eq.0) call nct_define_dim(ierr, nd, dimid, dimvid, nmem, handle, head, 2, hi_AITM2, hi_ASTR2, hi_AEND2)
+    if (ierr.eq.0) call nct_define_dim(ierr, nd, dimid, dimvid, nmem, handle, head, 3, hi_AITM3, hi_ASTR3, hi_AEND3)
 
-    if (ierr.eq.0) ncfiles(handle)%dimid(1:3) = dimid(1:3)
-    if (ierr.eq.0) ncfiles(handle)%ndim(1:3) = ndim(1:3)
+    if (ierr.eq.0) ncfiles(handle)%dimid(0:nd-1) = dimid(0:nd-1)
+    if (ierr.eq.0) ncfiles(handle)%dimvid(0:nd-1) = dimvid(0:nd-1)
+    if (ierr.eq.0) ncfiles(handle)%nmem(0:nd-1) = nmem(0:nd-1)
 
     if (ierr.eq.0) call get_item(ierr, head, hitm, hi_ITEM)
     if (ierr.eq.0) call get_item(ierr, head, hfmt, hi_DFMT)
@@ -519,8 +543,9 @@ contains
        end select
     endif
     if (ierr.eq.0) then
-       dimid(4) = ncfiles(handle)%drecid
-       istt = nf90_def_var(ncid, hitm, nfmt, dimid(:), varid)
+       dimid(nd) = ncfiles(handle)%drecid
+       ncfiles(handle)%ndim = nd
+       istt = nf90_def_var(ncid, hitm, nfmt, dimid(0:nd), varid)
        if (istt.ne.NF90_NOERR) ierr = _ERROR(ERR_PANIC)
     endif
     if (ierr.eq.0) then
@@ -550,40 +575,72 @@ contains
        istt = nf90_enddef(ncid)
        if (istt.ne.NF90_NOERR) ierr = _ERROR(ERR_PANIC)
     endif
+    if (ierr.eq.0) then
+       m = MAXVAL(nmem(0:nd-1))
+       allocate(co(0:m-1), STAT=ierr)
+       if (ierr.eq.0) then
+          do j = 0, m - 1
+             co(j) = j
+          enddo
+       endif
+       do j = 0, nd - 1
+          if (ierr.eq.0) then
+             m = nmem(j)
+             istt = nf90_put_var(ncid, dimvid(j), co(0:m-1))
+             if (istt.ne.NF90_NOERR) ierr = _ERROR(ERR_PANIC)
+          endif
+       enddo
+       if (ierr.eq.0) deallocate(co, STAT=ierr)
+    endif
 
   end subroutine nct_define_variable
 
 !!!_  - nct_define_dim
   subroutine nct_define_dim &
-       & (ierr, dimid, ndim, handle, head, cidx, hax, hmin, hmax)
+       & (ierr, nd, dimid, dimvid, nmem, handle, head, cidx, hax, hmin, hmax)
     use TOUZA_Nio_header,only: litem, get_item
     implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: dimid
-    integer,         intent(out) :: ndim
-    integer,         intent(in)  :: handle
-    character(len=*),intent(in)  :: head(*)
-    integer,         intent(in)  :: cidx
-    integer,         intent(in)  :: hax, hmin, hmax
+    integer,         intent(out)   :: ierr
+    integer,         intent(inout) :: nd
+    integer,         intent(inout) :: dimid(0:*)
+    integer,         intent(inout) :: dimvid(0:*)
+    integer,         intent(inout) :: nmem(0:*)
+    integer,         intent(in)    :: handle
+    character(len=*),intent(in)    :: head(*)
+    integer,         intent(in)    :: cidx
+    integer,         intent(in)    :: hax, hmin, hmax
 
     integer ncid
     character(len=litem) :: xname
     integer :: jmin, jmax
     integer istt
+    integer nm, di, vi
 
     ierr = 0
 
     ncid = ncfiles(handle)%ncid
     if (ierr.eq.0) call get_item(ierr, head, xname, hax)
-    if (ierr.eq.0) call get_item(ierr, head, jmin, hmin)
-    if (ierr.eq.0) call get_item(ierr, head, jmax, hmax)
-
+    if (ierr.eq.0) call get_item(ierr, head, jmin, hmin, def=0)
+    if (ierr.eq.0) call get_item(ierr, head, jmax, hmax, def=0)
     if (ierr.eq.0) then
-101    format('COOR', I3.3)
-       if (xname.eq.' ') write(xname, 101) cidx
-       ndim = jmax - jmin + 1
-       istt = nf90_def_dim(ncid, xname, ndim, dimid)
-       if (istt.ne.NF90_NOERR) ierr = _ERROR(ERR_PANIC)
+       nm = jmax - jmin + 1
+       if (nm.le.1.and.xname.eq.' ') then
+          continue
+       else
+101       format('COOR', I3.3)
+          if (xname.eq.' ') write(xname, 101) cidx
+          istt = nf90_def_dim(ncid, xname, nm, di)
+          if (istt.eq.NF90_NOERR) then
+             istt = nf90_def_var(ncid, xname, nf90_double, (/di/), vi)
+          endif
+          if (istt.ne.NF90_NOERR) ierr = _ERROR(ERR_PANIC)
+          if (ierr.eq.0) then
+             nmem(nd) = nm
+             dimid(nd) = di
+             dimvid(nd) = vi
+             nd = nd + 1
+          endif
+       endif
     endif
   end subroutine nct_define_dim
 !!!_ + end module
@@ -601,12 +658,13 @@ program test_nio_nctcdf
   integer ierr
   integer jarg
   integer ktest
-  integer hfile1, hfile2
-  integer nx, ny, nz, nn
 
   real(kind=KBUF) :: vmiss = -999.0_KBUF
-  real(kind=KBUF),allocatable :: v(:)
-  character(len=litem) :: hd(nitem)
+
+  integer nx, ny, nz, n1, n2
+  integer hfile1, hfile2
+  real(kind=KBUF),allocatable :: v1(:), v2(:)
+  character(len=litem) :: hd1(nitem), hd2(nitem)
 
   ierr = 0
   jarg = 0
@@ -629,43 +687,49 @@ program test_nio_nctcdf
   nx = 5
   ny = 7
   nz = 2
-  nn = nx * ny * nz
+  n1 = nx * ny
+  n2 = nx * ny * nz
 
-  allocate(v(1:nn), STAT=ierr)
+  allocate(v1(1:n1), v2(1:n2), STAT=ierr)
 
-  hd(:) = ' '
-  if (ierr.eq.0) call put_item(ierr, hd, 9010,   hi_IDFM)
-  if (ierr.eq.0) call put_item(ierr, hd, 1,      hi_ASTR1)
-  if (ierr.eq.0) call put_item(ierr, hd, nx,     hi_AEND1)
-  if (ierr.eq.0) call put_item(ierr, hd, 'x',    hi_AITM1)
-  if (ierr.eq.0) call put_item(ierr, hd, 1,      hi_ASTR2)
-  if (ierr.eq.0) call put_item(ierr, hd, ny,     hi_AEND2)
-  if (ierr.eq.0) call put_item(ierr, hd, 'y',    hi_AITM2)
-  if (ierr.eq.0) call put_item(ierr, hd, 1,      hi_ASTR3)
-  if (ierr.eq.0) call put_item(ierr, hd, nz,     hi_AEND3)
-  if (ierr.eq.0) call put_item(ierr, hd, 'z',    hi_AITM3)
-  if (ierr.eq.0) call put_item(ierr, hd, vmiss,  hi_MISS)
+  hd1(:) = ' '
+  if (ierr.eq.0) call put_item(ierr, hd1, 9010,   hi_IDFM)
+  if (ierr.eq.0) call put_item(ierr, hd1, 1,      hi_ASTR1)
+  if (ierr.eq.0) call put_item(ierr, hd1, nx,     hi_AEND1)
+  if (ierr.eq.0) call put_item(ierr, hd1, 'x',    hi_AITM1)
+  if (ierr.eq.0) call put_item(ierr, hd1, 1,      hi_ASTR2)
+  if (ierr.eq.0) call put_item(ierr, hd1, ny,     hi_AEND2)
+  if (ierr.eq.0) call put_item(ierr, hd1, 'y',    hi_AITM2)
+  if (ierr.eq.0) call put_item(ierr, hd1, vmiss,  hi_MISS)
 
-  if (ierr.eq.0) call put_item(ierr, hd, 'T2', hi_ITEM)
+  if (ierr.eq.0) call put_item(ierr, hd1, 'X', hi_ITEM)
+  if (ierr.eq.0) call put_item(ierr, hd1, 11,  hi_TIME)
+  if (ierr.eq.0) call put_item(ierr, hd1, 'CR8',  hi_DFMT)
+  if (ierr.eq.0) call show_header(ierr, hd1)
+  if (ierr.eq.0) call nct_define_write(ierr, hfile1, hd1)
 
-  if (ierr.eq.0) call show_header(ierr, hd)
-  if (ierr.eq.0) call put_item(ierr, hd, 11,  hi_TIME)
+  if (ierr.eq.0) hd2(:) = hd1(:)
+  if (ierr.eq.0) call put_item(ierr, hd2, 'Y', hi_ITEM)
+  if (ierr.eq.0) call put_item(ierr, hd2, 1,      hi_ASTR3)
+  if (ierr.eq.0) call put_item(ierr, hd2, nz,     hi_AEND3)
+  if (ierr.eq.0) call put_item(ierr, hd2, 'z',    hi_AITM3)
+  if (ierr.eq.0) call put_item(ierr, hd2, 'CR4',  hi_DFMT)
+  if (ierr.eq.0) call show_header(ierr, hd2)
+  if (ierr.eq.0) call nct_define_write(ierr, hfile2, hd2)
 
-  if (ierr.eq.0) call put_item(ierr, hd, 'CR8',  hi_DFMT)
-  if (ierr.eq.0) call nct_define_write(ierr, hfile1, hd)
-  if (ierr.eq.0) call put_item(ierr, hd, 'CR4',  hi_DFMT)
-  if (ierr.eq.0) call nct_define_write(ierr, hfile2, hd)
+  v1(:) = 123
+  v2(:) = 123
+  if (ierr.eq.0) call nct_write_data(ierr, v1, n1, hfile1, hd1)
+  if (ierr.eq.0) call nct_define_write(ierr, hfile1, hd1)
+  if (ierr.eq.0) call nct_write_data(ierr, v2, n2, hfile2, hd2)
+  if (ierr.eq.0) call nct_define_write(ierr, hfile2, hd2)
 
-  v(:) = 123
-  if (ierr.eq.0) call nct_write_data(ierr, v, nn, hfile1, hd)
-  if (ierr.eq.0) call nct_define_write(ierr, hfile1, hd)
-  if (ierr.eq.0) call nct_write_data(ierr, v, nn, hfile2, hd)
-  if (ierr.eq.0) call nct_define_write(ierr, hfile2, hd)
-
-  if (ierr.eq.0) call put_item(ierr, hd, 22,  hi_TIME)
-  v(:) = 234
-  if (ierr.eq.0) call nct_write_data(ierr, v, nn, hfile1, hd)
-  if (ierr.eq.0) call nct_write_data(ierr, v, nn, hfile2, hd)
+  if (ierr.eq.0) call put_item(ierr, hd1, 22,  hi_TIME)
+  if (ierr.eq.0) call put_item(ierr, hd2, 22,  hi_TIME)
+  v1(:) = 234
+  v2(:) = 234
+  if (ierr.eq.0) call nct_write_data(ierr, v1, n1, hfile1, hd1)
+  if (ierr.eq.0) call nct_write_data(ierr, v2, n2, hfile2, hd2)
 
   if (ierr.eq.0) call nct_close_write(ierr, hfile1)
   if (ierr.eq.0) call nct_close_write(ierr, hfile2)
