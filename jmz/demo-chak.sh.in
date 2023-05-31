@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/05/31 10:19:56 fuyuki demo-chak.sh.in>
+# Time-stamp: <2023/05/31 17:36:33 fuyuki demo-chak.sh.in>
 
 main ()
 {
@@ -10,6 +10,8 @@ main ()
   local ngtmean=ngtmean
   local ngtconv=ngtconv
 
+  local DEMO=()
+  set_demo_filter DEMO "$@" || return $?
   demo_inputs $demod || return $?
   demo_tutorial || return $?
   demo_operation || return $?
@@ -128,6 +130,18 @@ demo_operation ()
 
   run_demo flat:flat/0+1 -TRIM 9     T=0 $src FLAT=0 FLAT=1 FLUSH -i
 
+  # shift
+  src=(T=0 demo/base INT DUP)
+  run_demo shift:0+1  $src C0=::+1 FLUSH -i
+  run_demo shift:0-1  $src C0=::-1 FLUSH -i
+  run_demo shift:1+1  $src C1=::+1 FLUSH -i
+  run_demo shift:1-1  $src C1=::-1 FLUSH -i
+  run_demo shift:2+1  $src C2=::+1 FLUSH -i
+  run_demo shift:2-1  $src C2=::-1 FLUSH -i
+
+  run_demo shift:part/0+1  $src C0=1:4:+1 FLUSH -i
+  run_demo shift:part/0-1  $src C0=1:4:-1 FLUSH -i
+
   return 0
 }
 
@@ -163,6 +177,17 @@ run_demo ()
     esac
     shift
   done
+  if [[ -z $DEMO ]]; then
+    :
+  else
+    local d= match=
+    for d in "${(@)DEMO}"
+    do
+      [[ $tag =~ "$d" ]] && match=T && break
+    done
+    [[ -z $match ]] && return 0
+  fi
+
   local err=
   local args=("$@")
   local tmp=$(mktemp) tmp2=$(mktemp) tmp3=$(mktemp) log=$(mktemp)
@@ -183,8 +208,8 @@ run_demo ()
     [[ -n $hcom ]] && print -n - "   # $hcom"
     print -
     if [[ $err -eq 0 ]]; then
-      sed -e  '/^ \?[0-9]/,$d' $tmp
-      sed -ne '/^ \?[0-9]/,$p' $tmp > $tmp2
+      sed -e  '/^ \?-\?[0-9]/,$d' $tmp
+      sed -ne '/^ \?-\?[0-9]/,$p' $tmp > $tmp2
       if [[ $#trim -eq 1 ]]; then
         head --lines=$trim $tmp2 > $tmp3
         print - ":" >> $tmp3
@@ -375,6 +400,27 @@ gen_subr ()
   return 0
 }
 
+set_demo_filter ()
+{
+  local _var=$1; shift
+  local _r=()
+  local d= dd=
+  for d in "$@"
+  do
+    dd=()
+    for d in "${(@s/:/)d}"
+    do
+      if [[ -z $d ]]; then
+        dd+=("*")
+      else
+        dd+=("$d")
+      fi
+    done
+    _r+=("${(j/:/)dd}")
+  done
+  set -A "$_var" "${(@)_r}"
+  return $?
+}
 
 main "$@"; err=$?
 exit $err

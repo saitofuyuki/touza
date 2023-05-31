@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/05/19 08:57:49 fuyuki genopr.sh>
+# Time-stamp: <2023/05/31 20:41:40 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -275,9 +275,9 @@ register_all ()
   register -g buffer -p NAME              TAG
   register -g buffer -p NAME              DESC           'description'
   register -g buffer -o NAME              FUNC           'function declaration'
-  register -g buffer -p NAME/REPL/RANGE,.. -n 1,1 PERM   'array shape permutatation'
+  register -g buffer -p NAME/REPL/RANGE,.. -n 1,1 PERM   'array shape permutation'
   register -a PERM SHAPE
-  register -g buffer -p NAME/REPL/SIZE,..  -n 1,1 SIZE    'array size(shape) permutatation'
+  register -g buffer -p NAME/REPL/SIZE,..  -n 1,1 SIZE    'array size(shape) permutation'
   register -g buffer -p NAME/SHIFT         -n 1,1 CSHIFT  'circular shift along coordinate'
   register -g buffer -p NAME/SHIFT         -n 1,1 EOSHIFT 'end-off shift along coordinate'
 
