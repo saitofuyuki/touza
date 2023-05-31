@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/04/17 21:27:22 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/31 16:49:01 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -182,10 +182,12 @@ module chak_lib
      integer :: bgn = -1
      integer :: end = -1
      integer :: stp = -1
+     integer :: ofs = 0
+     integer :: cyc = 0
      character(len=lname) :: name
   end type loop_t
 
-  type(loop_t),save :: def_loop  = loop_t(null_range, null_range, -1, ' ')
+  type(loop_t),save :: def_loop  = loop_t(null_range, null_range, -1, 0, 0, ' ')
 
 !!!_  - buffer property
   type buffer_t
@@ -316,25 +318,27 @@ contains
     write(utmp, 102) repeat(' ', tab), trim(pfx), dom%n
     write(utmp, 103) repeat(' ', tab), trim(pfx), dom%mco, dom%cidx(0:dom%mco - 1)
     do jc = 0, dom%mco - 1
-111    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '+', I0, ' (', I0, ')')
-112    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '+', I0)
+111    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '*', I0, ' (', I0, ')')
+112    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '*', I0)
        call get_range_string(ierr, cran, dom%bgn(jc), dom%end(jc), 1)
        if (dom%ofs(jc).eq.null_range) then
-          write(utmp, 112) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%iter(jc), dom%strd(jc)
+          write(utmp, 112) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%strd(jc), dom%iter(jc)
        else
-          write(utmp, 111) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%iter(jc), dom%strd(jc), dom%ofs(jc)
+          write(utmp, 111) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%strd(jc), dom%iter(jc), dom%ofs(jc)
        endif
     enddo
   end subroutine show_domain
 
 !!!_   . get_range_string
   subroutine get_range_string &
-       & (ierr, str, b, e, s)
+       & (ierr, str, b, e, s, o)
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: str
     integer,         intent(in)  :: b, e, s
+    integer,optional,intent(in)  :: o
     integer bb, ee
+    character(len=32) ::obuf
 
     ierr = 0
 
@@ -342,8 +346,8 @@ contains
 112 format(I0, ':')
 113 format(':', I0)
 114 format(I0, ':', I0)
-115 format(I0, ':', I0, '+', I0)
-116 format(I0, ':', I0, '-', I0)
+115 format(I0, ':', I0, '(', I0, ')')
+116 format(I0, ':', I0, '(', I0, ')')
     bb = user_index_bgn(b)
     ee = user_index_end(e)
     if (bb.eq.null_range) then
@@ -361,11 +365,17 @@ contains
     else if (s.eq.0) then
        write(str, 115, IOSTAT=ierr) bb, ee, s
     else if (s.lt.0) then
-       write(str, 116, IOSTAT=ierr) bb, ee, abs(s)
+       write(str, 116, IOSTAT=ierr) bb, ee, s
     else
        write(str, 114, IOSTAT=ierr) bb, ee
     endif
-
+    if (present(o)) then
+121    format(':', SP, I0)
+       if (o.ne.0) then
+          write(obuf, 121) o
+          str = trim(str) // trim(obuf)
+       endif
+    endif
   end subroutine get_range_string
 
 !!!_   . get_perm_string
@@ -464,7 +474,7 @@ contains
     nc = 0
     mc = choice(lcoor, maxco)
     do jc = 0, mc - 1
-       call get_range_string(ierr, cran, lpp(jc)%bgn, lpp(jc)%end, lpp(jc)%stp)
+       call get_range_string(ierr, cran, lpp(jc)%bgn, lpp(jc)%end, lpp(jc)%stp, lpp(jc)%ofs)
 102    format(A, A, A)
 103    format(A, A)
        if (lpp(jc)%name.eq.' ') then
@@ -580,14 +590,13 @@ contains
     integer jodr, jphyc, jlogc
     character(len=lname)   :: cran
     character(len=lname*2) :: cbuf(0:lcoor-1)
-    integer b, e, s
+    integer b, e, s, odmy
     integer cb, ce
 
     ierr = 0
     str = ' '
     do jodr = 0, dom%mco - 1
-       ! call get_logical_range(b, e, s, jodr, lcp, pcp, dom, ref)
-       if (ierr.eq.0) call get_logical_range(b, e, s, jodr, lcp, pcp, dom)
+       if (ierr.eq.0) call get_logical_range(b, e, s, odmy, jodr, lcp, pcp, dom)
        if (ierr.eq.0) call get_range_string(ierr, cran, b, e, s)
        if (ierr.eq.0) then
           jphyc = dom%cidx(jodr)
@@ -819,8 +828,8 @@ contains
 
 !!!_   . get_logical_range
   subroutine get_logical_range &
-       & (b, e, s, jodr, lcp, pcp, dom, ref)
-    integer,       intent(out)         :: b, e, s
+       & (b, e, s, osh, jodr, lcp, pcp, dom, ref)
+    integer,       intent(out)         :: b, e, s, osh
     integer,       intent(in)          :: jodr
     type(loop_t),  intent(in)          :: lcp(0:*)
     type(loop_t),  intent(in)          :: pcp(0:*)
@@ -841,8 +850,19 @@ contains
     jlogc = dom%lidx(jodr)
     jphyc = dom%cidx(jodr)
     if (jlogc.ge.0) then
-       b = logical_index(lcp(jlogc)%bgn, low)
-       e = logical_index(lcp(jlogc)%end, high)
+       osh = lcp(jlogc)%ofs
+    else
+       osh = 0
+    endif
+    if (jlogc.ge.0) then
+       b = lcp(jlogc)%bgn
+       e = lcp(jlogc)%end
+       if (b.ne.null_range) b = b + osh
+       if (e.ne.null_range) e = e + osh
+       b = logical_index(b, low)
+       e = logical_index(e, high)
+       ! b = logical_index(lcp(jlogc)%bgn + lcp(jlogc)%ofs, low)
+       ! e = logical_index(lcp(jlogc)%end + lcp(jlogc)%ofs, high)
     else
        b = low
        e = high
@@ -851,12 +871,11 @@ contains
     if (jphyc.ge.0) then
        ! if (pcp(jphyc)%stp.gt.0) then
        if (pcp(jphyc)%stp.ge.0) then
-          if (b.eq.null_range) b = pcp(jphyc)%bgn
-          if (e.eq.null_range) e = pcp(jphyc)%end
+          if (b.eq.null_range) b = pcp(jphyc)%bgn + osh
+          if (e.eq.null_range) e = pcp(jphyc)%end + osh
        endif
        s = pcp(jphyc)%stp
     endif
-
   end subroutine get_logical_range
 
 !!!_   . settle_output_domain
@@ -924,18 +943,18 @@ contains
 !!!_  - coordinate manipulation
 !!!_   . decompose_coordinate_mod
   subroutine decompose_coordinate_mod &
-       & (ierr, jrep, b, e, s, arg, flag)
+       & (ierr, jrep, lpp, arg, flag)
     use TOUZA_Std,only: split_list, condop
     implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: jrep     ! name/rename as (1:jrep)
-    integer,optional,intent(out) :: b, e, s  ! either all or none specified
-    character(len=*),intent(in)  :: arg
-    integer,         intent(in)  :: flag     ! prefered style
+    integer,         intent(out)            :: ierr
+    integer,         intent(out)            :: jrep     ! name/rename as (1:jrep)
+    type(loop_t),    intent(inout),optional :: lpp
+    character(len=*),intent(in)             :: arg
+    integer,         intent(in)             :: flag     ! prefered style
     integer larg, lsep
     integer js0, js1
-    integer rpos(2)
-    integer,parameter :: rdef(2) = (/null_range, null_range/)
+    integer rpos(3)
+    integer,parameter :: rdef(3) = (/null_range, null_range, 0/)
     integer nc
     integer jran
     logical no_range
@@ -953,13 +972,7 @@ contains
     lsep = len(rename_sep)
     larg = len_trim(arg)
 
-    if ((present(b).eqv.present(e)) &
-         & .and. (present(b).eqv.present(s))) then
-       no_range = .not.present(b)
-    else
-       ierr = ERR_FEW_ARGUMENTS
-       return
-    endif
+    no_range = .not.present(lpp)
 
     js0 = index(arg, rename_sep)
     jran = -1
@@ -999,31 +1012,33 @@ contains
 
     rpos(1) = system_index_bgn(null_range)
     rpos(2) = system_index_end(null_range)
-    s = -1
-    call split_list(nc, rpos, arg(jran:larg), range_sep, 2, rdef(:))
+    rpos(3) = 0
+    lpp = def_loop
+    call split_list(nc, rpos, arg(jran:larg), range_sep, 3, rdef(:))
     if (nc.lt.0) then
        ierr = nc
        call message(ierr, 'cannot parse range: ' // trim(arg(jran:larg)))
     else if (nc.eq.0) then
-       b = system_index_bgn(rpos(1))
-       e = system_index_end(rpos(2))
+       lpp%bgn = system_index_bgn(rpos(1))
+       lpp%end = system_index_end(rpos(2))
     else if (nc.eq.1) then
        if (flag.eq.shape_size) then
           ! force null coordinate if size==0
-          b = 0
-          e = rpos(1)
-          s = condop(rpos(1).eq.0, 0, 1)
+          lpp%bgn = 0
+          lpp%end = rpos(1)
+          lpp%stp = condop(rpos(1).eq.0, 0, 1)
        else
-          b = system_index_bgn(rpos(1))
-          e = b + 1
-          s = 1
+          lpp%bgn = system_index_bgn(rpos(1))
+          lpp%end = lpp%bgn + 1
+          lpp%stp = 1
        endif
-    else if (nc.eq.2) then
-       b = system_index_bgn(rpos(1))
-       e = system_index_end(rpos(2))
-       s = 1
-       if (e.ne.null_range .and. e.le.b) s = 0
-    else if (nc.gt.2) then
+    else if (nc.lt.4) then
+       lpp%bgn = system_index_bgn(rpos(1))
+       lpp%end = system_index_end(rpos(2))
+       lpp%stp = 1
+       if (lpp%end.ne.null_range .and. lpp%end.le.lpp%bgn) lpp%stp = 0
+       if (nc.eq.3) lpp%ofs = rpos(3)
+    else if (nc.ge.4) then
        ierr = ERR_INVALID_PARAMETER
        call message(ierr, 'fail to extract range ' // trim(arg(jran:larg)))
     endif
@@ -1045,7 +1060,7 @@ contains
     integer jp, je, jr
     integer lf
     integer jerr
-    integer b, e, s
+    type(loop_t) :: lpp
 
     jerr = 0
     lf = len_trim(fmt)
@@ -1054,12 +1069,12 @@ contains
     do
        if (jp.ge.lf) exit
        je = find_next_sep(fmt, csep, jp)
-       if (jerr.eq.0) call decompose_coordinate_mod(jerr, jr, b, e, s, fmt(jp+1:je), shape_size)
+       if (jerr.eq.0) call decompose_coordinate_mod(jerr, jr, lpp, fmt(jp+1:je), shape_size)
        if (jerr.eq.0) then
-          if (s.le.0) then
+          if (lpp%stp.le.0) then
              irange(1:2, nco) = (/0, 0/)
           else
-             irange(1:2, nco) = (/b, e/)
+             irange(1:2, nco) = (/lpp%bgn, lpp%end/)
           endif
           cname(nco) = fmt(jp+1:jp+jr)
        endif
