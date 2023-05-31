@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/03/28 07:17:22 fuyuki demo-chak.sh.in>
+# Time-stamp: <2023/05/31 10:19:56 fuyuki demo-chak.sh.in>
 
 main ()
 {
@@ -116,17 +116,17 @@ demo_operation ()
   run_demo flat:flat/s02 -TRIM 9     $src FLAT=0,2     = POP
   run_demo flat:flat/s20 -TRIM 9     $src FLAT=2,0     = POP
 
-  run_demo flat:flat     -TRIM 3:3   $src FLAT         FLUSH -i
-  run_demo flat:flat/0   -TRIM 9     $src FLAT=0       FLUSH -i
-  run_demo flat:flat/1   -TRIM 9     $src FLAT=1       FLUSH -i
-  run_demo flat:flat/01  -TRIM 3:3   $src FLAT=0,1     FLUSH -i
-  run_demo flat:flat/10  -TRIM 9     $src FLAT=1,0     FLUSH -i
-  run_demo flat:flat/02  -TRIM 3:3   $src FLAT=0,2     FLUSH -i
-  run_demo flat:flat/20  -TRIM 3:3   $src FLAT=2,0     FLUSH -i
-  run_demo flat:flat/x   -TRIM 9     $src FLAT=lon     FLUSH -i
-  run_demo flat:flat/zy  -TRIM 9     $src FLAT=lev,lat FLUSH -i
+  run_demo flat:flat     -TRIM 3:3   T=0 $src FLAT         FLUSH -i
+  run_demo flat:flat/0   -TRIM 9     T=0 $src FLAT=0       FLUSH -i
+  run_demo flat:flat/1   -TRIM 9     T=0 $src FLAT=1       FLUSH -i
+  run_demo flat:flat/01  -TRIM 3:3   T=0 $src FLAT=0,1     FLUSH -i
+  run_demo flat:flat/10  -TRIM 9     T=0 $src FLAT=1,0     FLUSH -i
+  run_demo flat:flat/02  -TRIM 3:3   T=0 $src FLAT=0,2     FLUSH -i
+  run_demo flat:flat/20  -TRIM 3:3   T=0 $src FLAT=2,0     FLUSH -i
+  run_demo flat:flat/x   -TRIM 9     T=0 $src FLAT=lon     FLUSH -i
+  run_demo flat:flat/zy  -TRIM 9     T=0 $src FLAT=lev,lat FLUSH -i
 
-  run_demo flat:flat/0+1 -TRIM 9     $src FLAT=0 FLAT=1 FLUSH -i
+  run_demo flat:flat/0+1 -TRIM 9     T=0 $src FLAT=0 FLAT=1 FLUSH -i
 
   return 0
 }
@@ -154,7 +154,7 @@ run_demo ()
   while [[ $# -gt 0 ]]
   do
     case $1 in
-    (-NOCOL) col=; shift;;
+    (-NOCOL) col=;;
     (-TRIM)  trim=$2; shift 2;;
     (-E)     edup=T;;
     (-C)     hcom="$2"; shift;;
