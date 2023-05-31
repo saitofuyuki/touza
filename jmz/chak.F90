@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/05/19 08:59:54 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/31 16:53:43 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1254,6 +1254,8 @@ contains
              aqueue(jq)%lefts(:)%lcp(jc)%bgn  = null_range
              aqueue(jq)%lefts(:)%lcp(jc)%end  = null_range
              aqueue(jq)%lefts(:)%lcp(jc)%stp  = -1
+             aqueue(jq)%lefts(:)%lcp(jc)%ofs  = 0
+             aqueue(jq)%lefts(:)%lcp(jc)%cyc  = 0
           endif
        endif
        jc = jc + 1
@@ -1346,7 +1348,8 @@ contains
 
     integer jq
     integer jsbgn, jsend
-    integer b, e, s, jrep
+    type(loop_t) :: lpp
+    integer jrep
     integer flag
 
     ierr = 0
@@ -1386,16 +1389,12 @@ contains
           call message(ierr, 'too many ranks to SHAPE:' // trim(arg))
        else
           flag = condop((hopr.eq.opr_SIZE), shape_size, shape_element)
-          call decompose_coordinate_mod(ierr, jrep, b, e, s, arg(jpb+1:jpe-1), flag)
+          call decompose_coordinate_mod(ierr, jrep, lpp, arg(jpb+1:jpe-1), flag)
           if (ierr.eq.0) then
+             aqueue(jq)%lefts(:)%lcp(jc) = lpp
              aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
-             aqueue(jq)%lefts(:)%lcp(jc)%bgn  = b
-             aqueue(jq)%lefts(:)%lcp(jc)%end  = e
-             aqueue(jq)%lefts(:)%lcp(jc)%stp  = s
+             bstack(jsbgn:jsend-1)%lcp(jc) = lpp
              bstack(jsbgn:jsend-1)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
-             bstack(jsbgn:jsend-1)%lcp(jc)%bgn = b
-             bstack(jsbgn:jsend-1)%lcp(jc)%end = e
-             bstack(jsbgn:jsend-1)%lcp(jc)%stp = s
           endif
           ! aqueue(jq)%lefts(:)%lcp(jc)%name   = adjustl(arg(jpb+1:jpe-1))
           ! bstack(jsbgn:jsend-1)%lcp(jc)%name = adjustl(arg(jpb+1:jpe-1))
@@ -1417,7 +1416,8 @@ contains
     integer lasth
     integer jq
     integer pop, push
-    integer b, e, s, jrep
+    type(loop_t) :: lpp
+    integer jrep
     integer flag
 
     ierr = 0
@@ -1441,20 +1441,15 @@ contains
     endif
     if (ierr.eq.0) then
        flag = condop((hopr.eq.opr_SIZE), shape_size, shape_element)
-       call decompose_coordinate_mod(ierr, jrep, b, e, s, arg, flag)
+       call decompose_coordinate_mod(ierr, jrep, lpp, arg, flag)
        ! write(*, *) ierr, b, e, s, arg(1:jrep)
     endif
     if (ierr.eq.0) then
        jq = mqueue - 1
+       aqueue(jq)%lefts(:)%lcp(cidx) = lpp
        aqueue(jq)%lefts(:)%lcp(cidx)%name = arg(1:jrep)
-       aqueue(jq)%lefts(:)%lcp(cidx)%bgn = b
-       aqueue(jq)%lefts(:)%lcp(cidx)%end = e
-       aqueue(jq)%lefts(:)%lcp(cidx)%stp = s
-
+       bstack(mstack-pop:mstack-1)%lcp(cidx) = lpp
        bstack(mstack-pop:mstack-1)%lcp(cidx)%name = arg(1:jrep)
-       bstack(mstack-pop:mstack-1)%lcp(cidx)%bgn = b
-       bstack(mstack-pop:mstack-1)%lcp(cidx)%end = e
-       bstack(mstack-pop:mstack-1)%lcp(cidx)%stp = s
     endif
   end subroutine parse_coordinate_opr
 
@@ -3193,6 +3188,7 @@ contains
           obuffer(jb)%desc  = repr
           obuffer(jb)%desc2 = repr
           obuffer(jb)%ilev  = ilev_term
+          obuffer(jb)%pcp(:) = def_loop
           obuffer(jb)%pcp(:)%bgn = 0
           obuffer(jb)%pcp(:)%end = 0
           obuffer(jb)%pcp(:)%stp = -1
@@ -5895,6 +5891,10 @@ contains
        jb = buf_h2item(bufh(j))
        js = pstk(j)
        ! write(*, *) 'tc:', j, bufh(j), pstk(j), jb, js
+       ! do jc = 0, size(bstack(js)%lcp) - 1
+       !    write(*, *) 'bstack%lcp: ', js, jc, bstack(js)%lcp(jc)
+       !    write(*, *) 'obuffer%pcp:', jb, jc, obuffer(jb)%pcp(jc)
+       ! enddo
        if (ierr.eq.0) then
           call get_logical_shape &
                & (ierr, nameR(:,j), ctype(:,j), cpidx(:,j), bstack(js)%lcp, obuffer(jb)%pcp, lcoor)
@@ -5961,7 +5961,7 @@ contains
     integer j
     integer jb,    jo, js
     ! integer jphyc, jlogc
-    integer b,   e,    s
+    integer b,   e,    s,   odmy
     integer low, high, stp
     integer,parameter :: lini = HUGE(0)
     integer,parameter :: hini = (- HUGE(0)) - 1
@@ -5984,7 +5984,8 @@ contains
           do j = 0, nbuf - 1
              jb = buf_h2item(bufh(j))
              js = pstk(j)
-             call get_logical_range(b, e, s, jo, bstack(js)%lcp, obuffer(jb)%pcp, domR(j))
+             call get_logical_range(b, e, s, odmy, jo, bstack(js)%lcp, obuffer(jb)%pcp, domR(j))
+             ! write(*, *) 'glr:', jo, j, b, e, s
              stp = max(stp, s)
              if (isi) then
                 if (b.ne.null_range) low = max(low, b)
@@ -6014,7 +6015,7 @@ contains
     type(domain_t),intent(in)    :: ref
 
     integer jo
-    integer b,  e, s
+    integer b, e, s, osh
     integer jb
 
     ierr = 0
@@ -6023,17 +6024,25 @@ contains
     do jo = 0, ref%mco - 1
        ! call set_logical_range(b, e, jo, bstack(jstk)%lcp, dom, ref)
        call get_logical_range &
-            & (b, e, s, jo, bstack(jstk)%lcp, obuffer(jb)%pcp, dom, ref)
+            & (b, e, s, osh, jo, bstack(jstk)%lcp, obuffer(jb)%pcp, dom, ref)
        dom%bgn(jo) = b
        dom%end(jo) = max(e, 1+b)
        dom%iter(jo) = max(1, e - b)
+       dom%ofs(jo) = osh
+       ! write(*, *) 'sib0:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
     enddo
     if (ierr.eq.0) then
        call settle_domain_stride(ierr, dom, obuffer(jb)%pcp)
     endif
+    ! do jo = 0, ref%mco - 1
+    !    write(*, *) 'sib1:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
+    ! enddo
     if (ierr.eq.0) then
        call settle_domain_loop_h(ierr, dom, hbuf, ref)
     endif
+    ! do jo = 0, ref%mco - 1
+    !    write(*, *) 'sib9:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
+    ! enddo
 
   end subroutine settle_input_domain
 
@@ -6069,21 +6078,23 @@ contains
                 dom%bgn(jc) = max(0, max(refd%bgn(jc), dom%bgn(jc)) - refd%bgn(jc))
                 dom%end(jc) = max(0, min(refd%end(jc), dom%end(jc)) - refd%bgn(jc))
              else
-                dom%bgn(jc) = max(refd%bgn(jc), dom%bgn(jc), buf%pcp(kc)%bgn) - refd%bgn(jc)
-                dom%end(jc) = min(refd%end(jc), dom%end(jc), buf%pcp(kc)%end) - refd%bgn(jc)
+                dom%bgn(jc) = max(refd%bgn(jc), dom%bgn(jc), buf%pcp(kc)%bgn + dom%ofs(jc)) - refd%bgn(jc)
+                dom%end(jc) = min(refd%end(jc), dom%end(jc), buf%pcp(kc)%end + dom%ofs(jc)) - refd%bgn(jc)
              endif
              if (buf%pcp(kc)%bgn.eq.null_range) then
                 dom%ofs(jc) = 0
              else
-                dom%ofs(jc) = - (buf%pcp(kc)%bgn - refd%bgn(jc))
+                dom%ofs(jc) = - (buf%pcp(kc)%bgn + dom%ofs(jc) - refd%bgn(jc))
              endif
           else
              dom%bgn(jc) = max(0, max(refd%bgn(jc), dom%bgn(jc)) - refd%bgn(jc))
              dom%end(jc) = max(0, min(refd%end(jc), dom%end(jc)) - refd%bgn(jc))
              dom%ofs(jc) = 0
           endif
+          ! write(*, *) 'sdl1:', jc, dom%bgn(jc), dom%end(jc), dom%iter(jc), dom%ofs(jc)
           dom%end(jc) = max(dom%bgn(jc), dom%end(jc))
           dom%iter(jc) = max(1, dom%end(jc) - dom%bgn(jc))
+          ! write(*, *) 'sdl9:', jc, dom%bgn(jc), dom%end(jc), dom%iter(jc), dom%ofs(jc)
        enddo
     endif
 
@@ -6151,6 +6162,8 @@ contains
              buf%pcp(jc)%end = dom%end(jc)
              buf%pcp(jc)%stp = 1
           endif
+          buf%pcp(jc)%ofs = 0
+          buf%pcp(jc)%cyc = 0
        enddo
        do jc = dom%mco, lcoor - 1
           buf%pcp(jc) = def_loop
