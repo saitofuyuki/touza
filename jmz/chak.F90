@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/05/31 16:53:43 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/01 17:38:56 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -283,7 +283,11 @@ contains
 201    format('queue[', I0, '] ', I0, 1x, A)
        if (ierr.eq.0) then
           js = js - aqueue(j)%nopr + size(aqueue(j)%lefts)
-          write(utmp, 201) user_index_bgn(j), js, trim(str)
+          if (utmp.ge.0) then
+             write(utmp, 201) user_index_bgn(j), js, trim(str)
+          else if (utmp.eq.-1) then
+             write(*,    201) user_index_bgn(j), js, trim(str)
+          endif
        endif
     enddo
   end subroutine show_queue
@@ -1145,6 +1149,17 @@ contains
           npop = pop + 1
        endif
        if (ierr.eq.0) call stack_POP(ierr, pop, npop, iter, arg=arg)
+    else if (hopr.eq.opr_PROP) then
+       if (ierr.eq.0) call last_queue(ierr, hlast, pop, iter=iter)
+       if (ierr.eq.0) then
+          if (hlast.eq.hopr.and.iter.eq.0) then
+             continue
+          else
+             pop = 0
+          endif
+          npop = pop + 1
+       endif
+       if (ierr.eq.0) call stack_POP(ierr, pop, npop, iter, hopr)
     else if (ANY(hopr.eq.(/opr_FLUSH, opr_DFLUSH, opr_CFLUSH/))) then
        pop = 0
        ! npop = mstack
@@ -1738,9 +1753,9 @@ contains
           call stack_DUP(ierr, lasth, 1)
        else if (lasth.eq.opr_EXCH) then
           call stack_EXCH(ierr, lasth, 1)
-       else if (lasth.eq.opr_POP) then
+       else if (ANY(lasth.eq.(/opr_POP, opr_PROP/))) then
           npop = stacks_above_anchor(opop, opush)
-          call stack_POP(ierr, opop, npop, 1)
+          call stack_POP(ierr, opop, npop, 1, lasth)
        else if (lasth.eq.opr_DIST) then
           call stack_DIST(ierr, lasth)
        else if (lasth.eq.opr_INSERT) then
@@ -3938,7 +3953,7 @@ contains
           pop = aqueue(jq)%nopr
           if (ierr.eq.0) then
              call apply_operator &
-                  & (ierr, hterm, aqueue(jq)%lefts, pop, push, aqueue(jq)%cmode, levv)
+                  & (ierr, hterm, aqueue(jq)%lefts, pop, push, aqueue(jq)%cmode, irecw, levv)
           endif
        end select
        if (is_msglev_DETAIL(levv)) then
@@ -4035,13 +4050,14 @@ contains
 !!!_  - operations
 !!!_   . apply_operator
   subroutine apply_operator &
-       & (ierr, handle, lefts, pop, push, cmode, levv)
+       & (ierr, handle, lefts, pop, push, cmode, irec, levv)
     implicit none
     integer,      intent(out)   :: ierr
     integer,      intent(in)    :: handle
     type(stack_t),intent(inout) :: lefts(*)
     integer,      intent(in)    :: push, pop
     integer,      intent(in)    :: cmode
+    integer,      intent(in)    :: irec
     integer,      intent(in)    :: levv
 
     integer,parameter :: lmaxo = 8
@@ -4061,6 +4077,8 @@ contains
           call flush_stack(ierr, pop, IOR(cmode, cmode_xundef))
        else if (handle.eq.opr_CFLUSH) then
           call flush_stack(ierr, pop, IOR(cmode, cmode_column))
+       else if (handle.eq.opr_PROP) then
+          call list_stack(ierr, pop, irec)
 !!!_    * transformation
        else if (handle.eq.opr_TRANSF) then
           continue
@@ -4529,7 +4547,7 @@ contains
     integer js
 
     integer jbuf
-    character(len=64) :: lcstr, pcstr, dstr
+    character(len=128) :: lcstr, pcstr, dstr
     character(len=64) :: fmt_nline
     character(len=64) :: fmt_xline
     character(len=64),allocatable :: vals(:)
@@ -5047,6 +5065,62 @@ contains
     endif
 
   end subroutine flush_buffer_horizontally_column
+
+!!!_   . list_stack
+  subroutine list_stack(ierr, pop, irec, u)
+    use TOUZA_Std,only: choice
+    use TOUZA_Nio,only: show_header, parse_header_size
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: pop
+    integer,intent(in)          :: irec
+    integer,intent(in),optional :: u
+
+    integer jinp
+    integer jbuf
+    integer hb
+    integer js
+    integer m, alev
+    integer utmp
+    character(len=64) :: cprop(0:lcoor-1)
+    character(len=128) :: str, dstr
+
+    type(buffer_t) :: htmp
+    type(domain_t) :: doml, domr(1)
+    integer btmp(1), ptmp(1)
+    integer nb
+
+    ierr = 0
+    utmp = choice(ulog, u)
+    nb = 1
+
+    do jinp = 0, pop - 1
+       js = mstack - pop + jinp
+       hb = bstack(js)%bh
+
+       alev = anchor_h2level(hb)
+       if (alev.ge.0) cycle
+       jbuf  = buf_h2item(hb)
+
+       btmp(1) = hb
+       ptmp(1) = js
+
+       if (ierr.eq.0) then
+          call get_compromise_domain(ierr, domL, domR, btmp, ptmp, nb, cmode_inclusive, htmp)
+       endif
+       if (ierr.eq.0) then
+          call get_domain_shape &
+               & (ierr, dstr, domR(1), obuffer(jbuf)%pcp, bstack(js)%lcp, domL, &
+               &  ldelim=' ', rdelim=' ', sep=',')
+       endif
+       if (ierr.eq.0) call get_obj_string(ierr, str, hb)
+101    format(I0, 1x, I0, 1x, A, 1x, A, 1x, A)
+       write(utmp, 101) &
+            & user_index_bgn(irec), user_index_bgn(js), &
+            & trim(str), trim(dstr), trim(obuffer(jbuf)%desc)
+    enddo
+
+  end subroutine list_stack
 
 !!!_   . copy_set_header
   subroutine copy_set_header &

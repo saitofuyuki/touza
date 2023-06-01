@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/05/31 20:41:40 fuyuki genopr.sh>
+# Time-stamp: <2023/06/01 17:02:05 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -108,6 +108,7 @@ register_all ()
   register -g stack -n 1,2         COPY     'copy top stack on new buffer'
   register -g stack -n 1,1         CLONE    'copy top stack on new buffer and discard the original'
   register -g stack -n 1,0 -o NAME POP      'discard top stack and optionally tag'
+  register -g stack -n 1,0         PROP     'show stack properties and pop'
   register -g stack -n 2,2         EXCH     'B A; exchange two top stacks'
   register -g stack -n 0,0         NOP      'no operation; do nothing'
   register -g stack +n m,'2(m-1)'  DIST     'distribute top stack for every stack from last anchor'
