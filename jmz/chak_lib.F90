@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/05/31 16:49:01 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/01 17:52:14 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -577,19 +577,23 @@ contains
   end subroutine get_domain_result
 !!!_   . get_domain_shape
   subroutine get_domain_shape &
-       & (ierr, str, dom, pcp, lcp, ref, cbgn, cend)
-    use TOUZA_Std,only: join_list, choice
+       & (ierr, str, dom, pcp, lcp, ref, cbgn, cend, ldelim, rdelim, sep)
+    use TOUZA_Std,only: join_list, choice, choice_a
     implicit none
-    integer,         intent(out) :: ierr
-    character(len=*),intent(out) :: str
-    type(domain_t),  intent(in)  :: dom
-    type(loop_t),    intent(in)  :: pcp(0:*), lcp(0:*)
-    type(domain_t),  intent(in)  :: ref
-    integer,optional,intent(in)  :: cbgn, cend
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(out)         :: str
+    type(domain_t),  intent(in)          :: dom
+    type(loop_t),    intent(in)          :: pcp(0:*), lcp(0:*)
+    type(domain_t),  intent(in)          :: ref
+    integer,optional,intent(in)          :: cbgn, cend
+    character(len=*),intent(in),optional :: ldelim, rdelim, sep
 
     integer jodr, jphyc, jlogc
     character(len=lname)   :: cran
     character(len=lname*2) :: cbuf(0:lcoor-1)
+
+    character(len=32) :: ld, rd, sp
+
     integer b, e, s, odmy
     integer cb, ce
 
@@ -627,7 +631,14 @@ contains
     if (ierr.eq.0) then
        cb = choice(0, cbgn)
        ce = choice(dom%mco, cend)
-       call join_list(ierr, str, cbuf(cb:ce-1), ldelim='[', rdelim=']')
+       call choice_a(ld, '[', ldelim)
+       call choice_a(rd, ']', rdelim)
+       call choice_a(sp, ' ', sep)
+       call join_list(ierr, str, cbuf(cb:ce-1), sep=sp)
+       if (ierr.eq.0) then
+          if (ld.ne.' ') str = trim(ld) // trim(str)
+          if (rd.ne.' ') str = trim(str) // trim(rd)
+       endif
     endif
   end subroutine get_domain_shape
 
