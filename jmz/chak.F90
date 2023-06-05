@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/01 17:38:56 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/05 13:28:41 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -70,7 +70,7 @@ program chak
 
   integer,parameter :: max_operands = 2
 !!!_  - global flags
-  integer :: def_cmode = cmode_inclusive   ! default compromise mode
+  integer :: def_cmode = cmode_null   ! default compromise mode
 
   character(len=lfmt),save :: afmt_int = '(I0)'
   character(len=lfmt),save :: afmt_flt = '(es16.12)'
@@ -235,6 +235,7 @@ contains
     integer j
     integer js
     integer hk
+    integer cmode
     character(len=128) :: buf
     character(len=lpath) :: str
     character cmd
@@ -248,7 +249,11 @@ contains
     js = 0
     do j = 0, min(mqueue, lqueue) - 1
        if (ierr.eq.0) then
-          select case(aqueue(j)%cmode)
+          cmode = aqueue(j)%cmode
+          if (cmode.eq.cmode_null) cmode = def_cmode
+          select case(cmode)
+          case(cmode_each)
+             cmd = 'e'
           case(cmode_first)
              cmd = 'l'
           case(cmode_inclusive)
@@ -664,6 +669,8 @@ contains
        md = mode_terminate
     else if (abuf.eq.'-p') then
        md = mode_persistent
+    else if (abuf.eq.'-e') then
+       cmd = cmode_each
     else if (abuf.eq.'-i') then   ! compromise mode
        cmd = cmode_inclusive
     else if (abuf.eq.'-x') then
@@ -3924,6 +3931,7 @@ contains
     integer neof, nterm
     integer hf
     integer stt, sttj
+    integer cmode
 
     ierr = 0
 
@@ -3952,8 +3960,10 @@ contains
           push = size(aqueue(jq)%lefts)
           pop = aqueue(jq)%nopr
           if (ierr.eq.0) then
+             cmode = aqueue(jq)%cmode
+             if (cmode.eq.cmode_null) cmode = def_cmode
              call apply_operator &
-                  & (ierr, hterm, aqueue(jq)%lefts, pop, push, aqueue(jq)%cmode, irecw, levv)
+                  & (ierr, hterm, aqueue(jq)%lefts, pop, push, cmode, irecw, levv)
           endif
        end select
        if (is_msglev_DETAIL(levv)) then
@@ -4051,6 +4061,7 @@ contains
 !!!_   . apply_operator
   subroutine apply_operator &
        & (ierr, handle, lefts, pop, push, cmode, irec, levv)
+    use TOUZA_Std,only: condrep
     implicit none
     integer,      intent(out)   :: ierr
     integer,      intent(in)    :: handle
@@ -4063,6 +4074,7 @@ contains
     integer,parameter :: lmaxo = 8
     integer righth(pop)
     integer j, jb
+    integer cm
     character(len=8) :: opr
 
     ierr = 0
@@ -4070,13 +4082,16 @@ contains
     if (ierr.eq.0) then
 !!!_    * output
        if (handle.eq.opr_OUTPUT) then
-          call flush_stack(ierr, pop, cmode_null)
+          call flush_stack(ierr, pop, cmode_each)
        else if (handle.eq.opr_FLUSH) then
-          call flush_stack(ierr, pop, cmode)
+          cm = condrep(cmode, cmode_null, cmode_each)
+          call flush_stack(ierr, pop, cm)
        else if (handle.eq.opr_DFLUSH) then
-          call flush_stack(ierr, pop, IOR(cmode, cmode_xundef))
+          cm = condrep(cmode, cmode_null, cmode_each)
+          call flush_stack(ierr, pop, IOR(cm, cmode_xundef))
        else if (handle.eq.opr_CFLUSH) then
-          call flush_stack(ierr, pop, IOR(cmode, cmode_column))
+          cm = condrep(cmode, cmode_null, cmode_each)
+          call flush_stack(ierr, pop, IOR(cm, cmode_column))
        else if (handle.eq.opr_PROP) then
           call list_stack(ierr, pop, irec)
 !!!_    * transformation
@@ -4340,7 +4355,7 @@ contains
     enddo
 
     select case(IAND(cmode, cmode_compromise))
-    case (cmode_null)
+    case (cmode_each)
        if (IAND(cmode, cmode_column).eq.0) then
           call flush_buffer_each(ierr, nbuf, bufh, bufj, pstk, cmode, u)
        else

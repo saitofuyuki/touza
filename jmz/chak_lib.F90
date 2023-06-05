@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/01 17:52:14 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/04 15:06:20 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -143,14 +143,15 @@ module chak_lib
 
 !!!_  - domain compromise mode for non-unary operations
   integer,parameter :: cmode_null      = 0
-  integer,parameter :: cmode_inclusive = 1
-  integer,parameter :: cmode_intersect = 2
-  integer,parameter :: cmode_first     = 3
+  integer,parameter :: cmode_each      = 1
+  integer,parameter :: cmode_inclusive = 2
+  integer,parameter :: cmode_intersect = 3
+  integer,parameter :: cmode_first     = 4
 
-  integer,parameter :: cmode_compromise = 3  ! mask
+  integer,parameter :: cmode_compromise = 7  ! mask
 
-  integer,parameter :: cmode_xundef     = 4  ! exclude undefined at flushing
-  integer,parameter :: cmode_column     = 8  ! columned
+  integer,parameter :: cmode_xundef     = 8  ! exclude undefined at flushing
+  integer,parameter :: cmode_column     = 16  ! columned
 
 !!!_  - shape parser flag
   integer,parameter :: shape_element = 0  ! interprete single integer as element
