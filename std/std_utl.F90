@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/04/08 10:59:49 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/05 13:24:46 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2023
@@ -25,8 +25,9 @@
 #else
 #  define _ELEMENTAL
 #endif
-#define _CHOICE_DECL _ELEMENTAL
-#define _CONDOP_DECL _ELEMENTAL
+#define _CHOICE_DECL  _ELEMENTAL
+#define _CONDOP_DECL  _ELEMENTAL
+#define _CONDREP_DECL _ELEMENTAL
 !!!_@ TOUZA_Std_utl - small utilities
 module TOUZA_Std_utl
   use TOUZA_Std_prc, only: KFLT, KDBL, KI64
@@ -57,6 +58,10 @@ module TOUZA_Std_utl
   interface condop
      module procedure condop_i, condop_f, condop_d, condop_l
   end interface condop
+
+  interface condrep
+     module procedure condrep_i, condrep_f, condrep_d
+  end interface condrep
 
   interface upcase
      module procedure upcase_m, upcase_o
@@ -101,7 +106,7 @@ module TOUZA_Std_utl
   public init, diag, finalize
   public choice, choice_a
   public set_if_present
-  public condop
+  public condop, condrep
   public chcount
   public upcase, downcase
   public ndigits
@@ -494,6 +499,43 @@ contains
     endif
     return
   end subroutine set_if_present_a
+
+!!!_  & condrep() - conditional replace operator
+  _CONDREP_DECL integer function condrep_i (v, src, rep) result(r)
+    implicit none
+    integer,intent(in) :: v
+    integer,intent(in) :: src, rep
+    if (v.eq.src) then
+       r = rep
+    else
+       r = v
+    endif
+    return
+  end function condrep_i
+  _CONDREP_DECL real(kind=KTGT) function condrep_f (v, src, rep) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    real(kind=KTGT),intent(in) :: v
+    real(kind=KTGT),intent(in) :: src, rep
+    if (v.eq.src) then
+       r = rep
+    else
+       r = v
+    endif
+    return
+  end function condrep_f
+  _CONDREP_DECL real(kind=KTGT) function condrep_d (v, src, rep) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: v
+    real(kind=KTGT),intent(in) :: src, rep
+    if (v.eq.src) then
+       r = rep
+    else
+       r = v
+    endif
+    return
+  end function condrep_d
 
 !!!_  & condop() - conditional operator
   _CONDOP_DECL integer function condop_i (l, vt, vf) result(r)
