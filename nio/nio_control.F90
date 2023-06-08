@@ -1,7 +1,7 @@
 !!!_! nio_control.F90 - TOUZA/Nio control center
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 12 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:39:45 fuyuki nio_control.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/08 13:18:05 fuyuki nio_control.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -349,6 +349,7 @@ contains
     logical bcache, bseq
 
     ierr = err_default
+    handle = -1
     ! todo: cache-mode check
 
     f = flag
