@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2023/04/17 14:27:50 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/08 10:45:13 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2023
@@ -1199,8 +1199,8 @@ contains
        &  ucfg, cha, chc,  che,  chu)
     implicit none
     integer,         intent(out)   :: ierr
-    character(len=*),intent(out)   :: T(0:*)
-    character(len=*),intent(out)   :: V(0:*)
+    character(len=*),intent(inout) :: T(0:*)
+    character(len=*),intent(inout) :: V(0:*)
     integer,         intent(inout) :: jpa
     integer,         intent(in)    :: npa
     integer,         intent(inout) :: me
@@ -1796,9 +1796,9 @@ contains
        else
           ierr = 1
        endif
-       if (present(nitem)) then
-          nitem = 0
-       endif
+    endif
+    if (present(nitem)) then
+       nitem = 0
     endif
     return
   end subroutine default_vals_i
@@ -1822,9 +1822,9 @@ contains
        else
           ierr = 1
        endif
-       if (present(nitem)) then
-          nitem = 0
-       endif
+    endif
+    if (present(nitem)) then
+       nitem = 0
     endif
     return
   end subroutine default_vals_f
@@ -1848,9 +1848,9 @@ contains
        else
           ierr = 1
        endif
-       if (present(nitem)) then
-          nitem = 0
-       endif
+    endif
+    if (present(nitem)) then
+       nitem = 0
     endif
     return
   end subroutine default_vals_d
