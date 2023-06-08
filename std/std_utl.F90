@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/06/06 09:45:51 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/08 10:16:10 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2023
@@ -890,6 +890,8 @@ contains
     integer p
 
     ierr = 0
+    ufc = ' '
+    ofc = ' '
     if (present(single)) then
        fmt = single
     else
@@ -1201,7 +1203,7 @@ contains
        & (n, h, str, sep, lim, empty)
     implicit none
     integer,          intent(out)         :: n         ! number of elements or error code
-    integer,          intent(out)         :: h(0:)
+    integer,          intent(out)         :: h(0:*)
     character(len=*), intent(in)          :: str
     character(len=*), intent(in)          :: sep
     integer,          intent(in),optional :: lim       ! negative to count only; 0 to infinite
