@@ -56,11 +56,11 @@ main ()
     if [[ $#ref -eq 1 ]]; then
       base=${sub%_*}_
     else
-       [[ -z $aref ]] && print -u2 - "cannot set reference suffix for $sub" && returun 1
+       [[ -z $aref ]] && print -u2 - "cannot set reference suffix for $sub" && return 1
        ref=$aref
-       base=${sub}_
-       sub=${sub}_$ref
+       base=${sub%$ref}
     fi
+    print -u2 - "transform: $base+[$ref] > $sub"
 
     bpat="^[^!]*\\(subroutine\\|function\\) *$sub"
     epat="^[^!]*end .*\\(subroutine\\|function\\) *$sub"
