@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/06/08 10:16:10 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/09 09:10:54 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2023
@@ -63,12 +63,6 @@ module TOUZA_Std_utl
      module procedure condrep_i, condrep_f, condrep_d
   end interface condrep
 
-  interface opt_array_size
-     module procedure opt_array_size_empty
-     module procedure opt_array_size_i, opt_array_size_l, opt_array_size_b
-     module procedure opt_array_size_f, opt_array_size_d, opt_array_size_a
-  end interface opt_array_size
-
   interface upcase
      module procedure upcase_m, upcase_o
   end interface upcase
@@ -113,7 +107,6 @@ module TOUZA_Std_utl
   public choice, choice_a
   public set_if_present
   public condop, condrep
-  public opt_array_size
   public chcount
   public upcase, downcase
   public ndigits
@@ -594,52 +587,6 @@ contains
     endif
     return
   end function condop_l
-
-!!!_  & opt_array_size() - count optional array size
-  PURE &
-  integer function opt_array_size_empty () result (n)
-    implicit none
-    n = -1
-  end function opt_array_size_empty
-  PURE &
-  integer function opt_array_size_i (v) result (n)
-    implicit none
-    integer,intent(in) :: v(:)
-    n = size(v)
-  end function opt_array_size_i
-  PURE &
-  integer function opt_array_size_l (v) result (n)
-    use TOUZA_Std_prc,only: KTGT=>KI64
-    implicit none
-    integer(kind=KTGT),intent(in) :: v(:)
-    n = size(v)
-  end function opt_array_size_l
-  PURE &
-  integer function opt_array_size_b (v) result (n)
-    implicit none
-    logical,intent(in) :: v(:)
-    n = size(v)
-  end function opt_array_size_b
-  PURE &
-  integer function opt_array_size_f (v) result (n)
-    use TOUZA_Std_prc,only: KTGT=>KFLT
-    implicit none
-    real(kind=KTGT),intent(in) :: v(:)
-    n = size(v)
-  end function opt_array_size_f
-  PURE &
-  integer function opt_array_size_d (v) result (n)
-    use TOUZA_Std_prc,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: v(:)
-    n = size(v)
-  end function opt_array_size_d
-  PURE &
-  integer function opt_array_size_a (v) result (n)
-    implicit none
-    character(len=*),intent(in) :: v(:)
-    n = size(v)
-  end function opt_array_size_a
 
 !!!_  & chcount() - count character(s) occurrence
   integer function chcount (str, chs) &
