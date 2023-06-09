@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz CH(swiss) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/10/05 22:19:32 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/11/01 14:47:14 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -22,7 +22,8 @@
 module chak_file
 !!!_ + Declaration
 !!!_  - modules
-  use chak_lib,lib_init=>init,lib_finalize=>finalize
+  use jmz_param, jp_init=>init,  jp_finalize=>finalize
+  use chak_lib,  lib_init=>init, lib_finalize=>finalize
   implicit none
   public
 !!!_  - parameters
@@ -76,6 +77,8 @@ module chak_file
   integer,parameter :: bigg_off = 0
   integer,parameter :: bigg_on  = 1
 
+!!!_  - separator special
+    character(len=*),parameter :: urt_osep = '+'
 !!!_  - type
   integer,parameter :: rec_bgn = 0
   integer,parameter :: rec_end = 1
@@ -147,7 +150,7 @@ contains
     file%nrec = -1
     file%h = ' '
     file%fmt = ' '
-    file%kfmt = GFMT_ERR
+    file%kfmt  = cfmt_error
     file%hedit = hedit_all
     file%mode  = choice(mode_unset, mode)
     file%hflag = choice(hflag_unset, flag)
@@ -323,6 +326,7 @@ contains
     character(len=*),parameter :: asep = item_sep
     character(len=*),parameter :: bsep = ':'
     integer jp
+    integer kfmt
 
     ierr = 0
 
@@ -330,8 +334,9 @@ contains
     jp = find_next_sep(arg, asep)
     call upcase(abuf, arg(1:jp))
     abuf = abuf(1:jp) // arg(jp+1:)
-    call parse_record_fmt(ierr, file%kfmt, abuf)
+    call parse_record_fmt(ierr, kfmt, abuf)
     if (ierr.eq.0) then
+       file%kfmt = cfmt_gtool_seq
        file%fmt = trim(abuf)
     else
        ierr = 0
@@ -708,6 +713,7 @@ contains
        & (ierr, file, def, levv)
     use TOUZA_Std,only: new_unit, sus_open, is_error_match, upcase
     use TOUZA_Std,only: check_byte_order
+    use TOUZA_Nio,only: cache_open_read
     implicit none
     integer,     intent(out)         :: ierr
     type(file_t),intent(inout)       :: file
@@ -715,6 +721,8 @@ contains
     integer,     intent(in),optional :: levv
 
     character(len=128) :: iomsg
+    integer mpath, mitem
+    integer ch
 
     ierr = 0
 
@@ -736,17 +744,27 @@ contains
              endif
           else if (file%kfmt.eq.cfmt_cdf) then
              ierr = ERR_NOT_IMPLEMENTED
-          else
-             if (file%kfmt.ge.cfmt_binary) then
-                if (ierr.eq.0) call check_byte_order(ierr, file%t, file%u, force=.TRUE., levv=levv)
-             endif
+          else if (file%kfmt.ge.cfmt_binary) then
+             call check_byte_order(ierr, file%t, file%u, force=.TRUE., levv=levv)
              if (ierr.eq.0) then
                 call sus_open(ierr, file%u, file%name, ACTION='R', STATUS='O', IOMSG=iomsg)
              endif
-             if (file%kfmt.ge.cfmt_binary) then
-                if (ierr.eq.0) call open_read_binary(ierr, file)
-             endif
+             if (ierr.eq.0) call open_read_binary(ierr, file)
              if (ierr.ne.0) ierr = ERR_INVALID_PARAMETER
+          else
+             call parse_file_item(ierr, mpath, mitem, file%name, file%u)
+             if (ierr.eq.0) then
+                if (mpath.eq.0) then
+                   call sus_open(ierr, file%u, file%name, ACTION='R', STATUS='O', IOMSG=iomsg)
+                else
+                   file%name = file%name(1:mpath)
+                   call cache_open_read(ierr, ch, file%name, flag=0, unit=file%u)
+                   if (ierr.eq.0) then
+                      file%kfmt = cfmt_gtool_cache
+                      file%u = ch
+                   endif
+                endif
+             endif
           endif
        endif
        if (ierr.eq.0) call clone_default_rgroup(ierr, file, def)
@@ -767,10 +785,91 @@ contains
     endif
   end subroutine open_read_file
 
+!!!_   . parse_file_item
+  subroutine parse_file_item &
+       & (ierr, mpath, mitem, &
+       &  file, utest, seps,  rlev)
+    use TOUZA_Std,only: choice, choice_a
+    use TOUZA_Std,only: new_unit, sus_open, sus_close
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: mpath, mitem
+    character(len=*),intent(in)          :: file
+    integer,         intent(in),optional :: utest
+    character(len=*),intent(in),optional :: seps
+    integer,         intent(in),optional :: rlev
+
+    integer jerr_full
+    integer jerr_filter
+    integer utmp
+    logical btmp
+    integer lf
+    integer jc
+    character(len=1) :: csep
+
+    ! A/B/file             A/B/file   + (null)     sequential
+    ! A/B/file/            A/B/file   + (null)     cache
+    ! A/B/file/item        A/B/file   + item       cache
+    ! A/B/file/group/item  A/B/file   + group/item cache
+
+    ! not implemented
+    ! (deprecated)
+    ! A/B/file?item        A/B/file   + item       cache
+    ! A/B/file?group/item  A/B/file   + group/item cache
+    ! A/B/?file?           A/B/?file  + (null)     sequential
+    ! A/B/?file/           A/B/?file  + (null)     cache
+
+    ierr = 0
+    mpath = 0     ! normal path
+    mitem = -1    ! sequential mode
+
+    utmp = choice(-1, utest)
+    if (utmp.lt.0) utmp = new_unit()
+    if (utmp.lt.0) then
+       ierr = utmp
+       return
+    endif
+    if (ierr.eq.0) inquire(unit=utmp, opened=btmp, IOSTAT=ierr)
+    if (ierr.eq.0) then
+       if (btmp) ierr = ERR_PANIC
+    endif
+    jerr_full = -1
+    jerr_filter = -1
+    if (ierr.eq.0) then
+       ! full-name
+       call sus_open(jerr_full, utmp, file, ACTION='R', STATUS='O')
+       if (jerr_full.eq.0) call sus_close(ierr, utmp, file)
+    endif
+    if (ierr.eq.0) then
+       if (jerr_full.ne.0) then
+          lf = len_trim(file)
+          mitem = lf
+          do jc = 0, file_item_level - 1
+             mitem = index(file(1:mitem), path_sep, back=.true.)
+             if (mitem.le.0) exit
+             mitem = mitem - 1
+             call sus_open(jerr_filter, utmp, file(1:mitem), ACTION='R', STATUS='O')
+             if (jerr_filter.eq.0) then
+                mpath = mitem
+                mitem = mitem + 2
+                if (mitem.gt.lf) mitem = 0
+                call sus_close(ierr, utmp, file)
+                exit
+             endif
+          enddo
+       endif
+    endif
+    if (jerr_full.eq.0) then
+       mpath = 0
+       mitem = 0
+    endif
+    ! if (ierr.eq.0) call sus_close(ierr, utmp, file)
+  end subroutine parse_file_item
+
 !!!_   . cue_read_file
   subroutine cue_read_file &
        & (ierr, file)
-    use TOUZA_Std,only: new_unit, sus_open
+    use TOUZA_Std,only: new_unit
     implicit none
     integer,     intent(out)   :: ierr
     type(file_t),intent(inout) :: file
@@ -808,7 +907,7 @@ end subroutine cue_read_file
 !!!_   . cue_next_read
   subroutine cue_next_read &
        & (ierr, stt, file)
-    use TOUZA_Std,only: new_unit, sus_open
+    use TOUZA_Std,only: new_unit
     implicit none
     integer,     intent(out)   :: ierr
     integer,     intent(out)   :: stt
@@ -1359,7 +1458,7 @@ end subroutine cue_read_file
     call nio_skip_records(ierr, nskp, file%u, nskip=nsuc, krect=ksubm)
     if (ierr.eq.0) call nio_read_header(ierr, head, file%t, file%u)
     if (ierr.eq.0) call get_item(ierr, head, file%fmt, hi_DFMT)
-    if (ierr.eq.0) call parse_record_fmt(ierr, file%kfmt, file%fmt)
+    ! if (ierr.eq.0) call parse_record_fmt(ierr, file%kfmt, file%fmt)
 
   end subroutine read_header_nio
 
@@ -1468,6 +1567,25 @@ end subroutine cue_read_file
     enddo
   end subroutine put_header_lprops
 
+!!!_   . put_header_fmt
+  subroutine put_header_fmt(ierr, head, fmt)
+    use TOUZA_Std,only: upcase, find_next_sep
+    use TOUZA_Nio,only: put_item, hi_DFMT
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: head(*)
+    character(len=*),intent(in)  :: fmt
+
+    character(len=litem) :: fbuf
+    character(len=*),parameter :: osep = urt_osep
+    integer jp
+
+    ierr = 0
+    call upcase(fbuf, fmt)
+    jp = find_next_sep(fbuf, osep)
+    call put_item(ierr, head, fbuf(1:jp),  hi_DFMT)
+  end subroutine put_header_fmt
+
 !!!_   . read_data_nio
   subroutine read_data_nio(ierr, v, n, file)
     use TOUZA_Nio,only: nio_read_data, parse_record_fmt, nio_allow_sub
@@ -1491,9 +1609,10 @@ end subroutine cue_read_file
   subroutine write_data_nio &
        & (ierr, v, n, head, file)
     use TOUZA_Nio,only: nio_write_data, lopts, parse_urt_options
-    use TOUZA_Nio,only: GFMT_URT
-    use TOUZA_Nio,only: GFMT_MRT
+    use TOUZA_Nio,only: GFMT_URT, GFMT_MRT
+    use TOUZA_Nio,only: hi_DFMT
     use TOUZA_Nio,only: switch_urt_diag, nio_allow_sub
+    use TOUZA_Nio,only: parse_record_fmt
     implicit none
     integer,         intent(out)   :: ierr
     real(kind=KBUF), intent(in)    :: v(0:*)
@@ -1502,28 +1621,35 @@ end subroutine cue_read_file
     type(file_t),    intent(inout) :: file
     integer kopts(lopts)
     integer jo
-    character(len=*),parameter :: osep = '+'
+    character(len=*),parameter :: osep = urt_osep
     integer krect
+    integer kfmt
 
     ierr = 0
     krect = nio_allow_sub(file%t, file%bigg.eq.bigg_off)
-    if (file%kfmt.eq.GFMT_URT .or. file%kfmt.eq.GFMT_MRT) then
-       jo = index(file%fmt, osep)
-       if (jo.gt.0) then
-          call parse_urt_options(ierr, kopts, file%fmt(jo+1:))
-          if (ierr.ne.0) then
-             ierr = ERR_INVALID_PARAMETER
-             call message(ierr, 'invalid *rt options = ' // trim(file%fmt(jo+1:)))
-             return
+    if (ierr.eq.0) call parse_record_fmt(ierr, kfmt, file%fmt)
+    if (ierr.ne.0) then
+       call parse_record_fmt(ierr, kfmt, head(hi_DFMT))
+    endif
+    if (ierr.eq.0) then
+       if (kfmt.eq.GFMT_URT .or. kfmt.eq.GFMT_MRT) then
+          jo = index(file%fmt, osep)
+          if (jo.gt.0) then
+             call parse_urt_options(ierr, kopts, file%fmt(jo+1:))
+             if (ierr.ne.0) then
+                ierr = ERR_INVALID_PARAMETER
+                call message(ierr, 'invalid *rt options = ' // trim(file%fmt(jo+1:)))
+                return
+             endif
+             if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, ulog)
+             call nio_write_data(ierr, v, n, head, krect, file%u, kopts)
+             if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, -2)
+          else
+             call nio_write_data(ierr, v, n, head, krect, file%u)
           endif
-          if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, ulog)
-          call nio_write_data(ierr, v, n, head, krect, file%u, kopts)
-          if (is_msglev_DETAIL(lev_verbose)) call switch_urt_diag(' ', 0, -2)
        else
           call nio_write_data(ierr, v, n, head, krect, file%u)
        endif
-    else
-       call nio_write_data(ierr, v, n, head, krect, file%u)
     endif
   end subroutine write_data_nio
 

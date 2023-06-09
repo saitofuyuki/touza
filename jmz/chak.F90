@@ -4375,7 +4375,8 @@ contains
     endif
     if (ierr.eq.0) then
        if (file%fmt.ne.' ') then
-          call put_item(ierr, head, file%fmt,  hi_DFMT)
+          call put_header_fmt(ierr, head, file%fmt)
+          ! call put_item(ierr, head, file%fmt,  hi_DFMT)
           call parse_record_fmt(jerr, kfmt, file%fmt)
        else
           call get_item(jerr, head, tstr,  hi_DFMT)
@@ -4401,7 +4402,7 @@ contains
        n = parse_header_size(head, 0, lazy=1)
     endif
 
-    if (file%kfmt.le.cfmt_org) then
+    if (file%kfmt.lt.cfmt_gtool) then
        if (ierr.eq.0) then
           ! file%t = REC_DEFAULT
           file%t = REC_BIG
@@ -4534,11 +4535,11 @@ contains
     if (jerr.eq.0) call parse_record_fmt(jerr, kfmt, vp)
     if (jerr.eq.0) then
        select case (kfmt)
-       case (GFMT_UR4, GFMT_MR4)
+       case (GFMT_UR4, GFMT_MR4, GFMT_PR4)
           k = kv_flt
-       case (GFMT_UR8, GFMT_MR8)
+       case (GFMT_UR8, GFMT_MR8, GFMT_PR8)
           k = kv_dbl
-       case (GFMT_UI4, GFMT_MI4)
+       case (GFMT_UI4, GFMT_MI4, GFMT_PI4)
           k = kv_int
        case (GFMT_URC,GFMT_URC2)
           k = kv_dbl
