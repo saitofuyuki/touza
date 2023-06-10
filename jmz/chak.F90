@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/05 13:28:41 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/10 23:38:45 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -5198,11 +5198,18 @@ contains
        btmp(1) = lasth
        ptmp(1) = js
        nb = 1
-       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, ptmp, nb, buf)
+       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, ptmp, nb, buf, clip=.FALSE.)
        if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, ptmp, nb)
        if (ierr.eq.0) call settle_output_domain(ierr, domL)
        if (ierr.eq.0) call set_output_buffer(ierr, buf, btmp, domL)
     endif
+    ! debug
+    ! if (ierr.eq.0) call show_domain(ierr, domL,    'index/L', indent=3)
+    ! if (ierr.eq.0) call show_domain(ierr, domR(1), 'index/R', indent=4)
+    ! if (ierr.eq.0) then
+    !    write(*, *) '     index/c:', jotgt, domL%mco, domR(1)%mco
+    ! endif
+
     if (ierr.eq.0) then
        if (jotgt.lt.domL%mco) then
           b = domL%bgn(jotgt)
@@ -5328,6 +5335,7 @@ contains
                 domP%bgn(jc) = 0
                 domP%end(jc) = 1
                 domP%ofs(jc) = 0
+                domP%cyc(jc) = 0
                 domP%strd(jc) = 0
              endif
           enddo
@@ -5339,6 +5347,7 @@ contains
              e = max(1 + b, e)
              domP%bgn(jcx) = 0
              domP%ofs(jcx) = b
+             domP%cyc(jcx) = 0
              domP%end(jcx) = max(1, e - b)
              domP%strd(jcx) = n
              n = n * domP%end(jcx)
@@ -5953,7 +5962,7 @@ contains
 
 !!!_   . tweak_coordinates
   subroutine tweak_coordinates &
-       & (ierr, domL, domR, bufh, pstk, nbuf, bufo)
+       & (ierr, domL, domR, bufh, pstk, nbuf, bufo, clip)
     use TOUZA_Std,only: choice, find_first
     implicit none
     integer,       intent(out)            :: ierr
@@ -5963,12 +5972,14 @@ contains
     integer,       intent(in)             :: pstk(0:*)
     integer,       intent(in)             :: nbuf
     type(buffer_t),intent(inout),optional :: bufo       ! to store coordinate names only
+    logical,       intent(in),   optional :: clip       ! to clip empty coordinates (TRUE)
 
     integer nceff
     character(len=lname) :: nameL(0:lcoor-1),  nameR(0:lcoor-1, 0:nbuf-1)
     integer j, jb, jc, jo, js
     integer jerr
 
+    integer nrphy(0:nbuf-1)
     integer clidx(0:lcoor-1, 0:nbuf-1)
     integer cpidx(0:lcoor-1, 0:nbuf-1)
     integer ctype(0:lcoor-1, 0:nbuf-1)
@@ -5986,11 +5997,13 @@ contains
        ! enddo
        if (ierr.eq.0) then
           call get_logical_shape &
-               & (ierr, nameR(:,j), ctype(:,j), cpidx(:,j), bstack(js)%lcp, obuffer(jb)%pcp, lcoor)
+               & (ierr, nrphy(j), nameR(:,j), ctype(:,j), cpidx(:,j), bstack(js)%lcp, obuffer(jb)%pcp, lcoor)
+          ! write(*, *) 'ranks', j, nrphy, obuffer(jb)%pcp(:)%cyc
        endif
     enddo
     if (ierr.eq.0) then
-       call match_perms(ierr, nceff, nameL, clidx, ctype, nameR, lcoor, nbuf)
+       ! if (choice(.TRUE., clip)) nrphy(0:nbuf-1) = -1
+       call match_perms(ierr, nceff, nameL, clidx, nrphy, ctype, nameR, lcoor, nbuf)
     endif
 
     if (ierr.eq.0) then
@@ -6008,6 +6021,7 @@ contains
        enddo
        domL%mco = nceff
        domL%ofs(0:nceff-1) = null_range
+       domL%cyc(0:nceff-1) = 0
        domL%cidx(0:nceff-1) = -1
        domL%strd(0:nceff) = -1
        do jc = 0, nceff - 1
@@ -6050,7 +6064,7 @@ contains
     integer j
     integer jb,    jo, js
     ! integer jphyc, jlogc
-    integer b,   e,    s,   odmy
+    integer b,   e,    s,   odmy, cdmy
     integer low, high, stp
     integer,parameter :: lini = HUGE(0)
     integer,parameter :: hini = (- HUGE(0)) - 1
@@ -6073,7 +6087,8 @@ contains
           do j = 0, nbuf - 1
              jb = buf_h2item(bufh(j))
              js = pstk(j)
-             call get_logical_range(b, e, s, odmy, jo, bstack(js)%lcp, obuffer(jb)%pcp, domR(j))
+             call get_logical_range &
+                  & (b, e, s, odmy, cdmy, jo, bstack(js)%lcp, obuffer(jb)%pcp, domR(j))
              ! write(*, *) 'glr:', jo, j, b, e, s
              stp = max(stp, s)
              if (isi) then
@@ -6104,7 +6119,7 @@ contains
     type(domain_t),intent(in)    :: ref
 
     integer jo
-    integer b, e, s, osh
+    integer b, e, s, osh, cyc
     integer jb
 
     ierr = 0
@@ -6113,11 +6128,12 @@ contains
     do jo = 0, ref%mco - 1
        ! call set_logical_range(b, e, jo, bstack(jstk)%lcp, dom, ref)
        call get_logical_range &
-            & (b, e, s, osh, jo, bstack(jstk)%lcp, obuffer(jb)%pcp, dom, ref)
+            & (b, e, s, osh, cyc, jo, bstack(jstk)%lcp, obuffer(jb)%pcp, dom, ref)
        dom%bgn(jo) = b
        dom%end(jo) = max(e, 1+b)
        dom%iter(jo) = max(1, e - b)
        dom%ofs(jo) = osh
+       dom%cyc(jo) = cyc
        ! write(*, *) 'sib0:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
     enddo
     if (ierr.eq.0) then
