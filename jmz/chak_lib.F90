@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/04 15:06:20 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/10 23:27:05 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -171,6 +171,7 @@ module chak_lib
      integer :: n                   ! total size
      integer :: mco                 ! coordinate size
      integer :: ofs(0:lcoor-1)
+     integer :: cyc(0:lcoor-1)
      integer :: iter(0:lcoor-1)
      integer :: strd(0:lcoor)       ! with sentry
      integer :: bgn(0:lcoor-1)
@@ -184,11 +185,11 @@ module chak_lib
      integer :: end = -1
      integer :: stp = -1
      integer :: ofs = 0
-     integer :: cyc = 0
+     integer :: cyc = -1        ! 0 if still effective empty
      character(len=lname) :: name
   end type loop_t
 
-  type(loop_t),save :: def_loop  = loop_t(null_range, null_range, -1, 0, 0, ' ')
+  type(loop_t),save :: def_loop  = loop_t(null_range, null_range, -1, 0, -1, ' ')
 
 !!!_  - buffer property
   type buffer_t
@@ -321,7 +322,7 @@ contains
     do jc = 0, dom%mco - 1
 111    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '*', I0, ' (', I0, ')')
 112    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '*', I0)
-       call get_range_string(ierr, cran, dom%bgn(jc), dom%end(jc), 1)
+       call get_range_string(ierr, cran, dom%bgn(jc), dom%end(jc), 1, c=dom%cyc(jc))
        if (dom%ofs(jc).eq.null_range) then
           write(utmp, 112) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%strd(jc), dom%iter(jc)
        else
@@ -332,12 +333,12 @@ contains
 
 !!!_   . get_range_string
   subroutine get_range_string &
-       & (ierr, str, b, e, s, o)
+       & (ierr, str, b, e, s, o, c)
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: str
     integer,         intent(in)  :: b, e, s
-    integer,optional,intent(in)  :: o
+    integer,optional,intent(in)  :: o, c
     integer bb, ee
     character(len=32) ::obuf
 
@@ -595,13 +596,13 @@ contains
 
     character(len=32) :: ld, rd, sp
 
-    integer b, e, s, odmy
+    integer b, e, s, odmy, cdmy
     integer cb, ce
 
     ierr = 0
     str = ' '
     do jodr = 0, dom%mco - 1
-       if (ierr.eq.0) call get_logical_range(b, e, s, odmy, jodr, lcp, pcp, dom)
+       if (ierr.eq.0) call get_logical_range(b, e, s, odmy, cdmy, jodr, lcp, pcp, dom)
        if (ierr.eq.0) call get_range_string(ierr, cran, b, e, s)
        if (ierr.eq.0) then
           jphyc = dom%cidx(jodr)
@@ -840,15 +841,15 @@ contains
 
 !!!_   . get_logical_range
   subroutine get_logical_range &
-       & (b, e, s, osh, jodr, lcp, pcp, dom, ref)
-    integer,       intent(out)         :: b, e, s, osh
+       & (b, e, s, osh, cyc, jodr, lcp, pcp, dom, ref)
+    integer,       intent(out)         :: b, e, s, osh, cyc
     integer,       intent(in)          :: jodr
     type(loop_t),  intent(in)          :: lcp(0:*)
     type(loop_t),  intent(in)          :: pcp(0:*)
     type(domain_t),intent(in)          :: dom
     type(domain_t),intent(in),optional :: ref
 
-    integer low, high
+    integer low,   high
     integer jlogc, jphyc
 
     if (present(ref)) then
@@ -888,6 +889,7 @@ contains
        endif
        s = pcp(jphyc)%stp
     endif
+    ! write(*, *) 'glr: ', osh, b, e, s
   end subroutine get_logical_range
 
 !!!_   . settle_output_domain
@@ -965,8 +967,9 @@ contains
     integer,         intent(in)             :: flag     ! prefered style
     integer larg, lsep
     integer js0, js1
-    integer rpos(3)
-    integer,parameter :: rdef(3) = (/null_range, null_range, 0/)
+    integer,parameter:: rmem = 4
+    integer rpos(rmem)
+    integer,parameter :: rdef(rmem) = (/null_range, null_range, 0, 0/)
     integer nc
     integer jran
     logical no_range
@@ -978,7 +981,7 @@ contains
     ! NAME/REPL/                                   no / absorption
     ! NAME/REPL
     !  NAME REPL  alpha+alnum
-    !  RANGE      [num][:[num]]
+    !  RANGE      [num][:[num[:[num]]]]   begin:end:shift:cycle
 
     ierr = 0
     lsep = len(rename_sep)
@@ -1025,8 +1028,9 @@ contains
     rpos(1) = system_index_bgn(null_range)
     rpos(2) = system_index_end(null_range)
     rpos(3) = 0
+    rpos(4) = 0
     lpp = def_loop
-    call split_list(nc, rpos, arg(jran:larg), range_sep, 3, rdef(:))
+    call split_list(nc, rpos, arg(jran:larg), range_sep, rmem, rdef(:))
     if (nc.lt.0) then
        ierr = nc
        call message(ierr, 'cannot parse range: ' // trim(arg(jran:larg)))
@@ -1044,13 +1048,14 @@ contains
           lpp%end = lpp%bgn + 1
           lpp%stp = 1
        endif
-    else if (nc.lt.4) then
+    else if (nc.lt.5) then
        lpp%bgn = system_index_bgn(rpos(1))
        lpp%end = system_index_end(rpos(2))
        lpp%stp = 1
        if (lpp%end.ne.null_range .and. lpp%end.le.lpp%bgn) lpp%stp = 0
-       if (nc.eq.3) lpp%ofs = rpos(3)
-    else if (nc.ge.4) then
+       if (nc.ge.3) lpp%ofs = rpos(3)
+       if (nc.ge.4) lpp%cyc = rpos(4)
+    else
        ierr = ERR_INVALID_PARAMETER
        call message(ierr, 'fail to extract range ' // trim(arg(jran:larg)))
     endif
@@ -1104,10 +1109,11 @@ contains
 
 !!!_   . get_logical_shape
   subroutine get_logical_shape &
-       & (ierr, cname, ctype, cpidx, lcp, pcp, mco)
+       & (ierr, nrphy, cname, ctype, cpidx, lcp, pcp, mco)
     use TOUZA_Std,only: find_first, parse_number, begin_with
     implicit none
     integer,         intent(out) :: ierr
+    integer,         intent(out) :: nrphy        ! array ranks (physical)
     character(len=*),intent(out) :: cname(0:*)   ! coordinate name
     integer,         intent(out) :: ctype(0:*)   ! coordinate type (unset null wild normal)
     integer,         intent(out) :: cpidx(0:*)   ! corresponding (physical) index
@@ -1148,6 +1154,7 @@ contains
     integer tblp2l(0:mco-1)
     character(len=*),parameter :: delete_coor_cont = delete_coor // delete_coor
     character(len=*),parameter :: delete_coor_full = delete_coor_cont // delete_coor
+    logical ceff
 
     ierr = 0
     tblp2l(:) = co_unset
@@ -1267,16 +1274,19 @@ contains
        enddo
     endif
 
+    nrphy = 0
     if (ierr.eq.0) then
-       nranks = 0
        ! adjust coordinate types
        do jodr = 0, mco - 1
           if (cpidx(jodr).ge.0) then
              ctype(jodr) = coordinate_type(cname(jodr), lcp(jodr), pcp(cpidx(jodr)))
+             ! write(*, *) 'adjust', jodr, ctype(jodr), pcp(cpidx(jodr))%cyc
+             ceff = pcp(cpidx(jodr))%cyc.ge.0
           else
              ctype(jodr) = coordinate_type(cname(jodr), lcp(jodr))
+             ceff = .TRUE.
           endif
-          if (cpidx(jodr).ge.0.or.ctype(jodr).ne.co_null) nranks = jodr + 1
+          if ((cpidx(jodr).ge.0.or.ctype(jodr).ne.co_null) .and. ceff) nrphy = jodr + 1
        enddo
     endif
 
@@ -1285,7 +1295,7 @@ contains
 !!!_   . match_perms
   subroutine match_perms &
        & (ierr,   nceff,  cnameL, clidxR, &
-       &  ctypeR, cnameR, mco,    nbuf, ltbl)
+       &  nrankR, ctypeR, cnameR, mco,    nbuf, ltbl)
     use TOUZA_Std,only: choice, find_first, join_list
     implicit none
     integer,         intent(out) :: ierr
@@ -1293,6 +1303,7 @@ contains
     integer,         intent(out) :: nceff
     character(len=*),intent(out) :: cnameL(0:*)
     integer,         intent(out) :: clidxR(0:mco-1, 0:*)
+    integer,         intent(in)  :: nrankR(0:*)
     integer,         intent(in)  :: ctypeR(0:mco-1, 0:*)
     character(len=*),intent(in)  :: cnameR(0:mco-1, 0:*)
     integer,         intent(in)  :: nbuf
@@ -1347,7 +1358,9 @@ contains
     jbref = 0
     do jb = 0, nbuf - 1
        meff(jb) = count_coordinates(ctypeR(:, jb), cnameR(:, jb), mco)
+       meff(jb) = max(meff(jb), nrankR(jb))
     enddo
+
     mref = maxval(meff(0:nbuf-1))
     ! set reference priority table
     jb = jbref
@@ -1402,6 +1415,7 @@ contains
           gidx(jodr, jb) = jcur
        enddo
     enddo other
+
     if (ierr.eq.0) then
        ! duplication check
        do jb = 0, nbuf - 1
@@ -1483,7 +1497,6 @@ contains
        endif
     endif
     if (ierr.eq.0) then
-       ! write(*, *) jbuf(0:nt-1)
        ! packing
        jpack(0:nt-1) = -1
        nceff = 0
