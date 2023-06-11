@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/10 23:38:45 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/14 20:47:43 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1269,7 +1269,7 @@ contains
           ierr = ERR_INSUFFICIENT_BUFFER
           call message(ierr, 'too many ranks to SHAPE:' // trim(arg))
        else
-          flag = condop((hopr.eq.opr_SIZE), shape_size, shape_element)
+          flag = switch_shape_operator(hopr)
           call decompose_coordinate_mod(ierr, jrep, arg=arg(jpb+1:jpe-1), flag=flag)
           if (ierr.eq.0) then
              aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
@@ -1315,7 +1315,7 @@ contains
              call reg_fake_opr(oentr, hbuf, obuffer(jb)%name)
              ierr = min(0, ierr)
           endif
-       case(opr_PERM,opr_SIZE)
+       case(opr_PERM,opr_SHAPE,opr_SIZE,opr_SHIFT)
           call parse_buffer_shape(ierr, arg(jpar:), hopr)
        case(opr_MISS)
           if (jpar.lt.jend) then
@@ -1410,7 +1410,7 @@ contains
           ierr = ERR_INSUFFICIENT_BUFFER
           call message(ierr, 'too many ranks to SHAPE:' // trim(arg))
        else
-          flag = condop((hopr.eq.opr_SIZE), shape_size, shape_element)
+          flag = switch_shape_operator(hopr)
           call decompose_coordinate_mod(ierr, jrep, lpp, arg(jpb+1:jpe-1), flag)
           if (ierr.eq.0) then
              aqueue(jq)%lefts(:)%lcp(jc) = lpp
@@ -1462,7 +1462,7 @@ contains
        endif
     endif
     if (ierr.eq.0) then
-       flag = condop((hopr.eq.opr_SIZE), shape_size, shape_element)
+       flag = switch_shape_operator(hopr)
        call decompose_coordinate_mod(ierr, jrep, lpp, arg, flag)
        ! write(*, *) ierr, b, e, s, arg(1:jrep)
     endif
@@ -4097,9 +4097,7 @@ contains
 !!!_    * transformation
        else if (handle.eq.opr_TRANSF) then
           continue
-       else if (handle.eq.opr_PERM) then
-          continue
-       else if (handle.eq.opr_SIZE) then
+       else if (ANY(handle.eq.(/opr_PERM, opr_SHAPE, opr_SIZE, opr_SHIFT/))) then
           continue
 !!!_    * index
        else if (handle.ge.opr_C0.and.handle.lt.opr_C3) then

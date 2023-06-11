@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/05/19 09:00:46 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/15 07:00:12 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -237,6 +237,27 @@ contains
     b = pop.eq.1 .and. push.eq.1
     ! b = .FALSE.
   end function is_operator_reusable
+!!!_   . switch_shape_operator ()
+  integer function switch_shape_operator(opr) result(n)
+    implicit none
+    integer,intent(in) :: opr
+    select case(opr)
+    case(opr_SHAPE,opr_TRANSF)
+       n = shape_element
+    case(opr_PERM)
+       n = shape_coordinate
+    case(opr_SIZE)
+       n = shape_size
+    case(opr_SHIFT)
+       n = shape_shift
+    case(opr_FLAT)
+       n = shape_coordinate
+    case default
+       n = shape_error
+    end select
+    return
+  end function switch_shape_operator
+
 !!!_  - htb wrappers
 !!!_   . reg_opr_core
   integer function reg_opr_core &
