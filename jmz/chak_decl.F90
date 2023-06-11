@@ -1,6 +1,6 @@
 !!!_! jmz/chak_decl.F90 - TOUZA/Jmz CH(swiss) army knife operator symbol declaration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-06-01T17:02:13+09:00
+! Created by genopr.sh at 2023-06-11T09:18:29+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -379,15 +379,15 @@
   integer,parameter :: opr_DESC = 133
   integer,parameter :: opr_FUNC = 134
   integer,parameter :: opr_PERM = 135
-  integer,parameter :: opr_SHAPE = opr_PERM
-  integer,parameter :: opr_SIZE = 136
-  integer,parameter :: opr_CSHIFT = 137
-  integer,parameter :: opr_EOSHIFT = 138
-  integer,parameter :: opr_C0 = 139
-  integer,parameter :: opr_C1 = 140
-  integer,parameter :: opr_C2 = 141
-  integer,parameter :: opr_C3 = 142
-  integer,parameter :: opr_X = 143
-  integer,parameter :: opr_Y = 144
-  integer,parameter :: opr_Z = 145
-  integer,parameter :: grp_buffer_end = 146
+  integer,parameter :: opr_SHAPE = 136
+  integer,parameter :: opr_SIZE = 137
+  integer,parameter :: opr_CSHIFT = 138
+  integer,parameter :: opr_EOSHIFT = 139
+  integer,parameter :: opr_C0 = 140
+  integer,parameter :: opr_C1 = 141
+  integer,parameter :: opr_C2 = 142
+  integer,parameter :: opr_C3 = 143
+  integer,parameter :: opr_X = 144
+  integer,parameter :: opr_Y = 145
+  integer,parameter :: opr_Z = 146
+  integer,parameter :: grp_buffer_end = 147

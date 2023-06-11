@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/10 23:27:05 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/11 10:46:59 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -154,8 +154,10 @@ module chak_lib
   integer,parameter :: cmode_column     = 16  ! columned
 
 !!!_  - shape parser flag
-  integer,parameter :: shape_element = 0  ! interprete single integer as element
-  integer,parameter :: shape_size    = 1  ! interprete single integer as size
+  integer,parameter :: shape_error      = -1
+  integer,parameter :: shape_element    = 0  ! interprete single integer as element    (SHAPE)
+  integer,parameter :: shape_size       = 1  ! interprete single integer as size       (SIZE)
+  integer,parameter :: shape_coordinate = 2  ! interprete single integer as coordinate (PERM)
 
 !!!_  - global flags
   integer,save :: lev_verbose = 0
@@ -973,6 +975,9 @@ contains
     integer nc
     integer jran
     logical no_range
+    character(len=*),parameter :: cdigits = '0123456789'
+
+    ! default rename_sep = '/'
 
     ! NAME/REPL//RANGE   == NAME/REPL/  RANGE      / before RANGE is absorbed
     ! NAME/REPL/RANGE    == NAME/REPL   RANGE
@@ -1007,6 +1012,16 @@ contains
              endif
           endif
        endif
+    else if (flag.eq.shape_coordinate) then
+       js0 = verify(arg(1:larg), cdigits)
+       ! write(*, *) 'coordinate:', js0, arg(1:larg)
+       if (js0.eq.0) then
+          js0  = larg
+          jrep = larg
+          jran = larg + 1
+       else
+          js0 = 1
+       endif
     else
        js0 = 1
     endif
@@ -1016,7 +1031,7 @@ contains
     endif
 
     if (jran.lt.0) then
-       if (index(('0123456789' // range_sep), arg(js0:js0)).eq.0) then
+       if (index((cdigits // range_sep), arg(js0:js0)).eq.0) then
           jran = larg + 1
           jrep = larg
        else
@@ -1031,6 +1046,7 @@ contains
     rpos(4) = 0
     lpp = def_loop
     call split_list(nc, rpos, arg(jran:larg), range_sep, rmem, rdef(:))
+    ! write(*, *) 'split', nc, jran, larg
     if (nc.lt.0) then
        ierr = nc
        call message(ierr, 'cannot parse range: ' // trim(arg(jran:larg)))
@@ -1059,7 +1075,7 @@ contains
        ierr = ERR_INVALID_PARAMETER
        call message(ierr, 'fail to extract range ' // trim(arg(jran:larg)))
     endif
-    ! write(*, *) jrep, jran, '{' // arg(1:jrep) // '}{' // arg(jran:larg) // '} ', b, e, s
+    ! write(*, *) jrep, jran, '{' // arg(1:jrep) // '}{' // arg(jran:larg) // '} '
   end subroutine decompose_coordinate_mod
 
 !!!_   . parse_format_shape
