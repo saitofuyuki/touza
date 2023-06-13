@@ -1,7 +1,7 @@
 !!!_! ami_nio.F90 - TOUZA/Ami/nio-format interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 19 2023
-#define TIME_STAMP 'Time-stamp: <2023/04/05 16:35:25 fuyuki ami_nio.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/10/26 16:03:47 fuyuki ami_nio.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -40,8 +40,11 @@ module TOUZA_Ami_nio
   integer,parameter,public :: xhi_lim  = 3
 !!!_ + public
   integer,parameter :: vmiss = -999
-  integer,parameter,public :: fmt_packed = 0
-  integer,parameter,public :: fmt_expand = 1
+  character(len=*),parameter :: fmt_mask  = 'M'
+  character(len=*),parameter :: fmt_pcrs  = 'P'
+  character(len=*),parameter :: fmt_plain = 'U'
+
+  character(len=*),parameter :: fmt_sparse  = 'S'
 !!!_  - item (variable) key
   character(len=*),parameter,public :: item_c2o    = 'IJC2O'
   character(len=*),parameter,public :: item_a2m    = 'IJRECOV_A2M'
@@ -716,11 +719,12 @@ contains
     use TOUZA_Nio,only: hi_DFMT, hi_ITEM, litem
     use TOUZA_Nio,only: nio_write_header, nio_write_data, put_item
     use TOUZA_Nio,only: put_header_cprop, get_header_cprop
+    use TOUZA_Nio,only: nio_store_qjds
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(inout) :: krect
     character(len=*),intent(inout) :: hd(*)
-    integer,         intent(in)    :: fmt
+    character(len=*),intent(in)    :: fmt
     integer,         intent(in)    :: ij_ahead(0:*)                ! ij_amax
     integer,         intent(in)    :: ijrecov_a2m(*), ijc2o(*)     ! len_a2m
     real(kind=KTGT), intent(in)    :: satm(*)                      ! len_a2m
@@ -729,15 +733,18 @@ contains
     integer,         intent(in)    :: u
 
     character(len=litem) :: dummy
+    character(len=2) :: xfmt
     integer r(2)
     integer lw, lx, ly, lh
     integer len_a2m
     integer,allocatable :: bi(:)
     real(kind=KTGT),allocatable :: bb(:)
+    character(len=16) :: cfmt_i, cfmt_r
+    character(len=*),parameter :: ccol_atm = 'amax'
 
     ierr = 0
     len_a2m = ij_ahead(ij_amax)
-    if (ierr.eq.0) call put_header_cprop(ierr, hd, 'amax', (/1, ij_amax/), 3)
+    if (ierr.eq.0) call put_header_cprop(ierr, hd, ccol_atm, (/1, ij_amax/), 3)
     if (ierr.eq.0) then
        call get_header_cprop(dummy, r, hd, 1)
        lx = max(0, r(2) - r(1)) + 1
@@ -746,44 +753,59 @@ contains
        lh = lx * ly
     endif
 
-    if (IAND(fmt, fmt_expand).gt.0) then
+    xfmt = ' '
+    xfmt = fmt
+    select case(xfmt(1:1))
+    case (fmt_mask)
+       cfmt_i = 'MI4'
+       cfmt_r = 'MR8'
+    case (fmt_pcrs)
+       cfmt_i = 'PI4'
+       cfmt_r = 'PR8'
+    case default
+       cfmt_i = 'UI4'
+       cfmt_r = 'UR8'
+    end select
+
+    if (ierr.eq.0) call put_item(ierr, hd, cfmt_i, hi_DFMT)
+    if (ierr.eq.0) call put_item(ierr, hd, 'IJC2O', hi_ITEM)
+
+    if (ierr.eq.0) then
        lw = lh * ij_amax
-       if (ierr.eq.0) allocate(bi(0:lw-1), bb(0:lw-1), STAT=ierr)
+       allocate(bi(0:lw-1), bb(0:lw-1), STAT=ierr)
+    endif
+    if (xfmt(2:2).eq.fmt_sparse) then
+       if (ierr.eq.0) then
+          call nio_store_qjds &
+               & (ierr, ijc2o, ijrecov_a2m,  ij_ahead,  ij_amax, &
+               &  hd,   u,     krect,        ccol_atm)
+       endif
+    else
        if (ierr.eq.0) then
           call unpack_array(ierr, bi, lh, ij_amax, ijc2o,  ijrecov_a2m, ij_ahead, vmiss)
        endif
-       if (ierr.eq.0) call put_item(ierr, hd, 'MI4', hi_DFMT)
-       if (ierr.eq.0) call put_item(ierr, hd, 'IJC2O', hi_ITEM)
        if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
        if (ierr.eq.0) call nio_write_data(ierr, bi, lw, hd, krect, u)
+    endif
 
+    if (ierr.eq.0) call put_item(ierr, hd, cfmt_r, hi_DFMT)
+    if (ierr.eq.0) call put_item(ierr, hd, 'SATM', hi_ITEM)
+    if (xfmt(2:2).eq.fmt_sparse) then
+       if (ierr.eq.0) then
+          call nio_store_qjds &
+               & (ierr, satm, ijrecov_a2m,  ij_ahead,  ij_amax, &
+               &  hd,   u,    krect,        ccol_atm)
+       endif
+    else
        if (ierr.eq.0) then
           call unpack_array(ierr, bb, lh, ij_amax, satm,  ijrecov_a2m, ij_ahead, real(vmiss, kind=KTGT))
        endif
-       if (ierr.eq.0) call put_item(ierr, hd, 'MR8', hi_DFMT)
-       if (ierr.eq.0) call put_item(ierr, hd, 'SATM', hi_ITEM)
        if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
        if (ierr.eq.0) call nio_write_data(ierr, bb, lw, hd, krect, u)
-
-       if (ierr.eq.0) deallocate(bi, bb, STAT=ierr)
-    else
-       ! PTn format store ij_ahead(1:), not (0:)
-       if (ierr.eq.0) call put_item(ierr, hd, 'PI4', hi_DFMT)
-       if (ierr.eq.0) call put_item(ierr, hd, 'IJRECOV_A2M', hi_ITEM)
-       if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
-       if (ierr.eq.0) call nio_write_data(ierr, ijrecov_a2m, len_a2m, hd, krect, u, kopts=ij_ahead(1:ij_amax))
-
-       if (ierr.eq.0) call put_item(ierr, hd, 'PI4 IJRECOV_A2M', hi_DFMT)
-
-       if (ierr.eq.0) call put_item(ierr, hd, 'IJC2O', hi_ITEM)
-       if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
-       if (ierr.eq.0) call nio_write_data(ierr, ijc2o, len_a2m, hd, krect, u, kopts=ij_ahead(1:ij_amax))
-
-       if (ierr.eq.0) call put_item(ierr, hd, 'PR8 IJRECOV_A2M', hi_DFMT)
-       if (ierr.eq.0) call put_item(ierr, hd, 'SATM', hi_ITEM)
-       if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
-       if (ierr.eq.0) call nio_write_data(ierr, satm, len_a2m, hd, krect, u, kopts=ij_ahead(1:ij_amax))
     endif
+
+    if (ierr.eq.0) deallocate(bi, bb, STAT=ierr)
+
     if (ierr.eq.0) call put_item(ierr, hd, 'UR8', hi_DFMT)
     if (ierr.eq.0) call put_header_cprop(ierr, hd, ' ', (/1, 1/), 3)
     if (ierr.eq.0) call put_item(ierr, hd, 'RU', hi_ITEM)
@@ -809,11 +831,12 @@ contains
     use TOUZA_Nio,only: hi_DFMT, hi_ITEM, litem
     use TOUZA_Nio,only: nio_write_header, nio_write_data, put_item
     use TOUZA_Nio,only: get_header_cprop, put_header_cprop
+    use TOUZA_Nio,only: nio_store_qjds
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(inout) :: krect
     character(len=*),intent(inout) :: hd(*)
-    integer,         intent(in)    :: fmt
+    character(len=*),intent(in)    :: fmt
     integer,         intent(in)    :: ijrecov_o2c(*), ijo2c(*)     ! len_a2m
     real(kind=KTGT), intent(in)    :: socn(*)
     real(kind=KTGT), intent(in)    :: ruo(*), rvo(*), flandg(*)
@@ -822,14 +845,18 @@ contains
     integer,         intent(in)    :: u
 
     character(len=litem) :: dummy
+    character(len=2) :: xfmt
     integer r(2)
     integer len_o2a
     integer lw, lx, ly, lh
     integer,allocatable :: bi(:)
     real(kind=KTGT),allocatable :: bb(:)
+    character(len=16) :: cfmt_i, cfmt_r
+    character(len=*),parameter :: ccol_ocn = 'omax'
 
     ierr = 0
-    if (ierr.eq.0) call put_header_cprop(ierr, hd, 'omax', (/1, ij_omax/), 3)
+
+    if (ierr.eq.0) call put_header_cprop(ierr, hd, ccol_ocn, (/1, ij_omax/), 3)
     if (ierr.eq.0) then
        call get_header_cprop(dummy, r, hd, 1)
        lx = max(0, r(2) - r(1)) + 1
@@ -839,44 +866,58 @@ contains
        lw = lh * ij_omax
     endif
 
+    xfmt = ' '
+    xfmt = fmt
+
+    select case(xfmt(1:1))
+    case (fmt_mask)
+       cfmt_i = 'MI4'
+       cfmt_r = 'MR8'
+    case (fmt_pcrs)
+       cfmt_i = 'PI4'
+       cfmt_r = 'PR8'
+    case default
+       cfmt_i = 'UI4'
+       cfmt_r = 'UR8'
+    end select
+
     len_o2a = ij_ohead(ij_omax)
 
-    if (IAND(fmt, fmt_expand).gt.0) then
-       if (ierr.eq.0) allocate(bi(0:lw-1), bb(0:lw-1), STAT=ierr)
+    if (ierr.eq.0) allocate(bi(0:lw-1), bb(0:lw-1), STAT=ierr)
+    if (ierr.eq.0) call put_item(ierr, hd, cfmt_i, hi_DFMT)
+    if (ierr.eq.0) call put_item(ierr, hd, 'IJO2C', hi_ITEM)
+
+    if (xfmt(2:2).eq.fmt_sparse) then
+       if (ierr.eq.0) then
+          call nio_store_qjds &
+               & (ierr, ijo2c, ijrecov_o2c,  ij_ohead,  ij_omax, &
+               &  hd,   u,     krect,        ccol_ocn)
+       endif
+    else
        if (ierr.eq.0) then
           call unpack_array(ierr, bi, lh, ij_omax, ijo2c,  ijrecov_o2c, ij_ohead, vmiss)
        endif
-       if (ierr.eq.0) call put_item(ierr, hd, 'MI4', hi_DFMT)
-       if (ierr.eq.0) call put_item(ierr, hd, 'IJO2C', hi_ITEM)
        if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
        if (ierr.eq.0) call nio_write_data(ierr, bi, lw, hd, krect, u)
+    endif
 
+    if (ierr.eq.0) call put_item(ierr, hd, cfmt_r, hi_DFMT)
+    if (ierr.eq.0) call put_item(ierr, hd, 'SOCN', hi_ITEM)
+    if (xfmt(2:2).eq.fmt_sparse) then
+       if (ierr.eq.0) then
+          call nio_store_qjds &
+               & (ierr, socn, ijrecov_o2c,  ij_ohead,  ij_omax, &
+               &  hd,   u,    krect,        ccol_ocn)
+       endif
+    else
        if (ierr.eq.0) then
           call unpack_array(ierr, bb, lh, ij_omax, socn, ijrecov_o2c, ij_ohead, real(vmiss, kind=KTGT))
        endif
-       if (ierr.eq.0) call put_item(ierr, hd, 'MR8', hi_DFMT)
-       if (ierr.eq.0) call put_item(ierr, hd, 'SOCN', hi_ITEM)
        if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
        if (ierr.eq.0) call nio_write_data(ierr, bb, lw, hd, krect, u)
-
-       if (ierr.eq.0) deallocate(bi, bb, STAT=ierr)
-    else
-       if (ierr.eq.0) call put_item(ierr, hd, 'PI4', hi_DFMT)
-       if (ierr.eq.0) call put_item(ierr, hd, 'IJRECOV_O2C', hi_ITEM)
-       if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
-       if (ierr.eq.0) call nio_write_data(ierr, ijrecov_o2c, len_o2a, hd, krect, u, kopts=ij_ohead(1:ij_omax))
-
-       if (ierr.eq.0) call put_item(ierr, hd, 'PI4 IJRECOV_O2C', hi_DFMT)
-
-       if (ierr.eq.0) call put_item(ierr, hd, 'IJO2C', hi_ITEM)
-       if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
-       if (ierr.eq.0) call nio_write_data(ierr, ijo2c, len_o2a, hd, krect, u, kopts=ij_ohead(1:ij_omax))
-
-       if (ierr.eq.0) call put_item(ierr, hd, 'PR8 IJRECOV_O2C', hi_DFMT)
-       if (ierr.eq.0) call put_item(ierr, hd, 'SOCN', hi_ITEM)
-       if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
-       if (ierr.eq.0) call nio_write_data(ierr, socn, len_o2a, hd, krect, u, kopts=ij_ohead(1:ij_omax))
     endif
+
+    if (ierr.eq.0) deallocate(bi, bb, STAT=ierr)
 
     if (ierr.eq.0) call put_item(ierr, hd, 'UR8', hi_DFMT)
     if (ierr.eq.0) call put_header_cprop(ierr, hd, ' ', (/1, 1/), 3)
@@ -1040,15 +1081,24 @@ program test_ami_nio
   integer u
   logical swap
 
+  ! rafile
   integer ij_amax, len_a2m, nxygdm
   integer,       allocatable :: ij_ahead(:), ijrecov_a2m(:), ijc2o(:)
   real(kind=KMD),allocatable :: satm(:), ru(:), rv(:), rocn(:)
 
+  ! rofile
+  real(kind=KMD),allocatable :: ruo(:), rvo(:), flandg(:)
+
   integer ij_omax, len_o2a, ijdim
   integer,       allocatable :: ij_ohead(:), ijrecov_o2c(:), ijo2c(:)
-  real(kind=KMD),allocatable :: socn (:), ruo(:), rvo(:), flandg(:)
+  real(kind=KMD),allocatable :: socn(:)
+
+  integer ij_olmax, len_o2cl
+  integer,       allocatable :: ij_olhead(:), ijrecov_o2cl(:), ijo2cl(:)
+  real(kind=KMD),allocatable :: slnd(:)
 
   integer mdomo, mdoma
+  integer kraf,  krof
 
   character(len=litem) :: axatm, ayatm
   character(len=litem) :: axocn, ayocn
@@ -1061,10 +1111,10 @@ program test_ami_nio
   integer mxc, lxc, pxc
   integer myc, lyc
 
-  integer kfmt
   integer krect
   character(len=litem) :: hd(nitem)
   character(len=128) :: arg
+  character(len=16)  :: fmt
 
   integer,parameter :: offset_legacy = 1
 
@@ -1103,12 +1153,8 @@ program test_ami_nio
   if (ierr.eq.0) call get_option(ierr, rofile, 'RO',  ' ')
   if (ierr.eq.0) call get_option(ierr, xfile,  'OUT', ' ')
 
-  if (ierr.eq.0) call get_option(ierr, arg,  'FMT', ' ')
-  kfmt = 0
-  if (ierr.eq.0) then
-     if (index(arg, 'x').gt.0) kfmt = IOR(kfmt, fmt_expand)
-  endif
-
+  if (ierr.eq.0) call get_option(ierr, fmt,  'FMT', ' ')
+  if (ierr.eq.0) call upcase(fmt)
 
   if (ierr.eq.0) call arg_diag(ierr)
 
@@ -1119,7 +1165,7 @@ program test_ami_nio
      if (rafile.eq.' ') then
         write(*, *) 'need rafile path'
      else
-        call open_rafile_legacy(ierr, swap, ij_amax, len_a2m, nxygdm, rafile, u)
+        call open_rafile_legacy(ierr, kraf, swap, ij_amax, len_a2m, nxygdm, rafile, u)
 101     format('open/rafile: ', A, 1x, L1, 2(1x, I0), 1x, I0, ' / ', I0)
         mdoma = nxygdm * ij_amax
         write(*, 101) trim(rafile), swap, ij_amax, nxygdm, len_a2m, mdoma
@@ -1131,16 +1177,16 @@ program test_ami_nio
         endif
         if (ierr.eq.0) then
            call read_rafile_legacy &
-                & (ierr, &
+                & (ierr,     &
                 &  ij_ahead, ijrecov_a2m, ijc2o,  satm, ru, rv, rocn, &
-                &  ij_amax,  len_a2m,     nxygdm, u,    swap)
+                &  ij_amax,  len_a2m,     nxygdm, u,    swap,   kraf)
         endif
      endif
      if (ierr.eq.0) call sus_close(ierr, u, rafile)
   endif
   if (ierr.eq.0) then
      if (rofile.ne.' ') then
-        call open_rofile_legacy(ierr, swap, ijdim, rofile, u)
+        call open_rofile_legacy(ierr, krof, swap, ijdim, rofile, u)
 111     format('open/rofile: ', A, 1x, L1, 1x, I0)
         write(*, 111) trim(rofile), swap, ijdim
         if (ierr.eq.0) then
@@ -1164,7 +1210,7 @@ program test_ami_nio
            call read_rofile_legacy2 &
                 & (ierr,     &
                 &  ij_ohead, ijrecov_o2c, ijo2c, socn, flandg, ruo, rvo, &
-                &  ijdim,    ij_omax,     u,     swap)
+                &  ijdim,    ij_omax,     u,     swap, krof)
         endif
      endif
      if (ierr.eq.0) call sus_close(ierr, u, rofile)
@@ -1245,7 +1291,7 @@ program test_ami_nio
         if (ierr.eq.0) then
            call write_radata_nio &
                 & (ierr, krect, &
-                &  hd,   u,     kfmt,  &
+                &  hd,   u,     fmt,  &
                 &  ijrecov_a2m, ijc2o, satm, ru, rv, rocn, ij_ahead, ij_amax)
         endif
         if (ierr.eq.0) call set_roheader(ierr, hd, axatm, ayatm, ijdim, mxc, myc)
@@ -1254,7 +1300,7 @@ program test_ami_nio
         if (ierr.eq.0) then
            call write_rodata_nio &
                 & (ierr,  krect, &
-                &  hd,    u,    kfmt,   &
+                &  hd,    u,    fmt,   &
                 &  ijrecov_o2c, ijo2c, socn, ruo, rvo, flandg, ij_ohead, ij_omax)
         endif
      endif
