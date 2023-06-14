@@ -1,7 +1,7 @@
 !!!_! ami_table.F90. - TOUZA/Ami/table amida-coupler table procedures
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/03 14:35:50 fuyuki ami_table.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/10/19 11:02:48 fuyuki ami_table.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -430,6 +430,7 @@ contains
     endif
     return
   end subroutine check_monotonic_d
+!!!_ + 1d coordinate simple mapping
 !!!_ + geographical from/to stereographic mapping
 !!!_  - is_inside_dest()
   logical function is_inside_dest_d &
@@ -1624,15 +1625,15 @@ contains
           endif
        endif
        call output_stereo &
-            & (ierr, iofs, iprj, wprj, nmem, ngg, &
+            & (ierr, iofs, iprj, wprj, nmem, nlon, nlat, &
             &  xl,   dx,   mxc,  yl,   dy,   myc, &
             &  r,    path, safe)
     endif
   end subroutine batch_test_gs
 
   subroutine output_stereo &
-       & (ierr,   iofs,   iprj,   wprj,  nmem,  ngg,    &
-       &  xl,     dx,     mx,     yl,    dy,    my,     &
+       & (ierr,   iofs,   iprj,   wprj,  nmem,  nlon, nlat, &
+       &  xl,     dx,     mx,     yl,    dy,    my,         &
        &  r,      path,   safe)
     implicit none
     integer,parameter :: KTGT=KDBL
@@ -1640,7 +1641,7 @@ contains
     integer,         intent(in)  :: iofs(0:*)
     integer,         intent(in)  :: iprj(0:*)
     real(kind=KTGT), intent(in)  :: wprj(0:*)
-    integer,         intent(in)  :: nmem, ngg
+    integer,         intent(in)  :: nmem, nlon, nlat
     real(kind=KTGT), intent(in)  :: xl, dx
     real(kind=KTGT), intent(in)  :: yl, dy
     integer,         intent(in)  :: mx, my
@@ -1651,7 +1652,7 @@ contains
     integer,        allocatable :: ngrd(:)
     real(kind=KTGT),allocatable :: wsum(:)
 
-    integer,        allocatable :: itab(:)
+    integer,        allocatable :: itab(:), cols(:)
     real(kind=KTGT),allocatable :: wtab(:)
 
     integer,        allocatable :: ipsub(:), issub(:), iends(:)
@@ -1665,6 +1666,7 @@ contains
     integer lnum, nnum
     integer         :: iundef = -999
     real(kind=KTGT) :: wundef = -999.0_KTGT
+    integer ngg, ncol
 
     integer kfmt
     integer krect
@@ -1672,8 +1674,10 @@ contains
 
     ierr = 0
     mh = mx * my
+    ngg = nlon * nlat
     r2 = r * r
     if (ierr.eq.0) allocate(wsum(0:mh-1), ngrd(0:mh-1), STAT=ierr)
+    if (ierr.eq.0) allocate(cols(0:ngg-1), STAT=ierr)
     if (ierr.eq.0) then
        wsum(:) = 0.0_KTGT
        ngrd(:) = 0
@@ -1684,6 +1688,8 @@ contains
              ngrd(jh) = ngrd(jh) + 1
           endif
        enddo
+       cols(0:ngg-1) = iofs(1:ngg) - iofs(0:ngg-1)
+       ncol = maxval(cols(0:ngg-1))
     endif
     lnum = 4
     if (ierr.eq.0) allocate(itab(0:mh*lnum-1), wtab(0:mh*lnum-1), STAT=ierr)
@@ -1736,6 +1742,8 @@ contains
        endif
     else
        krect = REC_BIG
+       u = new_unit()
+       ierr = min(0, u)
 
        if (ierr.eq.0) call sus_open(ierr, u, path, ACTION='W', STATUS='R')
        if (ierr.eq.0) call get_default_header(hd)
@@ -1769,6 +1777,41 @@ contains
        if (ierr.eq.0) call put_item(ierr, hd, 'nprj', hi_ITEM)
        if (ierr.eq.0) call nio_write_header(ierr, hd, krect, u)
        if (ierr.eq.0) call nio_write_data(ierr, ngrd, mh, hd, krect, u)
+
+       if (ierr.eq.0) call put_item(ierr, hd, 'PI4',  hi_DFMT)
+       if (ierr.eq.0) call put_item(ierr, hd, 'isrc', hi_ITEM)
+       if (ierr.eq.0) call put_header_cprop(ierr, hd, 'lon', (/1, nlon/), 1)
+       if (ierr.eq.0) call put_header_cprop(ierr, hd, 'lat', (/1, nlat/), 2)
+       if (ierr.eq.0) call put_header_cprop(ierr, hd, ' ',(/0, 0/), 3)
+       if (ierr.eq.0) then
+          call nio_store_csr &
+               & (ierr, iprj, iofs,  &
+               &  hd,   u,    krect)
+       endif
+
+       if (ierr.eq.0) call put_item(ierr, hd, 'PR8',  hi_DFMT)
+       if (ierr.eq.0) call put_item(ierr, hd, 'wsrc', hi_ITEM)
+       if (ierr.eq.0) then
+          call nio_store_csr &
+               & (ierr, wprj, iofs,  &
+               &  hd,   u,    krect)
+       endif
+
+       if (ierr.eq.0) call put_item(ierr, hd, 'MI4',  hi_DFMT)
+       if (ierr.eq.0) call put_item(ierr, hd, 'isrc', hi_ITEM)
+       if (ierr.eq.0) then
+          call nio_store_csr &
+               & (ierr, iprj, iofs,  &
+               &  hd,   u,    krect)
+       endif
+       if (ierr.eq.0) call put_item(ierr, hd, 'MR8',  hi_DFMT)
+       if (ierr.eq.0) call put_item(ierr, hd, 'wsrc', hi_ITEM)
+       if (ierr.eq.0) then
+          call nio_store_csr &
+               & (ierr, wprj, iofs,  &
+               &  hd,   u,    krect)
+       endif
+
     endif
 
     if (ierr.eq.0) deallocate(wsum, itab, wtab, STAT=ierr)
