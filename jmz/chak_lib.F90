@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/11 10:46:59 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/15 08:09:35 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -158,6 +158,7 @@ module chak_lib
   integer,parameter :: shape_element    = 0  ! interprete single integer as element    (SHAPE)
   integer,parameter :: shape_size       = 1  ! interprete single integer as size       (SIZE)
   integer,parameter :: shape_coordinate = 2  ! interprete single integer as coordinate (PERM)
+  integer,parameter :: shape_shift      = 4  ! interprete single integer as shift      (SHIFT)
 
 !!!_  - global flags
   integer,save :: lev_verbose = 0
@@ -960,7 +961,7 @@ contains
 !!!_   . decompose_coordinate_mod
   subroutine decompose_coordinate_mod &
        & (ierr, jrep, lpp, arg, flag)
-    use TOUZA_Std,only: split_list, condop
+    use TOUZA_Std,only: split_list, condop, find_next_sep, parse_number
     implicit none
     integer,         intent(out)            :: ierr
     integer,         intent(out)            :: jrep     ! name/rename as (1:jrep)
@@ -975,7 +976,9 @@ contains
     integer nc
     integer jran
     logical no_range
-    character(len=*),parameter :: cdigits = '0123456789'
+    integer itmp
+    character(len=*),parameter :: cdigits  = '0123456789'
+    character(len=*),parameter :: csymbols = '+-'
 
     ! default rename_sep = '/'
 
@@ -1013,13 +1016,13 @@ contains
           endif
        endif
     else if (flag.eq.shape_coordinate) then
-       js0 = verify(arg(1:larg), cdigits)
-       ! write(*, *) 'coordinate:', js0, arg(1:larg)
-       if (js0.eq.0) then
+       call parse_number(ierr, itmp, arg(1:larg))
+       if (ierr.eq.0) then
           js0  = larg
           jrep = larg
           jran = larg + 1
        else
+          ierr = 0
           js0 = 1
        endif
     else
@@ -1031,9 +1034,16 @@ contains
     endif
 
     if (jran.lt.0) then
-       if (index((cdigits // range_sep), arg(js0:js0)).eq.0) then
-          jran = larg + 1
-          jrep = larg
+       if (index(arg(js0:larg), range_sep).eq.0) then
+          call parse_number(ierr, itmp, arg(js0:larg))
+          if (ierr.eq.0) then
+             jran = js0
+             jrep = jran - lsep - lsep
+          else
+             ierr = 0
+             jran = larg + 1
+             jrep = larg
+          endif
        else
           jran = js0
           jrep = jran - lsep - lsep
@@ -1046,7 +1056,6 @@ contains
     rpos(4) = 0
     lpp = def_loop
     call split_list(nc, rpos, arg(jran:larg), range_sep, rmem, rdef(:))
-    ! write(*, *) 'split', nc, jran, larg
     if (nc.lt.0) then
        ierr = nc
        call message(ierr, 'cannot parse range: ' // trim(arg(jran:larg)))
@@ -1059,11 +1068,16 @@ contains
           lpp%bgn = 0
           lpp%end = rpos(1)
           lpp%stp = condop(rpos(1).eq.0, 0, 1)
+       else if (flag.ge.shape_shift) then
+          lpp%ofs = rpos(1)
        else
           lpp%bgn = system_index_bgn(rpos(1))
           lpp%end = lpp%bgn + 1
           lpp%stp = 1
        endif
+    else if (nc.eq.2 .and. flag.ge.shape_shift) then
+       lpp%ofs = rpos(1)
+       lpp%cyc = rpos(2)
     else if (nc.lt.5) then
        lpp%bgn = system_index_bgn(rpos(1))
        lpp%end = system_index_end(rpos(2))
@@ -1081,7 +1095,7 @@ contains
 !!!_   . parse_format_shape
   subroutine parse_format_shape &
        & (nco, cname, irange, mco, fmt)
-    use TOUZA_Std,only: parse_number, find_next_sep
+    use TOUZA_Std,only: find_next_sep
     implicit none
     integer,         intent(out) :: nco
     character(len=*),intent(out) :: cname(0:*)
@@ -1730,6 +1744,7 @@ contains
 !!!_   . parse_coordinate_repl - parse coordinate argument complex
   subroutine parse_coordinate_repl &
        & (ierr, cold, xold, crep, xrep, str)
+    use TOUZA_Std,only: parse_number
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: cold, crep
@@ -1739,6 +1754,7 @@ contains
     integer lstr,  lsep
     integer jsep0, jsep1
     integer jp
+    integer idmy
     ierr = 0
 
     lstr = len_trim(str)
@@ -1752,6 +1768,16 @@ contains
     endif
     jsep0 = index(str, rename_sep)
     if (jsep0.eq.0) then
+       call parse_number(ierr, idmy, str(1:lstr))
+       if (ierr.eq.0) then
+          ! [+]NUMBER
+          xold = .FALSE.
+          xrep = .FALSE.
+          cold = str(1:lstr)
+          crep = ' '
+          return
+       endif
+       ierr = 0
        if (index(str(1:lstr), insert_coor).eq.1) then
           ! +REPL
           xold = .FALSE.

@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/11 09:18:59 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/14 20:47:43 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1315,7 +1315,7 @@ contains
              call reg_fake_opr(oentr, hbuf, obuffer(jb)%name)
              ierr = min(0, ierr)
           endif
-       case(opr_PERM,opr_SHAPE,opr_SIZE)
+       case(opr_PERM,opr_SHAPE,opr_SIZE,opr_SHIFT)
           call parse_buffer_shape(ierr, arg(jpar:), hopr)
        case(opr_MISS)
           if (jpar.lt.jend) then
@@ -4097,7 +4097,7 @@ contains
 !!!_    * transformation
        else if (handle.eq.opr_TRANSF) then
           continue
-       else if (ANY(handle.eq.(/opr_PERM, opr_SHAPE, opr_SIZE/))) then
+       else if (ANY(handle.eq.(/opr_PERM, opr_SHAPE, opr_SIZE, opr_SHIFT/))) then
           continue
 !!!_    * index
        else if (handle.ge.opr_C0.and.handle.lt.opr_C3) then
