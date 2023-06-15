@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/14 20:47:43 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/15 14:03:29 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -6062,8 +6062,8 @@ contains
     integer j
     integer jb,    jo, js
     ! integer jphyc, jlogc
-    integer b,   e,    s,   odmy, cdmy
-    integer low, high, stp
+    integer b,   e,    stp,   odmy, cdmy
+    integer low, high, stpx
     integer,parameter :: lini = HUGE(0)
     integer,parameter :: hini = (- HUGE(0)) - 1
     logical isi
@@ -6081,14 +6081,13 @@ contains
              low = lini
              high = hini
           endif
-          stp = -1
+          stpx = -1
           do j = 0, nbuf - 1
              jb = buf_h2item(bufh(j))
              js = pstk(j)
              call get_logical_range &
-                  & (b, e, s, odmy, cdmy, jo, bstack(js)%lcp, obuffer(jb)%pcp, domR(j))
-             ! write(*, *) 'glr:', jo, j, b, e, s
-             stp = max(stp, s)
+                  & (b, e, stp, odmy, cdmy, jo, bstack(js)%lcp, obuffer(jb)%pcp, domR(j))
+             stpx = max(stpx, stp)
              if (isi) then
                 if (b.ne.null_range) low = max(low, b)
                 if (e.ne.null_range) high = min(high, e)
@@ -6117,7 +6116,7 @@ contains
     type(domain_t),intent(in)    :: ref
 
     integer jo
-    integer b, e, s, osh, cyc
+    integer b, e, stp, osh, cyc
     integer jb
 
     ierr = 0
@@ -6126,7 +6125,7 @@ contains
     do jo = 0, ref%mco - 1
        ! call set_logical_range(b, e, jo, bstack(jstk)%lcp, dom, ref)
        call get_logical_range &
-            & (b, e, s, osh, cyc, jo, bstack(jstk)%lcp, obuffer(jb)%pcp, dom, ref)
+            & (b, e, stp, osh, cyc, jo, bstack(jstk)%lcp, obuffer(jb)%pcp, dom, ref)
        dom%bgn(jo) = b
        dom%end(jo) = max(e, 1+b)
        dom%iter(jo) = max(1, e - b)

@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/15 08:09:35 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/15 15:38:43 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -336,11 +336,11 @@ contains
 
 !!!_   . get_range_string
   subroutine get_range_string &
-       & (ierr, str, b, e, s, o, c)
+       & (ierr, str, b, e, stp, o, c)
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: str
-    integer,         intent(in)  :: b, e, s
+    integer,         intent(in)  :: b, e, stp
     integer,optional,intent(in)  :: o, c
     integer bb, ee
     character(len=32) ::obuf
@@ -363,14 +363,14 @@ contains
        endif
     else if (ee.eq.null_range) then
        write(str, 112, IOSTAT=ierr) bb
-    else if (s.gt.0) then
+    else if (stp.gt.0) then
        write(str, 114, IOSTAT=ierr) bb, ee
     else if (b.eq.0.and.e.eq.0) then
        str = '-'
-    else if (s.eq.0) then
-       write(str, 115, IOSTAT=ierr) bb, ee, s
-    else if (s.lt.0) then
-       write(str, 116, IOSTAT=ierr) bb, ee, s
+    else if (stp.eq.0) then
+       write(str, 115, IOSTAT=ierr) bb, ee, stp
+    else if (stp.lt.0) then
+       write(str, 116, IOSTAT=ierr) bb, ee, stp
     else
        write(str, 114, IOSTAT=ierr) bb, ee
     endif
@@ -543,7 +543,7 @@ contains
     integer jodr, jphyc
     character(len=lname)   :: cran
     character(len=lname*2) :: cbuf(0:lcoor-1)
-    integer b, e, s
+    integer b, e, stp
     integer cb, ce
 
     ierr = 0
@@ -551,8 +551,8 @@ contains
     do jodr = 0, dom%mco - 1
        b = dom%bgn(jodr)
        e = dom%end(jodr)
-       s = pcp(jodr)%stp
-       if (ierr.eq.0) call get_range_string(ierr, cran, b, e, s)
+       stp = pcp(jodr)%stp
+       if (ierr.eq.0) call get_range_string(ierr, cran, b, e, stp)
        if (ierr.eq.0) then
           jphyc = dom%cidx(jodr)
 101       format(A, '/', A)
@@ -599,14 +599,14 @@ contains
 
     character(len=32) :: ld, rd, sp
 
-    integer b, e, s, odmy, cdmy
+    integer b, e, stp, odmy, cdmy
     integer cb, ce
 
     ierr = 0
     str = ' '
     do jodr = 0, dom%mco - 1
-       if (ierr.eq.0) call get_logical_range(b, e, s, odmy, cdmy, jodr, lcp, pcp, dom)
-       if (ierr.eq.0) call get_range_string(ierr, cran, b, e, s)
+       if (ierr.eq.0) call get_logical_range(b, e, stp, odmy, cdmy, jodr, lcp, pcp, dom)
+       if (ierr.eq.0) call get_range_string(ierr, cran, b, e, stp)
        if (ierr.eq.0) then
           jphyc = dom%cidx(jodr)
           jlogc = dom%lidx(jodr)
@@ -748,6 +748,14 @@ contains
        ncur = ncur / domL%iter(jc)
        if (domR%bgn(jc).le.jcur.and.jcur.lt.domR%end(jc)) then
           n = n + (domR%ofs(jc) + jcur) * domR%strd(jc)
+       else if (domR%cyc(jc).gt.0) then
+          jcur = modulo(domR%ofs(jc) + jcur, domR%cyc(jc))
+          if (domR%bgn(jc).le.jcur.and.jcur.lt.domR%end(jc)) then
+             n = n + jcur * domR%strd(jc)
+          else
+             n = -1
+             exit
+          endif
        else
           n = -1
           exit
@@ -814,11 +822,19 @@ contains
     implicit none
     integer,       intent(in) :: lidx(0:*)
     type(domain_t),intent(in) :: dom
-    integer jc
+    integer jc, jj
     n = 0
     do jc = 0, dom%mco - 1
        if (dom%bgn(jc).le.lidx(jc).and.lidx(jc).lt.dom%end(jc)) then
           n = n + (dom%ofs(jc) + lidx(jc)) * dom%strd(jc)
+       else if (dom%cyc(jc).gt.0) then
+          jj = modulo(dom%ofs(jc) + lidx(jc), dom%cyc(jc))
+          if (dom%bgn(jc).le.jj.and.jj.lt.dom%end(jc)) then
+             n = n + jj * dom%strd(jc)
+          else
+             n = -1
+             exit
+          endif
        else
           n = -1
           exit
@@ -844,8 +860,8 @@ contains
 
 !!!_   . get_logical_range
   subroutine get_logical_range &
-       & (b, e, s, osh, cyc, jodr, lcp, pcp, dom, ref)
-    integer,       intent(out)         :: b, e, s, osh, cyc
+       & (b, e, stp, osh, cyc, jodr, lcp, pcp, dom, ref)
+    integer,       intent(out)         :: b, e, stp, osh, cyc
     integer,       intent(in)          :: jodr
     type(loop_t),  intent(in)          :: lcp(0:*)
     type(loop_t),  intent(in)          :: pcp(0:*)
@@ -867,32 +883,40 @@ contains
     jphyc = dom%cidx(jodr)
     if (jlogc.ge.0) then
        osh = lcp(jlogc)%ofs
+       cyc = lcp(jlogc)%cyc
     else
        osh = 0
+       cyc = 0
     endif
     if (jlogc.ge.0) then
        b = lcp(jlogc)%bgn
        e = lcp(jlogc)%end
-       if (b.ne.null_range) b = b + osh
-       if (e.ne.null_range) e = e + osh
        b = logical_index(b, low)
        e = logical_index(e, high)
+       if (cyc.le.0) then
+          if (b.ne.null_range) b = b + osh
+          if (e.ne.null_range) e = e + osh
+       endif
        ! b = logical_index(lcp(jlogc)%bgn + lcp(jlogc)%ofs, low)
        ! e = logical_index(lcp(jlogc)%end + lcp(jlogc)%ofs, high)
     else
        b = low
        e = high
     endif
-    s = -1
+    stp = -1
     if (jphyc.ge.0) then
        ! if (pcp(jphyc)%stp.gt.0) then
        if (pcp(jphyc)%stp.ge.0) then
-          if (b.eq.null_range) b = pcp(jphyc)%bgn + osh
-          if (e.eq.null_range) e = pcp(jphyc)%end + osh
+          if (cyc.le.0) then
+             if (b.eq.null_range) b = pcp(jphyc)%bgn + osh
+             if (e.eq.null_range) e = pcp(jphyc)%end + osh
+          else
+             if (b.eq.null_range) b = pcp(jphyc)%bgn
+             if (e.eq.null_range) e = pcp(jphyc)%end
+          endif
        endif
-       s = pcp(jphyc)%stp
+       stp = pcp(jphyc)%stp
     endif
-    ! write(*, *) 'glr: ', osh, b, e, s
   end subroutine get_logical_range
 
 !!!_   . settle_output_domain
