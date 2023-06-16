@@ -1,6 +1,6 @@
 !!!_! jmz/chak_decl.F90 - TOUZA/Jmz CH(swiss) army knife operator symbol declaration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-06-14T20:44:34+09:00
+! Created by genopr.sh at 2023-06-16T11:26:52+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
