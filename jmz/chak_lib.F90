@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/16 15:22:29 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/19 10:37:39 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -146,6 +146,13 @@ module chak_lib
   integer,parameter :: shape_size       = 1  ! interprete single integer as size       (SIZE)
   integer,parameter :: shape_coordinate = 2  ! interprete single integer as coordinate (PERM)
   integer,parameter :: shape_shift      = 4  ! interprete single integer as shift      (SHIFT)
+!!!_  - coordinate(loop) type
+  integer,parameter :: loop_error  = -2
+  integer,parameter :: loop_unset  = -1
+  integer,parameter :: loop_null   = 0       ! null coordinate  (expand to bgn:end)
+  integer,parameter :: loop_reduce = 1       ! sweep coordinate (shrink to 0:1)
+  integer,parameter :: loop_normal = 2
+
 !!!_  - common values
   real(kind=KBUF),save :: PI = ZERO
 !!!_  - domain property
@@ -165,13 +172,13 @@ module chak_lib
   type loop_t
      integer :: bgn = -1
      integer :: end = -1
-     integer :: stp = -1
+     integer :: flg = loop_unset
      integer :: ofs = 0
      integer :: cyc = -1        ! 0 if still effective empty
      character(len=lname) :: name
   end type loop_t
 
-  type(loop_t),save :: def_loop  = loop_t(null_range, null_range, -1, 0, -1, ' ')
+  type(loop_t),save :: def_loop  = loop_t(null_range, null_range, loop_unset, 0, -1, ' ')
 
 !!!_  - buffer property
   type buffer_t
@@ -204,6 +211,7 @@ module chak_lib
      integer :: cmode = cmode_null   ! operation mode
      character(len=ldesc)  :: desci
      character(len=ldesc)  :: desco
+     type(loop_t) :: lcp(0:lcoor-1)  ! logical (destination) coordinate properties
      type(stack_t),pointer :: lefts(:)       ! result stack to push
      integer :: opt                  ! option for any use
   end type queue_t
@@ -257,7 +265,7 @@ contains
     do jc = 0, size(lpp) - 1
 111    format(A, 'loop', A, ': ', I0, 1x, A, 1x, I0, ':', I0, ':', I0, '+', I0, '/', I0)
        write(utmp, 111) repeat(' ', tab), trim(pfx), jc, trim(lpp(jc)%name), &
-            & lpp(jc)%bgn, lpp(jc)%end, lpp(jc)%stp, lpp(jc)%ofs, lpp(jc)%cyc
+            & lpp(jc)%bgn, lpp(jc)%end, lpp(jc)%flg, lpp(jc)%ofs, lpp(jc)%cyc
     enddo
   end subroutine show_lpp
 !!!_   . show_domain
@@ -292,7 +300,7 @@ contains
     do jc = 0, dom%mco - 1
 111    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '*', I0, ' (', I0, ')')
 112    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '*', I0)
-       call get_range_string(ierr, cran, dom%bgn(jc), dom%end(jc), 1, c=dom%cyc(jc))
+       call get_range_string(ierr, cran, dom%bgn(jc), dom%end(jc), loop_normal, c=dom%cyc(jc))
        if (dom%ofs(jc).eq.null_range) then
           write(utmp, 112) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%strd(jc), dom%iter(jc)
        else
@@ -303,11 +311,11 @@ contains
 
 !!!_   . get_range_string
   subroutine get_range_string &
-       & (ierr, str, b, e, stp, o, c)
+       & (ierr, str, b, e, flg, o, c)
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: str
-    integer,         intent(in)  :: b, e, stp
+    integer,         intent(in)  :: b, e, flg
     integer,optional,intent(in)  :: o, c
     integer bb, ee
     character(len=32) ::obuf
@@ -318,29 +326,38 @@ contains
 112 format(I0, ':')
 113 format(':', I0)
 114 format(I0, ':', I0)
-115 format(I0, ':', I0, '(', I0, ')')
-116 format(I0, ':', I0, '(', I0, ')')
+118 format('(', I0, ')')
     bb = user_index_bgn(b)
     ee = user_index_end(e)
     if (bb.eq.null_range) then
        if (ee.eq.null_range) then
           write(str, 111, IOSTAT=ierr)
+          if (flg.eq.loop_normal) str = trim(str) // '(1)'
        else
           write(str, 113, IOSTAT=ierr) ee
        endif
     else if (ee.eq.null_range) then
        write(str, 112, IOSTAT=ierr) bb
-    else if (stp.gt.0) then
-       write(str, 114, IOSTAT=ierr) bb, ee
     else if (b.eq.0.and.e.eq.0) then
-       str = '-'
-    else if (stp.eq.0) then
-       write(str, 115, IOSTAT=ierr) bb, ee, stp
-    else if (stp.lt.0) then
-       write(str, 116, IOSTAT=ierr) bb, ee, stp
+       ! str = '-'
+       str = ' '
     else
        write(str, 114, IOSTAT=ierr) bb, ee
     endif
+
+    if (flg.eq.loop_normal) then
+       continue
+    else if (flg.eq.loop_reduce) then
+       str = trim(str) // '(-)'
+    else if (flg.eq.loop_null) then
+       str = trim(str) // '(0)'
+    else if (flg.eq.loop_unset) then
+       continue
+    else
+       write(obuf, 118, IOSTAT=ierr) flg
+       str = trim(str) // trim(obuf)
+    endif
+    if (str.eq.' ') str = '-'
     if (present(o)) then
 121    format(':', SP, I0)
        if (o.ne.0) then
@@ -446,7 +463,7 @@ contains
     nc = 0
     mc = choice(lcoor, maxco)
     do jc = 0, mc - 1
-       call get_range_string(ierr, cran, lpp(jc)%bgn, lpp(jc)%end, lpp(jc)%stp, lpp(jc)%ofs)
+       call get_range_string(ierr, cran, lpp(jc)%bgn, lpp(jc)%end, lpp(jc)%flg, lpp(jc)%ofs)
 102    format(A, A, A)
 103    format(A, A)
        if (lpp(jc)%name.eq.' ') then
@@ -460,7 +477,7 @@ contains
              write(cstr(jc), 103, IOSTAT=jerr) trim(lpp(jc)%name), trim(cran)
           endif
        endif
-       if (lpp(jc)%stp.ge.0) nc = jc
+       if (lpp(jc)%flg.ge.loop_null) nc = jc     ! if lpp is set
        if (lpp(jc)%name.ne.' ') nc = jc
     enddo
     call join_list(ierr, str, cstr(0:nc), ldelim='[', rdelim=']')
@@ -510,7 +527,7 @@ contains
     integer jodr, jphyc
     character(len=lname)   :: cran
     character(len=lname*2) :: cbuf(0:lcoor-1)
-    integer b, e, stp
+    integer b, e, flg
     integer cb, ce
 
     ierr = 0
@@ -518,8 +535,8 @@ contains
     do jodr = 0, dom%mco - 1
        b = dom%bgn(jodr)
        e = dom%end(jodr)
-       stp = pcp(jodr)%stp
-       if (ierr.eq.0) call get_range_string(ierr, cran, b, e, stp)
+       flg = pcp(jodr)%flg
+       if (ierr.eq.0) call get_range_string(ierr, cran, b, e, flg)
        if (ierr.eq.0) then
           jphyc = dom%cidx(jodr)
 101       format(A, '/', A)
@@ -566,14 +583,14 @@ contains
 
     character(len=32) :: ld, rd, sp
 
-    integer b, e, stp, odmy, cdmy
+    integer b, e, flg, odmy, cdmy
     integer cb, ce
 
     ierr = 0
     str = ' '
     do jodr = 0, dom%mco - 1
-       if (ierr.eq.0) call get_logical_range(b, e, stp, odmy, cdmy, jodr, lcp, pcp, dom)
-       if (ierr.eq.0) call get_range_string(ierr, cran, b, e, stp)
+       if (ierr.eq.0) call get_logical_range(b, e, flg, odmy, cdmy, jodr, lcp, pcp, dom)
+       if (ierr.eq.0) call get_range_string(ierr, cran, b, e, flg)
        if (ierr.eq.0) then
           jphyc = dom%cidx(jodr)
           jlogc = dom%lidx(jodr)
@@ -814,8 +831,8 @@ contains
 
 !!!_   . get_logical_range
   subroutine get_logical_range &
-       & (b, e, stp, osh, cyc, jodr, lcp, pcp, dom, ref)
-    integer,       intent(out)         :: b, e, stp, osh, cyc
+       & (b, e, flg, osh, cyc, jodr, lcp, pcp, dom, ref)
+    integer,       intent(out)         :: b, e, flg, osh, cyc
     integer,       intent(in)          :: jodr
     type(loop_t),  intent(in)          :: lcp(0:*)
     type(loop_t),  intent(in)          :: pcp(0:*)
@@ -824,6 +841,7 @@ contains
 
     integer low,   high
     integer jlogc, jphyc
+    integer bp,    ep
 
     if (present(ref)) then
        low  = ref%bgn(jodr)
@@ -857,19 +875,25 @@ contains
        b = low
        e = high
     endif
-    stp = -1
+    flg = loop_unset
     if (jphyc.ge.0) then
-       ! if (pcp(jphyc)%stp.gt.0) then
-       if (pcp(jphyc)%stp.ge.0) then
+       ! write(*, *) b, e, pcp(jphyc)%bgn, pcp(jphyc)%end, pcp(jphyc)%flg
+       bp = pcp(jphyc)%bgn
+       ep = pcp(jphyc)%end
+       if (pcp(jphyc)%flg.eq.loop_reduce) then
+          bp = 0
+          ep = 0
+       endif
+       if (pcp(jphyc)%flg.ge.loop_null) then  ! if pcp is set
           if (cyc.le.0) then
-             if (b.eq.null_range) b = pcp(jphyc)%bgn + osh
-             if (e.eq.null_range) e = pcp(jphyc)%end + osh
+             if (b.eq.null_range) b = bp + osh
+             if (e.eq.null_range) e = ep + osh
           else
-             if (b.eq.null_range) b = pcp(jphyc)%bgn
-             if (e.eq.null_range) e = pcp(jphyc)%end
+             if (b.eq.null_range) b = bp
+             if (e.eq.null_range) e = ep
           endif
        endif
-       stp = pcp(jphyc)%stp
+       flg = pcp(jphyc)%flg
     endif
   end subroutine get_logical_range
 
@@ -899,6 +923,47 @@ contains
     endif
   end subroutine settle_output_domain
 
+!!!_   . reduce_output_domain
+  subroutine reduce_output_domain(ierr, domZ, domL, lstk, buf)
+    use TOUZA_Std,only: parse_number
+    implicit none
+    integer,       intent(out)   :: ierr
+    type(domain_t),intent(inout) :: domZ   ! reduction
+    type(domain_t),intent(in)    :: domL   ! normal filter
+    type(stack_t), intent(in)    :: lstk
+    type(buffer_t),intent(in)    :: buf
+
+    integer jo, nx
+
+    ierr = 0
+    if (ierr.eq.0) then
+       domZ = domL
+       domZ%ofs(0:domZ%mco-1) = 0
+    endif
+    if (ierr.eq.0) then
+       nx = count(lstk%lcp(0:domZ%mco-1)%flg.ge.loop_null)
+       if (nx.eq.0) then
+          domZ%strd(0:domZ%mco-1) = 0
+       else
+          do jo = 0, domZ%mco - 1
+             if (lstk%lcp(jo)%flg.ge.loop_null) then
+                domZ%strd(jo) = 0
+             endif
+          enddo
+       endif
+    endif
+
+    if (ierr.eq.0) then
+       domZ%n = 1
+       do jo = 1, domZ%mco
+          if (domZ%strd(jo-1).gt.0) then
+             domZ%strd(jo-1) = domZ%n
+             domZ%n = domZ%n * max(1, domZ%end(jo-1) - domZ%bgn(jo-1))
+          endif
+       enddo
+    endif
+  end subroutine reduce_output_domain
+
 !!!_   . settle_domain_stride
   subroutine settle_domain_stride &
        & (ierr, dom, pcp)
@@ -907,7 +972,7 @@ contains
     type(domain_t),intent(inout) :: dom
     type(loop_t),  intent(in)    :: pcp(0:*)
 
-    integer jo, jc, w
+    integer jo, jc, w, stp
     integer strd(0:dom%mco)
 
     ierr = 0
@@ -923,12 +988,17 @@ contains
     strd(0) = 1
     do jc = 1, dom%mco
        w = pcp(jc-1)%end - pcp(jc-1)%bgn
-       strd(jc) = strd(jc-1) * max(1, w * max(0, pcp(jc-1)%stp))
+       ! stp = min(1, max(0, pcp(jc-1)%flg))
+       ! 0 if null, sweep, 1 if normal
+       stp = min(2, max(1, pcp(jc-1)%flg)) - 1
+       strd(jc) = strd(jc-1) * max(1, w * stp)
     enddo
     do jo = 0, dom%mco - 1
        jc = dom%cidx(jo)
        if (jc.ge.0) then
-          dom%strd(jo) = strd(jc) * max(0, pcp(jc)%stp)
+          ! stp = min(1, max(0, pcp(jc)%flg))
+          stp = min(2, max(1, pcp(jc)%flg)) - 1
+          dom%strd(jo) = strd(jc) * stp
        else
           dom%strd(jo) = 0
        endif
@@ -1045,13 +1115,13 @@ contains
           ! force null coordinate if size==0
           lpp%bgn = 0
           lpp%end = rpos(1)
-          lpp%stp = condop(rpos(1).eq.0, 0, 1)
+          lpp%flg = condop(rpos(1).eq.0, loop_null, loop_normal)
        else if (flag.ge.shape_shift) then
           lpp%ofs = rpos(1)
        else
           lpp%bgn = system_index_bgn(rpos(1))
           lpp%end = lpp%bgn + 1
-          lpp%stp = 1
+          lpp%flg = loop_normal
        endif
     else if (nc.eq.2 .and. flag.ge.shape_shift) then
        lpp%ofs = rpos(1)
@@ -1059,8 +1129,8 @@ contains
     else if (nc.lt.5) then
        lpp%bgn = system_index_bgn(rpos(1))
        lpp%end = system_index_end(rpos(2))
-       lpp%stp = 1
-       if (lpp%end.ne.null_range .and. lpp%end.le.lpp%bgn) lpp%stp = 0
+       lpp%flg = loop_normal
+       if (lpp%end.ne.null_range .and. lpp%end.le.lpp%bgn) lpp%flg = loop_null
        if (nc.ge.3) lpp%ofs = rpos(3)
        if (nc.ge.4) lpp%cyc = rpos(4)
     else
@@ -1096,7 +1166,7 @@ contains
        je = find_next_sep(fmt, csep, jp)
        if (jerr.eq.0) call decompose_coordinate_mod(jerr, jr, lpp, fmt(jp+1:je), shape_size)
        if (jerr.eq.0) then
-          if (lpp%stp.le.0) then
+          if (lpp%flg.le.loop_null) then
              irange(1:2, nco) = (/0, 0/)
           else
              irange(1:2, nco) = (/lpp%bgn, lpp%end/)
@@ -1172,7 +1242,7 @@ contains
     ! count ranks
     nranks = 1
     do jco = mco - 1, 0, -1
-       if (pcp(jco)%stp.ge.0.or.pcp(jco)%name.ne.' ') then
+       if (pcp(jco)%flg.ge.loop_null.or.pcp(jco)%name.ne.' ') then
           nranks = jco + 1
           exit
        endif
@@ -1645,7 +1715,7 @@ contains
     integer jc
     nc = -1
     do jc = 0, choice(lcoor, maxco) - 1
-       if (lpp(jc)%stp.ge.0) nc = jc
+       if (lpp(jc)%flg.ge.loop_null) nc = jc
        if (lpp(jc)%name.ne.' ') nc = jc
     enddo
     nc = nc + 1
@@ -1664,14 +1734,14 @@ contains
     endif
     n = co_unset
     if (present(pcp)) then
-       if (lcp%stp.lt.0) then
-          if (pcp%stp.gt.0) then
+       if (lcp%flg.lt.loop_null) then
+          if (pcp%flg.gt.loop_reduce) then
              n = co_wild
           else
              n = co_null
           endif
        else
-          if (pcp%stp.le.0) then
+          if (pcp%flg.le.loop_null) then
              b = lcp%bgn
              e = lcp%end
           else
@@ -1691,7 +1761,7 @@ contains
           endif
        endif
     else
-       if (lcp%stp.lt.0) then
+       if (lcp%flg.lt.loop_null) then
           n = co_null
        else
           b = lcp%bgn
@@ -1716,7 +1786,7 @@ contains
   logical function is_null_coor(lpp) result (b)
     implicit none
     type(loop_t),intent(in) :: lpp
-    b = (lpp%stp.le.0.and.lpp%name.eq.' ')
+    b = (lpp%flg.le.loop_null.and.lpp%name.eq.' ')
   end function is_null_coor
 
 !!!_   . parse_coordinate_repl - parse coordinate argument complex

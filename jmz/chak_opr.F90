@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/16 11:56:39 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/19 12:38:06 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -39,12 +39,19 @@ module chak_opr
   integer,parameter :: ilev_or = 10
   integer,parameter :: ilev_logical = 11
 
+!!!_   . type conversion
+  integer,parameter :: result_error = -1
+  integer,parameter :: result_asis  = 0
+  integer,parameter :: result_int   = 1
+  integer,parameter :: result_float = 2
+
 !!!_   . operator properties
   type opr_t
      integer :: push = -1
      integer :: pop = -1
      integer :: entr = -1
      integer :: ilev = ilev_unset
+     integer :: conv = result_asis
      character(len=8) :: istr = ' '
   end type opr_t
   type(opr_t),save,private :: oprop(0:lopr-1)
@@ -105,7 +112,7 @@ contains
   end subroutine register_operators
 !!!_   . reg_opr_prop
   subroutine reg_opr_prop &
-       & (ierr, idopr, str, pop, push, ilev, istr)
+       & (ierr, idopr, str, pop, push, ilev, istr, conv)
     use TOUZA_Std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
@@ -115,6 +122,7 @@ contains
     integer,         intent(in),optional :: push
     integer,         intent(in),optional :: ilev
     character(len=*),intent(in),optional :: istr
+    integer,         intent(in),optional :: conv
     integer entr
     if (idopr.ge.lopr.or.idopr.lt.0) then
        ierr = ERR_PANIC
@@ -129,6 +137,7 @@ contains
           oprop(idopr)%push = choice(-1, push)
           oprop(idopr)%pop = choice(-1, pop)
           oprop(idopr)%ilev = choice(ilev_unset, ilev)
+          oprop(idopr)%conv = choice(result_asis, conv)
           if (present(istr)) then
              oprop(idopr)%istr = istr
           else
@@ -221,6 +230,33 @@ contains
        endif
     endif
   end subroutine inquire_opr_infix
+
+!!!_   . adj_operator_type()
+  integer function adj_operator_type(handle, kv) result(n)
+    implicit none
+    integer,intent(in) :: handle
+    integer,intent(in) :: kv
+    if (handle.lt.0.or.handle.ge.mopr) then
+       n = ERR_INVALID_PARAMETER
+       call message(n, 'invalid operator handle to inquire', (/handle/))
+    else
+       n = oprop(handle)%conv
+       select case(n)
+       case (result_asis)
+          n = kv
+       case (result_int)
+          n = kv_int
+       case (result_float)
+          if (kv.eq.kv_flt) then
+             n = kv_flt
+          else
+             n = kv_dbl
+          endif
+       case default
+          n = kv_null
+       end select
+    endif
+  end function adj_operator_type
 !!!_   . is_operator_modify()
   logical function is_operator_modify(handle) result(b)
     implicit none
@@ -381,21 +417,24 @@ contains
   end subroutine apply_BINARY_lazy_template
 !!!_   . apply_REDUCE_template
   subroutine apply_REDUCE_template &
-       & (ierr, Z, domZ, X, domX, F)
+       & (ierr, Z, domZ, domY, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domZ, domY, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jx
+    integer jz, jy, jx
     ierr = 0
-    do jz = 0, domZ%n - 1
-       jx = conv_physical_index(jz, domZ, domX)
-       if (jx.ge.0) then
-          Z(jz) = elem_REDUCE_template(Z(jz), X(jx), F)
-       else
-          Z(jz) = elem_REDUCE_template(Z(jz), F, F)
+    do jy = 0, domY%n - 1
+       jx = conv_physical_index(jy, domY, domX)
+       jz = conv_physical_index(jy, domY, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_REDUCE_template(Z(jz), X(jx), F)
+          else
+             Z(jz) = elem_REDUCE_template(Z(jz), F, F)
+          endif
        endif
     enddo
   end subroutine apply_REDUCE_template
@@ -2111,21 +2150,25 @@ contains
 !!!_  - reduction operations
 !!!_   . apply_REDUCE_COUNT
   subroutine apply_REDUCE_COUNT &
-       & (ierr, Z, domZ, X, domX, F)
+       & (ierr, Z, domZ, domY, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domZ, domY, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jx
+    integer jz, jy, jx
     ierr = 0
-    do jz = 0, domZ%n - 1
-       jx = conv_physical_index(jz, domZ, domX)
-       if (jx.ge.0) then
-          Z(jz) = elem_REDUCE_count(Z(jz), X(jx), F)
-       else
-          Z(jz) = elem_REDUCE_count(Z(jz), F, F)
+    do jy = 0, domY%n - 1
+       jx = conv_physical_index(jy, domY, domX)
+       jz = conv_physical_index(jy, domY, domZ)
+       ! write(*, *) 'count', jy, jz, jx
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_REDUCE_count(Z(jz), X(jx), F)
+          else
+             Z(jz) = elem_REDUCE_count(Z(jz), F, F)
+          endif
        endif
     enddo
   end subroutine apply_REDUCE_COUNT

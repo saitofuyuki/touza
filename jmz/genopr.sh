@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/06/16 11:50:33 fuyuki genopr.sh>
+# Time-stamp: <2023/06/19 12:27:43 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -23,7 +23,7 @@ main ()
   local -A GRP=() SUBG=()
   local -A NSTACK=() ALIAS=() SYM=()
   local -A DSTACK=() # stack properties for description
-  local -A OPT=() PARAM=() INFIX=()
+  local -A OPT=() PARAM=() INFIX=() CONV=()
   local -A FUNC=()
   local -A IVAR=() AVAR=()
   local -A GRANGE=()
@@ -128,9 +128,9 @@ register_all ()
   register -n 2,1 -i call          MASK  'A if both A and B are defined, else MISS'
 
   # logical unary
-  register -g ubool -n 1,1            -i neg,'!'  NOT   'logical not; 1 if undefined, else MISS'
-  register -g ubool -n 1,1            -i call     BOOL  'boolean; 1 if defined, else MISS'
-  register -g ubool -n 1,1 -f -,FALSE -i call     BIN   'binary; 1 if defined, else 0'
+  register -g ubool -n 1,1            -i neg,'!' -c int  NOT   'logical not; 1 if undefined, else MISS'
+  register -g ubool -n 1,1            -i call    -c int  BOOL  'boolean; 1 if defined, else MISS'
+  register -g ubool -n 1,1 -f -,FALSE -i call    -c int  BIN   'binary; 1 if defined, else 0'
 
   # logical operation, inclusive
   register -g lazy -n 2,1            -i logical,'||'  OR      'logical or; A if defined, else B if defined, else MISS'
@@ -144,13 +144,13 @@ register_all ()
   register -g lazy -n 2,1 -f LAY,-,F -i call          RLAY    'background layer; A if B outside, else B'
 
   # primitive binary
-  register -n 2,1 -i add,'+'  ADD     'A+B'
-  register -n 2,1 -i add,'-'  SUB     'A-B'
-  register -n 2,1 -i mul,'*'  MUL     'A*B'
-  register -n 2,1 -i mul,'/'  DIV     'A/B'
-  register -n 2,1 -i mul,'//' IDIV    'A//B'
-  register -n 2,1 -i mul,'%'  MOD     'mod(A,B)'
-  register -n 2,1 -i exp,'**' POW     'pow(A,B)'
+  register -n 2,1 -i add,'+'  ADD         'A+B'
+  register -n 2,1 -i add,'-'  SUB         'A-B'
+  register -n 2,1 -i mul,'*'  MUL         'A*B'
+  register -n 2,1 -i mul,'/'  DIV         'A/B'
+  register -n 2,1 -i mul,'//' IDIV -c int 'A//B'
+  register -n 2,1 -i mul,'%'  MOD         'mod(A,B)'
+  register -n 2,1 -i exp,'**' POW         'pow(A,B)'
 
   register -n 2,1 -i call MODULO      'modulo(A,B)'
 
@@ -166,15 +166,16 @@ register_all ()
   register          -n 1,1 -i call     ABS     'abs(A)'
   register          -n 1,1 -i call     SQR     'A*A'
   register -g float -n 1,1 -i call     SQRT    'square root'
-  register          -n 1,1 -i call     SIGN    'copy A sign on 1'
-  register          -n 1,1 -i call     ZSIGN   '-1,0,+1 if negative,zero,positive'
+  register          -n 2,1 -i call         SIGN    'copy B sign on A'
+  register          -n 1,1 -i call -c int  SIGN1   'copy A sign on 1'
+  register          -n 1,1 -i call -c int  ZSIGN   '-1,0,+1 if negative,zero,positive'
 
   # integer opration
-  register -n 1,1 -i call          FLOOR   'largest integer <= A'
-  register -n 1,1 -i call          CEIL    'smallest integer >=A'
-  register -n 1,1 -i call          ROUND   'nearest integer of A'
-  register -n 1,1 -i call          TRUNC   'truncate toward 0'
-  register -n 1,1 -i call -f TRUNC INT     'truncate toward 0 and convert'
+  register -n 1,1 -i call          -c int FLOOR   'largest integer <= A'
+  register -n 1,1 -i call          -c int CEIL    'smallest integer >=A'
+  register -n 1,1 -i call          -c int ROUND   'nearest integer of A'
+  register -n 1,1 -i call                 TRUNC   'truncate toward 0'
+  register -n 1,1 -i call -f TRUNC -c int INT     'truncate toward 0 and convert'
 
   # math operation
   register -g float -n 1,1 -i call EXP      'exp(A)'
@@ -205,12 +206,12 @@ register_all ()
   register -n 2,1 -i shift,'>>' RSHIFT   'bitwise right shift'
 
   # floating-point operation
-  register -g float -n 1,1 -i call EXPONENT  'exponent(A)'
-  register -g float -n 1,1 -i call FRACTION  'fraction(A)'
-  register -g float -n 2,1 -i call SCALE     'scale(A,B)'
-  register -g float -n 2,1 -i call NEAREST   'nearest(A,B)'
-  register -g float -n 1,1 -i call SPACING   'spacing(A)'
-  register -g float -n 1,1 -i call RRSP      'rrspacing(A)'
+  register -g float -n 1,1 -i call -c int EXPONENT  'exponent(A)'
+  register -g float -n 1,1 -i call        FRACTION  'fraction(A)'
+  register -g float -n 2,1 -i call        SCALE     'scale(A,B)'
+  register -g float -n 2,1 -i call        NEAREST   'nearest(A,B)'
+  register -g float -n 1,1 -i call        SPACING   'spacing(A)'
+  register -g float -n 1,1 -i call        RRSP      'rrspacing(A)'
 
   # other operation
   register         -n 2,1 -i call             MIN    'min(A,B)'
@@ -219,20 +220,20 @@ register_all ()
   register -g lazy -n 2,1 -i call -f -,LLIMIT LMAX   'lazy MAX'
 
   # conditional operation (binary)
-  register -g bool -n 2,1 -f -,FALSE -i call EQB       '1 if A==B, else 0'
-  register -g bool -n 2,1 -f -,FALSE -i call NEB       '1 if A!=B, else 0'
-  register -g bool -n 2,1 -f -,FALSE -i call LTB       '1 if A<B, else 0'
-  register -g bool -n 2,1 -f -,FALSE -i call GTB       '1 if A>B, else 0'
-  register -g bool -n 2,1 -f -,FALSE -i call LEB       '1 if A<=B, else 0'
-  register -g bool -n 2,1 -f -,FALSE -i call GEB       '1 if A>=B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int EQB       '1 if A==B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int NEB       '1 if A!=B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int LTB       '1 if A<B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int GTB       '1 if A>B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int LEB       '1 if A<=B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int GEB       '1 if A>=B, else 0'
 
   # conditional operation (binary or MISS)
-  register -g bool -n 2,1 -i call EQ      '1, 0, MISS for A==B, not, either MISS'
-  register -g bool -n 2,1 -i call NE      '1, 0, MISS for A!=B, not, either MISS'
-  register -g bool -n 2,1 -i call LT      '1, 0, MISS for A<B, not, either MISS'
-  register -g bool -n 2,1 -i call GT      '1, 0, MISS for A>B, not, either MISS'
-  register -g bool -n 2,1 -i call LE      '1, 0, MISS for A<=B, not, either MISS'
-  register -g bool -n 2,1 -i call GE      '1, 0, MISS for A>=B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int EQ      '1, 0, MISS for A==B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int NE      '1, 0, MISS for A!=B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int LT      '1, 0, MISS for A<B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int GT      '1, 0, MISS for A>B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int LE      '1, 0, MISS for A<=B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int GE      '1, 0, MISS for A>=B, not, either MISS'
 
   register -a EQ EQU
   register -a NE NEU
@@ -259,7 +260,7 @@ register_all ()
   register -g reduction -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
   register -g reduction -o RANK -i call SUM     'sum through stacks or rank(s)'
   register -g reduction -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
-  register -g reduction -n 1,1 -o RANK -f ZERO -i call COUNT   'count defined elements through stacks or rank(s)'
+  register -g reduction -n 1,1 -o RANK -f ZERO -i call -c int COUNT   'count defined elements through stacks or rank(s)'
 
   register -g reduction -n 1,1 -i call -p RANK -s 'MIN=' UMIN    'minimum'
   register -g reduction -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'
@@ -311,13 +312,13 @@ register_all ()
 }
 
 # register [-g GROUP[,SUBGROUP]][-n POP,PUSH][-a ALIAS][-s SYMBOL]
-#          [-o OPTION][-p PARAM][-i INFIX][-f FUNC]
+#          [-o OPTION][-p PARAM][-i INFIX][-c CONV][-f FUNC]
 #          OPERATOR [DESCRIPTION]
 
 register ()
 {
   local grp= subg= nstack= alias= sym=
-  local opt= param= infix= func=
+  local opt= param= infix= conv= func=
   local opr= descr= dstack=
   while [[ $# -gt 0 ]]
   do
@@ -330,6 +331,7 @@ register ()
     (-o) opt=$2; shift;;
     (-p) param=$2; shift;;
     (-i) infix=(${(s:,:)2}); shift;;
+    (-c) conv=$2; shift;;
     (-f) func=$2; shift;;
     (--) shift; break;;
     (-*) print -u2 - "unknown option $1"; exit 1;;
@@ -367,6 +369,7 @@ register ()
   PARAM[$key]="$param"
   FUNC[$key]="$func"
   INFIX[$key]="$infix"
+  CONV[$key]="$conv"
   SYM[$key]="$sym"
   NSTACK[$key]="$nstack"
   DSTACK[$key]="$dstack"
@@ -432,7 +435,7 @@ output_register ()
   local grp= key=
   local iv= av=
   local nstack=()
-  local infix=() rarg=()
+  local infix=() rarg=() conv=
   local sub=
   output_f90_header "$of" "operator registration"
   # symbol
@@ -447,10 +450,14 @@ output_register ()
       iv=$IVAR[$key]
       nstack=(${=NSTACK[$key]})
       infix=(${=INFIX[$key]})
+      conv=$CONV[$key]
       rarg=(ierr "$iv" "$av")
+      [[ -z $conv && $grp == float ]] && conv=float
+
       [[ -n $nstack ]] && rarg+=($nstack[1] $nstack[2])
       [[ -n $infix[1] ]] && rarg+=("ilev=ilev_$infix[1]")
       [[ -n $infix[2] ]] && rarg+=("istr='$infix[2]'")
+      [[ -n $conv ]] && rarg+=("conv=result_$conv")
       fout -t 4 "if (ierr.eq.0) call reg_opr_prop(${(j:, :)rarg})"
       # if [[ -z $nstack ]]; then
       #   fout -t 4 "if (ierr.eq.0) call reg_opr_prop(ierr, $iv, $av)"
@@ -653,14 +660,14 @@ LAZY
           cat <<REDUCTION
 !!!_   . $sub
   subroutine $sub &
-       & (ierr, Z, domZ, X, domX, F)
+       & (ierr, Z, domZ, domY, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domZ, domY, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jx
+    integer jz, jy, jx
     ierr = 0
     do jz = 0, domZ%n - 1
        jx = conv_physical_index(jz, domZ, domX)
