@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/16 09:55:52 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/16 10:06:26 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -15,9 +15,6 @@
 #endif
 #include "jmz.h"
 !!!_* macros
-#ifndef   OPT_PATH_LEN
-#  define OPT_PATH_LEN 1024
-#endif
 #ifndef   OPT_DESC_LEN
 #  define OPT_DESC_LEN 1024
 #endif
@@ -659,19 +656,6 @@ contains
   end function handle_type
 
 !!!_  - index function
-!!!_   . set_user_offsets
-  subroutine set_user_offsets &
-       & (ierr, off_bgn, off_end)
-    use TOUZA_Std,only: choice
-    implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: off_bgn
-    integer,intent(in),optional :: off_end
-    ierr = 0
-    user_offset_bgn = choice(user_offset_bgn, off_bgn)
-    user_offset_end = choice(user_offset_end, off_end)
-  end subroutine set_user_offsets
-
 !!!_   . conv_physical_index
   PURE &
   integer function conv_physical_index (jlog, domL, domR) result(n)

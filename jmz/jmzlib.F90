@@ -1,7 +1,7 @@
 !!!_! jmzlib.F90 - TOUZA/Jmz library
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/16 09:57:31 fuyuki jmzlib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/16 10:04:20 fuyuki jmzlib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -118,6 +118,19 @@ contains
        endif
     endif
   end subroutine message
+!!!_  - set_user_offsets - control offset for users
+  subroutine set_user_offsets &
+       & (ierr, off_bgn, off_end)
+    use TOUZA_Std,only: choice
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: off_bgn
+    integer,intent(in),optional :: off_end
+    ierr = 0
+    user_offset_bgn = choice(user_offset_bgn, off_bgn)
+    user_offset_end = choice(user_offset_end, off_end)
+  end subroutine set_user_offsets
+
 !!!_ + End jmzlib
 end module jmzlib
 !!!_! FOOTER
