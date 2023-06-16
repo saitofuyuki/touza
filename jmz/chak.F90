@@ -5509,11 +5509,11 @@ contains
             & (ierr, Z, domZ, FZ, X, domX, FX)
          use chak_lib,only: KFLT, KDBL, domain_t
          implicit none
-         integer,          intent(out) :: ierr
-         real(kind=__KBUF),intent(out) :: Z(0:*)
-         real(kind=__KBUF),intent(in)  :: X(0:*)
-         type(domain_t),   intent(in)  :: domZ, domX
-         real(kind=__KBUF),intent(in)  :: FZ,   FX
+         integer,          intent(out)   :: ierr
+         real(kind=__KBUF),intent(inout) :: Z(0:*)
+         real(kind=__KBUF),intent(in)    :: X(0:*)
+         type(domain_t),   intent(in)    :: domZ, domX
+         real(kind=__KBUF),intent(in)    :: FZ,   FX
        end subroutine func
     end interface
 
@@ -5657,11 +5657,11 @@ contains
             & (ierr, Z, domZ, FZ, X, domX, FX)
          use chak_lib,only: KFLT, KDBL, domain_t
          implicit none
-         integer,          intent(out) :: ierr
-         real(kind=__KBUF),intent(out) :: Z(0:*)
-         real(kind=__KBUF),intent(in)  :: X(0:*)
-         type(domain_t),   intent(in)  :: domZ, domX
-         real(kind=__KBUF),intent(in)  :: FZ,   FX
+         integer,          intent(out)   :: ierr
+         real(kind=__KBUF),intent(inout) :: Z(0:*)
+         real(kind=__KBUF),intent(in)    :: X(0:*)
+         type(domain_t),   intent(in)    :: domZ, domX
+         real(kind=__KBUF),intent(in)    :: FZ,   FX
        end subroutine func
     end interface
 

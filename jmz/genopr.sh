@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/06/14 20:41:26 fuyuki genopr.sh>
+# Time-stamp: <2023/06/16 11:50:33 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -259,7 +259,7 @@ register_all ()
   register -g reduction -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
   register -g reduction -o RANK -i call SUM     'sum through stacks or rank(s)'
   register -g reduction -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
-  register -g reduction -o RANK -i call COUNT   'count defined elements through stacks or rank(s)'
+  register -g reduction -n 1,1 -o RANK -f ZERO -i call COUNT   'count defined elements through stacks or rank(s)'
 
   register -g reduction -n 1,1 -i call -p RANK -s 'MIN=' UMIN    'minimum'
   register -g reduction -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'
@@ -607,11 +607,11 @@ UNARY
   subroutine $sub &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -631,11 +631,11 @@ BINARY
   subroutine $sub &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -648,6 +648,30 @@ BINARY
     enddo
   end subroutine $sub
 LAZY
+          ;;
+      (reduction)
+          cat <<REDUCTION
+!!!_   . $sub
+  subroutine $sub &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = $elem(Z(jz), X(jx), F)
+       else
+          Z(jz) = $elem(Z(jz), F, F)
+       endif
+    enddo
+  end subroutine $sub
+REDUCTION
           ;;
       (*) print -u2 - "unknown subroutine type $stype"; return 1;;
       esac
@@ -719,6 +743,22 @@ UNARY
     endif
   end function $elem
 BINARY
+          ;;
+      (reduction)
+          cat <<REDUCTION
+!!!_    * $elem()
+  ELEMENTAL &
+  real(kind=KBUF) function $elem (X, Y, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F.or.Y.eq.F) then
+       Z = F
+    else
+       Z = X + Y
+    endif
+  end function $elem
+REDUCTION
           ;;
       (*) print -u2 - "unknown subroutine type $stype"; return 1;;
       esac
