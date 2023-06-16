@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/16 10:06:26 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/16 15:22:29 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -230,6 +230,36 @@ contains
     if (ierr.eq.0) call jl_finalize(ierr, u)
   end subroutine finalize
 !!!_  - utilities
+  subroutine show_lpp &
+       & (ierr, lpp, tag, u, levv, indent)
+    use TOUZA_Std,only: choice
+    implicit none
+    integer,         intent(out)         :: ierr
+    type(loop_t),    intent(in)          :: lpp(0:)
+    character(len=*),intent(in),optional :: tag
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv
+    integer,         intent(in),optional :: indent
+    integer utmp
+    integer lv
+    integer tab
+    character(len=64) :: pfx, cran
+    integer jc
+    ierr = 0
+    lv = choice(lev_verbose, levv)
+    utmp = choice(ulog, u)
+    tab = choice(0, indent)
+    if (present(tag)) then
+       pfx = '[' // trim(tag) // ']'
+    else
+       pfx = ' '
+    endif
+    do jc = 0, size(lpp) - 1
+111    format(A, 'loop', A, ': ', I0, 1x, A, 1x, I0, ':', I0, ':', I0, '+', I0, '/', I0)
+       write(utmp, 111) repeat(' ', tab), trim(pfx), jc, trim(lpp(jc)%name), &
+            & lpp(jc)%bgn, lpp(jc)%end, lpp(jc)%stp, lpp(jc)%ofs, lpp(jc)%cyc
+    enddo
+  end subroutine show_lpp
 !!!_   . show_domain
   subroutine show_domain &
        & (ierr, dom, tag, u, levv, indent)
