@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/15 19:56:20 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/16 09:58:46 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -18,7 +18,7 @@
 module chak_opr
 !!!_ + Declaration
 !!!_  - modules
-  use chak_lib,lib_init=>init
+  use chak_lib,lib_init=>init,lib_finalize=>finalize
   implicit none
   public
 !!!_  - declaration

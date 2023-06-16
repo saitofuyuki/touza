@@ -1,129 +1,123 @@
 !!!_! jmzlib.F90 - TOUZA/Jmz library
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2022/09/05 09:37:01 fuyuki jmzlib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/16 09:57:31 fuyuki jmzlib.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022
+! Copyright (C) 2022, 2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
 !   (https://www.apache.org/licenses/LICENSE-2.0)
 !
 #ifdef HAVE_CONFIG_H
-#  include "touza_config.h"
+#  include "jmz_config.h"
 #endif
 #include "jmz.h"
+!!!_* macros
+#ifndef   OPT_PATH_LEN
+#  define OPT_PATH_LEN 1024
+#endif
 !!!_@ TOUZA/Jmz/lib - jmz library
 module jmzlib
+!!!_ + Declaration
+!!!_  - modules
+  use TOUZA_Std,only: KFLT, KDBL, KIOFS
+  use TOUZA_Std,only: is_msglev
+  use TOUZA_Std,only: msglev_DETAIL,    msglev_NORMAL,    msglev_INFO,    msglev_DEBUG
+  use TOUZA_Std,only: msglev_WARNING
+  use TOUZA_Std,only: is_msglev_DETAIL, is_msglev_NORMAL, is_msglev_INFO, is_msglev_DEBUG
+  use TOUZA_Std,only: is_msglev_WARNING
+  use TOUZA_Std,only: trace_err
+!!!_  - default
   implicit none
   public
-!!!_ + Declaration
-  integer,parameter :: kfmt_ascii  = 1
-  integer,parameter :: kfmt_binary = 2
-  integer,parameter :: kfmt_gtool_legacy   = 3
-  integer,parameter :: kfmt_gtool_trapiche = 4
-
-  integer,parameter :: bforce = 1  ! force overwrite
-
-  character(len=*),parameter :: sep_rect = ':'
-!!!_ + Subroutines
+!!!_  - string length
+  integer,parameter :: lpath = OPT_PATH_LEN
+!!!_  - i/o units
+  integer,save :: ulog = -1
+  integer,save :: uerr = -1
+!!!_  - global flags
+  integer,save :: lev_verbose = 0
+  integer,save :: dbgv = -1
+  integer,save :: stdv = -1
+!!!_  - convention parameters
+  integer,save :: user_offset_bgn = 0     ! begin-index offset (user-friendly)
+  integer,save :: user_offset_end = 0     ! end-index offset (user-friendly)
+!!!_ + Procedures
 contains
-!!!_  - parse_rectype
-  subroutine parse_rectype &
-       & (ierr, krect, fmt)
-    use TOUZA_Nio
+!!!_  - init
+  subroutine init(ierr)
+    use TOUZA_Std,only: env_init, MPI_COMM_NULL, stdout=>uout, stderr=>uerr
     implicit none
-    integer,         intent(out)   :: ierr
-    integer,         intent(out)   :: krect
-    character(len=*),intent(inout) :: fmt
-
-    integer jp
-    character(len=1) :: c
+    integer,intent(out) :: ierr
 
     ierr = 0
-    jp = index(fmt, sep_rect)
-    if (jp.eq.0) then
-       krect = REC_ASIS
+
+    if (ierr.eq.0) call env_init(ierr, levv=stdv, icomm=MPI_COMM_NULL)
+    if (ierr.eq.0) ulog = stdout
+    if (ierr.eq.0) uerr = stderr
+  end subroutine init
+!!!_  - finalize
+  subroutine finalize(ierr, u)
+    use TOUZA_Std,only: choice
+    use TOUZA_Std,only: env_diag, env_finalize
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer utmp
+
+    ierr = 0
+    utmp = choice(ulog, u)
+    if (ierr.eq.0) call env_diag(ierr, utmp, levv=dbgv)
+    if (ierr.eq.0) call env_finalize(ierr, utmp, levv=dbgv)
+  end subroutine finalize
+
+!!!_  - message
+  subroutine message(ierr, msg, iadd, fmt, levm, u, indent)
+    use TOUZA_Std,only: choice, join_list
+    implicit none
+    integer,         intent(in)          :: ierr
+    character(len=*),intent(in)          :: msg     ! msg
+    integer,         intent(in),optional :: iadd(:)
+    character(len=*),intent(in),optional :: fmt
+    integer,         intent(in),optional :: levm    ! message level
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: indent
+    integer jerr
+    integer lv, utmp
+    character(len=1024) :: txt
+    integer skp
+    jerr = 0
+    lv = choice(0, levm)
+    if (ierr.ne.0) then
+       utmp = choice(uerr, u)
     else
-       c = fmt(jp+1:jp+1)
-       call upcase(c)
-       select case(c)
-       case('N')
-          krect = REC_DEFAULT
-       case('S')
-          krect = REC_SWAP
-       case('B')
-          krect = REC_BIG
-       case('L')
-          krect = REC_LITTLE
-       case default
-          krect = REC_ASIS
-       end select
-       fmt = fmt(1:jp-1)
+       utmp = choice(ulog, u)
     endif
-
-  end subroutine parse_rectype
-!!!_  - open_write - open file to write complex
-  subroutine open_write &
-       & (ierr, uwrite, kfmt, fmt, wfile, kflag)
-    use TOUZA_Std,only: upcase, uout, uerr
-    use TOUZA_Std,only: sus_open
-    implicit none
-    integer,         intent(out)   :: ierr
-    integer,         intent(inout) :: uwrite
-    integer,         intent(out)   :: kfmt
-    character(len=*),intent(inout) :: fmt
-    character(len=*),intent(in)    :: wfile
-    integer,         intent(in)    :: kflag
-    character(len=16) CSTT
-
-    ierr = 0
-
-    call upcase(fmt)
-
-    if (wfile.eq.' ' .or. wfile.eq.'-') then
-       ! stdout (ascii mode only)
-       uwrite = uout
-       kfmt = kfmt_ascii
-       if (fmt.eq.' '.or.fmt(1:1).eq.'(') then
-          continue
-       else
-          ierr = -1
-       endif
-    else
-       CSTT = 'NEW'
-       if (IAND(kflag, bforce).ne.0) CSTT = 'REPLACE'
-       if (fmt.eq.' '.or.fmt(1:1).eq.'(') then
-          ! ascii mode
-          kfmt = kfmt_ascii
-          open(UNIT=uwrite, FILE=wfile, IOSTAT=ierr, &
-               & ACTION='WRITE', STATUS=CSTT, FORM='FORMATTED', ACCESS='SEQUENTIAL')
-       else if (fmt(1:1).eq.'B') then
-          ! binary mode
-          kfmt = kfmt_binary
-          if (ierr.eq.0) call sus_open(ierr, uwrite, wfile, ACTION='W', STATUS=CSTT)
-       else
-          if (fmt(2:3).eq.'RT') then
-             kfmt = kfmt_gtool_trapiche
-          else
-             kfmt = kfmt_gtool_legacy
+    skp = choice(0, indent)
+    if (ierr.ne.0.or.is_msglev(lev_verbose, lv)) then
+       if (present(iadd)) then
+          if (size(iadd).gt.0) then
+             if (present(fmt)) then
+                write(txt, fmt, IOSTAT=jerr) iadd(:)
+             else
+                call join_list(jerr, txt, iadd(:), ldelim='(', rdelim=')')
+             endif
+             txt = trim(msg) // ' ' // trim(txt)
           endif
-          ! gtool mode
-          if (ierr.eq.0) call sus_open(ierr, uwrite, wfile, ACTION='W', STATUS=CSTT)
+       else
+          txt = msg
        endif
+102    format('error:', I0, ': ', A)
+101    format(A, A)
        if (ierr.ne.0) then
-201       format('error = ', I0, ' to open ', A)
-          write(uerr, 201) ierr, trim(wfile)
-          return
+          write(utmp, 102) ierr, trim(txt)
+       else
+          write(utmp, 101) repeat(' ', skp), trim(txt)
        endif
     endif
-    if (ierr.eq.0) then
-       if (kfmt.eq.kfmt_ascii &
-            & .and. fmt.eq.' ') fmt = '(E16.9)'
-    endif
-    return
-  end subroutine open_write
+  end subroutine message
 !!!_ + End jmzlib
 end module jmzlib
 !!!_! FOOTER

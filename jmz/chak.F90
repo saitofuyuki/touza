@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/15 14:03:29 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/16 10:01:03 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -29,7 +29,7 @@
 program chak
 !!!_ + Declaration
 !!!_  - modules
-  use chak_lib,lib_init=>init
+  use chak_lib,lib_init=>init, lib_finalize=>finalize
   use chak_opr,opr_init=>init, opr_diag=>diag, opr_finalize=>finalize
   use chak_file,file_init=>init
 ! #if HAVE_FORTRAN_IEEE_ARITHMETIC
@@ -173,7 +173,6 @@ contains
 
 !!!_   . finalize
   subroutine finalize(ierr, u)
-    use TOUZA_Std,only: env_diag, env_finalize
     use TOUZA_Nio,only: nio_diag=>diag, nio_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -187,13 +186,13 @@ contains
     if (is_msglev_DETAIL(lev_verbose)) then
        if (ierr.eq.0) call show_buffers(ierr, u)
     endif
-    if (ierr.eq.0) call env_diag(ierr, levv=dbgv)
     if (ierr.eq.0) call opr_diag(ierr, u, levv=dbgv)
     if (ierr.eq.0) call nio_diag(ierr, levv=dbgv)
 
     if (ierr.eq.0) call opr_finalize(ierr, u, levv=dbgv)
     if (ierr.eq.0) call nio_finalize(ierr, levv=dbgv)
-    if (ierr.eq.0) call env_finalize(ierr, levv=dbgv)
+
+    if (ierr.eq.0) call lib_finalize(ierr, u)
   end subroutine finalize
 
 !!!_   . show_usage
@@ -5093,7 +5092,7 @@ contains
     integer jbuf
     integer hb
     integer js
-    integer m, alev
+    integer alev
     integer utmp
     character(len=64) :: cprop(0:lcoor-1)
     character(len=128) :: str, dstr

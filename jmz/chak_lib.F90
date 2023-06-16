@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/15 15:38:43 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/16 09:55:52 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -31,12 +31,7 @@
 module chak_lib
 !!!_ + Declaration
 !!!_  - modules
-  use TOUZA_Std,only: KFLT,  KDBL,   KIOFS
-  use TOUZA_Std,only: is_msglev
-  use TOUZA_Std,only: msglev_NORMAL, msglev_INFO, msglev_DEBUG
-  use TOUZA_Std,only: msglev_WARNING, msglev_DETAIL
-  use TOUZA_Std,only: is_msglev_DETAIL, is_msglev_NORMAL, is_msglev_INFO, is_msglev_DEBUG
-  use TOUZA_Std,only: trace_err
+  use jmzlib, jl_init=>init, jl_finalize=>finalize
   use TOUZA_Nio,only: litem, nitem, GFMT_END
   implicit none
   public
@@ -108,13 +103,8 @@ module chak_lib
 !!!_  - character (symbols) for ascii output
   character(len=*),parameter :: amiss = '_'  ! character for missing value
   character(len=*),parameter :: aext  = '.'  ! character for external
-!!!_  - i/o units
-  integer,save :: ulog = -1
-  integer,save :: uerr = -1
-
 !!!_  - string length
   integer,parameter :: lname = litem * 4
-  integer,parameter :: lpath = OPT_PATH_LEN
   integer,parameter :: ldesc = OPT_DESC_LEN
 
 !!!_  - handles and types
@@ -159,14 +149,6 @@ module chak_lib
   integer,parameter :: shape_size       = 1  ! interprete single integer as size       (SIZE)
   integer,parameter :: shape_coordinate = 2  ! interprete single integer as coordinate (PERM)
   integer,parameter :: shape_shift      = 4  ! interprete single integer as shift      (SHIFT)
-
-!!!_  - global flags
-  integer,save :: lev_verbose = 0
-  integer,save :: dbgv = -1
-  integer,save :: stdv = -1
-
-  integer,save :: user_offset_bgn = 0     ! begin-index offset (user-friendly)
-  integer,save :: user_offset_end = 0     ! end-index offset (user-friendly)
 !!!_  - common values
   real(kind=KBUF),save :: PI = ZERO
 !!!_  - domain property
@@ -234,65 +216,23 @@ contains
 !!!_  - initialization
 !!!_   . init
   subroutine init(ierr)
-    use TOUZA_Std,only: env_init, MPI_COMM_NULL, stdout=>uout, stderr=>uerr
     implicit none
     integer,intent(out) :: ierr
 
     ierr = 0
-
-    if (ierr.eq.0) call env_init(ierr, levv=stdv, icomm=MPI_COMM_NULL)
-    if (ierr.eq.0) ulog = stdout
-    if (ierr.eq.0) uerr = stderr
-
+    if (ierr.eq.0) call jl_init(ierr)
     if (PI.eq.ZERO) PI = ATAN2(ZERO, -ONE)
   end subroutine init
-!!!_  - utilities
-!!!_   . message
-  subroutine message(ierr, msg, iadd, fmt, levm, u, indent)
-    use TOUZA_Std,only: choice, join_list
+!!!_   . finalize
+  subroutine finalize(ierr, u)
     implicit none
-    integer,         intent(in)          :: ierr
-    character(len=*),intent(in)          :: msg     ! msg
-    integer,         intent(in),optional :: iadd(:)
-    character(len=*),intent(in),optional :: fmt
-    integer,         intent(in),optional :: levm    ! message level
-    integer,         intent(in),optional :: u
-    integer,         intent(in),optional :: indent
-    integer jerr
-    integer lv, utmp
-    character(len=1024) :: txt
-    integer skp
-    jerr = 0
-    lv = choice(0, levm)
-    if (ierr.ne.0) then
-       utmp = choice(uerr, u)
-    else
-       utmp = choice(ulog, u)
-    endif
-    skp = choice(0, indent)
-    if (ierr.ne.0.or.is_msglev(lev_verbose, lv)) then
-       if (present(iadd)) then
-          if (size(iadd).gt.0) then
-             if (present(fmt)) then
-                write(txt, fmt, IOSTAT=jerr) iadd(:)
-             else
-                call join_list(jerr, txt, iadd(:), ldelim='(', rdelim=')')
-             endif
-             txt = trim(msg) // ' ' // trim(txt)
-          endif
-       else
-          txt = msg
-       endif
-102    format('error:', I0, ': ', A)
-101    format(A, A)
-       if (ierr.ne.0) then
-          write(utmp, 102) ierr, trim(txt)
-       else
-          write(utmp, 101) repeat(' ', skp), trim(txt)
-       endif
-    endif
-  end subroutine message
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
 
+    ierr = 0
+    if (ierr.eq.0) call jl_finalize(ierr, u)
+  end subroutine finalize
+!!!_  - utilities
 !!!_   . show_domain
   subroutine show_domain &
        & (ierr, dom, tag, u, levv, indent)

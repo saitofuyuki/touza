@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/03/30 11:35:35 fuyuki Makefile.am>
+# Time-stamp: <2023/06/16 09:33:01 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -18,13 +18,11 @@ LDADD = libjmz_local.la $(TOUZA_LIBS)
 
 noinst_SCRIPTS = jmzdepf90
 noinst_PROGRAMS = $(JMZ_EXTRA)
-EXTRA_PROGRAMS = jmzex jmzconv jmzcmp
+EXTRA_PROGRAMS = jmzcmp
 
 noinst_LTLIBRARIES	=	libjmz_local.la
 libjmz_local_la_SOURCES = jmzlib.F90 chak_lib.F90 chak_opr.F90 chak_file.F90
 
-jmzex_SOURCES = jmzex.F90 jmz.h
-jmzconv_SOURCES = jmzconv.F90 jmz.h
 jmzcmp_SOURCES = jmzcmp.F90 jmz.h
 
 TOUZA_LIBS	=	$(TOUZA_LIBRARY) @TOUZA_LIBS@
@@ -49,7 +47,6 @@ test_chak_file_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CHAK_FILE=1
 test_chak_file_LDADD = $(TEST_COMMON_LIBS) $(LDADD)
 
 # Following dependencies are necesary, as workaround
-$(jmzconv_OBJECTS): $(noinst_LTLIBRARIES)
 $(jmzcmp_OBJECTS): $(noinst_LTLIBRARIES)
 $(chak_OBJECTS): $(noinst_LTLIBRARIES)
 # $(chak_lib_OBJECTS): $(noinst_LTLIBRARIES)
@@ -65,12 +62,6 @@ demo-chak.sh: demo-chak.sh.in
 ocheck.sh: ocheck.sh.in
 	@sed -e 's,[@]CHAK[@],$(abs_builddir)/chak,g' \
 		 -e 's,[@]CHAK_OPTS[@],$(CHAK_OPTS),g' < $< >$@; chmod +x $@
-
-genx.sh: genx.sh.in
-	if test -e $<; then \
-		sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@; \
-		chmod +x $@; \
-	fi
 
 genx2.sh: genx2.sh.in
 	if test -e $<; then \
