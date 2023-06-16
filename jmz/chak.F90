@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/16 10:01:03 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/19 12:40:58 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -473,7 +473,7 @@ contains
 
 !!!_   . show_stack_perms
   subroutine show_stack_perms &
-       & (ierr, dom, cname, ctype, cpidx, bufh, pstk, mco, nbuf, u, levv)
+       & (ierr, dom, cname, ctype, cpidx, bufh, lstk, mco, nbuf, u, levv)
     use TOUZA_Std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
@@ -483,12 +483,12 @@ contains
     integer,         intent(in)          :: ctype(0:mco-1, 0:*)
     integer,         intent(in)          :: cpidx(0:mco-1, 0:*)
     integer,         intent(in)          :: bufh(0:*)
-    integer,         intent(in)          :: pstk(0:*)
+    type(stack_t),   intent(in)          :: lstk(0:*)  ! only for logical coordinates
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv
     integer utmp, lv
     integer j
-    integer hb, jb, js
+    integer hb, jb
     character(len=128) :: pstr, dstr
 
     ierr = 0
@@ -498,10 +498,9 @@ contains
     do j = 0, nbuf - 1
        hb = bufh(j)
        jb = buf_h2item(hb)
-       js = pstk(j)
        if (ierr.eq.0) then
           call get_perm_string &
-               & (ierr, pstr, cname(:,j), ctype(:,j), cpidx(:,j), obuffer(jb)%pcp, bstack(js)%lcp, mco)
+               & (ierr, pstr, cname(:,j), ctype(:,j), cpidx(:,j), obuffer(jb)%pcp, lstk(j)%lcp, mco)
        endif
        if (ierr.eq.0) then
           call get_domain_perm &
@@ -897,7 +896,7 @@ contains
     integer lasth
     integer jf
     integer nbufs
-    character(len=lname) :: bname, fname
+    character(len=lname) :: bname
     integer oentr
     integer jerr
 
@@ -1178,6 +1177,9 @@ contains
        call parse_index_opr(ierr, hopr, arg)
     else if (grp_header_bgn.le.hopr .and. hopr.lt.grp_header_end) then
        call parse_header_opr(ierr, hopr, arg)
+!!!_    * reduction operators
+    else if (grp_reduction_bgn.le.hopr .and. hopr.lt.grp_reduction_end) then
+       call parse_reduction_opr(ierr, hopr, arg)
 !!!_    * normal operators
     else if (hopr.ge.0) then
        if (is_operator(hopr)) then
@@ -1238,7 +1240,7 @@ contains
 
     integer jc
     integer jpb, jpe, larg
-    character,parameter :: csep=','       ! coordinate separaor
+    character,parameter :: csep = item_sep       ! coordinate separaor
 
     integer jq
     integer jsbgn, jsend
@@ -1271,12 +1273,12 @@ contains
           flag = switch_shape_operator(hopr)
           call decompose_coordinate_mod(ierr, jrep, arg=arg(jpb+1:jpe-1), flag=flag)
           if (ierr.eq.0) then
-             aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
-             aqueue(jq)%lefts(:)%lcp(jc)%bgn  = null_range
-             aqueue(jq)%lefts(:)%lcp(jc)%end  = null_range
-             aqueue(jq)%lefts(:)%lcp(jc)%stp  = -1
-             aqueue(jq)%lefts(:)%lcp(jc)%ofs  = 0
-             aqueue(jq)%lefts(:)%lcp(jc)%cyc  = 0
+             aqueue(jq)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
+             aqueue(jq)%lcp(jc)%bgn  = null_range
+             aqueue(jq)%lcp(jc)%end  = null_range
+             aqueue(jq)%lcp(jc)%flg  = loop_unset
+             aqueue(jq)%lcp(jc)%ofs  = 0
+             aqueue(jq)%lcp(jc)%cyc  = 0
           endif
        endif
        jc = jc + 1
@@ -1365,7 +1367,7 @@ contains
 
     integer jc
     integer jpb, jpe, larg
-    character,parameter :: csep=','       ! coordinate separaor
+    character,parameter :: csep = item_sep       ! coordinate separaor
 
     integer jq
     integer jsbgn, jsend
@@ -1412,8 +1414,8 @@ contains
           flag = switch_shape_operator(hopr)
           call decompose_coordinate_mod(ierr, jrep, lpp, arg(jpb+1:jpe-1), flag)
           if (ierr.eq.0) then
-             aqueue(jq)%lefts(:)%lcp(jc) = lpp
-             aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
+             aqueue(jq)%lcp(jc) = lpp
+             aqueue(jq)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
              bstack(jsbgn:jsend-1)%lcp(jc) = lpp
              bstack(jsbgn:jsend-1)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
           endif
@@ -1467,8 +1469,8 @@ contains
     endif
     if (ierr.eq.0) then
        jq = mqueue - 1
-       aqueue(jq)%lefts(:)%lcp(cidx) = lpp
-       aqueue(jq)%lefts(:)%lcp(cidx)%name = arg(1:jrep)
+       aqueue(jq)%lcp(cidx) = lpp
+       aqueue(jq)%lcp(cidx)%name = arg(1:jrep)
        bstack(mstack-pop:mstack-1)%lcp(cidx) = lpp
        bstack(mstack-pop:mstack-1)%lcp(cidx)%name = arg(1:jrep)
     endif
@@ -1602,6 +1604,110 @@ contains
     endif
     return
   end subroutine parse_header_opr
+
+!!!_   . parse_reduction_opr
+  subroutine parse_reduction_opr (ierr, hopr, arg)
+    use TOUZA_Std,only: parse_number
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: hopr
+    character(len=*),intent(in)  :: arg
+    integer jpar, jend
+    integer hbuf, jb
+
+    ierr = 0
+
+    if (ierr.eq.0) call pop_stack(ierr, hbuf, .TRUE.)   ! only to check,  pop later
+    if (ierr.eq.0) jb = buf_h2item(hbuf)
+    if (ierr.eq.0) ierr = min(0, jb)
+    if (ierr.eq.0) then
+       jpar = index(arg, param_sep) + 1
+       jend = len_trim(arg) + 1
+       if (jpar.eq.1) jpar = jend + 1
+       select case(hopr)
+       case(opr_COUNT)
+          if (jpar.le.jend) then
+             call parse_reduction_shape(ierr, arg(jpar:), hopr)
+          else
+             call parse_reduction_shape(ierr, ' ', hopr)
+          endif
+       case default
+          ierr = ERR_NOT_IMPLEMENTED
+          call message(ierr, 'reserved operator(reduction) ' // trim(arg))
+       end select
+    endif
+    return
+  end subroutine parse_reduction_opr
+
+!!!_   . parse_reduction_shape
+  subroutine parse_reduction_shape (ierr, arg, hopr)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: arg
+    integer,         intent(in)  :: hopr
+
+    integer pop, push
+
+    integer jc
+    integer jpb, jpe, larg
+    character,parameter :: csep = item_sep       ! coordinate separaor
+
+    integer jq
+    integer jsbgn, jsend
+    integer jrep
+    integer flag
+    integer hbuf(1)
+    type(loop_t) :: lpp
+
+    ierr = 0
+    pop = 1
+    push = pop
+
+    if (ierr.eq.0) call mpop_stack(ierr, hbuf(1:pop), pop)
+    if (ierr.eq.0) call search_free_buffer(ierr, hbuf(1:pop), pop)
+    if (ierr.eq.0) call mpush_stack(ierr, hbuf(1:push), push)
+    if (ierr.eq.0) call append_queue(ierr, hopr, pop, push, hbuf(1:pop))
+
+    jq = mqueue - 1
+    jsbgn = mstack - pop
+    jsend = mstack
+
+    jc = 0
+    larg = len_trim(arg)
+    jpb = 0
+    do
+       if (jpb.ge.larg) exit
+       jpe = index(arg(jpb+1:), csep) + jpb
+       if (jpe.eq.jpb) jpe = larg + 1
+       if (jpb+1.gt.jpe-1) then
+          continue
+       else if (jc.ge.lcoor) then
+          ierr = ERR_INSUFFICIENT_BUFFER
+          call message(ierr, 'too many ranks to reduction:' // trim(arg))
+       else
+          flag = switch_shape_operator(hopr)
+          call decompose_coordinate_mod(ierr, jrep, lpp, arg=arg(jpb+1:jpe-1), flag=flag)
+          if (ierr.eq.0) then
+             lpp%flg = loop_reduce
+             ! if (lpp%end.gt.0) lpp%end = - lpp%end
+             ! write(*, *) jc, lpp
+             aqueue(jq)%lcp(jc) = lpp
+             aqueue(jq)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
+             bstack(jsbgn:jsend-1)%lcp(jc) = lpp
+             bstack(jsbgn:jsend-1)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
+             ! aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
+             ! aqueue(jq)%lefts(:)%lcp(jc)%bgn  = null_range
+             ! aqueue(jq)%lefts(:)%lcp(jc)%end  = null_range
+             ! aqueue(jq)%lefts(:)%lcp(jc)%stp  = 0
+             ! aqueue(jq)%lefts(:)%lcp(jc)%ofs  = 0
+             ! aqueue(jq)%lefts(:)%lcp(jc)%cyc  = 0
+          endif
+       endif
+       jc = jc + 1
+       jpb = jpe
+    enddo
+    return
+  end subroutine parse_reduction_shape
 
 !!!_   . set_write_format
   subroutine set_write_format(ierr)
@@ -2519,6 +2625,7 @@ contains
           aqueue(jq)%desci = ' '
           aqueue(jq)%desco = ' '
           aqueue(jq)%iter = choice(0, iter)
+          aqueue(jq)%lcp(:) = def_loop
           allocate(aqueue(jq)%lefts(0:push-1), STAT=ierr)
        endif
        if (ierr.eq.0) then
@@ -2556,6 +2663,7 @@ contains
           aqueue(jq)%desci = ' '
           aqueue(jq)%desco = ' '
           aqueue(jq)%iter = choice(0, iter)
+          aqueue(jq)%lcp(:) = def_loop
           allocate(aqueue(jq)%lefts(0:push-1), STAT=ierr)
        endif
        if (ierr.eq.0) then
@@ -3212,7 +3320,7 @@ contains
           obuffer(jb)%pcp(:) = def_loop
           obuffer(jb)%pcp(:)%bgn = 0
           obuffer(jb)%pcp(:)%end = 0
-          obuffer(jb)%pcp(:)%stp = -1
+          obuffer(jb)%pcp(:)%flg = loop_unset
           obuffer(jb)%pcp(:)%name = ' '
           if (v.eq.UNDEF) then
              obuffer(jb)%undef = - UNDEF
@@ -3271,13 +3379,14 @@ contains
     integer,intent(in) :: handle
     integer jb, jc
     integer w
+    integer stp
     jb = buf_h2item(handle)
     if (jb.ge.0) then
        n = 1
        do jc = 0, lcoor - 1
           w = (obuffer(jb)%pcp(jc)%end - obuffer(jb)%pcp(jc)%bgn)
-          n = n * max(1, w * max(0, obuffer(jb)%pcp(jc)%stp))
-          ! n = n * max(1, w)
+          stp = min(1, max(0, obuffer(jb)%pcp(jc)%flg))
+          n = n * max(1, w * stp)
        enddo
     else
        n = jb
@@ -3605,7 +3714,7 @@ contains
     is_tweak = .FALSE.
     if (ierr.eq.0) then
        if (.not.is_tweak) then
-          is_tweak = ANY(bstack(jstk)%lcp(:)%stp.ge.0)
+          is_tweak = ANY(bstack(jstk)%lcp(:)%flg.ge.loop_null)
        endif
        if (.not.is_tweak) then
           is_tweak = ANY(bstack(jstk)%lcp(:)%name.ne.' ')
@@ -3614,17 +3723,17 @@ contains
           ! write(*, *) 'tweak'
           call tweak_buffer(ierr, btmp, bufh, jstk)
           if (ierr.eq.0) call put_header_lprops(ierr, head, btmp%pcp, file%hflag)
-       else if (ANY(obuffer(jb)%pcp(:)%stp.eq.0)) then
+       else if (ANY(obuffer(jb)%pcp(:)%flg.eq.loop_null)) then
           btmp%pcp(:) = obuffer(jb)%pcp(:)
           if (file%hflag.eq.hflag_nulld) then
              do jc = 0, lcoor - 1
-                if (btmp%pcp(jc)%stp.eq.0) then
+                if (btmp%pcp(jc)%flg.eq.loop_null) then
                    btmp%pcp(jc)%end = btmp%pcp(jc)%bgn
                 endif
              enddo
           else
              do jc = 0, lcoor - 1
-                if (btmp%pcp(jc)%stp.eq.0) then
+                if (btmp%pcp(jc)%flg.eq.loop_null) then
                    btmp%pcp(jc)%bgn = 0
                    btmp%pcp(jc)%end = 0
                 endif
@@ -3749,21 +3858,22 @@ contains
     integer,       intent(in)    :: jstk
 
     integer,parameter :: nbuf = 1
-    integer        :: htmp(nbuf), ptmp(nbuf)
+    integer        :: htmp(nbuf)
     type(domain_t) :: domL
     type(domain_t) :: domR(nbuf)
+    type(stack_t)  :: stmp(nbuf)
     integer jset
     integer jbR
     real(kind=KBUF) :: fillR
 
     ierr = 0
     htmp = hsrc
-    ptmp = jstk
+    stmp = bstack(jstk)
 
-    if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, htmp, ptmp, nbuf, bdest)
-    if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, htmp, ptmp, nbuf)
+    if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, htmp, stmp, nbuf, bdest)
+    if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, htmp, stmp, nbuf)
     if (ierr.eq.0) call settle_output_domain(ierr, domL)
-    if (ierr.eq.0) call settle_input_domain(ierr, domR(1), htmp(1), ptmp(1), domL)
+    if (ierr.eq.0) call settle_input_domain(ierr, domR(1), htmp(1), stmp(1), domL)
     if (ierr.eq.0) call set_output_buffer(ierr, bdest, htmp, domL)
 
     ! if (ierr.eq.0) call show_domain(ierr, domL)
@@ -3931,6 +4041,7 @@ contains
     integer hf
     integer stt, sttj
     integer cmode
+    integer js
 
     ierr = 0
 
@@ -3948,15 +4059,17 @@ contains
        if (is_msglev_DETAIL(levv)) then
           call trace_queue(jerr, aqueue(jq), levv)
        endif
+       push = size(aqueue(jq)%lefts)
+       do js = 0, push - 1
+          aqueue(jq)%lefts(js)%lcp = aqueue(jq)%lcp
+       enddo
        select case(termk)
        case(hk_file)
-          push = size(aqueue(jq)%lefts)
           pop = aqueue(jq)%nopr
           if (ierr.eq.0) call push_file(ierr, hterm, pop, push, aqueue(jq)%lefts, levv)
        case(hk_buffer)
           if (ierr.eq.0) call push_buffer(ierr, hterm, levv)
        case(hk_opr)
-          push = size(aqueue(jq)%lefts)
           pop = aqueue(jq)%nopr
           if (ierr.eq.0) then
              cmode = aqueue(jq)%cmode
@@ -4282,6 +4395,9 @@ contains
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_SPACING)
        else if (handle.eq.opr_RRSP) then
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_RRSP)
+!!!_    * reduction
+       else if (handle.eq.opr_COUNT) then
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_COUNT, ZERO)
 !!!_    * ignored
        else if (grp_system_bgn.le.handle.and.handle.lt.grp_system_end) then
           continue
@@ -4295,17 +4411,10 @@ contains
        endif
     endif
     if (ierr.eq.0) then
-       if (grp_float_bgn.le.handle .and. handle.lt.grp_float_end) then
-          do j = 1, push
-             jb = buf_h2item(lefts(j)%bh)
-             obuffer(jb)%k = kv_dbl
-          enddo
-       else if (ANY(handle.eq.(/opr_IDIV, opr_INT/))) then
-          do j = 1, push
-             jb = buf_h2item(lefts(j)%bh)
-             obuffer(jb)%k = kv_int
-          enddo
-       endif
+       do j = 1, push
+          jb = buf_h2item(lefts(j)%bh)
+          obuffer(jb)%k = adj_operator_type(handle, obuffer(jb)%k)
+       enddo
     endif
     if (ierr.eq.0) call mpop_stack(ierr, n=pop)
     if (ierr.eq.0) then
@@ -4331,7 +4440,7 @@ contains
     integer nbuf
     integer bufh(0:pop-1)
     integer bufj(0:pop-1)
-    integer pstk(0:pop-1)
+    type(stack_t) :: lstk(0:pop-1)
 
     ierr = 0
 
@@ -4345,7 +4454,7 @@ contains
           if (m.ge.0) then
              bufj(nbuf) = jb
              bufh(nbuf) = hb
-             pstk(nbuf) = js
+             lstk(nbuf) = bstack(js)
              nbuf = nbuf + 1
           endif
        endif
@@ -4354,35 +4463,34 @@ contains
     select case(IAND(cmode, cmode_compromise))
     case (cmode_each)
        if (IAND(cmode, cmode_column).eq.0) then
-          call flush_buffer_each(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+          call flush_buffer_each(ierr, nbuf, bufh, bufj, lstk, cmode, u)
        else
-          call flush_buffer_column(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+          call flush_buffer_column(ierr, nbuf, bufh, bufj, lstk, cmode, u)
        endif
     case default
        if (IAND(cmode, cmode_column).eq.0) then
-          call flush_buffer_horizontally(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+          call flush_buffer_horizontally(ierr, nbuf, bufh, bufj, lstk, cmode, u)
        else
-          call flush_buffer_horizontally_column(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+          call flush_buffer_horizontally_column(ierr, nbuf, bufh, bufj, lstk, cmode, u)
        endif
     end select
   end subroutine flush_stack
 
 !!!_   . flush_buffer_each - flush out buffers for each
-  subroutine flush_buffer_each(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+  subroutine flush_buffer_each(ierr, nbuf, bufh, bufj, lstk, cmode, u)
     use TOUZA_Std,only: choice
     use TOUZA_Nio,only: show_header, parse_header_size
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in)          :: nbuf
-    integer,intent(in)          :: bufh(0:*)
-    integer,intent(in)          :: bufj(0:*)
-    integer,intent(in)          :: pstk(0:*)   ! corresponding stack index for buffer
-    integer,intent(in)          :: cmode
-    integer,intent(in),optional :: u
+    integer,      intent(out)         :: ierr
+    integer,      intent(in)          :: nbuf
+    integer,      intent(in)          :: bufh(0:*)
+    integer,      intent(in)          :: bufj(0:*)
+    type(stack_t),intent(in)          :: lstk(0:*)  ! only for logical coordinates
+    integer,      intent(in)          :: cmode
+    integer,      intent(in),optional :: u
 
     integer utmp
     integer jb, hb
-    integer js
 
     integer jbuf
     character(len=64) :: lcstr, pcstr, dstr
@@ -4396,7 +4504,7 @@ contains
     integer jl, jp
     integer lidx(0:lcoor-1), pidx(0:lcoor-1)
     integer nb
-    integer btmp(1), ptmp(1)
+    integer btmp(1)
     character(len=256) :: cjoin, val
 
     logical skip_undef
@@ -4426,14 +4534,15 @@ contains
     do jbuf = 0, nbuf - 1
        jb = bufj(jbuf)
        hb = bufh(jbuf)
-       js = pstk(jbuf)
        nb = 1
        btmp(1) = hb
-       ptmp(1) = js
 
        if (ierr.eq.0) then
-          call get_compromise_domain(ierr, domL, domR, btmp, ptmp, nb, cmode_inclusive, htmp)
+          call get_compromise_domain(ierr, domL, domR, btmp, lstk(jbuf:jbuf), nb, cmode_inclusive, htmp)
        endif
+       ! if (ierr.eq.0) call show_domain(ierr, domL,    'each/L', indent=4)
+       ! if (ierr.eq.0) call show_domain(ierr, domR(1), 'each/R', indent=5)
+
        if (ierr.eq.0) call get_obj_string(ierr, val, hb)
 
        if (is_msglev(lev_verbose, -levq_rec)) then
@@ -4444,10 +4553,10 @@ contains
                & user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc)
        endif
        if (is_msglev(lev_verbose, -levq_stack)) then
-          if (ierr.eq.0) call get_domain_string(ierr, lcstr, bstack(js)%lcp)
+          if (ierr.eq.0) call get_domain_string(ierr, lcstr, lstk(jbuf)%lcp)
           if (ierr.eq.0) call get_domain_string(ierr, pcstr, obuffer(jb)%pcp)
           if (ierr.eq.0) then
-             call get_domain_shape(ierr, dstr, domR(1), obuffer(jb)%pcp, bstack(js)%lcp, domL)
+             call get_domain_shape(ierr, dstr, domR(1), obuffer(jb)%pcp, lstk(jbuf)%lcp, domL)
           endif
           if (ierr.eq.0) write(utmp, 231) trim(pcstr)
           if (ierr.eq.0) write(utmp, 232) trim(lcstr)
@@ -4542,21 +4651,20 @@ contains
   end subroutine flush_buffer_each
 
 !!!_   . flush_buffer_column - flush out buffers for each (columnized)
-  subroutine flush_buffer_column(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+  subroutine flush_buffer_column(ierr, nbuf, bufh, bufj, lstk, cmode, u)
     use TOUZA_Std,only: choice
     use TOUZA_Nio,only: show_header, parse_header_size
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in)          :: nbuf
-    integer,intent(in)          :: bufh(0:*)
-    integer,intent(in)          :: bufj(0:*)
-    integer,intent(in)          :: pstk(0:*)   ! corresponding stack index for buffer
-    integer,intent(in)          :: cmode
-    integer,intent(in),optional :: u
+    integer,      intent(out)         :: ierr
+    integer,      intent(in)          :: nbuf
+    integer,      intent(in)          :: bufh(0:*)
+    integer,      intent(in)          :: bufj(0:*)
+    type(stack_t),intent(in)          :: lstk(0:*)  ! only for logical coordinates
+    integer,      intent(in)          :: cmode
+    integer,      intent(in),optional :: u
 
     integer utmp
     integer jb, hb
-    integer js
 
     integer jbuf
     character(len=128) :: lcstr, pcstr, dstr
@@ -4570,7 +4678,7 @@ contains
     integer jl, jp
     integer lidx(0:lcoor-1), pidx(0:lcoor-1)
     integer nb
-    integer btmp(1), ptmp(1)
+    integer btmp(1)
     character(len=256) :: cjoin, val, ccols
 
     logical skip_undef
@@ -4603,13 +4711,11 @@ contains
     do jbuf = 0, nbuf - 1
        jb = bufj(jbuf)
        hb = bufh(jbuf)
-       js = pstk(jbuf)
        nb = 1
        btmp(1) = hb
-       ptmp(1) = js
 
        if (ierr.eq.0) then
-          call get_compromise_domain(ierr, domL, domR, btmp, ptmp, nb, cmode_inclusive, htmp)
+          call get_compromise_domain(ierr, domL, domR, btmp, lstk(jbuf:jbuf), nb, cmode_inclusive, htmp)
        endif
        if (ierr.eq.0) call get_obj_string(ierr, val, hb)
 
@@ -4621,10 +4727,10 @@ contains
                & user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc)
        endif
        if (is_msglev(lev_verbose, -levq_stack)) then
-          if (ierr.eq.0) call get_domain_string(ierr, lcstr, bstack(js)%lcp)
+          if (ierr.eq.0) call get_domain_string(ierr, lcstr, lstk(jbuf)%lcp)
           if (ierr.eq.0) call get_domain_string(ierr, pcstr, obuffer(jb)%pcp)
           if (ierr.eq.0) then
-             call get_domain_shape(ierr, dstr, domR(1), obuffer(jb)%pcp, bstack(js)%lcp, domL)
+             call get_domain_shape(ierr, dstr, domR(1), obuffer(jb)%pcp, lstk(jbuf)%lcp, domL)
           endif
           if (ierr.eq.0) write(utmp, 231) trim(pcstr)
           if (ierr.eq.0) write(utmp, 232) trim(lcstr)
@@ -4747,16 +4853,16 @@ contains
   end subroutine flush_buffer_column
 
 !!!_   . flush_buffer_horizontally - flush out buffers with horizontally pasting
-  subroutine flush_buffer_horizontally(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+  subroutine flush_buffer_horizontally(ierr, nbuf, bufh, bufj, lstk, cmode, u)
     use TOUZA_Std,only: choice, join_list
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in)          :: nbuf
-    integer,intent(in)          :: bufh(0:*)
-    integer,intent(in)          :: bufj(0:*)
-    integer,intent(in)          :: pstk(0:*)   ! corresponding stack index for buffer
-    integer,intent(in)          :: cmode
-    integer,intent(in),optional :: u
+    integer,      intent(out)         :: ierr
+    integer,      intent(in)          :: nbuf
+    integer,      intent(in)          :: bufh(0:*)
+    integer,      intent(in)          :: bufj(0:*)
+    type(stack_t),intent(in)          :: lstk(0:*)
+    integer,      intent(in)          :: cmode
+    integer,      intent(in),optional :: u
 
     integer utmp
 
@@ -4764,7 +4870,6 @@ contains
     type(domain_t) :: domr(0:nbuf-1)
 
     integer j, jb, hb
-    integer js
     integer mco, nco
     integer jl, jp
     integer lidx(0:lcoor-1), pidx(0:lcoor-1)
@@ -4784,7 +4889,7 @@ contains
     skip_undef = IAND(cmode, cmode_xundef).ne.0
     ccomp = IAND(cmode, cmode_compromise)
 
-    if (ierr.eq.0) call get_compromise_domain(ierr, doml, domr, bufh, pstk, nbuf, ccomp, htmp)
+    if (ierr.eq.0) call get_compromise_domain(ierr, doml, domr, bufh, lstk, nbuf, ccomp, htmp)
 
     if (lev_verbose.ge.levq_column) then
        do j = 0, nbuf - 1
@@ -4795,11 +4900,10 @@ contains
           do j = 0, nbuf - 1
              jb = bufj(j)
              hb = bufh(j)
-             js = pstk(j)
 202          format('## ', I0, 1x, A, 1x, A, 1x, A)
 203          format('## ', I0, 1x, A, 1x, A, 1x, A, ' // ', A)
              if (ierr.eq.0) then
-                call get_domain_shape(ierr, dstr, domr(j), obuffer(jb)%pcp, bstack(js)%lcp, doml)
+                call get_domain_shape(ierr, dstr, domr(j), obuffer(jb)%pcp, lstk(j)%lcp, doml)
              endif
              if (lev_verbose.ge.levq_rec) then
                 if (ierr.eq.0) then
@@ -4884,16 +4988,16 @@ contains
   end subroutine flush_buffer_horizontally
 
 !!!_   . flush_buffer_horizontally_column - flush out buffers with horizontally pasting (columnized)
-  subroutine flush_buffer_horizontally_column(ierr, nbuf, bufh, bufj, pstk, cmode, u)
+  subroutine flush_buffer_horizontally_column(ierr, nbuf, bufh, bufj, lstk, cmode, u)
     use TOUZA_Std,only: choice, join_list
     implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in)          :: nbuf
-    integer,intent(in)          :: bufh(0:*)
-    integer,intent(in)          :: bufj(0:*)
-    integer,intent(in)          :: pstk(0:*)   ! corresponding stack index for buffer
-    integer,intent(in)          :: cmode
-    integer,intent(in),optional :: u
+    integer,      intent(out)         :: ierr
+    integer,      intent(in)          :: nbuf
+    integer,      intent(in)          :: bufh(0:*)
+    integer,      intent(in)          :: bufj(0:*)
+    type(stack_t),intent(in)          :: lstk(0:*)  ! only for logical coordinates
+    integer,      intent(in)          :: cmode
+    integer,      intent(in),optional :: u
 
     integer utmp
 
@@ -4901,7 +5005,6 @@ contains
     type(domain_t) :: domr(0:nbuf)
 
     integer j, jb, hb
-    integer js
     integer mco, nco
     integer jlo, jp, jli
     integer lidx(0:lcoor-1), pidx(0:lcoor-1)
@@ -4927,7 +5030,7 @@ contains
     cline = 0
     ncolv = -1
 
-    if (ierr.eq.0) call get_compromise_domain(ierr, doml, domr, bufh, pstk, nbuf, ccomp, htmp)
+    if (ierr.eq.0) call get_compromise_domain(ierr, doml, domr, bufh, lstk, nbuf, ccomp, htmp)
     if (ierr.eq.0) then
        ncolv = 0
        joffc(0) = 0
@@ -4959,11 +5062,10 @@ contains
           do j = 0, nbuf - 1
              jb = bufj(j)
              hb = bufh(j)
-             js = pstk(j)
 202          format('## ', I0, 1x, A, 1x, A, 1x, A)
 203          format('## ', I0, 1x, A, 1x, A, 1x, A, ' // ', A)
              if (ierr.eq.0) then
-                call get_domain_shape(ierr, dstr, domr(j), obuffer(jb)%pcp, bstack(js)%lcp, doml)
+                call get_domain_shape(ierr, dstr, domr(j), obuffer(jb)%pcp, lstk(j)%lcp, doml)
              endif
              if (lev_verbose.ge.levq_rec) then
                 if (ierr.eq.0) then
@@ -4977,7 +5079,7 @@ contains
                 endif
              endif
              if (ierr.eq.0) then
-                call get_domain_shape(ierr, dstr, domr(j), obuffer(jb)%pcp, bstack(js)%lcp, doml, 0, cline + 1)
+                call get_domain_shape(ierr, dstr, domr(j), obuffer(jb)%pcp, lstk(j)%lcp, doml, 0, cline + 1)
              endif
              if (ierr.eq.0) vals(j) = trim(vals(j)) // trim(dstr)
           enddo
@@ -5099,7 +5201,8 @@ contains
 
     type(buffer_t) :: htmp
     type(domain_t) :: doml, domr(1)
-    integer btmp(1), ptmp(1)
+    integer btmp(1)
+    type(stack_t) :: stmp(1)
     integer nb
 
     ierr = 0
@@ -5115,10 +5218,10 @@ contains
        jbuf  = buf_h2item(hb)
 
        btmp(1) = hb
-       ptmp(1) = js
+       stmp(1) = bstack(js)
 
        if (ierr.eq.0) then
-          call get_compromise_domain(ierr, domL, domR, btmp, ptmp, nb, cmode_inclusive, htmp)
+          call get_compromise_domain(ierr, domL, domR, btmp, stmp, nb, cmode_inclusive, htmp)
        endif
        if (ierr.eq.0) then
           call get_domain_shape &
@@ -5180,6 +5283,7 @@ contains
     integer nb
     type(domain_t) :: doml, domr(1)
     integer btmp(1), ptmp(1)
+    type(stack_t) :: stmp(1)
 
     ierr = 0
     jotgt = handle - opr_C0
@@ -5193,10 +5297,11 @@ contains
     if (ierr.eq.0) then
        js = mstack - 1
        btmp(1) = lasth
+       stmp(1) = bstack(js)
        ptmp(1) = js
        nb = 1
-       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, ptmp, nb, buf, clip=.FALSE.)
-       if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, ptmp, nb)
+       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, stmp, nb, buf, clip=.FALSE.)
+       if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, stmp, nb)
        if (ierr.eq.0) call settle_output_domain(ierr, domL)
        if (ierr.eq.0) call set_output_buffer(ierr, buf, btmp, domL)
     endif
@@ -5223,12 +5328,12 @@ contains
           obuffer(jb)%pcp(:) = def_loop
 
           obuffer(jb)%pcp(:) = buf%pcp(:)
-          obuffer(jb)%pcp(0:domL%mco-1)%stp = 0
-          obuffer(jb)%pcp(domL%mco:)%stp = -1
+          obuffer(jb)%pcp(0:domL%mco-1)%flg = loop_null
+          obuffer(jb)%pcp(domL%mco:)%flg = loop_unset
 
           obuffer(jb)%pcp(jotgt)%bgn = b
           obuffer(jb)%pcp(jotgt)%end = e
-          obuffer(jb)%pcp(jotgt)%stp = 1
+          obuffer(jb)%pcp(jotgt)%flg = loop_normal
           obuffer(jb)%pcp(jotgt)%name = buf%pcp(jotgt)%name
           obuffer(jb)%undef = UNDEF
           if (ierr.eq.0) call alloc_buffer_t(ierr, obuffer(jb), n)
@@ -5265,6 +5370,7 @@ contains
     type(domain_t) :: domL, domR(1), domP
     integer btmp(1), ptmp(1)
     integer nc
+    type(stack_t) :: stmp(1)
 
     integer jcx, jt, jflat
     integer xco(0:lcoor-1)
@@ -5283,9 +5389,10 @@ contains
        js = mstack - 1
        btmp(1) = lasth
        ptmp(1) = js
+       stmp(1) = bstack(js)
        nb = 1
-       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, ptmp, nb, buf)
-       if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, ptmp, nb)
+       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, stmp, nb, buf)
+       if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, stmp, nb)
        if (ierr.eq.0) call settle_output_domain(ierr, domL)
        if (ierr.eq.0) call set_output_buffer(ierr, buf, btmp, domL)
     endif
@@ -5327,7 +5434,7 @@ contains
           domP%mco = domL%mco
           do jc = 0, domL%mco - 1
              if (ALL(jc.ne.xco(0:nc-1))) then
-                obuffer(jb)%pcp(jc)%stp = 0
+                obuffer(jb)%pcp(jc)%flg = loop_null
                 domL%iter(jc) = 1
                 domP%bgn(jc) = 0
                 domP%end(jc) = 1
@@ -5437,6 +5544,7 @@ contains
     integer,parameter :: nb = 1
     integer btmp(nb), ptmp(nb)
     type(domain_t) :: domL, domR(nb)
+    type(stack_t) :: stmp(nb)
 
     ierr = 0
     check = choice(.FALSE., bin)
@@ -5457,6 +5565,7 @@ contains
     do jout = ninp - 1, 0, -1
        jinp = ofsi + jout
        ptmp(nb) = mstack - ninp + jout
+       stmp(nb) = bstack(mstack - ninp + jout)
        if (ierr.eq.0) then
           hbL = lefts(jout)%bh
           hbR = bufi(jinp)
@@ -5476,11 +5585,15 @@ contains
        endif
        if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 1)
 
-       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, ptmp, nb, obuffer(jbL))
-       if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, ptmp, nb)
+       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, stmp, nb, obuffer(jbL))
+       if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, stmp, nb)
        if (ierr.eq.0) call settle_output_domain(ierr, domL)
-       if (ierr.eq.0) call settle_input_domain(ierr, domR(1), btmp(1), ptmp(1), domL)
+       if (ierr.eq.0) call settle_input_domain(ierr, domR(1), btmp(1), stmp(1), domL)
        if (ierr.eq.0) call set_output_buffer_h(ierr, lefts(jout)%bh, btmp, domL)
+
+       ! if (ierr.eq.0) call show_domain(ierr, domL,    'unary/L', indent=3)
+       ! if (ierr.eq.0) call show_domain(ierr, domR(1), 'unary/R', indent=4)
+
        if (ierr.eq.0) then
           call func &
                & (ierr, &
@@ -5535,7 +5648,7 @@ contains
     integer m
     integer ntmp
     integer btmp(0:size(bufi)-1)
-    integer ptmp(0:size(bufi)-1)
+    type(stack_t) :: stmp(0:size(bufi)-1)
 
     ierr = 0
 
@@ -5568,7 +5681,7 @@ contains
           m = buffer_vmems(obuffer(jbR))
           if (m.ge.0) then
              btmp(ntmp) = hbR
-             ptmp(ntmp) = pstk(jj-ofsi)
+             stmp(ntmp) = bstack(pstk(jj-ofsi))
              ntmp = ntmp + 1
           endif
        enddo
@@ -5584,7 +5697,7 @@ contains
        if (ierr.eq.0) call copy_set_header(ierr, hbL, btmp(0), ntmp)
        if (ierr.eq.0) then
           call get_compromise_domain &
-               & (ierr, domL, domR, btmp(0:ntmp-1), ptmp(0:ntmp-1), ntmp, cmode, obuffer(jbL))
+               & (ierr, domL, domR, btmp(0:ntmp-1), stmp(0:ntmp-1), ntmp, cmode, obuffer(jbL))
        endif
        if (choice(.FALSE., rev)) then
           if (ierr.eq.0) then
@@ -5684,7 +5797,7 @@ contains
     integer m
     integer ntmp
     integer btmp(0:size(bufi)-1)
-    integer ptmp(0:size(bufi)-1)
+    type(stack_t) :: stmp(0:size(bufi)-1)
 
     ierr = 0
     check = choice(.FALSE., bin)
@@ -5720,7 +5833,7 @@ contains
           ! write(*, *) 'tmp', jout, jinp, jj, bufi(jj), m
           if (m.ge.0) then
              btmp(ntmp) = hbR
-             ptmp(ntmp) = pstk(jj-ofsi)
+             stmp(ntmp) = bstack(pstk(jj-ofsi))
              ntmp = ntmp + 1
           endif
        enddo
@@ -5736,7 +5849,7 @@ contains
        if (ierr.eq.0) call copy_set_header(ierr, hbL, btmp(0), ntmp)
        if (ierr.eq.0) then
           call get_compromise_domain &
-               & (ierr, domL, domR, btmp(0:ntmp-1), ptmp(0:ntmp-1), ntmp, cmode, obuffer(jbL))
+               & (ierr, domL, domR, btmp(0:ntmp-1), stmp(0:ntmp-1), ntmp, cmode, obuffer(jbL))
        endif
        if (ierr.eq.0) then
           hbR = btmp(0)
@@ -5779,6 +5892,104 @@ contains
        endif
     enddo
   end subroutine apply_opr_BINARY
+
+!!!_   . apply_opr_REDUCE
+  subroutine apply_opr_REDUCE &
+       & (ierr, hopr, lefts, bufi, func, neutral)
+    use TOUZA_Std,only: choice
+    implicit none
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: hopr
+    type(stack_t),  intent(inout)       :: lefts(0:)
+    integer,        intent(in)          :: bufi(0:)
+    real(kind=KBUF),intent(in),optional :: neutral
+    interface
+       subroutine func &
+            & (ierr, Z, domZ, domY, X, domX, F)
+         use chak_lib,only: KFLT, KDBL, domain_t
+         implicit none
+         integer,          intent(out)   :: ierr
+         real(kind=__KBUF),intent(inout) :: Z(0:*)
+         real(kind=__KBUF),intent(in)    :: X(0:*)
+         type(domain_t),   intent(in)    :: domZ, domY, domX
+         real(kind=__KBUF),intent(in)    :: F
+       end subroutine func
+    end interface
+
+    integer jout
+    integer jinp, ninp
+    integer hbL, hbR
+    integer jbL, jbR
+    real(kind=KBUF) :: fillR, fillL
+    integer ofsi
+    integer m
+
+    integer,parameter :: nb = 1
+    integer btmp(nb)
+    type(domain_t) :: domL, domZ, domR(nb)
+    type(stack_t)  :: ltmp(nb)
+
+    ierr = 0
+
+    ninp = size(bufi)
+    ofsi = 0
+    if (is_anchor(bufi(ofsi))) then
+       ninp = ninp - 1
+       ofsi = ofsi + 1
+    endif
+    if (size(lefts).ne.ninp) ierr = ERR_INVALID_PARAMETER
+    if (ierr.ne.0) then
+       write(*, *) ninp, size(lefts)
+       call message(ierr, 'invalid argument length for reduction operation.')
+       return
+    endif
+
+    do jout = ninp - 1, 0, -1
+       jinp = ofsi + jout
+       ! ptmp(nb) = mstack - ninp + jout
+       ! stmp(nb) = bstack(mstack - ninp + jout)
+       ltmp(nb) = lefts(jout)   ! use logical coordinate at left
+
+       if (ierr.eq.0) then
+          hbL = lefts(jout)%bh
+          hbR = bufi(jinp)
+          jbL = buf_h2item(hbL)
+          jbR = buf_h2item(hbR)
+          fillR = obuffer(jbR)%undef
+          btmp(nb) = hbR
+       endif
+
+       if (ierr.eq.0) then
+          m = buffer_vmems(obuffer(jbR))
+          if (m.lt.0) cycle
+       endif
+       if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 1)
+       ! if (ierr.eq.0) call show_lpp(ierr, lefts(jout)%lcp(:))
+
+       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, ltmp, nb, obuffer(jbL))
+       if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, ltmp, nb)
+       if (ierr.eq.0) call settle_output_domain(ierr, domL)
+       if (ierr.eq.0) call settle_input_domain(ierr, domR(1), btmp(1), ltmp(1), domL)
+       if (ierr.eq.0) call settle_reduce_domain(ierr, domZ, obuffer(jbL), lefts(jout), domL)
+       ! if (ierr.eq.0) call reduce_output_domain(ierr, domZ, domL, lefts(jout), obuffer(jbL))
+       if (ierr.eq.0) call reduce_output_buffer(ierr, obuffer(jbL), lefts(jout), btmp, domZ)
+
+       ! if (ierr.eq.0) call show_domain(ierr, domZ,    'reduce/Z', indent=3)
+       ! if (ierr.eq.0) call show_domain(ierr, domL,    'reduce/L', indent=4)
+       ! if (ierr.eq.0) call show_domain(ierr, domR(1), 'reduce/R', indent=5)
+       fillL = choice(fillR, neutral)
+       obuffer(jbL)%vd(:) = fillL
+
+       if (ierr.eq.0) then
+          call func &
+               & (ierr, &
+               &  obuffer(jbL)%vd, domZ,    domL, &
+               &  obuffer(jbR)%vd, domR(1), fillR)
+       endif
+       if (ierr.eq.0) call set_unary_descr(ierr, hbL, hbR, hopr)
+    enddo
+
+  end subroutine apply_opr_REDUCE
 
 !!!_   . set_unary_descr
   subroutine set_unary_descr &
@@ -5911,14 +6122,14 @@ contains
   end subroutine set_binary_descr
 
 !!!_   . get_compromise_domain
-  subroutine get_compromise_domain(ierr, domL, domR, bufh, pstk, nbuf, cmode, bufo)
+  subroutine get_compromise_domain(ierr, domL, domR, bufh, lstk, nbuf, cmode, bufo)
     use TOUZA_Std,only: choice, find_first
     implicit none
     integer,       intent(out)            :: ierr
     type(domain_t),intent(inout)          :: domL
     type(domain_t),intent(inout)          :: domR(0:*)
     integer,       intent(in)             :: bufh(0:*)
-    integer,       intent(in)             :: pstk(0:*)   ! corresponding stack index for buffer
+    type(stack_t), intent(in)             :: lstk(0:*)   ! stack array only for logical coordinate
     integer,       intent(in)             :: nbuf
     integer,       intent(in)             :: cmode
     type(buffer_t),intent(inout),optional :: bufo
@@ -5927,21 +6138,21 @@ contains
 
     ierr = 0
 
-    if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, bufh, pstk, nbuf, bufo)
-    if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, bufh, pstk, nbuf)
+    if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, bufh, lstk, nbuf, bufo)
+    if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, bufh, lstk, nbuf)
     if (ierr.eq.0) then
        nceff = domL%mco
        select case(cmode)
        case (cmode_first)
-          call set_inclusive_domain(ierr, domL, domR, bufh, pstk, 1, intersect=.TRUE.)
+          call set_inclusive_domain(ierr, domL, domR, bufh, lstk, 1, intersect=.TRUE.)
        case (cmode_intersect)
-          call set_inclusive_domain(ierr, domL, domR, bufh, pstk, nbuf, intersect=.TRUE.)
+          call set_inclusive_domain(ierr, domL, domR, bufh, lstk, nbuf, intersect=.TRUE.)
        end select
     endif
     if (ierr.eq.0) call settle_output_domain(ierr, domL)
 
     do j = 0, nbuf - 1
-       if (ierr.eq.0) call settle_input_domain(ierr, domR(j), bufh(j), pstk(j), domL)
+       if (ierr.eq.0) call settle_input_domain(ierr, domR(j), bufh(j), lstk(j), domL)
     enddo
     if (present(bufo)) then
        if (ierr.eq.0) then
@@ -5959,21 +6170,21 @@ contains
 
 !!!_   . tweak_coordinates
   subroutine tweak_coordinates &
-       & (ierr, domL, domR, bufh, pstk, nbuf, bufo, clip)
+       & (ierr, domL, domR, bufh, lstk, nbuf, bufo, clip)
     use TOUZA_Std,only: choice, find_first
     implicit none
     integer,       intent(out)            :: ierr
     type(domain_t),intent(inout)          :: domL
     type(domain_t),intent(inout)          :: domR(0:*)
     integer,       intent(in)             :: bufh(0:*)
-    integer,       intent(in)             :: pstk(0:*)
+    type(stack_t), intent(in)             :: lstk(0:*)
     integer,       intent(in)             :: nbuf
     type(buffer_t),intent(inout),optional :: bufo       ! to store coordinate names only
     logical,       intent(in),   optional :: clip       ! to clip empty coordinates (TRUE)
 
     integer nceff
     character(len=lname) :: nameL(0:lcoor-1),  nameR(0:lcoor-1, 0:nbuf-1)
-    integer j, jb, jc, jo, js
+    integer j, jb, jc, jo
     integer jerr
 
     integer nrphy(0:nbuf-1)
@@ -5982,19 +6193,11 @@ contains
     integer ctype(0:lcoor-1, 0:nbuf-1)
 
     ierr = 0
-    ! write(*, *) 'tc:0', pstk(0:nbuf-1)
-    ! write(*, *) 'tc:1', bufh(0:nbuf-1)
     do j = 0, nbuf - 1
        jb = buf_h2item(bufh(j))
-       js = pstk(j)
-       ! write(*, *) 'tc:', j, bufh(j), pstk(j), jb, js
-       ! do jc = 0, size(bstack(js)%lcp) - 1
-       !    write(*, *) 'bstack%lcp: ', js, jc, bstack(js)%lcp(jc)
-       !    write(*, *) 'obuffer%pcp:', jb, jc, obuffer(jb)%pcp(jc)
-       ! enddo
        if (ierr.eq.0) then
           call get_logical_shape &
-               & (ierr, nrphy(j), nameR(:,j), ctype(:,j), cpidx(:,j), bstack(js)%lcp, obuffer(jb)%pcp, lcoor)
+               & (ierr, nrphy(j), nameR(:,j), ctype(:,j), cpidx(:,j), lstk(j)%lcp, obuffer(jb)%pcp, lcoor)
           ! write(*, *) 'ranks', j, nrphy, obuffer(jb)%pcp(:)%cyc
        endif
     enddo
@@ -6038,7 +6241,7 @@ contains
     if (ierr.eq.0) then
        if (is_msglev(lev_verbose, msglev_DETAIL-1)) then
           call show_stack_perms &
-               & (jerr, domR, nameR, ctype, cpidx, bufh, pstk, lcoor, nbuf)
+               & (jerr, domR, nameR, ctype, cpidx, bufh, lstk, lcoor, nbuf)
        endif
     endif
 
@@ -6046,23 +6249,23 @@ contains
 
 !!!_   . set_inclusive_domain
   subroutine set_inclusive_domain &
-       & (ierr, domL, domR, bufh, pstk, nbuf, intersect)
+       & (ierr, domL, domR, bufh, lstk, nbuf, intersect)
     use TOUZA_Std,only: choice, find_first
     implicit none
     integer,         intent(out)   :: ierr
     type(domain_t),  intent(inout) :: domL
     type(domain_t),  intent(in)    :: domR(0:*)
     integer,         intent(in)    :: bufh(0:*)
-    integer,         intent(in)    :: pstk(0:*)
+    type(stack_t),   intent(in)    :: lstk(0:*)  ! only for logical coordinates
     integer,         intent(in)    :: nbuf
     logical,optional,intent(in)    :: intersect
 
     integer nceff
     integer j
-    integer jb,    jo, js
+    integer jb,    jo
     ! integer jphyc, jlogc
-    integer b,   e,    stp,   odmy, cdmy
-    integer low, high, stpx
+    integer b,   e,    flg,   odmy, cdmy
+    integer low, high, flgx
     integer,parameter :: lini = HUGE(0)
     integer,parameter :: hini = (- HUGE(0)) - 1
     logical isi
@@ -6080,13 +6283,12 @@ contains
              low = lini
              high = hini
           endif
-          stpx = -1
+          flgx = -1
           do j = 0, nbuf - 1
              jb = buf_h2item(bufh(j))
-             js = pstk(j)
              call get_logical_range &
-                  & (b, e, stp, odmy, cdmy, jo, bstack(js)%lcp, obuffer(jb)%pcp, domR(j))
-             stpx = max(stpx, stp)
+                  & (b, e, flg, odmy, cdmy, jo, lstk(j)%lcp, obuffer(jb)%pcp, domR(j))
+             flgx = max(flgx, flg)
              if (isi) then
                 if (b.ne.null_range) low = max(low, b)
                 if (e.ne.null_range) high = min(high, e)
@@ -6096,56 +6298,134 @@ contains
              endif
           enddo
           if (low.eq.lini) low = 0
-          if (high.eq.hini) high = low + max(0, stp)
+          ! if (high.eq.hini) high = low + max(0, stp)
+          if (high.eq.hini) then
+             if (flgx.gt.loop_null) high = low + 1
+          endif
           domL%bgn(jo) = low
           domL%end(jo) = high
-          ! write(*, *) 'inclusive', jo, domL%bgn(jo), domL%end(jo)
        enddo
     endif
     return
   end subroutine set_inclusive_domain
 
 !!!_   . settle_input_domain
-  subroutine settle_input_domain(ierr, dom, hbuf, jstk, ref)
+  subroutine settle_input_domain(ierr, dom, hbuf, lstk, ref)
     implicit none
     integer,       intent(out)   :: ierr
     type(domain_t),intent(inout) :: dom
     integer,       intent(in)    :: hbuf
-    integer,       intent(in)    :: jstk
+    type(stack_t), intent(in)    :: lstk ! only for logical coordinates
     type(domain_t),intent(in)    :: ref
 
     integer jo
-    integer b, e, stp, osh, cyc
+    integer b, e, flg, osh, cyc
     integer jb
 
     ierr = 0
     jb = buf_h2item(hbuf)
+    ierr = min(0, jb)
+    if (ierr.eq.0) then
+       call settle_input_domain_core(ierr, dom, obuffer(jb), lstk, ref)
+    endif
+
+    ! do jo = 0, ref%mco - 1
+    !    ! call set_logical_range(b, e, jo, bstack(jstk)%lcp, dom, ref)
+    !    call get_logical_range &
+    !         & (b, e, flg, osh, cyc, jo, lstk%lcp, obuffer(jb)%pcp, dom, ref)
+    !    dom%bgn(jo) = b
+    !    dom%end(jo) = max(e, 1+b)
+    !    dom%iter(jo) = max(1, e - b)
+    !    dom%ofs(jo) = osh
+    !    dom%cyc(jo) = cyc
+    !    ! write(*, *) 'sib0:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
+    ! enddo
+    ! if (ierr.eq.0) then
+    !    call settle_domain_stride(ierr, dom, obuffer(jb)%pcp)
+    ! endif
+    ! ! do jo = 0, ref%mco - 1
+    ! !    write(*, *) 'sib1:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
+    ! ! enddo
+    ! if (ierr.eq.0) then
+    !    call settle_domain_loop_h(ierr, dom, hbuf, ref)
+    ! endif
+    ! ! do jo = 0, ref%mco - 1
+    ! !    write(*, *) 'sib9:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
+    ! ! enddo
+
+  end subroutine settle_input_domain
+
+!!!_   . settle_input_domain_core
+  subroutine settle_input_domain_core(ierr, dom, buf, lstk, ref)
+    implicit none
+    integer,       intent(out)   :: ierr
+    type(domain_t),intent(inout) :: dom
+    type(buffer_t),intent(inout) :: buf
+    type(stack_t), intent(in)    :: lstk ! only for logical coordinates
+    type(domain_t),intent(in)    :: ref
+
+    integer jo
+    integer b, e, flg, osh, cyc
+
+    ierr = 0
 
     do jo = 0, ref%mco - 1
-       ! call set_logical_range(b, e, jo, bstack(jstk)%lcp, dom, ref)
        call get_logical_range &
-            & (b, e, stp, osh, cyc, jo, bstack(jstk)%lcp, obuffer(jb)%pcp, dom, ref)
+            & (b, e, flg, osh, cyc, jo, lstk%lcp, buf%pcp, dom, ref)
        dom%bgn(jo) = b
        dom%end(jo) = max(e, 1+b)
        dom%iter(jo) = max(1, e - b)
        dom%ofs(jo) = osh
        dom%cyc(jo) = cyc
-       ! write(*, *) 'sib0:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
     enddo
     if (ierr.eq.0) then
-       call settle_domain_stride(ierr, dom, obuffer(jb)%pcp)
+       call settle_domain_stride(ierr, dom, buf%pcp)
     endif
-    ! do jo = 0, ref%mco - 1
-    !    write(*, *) 'sib1:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
-    ! enddo
     if (ierr.eq.0) then
-       call settle_domain_loop_h(ierr, dom, hbuf, ref)
+       call settle_domain_loop(ierr, dom, buf, ref)
     endif
-    ! do jo = 0, ref%mco - 1
-    !    write(*, *) 'sib9:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
-    ! enddo
+  end subroutine settle_input_domain_core
 
-  end subroutine settle_input_domain
+!!!_   . settle_reduce_domain
+  subroutine settle_reduce_domain(ierr, dom, buf, lstk, ref)
+    implicit none
+    integer,       intent(out)   :: ierr
+    type(domain_t),intent(inout) :: dom
+    type(buffer_t),intent(inout) :: buf
+    type(stack_t), intent(in)    :: lstk ! only for logical coordinates
+    type(domain_t),intent(in)    :: ref
+
+    integer jo, jc
+    integer nx
+
+    ierr = 0
+    nx = count(lstk%lcp(0:ref%mco-1)%flg.eq.loop_reduce)
+    dom = ref
+    do jo = 0, dom%mco - 1
+       if (nx.eq.0.or.lstk%lcp(jo)%flg.eq.loop_reduce) then
+          dom%strd(jo) = 0
+          dom%bgn(jo) = max(0, max(ref%bgn(jo), dom%bgn(jo)) - ref%bgn(jo))
+          dom%end(jo) = max(0, min(ref%end(jo), dom%end(jo)) - ref%bgn(jo))
+          buf%pcp(jo)%flg = loop_reduce
+       else
+          buf%pcp(jo)%flg = loop_normal
+       endif
+       buf%pcp(jo)%bgn = ref%bgn(jo)
+       buf%pcp(jo)%end = ref%end(jo)
+       dom%ofs(jo) = 0
+    enddo
+    if (ierr.eq.0) then
+       dom%n = 1
+       do jo = 1, dom%mco
+          jc = jo - 1
+          if (dom%strd(jc).gt.0) then
+             dom%strd(jc) = dom%n
+             dom%n = dom%n * max(1, dom%end(jc) - dom%bgn(jc))
+          endif
+       enddo
+    endif
+
+  end subroutine settle_reduce_domain
 
 !!!_   . settle_domain_loop_h
   subroutine settle_domain_loop_h(ierr, dom, handle, refd)
@@ -6175,7 +6455,7 @@ contains
        do jc = 0, dom%mco - 1
           kc = dom%cidx(jc)
           if (kc.ge.0) then
-             if (buf%pcp(kc)%stp.le.0) then
+             if (buf%pcp(kc)%flg.le.loop_null) then
                 dom%bgn(jc) = max(0, max(refd%bgn(jc), dom%bgn(jc)) - refd%bgn(jc))
                 dom%end(jc) = max(0, min(refd%end(jc), dom%end(jc)) - refd%bgn(jc))
              else
@@ -6195,7 +6475,6 @@ contains
           ! write(*, *) 'sdl1:', jc, dom%bgn(jc), dom%end(jc), dom%iter(jc), dom%ofs(jc)
           dom%end(jc) = max(dom%bgn(jc), dom%end(jc))
           dom%iter(jc) = max(1, dom%end(jc) - dom%bgn(jc))
-          ! write(*, *) 'sdl9:', jc, dom%bgn(jc), dom%end(jc), dom%iter(jc), dom%ofs(jc)
        enddo
     endif
 
@@ -6257,11 +6536,11 @@ contains
              buf%pcp(jc)%bgn = dom%bgn(jc)
              ! buf%pcp(jc)%end = dom%bgn(jc)
              buf%pcp(jc)%end = dom%end(jc)
-             buf%pcp(jc)%stp = 0
+             buf%pcp(jc)%flg = loop_null
           else
              buf%pcp(jc)%bgn = dom%bgn(jc)
              buf%pcp(jc)%end = dom%end(jc)
-             buf%pcp(jc)%stp = 1
+             buf%pcp(jc)%flg = loop_normal
           endif
           buf%pcp(jc)%ofs = 0
           buf%pcp(jc)%cyc = 0
@@ -6272,6 +6551,70 @@ contains
        call alloc_buffer_t(ierr, buf, dom%n)
     endif
   end subroutine set_output_buffer
+
+!!!_   . reduce_output_buffer - set result buffer as reduction
+  subroutine reduce_output_buffer &
+       & (ierr, buf, lstk, hbufi, dom)
+    use TOUZA_std,only: choice
+    use TOUZA_Nio,only: parse_header_size
+    implicit none
+    integer,       intent(out)   :: ierr
+    type(stack_t), intent(inout) :: lstk
+    type(buffer_t),intent(inout) :: buf
+    integer,       intent(in)    :: hbufi(0:)
+    type(domain_t),intent(in)    :: dom
+    integer kv
+    integer jb
+    integer jinp, ninp
+    integer jc
+    integer reff
+    integer nx
+
+    ierr = 0
+    ninp = size(hbufi)
+    ! set output buffer
+    if (ierr.eq.0) then
+       ! kv = kv_flt
+       kv = kv_int
+       reff = -1
+       do jinp = 0, ninp - 1
+          jb = buf_h2item(hbufi(jinp))
+          kv = max(kv, obuffer(jb)%k)
+          if (obuffer(jb)%reff.ge.0) then
+             if (reff.lt.0) reff = obuffer(jb)%reff
+          endif
+       enddo
+       buf%k = kv
+       buf%reff = reff
+    endif
+    if (ierr.eq.0) then
+       lstk%lcp(:) = def_loop
+    endif
+    if (ierr.eq.0) then
+       ! nx = count(lstk%lcp(0:dom%mco-1)%flg.eq.loop_reduce)
+       ! do jc = 0, dom%mco - 1
+       !    if (lstk%lcp(jc)%flg.eq.loop_reduce.or.nx.eq.0) then
+       !       ! buf%pcp(jc)%bgn = 0
+       !       ! buf%pcp(jc)%end = 0
+       !       buf%pcp(jc)%bgn = dom%bgn(jc)
+       !       buf%pcp(jc)%end = dom%end(jc)
+       !       buf%pcp(jc)%flg = loop_reduce
+       !       ! lstk%lcp(jc)%bgn = null_range
+       !       ! lstk%lcp(jc)%end = null_range
+       !    else
+       !       buf%pcp(jc)%bgn = dom%bgn(jc)
+       !       buf%pcp(jc)%end = dom%end(jc)
+       !       buf%pcp(jc)%flg = loop_normal
+       !    endif
+       !    buf%pcp(jc)%ofs = 0
+       !    buf%pcp(jc)%cyc = 0
+       ! enddo
+       do jc = dom%mco, lcoor - 1
+          buf%pcp(jc) = def_loop
+       enddo
+       call alloc_buffer_t(ierr, buf, dom%n)
+    endif
+  end subroutine reduce_output_buffer
 
 !!!_   & is_undef()
 !   elemental logical function is_undef(A, N) result(b)
