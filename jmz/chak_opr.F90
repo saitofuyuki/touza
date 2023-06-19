@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/19 13:29:42 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/19 14:56:45 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -288,7 +288,7 @@ contains
        n = shape_shift
     case(opr_FLAT)
        n = shape_coordinate
-    case(opr_COUNT)
+    case(grp_reduce_bgn:grp_reduce_end-1)
        n = shape_coordinate
     case default
        n = shape_error
@@ -2192,7 +2192,30 @@ contains
        endif
     enddo
   end subroutine apply_REDUCE_COUNT
-
+!!!_   . apply_REDUCE_SUM
+  subroutine apply_REDUCE_SUM &
+       & (ierr, Z, domZ, domY, X, domX, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domY, domX
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jy, jx
+    ierr = 0
+    do jy = 0, domY%n - 1
+       jx = conv_physical_index(jy, domY, domX)
+       jz = conv_physical_index(jy, domY, domZ)
+       ! write(*, *) 'sum', jy, jz, jx
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+            Z(jz) = elem_REDUCE_SUM(Z(jz), X(jx), F)
+         else
+            Z(jz) = elem_REDUCE_SUM(Z(jz), F, F)
+         endif
+       endif
+    end do
+  end subroutine apply_REDUCE_SUM
 !!!_  - elemental operatior templates
 !!!_   . elem_UNARY_template()
   ELEMENTAL &
@@ -3296,6 +3319,18 @@ contains
        Z = X + ONE
     endif
   end function elem_REDUCE_COUNT
+!!!_   . elem_SUM()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_REDUCE_SUM (X, Y, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F.or.Y.eq.F) then
+       Z = X
+    else
+       Z = X + Y
+    endif
+  end function elem_REDUCE_SUM
 
 !!!_ + end chak_opr
 end module chak_opr
