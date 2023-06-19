@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/19 10:37:39 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/20 08:02:16 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1786,7 +1786,7 @@ contains
   logical function is_null_coor(lpp) result (b)
     implicit none
     type(loop_t),intent(in) :: lpp
-    b = (lpp%flg.le.loop_null.and.lpp%name.eq.' ')
+    b = (lpp%flg.le.loop_reduce.and.lpp%name.eq.' ')
   end function is_null_coor
 
 !!!_   . parse_coordinate_repl - parse coordinate argument complex
