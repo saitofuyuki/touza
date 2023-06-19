@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz CH(swiss) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/19 06:37:14 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/19 15:48:51 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -1452,7 +1452,7 @@ end subroutine cue_read_file
              if (irange(1).le.0) irange(1) = 1
              irange(2) = irange(1)
           endif
-       else if (lpp(jc)%flg.eq.loop_null) then
+       else if (lpp(jc)%flg.eq.loop_null .or. lpp(jc)%flg.eq.loop_reduce) then
           ! if null coordinate enabled
           if (irange(1).eq.irange(2) .or. irange(1).eq.irange(2) - 1) then
              irange(:) = 0

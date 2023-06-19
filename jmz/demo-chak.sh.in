@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/05/31 17:36:33 fuyuki demo-chak.sh.in>
+# Time-stamp: <2023/06/20 15:30:22 fuyuki demo-chak.sh.in>
 
 main ()
 {
@@ -118,29 +118,55 @@ demo_operation ()
   run_demo flat:flat/s02 -TRIM 9     $src FLAT=0,2     = POP
   run_demo flat:flat/s20 -TRIM 9     $src FLAT=2,0     = POP
 
-  run_demo flat:flat     -TRIM 3:3   T=0 $src FLAT         FLUSH -i
-  run_demo flat:flat/0   -TRIM 9     T=0 $src FLAT=0       FLUSH -i
-  run_demo flat:flat/1   -TRIM 9     T=0 $src FLAT=1       FLUSH -i
-  run_demo flat:flat/01  -TRIM 3:3   T=0 $src FLAT=0,1     FLUSH -i
-  run_demo flat:flat/10  -TRIM 9     T=0 $src FLAT=1,0     FLUSH -i
-  run_demo flat:flat/02  -TRIM 3:3   T=0 $src FLAT=0,2     FLUSH -i
-  run_demo flat:flat/20  -TRIM 3:3   T=0 $src FLAT=2,0     FLUSH -i
-  run_demo flat:flat/x   -TRIM 9     T=0 $src FLAT=lon     FLUSH -i
-  run_demo flat:flat/zy  -TRIM 9     T=0 $src FLAT=lev,lat FLUSH -i
+  run_demo flat:flat     -TRIM 3:3   $src FLAT         FLUSH -i
+  run_demo flat:flat/0   -TRIM 9     $src FLAT=0       FLUSH -i
+  run_demo flat:flat/1   -TRIM 9     $src FLAT=1       FLUSH -i
+  run_demo flat:flat/01  -TRIM 3:3   $src FLAT=0,1     FLUSH -i
+  run_demo flat:flat/10  -TRIM 9     $src FLAT=1,0     FLUSH -i
+  run_demo flat:flat/02  -TRIM 3:3   $src FLAT=0,2     FLUSH -i
+  run_demo flat:flat/20  -TRIM 3:3   $src FLAT=2,0     FLUSH -i
+  run_demo flat:flat/x   -TRIM 9     $src FLAT=lon     FLUSH -i
+  run_demo flat:flat/zy  -TRIM 9     $src FLAT=lev,lat FLUSH -i
 
-  run_demo flat:flat/0+1 -TRIM 9     T=0 $src FLAT=0 FLAT=1 FLUSH -i
+  run_demo flat:flat/0+1 -TRIM 9     $src FLAT=0 FLAT=1 FLUSH -i
 
   # shift
   src=(T=0 demo/base INT DUP)
-  run_demo shift:0+1  $src C0=::+1 FLUSH -i
-  run_demo shift:0-1  $src C0=::-1 FLUSH -i
-  run_demo shift:1+1  $src C1=::+1 FLUSH -i
-  run_demo shift:1-1  $src C1=::-1 FLUSH -i
-  run_demo shift:2+1  $src C2=::+1 FLUSH -i
-  run_demo shift:2-1  $src C2=::-1 FLUSH -i
+  run_demo shift:0+1 -TRIM 18 $src C0=::+1 FLUSH -i
+  run_demo shift:0-1 -TRIM 18 $src C0=::-1 FLUSH -i
+  run_demo shift:1+1 -TRIM 10:10 $src C1=::+1 FLUSH -i
+  run_demo shift:1-1 -TRIM 10:10 $src C1=::-1 FLUSH -i
+  run_demo shift:2+1 -TRIM 10:10 $src C2=::+1 FLUSH -i
+  run_demo shift:2-1 -TRIM 10:10 $src C2=::-1 FLUSH -i
 
-  run_demo shift:part/0+1  $src C0=1:4:+1 FLUSH -i
-  run_demo shift:part/0-1  $src C0=1:4:-1 FLUSH -i
+  run_demo shift:0+1a -TRIM 18 $src SHIFT=+1 FLUSH -i
+  run_demo shift:0-1a -TRIM 18 $src SHIFT=-1 FLUSH -i
+  run_demo shift:1+1a -TRIM 10:10 $src SHIFT=,+1 FLUSH -i
+  run_demo shift:1-1a -TRIM 10:10 $src SHIFT=,-1 FLUSH -i
+
+  run_demo shift:part/0+1 -TRIM 18 $src C0=1:4:+1 FLUSH -i
+  run_demo shift:part/0-1 -TRIM 18 $src C0=1:4:-1 FLUSH -i
+
+  local w=8
+  run_demo cshift:0+1 -TRIM 18 $src C0=::+1:$w FLUSH -i
+  run_demo cshift:0-1 -TRIM 18 $src C0=::-1:$w FLUSH -i
+  run_demo cshiftP:0+1 -TRIM 18 $src C0=::+1:$((w+1)) FLUSH -i
+  run_demo cshiftP:0-1 -TRIM 18 $src C0=::-1:$((w+1)) FLUSH -i
+  run_demo cshiftM:0+1 -TRIM 18 $src C0=::+1:$((w-1)) FLUSH -i
+  run_demo cshiftM:0-1 -TRIM 18 $src C0=::-1:$((w-1)) FLUSH -i
+
+  # count
+  src=(demo/flat)
+  run_demo count:all $src COUNT   =
+  run_demo count:0   -TRIM 10 $src COUNT=0 =
+  run_demo count:1   -TRIM 10 $src COUNT=1 =
+  run_demo count:2   -TRIM 10 $src COUNT=2 =
+  run_demo count:0/p -TRIM 10 $src COUNT=0/2:6 =
+
+  run_demo count:0p  -TRIM 10 $src COUNT=2:6 =
+  run_demo count:yb  -TRIM 10 $src COUNT=,: =
+  run_demo count:ya  -TRIM 10 $src COUNT=,1 =
+  run_demo count:20  -TRIM 10 $src COUNT=2,0 =
 
   return 0
 }
@@ -169,7 +195,7 @@ run_demo ()
   do
     case $1 in
     (-NOCOL) col=;;
-    (-TRIM)  trim=$2; shift 2;;
+    (-TRIM)  trim=$2; shift;;
     (-E)     edup=T;;
     (-C)     hcom="$2"; shift;;
     (--)     shift; break;;
@@ -263,6 +289,9 @@ demo_inputs ()
   gen_subr suby:bs $outd/sub2.zx.base $outd/zx.base lat 2:3 || return $?
   gen_subr suby:bs $outd/sub1.zx.base $outd/zx.base lat 1:1 || return $?
 
+  local flat=$outd/flat
+  gen_flat flat $flat $nx $((nx-1)) $((nx-2)) || return $?
+
   return 0
 }
 
@@ -302,6 +331,33 @@ gen_source ()
            -e "date:c19730130 $tm" $E $ofile
     let jt++
   done
+
+  return 0
+}
+
+gen_flat ()
+{
+  local item=$1 ofile=$2; shift 2
+  local nx=$1 ny=$2 nz=$3
+
+  local C=()
+  [[ x${nx:--} != x- ]] && C+=(X=lon/:$nx)
+  [[ x${ny:--} != x- ]] && C+=(Y=lat/:$ny)
+  [[ x${nz:--} != x- ]] && C+=(Z=lev/:$nz)
+
+  local opr=(0 $C FLAT ADD X Y GEF MASK X Z GEF MASK BOOL INT)
+
+  local PROPS=(TITLE='demonstration source'
+               UNIT='shaku' ITEM="$item")
+
+  $chak -H0 -f $opr = $ofile $PROPS || return $?
+
+  local jt=1
+  tm="$(printf '%02d' $jt)0000"
+  $ngted -t $((jt+1)) \
+         -e "dset:ctouza-jmz" \
+         -e "time:c$((jt+100))" \
+         -e "date:c19730130 $tm" $ofile
 
   return 0
 }

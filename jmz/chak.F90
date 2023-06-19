@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/19 14:48:17 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/20 16:50:40 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1183,7 +1183,7 @@ contains
 !!!_    * normal operators
     else if (hopr.ge.0) then
        if (is_operator(hopr)) then
-          if (ierr.eq.0) call stack_normal_opr(ierr, 0, 0, hopr, 0)
+          if (ierr.eq.0) call parse_normal_opr(ierr, hopr, arg)
        else
           ! fake operator
           ierr = ERR_NO_CANDIDATE   ! not error
@@ -1612,29 +1612,41 @@ contains
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: hopr
     character(len=*),intent(in)  :: arg
+    integer hacc
     integer jpar, jend
     integer hbuf, jb
+    integer apos, opop, opush, npop
 
     ierr = 0
+    if (ierr.eq.0) then
+       jpar = index(arg, param_sep) + 1
+       jend = len_trim(arg) + 1
+       if (jpar.eq.1) jpar = jend + 1
+    endif
+    if (ierr.eq.0) then
+       hacc = hopr - var_reduce
+       if (arg(jpar:jend-1).eq.shape_sweep_stack) then
+          call stack_normal_opr(ierr, 0, 0, hacc, 0)
+          return
+       else if (arg(jpar:jend-1).eq.shape_sweep_accum) then
+          call stack_normal_opr(ierr, 0, 0, hacc, 0)
+          if (ierr.eq.0) call stack_CUM_opr(ierr, hacc)
+          return
+       endif
+    endif
 
     if (ierr.eq.0) call pop_stack(ierr, hbuf, .TRUE.)   ! only to check,  pop later
     if (ierr.eq.0) jb = buf_h2item(hbuf)
     if (ierr.eq.0) ierr = min(0, jb)
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
-       jend = len_trim(arg) + 1
-       if (jpar.eq.1) jpar = jend + 1
-       select case(hopr)
-       case(opr_COUNT,opr_SUM)
-          if (jpar.le.jend) then
-             call parse_reduction_shape(ierr, arg(jpar:), hopr)
-          else
-             call parse_reduction_shape(ierr, ' ', hopr)
-          endif
-       case default
-          ierr = ERR_NOT_IMPLEMENTED
-          call message(ierr, 'reserved operator(reduction) ' // trim(arg))
-       end select
+       if (arg(jpar:jend-1).eq.shape_sweep_reduce) then
+          jpar = jend + 1
+       endif
+       if (jpar.le.jend) then
+          call parse_reduction_shape(ierr, arg(jpar:), hopr)
+       else
+          call parse_reduction_shape(ierr, ' ', hopr)
+       endif
     endif
     return
   end subroutine parse_reduction_opr
@@ -1724,6 +1736,41 @@ contains
        enddo
     endif
   end subroutine set_write_format
+
+!!!_   . parse_normal_opr
+  subroutine parse_normal_opr(ierr, hopr, arg)
+    use TOUZA_Std,only: choice
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: hopr
+    character(len=*),intent(in)  :: arg
+    integer sweep
+    integer jpar, jend
+
+    ierr = 0
+    jpar = index(arg, param_sep) + 1
+    jend = len_trim(arg) + 1
+    if (jpar.eq.1) jpar = jend + 1
+
+    sweep = check_operator_sweep(hopr)
+    ierr = min(0, sweep)
+    if (ierr.eq.0) then
+       select case(sweep)
+       case(sweep_none)
+          call stack_normal_opr(ierr, 0, 0, hopr, 0)
+       case(sweep_accum)
+          if (arg(jpar:jend-1).eq.' ') then
+             call stack_normal_opr(ierr, 0, 0, hopr, 0)
+          else
+             call parse_reduction_opr(ierr, hopr + var_reduce, arg)
+          endif
+       case(sweep_reduce)
+          call parse_reduction_opr(ierr, hopr + var_reduce, arg)
+       case default
+          ierr = ERR_INVALID_SWITCH
+       end select
+    endif
+  end subroutine parse_normal_opr
 
 !!!_   . stack_normal_opr
   subroutine stack_normal_opr(ierr, opop, npop, hopr, iter)
@@ -3720,20 +3767,22 @@ contains
           is_tweak = ANY(bstack(jstk)%lcp(:)%name.ne.' ')
        endif
        if (is_tweak) then
-          ! write(*, *) 'tweak'
           call tweak_buffer(ierr, btmp, bufh, jstk)
           if (ierr.eq.0) call put_header_lprops(ierr, head, btmp%pcp, file%hflag)
-       else if (ANY(obuffer(jb)%pcp(:)%flg.eq.loop_null)) then
+       else if (ANY(obuffer(jb)%pcp(:)%flg.eq.loop_null) &
+            & .or. ANY(obuffer(jb)%pcp(:)%flg.eq.loop_reduce)) then
           btmp%pcp(:) = obuffer(jb)%pcp(:)
           if (file%hflag.eq.hflag_nulld) then
              do jc = 0, lcoor - 1
-                if (btmp%pcp(jc)%flg.eq.loop_null) then
+                if (btmp%pcp(jc)%flg.eq.loop_null &
+                     & .or. btmp%pcp(jc)%flg.eq.loop_reduce) then
                    btmp%pcp(jc)%end = btmp%pcp(jc)%bgn
                 endif
              enddo
           else
              do jc = 0, lcoor - 1
-                if (btmp%pcp(jc)%flg.eq.loop_null) then
+                if (btmp%pcp(jc)%flg.eq.loop_null &
+                     & .or. btmp%pcp(jc)%flg.eq.loop_reduce) then
                    btmp%pcp(jc)%bgn = 0
                    btmp%pcp(jc)%end = 0
                 endif
@@ -4398,10 +4447,27 @@ contains
        else if (handle.eq.opr_RRSP) then
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_RRSP)
 !!!_    * reduction
+       else if (handle.eq.rdc_ADD) then
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_ADD, ZERO)
+       else if (handle.eq.rdc_LADD) then
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_LADD, ZERO)
+       else if (handle.eq.rdc_MAX) then
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_MAX, LLIMIT)
+       else if (handle.eq.rdc_LMAX) then
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_LMAX)
+       else if (handle.eq.rdc_MIN) then
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_MIN, ULIMIT)
+       else if (handle.eq.rdc_LMIN) then
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_LMIN)
        else if (handle.eq.opr_COUNT) then
           call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_COUNT, ZERO)
        else if (handle.eq.opr_SUM) then
           call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_SUM, ZERO)
+!!!_    * accumulation
+       else if (handle.eq.acc_COUNT) then
+          call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_COUNT, ZERO)
+       else if (handle.eq.acc_SUM) then
+          call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_SUM, ZERO)
 !!!_    * ignored
        else if (grp_system_bgn.le.handle.and.handle.lt.grp_system_end) then
           continue
@@ -5200,7 +5266,6 @@ contains
     integer js
     integer alev
     integer utmp
-    character(len=64) :: cprop(0:lcoor-1)
     character(len=128) :: str, dstr
 
     type(buffer_t) :: htmp
@@ -5975,7 +6040,6 @@ contains
        if (ierr.eq.0) call settle_output_domain(ierr, domL)
        if (ierr.eq.0) call settle_input_domain(ierr, domR(1), btmp(1), ltmp(1), domL)
        if (ierr.eq.0) call settle_reduce_domain(ierr, domZ, obuffer(jbL), lefts(jout), domL)
-       ! if (ierr.eq.0) call reduce_output_domain(ierr, domZ, domL, lefts(jout), obuffer(jbL))
        if (ierr.eq.0) call reduce_output_buffer(ierr, obuffer(jbL), lefts(jout), btmp, domZ)
 
        ! if (ierr.eq.0) call show_domain(ierr, domZ,    'reduce/Z', indent=3)
@@ -6321,42 +6385,13 @@ contains
     integer,       intent(in)    :: hbuf
     type(stack_t), intent(in)    :: lstk ! only for logical coordinates
     type(domain_t),intent(in)    :: ref
-
-    integer jo
-    integer b, e, flg, osh, cyc
     integer jb
-
     ierr = 0
     jb = buf_h2item(hbuf)
     ierr = min(0, jb)
     if (ierr.eq.0) then
        call settle_input_domain_core(ierr, dom, obuffer(jb), lstk, ref)
     endif
-
-    ! do jo = 0, ref%mco - 1
-    !    ! call set_logical_range(b, e, jo, bstack(jstk)%lcp, dom, ref)
-    !    call get_logical_range &
-    !         & (b, e, flg, osh, cyc, jo, lstk%lcp, obuffer(jb)%pcp, dom, ref)
-    !    dom%bgn(jo) = b
-    !    dom%end(jo) = max(e, 1+b)
-    !    dom%iter(jo) = max(1, e - b)
-    !    dom%ofs(jo) = osh
-    !    dom%cyc(jo) = cyc
-    !    ! write(*, *) 'sib0:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
-    ! enddo
-    ! if (ierr.eq.0) then
-    !    call settle_domain_stride(ierr, dom, obuffer(jb)%pcp)
-    ! endif
-    ! ! do jo = 0, ref%mco - 1
-    ! !    write(*, *) 'sib1:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
-    ! ! enddo
-    ! if (ierr.eq.0) then
-    !    call settle_domain_loop_h(ierr, dom, hbuf, ref)
-    ! endif
-    ! ! do jo = 0, ref%mco - 1
-    ! !    write(*, *) 'sib9:', jo, dom%bgn(jo), dom%end(jo), dom%iter(jo), dom%ofs(jo)
-    ! ! enddo
-
   end subroutine settle_input_domain
 
 !!!_   . settle_input_domain_core
@@ -6431,19 +6466,6 @@ contains
 
   end subroutine settle_reduce_domain
 
-!!!_   . settle_domain_loop_h
-  subroutine settle_domain_loop_h(ierr, dom, handle, refd)
-    implicit none
-    integer,       intent(out)   :: ierr
-    type(domain_t),intent(inout) :: dom
-    integer,       intent(in)    :: handle
-    type(domain_t),intent(in)    :: refd
-    integer jb
-    jb = buf_h2item(handle)
-    ierr = min(0, jb)
-    if (ierr.eq.0) call settle_domain_loop(ierr, dom, obuffer(jb), refd)
-    return
-  end subroutine settle_domain_loop_h
 !!!_   . settle_domain_loop
   subroutine settle_domain_loop(ierr, dom, buf, refd)
     use TOUZA_std,only: choice
@@ -6572,7 +6594,6 @@ contains
     integer jinp, ninp
     integer jc
     integer reff
-    integer nx
 
     ierr = 0
     ninp = size(hbufi)
@@ -6595,24 +6616,6 @@ contains
        lstk%lcp(:) = def_loop
     endif
     if (ierr.eq.0) then
-       ! nx = count(lstk%lcp(0:dom%mco-1)%flg.eq.loop_reduce)
-       ! do jc = 0, dom%mco - 1
-       !    if (lstk%lcp(jc)%flg.eq.loop_reduce.or.nx.eq.0) then
-       !       ! buf%pcp(jc)%bgn = 0
-       !       ! buf%pcp(jc)%end = 0
-       !       buf%pcp(jc)%bgn = dom%bgn(jc)
-       !       buf%pcp(jc)%end = dom%end(jc)
-       !       buf%pcp(jc)%flg = loop_reduce
-       !       ! lstk%lcp(jc)%bgn = null_range
-       !       ! lstk%lcp(jc)%end = null_range
-       !    else
-       !       buf%pcp(jc)%bgn = dom%bgn(jc)
-       !       buf%pcp(jc)%end = dom%end(jc)
-       !       buf%pcp(jc)%flg = loop_normal
-       !    endif
-       !    buf%pcp(jc)%ofs = 0
-       !    buf%pcp(jc)%cyc = 0
-       ! enddo
        do jc = dom%mco, lcoor - 1
           buf%pcp(jc) = def_loop
        enddo

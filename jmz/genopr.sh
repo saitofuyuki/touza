@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/06/19 14:56:19 fuyuki genopr.sh>
+# Time-stamp: <2023/06/20 15:47:14 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -23,7 +23,7 @@ main ()
   local -A GRP=() SUBG=()
   local -A NSTACK=() ALIAS=() SYM=()
   local -A DSTACK=() # stack properties for description
-  local -A OPT=() PARAM=() INFIX=() CONV=()
+  local -A OPT=() PARAM=() INFIX=() CONV=() PROPS=()
   local -A FUNC=()
   local -A IVAR=() AVAR=()
   local -A GRANGE=()
@@ -144,21 +144,21 @@ register_all ()
   register -g lazy -n 2,1 -f LAY,-,F -i call          RLAY    'background layer; A if B outside, else B'
 
   # primitive binary
-  register -n 2,1 -i add,'+'  ADD         'A+B'
-  register -n 2,1 -i add,'-'  SUB         'A-B'
-  register -n 2,1 -i mul,'*'  MUL         'A*B'
-  register -n 2,1 -i mul,'/'  DIV         'A/B'
-  register -n 2,1 -i mul,'//' IDIV -c int 'A//B'
-  register -n 2,1 -i mul,'%'  MOD         'mod(A,B)'
-  register -n 2,1 -i exp,'**' POW         'pow(A,B)'
+  register -n 2,1 -i add,'+'  -P sweep=accum ADD         'A+B'
+  register -n 2,1 -i add,'-'                 SUB         'A-B'
+  register -n 2,1 -i mul,'*'                 MUL         'A*B'
+  register -n 2,1 -i mul,'/'                 DIV         'A/B'
+  register -n 2,1 -i mul,'//'                IDIV -c int 'A//B'
+  register -n 2,1 -i mul,'%'                 MOD         'mod(A,B)'
+  register -n 2,1 -i exp,'**'                POW         'pow(A,B)'
 
   register -n 2,1 -i call MODULO      'modulo(A,B)'
 
   # primitive binary inclusive
-  register -g lazy -n 2,1 -i add,'+'  -f ADD,ZERO LADD    'lazy ADD'
-  register -g lazy -n 2,1 -i add,'-'  -f SUB,ZERO LSUB    'lazy SUB'
-  register -g lazy -n 2,1 -i mul,'*'  -f MUL,ONE  LMUL    'lazy MUL'
-  register -g lazy -n 2,1 -i mul,'/'  -f DIV,ONE  LDIV    'lazy DIV'
+  register -g lazy -n 2,1 -i add,'+' -P sweep=accum -f ADD,ZERO LADD    'lazy ADD'
+  register -g lazy -n 2,1 -i add,'-'                -f SUB,ZERO LSUB    'lazy SUB'
+  register -g lazy -n 2,1 -i mul,'*'                -f MUL,ONE  LMUL    'lazy MUL'
+  register -g lazy -n 2,1 -i mul,'/'                -f DIV,ONE  LDIV    'lazy DIV'
 
   # primitive unary
   register          -n 1,1 -i neg,'-'  NEG     '-A'
@@ -214,10 +214,10 @@ register_all ()
   register -g float -n 1,1 -i call        RRSP      'rrspacing(A)'
 
   # other operation
-  register         -n 2,1 -i call             MIN    'min(A,B)'
-  register         -n 2,1 -i call             MAX    'max(A,B)'
-  register -g lazy -n 2,1 -i call -f -,ULIMIT LMIN   'lazy MIN'
-  register -g lazy -n 2,1 -i call -f -,LLIMIT LMAX   'lazy MAX'
+  register         -n 2,1 -i call -P sweep=accum             MIN    'min(A,B)'
+  register         -n 2,1 -i call -P sweep=accum             MAX    'max(A,B)'
+  register -g lazy -n 2,1 -i call -P sweep=accum -f -,ULIMIT LMIN   'lazy MIN'
+  register -g lazy -n 2,1 -i call -P sweep=accum -f -,LLIMIT LMAX   'lazy MAX'
 
   # conditional operation (binary)
   register -g bool -n 2,1 -f -,FALSE -i call -c int EQB       '1 if A==B, else 0'
@@ -259,11 +259,11 @@ register_all ()
   # reduction operation
   register -g reduce -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
   register -g reduce -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
-  register -g reduce -n 1,1 -o RANK -f -,ZERO -i call        SUM     'sum along rank(s)' 
-  register -g reduce -n 1,1 -o RANK -f -,ZERO -i call -c int COUNT   'count defined elements along rank(s)'
+  register -g reduce -n 1,1 -o RANK -f LADD,ZERO -i call        SUM     'sum along rank(s)'
+  register -g reduce -n 1,1 -o RANK -f -,ZERO    -i call -c int COUNT   'count defined elements along rank(s)'
 
-  register -g reduce -n 1,1 -i call -p RANK -s 'MIN=' UMIN    'minimum'
-  register -g reduce -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'
+  # register -g reduce -n 1,1 -i call -p RANK -s 'MIN=' UMIN    'minimum'
+  # register -g reduce -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'
 
   # transform operation
   #### coor=0,1,2,name,alias for coodinate, -1 or s for stack
@@ -318,7 +318,7 @@ register_all ()
 register ()
 {
   local grp= subg= nstack= alias= sym=
-  local opt= param= infix= conv= func=
+  local opt= param= infix= conv= func= props=()
   local opr= descr= dstack=
   while [[ $# -gt 0 ]]
   do
@@ -333,6 +333,7 @@ register ()
     (-i) infix=(${(s:,:)2}); shift;;
     (-c) conv=$2; shift;;
     (-f) func=$2; shift;;
+    (-P) props+=(${(s:,:)2}); shift;;
     (--) shift; break;;
     (-*) print -u2 - "unknown option $1"; exit 1;;
     (*)  break;;
@@ -370,6 +371,7 @@ register ()
   FUNC[$key]="$func"
   INFIX[$key]="$infix"
   CONV[$key]="$conv"
+  PROPS[$key]="$props"
   SYM[$key]="$sym"
   NSTACK[$key]="$nstack"
   DSTACK[$key]="$dstack"
@@ -384,7 +386,7 @@ output_decl ()
 {
   local of=$1; shift
   local grp= key=
-  local iv= av= gv=()
+  local iv= av= gv=() rv=
   local subg=
   # symbol
   output_f90_header "$of" "operator symbol declaration"
@@ -405,7 +407,7 @@ output_decl ()
   # id
   fout "!! operation id"
   local jnum=0
-  local ref=
+  local ref= sweep=
   for grp in $@
   do
     gv=($=GRANGE[$grp])
@@ -420,8 +422,22 @@ output_decl ()
         ref=$IVAR[$ALIAS[$key]]
         fout "integer,parameter :: $iv = $ref"
       else
-        fout "integer,parameter :: $iv = $jnum"
-        let jnum++
+        check_props sweep sweep $key
+        if [[ $grp == reduce ]]; then
+          rv=acc_${iv#*_}
+          fout "integer,parameter :: $rv = $jnum"
+          let jnum++
+          fout "integer,parameter :: $iv = $jnum"
+          let jnum++
+        else
+          fout "integer,parameter :: $iv = $jnum"
+          let jnum++
+          if [[ -n $sweep ]]; then
+            rv=rdc_${iv#*_}
+            fout "integer,parameter :: $rv = $iv + 1"
+            let jnum++
+          fi
+        fi
       fi
     done
     fout "integer,parameter :: $gv[2] = $jnum"
@@ -433,10 +449,10 @@ output_register ()
 {
   local of="$1"; shift
   local grp= key=
-  local iv= av=
+  local iv= av= rv=
   local nstack=()
   local infix=() rarg=() conv=
-  local sub=
+  local sub= sweep=
   output_f90_header "$of" "operator registration"
   # symbol
   for grp in "$@"
@@ -451,6 +467,8 @@ output_register ()
       nstack=(${=NSTACK[$key]})
       infix=(${=INFIX[$key]})
       conv=$CONV[$key]
+      check_props sweep sweep $key
+      [[ -z $sweep && $grp == reduce ]] && sweep=reduce
       rarg=(ierr "$iv" "$av")
       [[ -z $conv && $grp == float ]] && conv=float
 
@@ -458,7 +476,32 @@ output_register ()
       [[ -n $infix[1] ]] && rarg+=("ilev=ilev_$infix[1]")
       [[ -n $infix[2] ]] && rarg+=("istr='$infix[2]'")
       [[ -n $conv ]] && rarg+=("conv=result_$conv")
-      fout -t 4 "if (ierr.eq.0) call reg_opr_prop(${(j:, :)rarg})"
+      [[ -n $sweep ]] && rarg+=("sweep=sweep_$sweep")
+      fout -t 4 "if (ierr.eq.0) &"
+      fout -t 0 "call reg_opr_prop(${(j:, :)rarg})" |\
+          fold -w 80 -s |\
+          sed -e 's/$/ \&/' -e 's/^/      \& /' -e '$s/ *\&$//'
+      if [[ $sweep == accum ]]; then
+        rv=rdc_${iv#*_}
+        rarg=(ierr "$rv" "rdc_pfx // $av")
+        [[ -n $nstack ]] && rarg+=($((nstack[1]-1)) $nstack[2])
+        [[ -n $conv ]] && rarg+=("conv=result_$conv")
+        rarg+=("sweep=sweep_reduce")
+        fout -t 4 "if (ierr.eq.0) &"
+        fout -t 0 "call reg_opr_prop(${(j:, :)rarg})" |\
+            fold -w 80 -s |\
+            sed -e 's/$/ \&/' -e 's/^/      \& /' -e '$s/ *\&$//'
+      elif [[ $sweep == reduce ]]; then
+        rv=acc_${iv#*_}
+        rarg=(ierr "$rv" "acc_pfx // $av")
+        [[ -n $nstack ]] && rarg+=($((nstack[1]+1)) $nstack[2])
+        [[ -n $conv ]] && rarg+=("conv=result_$conv")
+        rarg+=("sweep=sweep_accum")
+        fout -t 4 "if (ierr.eq.0) &"
+        fout -t 0 "call reg_opr_prop(${(j:, :)rarg})" |\
+            fold -w 80 -s |\
+            sed -e 's/$/ \&/' -e 's/^/      \& /' -e '$s/ *\&$//'
+      fi
       # if [[ -z $nstack ]]; then
       #   fout -t 4 "if (ierr.eq.0) call reg_opr_prop(ierr, $iv, $av)"
       # else
@@ -661,13 +704,13 @@ LAZY
           cat <<REDUCE
 !!!_   . $sub
   subroutine $sub &
-       & (ierr, Z, domZ, domY, X, domX, F)
+       & (ierr, Z, domZ, FZ, domY, X, domX, FX)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
     type(domain_t), intent(in)    :: domZ, domY, domX
-    real(kind=KBUF),intent(in)    :: F
+    real(kind=KBUF),intent(in)    :: FZ,   FX
     integer jz, jy, jx
     ierr = 0
     do jy = 0, domY%n - 1
@@ -675,9 +718,9 @@ LAZY
        jz = conv_physical_index(jy, domY, domZ)
        if (jz.ge.0) then
           if (jx.ge.0) then
-            Z(jz) = $elem(Z(jz), X(jx), F)
+            Z(jz) = $elem(Z(jz), FZ, X(jx), FX)
          else
-            Z(jz) = $elem(Z(jz), F, F)
+            Z(jz) = $elem(Z(jz), FZ, FX,    FX)
          endif
        endif
     enddo
@@ -739,7 +782,7 @@ output_elem ()
   end function $elem
 UNARY
           ;;
-      (binary|lazy)
+      (binary|lazy|reduce)
           cat <<BINARY
 !!!_    * $elem()
   ELEMENTAL &
@@ -755,22 +798,22 @@ UNARY
   end function $elem
 BINARY
           ;;
-      (reduce)
-          cat <<REDUCE
-!!!_    * $elem()
-  ELEMENTAL &
-  real(kind=KBUF) function $elem (X, Y, F) result(Z)
-    implicit none
-    real(kind=KBUF),intent(in) :: X,  Y
-    real(kind=KBUF),intent(in) :: F
-    if (X.eq.F.or.Y.eq.F) then
-       Z = F
-    else
-       Z = X + Y
-    endif
-  end function $elem
-REDUCE
-          ;;
+#       (reduce)
+#           cat <<REDUCE
+# !!!_    * $elem()
+#   ELEMENTAL &
+#   real(kind=KBUF) function $elem (X, Y, F) result(Z)
+#     implicit none
+#     real(kind=KBUF),intent(in) :: X,  Y
+#     real(kind=KBUF),intent(in) :: F
+#     if (X.eq.F.or.Y.eq.F) then
+#        Z = F
+#     else
+#        Z = X + Y
+#     endif
+#   end function $elem
+# REDUCE
+#           ;;
       (*) print -u2 - "unknown subroutine type $stype"; return 1;;
       esac
     done
@@ -973,6 +1016,18 @@ output_list ()
   print -
 
 }
+
+check_props ()
+{
+  local __var=$1; shift || return $?
+  local pk=$1 key=$2
+  local pv=(${=PROPS[$key]})
+  local pp="${pv[(r)$pk=*]}"
+  [[ -n $pp ]] && pp=${pp#*=}
+  : ${(P)__var::=$pp}
+  return 0
+}
+
 
 main "$@"; err=$?
 exit $err

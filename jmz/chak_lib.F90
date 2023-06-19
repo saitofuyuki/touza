@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/19 10:37:39 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/20 16:05:39 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -97,6 +97,10 @@ module chak_lib
   character(len=*),parameter :: insert_coor = '+'
   character(len=*),parameter :: delete_coor = '-'
 
+  character(len=*),parameter :: shape_sweep_stack  = '+'
+  character(len=*),parameter :: shape_sweep_accum  = '++'
+  character(len=*),parameter :: shape_sweep_reduce = '='
+
 !!!_  - character (symbols) for ascii output
   character(len=*),parameter :: amiss = '_'  ! character for missing value
   character(len=*),parameter :: aext  = '.'  ! character for external
@@ -145,6 +149,7 @@ module chak_lib
   integer,parameter :: shape_element    = 0  ! interprete single integer as element    (SHAPE)
   integer,parameter :: shape_size       = 1  ! interprete single integer as size       (SIZE)
   integer,parameter :: shape_coordinate = 2  ! interprete single integer as coordinate (PERM)
+  integer,parameter :: shape_reduction  = 3  ! interprete single integer as coordinate (reduction)
   integer,parameter :: shape_shift      = 4  ! interprete single integer as shift      (SHIFT)
 !!!_  - coordinate(loop) type
   integer,parameter :: loop_error  = -2
@@ -251,7 +256,7 @@ contains
     integer utmp
     integer lv
     integer tab
-    character(len=64) :: pfx, cran
+    character(len=64) :: pfx
     integer jc
     ierr = 0
     lv = choice(lev_verbose, levv)
@@ -923,47 +928,6 @@ contains
     endif
   end subroutine settle_output_domain
 
-!!!_   . reduce_output_domain
-  subroutine reduce_output_domain(ierr, domZ, domL, lstk, buf)
-    use TOUZA_Std,only: parse_number
-    implicit none
-    integer,       intent(out)   :: ierr
-    type(domain_t),intent(inout) :: domZ   ! reduction
-    type(domain_t),intent(in)    :: domL   ! normal filter
-    type(stack_t), intent(in)    :: lstk
-    type(buffer_t),intent(in)    :: buf
-
-    integer jo, nx
-
-    ierr = 0
-    if (ierr.eq.0) then
-       domZ = domL
-       domZ%ofs(0:domZ%mco-1) = 0
-    endif
-    if (ierr.eq.0) then
-       nx = count(lstk%lcp(0:domZ%mco-1)%flg.ge.loop_null)
-       if (nx.eq.0) then
-          domZ%strd(0:domZ%mco-1) = 0
-       else
-          do jo = 0, domZ%mco - 1
-             if (lstk%lcp(jo)%flg.ge.loop_null) then
-                domZ%strd(jo) = 0
-             endif
-          enddo
-       endif
-    endif
-
-    if (ierr.eq.0) then
-       domZ%n = 1
-       do jo = 1, domZ%mco
-          if (domZ%strd(jo-1).gt.0) then
-             domZ%strd(jo-1) = domZ%n
-             domZ%n = domZ%n * max(1, domZ%end(jo-1) - domZ%bgn(jo-1))
-          endif
-       enddo
-    endif
-  end subroutine reduce_output_domain
-
 !!!_   . settle_domain_stride
   subroutine settle_domain_stride &
        & (ierr, dom, pcp)
@@ -1063,7 +1027,7 @@ contains
              endif
           endif
        endif
-    else if (flag.eq.shape_coordinate) then
+    else if (flag.eq.shape_coordinate.or.flag.eq.shape_reduction) then
        call parse_number(ierr, itmp, arg(1:larg))
        if (ierr.eq.0) then
           js0  = larg
@@ -1786,7 +1750,7 @@ contains
   logical function is_null_coor(lpp) result (b)
     implicit none
     type(loop_t),intent(in) :: lpp
-    b = (lpp%flg.le.loop_null.and.lpp%name.eq.' ')
+    b = (lpp%flg.le.loop_reduce.and.lpp%name.eq.' ')
   end function is_null_coor
 
 !!!_   . parse_coordinate_repl - parse coordinate argument complex
