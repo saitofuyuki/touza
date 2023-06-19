@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/19 12:40:58 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/19 13:26:37 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -4231,8 +4231,8 @@ contains
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_ABS)
        else if (handle.eq.opr_SQR) then
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_SQR)
-       else if (handle.eq.opr_SIGN) then
-          call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_SIGN)
+       else if (handle.eq.opr_SIGN1) then
+          call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_SIGN1)
        else if (handle.eq.opr_ZSIGN) then
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_ZSIGN)
        else if (handle.eq.opr_FLOOR) then
@@ -4253,6 +4253,8 @@ contains
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_BOOL, .TRUE.)
        else if (handle.eq.opr_BIN) then
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_BIN, .TRUE.)
+       else if (handle.eq.opr_SIGN) then
+          call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_SIGN)
        else if (handle.eq.opr_EQB) then
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_EQB, .TRUE.)
        else if (handle.eq.opr_NEB) then

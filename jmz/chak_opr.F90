@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/19 12:38:06 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/19 13:29:42 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -539,8 +539,8 @@ contains
        endif
     enddo
   end subroutine apply_UNARY_SQRT
-!!!_   . apply_UNARY_SIGN
-  subroutine apply_UNARY_SIGN &
+!!!_   . apply_UNARY_SIGN1
+  subroutine apply_UNARY_SIGN1 &
        & (ierr, Z, domZ, X, domX, F)
     implicit none
     integer,        intent(out) :: ierr
@@ -553,12 +553,12 @@ contains
     do jz = 0, domZ%n - 1
        jx = conv_physical_index(jz, domZ, domX)
        if (jx.ge.0) then
-          Z(jz) = elem_SIGN(X(jx), F)
+          Z(jz) = elem_SIGN1(X(jx), F)
        else
           Z(jz) = F
        endif
     enddo
-  end subroutine apply_UNARY_SIGN
+  end subroutine apply_UNARY_SIGN1
 !!!_   . apply_UNARY_ZSIGN
   subroutine apply_UNARY_ZSIGN &
        & (ierr, Z, domZ, X, domX, F)
@@ -2047,6 +2047,26 @@ contains
     enddo
   end subroutine apply_UNARY_RRSP
 
+!!!_   . apply_BINARY_SIGN
+  subroutine apply_BINARY_SIGN &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_SIGN(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_SIGN
 !!!_   . apply_BINARY_BITAND
   subroutine apply_BINARY_BITAND &
        & (ierr, Z, domZ, FZ, X, domX, FX)
@@ -2249,9 +2269,9 @@ contains
        Z = SIGN(ONE, X)
     endif
   end function elem_ZSIGN
-!!!_   & elem_SIGN() - SIGN(1,Z)
+!!!_   & elem_SIGN1() - SIGN(1,Z)
   ELEMENTAL &
-  real(kind=KBUF) function elem_SIGN (X, F) result(Z)
+  real(kind=KBUF) function elem_SIGN1 (X, F) result(Z)
     implicit none
     real(kind=KBUF),intent(in) :: X
     real(kind=KBUF),intent(in) :: F
@@ -2260,7 +2280,7 @@ contains
     else
        Z = SIGN(ONE, X)
     endif
-  end function elem_SIGN
+  end function elem_SIGN1
 !!!_   & elem_INV()
   ELEMENTAL &
   real(kind=KBUF) function elem_INV (X, F) result(Z)
@@ -3167,6 +3187,18 @@ contains
        Z = SCALE(X, INT(Y))
     endif
   end function elem_SCALE
+!!!_   & elem_SIGN()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_SIGN (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else
+       Z = SIGN(X, Y)
+    endif
+  end function elem_SIGN
 !!!_   & elem_BITNOT () - (integer only) bitwise not
   ELEMENTAL &
   real(kind=KBUF) function elem_BITNOT (X, F) result(Z)
