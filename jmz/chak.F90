@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/19 14:48:17 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/19 17:17:22 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -3720,20 +3720,22 @@ contains
           is_tweak = ANY(bstack(jstk)%lcp(:)%name.ne.' ')
        endif
        if (is_tweak) then
-          ! write(*, *) 'tweak'
           call tweak_buffer(ierr, btmp, bufh, jstk)
           if (ierr.eq.0) call put_header_lprops(ierr, head, btmp%pcp, file%hflag)
-       else if (ANY(obuffer(jb)%pcp(:)%flg.eq.loop_null)) then
+       else if (ANY(obuffer(jb)%pcp(:)%flg.eq.loop_null) &
+            & .or. ANY(obuffer(jb)%pcp(:)%flg.eq.loop_reduce)) then
           btmp%pcp(:) = obuffer(jb)%pcp(:)
           if (file%hflag.eq.hflag_nulld) then
              do jc = 0, lcoor - 1
-                if (btmp%pcp(jc)%flg.eq.loop_null) then
+                if (btmp%pcp(jc)%flg.eq.loop_null &
+                     & .or. btmp%pcp(jc)%flg.eq.loop_reduce) then
                    btmp%pcp(jc)%end = btmp%pcp(jc)%bgn
                 endif
              enddo
           else
              do jc = 0, lcoor - 1
-                if (btmp%pcp(jc)%flg.eq.loop_null) then
+                if (btmp%pcp(jc)%flg.eq.loop_null &
+                     & .or. btmp%pcp(jc)%flg.eq.loop_reduce) then
                    btmp%pcp(jc)%bgn = 0
                    btmp%pcp(jc)%end = 0
                 endif
