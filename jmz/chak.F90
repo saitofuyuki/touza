@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/19 13:26:37 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/19 14:48:17 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1178,7 +1178,7 @@ contains
     else if (grp_header_bgn.le.hopr .and. hopr.lt.grp_header_end) then
        call parse_header_opr(ierr, hopr, arg)
 !!!_    * reduction operators
-    else if (grp_reduction_bgn.le.hopr .and. hopr.lt.grp_reduction_end) then
+    else if (grp_reduce_bgn.le.hopr .and. hopr.lt.grp_reduce_end) then
        call parse_reduction_opr(ierr, hopr, arg)
 !!!_    * normal operators
     else if (hopr.ge.0) then
@@ -1625,7 +1625,7 @@ contains
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
        select case(hopr)
-       case(opr_COUNT)
+       case(opr_COUNT,opr_SUM)
           if (jpar.le.jend) then
              call parse_reduction_shape(ierr, arg(jpar:), hopr)
           else
@@ -4400,6 +4400,8 @@ contains
 !!!_    * reduction
        else if (handle.eq.opr_COUNT) then
           call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_COUNT, ZERO)
+       else if (handle.eq.opr_SUM) then
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_SUM, ZERO)
 !!!_    * ignored
        else if (grp_system_bgn.le.handle.and.handle.lt.grp_system_end) then
           continue

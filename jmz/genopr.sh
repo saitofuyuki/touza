@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/06/19 12:27:43 fuyuki genopr.sh>
+# Time-stamp: <2023/06/19 14:56:19 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -31,7 +31,7 @@ main ()
 
   register_all || return $?
 
-  local GODR=(system output anchor stack queue unary ubool bool binary filter lazy float other)
+  local GODR=(system output anchor stack queue unary ubool bool binary filter lazy float reduce other)
   GODR=($GODR ${(k)GRP})
   GODR=(${(u)GODR})
   local grp=
@@ -257,13 +257,13 @@ register_all ()
   register -n 2,1 -i call -p COOR BDIFF   'backward difference'
 
   # reduction operation
-  register -g reduction -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
-  register -g reduction -o RANK -i call SUM     'sum through stacks or rank(s)'
-  register -g reduction -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
-  register -g reduction -n 1,1 -o RANK -f ZERO -i call -c int COUNT   'count defined elements through stacks or rank(s)'
+  register -g reduce -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
+  register -g reduce -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
+  register -g reduce -n 1,1 -o RANK -f -,ZERO -i call        SUM     'sum along rank(s)' 
+  register -g reduce -n 1,1 -o RANK -f -,ZERO -i call -c int COUNT   'count defined elements along rank(s)'
 
-  register -g reduction -n 1,1 -i call -p RANK -s 'MIN=' UMIN    'minimum'
-  register -g reduction -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'
+  register -g reduce -n 1,1 -i call -p RANK -s 'MIN=' UMIN    'minimum'
+  register -g reduce -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'
 
   # transform operation
   #### coor=0,1,2,name,alias for coodinate, -1 or s for stack
@@ -489,6 +489,7 @@ output_call ()
     (ubool) apply=apply_opr_UNARY;;
     (bool)  apply=apply_opr_BINARY;;
     (filter)  apply=apply_opr_BINARY;;
+    (reduce)  apply=apply_opr_REDUCE;;
     (float) apply=;;
     (*)    continue;;
     esac
@@ -545,7 +546,7 @@ output_sub ()
   local grp= key=
   local nstack=() push= pop=
   local sub= stype=
-  local candi=(unary binary lazy ubool bool filter float)
+  local candi=(unary binary lazy ubool bool filter float reduce)
   local elem=
   local DONE=()
   local extval=
@@ -656,8 +657,8 @@ BINARY
   end subroutine $sub
 LAZY
           ;;
-      (reduction)
-          cat <<REDUCTION
+      (reduce)
+          cat <<REDUCE
 !!!_   . $sub
   subroutine $sub &
        & (ierr, Z, domZ, domY, X, domX, F)
@@ -669,16 +670,19 @@ LAZY
     real(kind=KBUF),intent(in)    :: F
     integer jz, jy, jx
     ierr = 0
-    do jz = 0, domZ%n - 1
-       jx = conv_physical_index(jz, domZ, domX)
-       if (jx.ge.0) then
-          Z(jz) = $elem(Z(jz), X(jx), F)
-       else
-          Z(jz) = $elem(Z(jz), F, F)
+    do jy = 0, domY%n - 1
+       jx = conv_physical_index(jy, domY, domX)
+       jz = conv_physical_index(jy, domY, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+            Z(jz) = $elem(Z(jz), X(jx), F)
+         else
+            Z(jz) = $elem(Z(jz), F, F)
+         endif
        endif
     enddo
   end subroutine $sub
-REDUCTION
+REDUCE
           ;;
       (*) print -u2 - "unknown subroutine type $stype"; return 1;;
       esac
@@ -690,7 +694,7 @@ output_elem ()
   local grp= key=
   local nstack=() push= pop=
   local sub= stype=
-  local candi=(unary binary lazy ubool bool filter float)
+  local candi=(unary binary lazy ubool bool filter float reduce)
   local elem=
   local DONE=()
   for grp in "$@"
@@ -751,8 +755,8 @@ UNARY
   end function $elem
 BINARY
           ;;
-      (reduction)
-          cat <<REDUCTION
+      (reduce)
+          cat <<REDUCE
 !!!_    * $elem()
   ELEMENTAL &
   real(kind=KBUF) function $elem (X, Y, F) result(Z)
@@ -765,7 +769,7 @@ BINARY
        Z = X + Y
     endif
   end function $elem
-REDUCTION
+REDUCE
           ;;
       (*) print -u2 - "unknown subroutine type $stype"; return 1;;
       esac
@@ -782,7 +786,11 @@ get_sub_name ()
   local ssfx=
   [[ ${__sub:--} == - ]] && __sub=$key
   if [[ $pop -eq 1 ]]; then
-    ssfx=UNARY
+    if [[ $grp == reduce ]]; then
+      ssfx=REDUCE
+    else
+      ssfx=UNARY
+    fi
   elif [[ $pop -eq 2 ]]; then
     if [[ $grp == lazy ]]; then
       ssfx=BINARY_lazy

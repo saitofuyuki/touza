@@ -1,6 +1,6 @@
 !!!_! jmz/chak_decl.F90 - TOUZA/Jmz CH(swiss) army knife operator symbol declaration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-06-19T12:28:01+09:00
+! Created by genopr.sh at 2023-06-19T14:46:13+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -146,14 +146,14 @@
   character(len=*),parameter :: str_NEAREST = 'NEAREST'
   character(len=*),parameter :: str_SPACING = 'SPACING'
   character(len=*),parameter :: str_RRSP = 'RRSP'
-  !! group: other
-  !! group: reduction
+  !! group: reduce
   character(len=*),parameter :: str_NORM = 'NORM'
-  character(len=*),parameter :: str_SUM = 'SUM'
   character(len=*),parameter :: str_AVR = 'AVR'
+  character(len=*),parameter :: str_SUM = 'SUM'
   character(len=*),parameter :: str_COUNT = 'COUNT'
   character(len=*),parameter :: str_UMIN = 'MIN='
   character(len=*),parameter :: str_UMAX = 'MAX='
+  !! group: other
   !! group: index
   character(len=*),parameter :: str_FLAT = 'FLAT'
   character(len=*),parameter :: str_INDEX = 'INDEX'
@@ -346,18 +346,18 @@
   integer,parameter :: opr_SPACING = 114
   integer,parameter :: opr_RRSP = 115
   integer,parameter :: grp_float_end = 116
-  !! group: other
-  integer,parameter :: grp_other_bgn = 116
-  integer,parameter :: grp_other_end = 116
-  !! group: reduction
-  integer,parameter :: grp_reduction_bgn = 116
+  !! group: reduce
+  integer,parameter :: grp_reduce_bgn = 116
   integer,parameter :: opr_NORM = 116
-  integer,parameter :: opr_SUM = 117
-  integer,parameter :: opr_AVR = 118
+  integer,parameter :: opr_AVR = 117
+  integer,parameter :: opr_SUM = 118
   integer,parameter :: opr_COUNT = 119
   integer,parameter :: opr_UMIN = 120
   integer,parameter :: opr_UMAX = 121
-  integer,parameter :: grp_reduction_end = 122
+  integer,parameter :: grp_reduce_end = 122
+  !! group: other
+  integer,parameter :: grp_other_bgn = 122
+  integer,parameter :: grp_other_end = 122
   !! group: index
   integer,parameter :: grp_index_bgn = 122
   integer,parameter :: opr_FLAT = 122
