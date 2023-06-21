@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/21 10:06:11 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/21 18:31:38 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -4611,6 +4611,7 @@ contains
        if (ierr.eq.0) then
           call get_compromise_domain(ierr, domL, domR, btmp, lstk(jbuf:jbuf), nb, cmode_inclusive, htmp)
        endif
+       ! if (ierr.eq.0) call show_lpp(ierr, lstk(jbuf)%lcp(:))
        ! if (ierr.eq.0) call show_domain(ierr, domL,    'each/L', indent=4)
        ! if (ierr.eq.0) call show_domain(ierr, domR(1), 'each/R', indent=5)
 
@@ -6359,6 +6360,7 @@ contains
              jb = buf_h2item(bufh(j))
              call get_logical_range &
                   & (b, e, flg, odmy, cdmy, jo, lstk(j)%lcp, obuffer(jb)%pcp, domR(j))
+             ! write(*,*) 'sid/0', j, jo, b, e, flg, odmy, cdmy
              flgx = max(flgx, flg)
              if (isi) then
                 if (b.ne.null_range) low = max(low, b)
@@ -6414,6 +6416,7 @@ contains
     do jo = 0, ref%mco - 1
        call get_logical_range &
             & (b, e, flg, osh, cyc, jo, lstk%lcp, buf%pcp, dom, ref)
+       ! write(*, *) jo, b, e, flg, osh, cyc
        dom%bgn(jo) = b
        dom%end(jo) = max(e, 1+b)
        dom%iter(jo) = max(1, e - b)
@@ -6488,17 +6491,25 @@ contains
        do jc = 0, dom%mco - 1
           kc = dom%cidx(jc)
           if (kc.ge.0) then
-             if (buf%pcp(kc)%flg.le.loop_reduce) then
-                dom%bgn(jc) = max(0, max(refd%bgn(jc), dom%bgn(jc)) - refd%bgn(jc))
-                dom%end(jc) = max(0, min(refd%end(jc), dom%end(jc)) - refd%bgn(jc))
-             else
-                dom%bgn(jc) = max(refd%bgn(jc), dom%bgn(jc), buf%pcp(kc)%bgn + dom%ofs(jc)) - refd%bgn(jc)
-                dom%end(jc) = min(refd%end(jc), dom%end(jc), buf%pcp(kc)%end + dom%ofs(jc)) - refd%bgn(jc)
-             endif
-             if (buf%pcp(kc)%bgn.eq.null_range) then
-                dom%ofs(jc) = 0
-             else
+             if (dom%cyc(jc).gt.0) then
+                !    write(*, *) 'sdl', jc, refd%bgn(jc), dom%bgn(jc), buf%pcp(kc)%bgn, dom%ofs(jc)
+                !    write(*, *) 'sdl', jc, refd%end(jc), dom%end(jc), buf%pcp(kc)%end, dom%ofs(jc)
+                dom%bgn(jc) = 0
+                dom%end(jc) = max(1, buf%pcp(kc)%end - buf%pcp(kc)%bgn)
                 dom%ofs(jc) = - (buf%pcp(kc)%bgn + dom%ofs(jc) - refd%bgn(jc))
+             else
+                if (buf%pcp(kc)%flg.le.loop_reduce) then
+                   dom%bgn(jc) = max(0, max(refd%bgn(jc), dom%bgn(jc)) - refd%bgn(jc))
+                   dom%end(jc) = max(0, min(refd%end(jc), dom%end(jc)) - refd%bgn(jc))
+                else
+                   dom%bgn(jc) = max(refd%bgn(jc), dom%bgn(jc), buf%pcp(kc)%bgn + dom%ofs(jc)) - refd%bgn(jc)
+                   dom%end(jc) = min(refd%end(jc), dom%end(jc), buf%pcp(kc)%end + dom%ofs(jc)) - refd%bgn(jc)
+                endif
+                if (buf%pcp(kc)%bgn.eq.null_range) then
+                   dom%ofs(jc) = 0
+                else
+                   dom%ofs(jc) = - (buf%pcp(kc)%bgn + dom%ofs(jc) - refd%bgn(jc))
+                endif
              endif
           else
              dom%bgn(jc) = max(0, max(refd%bgn(jc), dom%bgn(jc)) - refd%bgn(jc))
