@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/21 09:10:56 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/21 10:06:11 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -6420,11 +6420,15 @@ contains
        dom%ofs(jo) = osh
        dom%cyc(jo) = cyc
     enddo
+    jo = 0
+    ! write(*, *) 'range', dom%bgn(jo), dom%end(jo), dom%ofs(jo)
     if (ierr.eq.0) then
        call settle_domain_stride(ierr, dom, buf%pcp)
+       ! write(*, *) 'str', dom%bgn(jo), dom%end(jo), dom%ofs(jo)
     endif
     if (ierr.eq.0) then
        call settle_domain_loop(ierr, dom, buf, ref)
+       ! write(*, *) 'loop',dom%bgn(jo), dom%end(jo), dom%ofs(jo)
     endif
   end subroutine settle_input_domain_core
 
@@ -6484,7 +6488,7 @@ contains
        do jc = 0, dom%mco - 1
           kc = dom%cidx(jc)
           if (kc.ge.0) then
-             if (buf%pcp(kc)%flg.le.loop_null) then
+             if (buf%pcp(kc)%flg.le.loop_reduce) then
                 dom%bgn(jc) = max(0, max(refd%bgn(jc), dom%bgn(jc)) - refd%bgn(jc))
                 dom%end(jc) = max(0, min(refd%end(jc), dom%end(jc)) - refd%bgn(jc))
              else
