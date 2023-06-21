@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/20 16:05:39 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/21 19:46:46 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -287,7 +287,7 @@ contains
     integer utmp
     integer lv
     integer tab
-    character(len=64) :: pfx, cran
+    character(len=64) :: pfx, cran, str
     integer jc
     ierr = 0
     lv = choice(lev_verbose, levv)
@@ -303,13 +303,20 @@ contains
     write(utmp, 102) repeat(' ', tab), trim(pfx), dom%n
     write(utmp, 103) repeat(' ', tab), trim(pfx), dom%mco, dom%cidx(0:dom%mco - 1)
     do jc = 0, dom%mco - 1
-111    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '*', I0, ' (', I0, ')')
-112    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '*', I0)
        call get_range_string(ierr, cran, dom%bgn(jc), dom%end(jc), loop_normal, c=dom%cyc(jc))
+108    format('+', I0, '*', I0, ' (', I0, ')')
+109    format('+', I0, '*', I0)
        if (dom%ofs(jc).eq.null_range) then
-          write(utmp, 112) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%strd(jc), dom%iter(jc)
+          write(str, 109) dom%strd(jc), dom%iter(jc)
        else
-          write(utmp, 111) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%strd(jc), dom%iter(jc), dom%ofs(jc)
+          write(str, 108) dom%strd(jc), dom%iter(jc), dom%ofs(jc)
+       endif
+111    format(A, 'domain', A, ': ', I0, 1x, A, 1x, A)
+112    format(A, 'domain', A, ': ', I0, 1x, A, 1x, A, 1x, '{', I0, '}')
+       if (dom%cyc(jc).gt.0) then
+          write(utmp, 112) repeat(' ', tab), trim(pfx), jc, trim(cran), trim(str), dom%cyc(jc)
+       else
+          write(utmp, 111) repeat(' ', tab), trim(pfx), jc, trim(cran), trim(str)
        endif
     enddo
   end subroutine show_domain
@@ -722,9 +729,8 @@ contains
     do jc = 0, domL%mco - 1
        jcur = mod(ncur, domL%iter(jc))
        ncur = ncur / domL%iter(jc)
-       if (domR%bgn(jc).le.jcur.and.jcur.lt.domR%end(jc)) then
-          n = n + (domR%ofs(jc) + jcur) * domR%strd(jc)
-       else if (domR%cyc(jc).gt.0) then
+       if (domR%cyc(jc).gt.0) then
+          ! write(*, *) 'cond 1', jc
           jcur = modulo(domR%ofs(jc) + jcur, domR%cyc(jc))
           if (domR%bgn(jc).le.jcur.and.jcur.lt.domR%end(jc)) then
              n = n + jcur * domR%strd(jc)
@@ -732,6 +738,9 @@ contains
              n = -1
              exit
           endif
+       else if (domR%bgn(jc).le.jcur.and.jcur.lt.domR%end(jc)) then
+          ! write(*, *) 'cond 0', jc
+          n = n + (domR%ofs(jc) + jcur) * domR%strd(jc)
        else
           n = -1
           exit
@@ -794,23 +803,26 @@ contains
     endif
   end function logical_index
 !!!_   . physical_index
-  PURE integer function physical_index (lidx, dom) result(n)
+  PURE &
+  integer function physical_index (lidx, dom) result(n)
     implicit none
     integer,       intent(in) :: lidx(0:*)
     type(domain_t),intent(in) :: dom
     integer jc, jj
     n = 0
     do jc = 0, dom%mco - 1
-       if (dom%bgn(jc).le.lidx(jc).and.lidx(jc).lt.dom%end(jc)) then
-          n = n + (dom%ofs(jc) + lidx(jc)) * dom%strd(jc)
-       else if (dom%cyc(jc).gt.0) then
+        if (dom%cyc(jc).gt.0) then
           jj = modulo(dom%ofs(jc) + lidx(jc), dom%cyc(jc))
+          ! write(*, *) 'cond 1', jc, lidx(jc), dom%ofs(jc), dom%cyc(jc), jj, jt
           if (dom%bgn(jc).le.jj.and.jj.lt.dom%end(jc)) then
              n = n + jj * dom%strd(jc)
           else
              n = -1
              exit
           endif
+       else if (dom%bgn(jc).le.lidx(jc).and.lidx(jc).lt.dom%end(jc)) then
+          ! write(*, *) 'cond 0', jc, lidx(jc)
+          n = n + (dom%ofs(jc) + lidx(jc)) * dom%strd(jc)
        else
           n = -1
           exit
@@ -855,6 +867,7 @@ contains
        low = null_range
        high = null_range
     endif
+    ! write(*, *) 'glr/0:', low, high
 
     jlogc = dom%lidx(jodr)
     jphyc = dom%cidx(jodr)
@@ -865,21 +878,25 @@ contains
        osh = 0
        cyc = 0
     endif
+    ! if (cyc.gt.0) write(*, *) 'glr/0', low, high
     if (jlogc.ge.0) then
        b = lcp(jlogc)%bgn
        e = lcp(jlogc)%end
-       b = logical_index(b, low)
-       e = logical_index(e, high)
        if (cyc.le.0) then
           if (b.ne.null_range) b = b + osh
           if (e.ne.null_range) e = e + osh
        endif
+       b = logical_index(b, low)
+       e = logical_index(e, high)
        ! b = logical_index(lcp(jlogc)%bgn + lcp(jlogc)%ofs, low)
        ! e = logical_index(lcp(jlogc)%end + lcp(jlogc)%ofs, high)
     else
        b = low
        e = high
     endif
+    ! if (cyc.gt.0) write(*, *) 'glr/1', b, e
+    ! write(*, *) 'glr/1:', b, e, cyc, osh
+
     flg = loop_unset
     if (jphyc.ge.0) then
        ! write(*, *) b, e, pcp(jphyc)%bgn, pcp(jphyc)%end, pcp(jphyc)%flg
@@ -900,6 +917,8 @@ contains
        endif
        flg = pcp(jphyc)%flg
     endif
+    ! if (cyc.gt.0) write(*, *) 'glr/9', b, e
+    ! write(*, *) 'glr/9:', b, e
   end subroutine get_logical_range
 
 !!!_   . settle_output_domain
