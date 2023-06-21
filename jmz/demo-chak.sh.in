@@ -289,8 +289,8 @@ demo_inputs ()
   gen_subr suby:bs $outd/sub2.zx.base $outd/zx.base lat 2:3 || return $?
   gen_subr suby:bs $outd/sub1.zx.base $outd/zx.base lat 1:1 || return $?
 
-  local flat=$outd/flat
-  gen_flat flat $flat $nx $((nx-1)) $((nx-2)) || return $?
+  local bool=$outd/bool
+  gen_flat bool $bool $nx $((nx-1)) $((nx-2)) || return $?
 
   return 0
 }
