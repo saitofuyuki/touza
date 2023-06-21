@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/20 16:50:40 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/21 09:10:56 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1615,7 +1615,6 @@ contains
     integer hacc
     integer jpar, jend
     integer hbuf, jb
-    integer apos, opop, opush, npop
 
     ierr = 0
     if (ierr.eq.0) then
@@ -1675,8 +1674,9 @@ contains
     pop = 1
     push = pop
 
-    if (ierr.eq.0) call mpop_stack(ierr, hbuf(1:pop), pop)
+    if (ierr.eq.0) call mpop_stack(ierr, hbuf(1:pop), pop, keep=.TRUE.)
     if (ierr.eq.0) call search_free_buffer(ierr, hbuf(1:pop), pop)
+    if (ierr.eq.0) call mpop_stack(ierr, n=pop)
     if (ierr.eq.0) call mpush_stack(ierr, hbuf(1:push), push)
     if (ierr.eq.0) call append_queue(ierr, hopr, pop, push, hbuf(1:pop))
 
@@ -2342,8 +2342,9 @@ contains
        if (hopr.eq.opr_CLONE) then
           npop = 1
           npush = 1
-          if (ierr.eq.0) call pop_stack(ierr, copyh(1), anchor=.FALSE.)
+          if (ierr.eq.0) call pop_stack(ierr, copyh(1), keep=.TRUE., anchor=.FALSE.)
           if (ierr.eq.0) call search_free_buffer(ierr, copyh(1:1), 1)
+          if (ierr.eq.0) call pop_stack(ierr, anchor=.FALSE.)
           if (ierr.eq.0) call push_stack(ierr, copyh(1))
           if (ierr.eq.0) call append_queue(ierr, opr_COPY, npop, npush, copyh(1:1))
        else
@@ -6088,6 +6089,7 @@ contains
 111       format(A, A)
 112       format(A, '(', A, ')')
 121       format(A, '[', A, ']')
+          ! write(*, *) ilevi, jbr, '/', ilevo, jbl
           if (ilevo.eq.ilev_call) then
              write(obuffer(jbl)%desc2, 101, IOSTAT=jerr) trim(istr), trim(obuffer(jbr)%desc2)
           else if (ilevo.eq.ilev_neg) then
@@ -6100,6 +6102,7 @@ contains
              write(obuffer(jbl)%desc2, 121, IOSTAT=jerr) trim(istr), trim(obuffer(jbr)%desc2)
           endif
           obuffer(jbl)%ilev = ilevo
+          ! write(*, *) trim(istr), ' > ', trim(obuffer(jbr)%desc2), ' >> ', trim(obuffer(jbl)%desc2)
        endif
     endif
 

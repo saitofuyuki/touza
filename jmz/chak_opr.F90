@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/20 16:21:48 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/21 09:02:18 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -295,9 +295,10 @@ contains
     integer,intent(in) :: handle
     integer pop, push
     integer jerr
-    call inquire_opr_nstack(jerr, pop, push, handle)
-    ! b = pop.eq.1 .and. push.eq.1
+    ! always FALSE
     b = .FALSE.
+    ! call inquire_opr_nstack(jerr, pop, push, handle)
+    ! b = pop.eq.1 .and. push.eq.1
   end function is_operator_reusable
 !!!_   . switch_shape_operator ()
   integer function switch_shape_operator(opr) result(n)
