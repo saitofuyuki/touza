@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/06/20 15:47:14 fuyuki genopr.sh>
+# Time-stamp: <2023/06/21 10:04:49 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -142,6 +142,7 @@ register_all ()
   register -g lazy -n 2,1 -f LAY,-,T -i call          LLAY    'background layer; B if A outside, else A'
   register -a LLAY                                    LAY
   register -g lazy -n 2,1 -f LAY,-,F -i call          RLAY    'background layer; A if B outside, else B'
+  register         -n 3,1            -i call          IFELSE  'B if A defined, else C'
 
   # primitive binary
   register -n 2,1 -i add,'+'  -P sweep=accum ADD         'A+B'
@@ -170,7 +171,7 @@ register_all ()
   register          -n 1,1 -i call -c int  SIGN1   'copy A sign on 1'
   register          -n 1,1 -i call -c int  ZSIGN   '-1,0,+1 if negative,zero,positive'
 
-  # integer opration
+  # integer operation
   register -n 1,1 -i call          -c int FLOOR   'largest integer <= A'
   register -n 1,1 -i call          -c int CEIL    'smallest integer >=A'
   register -n 1,1 -i call          -c int ROUND   'nearest integer of A'
@@ -249,6 +250,10 @@ register_all ()
   register -g filter -n 2,1 -i call GTF      'A if A>B, else MISS'
   register -g filter -n 2,1 -i call LEF      'A if A<=B, else MISS'
   register -g filter -n 2,1 -i call GEF      'A if A>=B, else MISS'
+
+  # ternary operation
+  register -n 3,1 -i call INRANGE 'A if B<=A<=C else MISS'
+  register -n 3,1 -i call BLEND   'C A + (1 - C) B; blend A and B with weight C.'
 
   # transform
   register -n 2,1 -i call EXTR            'extraction'
