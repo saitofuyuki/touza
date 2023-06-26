@@ -1,6 +1,6 @@
 !!!_! jmz/chak_decl.F90 - TOUZA/Jmz CH(swiss) army knife operator symbol declaration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-06-26T12:49:40+09:00
+! Created by genopr.sh at 2023-06-26T21:19:20+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -146,15 +146,16 @@
   character(len=*),parameter :: str_NEAREST = 'NEAREST'
   character(len=*),parameter :: str_SPACING = 'SPACING'
   character(len=*),parameter :: str_RRSP = 'RRSP'
+  !! group: ternary
+  character(len=*),parameter :: str_IFELSE = 'IFELSE'
+  character(len=*),parameter :: str_INRANGE = 'INRANGE'
+  character(len=*),parameter :: str_BLEND = 'BLEND'
   !! group: reduce
   character(len=*),parameter :: str_NORM = 'NORM'
   character(len=*),parameter :: str_AVR = 'AVR'
   character(len=*),parameter :: str_SUM = 'SUM'
   character(len=*),parameter :: str_COUNT = 'COUNT'
   !! group: other
-  character(len=*),parameter :: str_IFELSE = 'IFELSE'
-  character(len=*),parameter :: str_INRANGE = 'INRANGE'
-  character(len=*),parameter :: str_BLEND = 'BLEND'
   !! group: index
   character(len=*),parameter :: str_FLAT = 'FLAT'
   character(len=*),parameter :: str_INDEX = 'INDEX'
@@ -353,22 +354,25 @@
   integer,parameter :: opr_SPACING = 120
   integer,parameter :: opr_RRSP = 121
   integer,parameter :: grp_float_end = 122
+  !! group: ternary
+  integer,parameter :: grp_ternary_bgn = 122
+  integer,parameter :: opr_IFELSE = 122
+  integer,parameter :: opr_INRANGE = 123
+  integer,parameter :: opr_BLEND = 124
+  integer,parameter :: grp_ternary_end = 125
   !! group: reduce
-  integer,parameter :: grp_reduce_bgn = 122
-  integer,parameter :: acc_NORM = 122
-  integer,parameter :: opr_NORM = 123
-  integer,parameter :: acc_AVR = 124
-  integer,parameter :: opr_AVR = 125
-  integer,parameter :: acc_SUM = 126
-  integer,parameter :: opr_SUM = 127
-  integer,parameter :: acc_COUNT = 128
-  integer,parameter :: opr_COUNT = 129
-  integer,parameter :: grp_reduce_end = 130
+  integer,parameter :: grp_reduce_bgn = 125
+  integer,parameter :: acc_NORM = 125
+  integer,parameter :: opr_NORM = 126
+  integer,parameter :: acc_AVR = 127
+  integer,parameter :: opr_AVR = 128
+  integer,parameter :: acc_SUM = 129
+  integer,parameter :: opr_SUM = 130
+  integer,parameter :: acc_COUNT = 131
+  integer,parameter :: opr_COUNT = 132
+  integer,parameter :: grp_reduce_end = 133
   !! group: other
-  integer,parameter :: grp_other_bgn = 130
-  integer,parameter :: opr_IFELSE = 130
-  integer,parameter :: opr_INRANGE = 131
-  integer,parameter :: opr_BLEND = 132
+  integer,parameter :: grp_other_bgn = 133
   integer,parameter :: grp_other_end = 133
   !! group: index
   integer,parameter :: grp_index_bgn = 133

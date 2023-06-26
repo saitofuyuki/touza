@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/26 12:52:08 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/26 21:38:39 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -2249,6 +2249,75 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_RSHIFT
+
+!!!_  - ternary operations
+!!!_   . apply_TERNARY_IFELSE
+  subroutine apply_TERNARY_IFELSE &
+       & (ierr, Z, domZ, FZ, X, domX, FX, Y, domY, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    real(kind=KBUF),intent(in)    :: Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    real(kind=KBUF),intent(in)    :: FZ, FX, FY
+    integer jz, jx, jy
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       jy = conv_physical_index(jz, domZ, domY)
+       if (jx.ge.0.and.jy.ge.0) then
+          Z(jz) = elem_IFELSE(Z(jz), X(jx), Y(jy), FZ, FX, FY)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_TERNARY_IFELSE
+!!!_   . apply_TERNARY_INRANGE
+  subroutine apply_TERNARY_INRANGE &
+       & (ierr, Z, domZ, FZ, X, domX, FX, Y, domY, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    real(kind=KBUF),intent(in)    :: Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    real(kind=KBUF),intent(in)    :: FZ, FX, FY
+    integer jz, jx, jy
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       jy = conv_physical_index(jz, domZ, domY)
+       if (jx.ge.0.and.jy.ge.0) then
+          Z(jz) = elem_INRANGE(Z(jz), X(jx), Y(jy), FZ, FX, FY)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_TERNARY_INRANGE
+!!!_   . apply_TERNARY_BLEND
+  subroutine apply_TERNARY_BLEND &
+       & (ierr, Z, domZ, FZ, X, domX, FX, Y, domY, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    real(kind=KBUF),intent(in)    :: Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    real(kind=KBUF),intent(in)    :: FZ, FX, FY
+    integer jz, jx, jy
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       jy = conv_physical_index(jz, domZ, domY)
+       if (jx.ge.0.and.jy.ge.0) then
+          Z(jz) = elem_BLEND(Z(jz), X(jx), Y(jy), FZ, FX, FY)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_TERNARY_BLEND
+
 !!!_  - reduction operations
 !!!_   . apply_REDUCE_ADD
   subroutine apply_REDUCE_ADD &
@@ -3526,6 +3595,52 @@ contains
        Z = NEAREST(X, Y)
     endif
   end function elem_NEAREST
+!!!_    * elem_IFELSE()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_IFELSE (X, Y, Z, FX, FY, FZ) result(W)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y,  Z
+    real(kind=KBUF),intent(in) :: FX, FY, FZ
+    if (X.eq.FX) then
+       if (Z.eq.FZ) then
+          W = FX
+       else
+          W = Z
+       endif
+    else
+       if (Y.eq.FY) then
+          W = FX
+       else
+          W = Y
+       endif
+    endif
+  end function elem_IFELSE
+!!!_    * elem_INRANGE()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_INRANGE (X, Y, Z, FX, FY, FZ) result(W)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y,  Z
+    real(kind=KBUF),intent(in) :: FX, FY, FZ
+    if (X.eq.FX.or.Y.eq.FY.or.Z.eq.FZ) then
+       W = FX
+    else if (X.GE.Y.and.X.LE.Z) then
+       W = X
+    else
+       W = FX
+    endif
+  end function elem_INRANGE
+!!!_    * elem_BLEND()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_BLEND (X, Y, Z, FX, FY, FZ) result(W)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y,  Z
+    real(kind=KBUF),intent(in) :: FX, FY, FZ
+    if (X.eq.FX.or.Y.eq.FY.or.Z.eq.FZ) then
+       W = FX
+    else
+       W = X * Z + Y * (ONE - Z)
+    endif
+  end function elem_BLEND
 !!!_  - elemental reduction operators
 !!!_   . elem_SUM() - X + Y, ignore undef
   ELEMENTAL &

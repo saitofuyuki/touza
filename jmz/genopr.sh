@@ -31,7 +31,7 @@ main ()
 
   register_all || return $?
 
-  local GODR=(system output anchor stack queue unary ubool bool binary filter lazy float reduce other)
+  local GODR=(system output anchor stack queue unary ubool bool binary filter lazy float ternary reduce other)
   GODR=($GODR ${(k)GRP})
   GODR=(${(u)GODR})
   local grp=
@@ -359,6 +359,8 @@ register ()
       grp=${(k)GRP[(r)* $alias *]}
       [[ -z $grp ]] && grp=${(k)GRP[(r)* $alias]}
       [[ -z $grp ]] && print -u2 - "cannot find alias source for $key ($alias)" && return 1
+    elif [[ $nstack[1] -eq 3 && $nstack[2] -eq 1 ]]; then
+      grp='ternary'
     elif [[ $nstack[1] -eq 2 && $nstack[2] -eq 1 ]]; then
       grp='binary'
     elif [[ $nstack[1] -eq 1 && $nstack[2] -eq 1 ]]; then
@@ -538,6 +540,7 @@ output_call ()
     (bool)  apply=apply_opr_BINARY;;
     (filter)  apply=apply_opr_BINARY;;
     (reduce)  apply=apply_opr_REDUCE;;
+    (ternary)  apply=apply_opr_TERNARY;;
     (float) apply=;;
     (*)    continue;;
     esac
@@ -576,6 +579,8 @@ output_call ()
           afunc=apply_opr_UNARY
         elif [[ $pop -eq 2 && $push -eq 1 ]]; then
           afunc=apply_opr_BINARY
+        elif [[ $pop -eq 3 && $push -eq 1 ]]; then
+          afunc=apply_opr_TERNARY
         else
           print -u2 - "Cannot determine apply function for $key"
           return 1
@@ -594,7 +599,7 @@ output_sub ()
   local grp= key=
   local nstack=() push= pop=
   local sub= stype=
-  local candi=(unary binary lazy ubool bool filter float reduce)
+  local candi=(unary binary lazy ternary ubool bool filter float reduce)
   local elem=
   local DONE=()
   local extval=
@@ -627,6 +632,8 @@ fout -t 0 "!!!_  - $grp operations"
           stype=unary
         elif [[ $pop -eq 2 && $push -eq 1 ]]; then
           stype=binary
+        elif [[ $pop -eq 3 && $push -eq 1 ]]; then
+          stype=ternary
         else
           print -u2 - "Cannot determine subroutine for $key"
           return 1
@@ -705,6 +712,32 @@ BINARY
   end subroutine $sub
 LAZY
           ;;
+      (ternary)
+          cat <<TERNARY
+!!!_   . $sub
+  subroutine $sub &
+       & (ierr, Z, domZ, FZ, X, domX, FX, Y, domY, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    real(kind=KBUF),intent(in)    :: Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    real(kind=KBUF),intent(in)    :: FZ, FX, FY
+    integer jz, jx, jy
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       jy = conv_physical_index(jz, domZ, domY)
+       if (jx.ge.0.and.jy.ge.0) then
+          Z(jz) = $elem(Z(jz), X(jx), Y(jy), FZ, FX, FY)
+       else
+          Z(jz) = ${extval:-FZ}
+       endif
+    enddo
+  end subroutine $sub
+TERNARY
+          ;;
       (reduce)
           cat <<REDUCE
 !!!_   . $sub
@@ -742,7 +775,7 @@ output_elem ()
   local grp= key=
   local nstack=() push= pop=
   local sub= stype=
-  local candi=(unary binary lazy ubool bool filter float reduce)
+  local candi=(unary binary lazy ternary ubool bool filter float reduce)
   local elem=
   local DONE=()
   for grp in "$@"
@@ -765,6 +798,8 @@ output_elem ()
           stype=unary
         elif [[ $pop -eq 2 && $push -eq 1 ]]; then
           stype=binary
+        elif [[ $pop -eq 3 && $push -eq 1 ]]; then
+          stype=ternary
         else
           print -u2 - "Cannot determine elemental for $key"
           return 1
@@ -802,6 +837,22 @@ UNARY
     endif
   end function $elem
 BINARY
+          ;;
+      (ternary)
+          cat <<TERNARY
+!!!_    * $elem()
+  ELEMENTAL &
+  real(kind=KBUF) function $elem (X, Y, Z, FX, FY, FZ) result(W)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y,  Z
+    real(kind=KBUF),intent(in) :: FX, FY, FZ
+    if (X.eq.FX.or.Y.eq.FY.or.Z.eq.FZ) then
+       W = FX
+    else
+       W = X + Y + Z
+    endif
+  end function $elem
+TERNARY
           ;;
 #       (reduce)
 #           cat <<REDUCE
@@ -845,6 +896,8 @@ get_sub_name ()
     else
       ssfx=BINARY
     fi
+  elif [[ $pop -eq 3 ]]; then
+    ssfx=TERNARY
   else
     print -u2 - "$key/$grp subroutine is not prepared"
     return 1
@@ -892,7 +945,7 @@ output_table ()
   local grp= key=
   local nstack=() push= pop=
   local sym= alias= opt=
-  local candi=(unary binary lazy ubool bool filter stack index float)
+  local candi=(unary binary lazy ternary ubool bool filter stack index float)
   local aapp=
   for grp in "$@"
   do
@@ -1002,7 +1055,7 @@ output_list ()
 {
   local grp= key=
   local sym= list=()
-  local candi=(unary binary lazy ubool bool filter stack index float)
+  local candi=(unary binary lazy ternary ubool bool filter stack index float)
 
   for grp in "$@"
   do
