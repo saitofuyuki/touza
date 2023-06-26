@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/21 19:46:46 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/23 22:01:15 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -23,6 +23,9 @@
 #endif
 #ifndef   OPT_CHAK_BUFFERS
 #  define OPT_CHAK_BUFFERS  256
+#endif
+#ifndef    OPT_CHAK_STACKS
+#  define  OPT_CHAK_STACKS   512
 #endif
 !!!_@ TOUZA/Jmz/chak-lib - nio swiss army knife (library)
 module chak_lib
@@ -109,28 +112,31 @@ module chak_lib
   integer,parameter :: ldesc = OPT_DESC_LEN
 
 !!!_  - handles and types
-  integer,parameter :: lfile = OPT_CHAK_FILES
+  integer,parameter :: lfile   = OPT_CHAK_FILES
   integer,parameter :: lbuffer = OPT_CHAK_BUFFERS
-  integer,parameter :: lopr = 512
-  integer,parameter :: oprlen = 16
+  integer,parameter :: lstack  = OPT_CHAK_STACKS
+  integer,parameter :: lopr    = 512
+  integer,parameter :: oprlen  = 16
 
   integer,save :: mfile = 0
   integer,save :: mbuffer = 0
   integer,save :: mopr = 0
 
-  integer,parameter :: lmodule = max(lopr, lfile, lbuffer) * 2
+  integer,parameter :: lmodule = max(lopr, lfile, lbuffer, lstack) * 2
 !!!_  - handle offsets and kinds
   integer,parameter :: hk_error = -1
   integer,parameter :: hk_opr = 0
   integer,parameter :: hk_file = 1
   integer,parameter :: hk_buffer = 2
   integer,parameter :: hk_anchor = 3
-  integer,parameter :: hk_overflow = 4
+  integer,parameter :: hk_stack  = 4
+  integer,parameter :: hk_overflow = 5
 
   integer,parameter :: ofs_opr    = lmodule * hk_opr
   integer,parameter :: ofs_file   = lmodule * hk_file
   integer,parameter :: ofs_buffer = lmodule * hk_buffer
   integer,parameter :: ofs_anchor = lmodule * hk_anchor
+  integer,parameter :: ofs_stack  = lmodule * hk_stack
 
 !!!_  - domain compromise mode for non-unary operations
   integer,parameter :: cmode_null      = 0
@@ -157,6 +163,11 @@ module chak_lib
   integer,parameter :: loop_null   = 0       ! null coordinate  (expand to bgn:end)
   integer,parameter :: loop_reduce = 1       ! sweep coordinate (shrink to 0:1)
   integer,parameter :: loop_normal = 2
+
+!!!_  - buffer status
+  integer,parameter :: buf_used   = +1
+  integer,parameter :: buf_free   = 0
+  integer,parameter :: buf_locked = -1
 
 !!!_  - common values
   real(kind=KBUF),save :: PI = ZERO
@@ -204,7 +215,7 @@ module chak_lib
 
 !!!_  - buffer stack
   type stack_t
-     integer      :: bh
+     integer      :: bh             ! buffer or stack handle
      type(loop_t) :: lcp(0:lcoor-1) ! logical (destination) coordinate properties
   end type stack_t
 
@@ -320,6 +331,63 @@ contains
        endif
     enddo
   end subroutine show_domain
+
+!!!_   . diag_queue
+  subroutine diag_queue &
+       & (ierr, aq, tag, u, levv, indent)
+    use TOUZA_Std,only: choice
+    implicit none
+    integer,         intent(out)         :: ierr
+    type(queue_t),   intent(in)          :: aq
+    character(len=*),intent(in),optional :: tag
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv
+    integer,         intent(in),optional :: indent
+    integer utmp
+    integer lv
+    integer tab
+    integer js, jh
+    character(len=64) :: pfx, obj, spfx
+
+    ierr = 0
+    lv = choice(lev_verbose, levv)
+    utmp = choice(ulog, u)
+    tab = choice(0, indent)
+    if (present(tag)) then
+       pfx = '[' // trim(tag) // ']'
+    else
+       pfx = ' '
+    endif
+101 format(A, 'queue', A, ' = ', I0, 1x, I0, 1x, I0, 1x, I0, 1x, I0)
+    write(utmp, 101) repeat(' ', tab), &
+         & trim(pfx), aq%term, aq%nopr, aq%iter, aq%cmode, &
+         & size(aq%lefts)
+    if (ierr.eq.0) call show_lpp(ierr, aq%lcp, tag, utmp, lv, tab + 2)
+    do js = 0, size(aq%lefts) - 1
+121    format('buffer[', I0, ']')
+122    format('stack[', I0, ']')
+123    format('handle[', I0, ']')
+       jh = buf_h2item(aq%lefts(js)%bh)
+       if (jh.ge.0) then
+          write(obj, 121) jh
+       else
+          jh = stack_h2item(aq%lefts(js)%bh)
+          if (jh.ge.0) then
+             write(obj, 122) jh
+          else
+             write(obj, 123) aq%lefts(js)%bh
+          endif
+       endif
+111    format(A, ':', A)
+112    format(A)
+       if (present(tag)) then
+          write(spfx, 111) trim(tag), trim(obj)
+       else
+          write(spfx, 112) trim(obj)
+       endif
+       if (ierr.eq.0) call show_lpp(ierr, aq%lefts(js)%lcp, spfx, utmp, lv, tab + 4)
+    enddo
+  end subroutine diag_queue
 
 !!!_   . get_range_string
   subroutine get_range_string &
@@ -685,6 +753,36 @@ contains
        n = ERR_INVALID_ITEM
     endif
   end function buf_i2handle
+
+!!!_   . stack_h2item()
+  ELEMENTAL integer function stack_h2item(handle) result(n)
+    implicit none
+    integer,intent(in) :: handle
+    n = handle - ofs_stack
+    if (n.ge.0.and.n.lt.lstack) then
+       continue
+    else
+       n = ERR_INVALID_ITEM
+    endif
+  end function stack_h2item
+
+!!!_   . stack_i2handle()
+  integer function stack_i2handle(item) result(n)
+    implicit none
+    integer,intent(in) :: item
+    if (item.ge.0.and.item.lt.lstack) then
+       n = item + ofs_stack
+    else
+       n = ERR_INVALID_ITEM
+    endif
+  end function stack_i2handle
+
+!!!_   . is_buffer()
+  logical function is_buffer(handle) result(b)
+    implicit none
+    integer,intent(in) :: handle
+    b = (handle_type(handle) .eq. hk_buffer)
+  end function is_buffer
 
 !!!_   . is_operator()
   logical function is_operator(handle) result(b)
