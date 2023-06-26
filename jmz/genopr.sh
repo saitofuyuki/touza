@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/06/21 10:04:49 fuyuki genopr.sh>
+# Time-stamp: <2023/06/26 12:48:30 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -116,7 +116,7 @@ register_all ()
   register -g stack +n m,'2m'      REPEAT   'repeat from last non-adjacent anchor'
   register -g stack +n m,0         FLUSH    'flush-out from last anchor'
   register -g stack +n m,0         DFLUSH   'flush-out from last anchor (defined only)'
-  register -g stack +n m,0 -o COLS CFLUSH   'flush-out from last anchor (columnized)'
+  register -g stack +n m,0         CFLUSH   'flush-out from last anchor (columnized)'
 
   # queue manipulation
   register -g queue ITER   'iterate last queue operator for each set from last anchor'
@@ -145,7 +145,7 @@ register_all ()
   register         -n 3,1            -i call          IFELSE  'B if A defined, else C'
 
   # primitive binary
-  register -n 2,1 -i add,'+'  -P sweep=accum ADD         'A+B'
+  register -n 2,1 -i add,'+'  -P sweep=stack ADD         'A+B'
   register -n 2,1 -i add,'-'                 SUB         'A-B'
   register -n 2,1 -i mul,'*'                 MUL         'A*B'
   register -n 2,1 -i mul,'/'                 DIV         'A/B'
@@ -156,7 +156,7 @@ register_all ()
   register -n 2,1 -i call MODULO      'modulo(A,B)'
 
   # primitive binary inclusive
-  register -g lazy -n 2,1 -i add,'+' -P sweep=accum -f ADD,ZERO LADD    'lazy ADD'
+  register -g lazy -n 2,1 -i add,'+' -P sweep=stack -f ADD,ZERO LADD    'lazy ADD'
   register -g lazy -n 2,1 -i add,'-'                -f SUB,ZERO LSUB    'lazy SUB'
   register -g lazy -n 2,1 -i mul,'*'                -f MUL,ONE  LMUL    'lazy MUL'
   register -g lazy -n 2,1 -i mul,'/'                -f DIV,ONE  LDIV    'lazy DIV'
@@ -215,10 +215,10 @@ register_all ()
   register -g float -n 1,1 -i call        RRSP      'rrspacing(A)'
 
   # other operation
-  register         -n 2,1 -i call -P sweep=accum             MIN    'min(A,B)'
-  register         -n 2,1 -i call -P sweep=accum             MAX    'max(A,B)'
-  register -g lazy -n 2,1 -i call -P sweep=accum -f -,ULIMIT LMIN   'lazy MIN'
-  register -g lazy -n 2,1 -i call -P sweep=accum -f -,LLIMIT LMAX   'lazy MAX'
+  register         -n 2,1 -i call -P sweep=stack             MIN    'min(A,B)'
+  register         -n 2,1 -i call -P sweep=stack             MAX    'max(A,B)'
+  register -g lazy -n 2,1 -i call -P sweep=stack -f -,ULIMIT LMIN   'lazy MIN'
+  register -g lazy -n 2,1 -i call -P sweep=stack -f -,LLIMIT LMAX   'lazy MAX'
 
   # conditional operation (binary)
   register -g bool -n 2,1 -f -,FALSE -i call -c int EQB       '1 if A==B, else 0'
@@ -486,7 +486,7 @@ output_register ()
       fout -t 0 "call reg_opr_prop(${(j:, :)rarg})" |\
           fold -w 80 -s |\
           sed -e 's/$/ \&/' -e 's/^/      \& /' -e '$s/ *\&$//'
-      if [[ $sweep == accum ]]; then
+      if [[ $sweep == accum || $sweep = stack ]]; then
         rv=rdc_${iv#*_}
         rarg=(ierr "$rv" "rdc_pfx // $av")
         [[ -n $nstack ]] && rarg+=($((nstack[1]-1)) $nstack[2])

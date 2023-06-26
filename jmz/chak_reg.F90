@@ -1,6 +1,6 @@
 !!!_! jmz/chak_reg.F90 - TOUZA/Jmz CH(swiss) army knife operator registration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-06-20T15:47:19+09:00
+! Created by genopr.sh at 2023-06-26T12:49:40+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -138,7 +138,7 @@
       & call reg_opr_prop(ierr, opr_MASK, str_MASK, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_ADD, str_ADD, 2, 1, ilev=ilev_add, istr='+',  &
-      & sweep=sweep_accum)
+      & sweep=sweep_stack)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, rdc_ADD, rdc_pfx // str_ADD, 1, 1, sweep=sweep_reduce)
     if (ierr.eq.0) &
@@ -171,12 +171,12 @@
       & istr='>>')
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_MIN, str_MIN, 2, 1, ilev=ilev_call,  &
-      & sweep=sweep_accum)
+      & sweep=sweep_stack)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, rdc_MIN, rdc_pfx // str_MIN, 1, 1, sweep=sweep_reduce)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_MAX, str_MAX, 2, 1, ilev=ilev_call,  &
-      & sweep=sweep_accum)
+      & sweep=sweep_stack)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, rdc_MAX, rdc_pfx // str_MAX, 1, 1, sweep=sweep_reduce)
     if (ierr.eq.0) &
@@ -219,7 +219,7 @@
       & call reg_opr_prop(ierr, opr_RLAY, str_RLAY, 2, 1, ilev=ilev_call)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_LADD, str_LADD, 2, 1, ilev=ilev_add, istr='+',  &
-      & sweep=sweep_accum)
+      & sweep=sweep_stack)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, rdc_LADD, rdc_pfx // str_LADD, 1, 1, sweep=sweep_reduce)
     if (ierr.eq.0) &
@@ -230,12 +230,12 @@
       & call reg_opr_prop(ierr, opr_LDIV, str_LDIV, 2, 1, ilev=ilev_mul, istr='/')
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_LMIN, str_LMIN, 2, 1, ilev=ilev_call,  &
-      & sweep=sweep_accum)
+      & sweep=sweep_stack)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, rdc_LMIN, rdc_pfx // str_LMIN, 1, 1, sweep=sweep_reduce)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_LMAX, str_LMAX, 2, 1, ilev=ilev_call,  &
-      & sweep=sweep_accum)
+      & sweep=sweep_stack)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, rdc_LMAX, rdc_pfx // str_LMAX, 1, 1, sweep=sweep_reduce)
     if (ierr.eq.0) &
@@ -326,6 +326,12 @@
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, acc_COUNT, acc_pfx // str_COUNT, 2, 1, conv=result_int,  &
       & sweep=sweep_accum)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_IFELSE, str_IFELSE, 3, 1, ilev=ilev_call)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_INRANGE, str_INRANGE, 3, 1, ilev=ilev_call)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_BLEND, str_BLEND, 3, 1, ilev=ilev_call)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_FLAT, str_FLAT)
     if (ierr.eq.0) &

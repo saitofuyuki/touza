@@ -1,6 +1,6 @@
 !!!_! jmz/chak_decl.F90 - TOUZA/Jmz CH(swiss) army knife operator symbol declaration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-06-20T15:47:18+09:00
+! Created by genopr.sh at 2023-06-26T12:49:40+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -152,6 +152,9 @@
   character(len=*),parameter :: str_SUM = 'SUM'
   character(len=*),parameter :: str_COUNT = 'COUNT'
   !! group: other
+  character(len=*),parameter :: str_IFELSE = 'IFELSE'
+  character(len=*),parameter :: str_INRANGE = 'INRANGE'
+  character(len=*),parameter :: str_BLEND = 'BLEND'
   !! group: index
   character(len=*),parameter :: str_FLAT = 'FLAT'
   character(len=*),parameter :: str_INDEX = 'INDEX'
@@ -363,41 +366,44 @@
   integer,parameter :: grp_reduce_end = 130
   !! group: other
   integer,parameter :: grp_other_bgn = 130
-  integer,parameter :: grp_other_end = 130
+  integer,parameter :: opr_IFELSE = 130
+  integer,parameter :: opr_INRANGE = 131
+  integer,parameter :: opr_BLEND = 132
+  integer,parameter :: grp_other_end = 133
   !! group: index
-  integer,parameter :: grp_index_bgn = 130
-  integer,parameter :: opr_FLAT = 130
+  integer,parameter :: grp_index_bgn = 133
+  integer,parameter :: opr_FLAT = 133
   integer,parameter :: opr_INDEX = opr_FLAT
-  integer,parameter :: grp_index_end = 131
+  integer,parameter :: grp_index_end = 134
   !! group: header
-  integer,parameter :: grp_header_bgn = 131
-  integer,parameter :: opr_FMT = 131
-  integer,parameter :: opr_ITEM = 132
-  integer,parameter :: opr_UNIT = 133
-  integer,parameter :: opr_TITLE = 134
-  integer,parameter :: opr_EDIT = 135
-  integer,parameter :: opr_DSET = 136
-  integer,parameter :: opr_TSEL = 137
-  integer,parameter :: opr_RSEL = 138
-  integer,parameter :: opr_MISS = 139
-  integer,parameter :: opr_DUR = 140
-  integer,parameter :: grp_header_end = 141
+  integer,parameter :: grp_header_bgn = 134
+  integer,parameter :: opr_FMT = 134
+  integer,parameter :: opr_ITEM = 135
+  integer,parameter :: opr_UNIT = 136
+  integer,parameter :: opr_TITLE = 137
+  integer,parameter :: opr_EDIT = 138
+  integer,parameter :: opr_DSET = 139
+  integer,parameter :: opr_TSEL = 140
+  integer,parameter :: opr_RSEL = 141
+  integer,parameter :: opr_MISS = 142
+  integer,parameter :: opr_DUR = 143
+  integer,parameter :: grp_header_end = 144
   !! group: buffer
-  integer,parameter :: grp_buffer_bgn = 141
-  integer,parameter :: opr_TAG = 141
-  integer,parameter :: opr_DESC = 142
-  integer,parameter :: opr_FUNC = 143
-  integer,parameter :: opr_PERM = 144
-  integer,parameter :: opr_SHAPE = 145
-  integer,parameter :: opr_SIZE = 146
-  integer,parameter :: opr_SHIFT = 147
-  integer,parameter :: opr_CSHIFT = 148
-  integer,parameter :: opr_EOSHIFT = 149
-  integer,parameter :: opr_C0 = 150
-  integer,parameter :: opr_C1 = 151
-  integer,parameter :: opr_C2 = 152
-  integer,parameter :: opr_C3 = 153
-  integer,parameter :: opr_X = 154
-  integer,parameter :: opr_Y = 155
-  integer,parameter :: opr_Z = 156
-  integer,parameter :: grp_buffer_end = 157
+  integer,parameter :: grp_buffer_bgn = 144
+  integer,parameter :: opr_TAG = 144
+  integer,parameter :: opr_DESC = 145
+  integer,parameter :: opr_FUNC = 146
+  integer,parameter :: opr_PERM = 147
+  integer,parameter :: opr_SHAPE = 148
+  integer,parameter :: opr_SIZE = 149
+  integer,parameter :: opr_SHIFT = 150
+  integer,parameter :: opr_CSHIFT = 151
+  integer,parameter :: opr_EOSHIFT = 152
+  integer,parameter :: opr_C0 = 153
+  integer,parameter :: opr_C1 = 154
+  integer,parameter :: opr_C2 = 155
+  integer,parameter :: opr_C3 = 156
+  integer,parameter :: opr_X = 157
+  integer,parameter :: opr_Y = 158
+  integer,parameter :: opr_Z = 159
+  integer,parameter :: grp_buffer_end = 160

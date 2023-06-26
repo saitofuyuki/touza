@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/21 09:02:18 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/26 12:52:08 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -49,9 +49,10 @@ module chak_opr
   ! reduction:     operator along coordinate
   ! accumulation:  operator stack coordinate
   ! sweep: reduction + accumulation
-  integer,parameter :: sweep_none   = 0
-  integer,parameter :: sweep_accum  = 1  ! prefer accumulation
-  integer,parameter :: sweep_reduce = 2  ! prefer reduction
+  integer,parameter :: sweep_none   = 0  ! empty parameter, no reduction
+  integer,parameter :: sweep_stack  = 1  ! stack if no parameter, reduction enabled
+  integer,parameter :: sweep_accum  = 2  ! accumulate if no parameter, reduction enabled
+  integer,parameter :: sweep_reduce = 3  ! reduce if no parameter
 
 !!!_   . operator variation
   integer,parameter :: var_reduce = +1
@@ -289,6 +290,13 @@ contains
     integer,intent(in) :: handle
     b = handle.eq.opr_TRANSF
   end function is_operator_modify
+!!!_   . is_operator_stacks()
+  logical function is_operator_stacks(handle) result(b)
+    implicit none
+    integer,intent(in) :: handle
+    b = ((grp_stack_bgn.le.handle).and.(handle.lt.grp_stack_end)) &
+         .or. (handle.eq.opr_ANCHOR)
+  end function is_operator_stacks
 !!!_   . is_operator_reusable()
   logical function is_operator_reusable(handle) result(b)
     implicit none
