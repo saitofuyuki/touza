@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/26 15:50:03 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/27 07:44:01 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -4745,6 +4745,13 @@ contains
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_SPACING)
        else if (handle.eq.opr_RRSP) then
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), apply_UNARY_RRSP)
+!!!_    * ternary
+       else if (handle.eq.opr_IFELSE) then
+          call apply_opr_TERNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_TERNARY_IFELSE)
+       else if (handle.eq.opr_INRANGE) then
+          call apply_opr_TERNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_TERNARY_INRANGE)
+       else if (handle.eq.opr_BLEND) then
+          call apply_opr_TERNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_TERNARY_BLEND)
 !!!_    * reduction
        else if (handle.eq.rdc_ADD) then
           call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_ADD, ZERO)
@@ -6381,6 +6388,164 @@ contains
     enddo
   end subroutine apply_opr_BINARY
 
+!!!_   . apply_opr_TERNARY
+  subroutine apply_opr_TERNARY &
+       & (ierr, hopr, lefts, bufi, cmode, func, bin)
+    use TOUZA_Std,only: choice, jot
+    implicit none
+    integer,      intent(out)         :: ierr
+    integer,      intent(in)          :: hopr
+    type(stack_t),intent(inout)       :: lefts(0:)
+    integer,      intent(in)          :: bufi(0:)
+    integer,      intent(in)          :: cmode
+    logical,      intent(in),optional :: bin
+    interface
+       subroutine func &
+            & (ierr, Z, domZ, FZ, X, domX, FX, Y, domY, FY)
+         use chak_lib,only: KFLT, KDBL, domain_t
+         implicit none
+         integer,          intent(out)   :: ierr
+         real(kind=__KBUF),intent(inout) :: Z(0:*)
+         real(kind=__KBUF),intent(in)    :: X(0:*)
+         real(kind=__KBUF),intent(in)    :: Y(0:*)
+         type(domain_t),   intent(in)    :: domZ, domX, domY
+         real(kind=__KBUF),intent(in)    :: FZ,   FX,   FY
+       end subroutine func
+    end interface
+
+    integer,parameter :: defopr = 2
+
+    integer nopr
+    integer jout, nout
+    integer jinp, ninp, jj
+    integer hbL, hbR0, hbR1
+    integer jbL, jbR0, jbR1
+    integer ofsi
+    integer jset0, jset1
+    type(domain_t) :: domL
+    type(domain_t) :: domR(0:size(bufi)-1)
+    integer        :: pstk(0:size(bufi)-1)
+
+    real(kind=KBUF) :: fillL, fillR0, fillR1
+    logical check
+
+    integer m
+    integer ntmp
+    integer btmp(0:size(bufi)-1)
+    type(stack_t) :: stmp(0:size(bufi)-1)
+
+    ierr = 0
+    check = choice(.FALSE., bin)
+
+    ! -3+1  -6+2  -9+3
+    ! -3+1  -5+1  -7+1 ...
+
+    ninp = size(bufi)
+    ofsi = 0
+    if (is_anchor(bufi(ofsi))) then
+       ninp = ninp - 1
+       ofsi = ofsi + 1
+    endif
+    call jot(pstk, ninp, e=mstack)
+    ! write(*, *) 'jot', ninp, ofsi, pstk(0:ninp-1)
+    nout = size(lefts)
+    nopr = ninp / nout
+    ! Reduce every (ninp / nout) buffer to nout.
+    ! i.e., error if (ninp % nout) != 0 or (ninp / nout) < 2
+
+    if (mod(ninp, nout).ne.0) ierr = ERR_INVALID_PARAMETER
+    if (nopr.lt.defopr) ierr = ERR_INVALID_PARAMETER
+    if (ierr.ne.0) then
+       call message(ierr, 'invalid operands for ternary operation.')
+       return
+    endif
+
+    do jout = nout - 1 , 0, -1
+       jinp = jout * nopr + ofsi
+
+       ntmp = 0
+       do jj = jinp, jinp + nopr - 1
+          hbR0 = bufi(jj)
+          jbR0 = buf_h2item(hbR0)
+          m = buffer_vmems(obuffer(jbR0))
+          if (m.ge.0) then
+             btmp(ntmp) = hbR0
+             stmp(ntmp) = bstack(pstk(jj-ofsi))
+             ntmp = ntmp + 1
+          endif
+       enddo
+       if (ntmp.lt.defopr) then
+          ierr = ERR_INVALID_PARAMETER
+          call message(ierr, 'too much null operands for ternary operation.')
+          return
+       endif
+
+       hbL = lefts(jout)%bh
+       jbL = buf_h2item(hbL)
+
+       if (ierr.eq.0) call copy_set_header(ierr, hbL, btmp(0), ntmp)
+       if (ierr.eq.0) then
+          call get_compromise_domain &
+               & (ierr, domL, domR, btmp(0:ntmp-1), stmp(0:ntmp-1), ntmp, cmode, obuffer(jbL))
+       endif
+       if (ierr.eq.0) then
+          hbR0 = btmp(0)
+          jbR0 = buf_h2item(hbR0)
+          fillL = obuffer(jbR0)%undef
+          if (check.and. (fillL.eq.TRUE.or.fillL.eq.FALSE)) then
+             ierr = ERR_PANIC
+             call message(ierr, 'MISS value cannot be 1 nor 0')
+             return
+          endif
+       endif
+       if (ierr.eq.0) then
+          jset0 = 0
+          hbR0 = btmp(jset0)
+          jbR0 = buf_h2item(hbR0)
+          fillL = obuffer(jbR0)%undef
+          if (check.and. (fillL.eq.TRUE.or.fillL.eq.FALSE)) then
+             ierr = ERR_PANIC
+             call message(ierr, 'MISS value cannot be 1 nor 0')
+             return
+          endif
+       endif
+       if (ierr.eq.0) then
+          call apply_COPY &
+               & (ierr, &
+               &  obuffer(jbL)%vd,  domL, &
+               &  obuffer(jbR0)%vd, domR(jset0), fillL)
+       endif
+       if (ierr.eq.0) then
+          do jj = 1, ntmp - 1, 2
+             jset0 = jj
+             jset1 = jj + 1
+             hbR0 = btmp(jset0)
+             hbR1 = btmp(jset1)
+             jbR0 = buf_h2item(hbR0)
+             jbR1 = buf_h2item(hbR1)
+             fillR0 = obuffer(jbR0)%undef
+             fillR1 = obuffer(jbR1)%undef
+             if (check.and. ANY((/fillR0,fillR1/).eq.TRUE) &
+                  & .or.ANY((/fillR0,fillR1/).eq.FALSE)) then
+                ierr = ERR_PANIC
+                call message(ierr, 'MISS value cannot be 1 nor 0')
+                return
+             endif
+             if (ierr.eq.0) then
+                call func &
+                     & (ierr, &
+                     &  obuffer(jbL)%vd,  domL,        fillL, &
+                     &  obuffer(jbR0)%vd, domR(jset0), fillR0, &
+                     &  obuffer(jbR1)%vd, domR(jset1), fillR1)
+             endif
+          enddo
+       endif
+       if (ierr.eq.0) then
+          call set_binary_descr(ierr, hbL, btmp(0:ntmp-1), hopr, upop=3)
+       endif
+    enddo
+  end subroutine apply_opr_TERNARY
+
 !!!_   . apply_opr_REDUCE
   subroutine apply_opr_REDUCE &
        & (ierr, hopr, lefts, bufi, func, neutral)
@@ -6528,13 +6693,15 @@ contains
 
 !!!_   . set_binary_descr
   subroutine set_binary_descr &
-       & (ierr, bufo, bufi, oprh)
+       & (ierr, bufo, bufi, oprh, upop)
+    use TOUZA_Std,only: choice
     implicit none
-    integer,intent(out) :: ierr
-    integer,intent(in)  :: bufo
-    integer,intent(in)  :: bufi(:)
-    integer,intent(in)  :: oprh
-    integer jinp, ninp
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: bufo
+    integer,intent(in)          :: bufi(:)
+    integer,intent(in)          :: oprh
+    integer,intent(in),optional :: upop
+    integer jinp, ninp, nu
     integer jbl,  jbr, hbr
     character(len=64) :: opr
     integer ilevo
@@ -6543,6 +6710,7 @@ contains
 
     ierr = 0
     ninp = size(bufi)
+    nu = choice(2, upop)
     jbl = buf_h2item(bufo)
 
     jinp = 1
@@ -6557,7 +6725,7 @@ contains
     if (ierr.eq.0) call query_opr_name(ierr, opr, oprh)
     if (ierr.eq.0) then
        obuffer(jbl)%desc = trim(obuffer(jbl)%desc) // ' ' // trim(opr)
-       if (ninp.gt.2) then
+       if (ninp.gt.nu) then
           obuffer(jbl)%desc = str_MARK // ' ' // trim(obuffer(jbl)%desc) // ' ' // str_CUM
        endif
     endif

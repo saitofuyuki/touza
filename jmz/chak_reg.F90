@@ -1,6 +1,6 @@
 !!!_! jmz/chak_reg.F90 - TOUZA/Jmz CH(swiss) army knife operator registration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-06-26T12:49:40+09:00
+! Created by genopr.sh at 2023-06-26T21:19:07+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -148,7 +148,8 @@
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_DIV, str_DIV, 2, 1, ilev=ilev_mul, istr='/')
     if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_IDIV, str_IDIV, 2, 1, ilev=ilev_mul, istr='//')
+      & call reg_opr_prop(ierr, opr_IDIV, str_IDIV, 2, 1, ilev=ilev_mul, istr='//',  &
+      & conv=result_int)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_MOD, str_MOD, 2, 1, ilev=ilev_mul, istr='%')
     if (ierr.eq.0) &
@@ -308,6 +309,12 @@
       & call reg_opr_prop(ierr, opr_RRSP, str_RRSP, 1, 1, ilev=ilev_call,  &
       & conv=result_float)
     if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_IFELSE, str_IFELSE, 3, 1, ilev=ilev_call)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_INRANGE, str_INRANGE, 3, 1, ilev=ilev_call)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_BLEND, str_BLEND, 3, 1, ilev=ilev_call)
+    if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_NORM, str_NORM, ilev=ilev_call, sweep=sweep_reduce)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, acc_NORM, acc_pfx // str_NORM, sweep=sweep_accum)
@@ -326,12 +333,6 @@
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, acc_COUNT, acc_pfx // str_COUNT, 2, 1, conv=result_int,  &
       & sweep=sweep_accum)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_IFELSE, str_IFELSE, 3, 1, ilev=ilev_call)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_INRANGE, str_INRANGE, 3, 1, ilev=ilev_call)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_BLEND, str_BLEND, 3, 1, ilev=ilev_call)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_FLAT, str_FLAT)
     if (ierr.eq.0) &
