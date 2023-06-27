@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/27 07:44:01 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/27 10:54:27 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -80,9 +80,10 @@ program chak
   integer,parameter :: levq_column = levq_stack - 1
   integer,parameter :: levq_coordinate = levq_column - 1
 
-  character(len=*),parameter :: bfmt_write_buf   = '(''W'', I0)'
-  character(len=*),parameter :: bfmt_read_buf    = '(''F'', I0)'
-  character(len=*),parameter :: bfmt_read_filter = '(''F'', I0, ''.'', I0)'
+  character(len=*),parameter :: bfmt_write_buf    = '(''W'', I0)'
+  character(len=*),parameter :: bfmt_write_filter = '(''W'', I0, ''.'', I0)'
+  character(len=*),parameter :: bfmt_read_buf     = '(''F'', I0)'
+  character(len=*),parameter :: bfmt_read_filter  = '(''F'', I0, ''.'', I0)'
 
   integer,parameter :: tuple_default = -1
   integer,parameter :: tuple_null = -9
@@ -571,7 +572,7 @@ contains
                 ierr = min(0, ierr)
              endif
              if (ierr.eq.0) then
-                call parse_arg_file(ierr, arg)
+                call parse_arg_file(ierr, arg, japos)
                 if (ierr.eq.0) exit
                 ierr = min(0, ierr)
              endif
@@ -893,10 +894,11 @@ contains
 
 !!!_   . parse_arg_file
   subroutine parse_arg_file &
-       & (ierr, arg)
+       & (ierr, arg, japos)
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(in)    :: arg
+    integer,         intent(inout) :: japos
     integer hfile, hbuf
     integer jb
     integer lasth
@@ -905,6 +907,9 @@ contains
     character(len=lname) :: bname
     integer oentr
     integer jerr
+    integer niter, hiter, ntup
+    integer npop,  nfetch
+    integer jx
 
     ierr = 0
     call new_file(ierr, hfile, arg)
@@ -922,17 +927,38 @@ contains
           ofile(jf)%hedit = ofile(def_write)%hedit
           ofile(jf)%hflag = ofile(def_write)%hflag
           ofile(jf)%bigg  = ofile(def_write)%bigg
-          call append_queue(ierr, hfile, pop=1, push=0)
-          if (ierr.eq.0) call pop_stack(ierr, hbuf)
+          if (ierr.eq.0) call parse_prefetch_tuples(ierr, niter, hiter, ntup, -1, arg, japos)
           if (ierr.eq.0) then
-             jb = buf_h2item(hbuf)
-             obuffer(jb)%stt = buf_locked
-             ! fake operator for file handle
-             write(bname, bfmt_write_buf, IOSTAT=jerr) user_index_bgn(wcount)
-             if (ierr.eq.0) call reg_fake_opr(oentr, hfile, bname)
-             if (ierr.eq.0) ofile(jf)%opr = oentr
-             ierr = min(0, oentr)
+             if (hiter.ge.0.and.hiter.ne.opr_ITER) then
+                ierr = ERR_INVALID_PARAMETER
+                call message(ierr, 'Modifier operator conflicts with output.')
+             endif
           endif
+          if (ierr.eq.0) then
+             niter = adj_iterates(1, niter)
+             call check_fetch(ierr, nfetch, npop, niter, 1, hfile)
+          endif
+          if (ierr.eq.0) call append_queue(ierr, hfile, pop=npop, push=0)
+          if (ierr.eq.0) then
+             do jx = 0, nfetch - 1
+                if (ierr.eq.0) call pop_stack(ierr, hbuf)
+                if (ierr.eq.0) then
+                   ! fake operator for file handle
+                   jb = buf_h2item(hbuf)
+                   obuffer(jb)%stt = buf_locked
+                   if (nfetch.eq.1) then
+                      write(bname, bfmt_write_buf, IOSTAT=jerr) user_index_bgn(wcount)
+                   else
+                      write(bname, bfmt_write_filter, IOSTAT=jerr) &
+                           & user_index_bgn(wcount), user_index_bgn(nfetch - jx - 1)
+                   endif
+                   if (ierr.eq.0) call reg_fake_opr(oentr, hbuf, bname)
+                   if (ierr.eq.0) obuffer(jb)%name = trim(bname)
+                endif
+             enddo
+          endif
+          if (ierr.eq.0) call mset_stack_queue(ierr, pop=(npop - nfetch))
+          if (ierr.eq.0) ofile(jf)%opr = hfile
           if (ierr.eq.0) wcount = wcount + 1
        else
           if (.not.associated(ofile(def_read)%rgrp)) then
@@ -4487,7 +4513,8 @@ contains
     type(stack_t), intent(in)  :: lefts(*)
     integer,       intent(in)  :: levv
     integer jfile
-    integer bufh
+    integer jx
+    integer bufh(0:pop-1)
 
     jfile = file_h2item(handle)
     ierr = min(0, jfile)
@@ -4496,9 +4523,13 @@ contains
           if (ierr.eq.0) call read_push_file(ierr, ofile(jfile), handle, pop, push, lefts, levv)
           if (ierr.eq.0) call mpush_stack_st(ierr, lefts, push)
        else
-          if (ierr.eq.0) call pop_stack(ierr, bufh, keep=.TRUE.)
-          if (ierr.eq.0) call write_file(ierr, ofile(jfile), bufh, mstack-1, levv)
-          if (ierr.eq.0) call pop_stack(ierr)
+          if (ierr.eq.0) call mpop_stack(ierr, bufh, pop, keep=.TRUE.)
+          if (ierr.eq.0) then
+             do jx = 0, pop - 1
+                if (ierr.eq.0) call write_file(ierr, ofile(jfile), bufh(jx), mstack-pop+jx, levv)
+             enddo
+          endif
+          if (ierr.eq.0) call mpop_stack(ierr, n=pop)
        endif
     endif
   end subroutine push_file
