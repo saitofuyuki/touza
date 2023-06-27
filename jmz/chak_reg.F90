@@ -1,6 +1,6 @@
 !!!_! jmz/chak_reg.F90 - TOUZA/Jmz CH(swiss) army knife operator registration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-06-26T21:19:07+09:00
+! Created by genopr.sh at 2023-06-27T12:02:02+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -148,8 +148,7 @@
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_DIV, str_DIV, 2, 1, ilev=ilev_mul, istr='/')
     if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_IDIV, str_IDIV, 2, 1, ilev=ilev_mul, istr='//',  &
-      & conv=result_int)
+      & call reg_opr_prop(ierr, opr_IDIV, str_IDIV, 2, 1, ilev=ilev_mul, istr='//')
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_MOD, str_MOD, 2, 1, ilev=ilev_mul, istr='%')
     if (ierr.eq.0) &
@@ -333,6 +332,11 @@
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, acc_COUNT, acc_pfx // str_COUNT, 2, 1, conv=result_int,  &
       & sweep=sweep_accum)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_WSUM, str_WSUM, 2, 2, ilev=ilev_call,  &
+      & sweep=sweep_reduce)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, acc_WSUM, acc_pfx // str_WSUM, 3, 2, sweep=sweep_accum)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_FLAT, str_FLAT)
     if (ierr.eq.0) &

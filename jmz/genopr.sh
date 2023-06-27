@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/06/26 12:48:30 fuyuki genopr.sh>
+# Time-stamp: <2023/06/27 16:50:55 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -149,7 +149,7 @@ register_all ()
   register -n 2,1 -i add,'-'                 SUB         'A-B'
   register -n 2,1 -i mul,'*'                 MUL         'A*B'
   register -n 2,1 -i mul,'/'                 DIV         'A/B'
-  register -n 2,1 -i mul,'//'                IDIV -c int 'A//B'
+  register -n 2,1 -i mul,'//' -c int         IDIV        'A//B'
   register -n 2,1 -i mul,'%'                 MOD         'mod(A,B)'
   register -n 2,1 -i exp,'**'                POW         'pow(A,B)'
 
@@ -266,6 +266,7 @@ register_all ()
   register -g reduce -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
   register -g reduce -n 1,1 -o RANK -f LADD,ZERO -i call        SUM     'sum along rank(s)'
   register -g reduce -n 1,1 -o RANK -f -,ZERO    -i call -c int COUNT   'count defined elements along rank(s)'
+  register -g reduce -n 2,2 -o RANK -f -,ZERO    -i call        WSUM    'weighted sum and weight along rank(s)'
 
   # register -g reduce -n 1,1 -i call -p RANK -s 'MIN=' UMIN    'minimum'
   # register -g reduce -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'

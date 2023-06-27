@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/23 22:01:15 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/28 14:26:48 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -310,9 +310,11 @@ contains
        pfx = ' '
     endif
 102 format(A, 'domain', A, ' total = ', I0)
-103 format(A, 'domain', A, ': ', I0, ' / = ', 6(1x, I0))
+103 format(A, 'domain', A, ':c ', I0, ' / = ', 6(1x, I0))
+104 format(A, 'domain', A, ':l ', I0, ' / = ', 6(1x, I0))
     write(utmp, 102) repeat(' ', tab), trim(pfx), dom%n
     write(utmp, 103) repeat(' ', tab), trim(pfx), dom%mco, dom%cidx(0:dom%mco - 1)
+    write(utmp, 104) repeat(' ', tab), trim(pfx), dom%mco, dom%lidx(0:dom%mco - 1)
     do jc = 0, dom%mco - 1
        call get_range_string(ierr, cran, dom%bgn(jc), dom%end(jc), loop_normal, c=dom%cyc(jc))
 108    format('+', I0, '*', I0, ' (', I0, ')')
@@ -829,9 +831,9 @@ contains
        ncur = ncur / domL%iter(jc)
        if (domR%cyc(jc).gt.0) then
           ! write(*, *) 'cond 1', jc
-          jcur = modulo(domR%ofs(jc) + jcur, domR%cyc(jc))
+          jcur = modulo(domR%ofs(jc) + jcur, domR%cyc(jc)) - domR%ofs(jc)
           if (domR%bgn(jc).le.jcur.and.jcur.lt.domR%end(jc)) then
-             n = n + jcur * domR%strd(jc)
+             n = n + (domR%ofs(jc) + jcur) * domR%strd(jc)
           else
              n = -1
              exit
@@ -910,10 +912,10 @@ contains
     n = 0
     do jc = 0, dom%mco - 1
         if (dom%cyc(jc).gt.0) then
-          jj = modulo(dom%ofs(jc) + lidx(jc), dom%cyc(jc))
+          jj = modulo(dom%ofs(jc) + lidx(jc), dom%cyc(jc)) - dom%ofs(jc)
           ! write(*, *) 'cond 1', jc, lidx(jc), dom%ofs(jc), dom%cyc(jc), jj, jt
           if (dom%bgn(jc).le.jj.and.jj.lt.dom%end(jc)) then
-             n = n + jj * dom%strd(jc)
+             n = n + (dom%ofs(jc) + jj) * dom%strd(jc)
           else
              n = -1
              exit
@@ -957,6 +959,7 @@ contains
     integer low,   high
     integer jlogc, jphyc
     integer bp,    ep
+    integer lflg
 
     if (present(ref)) then
        low  = ref%bgn(jodr)
@@ -972,9 +975,11 @@ contains
     if (jlogc.ge.0) then
        osh = lcp(jlogc)%ofs
        cyc = lcp(jlogc)%cyc
+       lflg = lcp(jlogc)%flg
     else
        osh = 0
        cyc = 0
+       lflg = loop_unset
     endif
     ! if (cyc.gt.0) write(*, *) 'glr/0', low, high
     if (jlogc.ge.0) then
@@ -1000,11 +1005,15 @@ contains
        ! write(*, *) b, e, pcp(jphyc)%bgn, pcp(jphyc)%end, pcp(jphyc)%flg
        bp = pcp(jphyc)%bgn
        ep = pcp(jphyc)%end
-       if (pcp(jphyc)%flg.eq.loop_reduce) then
+       flg = pcp(jphyc)%flg
+       if (flg.eq.loop_reduce) then
           bp = 0
           ep = 0
        endif
-       if (pcp(jphyc)%flg.ge.loop_null) then  ! if pcp is set
+       if (flg.eq.loop_reduce.and.lflg.eq.loop_reduce) then
+          b = bp
+          e = ep
+       else if (flg.ge.loop_null) then  ! if pcp is set
           if (cyc.le.0) then
              if (b.eq.null_range) b = bp + osh
              if (e.eq.null_range) e = ep + osh
@@ -1013,8 +1022,12 @@ contains
              if (e.eq.null_range) e = ep
           endif
        endif
-       flg = pcp(jphyc)%flg
     endif
+    ! if (jlogc.ge.0) then
+    !    if (lcp(jlogc)%flg.eq.loop_reduce) then
+    !       write(*, *) 'glr/reduce', jodr, jlogc, b, e, flg
+    !    endif
+    ! endif
     ! if (cyc.gt.0) write(*, *) 'glr/9', b, e
     ! write(*, *) 'glr/9:', b, e
   end subroutine get_logical_range
@@ -1044,6 +1057,90 @@ contains
        enddo
     endif
   end subroutine settle_output_domain
+
+!!!_   . adjust_reduce_domain
+  subroutine adjust_reduce_domain(ierr, domL, domR, pcp, lcp)
+    implicit none
+    integer,       intent(out)   :: ierr
+    type(domain_t),intent(inout) :: domL  ! domain for loop
+    type(domain_t),intent(inout) :: domR  ! domain for reduction
+    type(loop_t),  intent(inout) :: pcp(0:*)  ! physical coordinate to store reduction coordintate
+    type(loop_t),  intent(in)    :: lcp(0:*)  ! logical coordinate
+
+    integer jo, jc
+    integer nx, nc
+    integer b, e, flg, osh, cyc
+
+    ierr = 0
+    ! if (ierr.eq.0) call show_domain(ierr, domL, 'adjust/L0', indent=3)  ! range
+    ! if (ierr.eq.0) call show_domain(ierr, domR, 'adjust/R0', indent=5)  ! no change
+
+    if (ierr.eq.0) then
+       nc = domR%mco
+       nx = count(lcp(0:nc-1)%flg.eq.loop_reduce)
+       do jo = 0, nc - 1
+          pcp(jo)%bgn = domL%bgn(jo)
+          pcp(jo)%end = domL%end(jo)
+          pcp(jo)%flg = loop_null
+          domR%bgn(jo) = 0
+          domR%end(jo) = domL%end(jo) - domL%bgn(jo)
+          domR%strd(jo) = 1
+       enddo
+       do jo = 0, nc - 1
+          jc = domR%cidx(jo)
+          ! write(*, *) '--- ', jc, ' ---'
+          ! write(*, *) '    ', jo, domL%cidx(jo)
+          ! write(*, *) '   l', lcp(jo)%bgn,  lcp(jo)%end,  lcp(jo)%flg
+          if (jc.ge.0) then
+             call get_logical_range(b, e, flg, osh, cyc, jo, lcp, pcp, domR)
+             ! write(*, *) '   p', pcp(jc)%bgn,  pcp(jc)%end,  pcp(jc)%flg
+             ! write(*, *) '   L', domL%bgn(jc), domL%end(jc)
+             ! write(*, *) '   G', b, e, flg, osh, cyc
+             domL%bgn(jc) = b
+             domL%end(jc) = e
+             domR%bgn(jc) = 0
+             domR%end(jc) = e - b
+             if (nx.eq.0.or.lcp(jo)%flg.eq.loop_reduce) then
+                domR%strd(jc) = 0
+                pcp(jc)%flg = loop_reduce
+             else
+                domR%strd(jc) = 1
+                pcp(jc)%flg = loop_null
+             endif
+          endif
+       enddo
+    endif
+    if (ierr.eq.0) then
+       domL%strd(0) = 1
+       do jo = 1, domL%mco
+          domL%strd(jo) = domL%strd(jo-1) * max(1, domL%end(jo-1) - domL%bgn(jo-1))
+       enddo
+       domL%n = domL%strd(domL%mco)
+       do jo = 0, domL%mco - 1
+          domL%strd(jo) = domL%strd(jo) * min(1, max(0, domL%end(jo) - domL%bgn(jo)))
+       enddo
+       do jo = 0, domL%mco - 1
+          domL%end(jo)  = max(domL%end(jo), 1 + domL%bgn(jo))
+          domL%iter(jo) = max(1, domL%end(jo) - domL%bgn(jo))
+       enddo
+       domR%n = 1
+       do jo = 1, nc
+          jc = jo - 1
+          if (domR%strd(jc).gt.0) then
+             domR%strd(jc) = domR%n
+             domR%n = domR%n * max(1, domR%end(jc) - domR%bgn(jc))
+          endif
+       enddo
+       domR%cidx(0:nc-1) = domL%cidx(0:nc-1)
+       domR%strd(nc) = domR%n
+       domR%iter(0:nc-1) = domL%iter(0:nc-1)
+       domR%ofs(0:nc-1) = 0
+       domR%cyc(0:nc-1) = 0
+    endif
+
+    ! if (ierr.eq.0) call show_domain(ierr, domL, 'adjust/L9', indent=3)  ! range
+    ! if (ierr.eq.0) call show_domain(ierr, domR, 'adjust/R9', indent=5)  ! no change
+  end subroutine adjust_reduce_domain
 
 !!!_   . settle_domain_stride
   subroutine settle_domain_stride &

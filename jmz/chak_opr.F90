@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/27 10:38:32 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/27 15:01:43 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -457,18 +457,18 @@ contains
   end subroutine apply_BINARY_lazy_template
 !!!_   . apply_REDUCE_template
   subroutine apply_REDUCE_template &
-       & (ierr, Z, domZ, domY, X, domX, F)
+       & (ierr, Z, domZ, domR, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domY, domX
+    type(domain_t), intent(in)    :: domZ, domR, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jy, jx
+    integer jz, jr, jx
     ierr = 0
-    do jy = 0, domY%n - 1
-       jx = conv_physical_index(jy, domY, domX)
-       jz = conv_physical_index(jy, domY, domZ)
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
        if (jz.ge.0) then
           if (jx.ge.0) then
              Z(jz) = elem_BINARY_template(Z(jz), X(jx), F, F)
@@ -2321,18 +2321,18 @@ contains
 !!!_  - reduction operations
 !!!_   . apply_REDUCE_ADD
   subroutine apply_REDUCE_ADD &
-       & (ierr, Z, domZ, domY, X, domX, F)
+       & (ierr, Z, domZ, domR, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domY, domX
+    type(domain_t), intent(in)    :: domZ, domR, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jy, jx
+    integer jz, jr, jx
     ierr = 0
-    do jy = 0, domY%n - 1
-       jx = conv_physical_index(jy, domY, domX)
-       jz = conv_physical_index(jy, domY, domZ)
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
        if (jz.ge.0) then
           if (jx.ge.0) then
              Z(jz) = elem_ADD(Z(jz), X(jx), F, F)
@@ -2344,18 +2344,18 @@ contains
   end subroutine apply_REDUCE_ADD
 !!!_   . apply_REDUCE_LADD
   subroutine apply_REDUCE_LADD &
-       & (ierr, Z, domZ, domY, X, domX, F)
+       & (ierr, Z, domZ, domR, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domY, domX
+    type(domain_t), intent(in)    :: domZ, domR, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jy, jx
+    integer jz, jr, jx
     ierr = 0
-    do jy = 0, domY%n - 1
-       jx = conv_physical_index(jy, domY, domX)
-       jz = conv_physical_index(jy, domY, domZ)
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
        if (jz.ge.0) then
           if (jx.ge.0) then
              Z(jz) = elem_ADD(Z(jz), X(jx), F, F)
@@ -2367,18 +2367,18 @@ contains
   end subroutine apply_REDUCE_LADD
 !!!_   . apply_REDUCE_MAX
   subroutine apply_REDUCE_MAX &
-       & (ierr, Z, domZ, domY, X, domX, F)
+       & (ierr, Z, domZ, domR, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domY, domX
+    type(domain_t), intent(in)    :: domZ, domR, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jy, jx
+    integer jz, jr, jx
     ierr = 0
-    do jy = 0, domY%n - 1
-       jx = conv_physical_index(jy, domY, domX)
-       jz = conv_physical_index(jy, domY, domZ)
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
        if (jz.ge.0) then
           if (jx.ge.0) then
              Z(jz) = elem_MAX(Z(jz), X(jx), F, F)
@@ -2390,18 +2390,18 @@ contains
   end subroutine apply_REDUCE_MAX
 !!!_   . apply_REDUCE_LMAX
   subroutine apply_REDUCE_LMAX &
-       & (ierr, Z, domZ, domY, X, domX, F)
+       & (ierr, Z, domZ, domR, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domY, domX
+    type(domain_t), intent(in)    :: domZ, domR, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jy, jx
+    integer jz, jr, jx
     ierr = 0
-    do jy = 0, domY%n - 1
-       jx = conv_physical_index(jy, domY, domX)
-       jz = conv_physical_index(jy, domY, domZ)
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
        if (jz.ge.0) then
           if (jx.ge.0) then
              Z(jz) = elem_LMAX(Z(jz), X(jx), F, F)
@@ -2413,18 +2413,18 @@ contains
   end subroutine apply_REDUCE_LMAX
 !!!_   . apply_REDUCE_MIN
   subroutine apply_REDUCE_MIN &
-       & (ierr, Z, domZ, domY, X, domX, F)
+       & (ierr, Z, domZ, domR, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domY, domX
+    type(domain_t), intent(in)    :: domZ, domR, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jy, jx
+    integer jz, jr, jx
     ierr = 0
-    do jy = 0, domY%n - 1
-       jx = conv_physical_index(jy, domY, domX)
-       jz = conv_physical_index(jy, domY, domZ)
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
        if (jz.ge.0) then
           if (jx.ge.0) then
              Z(jz) = elem_MIN(Z(jz), X(jx), F, F)
@@ -2436,18 +2436,18 @@ contains
   end subroutine apply_REDUCE_MIN
 !!!_   . apply_REDUCE_LMIN
   subroutine apply_REDUCE_LMIN &
-       & (ierr, Z, domZ, domY, X, domX, F)
+       & (ierr, Z, domZ, domR, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domY, domX
+    type(domain_t), intent(in)    :: domZ, domR, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jy, jx
+    integer jz, jr, jx
     ierr = 0
-    do jy = 0, domY%n - 1
-       jx = conv_physical_index(jy, domY, domX)
-       jz = conv_physical_index(jy, domY, domZ)
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
        if (jz.ge.0) then
           if (jx.ge.0) then
              Z(jz) = elem_LMIN(Z(jz), X(jx), F, F)
@@ -2459,19 +2459,19 @@ contains
   end subroutine apply_REDUCE_LMIN
 !!!_   . apply_REDUCE_COUNT
   subroutine apply_REDUCE_COUNT &
-       & (ierr, Z, domZ, domY, X, domX, F)
+       & (ierr, Z, domZ, domR, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domY, domX
+    type(domain_t), intent(in)    :: domZ, domR, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jy, jx
+    integer jz, jr, jx
     ierr = 0
-    do jy = 0, domY%n - 1
-       jx = conv_physical_index(jy, domY, domX)
-       jz = conv_physical_index(jy, domY, domZ)
-       ! write(*, *) 'count', jy, jz, jx
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       ! write(*, *) 'count', jr, jz, jx
        if (jz.ge.0) then
           if (jx.ge.0) then
              Z(jz) = elem_COUNT(Z(jz), X(jx), F, F)
@@ -2483,19 +2483,19 @@ contains
   end subroutine apply_REDUCE_COUNT
 !!!_   . apply_REDUCE_SUM
   subroutine apply_REDUCE_SUM &
-       & (ierr, Z, domZ, domY, X, domX, F)
+       & (ierr, Z, domZ, domR, X, domX, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domY, domX
+    type(domain_t), intent(in)    :: domZ, domR, domX
     real(kind=KBUF),intent(in)    :: F
-    integer jz, jy, jx
+    integer jz, jr, jx
     ierr = 0
-    do jy = 0, domY%n - 1
-       jx = conv_physical_index(jy, domY, domX)
-       jz = conv_physical_index(jy, domY, domZ)
-       ! write(*, *) 'sum', jy, jz, jx
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       ! write(*, *) 'sum', jr, jz, jx
        if (jz.ge.0) then
           if (jx.ge.0) then
             Z(jz) = elem_SUM(Z(jz), X(jx), F, F)
@@ -2505,6 +2505,35 @@ contains
        endif
     end do
   end subroutine apply_REDUCE_SUM
+!!!_   . apply_REDUCE_WSUM
+  subroutine apply_REDUCE_WSUM &
+       & (ierr, Z, W, domZ, X, domX, Y, domY, domR, FZ, FX, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(inout) :: W(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    real(kind=KBUF),intent(in)    :: Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: FZ,   FX,   FY
+    integer jz, jr, jx, jy
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jy = conv_physical_index(jr, domR, domY)
+       jz = conv_physical_index(jr, domR, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0.and.jy.ge.0) then
+             ! write(*, *) jr, jz, jx, jy, Z(jz), W(jz), X(jx), Y(jy)
+             if (X(jx).ne.FX.and.Y(jy).ne.FY) then
+                Z(jz) = Z(jz) + Y(jy) * X(jx)
+                W(jz) = W(jz) + Y(jy)
+             endif
+          endif
+       endif
+    end do
+  end subroutine apply_REDUCE_WSUM
 !!!_  - elemental operatior templates
 !!!_   . elem_UNARY_template()
   ELEMENTAL &
