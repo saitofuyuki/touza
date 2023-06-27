@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/27 10:54:27 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/27 11:07:31 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -234,6 +234,7 @@ contains
     character(len=128) :: buf
     character(len=lpath) :: str
     character cmd
+    integer jfile
 
     ierr = 0
     utmp = choice(ulog, u)
@@ -274,7 +275,8 @@ contains
                 endif
              endif
           case(hk_file)
-             write(str, 111, IOSTAT=ierr) trim(aqueue(j)%desco)
+             jfile = file_h2item(aqueue(j)%term)
+             write(str, 111, IOSTAT=ierr) trim(ofile(jfile)%name)
           case default
              write(str, 121, IOSTAT=ierr) trim(aqueue(j)%desco)
           end select
@@ -4526,6 +4528,7 @@ contains
           if (ierr.eq.0) call mpop_stack(ierr, bufh, pop, keep=.TRUE.)
           if (ierr.eq.0) then
              do jx = 0, pop - 1
+                if (is_anchor(bufh(jx))) cycle
                 if (ierr.eq.0) call write_file(ierr, ofile(jfile), bufh(jx), mstack-pop+jx, levv)
              enddo
           endif
