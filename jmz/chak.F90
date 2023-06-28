@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/28 14:27:14 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/28 16:22:38 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -5341,7 +5341,7 @@ contains
        if (ierr.eq.0) call get_domain_result(ierr, cjoin, doml, htmp%pcp)
        if (ierr.eq.0) call join_list(ierr, vjoin, vals(0:nbuf-1))
 211    format('#', A, 1x, A)
-       write(utmp, 211) trim(cjoin), trim(vjoin)
+       if (ierr.eq.0) write(utmp, 211) trim(cjoin), trim(vjoin)
     endif
 
     if (ierr.eq.0) then
@@ -7260,24 +7260,30 @@ contains
           endif
           flgx = -1
           do j = 0, nbuf - 1
-             call get_logical_range &
-                  & (b, e, flg, odmy, cdmy, jo, lstk(j)%lcp, pbuf(j)%pcp, domR(j))
-             flgx = max(flgx, flg)
-             if (isi) then
-                if (b.ne.null_range) low = max(low, b)
-                if (e.ne.null_range) high = min(high, e)
-             else
-                if (b.ne.null_range) low = min(low, b)
-                if (e.ne.null_range) high = max(high, e)
+             if (ierr.eq.0) then
+                call get_logical_range &
+                     & (ierr, b, e, flg, odmy, cdmy, jo, lstk(j)%lcp, pbuf(j)%pcp, domR(j))
+             endif
+             if (ierr.eq.0) then
+                flgx = max(flgx, flg)
+                if (isi) then
+                   if (b.ne.null_range) low = max(low, b)
+                   if (e.ne.null_range) high = min(high, e)
+                else
+                   if (b.ne.null_range) low = min(low, b)
+                   if (e.ne.null_range) high = max(high, e)
+                endif
              endif
           enddo
-          if (low.eq.lini) low = 0
-          ! if (high.eq.hini) high = low + max(0, stp)
-          if (high.eq.hini) then
-             if (flgx.gt.loop_null) high = low + 1
+          if (ierr.eq.0) then
+             if (low.eq.lini) low = 0
+             ! if (high.eq.hini) high = low + max(0, stp)
+             if (high.eq.hini) then
+                if (flgx.gt.loop_null) high = low + 1
+             endif
+             domL%bgn(jo) = low
+             domL%end(jo) = high
           endif
-          domL%bgn(jo) = low
-          domL%end(jo) = high
        enddo
     endif
     return
@@ -7311,18 +7317,30 @@ contains
 
     integer jo
     integer b, e, flg, osh, cyc
+    ! character(len=128) :: txt
 
     ierr = 0
 
     do jo = 0, ref%mco - 1
-       call get_logical_range &
-            & (b, e, flg, osh, cyc, jo, lcp, pcp, dom, ref)
-       ! write(*, *) 'input', jo, b, e, flg, osh, cyc
-       dom%bgn(jo) = b
-       dom%end(jo) = max(e, 1+b)
-       dom%iter(jo) = max(1, e - b)
-       dom%ofs(jo) = osh
-       dom%cyc(jo) = cyc
+       if (ierr.eq.0) then
+          call get_logical_range &
+               & (ierr, b, e, flg, osh, cyc, jo, lcp, pcp, dom, ref)
+       endif
+       if (ierr.eq.0) then
+          dom%bgn(jo) = b
+          dom%end(jo) = max(e, 1+b)
+          dom%iter(jo) = max(1, e - b)
+          dom%ofs(jo) = osh
+          dom%cyc(jo) = cyc
+       endif
+!        if (cyc.gt.0) then
+!           if (e.gt.b .and. cyc.gt.e) then
+!              ierr = ERR_INVALID_PARAMETER
+! 101          format('too much cyclic length at ', I0, ': ', I0, ' > ', I0, ':', I0)
+!              write(txt, 101) jo, cyc, b, e
+!              call message(ierr, txt)
+!           endif
+!        endif
     enddo
     if (ierr.eq.0) then
        call settle_domain_stride(ierr, dom, pcp)

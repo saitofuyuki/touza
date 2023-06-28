@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/06/20 15:30:22 fuyuki demo-chak.sh.in>
+# Time-stamp: <2023/06/28 16:07:54 fuyuki demo-chak.sh.in>
 
 main ()
 {
@@ -150,8 +150,11 @@ demo_operation ()
   local w=8
   run_demo cshift:0+1 -TRIM 18 $src C0=::+1:$w FLUSH -i
   run_demo cshift:0-1 -TRIM 18 $src C0=::-1:$w FLUSH -i
-  run_demo cshiftP:0+1 -TRIM 18 $src C0=::+1:$((w+1)) FLUSH -i
-  run_demo cshiftP:0-1 -TRIM 18 $src C0=::-1:$((w+1)) FLUSH -i
+  run_demo cshiftP:0+1err -TRIM 18 $src C0=::+1:$((w+1)) FLUSH -i
+
+  run_demo cshiftP:0+1 -TRIM 18 $src C0=:$((w+1)) CLONE C0=::+1:$((w+1)) FLUSH -i
+  run_demo cshiftP:0-1 -TRIM 18 $src C0=:$((w+1)) CLONE C0=::-1:$((w+1)) FLUSH -i
+
   run_demo cshiftM:0+1 -TRIM 18 $src C0=::+1:$((w-1)) FLUSH -i
   run_demo cshiftM:0-1 -TRIM 18 $src C0=::-1:$((w-1)) FLUSH -i
 
