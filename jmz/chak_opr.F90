@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/27 15:01:43 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/28 17:06:43 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -457,12 +457,13 @@ contains
   end subroutine apply_BINARY_lazy_template
 !!!_   . apply_REDUCE_template
   subroutine apply_REDUCE_template &
-       & (ierr, Z, domZ, domR, X, domX, F)
+       & (ierr, Z, domZ, X, domX, domR, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domR, domX
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
     real(kind=KBUF),intent(in)    :: F
     integer jz, jr, jx
     ierr = 0
@@ -2321,12 +2322,13 @@ contains
 !!!_  - reduction operations
 !!!_   . apply_REDUCE_ADD
   subroutine apply_REDUCE_ADD &
-       & (ierr, Z, domZ, domR, X, domX, F)
+       & (ierr, Z, domZ, X, domX, domR, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domR, domX
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
     real(kind=KBUF),intent(in)    :: F
     integer jz, jr, jx
     ierr = 0
@@ -2344,12 +2346,13 @@ contains
   end subroutine apply_REDUCE_ADD
 !!!_   . apply_REDUCE_LADD
   subroutine apply_REDUCE_LADD &
-       & (ierr, Z, domZ, domR, X, domX, F)
+       & (ierr, Z, domZ, X, domX, domR, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domR, domX
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
     real(kind=KBUF),intent(in)    :: F
     integer jz, jr, jx
     ierr = 0
@@ -2367,12 +2370,13 @@ contains
   end subroutine apply_REDUCE_LADD
 !!!_   . apply_REDUCE_MAX
   subroutine apply_REDUCE_MAX &
-       & (ierr, Z, domZ, domR, X, domX, F)
+       & (ierr, Z, domZ, X, domX, domR, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domR, domX
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
     real(kind=KBUF),intent(in)    :: F
     integer jz, jr, jx
     ierr = 0
@@ -2390,12 +2394,13 @@ contains
   end subroutine apply_REDUCE_MAX
 !!!_   . apply_REDUCE_LMAX
   subroutine apply_REDUCE_LMAX &
-       & (ierr, Z, domZ, domR, X, domX, F)
+       & (ierr, Z, domZ, X, domX, domR, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domR, domX
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
     real(kind=KBUF),intent(in)    :: F
     integer jz, jr, jx
     ierr = 0
@@ -2413,12 +2418,13 @@ contains
   end subroutine apply_REDUCE_LMAX
 !!!_   . apply_REDUCE_MIN
   subroutine apply_REDUCE_MIN &
-       & (ierr, Z, domZ, domR, X, domX, F)
+       & (ierr, Z, domZ, X, domX, domR, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domR, domX
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
     real(kind=KBUF),intent(in)    :: F
     integer jz, jr, jx
     ierr = 0
@@ -2436,12 +2442,13 @@ contains
   end subroutine apply_REDUCE_MIN
 !!!_   . apply_REDUCE_LMIN
   subroutine apply_REDUCE_LMIN &
-       & (ierr, Z, domZ, domR, X, domX, F)
+       & (ierr, Z, domZ, X, domX, domR, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domR, domX
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
     real(kind=KBUF),intent(in)    :: F
     integer jz, jr, jx
     ierr = 0
@@ -2459,12 +2466,13 @@ contains
   end subroutine apply_REDUCE_LMIN
 !!!_   . apply_REDUCE_COUNT
   subroutine apply_REDUCE_COUNT &
-       & (ierr, Z, domZ, domR, X, domX, F)
+       & (ierr, Z, domZ, X, domX, domR, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domR, domX
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
     real(kind=KBUF),intent(in)    :: F
     integer jz, jr, jx
     ierr = 0
@@ -2483,12 +2491,13 @@ contains
   end subroutine apply_REDUCE_COUNT
 !!!_   . apply_REDUCE_SUM
   subroutine apply_REDUCE_SUM &
-       & (ierr, Z, domZ, domR, X, domX, F)
+       & (ierr, Z, domZ, X, domX, domR, F)
     implicit none
     integer,        intent(out)   :: ierr
     real(kind=KBUF),intent(inout) :: Z(0:*)
     real(kind=KBUF),intent(in)    :: X(0:*)
-    type(domain_t), intent(in)    :: domZ, domR, domX
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
     real(kind=KBUF),intent(in)    :: F
     integer jz, jr, jx
     ierr = 0
@@ -2523,6 +2532,7 @@ contains
        jx = conv_physical_index(jr, domR, domX)
        jy = conv_physical_index(jr, domR, domY)
        jz = conv_physical_index(jr, domR, domZ)
+       ! write(*, *) 'wsum', jr, jz, jx, jy
        if (jz.ge.0) then
           if (jx.ge.0.and.jy.ge.0) then
              ! write(*, *) jr, jz, jx, jy, Z(jz), W(jz), X(jx), Y(jy)
