@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/28 14:26:48 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/28 16:46:57 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -671,7 +671,7 @@ contains
     ierr = 0
     str = ' '
     do jodr = 0, dom%mco - 1
-       if (ierr.eq.0) call get_logical_range(b, e, flg, odmy, cdmy, jodr, lcp, pcp, dom)
+       if (ierr.eq.0) call get_logical_range(ierr, b, e, flg, odmy, cdmy, jodr, lcp, pcp, dom)
        if (ierr.eq.0) call get_range_string(ierr, cran, b, e, flg)
        if (ierr.eq.0) then
           jphyc = dom%cidx(jodr)
@@ -829,18 +829,13 @@ contains
     do jc = 0, domL%mco - 1
        jcur = mod(ncur, domL%iter(jc))
        ncur = ncur / domL%iter(jc)
-       if (domR%cyc(jc).gt.0) then
-          ! write(*, *) 'cond 1', jc
-          jcur = modulo(domR%ofs(jc) + jcur, domR%cyc(jc)) - domR%ofs(jc)
-          if (domR%bgn(jc).le.jcur.and.jcur.lt.domR%end(jc)) then
-             n = n + (domR%ofs(jc) + jcur) * domR%strd(jc)
+       if (domR%bgn(jc).le.jcur.and.jcur.lt.domR%end(jc)) then
+          jcur = domR%ofs(jc) + jcur
+          if (domR%cyc(jc).gt.0) then
+             n = n + modulo(jcur, domR%cyc(jc)) * domR%strd(jc)
           else
-             n = -1
-             exit
+             n = n + jcur * domR%strd(jc)
           endif
-       else if (domR%bgn(jc).le.jcur.and.jcur.lt.domR%end(jc)) then
-          ! write(*, *) 'cond 0', jc
-          n = n + (domR%ofs(jc) + jcur) * domR%strd(jc)
        else
           n = -1
           exit
@@ -911,18 +906,13 @@ contains
     integer jc, jj
     n = 0
     do jc = 0, dom%mco - 1
-        if (dom%cyc(jc).gt.0) then
-          jj = modulo(dom%ofs(jc) + lidx(jc), dom%cyc(jc)) - dom%ofs(jc)
-          ! write(*, *) 'cond 1', jc, lidx(jc), dom%ofs(jc), dom%cyc(jc), jj, jt
-          if (dom%bgn(jc).le.jj.and.jj.lt.dom%end(jc)) then
-             n = n + (dom%ofs(jc) + jj) * dom%strd(jc)
+       if (dom%bgn(jc).le.lidx(jc).and.lidx(jc).lt.dom%end(jc)) then
+          jj = dom%ofs(jc) + lidx(jc)
+          if (dom%cyc(jc).gt.0) then
+             n = n + modulo(jj, dom%cyc(jc)) * dom%strd(jc)
           else
-             n = -1
-             exit
+             n = n + jj * dom%strd(jc)
           endif
-       else if (dom%bgn(jc).le.lidx(jc).and.lidx(jc).lt.dom%end(jc)) then
-          ! write(*, *) 'cond 0', jc, lidx(jc)
-          n = n + (dom%ofs(jc) + lidx(jc)) * dom%strd(jc)
        else
           n = -1
           exit
@@ -948,7 +938,8 @@ contains
 
 !!!_   . get_logical_range
   subroutine get_logical_range &
-       & (b, e, flg, osh, cyc, jodr, lcp, pcp, dom, ref)
+       & (ierr, b, e, flg, osh, cyc, jodr, lcp, pcp, dom, ref)
+    integer,       intent(out)         :: ierr
     integer,       intent(out)         :: b, e, flg, osh, cyc
     integer,       intent(in)          :: jodr
     type(loop_t),  intent(in)          :: lcp(0:*)
@@ -960,7 +951,9 @@ contains
     integer jlogc, jphyc
     integer bp,    ep
     integer lflg
+    character(len=128) :: txt
 
+    ierr = 0
     if (present(ref)) then
        low  = ref%bgn(jodr)
        high = ref%end(jodr)
@@ -1020,6 +1013,14 @@ contains
           else
              if (b.eq.null_range) b = bp
              if (e.eq.null_range) e = ep
+          endif
+       endif
+       if (cyc.gt.0) then
+          if (flg.eq.loop_normal.and.cyc.gt.ep) then
+             ierr = ERR_INVALID_PARAMETER
+101          format('too much cyclic length at ', I0, ': ', I0, ' > ', I0, ':', I0)
+             write(txt, 101) jphyc, cyc, bp, ep
+             call message(ierr, txt)
           endif
        endif
     endif
@@ -1092,20 +1093,24 @@ contains
           ! write(*, *) '    ', jo, domL%cidx(jo)
           ! write(*, *) '   l', lcp(jo)%bgn,  lcp(jo)%end,  lcp(jo)%flg
           if (jc.ge.0) then
-             call get_logical_range(b, e, flg, osh, cyc, jo, lcp, pcp, domR)
+             if (ierr.eq.0) then
+                call get_logical_range(ierr, b, e, flg, osh, cyc, jo, lcp, pcp, domR)
+             endif
              ! write(*, *) '   p', pcp(jc)%bgn,  pcp(jc)%end,  pcp(jc)%flg
              ! write(*, *) '   L', domL%bgn(jc), domL%end(jc)
              ! write(*, *) '   G', b, e, flg, osh, cyc
-             domL%bgn(jc) = b
-             domL%end(jc) = e
-             domR%bgn(jc) = 0
-             domR%end(jc) = e - b
-             if (nx.eq.0.or.lcp(jo)%flg.eq.loop_reduce) then
-                domR%strd(jc) = 0
-                pcp(jc)%flg = loop_reduce
-             else
-                domR%strd(jc) = 1
-                pcp(jc)%flg = loop_null
+             if (ierr.eq.0) then
+                domL%bgn(jc) = b
+                domL%end(jc) = e
+                domR%bgn(jc) = 0
+                domR%end(jc) = e - b
+                if (nx.eq.0.or.lcp(jo)%flg.eq.loop_reduce) then
+                   domR%strd(jc) = 0
+                   pcp(jc)%flg = loop_reduce
+                else
+                   domR%strd(jc) = 1
+                   pcp(jc)%flg = loop_null
+                endif
              endif
           endif
        enddo
