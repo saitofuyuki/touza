@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/29 07:43:28 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/29 08:47:38 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1586,6 +1586,14 @@ contains
     endif
     if (ierr.eq.0) then
        jq = mqueue - 1
+       if (aqueue(jq)%lcp(cidx)%flg.ne.loop_unset) then
+          ierr = ERR_INVALID_PARAMETER
+          call message(ierr, 'repeat operation for same coordinate.')
+       endif
+    endif
+    if (ierr.eq.0) then
+       ! call show_lpp(ierr, aqueue(jq)%lcp, 'aq')
+       ! call show_lpp(ierr, (/lpp/), 'pco')
        aqueue(jq)%lcp(cidx) = lpp
        aqueue(jq)%lcp(cidx)%name = arg(1:jrep)
        bstack(mstack-pop:mstack-1)%lcp(cidx) = lpp
