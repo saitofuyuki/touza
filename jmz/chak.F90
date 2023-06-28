@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/28 16:22:38 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/28 17:16:06 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -6599,33 +6599,41 @@ contains
     real(kind=KBUF),intent(in),optional :: neutral
     interface
        subroutine func &
-            & (ierr, Z, domZ, domY, X, domX, F)
+            & (ierr, Z, domZ, X, domX, domR, F)
          use chak_lib,only: KFLT, KDBL, domain_t
          implicit none
          integer,          intent(out)   :: ierr
          real(kind=__KBUF),intent(inout) :: Z(0:*)
          real(kind=__KBUF),intent(in)    :: X(0:*)
-         type(domain_t),   intent(in)    :: domZ, domY, domX
+         type(domain_t),   intent(in)    :: domZ, domX
+         type(domain_t),   intent(in)    :: domR
          real(kind=__KBUF),intent(in)    :: F
        end subroutine func
     end interface
 
-    integer jout
+    integer jout, nout
     integer jinp, ninp
-    integer hbL, hbR
-    integer jbL, jbR
-    real(kind=KBUF) :: fillR, fillL
+    integer hbZ, hbX
+    integer jbZ, jbX
+    real(kind=KBUF) :: fillX, fillZ
     integer ofsi
     integer m
 
+    integer jx
     integer,parameter :: nb = 1
-    integer btmp(nb)
-    type(domain_t) :: domL, domZ, domR(nb)
-    type(stack_t)  :: ltmp(nb)
+    integer btmp(0:nb-1)
+    type(domain_t) :: domZ(1)
+    type(stack_t)  :: stmp(0:nb-1)
+
+    type(buffer_t) :: buft(1)
+    type(domain_t) :: domR, domX(0:nb-1)
+    type(stack_t)  :: ltmp(0:nb-1)
 
     ierr = 0
 
     ninp = size(bufi)
+    nout = size(lefts)
+
     ofsi = 0
     if (is_anchor(bufi(ofsi))) then
        ninp = ninp - 1
@@ -6638,48 +6646,52 @@ contains
        return
     endif
 
-    do jout = ninp - 1, 0, -1
-       jinp = ofsi + jout
-       ! ptmp(nb) = mstack - ninp + jout
-       ! stmp(nb) = bstack(mstack - ninp + jout)
-       ltmp(nb) = lefts(jout)   ! use logical coordinate at left
-
+    do jx = 1, nout
        if (ierr.eq.0) then
-          hbL = lefts(jout)%bh
-          hbR = bufi(jinp)
-          jbL = buf_h2item(hbL)
-          jbR = buf_h2item(hbR)
-          fillR = obuffer(jbR)%undef
-          btmp(nb) = hbR
+          jout = nout - jx
+          jinp = ofsi + jout
+
+          ltmp(0) = lefts(jout)   ! use logical coordinate at left
+          btmp(0) = bufi(jinp)
+          stmp(0) = bstack(mstack-jx)
+
+          hbZ = lefts(jout)%bh
+          hbX = bufi(jinp)
+          jbZ = buf_h2item(hbZ)
+          jbX = buf_h2item(hbX)
+          fillX = obuffer(jbX)%undef
        endif
 
        if (ierr.eq.0) then
-          m = buffer_vmems(obuffer(jbR))
+          m = buffer_vmems(obuffer(jbX))
           if (m.lt.0) cycle
        endif
        if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 1)
-       ! if (ierr.eq.0) call show_lpp(ierr, lefts(jout)%lcp(:))
 
-       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, btmp, ltmp, nb, obuffer(jbL))
-       if (ierr.eq.0) call set_inclusive_domain(ierr, domL, domR, btmp, ltmp, nb)
-       if (ierr.eq.0) call settle_output_domain(ierr, domL)
-       if (ierr.eq.0) call settle_input_domain(ierr, domR(1), btmp(1), ltmp(1), domL)
-       if (ierr.eq.0) call settle_reduce_domain(ierr, domZ, obuffer(jbL), lefts(jout), domL)
-       if (ierr.eq.0) call reduce_output_buffer(ierr, obuffer(jbL), lefts(jout), btmp, domZ)
+       if (ierr.eq.0) call tweak_coordinates(ierr, domR, domX, btmp, stmp, nb, buft(1))
+       if (ierr.eq.0) call tweak_coordinates_core(ierr, domZ, buft, ltmp, 1)  ! cidx
+       if (ierr.eq.0) call set_inclusive_domain(ierr, domR, domX, btmp, stmp, nb)
+
+       if (ierr.eq.0) call adjust_reduce_domain(ierr, domR, domZ(1), buft(1)%pcp, ltmp(0)%lcp)
+
+       if (ierr.eq.0) call settle_input_domain(ierr, domX(0), btmp(0), stmp(0), domR)
+
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), btmp(0:0), domZ(1), buft(1))
 
        ! if (ierr.eq.0) call show_domain(ierr, domZ,    'reduce/Z', indent=3)
        ! if (ierr.eq.0) call show_domain(ierr, domL,    'reduce/L', indent=4)
        ! if (ierr.eq.0) call show_domain(ierr, domR(1), 'reduce/R', indent=5)
-       fillL = choice(fillR, neutral)
-       obuffer(jbL)%vd(:) = fillL
+       fillZ = choice(fillX, neutral)
+       obuffer(jbZ)%vd(:) = fillZ
 
        if (ierr.eq.0) then
           call func &
                & (ierr, &
-               &  obuffer(jbL)%vd, domZ,    domL, &
-               &  obuffer(jbR)%vd, domR(1), fillR)
+               &  obuffer(jbZ)%vd, domZ(1), &
+               &  obuffer(jbX)%vd, domX(0), &
+               &  domR, fillX)
        endif
-       if (ierr.eq.0) call set_unary_descr(ierr, hbL, hbR, hopr)
+       if (ierr.eq.0) call set_unary_descr(ierr, hbZ, hbX, hopr)
     enddo
 
   end subroutine apply_opr_REDUCE
@@ -7333,14 +7345,6 @@ contains
           dom%ofs(jo) = osh
           dom%cyc(jo) = cyc
        endif
-!        if (cyc.gt.0) then
-!           if (e.gt.b .and. cyc.gt.e) then
-!              ierr = ERR_INVALID_PARAMETER
-! 101          format('too much cyclic length at ', I0, ': ', I0, ' > ', I0, ':', I0)
-!              write(txt, 101) jo, cyc, b, e
-!              call message(ierr, txt)
-!           endif
-!        endif
     enddo
     if (ierr.eq.0) then
        call settle_domain_stride(ierr, dom, pcp)
@@ -7355,74 +7359,6 @@ contains
        ! enddo
     endif
   end subroutine settle_input_domain_core
-
-!!!_   . settle_reduce_domain
-  subroutine settle_reduce_domain(ierr, dom, buf, lstk, ref)
-    implicit none
-    integer,       intent(out)   :: ierr
-    type(domain_t),intent(inout) :: dom
-    type(buffer_t),intent(inout) :: buf
-    type(stack_t), intent(in)    :: lstk ! only for logical coordinates
-    type(domain_t),intent(in)    :: ref
-
-    integer jo, jc
-    integer nx
-
-    ierr = 0
-    nx = count(lstk%lcp(0:ref%mco-1)%flg.eq.loop_reduce)
-    dom = ref
-    do jo = 0, dom%mco - 1
-       if (nx.eq.0.or.lstk%lcp(jo)%flg.eq.loop_reduce) then
-          dom%strd(jo) = 0
-          dom%bgn(jo) = max(0, max(ref%bgn(jo), dom%bgn(jo)) - ref%bgn(jo))
-          dom%end(jo) = max(0, min(ref%end(jo), dom%end(jo)) - ref%bgn(jo))
-          buf%pcp(jo)%flg = loop_reduce
-       else
-          buf%pcp(jo)%flg = loop_normal
-       endif
-       buf%pcp(jo)%bgn = ref%bgn(jo)
-       buf%pcp(jo)%end = ref%end(jo)
-       dom%ofs(jo) = 0
-    enddo
-    if (ierr.eq.0) then
-       dom%n = 1
-       do jo = 1, dom%mco
-          jc = jo - 1
-          if (dom%strd(jc).gt.0) then
-             dom%strd(jc) = dom%n
-             dom%n = dom%n * max(1, dom%end(jc) - dom%bgn(jc))
-          endif
-       enddo
-    endif
-
-  end subroutine settle_reduce_domain
-
-!!!_   . rotate_domain
-  subroutine rotate_domain(ierr, dom, med, ref)
-    implicit none
-    integer,       intent(out)   :: ierr
-    type(domain_t),intent(inout) :: dom
-    type(domain_t),intent(in)    :: med, ref
-
-    type(domain_t) :: dbuf
-    integer jc, jsrc
-
-    ierr = 0
-    dbuf = dom
-
-    do jc = 0, dom%mco - 1
-       jsrc = ref%cidx(jc)
-       jsrc = med%cidx(jsrc)
-       dom%cidx(jc) = jsrc
-       dom%lidx(jc) = dbuf%lidx(jsrc)
-       dom%ofs(jc)  = dbuf%ofs(jsrc)
-       dom%cyc(jc)  = dbuf%cyc(jsrc)
-       dom%iter(jc) = dbuf%iter(jsrc)
-       dom%strd(jc) = dbuf%strd(jsrc)
-       dom%bgn(jc)  = dbuf%bgn(jsrc)
-       dom%end(jc)  = dbuf%end(jsrc)
-    enddo
-  end subroutine rotate_domain
 
 !!!_   . settle_domain_loop
   subroutine settle_domain_loop(ierr, dom, pcp, refd)
@@ -7567,56 +7503,6 @@ contains
        endif
     enddo
   end subroutine set_reduce_buffer
-
-!!!_   . reduce_output_buffer - set result buffer as reduction
-  subroutine reduce_output_buffer &
-       & (ierr, buf, lstk, hbufi, dom, bref)
-    use TOUZA_std,only: choice
-    use TOUZA_Nio,only: parse_header_size
-    implicit none
-    integer,       intent(out)   :: ierr
-    type(buffer_t),intent(inout) :: buf
-    type(stack_t), intent(inout) :: lstk
-    integer,       intent(in)    :: hbufi(0:)
-    type(domain_t),intent(in)    :: dom
-    type(buffer_t),intent(in),optional :: bref
-    integer kv
-    integer jb
-    integer jinp, ninp
-    integer jc
-    integer reff
-
-    ierr = 0
-    if (present(bref)) then
-       buf%pcp(:) = bref%pcp(:)
-    endif
-
-    ninp = size(hbufi)
-    ! set output buffer
-    if (ierr.eq.0) then
-       ! kv = kv_flt
-       kv = kv_int
-       reff = -1
-       do jinp = 0, ninp - 1
-          jb = buf_h2item(hbufi(jinp))
-          kv = max(kv, obuffer(jb)%k)
-          if (obuffer(jb)%reff.ge.0) then
-             if (reff.lt.0) reff = obuffer(jb)%reff
-          endif
-       enddo
-       buf%k = kv
-       buf%reff = reff
-    endif
-    if (ierr.eq.0) then
-       lstk%lcp(:) = def_loop
-    endif
-    if (ierr.eq.0) then
-       do jc = dom%mco, lcoor - 1
-          buf%pcp(jc) = def_loop
-       enddo
-       call alloc_buffer_t(ierr, buf, dom%n)
-    endif
-  end subroutine reduce_output_buffer
 
 !!!_   & buf_index() - convert buffer/stack handle to buffer index
   integer function buf_index(handle) result(n)
