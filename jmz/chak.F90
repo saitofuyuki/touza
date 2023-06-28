@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/28 17:16:06 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/29 07:43:28 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1455,15 +1455,8 @@ contains
 
     integer lasth, pop, push
 
-    integer jc
-    integer jpb, jpe, larg
-    character,parameter :: csep = item_sep       ! coordinate separaor
-
     integer jq
     integer jsbgn, jsend
-    type(loop_t) :: lpp
-    integer jrep
-    integer flag
 
     ierr = 0
 
@@ -1484,13 +1477,41 @@ contains
        endif
     endif
 
-    jq = mqueue - 1
-    jsbgn = mstack - pop
-    jsend = mstack
+    if (ierr.eq.0) then
+       jq = mqueue - 1
+       jsbgn = mstack - pop
+       jsend = mstack
+       call parse_shape_par(ierr, bstack(jsbgn:jsend-1), aqueue(jq), arg, hopr)
+    endif
 
+    return
+  end subroutine parse_buffer_shape
+
+!!!_   . parse_shape_par
+  subroutine parse_shape_par &
+       & (ierr, stack, queue, arg, hopr, lflag)
+    implicit none
+    integer,         intent(out)   :: ierr
+    type(stack_t),   intent(inout) :: stack(:)
+    type(queue_t),   intent(inout) :: queue
+    character(len=*),intent(in)    :: arg
+    integer,         intent(in)    :: hopr
+    integer,optional,intent(in)    :: lflag
+
+    character,parameter :: csep = item_sep       ! coordinate separaor
+    integer jc, js
+    integer larg
+    integer jpb, jpe, jrep
+    type(loop_t) :: lpp
+    integer flag
+    character(len=lopr) :: copr
+
+    ierr = 0
     jc = 0
     larg = len_trim(arg)
     jpb = 0
+    flag = switch_shape_operator(hopr)
+
     do
        if (jpb.ge.larg) exit
        jpe = index(arg(jpb+1:), csep) + jpb
@@ -1498,25 +1519,31 @@ contains
        if (jpb+1.gt.jpe-1) then
           continue
        else if (jc.ge.lcoor) then
+          call query_opr_name(ierr, copr, hopr)
           ierr = ERR_INSUFFICIENT_BUFFER
-          call message(ierr, 'too many ranks to SHAPE:' // trim(arg))
+          call message(ierr, 'too many ranks for ' // trim(copr) // ':' // trim(arg))
        else
-          flag = switch_shape_operator(hopr)
           call decompose_coordinate_mod(ierr, jrep, lpp, arg(jpb+1:jpe-1), flag)
           if (ierr.eq.0) then
-             aqueue(jq)%lcp(jc) = lpp
-             aqueue(jq)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
-             bstack(jsbgn:jsend-1)%lcp(jc) = lpp
-             bstack(jsbgn:jsend-1)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
+             if (present(lflag)) then
+                lpp%flg = lflag
+             endif
+             queue%lcp(jc) = lpp
+             queue%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
+             stack(:)%lcp(jc) = lpp
+             stack(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
           endif
-          ! aqueue(jq)%lefts(:)%lcp(jc)%name   = adjustl(arg(jpb+1:jpe-1))
-          ! bstack(jsbgn:jsend-1)%lcp(jc)%name = adjustl(arg(jpb+1:jpe-1))
        endif
        jc = jc + 1
        jpb = jpe
     enddo
-    return
-  end subroutine parse_buffer_shape
+    if (ierr.eq.0) then
+       queue%lcp(jc:) = def_loop
+       do js = 1, size(stack)
+          stack(js)%lcp(jc:) = def_loop
+       enddo
+    endif
+  end subroutine parse_shape_par
 
 !!!_   . parse_coordinate_opr
   subroutine parse_coordinate_opr (ierr, cidx, arg, hopr)
@@ -1813,7 +1840,6 @@ contains
 
     character(len=8) :: copr
     integer jpar, jend
-    integer jpb,  jpe
 
     integer upop,   npop
     integer upush,  npush
@@ -1821,15 +1847,12 @@ contains
     integer nfetch, ntgt
     integer jb,     jx
 
-    integer   flag
-    integer   jc
     character,parameter :: csep = item_sep       ! coordinate separaor
     integer   jq
     integer   jsbgn, jsend
-    integer   jrep
-    type(loop_t) :: lpp
 
     ierr = 0
+
     if (ierr.eq.0) call inquire_opr_nstack(ierr, upop, upush, hopr)
     ! if (ierr.eq.0) then
     !    if (upop.ne.1.or.upush.ne.1) then
@@ -1873,37 +1896,13 @@ contains
        if (jpar.eq.1) jpar = jend
        if (arg(jpar:jend-1).eq.shape_sweep_reduce) jpar = jend
 
-       flag = switch_shape_operator(hopr)
-
-       jc = 0
-       jpb = jpar - 1
        jq = mqueue - 1
        jsbgn = mstack - npop
        jsend = mstack
-       do
-          if (jpb.ge.jend-1) exit
-          jpe = index(arg(jpb+1:), csep) + jpb
-          if (jpe.eq.jpb) jpe = jend + 1
-          if (jpb+1.gt.jpe-1) then
-             continue
-          else if (jc.ge.lcoor) then
-             ierr = ERR_INSUFFICIENT_BUFFER
-             call message(ierr, 'too many ranks to reduction:' // trim(arg))
-          else
-             call decompose_coordinate_mod(ierr, jrep, lpp, arg=arg(jpb+1:jpe-1), flag=flag)
-             if (ierr.eq.0) then
-                lpp%flg = loop_reduce
-                aqueue(jq)%lcp(jc) = lpp
-                aqueue(jq)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
-                bstack(jsbgn:jsend-1)%lcp(jc) = lpp
-                bstack(jsbgn:jsend-1)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
-             endif
-          endif
-          jpb = jpe
-          jc = jc + 1
-       enddo
-    endif
 
+       call parse_shape_par &
+            & (ierr, bstack(jsbgn:jsend-1), aqueue(jq), arg(jpar:), hopr, loop_reduce)
+    endif
     return
   end subroutine stack_reduction_opr
 
@@ -2518,6 +2517,7 @@ contains
           enddo
        endif
     endif
+    ! write(*, *) 'EXCH/9'
     if (ierr.eq.0) call mset_stack_queue(ierr)
   end subroutine stack_EXCH
 
@@ -3409,6 +3409,8 @@ contains
                 obuffer(jb)%stt = obuffer(jb)%stt + 1
              endif
           endif
+          ! write(*, *) 'qfs', jq, jx, n, jd, hb, bpos
+          ! call show_lpp(ierr, aqueue(jq)%lefts(jd)%lcp, 'qfs')
        enddo
     endif
   end subroutine queue_fetch_stack
@@ -3503,6 +3505,9 @@ contains
     if (push.gt.0) then
        if (ierr.eq.0) call mpush_stack_st(ierr, lefts, push, bh)
     endif
+    ! do js = 0, push - 1
+    !    call show_lpp(ierr, lefts(js)%lcp, 'mset')
+    ! enddo
   end subroutine mset_stack_st
 
 !!!_   . assign_free_buffer
@@ -4434,11 +4439,19 @@ contains
           call trace_queue(jerr, aqueue(jq), levv)
        endif
        push = size(aqueue(jq)%lefts)
+       ! write(*, *) 'batch/normal', jq
        if (.not.is_operator_stacks(hterm)) then
           do js = 0, push - 1
              aqueue(jq)%lefts(js)%lcp = aqueue(jq)%lcp
           enddo
+          ! do js = 0, push - 1
+          !    call show_lpp(ierr, aqueue(jq)%lcp, 'aqueue')
+          ! enddo
        endif
+       ! write(*, *) 'batch', jq
+       ! do js = 0, push - 1
+       !    call show_lpp(ierr, aqueue(jq)%lefts(js)%lcp, 'aqueue')
+       ! enddo
        select case(termk)
        case(hk_file)
           pop = aqueue(jq)%nopr
@@ -5642,6 +5655,7 @@ contains
        if (ierr.eq.0) then
           call get_compromise_domain(ierr, domL, domR, btmp, stmp, nb, cmode_inclusive, htmp)
        endif
+       ! call show_lpp(ierr, bstack(js)%lcp, 'stack')
        if (ierr.eq.0) then
           call get_domain_shape &
                & (ierr, dstr, domR(1), obuffer(jbuf)%pcp, bstack(js)%lcp, domL, &
