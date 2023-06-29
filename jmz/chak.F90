@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/29 08:47:38 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/29 13:53:29 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1163,6 +1163,8 @@ contains
 !!!_    * buffer property operator
     else if (grp_buffer_bgn.le.hopr .and. hopr.lt.grp_buffer_end) then
        call parse_buffer_opr(ierr, hopr, arg)
+    else if (grp_shape_bgn.le.hopr .and. hopr.lt.grp_shape_end) then
+       call parse_shape_opr(ierr, hopr, arg)
     else if (grp_index_bgn.le.hopr .and. hopr.lt.grp_index_end) then
        call parse_index_opr(ierr, hopr, arg)
     else if (grp_header_bgn.le.hopr .and. hopr.lt.grp_header_end) then
@@ -1293,6 +1295,7 @@ contains
     character(len=*),intent(in)  :: arg
     integer jpar, jend
     integer hbuf, jb
+    integer ci
 
     ierr = 0
     call pop_stack(ierr, hbuf, .TRUE.)
@@ -1308,6 +1311,23 @@ contains
              call parse_flat_shape(ierr, arg(jpar:), hopr)
           else
              call parse_flat_shape(ierr, ' ', hopr)
+          endif
+       case(opr_C0:opr_C3)
+          ci = system_index_bgn(hopr - opr_C0)
+          if (ci.lt.0 .or. ci.ge.mcoor) then
+             ierr = ERR_INVALID_ITEM
+             call message(ierr, 'invalid coordinate ' // trim(arg))
+          else if (jpar.le.jend) then
+             call parse_buffer_coor(ierr, ci, arg(jpar:jend-1), opr_TRANSF)
+          else
+             call stack_index_opr(ierr, opr_C0 + ci)
+          endif
+       case(opr_X:opr_Z)
+          ci = (hopr - opr_X)
+          if (jpar.le.jend) then
+             call parse_buffer_coor(ierr, ci, arg(jpar:jend-1), opr_TRANSF)
+          else
+             call stack_index_opr(ierr, opr_C0 + ci)
           endif
        case default
           ierr = ERR_NOT_IMPLEMENTED
@@ -1406,8 +1426,6 @@ contains
              call reg_fake_opr(oentr, hbuf, obuffer(jb)%name)
              ierr = min(0, ierr)
           endif
-       case(opr_PERM,opr_SHAPE,opr_SIZE,opr_SHIFT)
-          call parse_buffer_shape(ierr, arg(jpar:), hopr)
        case(opr_MISS)
           if (jpar.lt.jend) then
              call parse_number(ierr, undef, arg(jpar:jend-1))
@@ -1420,23 +1438,6 @@ contains
           else
              call stack_buffer_opr(ierr, hopr)
           endif
-       case(opr_C0:opr_C3)
-          ci = system_index_bgn(hopr - opr_C0)
-          if (ci.lt.0 .or. ci.ge.mcoor) then
-             ierr = ERR_INVALID_ITEM
-             call message(ierr, 'invalid coordinate ' // trim(arg))
-          else if (jpar.le.jend) then
-             call parse_coordinate_opr(ierr, ci, arg(jpar:jend-1), opr_TRANSF)
-          else
-             call stack_buffer_opr(ierr, opr_C0 + ci)
-          endif
-       case(opr_X:opr_Z)
-          ci = (hopr - opr_X)
-          if (jpar.le.jend) then
-             call parse_coordinate_opr(ierr, ci, arg(jpar:jend-1), opr_TRANSF)
-          else
-             call stack_buffer_opr(ierr, opr_C0 + ci)
-          endif
        case default
           ierr = ERR_NOT_IMPLEMENTED
           call message(ierr, 'reserved operator(buffer) ' // trim(arg))
@@ -1444,6 +1445,70 @@ contains
     endif
     return
   end subroutine parse_buffer_opr
+
+!!!_   . stack_buffer_opr
+  subroutine stack_buffer_opr (ierr, hopr)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: hopr
+    integer hbuf(1)
+
+    ierr = 0
+
+    if (ierr.eq.0) call search_free_buffer(ierr, hbuf, 1, stt=buf_used)
+    if (ierr.eq.0) call push_stack(ierr, hbuf(1))
+    if (ierr.eq.0) call append_queue(ierr, hopr, 0, 1, hbuf)
+
+  end subroutine stack_buffer_opr
+
+!!!_   . parse_shape_opr
+  subroutine parse_shape_opr (ierr, hopr, arg)
+    use TOUZA_Std,only: parse_number
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: hopr
+    character(len=*),intent(in)  :: arg
+    integer jpar, jend
+    integer hbuf, hobj, jb
+    integer ci
+    real(kind=KBUF) :: undef
+    integer oentr
+
+    ierr = 0
+    call pop_stack(ierr, hobj, .TRUE.)
+    if (ierr.eq.0) jb = buf_index(hobj)
+    if (ierr.eq.0) ierr = min(0, jb)
+    if (ierr.eq.0) then
+       jpar = index(arg, param_sep) + 1
+       jend = len_trim(arg) + 1
+       if (jpar.eq.1) jpar = jend + 1
+       select case(hopr)
+       case(opr_PERM,opr_SHAPE,opr_SIZE,opr_SHIFT)
+          call parse_buffer_shape(ierr, arg(jpar:), hopr)
+       ! case(opr_C0:opr_C3)
+       !    ci = system_index_bgn(hopr - opr_C0)
+       !    if (ci.lt.0 .or. ci.ge.mcoor) then
+       !       ierr = ERR_INVALID_ITEM
+       !       call message(ierr, 'invalid coordinate ' // trim(arg))
+       !    else if (jpar.le.jend) then
+       !       call parse_buffer_coor(ierr, ci, arg(jpar:jend-1), opr_TRANSF)
+       !    else
+       !       call stack_index_opr(ierr, opr_C0 + ci)
+       !    endif
+       ! case(opr_X:opr_Z)
+       !    ci = (hopr - opr_X)
+       !    if (jpar.le.jend) then
+       !       call parse_buffer_coor(ierr, ci, arg(jpar:jend-1), opr_TRANSF)
+       !    else
+       !       call stack_index_opr(ierr, opr_C0 + ci)
+       !    endif
+       case default
+          ierr = ERR_NOT_IMPLEMENTED
+          call message(ierr, 'reserved operator(shape) ' // trim(arg))
+       end select
+    endif
+    return
+  end subroutine parse_shape_opr
 
 !!!_   . parse_buffer_shape
   subroutine parse_buffer_shape (ierr, arg, hopr)
@@ -1483,9 +1548,73 @@ contains
        jsend = mstack
        call parse_shape_par(ierr, bstack(jsbgn:jsend-1), aqueue(jq), arg, hopr)
     endif
+    if (ierr.eq.0) then
+       aqueue(jq)%lefts(:) = bstack(jsbgn:jsend-1)
+    endif
+    ! call show_lpp(ierr, bstack(jsbgn)%lcp)
+    ! call diag_last_queue(ierr)
 
     return
   end subroutine parse_buffer_shape
+
+!!!_   . parse_buffer_coor
+  subroutine parse_buffer_coor (ierr, cidx, arg, hopr)
+    use TOUZA_Std,only: split_list, condop
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: cidx
+    character(len=*),intent(in)  :: arg
+    integer,         intent(in)  :: hopr
+    integer lasth
+    integer jq
+    integer pop, push
+    type(loop_t) :: lpp
+    integer jrep
+    integer flag
+
+    integer jsbgn, jsend
+
+    ierr = 0
+
+    if (ierr.eq.0) call last_queue(ierr, lasth, pop, push)
+    if (ierr.eq.0) then
+       if (lasth.ne.hopr) then
+          call inquire_opr_nstack(ierr, pop, push, hopr)
+          if (ierr.eq.0) then
+             if (pop.ne.push) then
+                ierr = ERR_PANIC
+                call message(ierr, 'panic in transformation property')
+                return
+             endif
+          endif
+          if (ierr.eq.0) then
+             call append_queue_stack(ierr, hopr, pop, push)
+          endif
+       endif
+    endif
+    if (ierr.eq.0) then
+       flag = switch_shape_operator(hopr)
+       call decompose_coordinate_mod(ierr, jrep, lpp, arg, flag)
+    endif
+    if (ierr.eq.0) then
+       jq = mqueue - 1
+       if (aqueue(jq)%lcp(cidx)%flg.ne.loop_unset) then
+          ierr = ERR_INVALID_PARAMETER
+          call message(ierr, 'repeat operation for same coordinate.')
+       endif
+    endif
+    if (ierr.eq.0) then
+       jsbgn = mstack - pop
+       jsend = mstack
+
+       aqueue(jq)%lcp(cidx) = lpp
+       aqueue(jq)%lcp(cidx)%name = arg(1:jrep)
+       bstack(jsbgn:jsend-1)%lcp(cidx) = lpp
+       bstack(jsbgn:jsend-1)%lcp(cidx)%name = arg(1:jrep)
+
+       aqueue(jq)%lefts(:) = bstack(jsbgn:jsend-1)
+    endif
+  end subroutine parse_buffer_coor
 
 !!!_   . parse_shape_par
   subroutine parse_shape_par &
@@ -1499,7 +1628,7 @@ contains
     integer,optional,intent(in)    :: lflag
 
     character,parameter :: csep = item_sep       ! coordinate separaor
-    integer jc, js
+    integer jc
     integer larg
     integer jpb, jpe, jrep
     type(loop_t) :: lpp
@@ -1537,72 +1666,10 @@ contains
        jc = jc + 1
        jpb = jpe
     enddo
-    if (ierr.eq.0) then
-       queue%lcp(jc:) = def_loop
-       do js = 1, size(stack)
-          stack(js)%lcp(jc:) = def_loop
-       enddo
-    endif
   end subroutine parse_shape_par
 
-!!!_   . parse_coordinate_opr
-  subroutine parse_coordinate_opr (ierr, cidx, arg, hopr)
-    use TOUZA_Std,only: split_list, condop
-    implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(in)  :: cidx
-    character(len=*),intent(in)  :: arg
-    integer,         intent(in)  :: hopr
-    integer lasth
-    integer jq
-    integer pop, push
-    type(loop_t) :: lpp
-    integer jrep
-    integer flag
-
-    ierr = 0
-
-    if (ierr.eq.0) call last_queue(ierr, lasth, pop, push)
-    if (ierr.eq.0) then
-       if (lasth.ne.hopr) then
-          call inquire_opr_nstack(ierr, pop, push, hopr)
-          if (ierr.eq.0) then
-             if (pop.ne.push) then
-                ierr = ERR_PANIC
-                call message(ierr, 'panic in transformation property')
-                return
-             endif
-          endif
-          if (ierr.eq.0) then
-             ! call append_queue(ierr, hopr, pop, push, bstack(mstack-pop:mstack-push))
-             call append_queue_stack(ierr, hopr, pop, push)
-          endif
-       endif
-    endif
-    if (ierr.eq.0) then
-       flag = switch_shape_operator(hopr)
-       call decompose_coordinate_mod(ierr, jrep, lpp, arg, flag)
-       ! write(*, *) ierr, b, e, s, arg(1:jrep)
-    endif
-    if (ierr.eq.0) then
-       jq = mqueue - 1
-       if (aqueue(jq)%lcp(cidx)%flg.ne.loop_unset) then
-          ierr = ERR_INVALID_PARAMETER
-          call message(ierr, 'repeat operation for same coordinate.')
-       endif
-    endif
-    if (ierr.eq.0) then
-       ! call show_lpp(ierr, aqueue(jq)%lcp, 'aq')
-       ! call show_lpp(ierr, (/lpp/), 'pco')
-       aqueue(jq)%lcp(cidx) = lpp
-       aqueue(jq)%lcp(cidx)%name = arg(1:jrep)
-       bstack(mstack-pop:mstack-1)%lcp(cidx) = lpp
-       bstack(mstack-pop:mstack-1)%lcp(cidx)%name = arg(1:jrep)
-    endif
-  end subroutine parse_coordinate_opr
-
-!!!_   . stack_buffer_opr
-  subroutine stack_buffer_opr (ierr, hopr)
+!!!_   . stack_index_opr
+  subroutine stack_index_opr (ierr, hopr)
     implicit none
     integer,intent(out) :: ierr
     integer,intent(in)  :: hopr
@@ -1614,7 +1681,7 @@ contains
     if (ierr.eq.0) call push_stack(ierr, hbuf(1))
     if (ierr.eq.0) call append_queue(ierr, hopr, 0, 1, hbuf)
 
-  end subroutine stack_buffer_opr
+  end subroutine stack_index_opr
 
 !!!_   . parse_stack_opr
   subroutine parse_stack_opr (ierr, hopr, arg, japos)
@@ -1888,7 +1955,7 @@ contains
        nopr  = upush
        call append_queue(ierr, hopr, npop, npush)
     endif
-    if (ierr.eq.0) call queue_fetch_stack(ierr, nfetch)
+    ! if (ierr.eq.0) call queue_fetch_stack(ierr, nfetch, upd=.FALSE.)
     if (ierr.eq.0) then
        do jx = 1, ntgt, upop
           jb = npush - jx * nopr
@@ -2441,6 +2508,11 @@ contains
 
     if (ierr.eq.0) then
        if (nkeep.gt.0) call queue_fetch_stack(ierr, nfetch, qstep=(nopr + nkeep))
+    endif
+    if (ierr.eq.0) then
+       do jx = nkeep, nopr + nkeep - 1
+          if (ierr.eq.0) call queue_fetch_stack(ierr, nfetch, qdest=jx, qstep=(nopr + nkeep), upd=.FALSE.)
+       enddo
     endif
     if (ierr.eq.0) then
        do jx = 1, ntgt
@@ -3377,7 +3449,7 @@ contains
   end subroutine mpush_stack_st
 
 !!!_   . queue_fetch_stack
-  subroutine queue_fetch_stack(ierr, n, qdest, qstep, ssrc)
+  subroutine queue_fetch_stack(ierr, n, qdest, qstep, ssrc, upd)
     use TOUZA_Std,only: choice
     implicit none
     integer,intent(out)         :: ierr
@@ -3385,6 +3457,7 @@ contains
     integer,intent(in),optional :: qdest   ! (0)  queue buffer destination index
     integer,intent(in),optional :: qstep   ! (1)  queue buffer destination stride
     integer,intent(in),optional :: ssrc    ! (-n) stack buffer source index
+    logical,intent(in),optional :: upd     ! (T)  whether to update status
     integer jq
     integer jx, jb, jd, hb
     integer dest, ds
@@ -3410,11 +3483,13 @@ contains
        do jx = 0, n - 1
           jd = dest + jx * ds
           aqueue(jq)%lefts(jd) = bstack(bpos + jx)
-          hb = aqueue(jq)%lefts(jd)%bh
-          jb = buf_index(hb)
-          if (jb.ge.0) then
-             if (obuffer(jb)%stt.ge.buf_free) then
-                obuffer(jb)%stt = obuffer(jb)%stt + 1
+          if (choice(.TRUE., upd)) then
+             hb = aqueue(jq)%lefts(jd)%bh
+             jb = buf_index(hb)
+             if (jb.ge.0) then
+                if (obuffer(jb)%stt.ge.buf_free) then
+                   obuffer(jb)%stt = obuffer(jb)%stt + 1
+                endif
              endif
           endif
           ! write(*, *) 'qfs', jq, jx, n, jd, hb, bpos
@@ -4448,6 +4523,9 @@ contains
        endif
        push = size(aqueue(jq)%lefts)
        ! write(*, *) 'batch/normal', jq
+       ! do js = 0, push - 1
+       !    call show_lpp(ierr, aqueue(jq)%lefts(js)%lcp, 'apply')
+       ! enddo
        if (.not.is_operator_stacks(hterm)) then
           do js = 0, push - 1
              aqueue(jq)%lefts(js)%lcp = aqueue(jq)%lcp

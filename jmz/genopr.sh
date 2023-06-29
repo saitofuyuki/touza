@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/06/27 16:50:55 fuyuki genopr.sh>
+# Time-stamp: <2023/06/29 13:48:18 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -112,6 +112,7 @@ register_all ()
   register -g stack -n 2,2         EXCH     'B A; exchange two top stacks'
   register -g stack -n 0,0         NOP      'no operation; do nothing'
   register -g stack +n m,'2(m-1)'  DIST     'distribute top stack for every stack from last anchor'
+  register -g stack +n m,m         ROLL     'rotate from last anchor'
   register -g stack +n m,m         INSERT   'move top stack after last anchor'
   register -g stack +n m,'2m'      REPEAT   'repeat from last non-adjacent anchor'
   register -g stack +n m,0         FLUSH    'flush-out from last anchor'
@@ -283,20 +284,22 @@ register_all ()
   register -g buffer -p NAME              TAG
   register -g buffer -p NAME              DESC           'description'
   register -g buffer -o NAME              FUNC           'function declaration'
-  register -g buffer -p NAME/REPL/RANGE,.. -n 1,1 PERM    'array shape permutation'
-  register -g buffer -p NAME/REPL/RANGE,.. -n 1,1 SHAPE   'array range(shape) permutation'
-  register -g buffer -p NAME/REPL/SIZE,..  -n 1,1 SIZE    'array size(shape) permutation'
-  register -g buffer -p NAME/REPL/SHIFT    -n 1,1 SHIFT   'simple shift along coordinate'
-  register -g buffer -p NAME/REPL/SHIFT    -n 1,1 CSHIFT  'circular shift along coordinate'
-  register -g buffer -p NAME/REPL/SHIFT    -n 1,1 EOSHIFT 'end-off shift along coordinate'
 
-  register -g buffer,index -o NAME/REPL/RANGE    C0  'put top stack coordinate[0] index'
-  register -g buffer,index -o NAME/REPL/RANGE    C1  'put top stack coordinate[1] index'
-  register -g buffer,index -o NAME/REPL/RANGE    C2  'put top stack coordinate[2] index'
-  register -g buffer,index -o NAME/REPL/RANGE    C3  'put top stack coordinate[3] index'
-  register -g buffer,index -o NAME/REPL/RANGE    X   'put top stack coordinate[0] index'
-  register -g buffer,index -o NAME/REPL/RANGE    Y   'put top stack coordinate[1] index'
-  register -g buffer,index -o NAME/REPL/RANGE    Z   'put top stack coordinate[2] index'
+  # shape manipulation
+  register -g shape -p NAME/REPL/RANGE,.. -n 1,1 PERM    'array shape permutation'
+  register -g shape -p NAME/REPL/RANGE,.. -n 1,1 SHAPE   'array range(shape) permutation'
+  register -g shape -p NAME/REPL/SIZE,..  -n 1,1 SIZE    'array size(shape) permutation'
+  register -g shape -p NAME/REPL/SHIFT    -n 1,1 SHIFT   'simple shift along coordinate'
+  register -g shape -p NAME/REPL/SHIFT    -n 1,1 CSHIFT  'circular shift along coordinate'
+  register -g shape -p NAME/REPL/SHIFT    -n 1,1 EOSHIFT 'end-off shift along coordinate'
+
+  register -g index,shape -o NAME/REPL/RANGE    C0  'put top stack coordinate[0] index'
+  register -g index,shape -o NAME/REPL/RANGE    C1  'put top stack coordinate[1] index'
+  register -g index,shape -o NAME/REPL/RANGE    C2  'put top stack coordinate[2] index'
+  register -g index,shape -o NAME/REPL/RANGE    C3  'put top stack coordinate[3] index'
+  register -g index,shape -o NAME/REPL/RANGE    X   'put top stack coordinate[0] index'
+  register -g index,shape -o NAME/REPL/RANGE    Y   'put top stack coordinate[1] index'
+  register -g index,shape -o NAME/REPL/RANGE    Z   'put top stack coordinate[2] index'
 
   register -g index        -o NAME,...           FLAT  'flat index'
   register -a FLAT INDEX
@@ -1005,7 +1008,7 @@ output_table ()
     print -
   done
 
-  candi=(buffer header)
+  candi=(shape buffer header)
   for grp in "$@"
   do
     [[ $candi[(I)$grp] -eq 0 ]] && continue
