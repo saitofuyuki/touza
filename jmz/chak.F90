@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/29 13:53:29 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/29 14:46:36 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1187,7 +1187,7 @@ contains
 
 !!!_    * parse_prefetch_tuples - prefetch tuple and ITER-type operators
   subroutine parse_prefetch_tuples &
-       & (ierr, niter, hiter, ntup, htup, arg, japos)
+       & (ierr, niter, hiter, ntup, htup, arg, japos, contr)
     use TOUZA_Std,only: parse_number, get_param
     implicit none
     integer,         intent(out)   :: ierr
@@ -1197,6 +1197,7 @@ contains
     integer,         intent(in)    :: htup
     character(len=*),intent(in)    :: arg
     integer,         intent(inout) :: japos
+    logical,optional,intent(in)    :: contr  ! [T] contraction
     integer npos
     character(len=lpath) :: abuf
     integer jerr
@@ -1206,7 +1207,7 @@ contains
 
     ierr = 0
     if (htup.ge.0) then
-       call parse_arg_tuple(ierr, ntup, htup, arg, japos)
+       call parse_arg_tuple(ierr, ntup, htup, arg, japos, contr)
     else
        ntup = tuple_null
     endif
@@ -1231,14 +1232,15 @@ contains
     endif
   end subroutine parse_prefetch_tuples
 !!!_    * parse_arg_tuple - prefetch tuple and ITER-type operators
-  subroutine parse_arg_tuple(ierr, nrep, hopr, arg, japos)
-    use TOUZA_Std,only: parse_number, get_param
+  subroutine parse_arg_tuple(ierr, nrep, hopr, arg, japos, contr)
+    use TOUZA_Std,only: parse_number, get_param, choice
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(out)   :: nrep
     integer,         intent(in)    :: hopr
     character(len=*),intent(in)    :: arg
     integer,         intent(inout) :: japos
+    logical,optional,intent(in)    :: contr  ! [T] contraction
 
     character(len=lpath) :: abuf
     integer npos
@@ -1257,32 +1259,34 @@ contains
        call parse_number(ierr, nrep, arg(jpar:jend-1))
     endif
 
-    if (ierr.eq.0) then
-       npos = japos
-       nadd = 0
-       do
-          npos = japos + 1
-          call get_param(jerr, abuf, npos)
-          if (jerr.ne.0) exit
-          hnxt = parse_term_operator(abuf)
-          if (hnxt.ne.hopr) exit
+    if (choice(.TRUE., contr)) then
+       if (ierr.eq.0) then
+          npos = japos
+          nadd = 0
+          do
+             npos = japos + 1
+             call get_param(jerr, abuf, npos)
+             if (jerr.ne.0) exit
+             hnxt = parse_term_operator(abuf)
+             if (hnxt.ne.hopr) exit
 
-          jpar = index(abuf, param_sep) + 1
-          jend = len_trim(abuf) + 1
-          if (jpar.eq.1) jpar = jend + 1
-          inxt = 0
-          if (jpar.lt.jend) then
-             call parse_number(ierr, inxt, abuf(jpar:jend-1))
-             if (ierr.ne.0) exit
-             nadd  = nadd + max(0, inxt)
-          else
-             nadd  = nadd + 1
+             jpar = index(abuf, param_sep) + 1
+             jend = len_trim(abuf) + 1
+             if (jpar.eq.1) jpar = jend + 1
+             inxt = 0
+             if (jpar.lt.jend) then
+                call parse_number(ierr, inxt, abuf(jpar:jend-1))
+                if (ierr.ne.0) exit
+                nadd  = nadd + max(0, inxt)
+             else
+                nadd  = nadd + 1
+             endif
+             japos = npos
+          enddo
+          if (nadd.gt.0) then
+             if (nrep.eq.tuple_default) nrep = 1
+             nrep = nrep + nadd
           endif
-          japos = npos
-       enddo
-       if (nadd.gt.0) then
-          if (nrep.eq.tuple_default) nrep = 1
-          nrep = nrep + nadd
        endif
     endif
   end subroutine parse_arg_tuple
@@ -1710,6 +1714,9 @@ contains
           endif
        endif
        if (ierr.eq.0) call parse_prefetch_tuples(ierr, niter, hiter, ntup, hopr, arg(1:jend-1), japos)
+    else if (hopr.eq.opr_ROLL) then
+       ! no contraction
+       if (ierr.eq.0) call parse_prefetch_tuples(ierr, niter, hiter, ntup, hopr, arg, japos, .FALSE.)
     else
        if (ierr.eq.0) call parse_prefetch_tuples(ierr, niter, hiter, ntup, hopr, arg, japos)
     endif
@@ -1740,6 +1747,8 @@ contains
        if (ierr.eq.0) call stack_DUP(ierr, hopr, ntup, niter)
     case(opr_COPY,opr_CLONE)
        if (ierr.eq.0) call stack_COPY(ierr, hopr, ntup, niter)
+    case(opr_ROLL)
+       if (ierr.eq.0) call stack_ROLL(ierr, hopr, ntup, niter)
     case(opr_EXCH)
        if (ierr.eq.0) call stack_EXCH(ierr, hopr, ntup, niter)
     case(opr_POP,opr_PROP)
@@ -2524,6 +2533,82 @@ contains
     if (ierr.eq.0) call mset_stack_queue(ierr, pop=(npop - ntgt))
     call message(ierr, 'trace:stack_COPY', levm=-9)
   end subroutine stack_COPY
+
+!!!_   . stack_ROLL - cumulative ROLL.  ITERated ROLL queue is compacted.
+  subroutine stack_ROLL(ierr, hopr, ntup, iter)
+    use TOUZA_Std,only: choice
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: hopr
+    integer,intent(in)          :: ntup
+    integer,intent(in),optional :: iter
+
+    integer niter, npop,   npush, nopr
+    integer nkeep, nfetch, ntgt
+    integer apush
+    integer jsrc,  jdst,   jp
+!!!_    * note
+    !      A B C D     ROLL=+4     =  D A B C
+    !      A B C D     ROLL=-4     =  B C D A
+
+    !      A STOP B    ROLL=+3     =  B A STOP
+    !      A STOP B    ROLL=-3     =  STOP B A
+!!!_    * body
+    ierr = 0
+
+    niter = adj_iterates(1, iter)
+    nopr  = adj_iterates(0, ntup)
+
+    call check_fetch(ierr, nfetch, npop, niter, abs(nopr), hopr, apush)
+
+    if (ierr.eq.0) then
+       if (niter.gt.0.and.nfetch.eq.0) then
+          ierr = ERR_INVALID_PARAMETER
+          call message(ierr, 'ITERated ROLL cannot follow anchor')
+       else
+          nfetch = nfetch - apush
+          npop   = npop - apush
+          npush  = nfetch
+          call append_queue(ierr, hopr, npop, npush)
+       endif
+    endif
+
+    if (nopr.eq.0) then
+       continue
+    else if (npop.gt.mstack) then
+       ierr = ERR_INVALID_PARAMETER
+       call message(ierr, 'few operands for ROLL.')
+    else
+       if (mod(nfetch, nopr).ne.0) then
+          ierr = ERR_INVALID_PARAMETER
+          call message(ierr, 'invalid operands for ROLL.')
+       else
+          ntgt = nfetch / nopr
+          if (ntgt.gt.0) then
+             ! roll to right
+             do jp = 0, ntgt - 1
+                jdst = nopr * jp
+                jsrc = - nfetch + jp * nopr
+                if (ierr.eq.0) call queue_fetch_stack(ierr, 1,      jdst,   ssrc=jsrc+nopr-1)
+                if (ierr.eq.0) call queue_fetch_stack(ierr, nopr-1, jdst+1, ssrc=jsrc)
+             enddo
+          else
+             ! roll to left
+             ! A B C D
+             ! B C D A
+             ntgt = -ntgt
+             nopr = -nopr
+             do jp = 0, ntgt - 1
+                jdst = nopr * jp
+                jsrc = - nfetch + jp * nopr
+                if (ierr.eq.0) call queue_fetch_stack(ierr, 1,      jdst+nopr-1, ssrc=jsrc)
+                if (ierr.eq.0) call queue_fetch_stack(ierr, nopr-1, jdst,        ssrc=jsrc+1)
+             enddo
+          endif
+       endif
+    endif
+    if (ierr.eq.0) call mset_stack_queue(ierr)
+  end subroutine stack_ROLL
 
 !!!_   . stack_EXCH - cumulative EXCH.  ITERated EXCH queue is compacted.
   subroutine stack_EXCH(ierr, hopr, ntup, iter)
