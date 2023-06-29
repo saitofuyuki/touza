@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/28 17:06:43 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/29 13:56:49 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -290,12 +290,20 @@ contains
     integer,intent(in) :: handle
     b = handle.eq.opr_TRANSF
   end function is_operator_modify
+!!!_   . is_operator_shape()
+  logical function is_operator_shape(handle) result(b)
+    implicit none
+    integer,intent(in) :: handle
+    b = ((grp_shape_bgn.le.handle).and.(handle.lt.grp_shape_end)) &
+         & .or. handle.eq.opr_TRANSF
+  end function is_operator_shape
 !!!_   . is_operator_stacks()
   logical function is_operator_stacks(handle) result(b)
     implicit none
     integer,intent(in) :: handle
-    b = ((grp_stack_bgn.le.handle).and.(handle.lt.grp_stack_end)) &
-         .or. (handle.eq.opr_ANCHOR)
+    b = ((grp_stack_bgn.le.handle).and.(handle.lt.grp_stack_end))
+    if (.not.b) b = handle.eq.opr_ANCHOR
+    if (.not.b) b = is_operator_shape(handle)
   end function is_operator_stacks
 !!!_   . is_operator_reusable()
   logical function is_operator_reusable(handle) result(b)

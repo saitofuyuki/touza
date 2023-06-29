@@ -1,6 +1,6 @@
 !!!_! jmz/chak_reg.F90 - TOUZA/Jmz CH(swiss) army knife operator registration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-06-27T12:02:02+09:00
+! Created by genopr.sh at 2023-06-29T13:53:02+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -43,6 +43,8 @@
       & call reg_opr_prop(ierr, opr_NOP, str_NOP, 0, 0)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_DIST, str_DIST)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_ROLL, str_ROLL)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_INSERT, str_INSERT)
     if (ierr.eq.0) &
@@ -148,7 +150,8 @@
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_DIV, str_DIV, 2, 1, ilev=ilev_mul, istr='/')
     if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_IDIV, str_IDIV, 2, 1, ilev=ilev_mul, istr='//')
+      & call reg_opr_prop(ierr, opr_IDIV, str_IDIV, 2, 1, ilev=ilev_mul, istr='//',  &
+      & conv=result_int)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_MOD, str_MOD, 2, 1, ilev=ilev_mul, istr='%')
     if (ierr.eq.0) &
@@ -338,9 +341,35 @@
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, acc_WSUM, acc_pfx // str_WSUM, 3, 2, sweep=sweep_accum)
     if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_C0, str_C0)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_C1, str_C1)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_C2, str_C2)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_C3, str_C3)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_X, str_X)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_Y, str_Y)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_Z, str_Z)
+    if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_FLAT, str_FLAT)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_INDEX, str_INDEX)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_PERM, str_PERM, 1, 1)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_SHAPE, str_SHAPE, 1, 1)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_SIZE, str_SIZE, 1, 1)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_SHIFT, str_SHIFT, 1, 1)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_CSHIFT, str_CSHIFT, 1, 1)
+    if (ierr.eq.0) &
+      & call reg_opr_prop(ierr, opr_EOSHIFT, str_EOSHIFT, 1, 1)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_FMT, str_FMT)
     if (ierr.eq.0) &
@@ -367,29 +396,3 @@
       & call reg_opr_prop(ierr, opr_DESC, str_DESC)
     if (ierr.eq.0) &
       & call reg_opr_prop(ierr, opr_FUNC, str_FUNC)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_PERM, str_PERM, 1, 1)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_SHAPE, str_SHAPE, 1, 1)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_SIZE, str_SIZE, 1, 1)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_SHIFT, str_SHIFT, 1, 1)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_CSHIFT, str_CSHIFT, 1, 1)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_EOSHIFT, str_EOSHIFT, 1, 1)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_C0, str_C0)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_C1, str_C1)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_C2, str_C2)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_C3, str_C3)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_X, str_X)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_Y, str_Y)
-    if (ierr.eq.0) &
-      & call reg_opr_prop(ierr, opr_Z, str_Z)
