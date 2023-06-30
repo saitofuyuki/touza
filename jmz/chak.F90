@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/29 14:46:36 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/30 16:56:50 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1409,7 +1409,6 @@ contains
     character(len=*),intent(in)  :: arg
     integer jpar, jend
     integer hbuf, hobj, jb
-    integer ci
     real(kind=KBUF) :: undef
     integer oentr
 
@@ -1473,10 +1472,7 @@ contains
     integer,         intent(in)  :: hopr
     character(len=*),intent(in)  :: arg
     integer jpar, jend
-    integer hbuf, hobj, jb
-    integer ci
-    real(kind=KBUF) :: undef
-    integer oentr
+    integer hobj, jb
 
     ierr = 0
     call pop_stack(ierr, hobj, .TRUE.)
@@ -1489,23 +1485,6 @@ contains
        select case(hopr)
        case(opr_PERM,opr_SHAPE,opr_SIZE,opr_SHIFT)
           call parse_buffer_shape(ierr, arg(jpar:), hopr)
-       ! case(opr_C0:opr_C3)
-       !    ci = system_index_bgn(hopr - opr_C0)
-       !    if (ci.lt.0 .or. ci.ge.mcoor) then
-       !       ierr = ERR_INVALID_ITEM
-       !       call message(ierr, 'invalid coordinate ' // trim(arg))
-       !    else if (jpar.le.jend) then
-       !       call parse_buffer_coor(ierr, ci, arg(jpar:jend-1), opr_TRANSF)
-       !    else
-       !       call stack_index_opr(ierr, opr_C0 + ci)
-       !    endif
-       ! case(opr_X:opr_Z)
-       !    ci = (hopr - opr_X)
-       !    if (jpar.le.jend) then
-       !       call parse_buffer_coor(ierr, ci, arg(jpar:jend-1), opr_TRANSF)
-       !    else
-       !       call stack_index_opr(ierr, opr_C0 + ci)
-       !    endif
        case default
           ierr = ERR_NOT_IMPLEMENTED
           call message(ierr, 'reserved operator(shape) ' // trim(arg))
@@ -2547,10 +2526,10 @@ contains
     integer,intent(in)          :: ntup
     integer,intent(in),optional :: iter
 
-    integer niter, npop,   npush, nopr
-    integer nkeep, nfetch, ntgt
+    integer niter,  npop,  npush, nopr
+    integer nfetch, ntgt
     integer apush
-    integer jsrc,  jdst,   jp
+    integer jsrc,   jdst,  jp
 !!!_    * note
     !      A B C D     ROLL=+4     =  D A B C
     !      A B C D     ROLL=-4     =  B C D A
@@ -4983,7 +4962,11 @@ contains
        else if (handle.eq.rdc_ADD) then
           call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_ADD, ZERO)
        else if (handle.eq.rdc_LADD) then
-          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_LADD, ZERO)
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_LADD)
+       else if (handle.eq.rdc_MUL) then
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_MUL, ONE)
+       else if (handle.eq.rdc_LMUL) then
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_LMUL)
        else if (handle.eq.rdc_MAX) then
           call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_MAX, LLIMIT)
        else if (handle.eq.rdc_LMAX) then
@@ -4993,18 +4976,26 @@ contains
        else if (handle.eq.rdc_LMIN) then
           call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_LMIN)
        else if (handle.eq.opr_COUNT) then
-          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_COUNT)
+          call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_COUNT, ZERO)
        else if (handle.eq.opr_SUM) then
           call apply_opr_REDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_SUM, ZERO)
        else if (handle.eq.opr_WSUM) then
-          call apply_opr_WREDUCE(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_WSUM, ZERO)
+          call apply_opr_REDUCE_2(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_WSUM, ZERO)
+       else if (handle.eq.opr_WMV) then
+          call apply_opr_REDUCE_3(ierr, handle, lefts(1:push), righth(1:pop), apply_REDUCE_WMV,  ZERO)
 !!!_    * accumulation
        else if (handle.eq.acc_COUNT) then
-          call apply_opr_BINARY_lazy &
-               & (ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_COUNT, ZERO, init=.TRUE.)
+          call apply_opr_UNARY_acc &
+               & (ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_ACCUM_COUNT, ZERO)
        else if (handle.eq.acc_SUM) then
-          call apply_opr_BINARY_lazy &
-               & (ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_SUM, ZERO)
+          call apply_opr_UNARY_acc &
+               & (ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_ACCUM_SUM, ZERO)
+       else if (handle.eq.acc_WSUM) then
+          call apply_opr_BINARY_acc &
+               & (ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_ACCUM_WSUM, ZERO)
+       else if (handle.eq.acc_WMV) then
+          call apply_opr_BINARY_acc3 &
+               & (ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_ACCUM_WMV, ZERO)
 !!!_    * ignored
        else if (grp_system_bgn.le.handle.and.handle.lt.grp_system_end) then
           continue
@@ -6887,8 +6878,8 @@ contains
 
   end subroutine apply_opr_REDUCE
 
-!!!_   . apply_opr_WREDUCE
-  subroutine apply_opr_WREDUCE &
+!!!_   . apply_opr_REDUCE_2
+  subroutine apply_opr_REDUCE_2 &
        & (ierr, hopr, lefts, bufi, func, neutral)
     use TOUZA_Std,only: choice
     implicit none
@@ -6951,7 +6942,7 @@ contains
           jinp = ofsi + ninp - jx * upop
           ltmp(0:upush-1) = lefts(jout:jout+upush-1)   ! use logical coordinate at left
           btmp(0:upop-1)  = bufi(jinp:jinp+upop-1)
-          stmp(0:upop-1)  = bstack(mstack-jx*upush:mstack-jx*upush+1)
+          stmp(0:upop-1)  = bstack(mstack-jx*upop:mstack-jx*upop+upop-1)
        endif
 
        do j = 0, upush - 1
@@ -7014,7 +7005,541 @@ contains
        ! endif
     enddo outer
 
-  end subroutine apply_opr_WREDUCE
+  end subroutine apply_opr_REDUCE_2
+
+!!!_   . apply_opr_REDUCE_3
+  subroutine apply_opr_REDUCE_3 &
+       & (ierr, hopr, lefts, bufi, func, neutral)
+    use TOUZA_Std,only: choice
+    implicit none
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: hopr
+    type(stack_t),  intent(inout)       :: lefts(0:)
+    integer,        intent(in)          :: bufi(0:)
+    real(kind=KBUF),intent(in),optional :: neutral
+    interface
+       subroutine func &
+            & (ierr, Z, V, W, domZ, X, domX, Y, domY, domR, FZ, FX, FY)
+         use chak_lib,only: KFLT, KDBL, domain_t
+         implicit none
+         integer,          intent(out)   :: ierr
+         real(kind=__KBUF),intent(inout) :: Z(0:*), V(0:*), W(0:*)
+         real(kind=__KBUF),intent(in)    :: X(0:*), Y(0:*)
+         type(domain_t),   intent(in)    :: domZ, domX, domY
+         type(domain_t),   intent(in)    :: domR
+         real(kind=__KBUF),intent(in)    :: FZ,   FX,   FY
+       end subroutine func
+    end interface
+
+    integer jx
+    integer jout, nout
+    integer jinp, ninp
+    integer,parameter :: upush = 3, upop = 2
+    integer hbZ(0:upush-1), hbX(0:upop-1)
+    integer jbZ, jbV, jbW,  jbX(0:upop-1)
+    real(kind=KBUF) :: fillX(0:upop-1), fillZ
+    integer ofsi
+    integer j, m
+
+    integer,parameter :: nb = upop
+    integer btmp(0:nb-1)
+    type(domain_t) :: domZ(1)
+    type(stack_t)  :: stmp(0:nb-1)
+
+    type(buffer_t) :: buft(1)
+    type(domain_t) :: domR, domX(0:nb-1)
+    type(stack_t)  :: ltmp(0:upush-1)
+
+    ierr = 0
+
+    ninp = size(bufi)
+    nout = size(lefts)
+    ofsi = 0
+    if (is_anchor(bufi(ofsi))) then
+       ninp = ninp - 1
+       ofsi = ofsi + 1
+    endif
+    if (ierr.ne.0) then
+       write(*, *) ninp, size(lefts)
+       call message(ierr, 'invalid argument length for reduction operation.')
+       return
+    endif
+
+    outer: do jx = 1, nout / upush
+       if (ierr.eq.0) then
+          jout = nout - jx * upush
+          jinp = ofsi + ninp - jx * upop
+          ltmp(0:upush-1) = lefts(jout:jout+upush-1)   ! use logical coordinate at left
+          btmp(0:upop-1)  = bufi(jinp:jinp+upop-1)
+          stmp(0:upop-1)  = bstack(mstack-jx*upop:mstack-jx*upop+upop-1)
+       endif
+
+       if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 1)
+       do j = 1, upush - 1
+          if (ierr.eq.0) call copy_set_header(ierr, lefts(jout+j)%bh, bufi(jinp+1), 1)
+       enddo
+
+       ! write(*, *) 'wreduce/begin'
+       if (ierr.eq.0) call tweak_coordinates(ierr, domR, domX, btmp, stmp, nb, buft(1))
+       if (ierr.eq.0) call tweak_coordinates_core(ierr, domZ, buft, ltmp, 1)  ! cidx
+       if (ierr.eq.0) call set_inclusive_domain(ierr, domR, domX, btmp, stmp, nb)
+
+       if (ierr.eq.0) call adjust_reduce_domain(ierr, domR, domZ(1), buft(1)%pcp, ltmp(0)%lcp)
+
+       do j = 0, upop - 1
+          if (ierr.eq.0) call settle_input_domain(ierr, domX(j), btmp(j), stmp(j), domR)
+       enddo
+
+       if (ierr.eq.0) then
+          hbZ(0) = lefts(jout)%bh
+          hbZ(1) = lefts(jout+1)%bh
+          hbZ(2) = lefts(jout+2)%bh
+          jbZ = buf_h2item(hbZ(0))
+          jbV = buf_h2item(hbZ(1))
+          jbW = buf_h2item(hbZ(2))
+
+          do j = 0, upop - 1
+             jbX(j) = buf_h2item(bufi(jinp+j))
+             hbX(j) = bufi(jinp+j)
+             m = buffer_vmems(obuffer(jbX(j)))
+             if (m.lt.0) cycle outer
+          enddo
+       endif
+
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), btmp(0:0), domZ(1), buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbV), btmp(1:1), domZ(1), buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbW), btmp(1:1), domZ(1), buft(1))
+
+       if (ierr.eq.0) then
+          fillX(0) = obuffer(jbX(0))%undef
+          fillX(1) = obuffer(jbX(1))%undef
+          fillZ = choice(fillX(0), neutral)
+          obuffer(jbZ)%vd(:) = fillZ
+          obuffer(jbV)%vd(:) = fillZ
+          obuffer(jbW)%vd(:) = fillZ
+       endif
+       if (ierr.eq.0) then
+          call func &
+               & (ierr, &
+               &  obuffer(jbZ)%vd,    obuffer(jbV)%vd, obuffer(jbW)%vd, domZ(1), &
+               &  obuffer(jbX(0))%vd, domX(0), &
+               &  obuffer(jbX(1))%vd, domX(1), &
+               &  domR, fillZ, fillX(0),    fillX(1))
+       endif
+       if (ierr.eq.0) call set_multiv_descr(ierr, hbZ, hbX, hopr)
+    enddo outer
+
+  end subroutine apply_opr_REDUCE_3
+
+!!!_   . apply_opr_UNARY_acc
+  subroutine apply_opr_UNARY_acc &
+       & (ierr, hopr, lefts, bufi, cmode, func, neutral, rev)
+    use TOUZA_std,only: choice, jot
+    implicit none
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: hopr
+    type(stack_t),  intent(inout)       :: lefts(0:)
+    integer,        intent(in)          :: bufi(0:)
+    integer,        intent(in)          :: cmode
+    real(kind=KBUF),intent(in),optional :: neutral
+    logical,        intent(in),optional :: rev
+    interface
+       subroutine func &
+            & (ierr, Z, domZ, FZ, X, domX, FX)
+         use chak_lib,only: KFLT, KDBL, domain_t
+         implicit none
+         integer,          intent(out)   :: ierr
+         real(kind=__KBUF),intent(inout) :: Z(0:*)
+         real(kind=__KBUF),intent(in)    :: X(0:*)
+         type(domain_t),   intent(in)    :: domZ, domX
+         real(kind=__KBUF),intent(in)    :: FZ,   FX
+       end subroutine func
+    end interface
+
+    integer,parameter :: defopr = 1
+
+    integer nopr
+    integer jout, nout
+    integer jinp, ninp, jj
+    integer hbL, hbR
+    integer jbL, jbR
+    integer ofsi
+    integer jset
+    type(domain_t) :: domL
+    type(domain_t) :: domR(0:size(bufi)-1)
+    integer        :: pstk(0:size(bufi)-1)
+
+    real(kind=KBUF) :: fillL, fillR
+
+    integer m
+    integer ntmp
+    integer btmp(0:size(bufi)-1)
+    type(stack_t) :: stmp(0:size(bufi)-1)
+
+    ierr = 0
+
+    ninp = size(bufi)
+    ofsi = 0
+    if (is_anchor(bufi(ofsi))) then
+       ninp = ninp - 1
+       ofsi = ofsi + 1
+    endif
+    call jot(pstk, ninp, e=mstack)
+    nout = size(lefts)
+    nopr = ninp / nout
+    ! Reduce every (ninp / nout) buffer to nout.
+    ! i.e., error if (ninp % nout) != 0 or (ninp / nout) < 2
+
+    if (mod(ninp, nout).ne.0) ierr = ERR_INVALID_PARAMETER
+    if (nopr.lt.defopr) ierr = ERR_INVALID_PARAMETER
+    if (ierr.ne.0) then
+       call message(ierr, 'invalid operands for accumulate unary operation.')
+       return
+    endif
+
+    do jout = nout - 1 , 0, -1
+       jinp = jout * nopr + ofsi
+
+       ntmp = 0
+       do jj = jinp, jinp + nopr - 1
+          hbR = bufi(jj)
+          jbR = buf_h2item(hbR)
+          m = buffer_vmems(obuffer(jbR))
+          if (m.ge.0) then
+             btmp(ntmp) = hbR
+             stmp(ntmp) = bstack(pstk(jj-ofsi))
+             ntmp = ntmp + 1
+          endif
+       enddo
+       if (ntmp.lt.defopr) then
+          ierr = ERR_INVALID_PARAMETER
+          call message(ierr, 'too much null operands for binary operation.')
+          return
+       endif
+
+       hbL = lefts(jout)%bh
+       jbL = buf_h2item(hbL)
+
+       if (ierr.eq.0) call copy_set_header(ierr, hbL, btmp(0), ntmp)
+       if (ierr.eq.0) then
+          call get_compromise_domain &
+               & (ierr, domL, domR, btmp(0:ntmp-1), stmp(0:ntmp-1), ntmp, cmode, obuffer(jbL))
+       endif
+       if (choice(.FALSE., rev)) then
+          if (ierr.eq.0) then
+             jset = ntmp - 1
+             hbR = btmp(jset)
+             jbR = buf_h2item(hbR)
+             fillR = obuffer(jbR)%undef
+             fillL = choice(fillR, neutral)
+             obuffer(jbL)%vd(:) = fillL
+          endif
+          if (ierr.eq.0) then
+             do jj = ntmp - 2, 0, -1
+                jset = jj
+                hbR = btmp(jj)
+                jbR = buf_h2item(hbR)
+                fillR = obuffer(jbR)%undef
+                call func &
+                     & (ierr, &
+                     &  obuffer(jbL)%vd, domL,       fillL, &
+                     &  obuffer(jbR)%vd, domR(jset), fillR)
+             enddo
+          endif
+       else
+          if (ierr.eq.0) then
+             jset = 0
+             hbR = btmp(jset)
+             jbR = buf_h2item(hbR)
+             fillR = obuffer(jbR)%undef
+             fillL = choice(fillR, neutral)
+             obuffer(jbL)%vd(:) = fillL
+          endif
+          if (ierr.eq.0) then
+             do jj = 0, ntmp - 1
+                jset = jj
+                hbR = btmp(jj)
+                jbR = buf_h2item(hbR)
+                fillR = obuffer(jbR)%undef
+                call func &
+                     & (ierr, &
+                     &  obuffer(jbL)%vd, domL,       fillL, &
+                     &  obuffer(jbR)%vd, domR(jset), fillR)
+             enddo
+          endif
+       endif
+       if (ierr.eq.0) then
+          call set_binary_descr(ierr, hbL, btmp(0:ntmp-1), hopr)
+       endif
+    enddo
+  end subroutine apply_opr_UNARY_acc
+
+!!!_   . apply_opr_BINARY_acc
+  subroutine apply_opr_BINARY_acc &
+       & (ierr, hopr, lefts, bufi, cmode, func, neutral, rev)
+    use TOUZA_std,only: choice, jot
+    implicit none
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: hopr
+    type(stack_t),  intent(inout)       :: lefts(0:)
+    integer,        intent(in)          :: bufi(0:)
+    integer,        intent(in)          :: cmode
+    real(kind=KBUF),intent(in),optional :: neutral
+    logical,        intent(in),optional :: rev
+    interface
+       subroutine func &
+            & (ierr, Z, W, domZ, FZ, X, domX, Y, domY, FX, FY)
+         use chak_lib,only: KFLT, KDBL, domain_t
+         implicit none
+         integer,          intent(out)   :: ierr
+         real(kind=__KBUF),intent(inout) :: Z(0:*), W(0:*)
+         real(kind=__KBUF),intent(in)    :: X(0:*), Y(0:*)
+         type(domain_t),   intent(in)    :: domZ, domX, domY
+         real(kind=__KBUF),intent(in)    :: FZ,   FX, FY
+       end subroutine func
+    end interface
+
+    integer,parameter :: defopr = 2
+
+    integer jx
+    integer nopr
+    integer jout, nout
+    integer jinp, ninp, jj, ji
+    integer hbZ(0:defopr-1), hbX, hbY
+    integer jbZ, jbW, jbX, jbY
+    integer ofsi
+    integer jset
+    type(domain_t) :: domZ
+    type(domain_t) :: domX(0:size(bufi)-1)
+    integer        :: pstk(0:size(bufi)-1)
+
+    real(kind=KBUF) :: fillZ, fillX, fillY
+
+    integer m
+    integer ntmp
+    integer btmp(0:size(bufi)-1)
+    type(stack_t) :: stmp(0:size(bufi)-1)
+
+    ierr = 0
+
+    ninp = size(bufi)
+    ofsi = 0
+    if (is_anchor(bufi(ofsi))) then
+       ninp = ninp - 1
+       ofsi = ofsi + 1
+    endif
+    call jot(pstk, ninp, e=mstack)
+    nout = size(lefts)
+    nopr = ninp / nout
+
+    if (mod(ninp, nout).ne.0) ierr = ERR_INVALID_PARAMETER
+    if (mod(nout, defopr).ne.0) ierr = ERR_INVALID_PARAMETER
+    if (mod(ninp, defopr).ne.0) ierr = ERR_INVALID_PARAMETER
+    if (ierr.ne.0) then
+       call message(ierr, 'invalid operands for accumulate binary operation.')
+       return
+    endif
+
+    do jx = 1, nout / defopr
+       jout = nout - jx * defopr
+       jinp = ninp - jx * (nopr * defopr) + ofsi
+
+       ntmp = 0
+       do jj = jinp, jinp + nopr * defopr - 1, defopr
+          m = 0
+          do ji = 0, defopr - 1
+             hbX = bufi(jj+ji)
+             jbX = buf_h2item(hbX)
+             m = max(m, buffer_vmems(obuffer(jbX)))
+             btmp(ntmp+ji) = hbX
+             stmp(ntmp+ji) = bstack(pstk(jj+ji-ofsi))
+          enddo
+          if (m.gt.0) ntmp = ntmp + defopr
+       enddo
+
+       hbZ(0) = lefts(jout)%bh
+       hbZ(1) = lefts(jout+1)%bh
+       jbZ = buf_h2item(hbZ(0))
+       jbW = buf_h2item(hbZ(1))
+
+       do ji = 0, defopr - 1
+          if (ierr.eq.0) call copy_set_header(ierr, hbZ(ji), btmp(0), ntmp)
+       enddo
+       if (ierr.eq.0) then
+          call get_compromise_domain &
+               & (ierr, domZ, domX, btmp(0:ntmp-1), stmp(0:ntmp-1), ntmp, cmode, obuffer(jbZ))
+       endif
+       if (ierr.eq.0) call set_output_buffer(ierr, obuffer(jbW), btmp(0:ntmp-1), domZ)
+       if (ierr.eq.0) then
+          jset = 0
+          hbX = btmp(jset)
+          hbY = btmp(jset+1)
+          jbX = buf_h2item(hbX)
+          jbY = buf_h2item(hbY)
+          fillX = obuffer(jbX)%undef
+          fillY = obuffer(jbY)%undef
+          fillZ = choice(fillX, neutral)
+          obuffer(jbZ)%vd(:) = fillZ
+          obuffer(jbW)%vd(:) = fillZ
+       endif
+       if (ierr.eq.0) then
+          do jj = 0, ntmp - 1, defopr
+             jset = jj
+             hbX = btmp(jj)
+             hbY = btmp(jj+1)
+             jbX = buf_h2item(hbX)
+             jbY = buf_h2item(hbY)
+             fillX = obuffer(jbX)%undef
+             fillY = obuffer(jbY)%undef
+             if (ierr.eq.0) then
+                call func &
+                     & (ierr, &
+                     &  obuffer(jbZ)%vd, obuffer(jbW)%vd, &
+                     &  domZ,            fillZ, &
+                     &  obuffer(jbX)%vd, domX(0), &
+                     &  obuffer(jbY)%vd, domX(1), &
+                     &  fillX, fillY)
+             endif
+          enddo
+       endif
+       if (ierr.eq.0) call set_multiv_descr(ierr, hbZ, btmp(0:ntmp-1), hopr)
+    enddo
+  end subroutine apply_opr_BINARY_acc
+!!!_   . apply_opr_BINARY_acc3
+  subroutine apply_opr_BINARY_acc3 &
+       & (ierr, hopr, lefts, bufi, cmode, func, neutral, rev)
+    use TOUZA_std,only: choice, jot
+    implicit none
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: hopr
+    type(stack_t),  intent(inout)       :: lefts(0:)
+    integer,        intent(in)          :: bufi(0:)
+    integer,        intent(in)          :: cmode
+    real(kind=KBUF),intent(in),optional :: neutral
+    logical,        intent(in),optional :: rev
+    interface
+       subroutine func &
+            & (ierr, Z, V, W, domZ, FZ, X, domX, Y, domY, FX, FY)
+         use chak_lib,only: KFLT, KDBL, domain_t
+         implicit none
+         integer,          intent(out)   :: ierr
+         real(kind=__KBUF),intent(inout) :: Z(0:*), W(0:*), V(0:*)
+         real(kind=__KBUF),intent(in)    :: X(0:*), Y(0:*)
+         type(domain_t),   intent(in)    :: domZ, domX, domY
+         real(kind=__KBUF),intent(in)    :: FZ,   FX, FY
+       end subroutine func
+    end interface
+
+    integer,parameter :: upop = 2, upush = 3
+
+    integer jx
+    integer nopr
+    integer jout, nout
+    integer jinp, ninp, jj, ji
+    integer hbZ(0:upush-1), hbX, hbY
+    integer jbZ, jbV, jbW, jbX, jbY
+    integer ofsi
+    integer jset
+    type(domain_t) :: domZ
+    type(domain_t) :: domX(0:size(bufi)-1)
+    integer        :: pstk(0:size(bufi)-1)
+
+    real(kind=KBUF) :: fillZ, fillX, fillY
+
+    integer m
+    integer ntmp
+    integer btmp(0:size(bufi)-1)
+    type(stack_t) :: stmp(0:size(bufi)-1)
+
+    ierr = 0
+
+    ninp = size(bufi)
+    ofsi = 0
+    if (is_anchor(bufi(ofsi))) then
+       ninp = ninp - 1
+       ofsi = ofsi + 1
+    endif
+    call jot(pstk, ninp, e=mstack)
+    nout = size(lefts)
+    nopr = ninp / (nout / upush)
+
+    if (mod(ninp, nopr).ne.0) ierr = ERR_INVALID_PARAMETER
+    if (mod(nout, upush).ne.0) ierr = ERR_INVALID_PARAMETER
+    if (mod(ninp, upop).ne.0) ierr = ERR_INVALID_PARAMETER
+    if (ierr.ne.0) then
+       call message(ierr, 'invalid operands for accumulate binary[3] operation.')
+       return
+    endif
+
+    do jx = 1, nout / upush
+       jout = nout - jx * upush
+       jinp = ninp - jx * (nopr * upop) + ofsi
+
+       ntmp = 0
+       do jj = jinp, jinp + nopr * upop - 1, upop
+          m = 0
+          do ji = 0, upop - 1
+             hbX = bufi(jj+ji)
+             jbX = buf_h2item(hbX)
+             m = max(m, buffer_vmems(obuffer(jbX)))
+             btmp(ntmp+ji) = hbX
+             stmp(ntmp+ji) = bstack(pstk(jj+ji-ofsi))
+          enddo
+          if (m.gt.0) ntmp = ntmp + upop
+       enddo
+
+       hbZ(0) = lefts(jout)%bh
+       hbZ(1) = lefts(jout+1)%bh
+       hbZ(2) = lefts(jout+2)%bh
+       jbZ = buf_h2item(hbZ(0))
+       jbV = buf_h2item(hbZ(1))
+       jbW = buf_h2item(hbZ(2))
+
+       do ji = 0, upush - 1
+          if (ierr.eq.0) call copy_set_header(ierr, hbZ(ji), btmp(0), ntmp)
+       enddo
+       if (ierr.eq.0) then
+          call get_compromise_domain &
+               & (ierr, domZ, domX, btmp(0:ntmp-1), stmp(0:ntmp-1), ntmp, cmode, obuffer(jbZ))
+       endif
+       if (ierr.eq.0) call set_output_buffer(ierr, obuffer(jbV), btmp(0:ntmp-1), domZ)
+       if (ierr.eq.0) call set_output_buffer(ierr, obuffer(jbW), btmp(0:ntmp-1), domZ)
+       if (ierr.eq.0) then
+          jset = 0
+          hbX = btmp(jset)
+          hbY = btmp(jset+1)
+          jbX = buf_h2item(hbX)
+          jbY = buf_h2item(hbY)
+          fillX = obuffer(jbX)%undef
+          fillY = obuffer(jbY)%undef
+          fillZ = choice(fillX, neutral)
+          obuffer(jbZ)%vd(:) = fillZ
+          obuffer(jbV)%vd(:) = fillZ
+          obuffer(jbW)%vd(:) = fillZ
+       endif
+       if (ierr.eq.0) then
+          do jj = 0, ntmp - 1, upop
+             jset = jj
+             hbX = btmp(jj)
+             hbY = btmp(jj+1)
+             jbX = buf_h2item(hbX)
+             jbY = buf_h2item(hbY)
+             fillX = obuffer(jbX)%undef
+             fillY = obuffer(jbY)%undef
+             if (ierr.eq.0) then
+                call func &
+                     & (ierr, &
+                     &  obuffer(jbZ)%vd, obuffer(jbV)%vd, obuffer(jbW)%vd, &
+                     &  domZ,            fillZ, &
+                     &  obuffer(jbX)%vd, domX(0), &
+                     &  obuffer(jbY)%vd, domX(1), &
+                     &  fillX, fillY)
+             endif
+          enddo
+       endif
+       if (ierr.eq.0) call set_multiv_descr(ierr, hbZ, btmp(0:ntmp-1), hopr)
+    enddo
+  end subroutine apply_opr_BINARY_acc3
 
 !!!_   . set_unary_descr
   subroutine set_unary_descr &
