@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/06/29 13:48:18 fuyuki genopr.sh>
+# Time-stamp: <2023/06/30 16:12:12 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -118,6 +118,7 @@ register_all ()
   register -g stack +n m,0         FLUSH    'flush-out from last anchor'
   register -g stack +n m,0         DFLUSH   'flush-out from last anchor (defined only)'
   register -g stack +n m,0         CFLUSH   'flush-out from last anchor (columnized)'
+  register -g stack -n 1,1 -f DUP -c float FLOAT 'change type as floating point'
 
   # queue manipulation
   register -g queue ITER   'iterate last queue operator for each set from last anchor'
@@ -148,19 +149,20 @@ register_all ()
   # primitive binary
   register -n 2,1 -i add,'+'  -P sweep=stack ADD         'A+B'
   register -n 2,1 -i add,'-'                 SUB         'A-B'
-  register -n 2,1 -i mul,'*'                 MUL         'A*B'
+  register -n 2,1 -i mul,'*'  -P sweep=stack MUL         'A*B'
   register -n 2,1 -i mul,'/'                 DIV         'A/B'
-  register -n 2,1 -i mul,'//' -c int         IDIV        'A//B'
-  register -n 2,1 -i mul,'%'                 MOD         'mod(A,B)'
-  register -n 2,1 -i exp,'**'                POW         'pow(A,B)'
+  register -n 2,1 -i mul,'/'  -c float -f DIV RDIV        'A/B'
+  register -n 2,1 -i mul,'//' -c int          IDIV        'A//B'
+  register -n 2,1 -i mul,'%'                  MOD         'mod(A,B)'
+  register -n 2,1 -i exp,'**'                 POW         'pow(A,B)'
 
   register -n 2,1 -i call MODULO      'modulo(A,B)'
 
   # primitive binary inclusive
-  register -g lazy -n 2,1 -i add,'+' -P sweep=stack -f ADD,ZERO LADD    'lazy ADD'
-  register -g lazy -n 2,1 -i add,'-'                -f SUB,ZERO LSUB    'lazy SUB'
-  register -g lazy -n 2,1 -i mul,'*'                -f MUL,ONE  LMUL    'lazy MUL'
-  register -g lazy -n 2,1 -i mul,'/'                -f DIV,ONE  LDIV    'lazy DIV'
+  register -g lazy -n 2,1 -i add,'+' -P sweep=stack LADD    'lazy ADD'
+  register -g lazy -n 2,1 -i add,'-'                LSUB    'lazy SUB'
+  register -g lazy -n 2,1 -i mul,'*' -P sweep=stack LMUL    'lazy MUL'
+  register -g lazy -n 2,1 -i mul,'/'                LDIV    'lazy DIV'
 
   # primitive unary
   register          -n 1,1 -i neg,'-'  NEG     '-A'
@@ -216,10 +218,10 @@ register_all ()
   register -g float -n 1,1 -i call        RRSP      'rrspacing(A)'
 
   # other operation
-  register         -n 2,1 -i call -P sweep=stack             MIN    'min(A,B)'
-  register         -n 2,1 -i call -P sweep=stack             MAX    'max(A,B)'
-  register -g lazy -n 2,1 -i call -P sweep=stack -f -,ULIMIT LMIN   'lazy MIN'
-  register -g lazy -n 2,1 -i call -P sweep=stack -f -,LLIMIT LMAX   'lazy MAX'
+  register         -n 2,1 -i call -P sweep=stack  MIN    'min(A,B)'
+  register         -n 2,1 -i call -P sweep=stack  MAX    'max(A,B)'
+  register -g lazy -n 2,1 -i call -P sweep=stack  LMIN   'lazy MIN'
+  register -g lazy -n 2,1 -i call -P sweep=stack  LMAX   'lazy MAX'
 
   # conditional operation (binary)
   register -g bool -n 2,1 -f -,FALSE -i call -c int EQB       '1 if A==B, else 0'
@@ -265,9 +267,10 @@ register_all ()
   # reduction operation
   register -g reduce -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
   register -g reduce -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
-  register -g reduce -n 1,1 -o RANK -f LADD,ZERO -i call        SUM     'sum along rank(s)'
-  register -g reduce -n 1,1 -o RANK -f -,ZERO    -i call -c int COUNT   'count defined elements along rank(s)'
-  register -g reduce -n 2,2 -o RANK -f -,ZERO    -i call        WSUM    'weighted sum and weight along rank(s)'
+  register -g reduce -n 1,1 -o RANK -f -,ZERO -i call        SUM     'sum along rank(s)'
+  register -g reduce -n 1,1 -o RANK -f -,ZERO -i call -c int COUNT   'count defined elements along rank(s)'
+  register -g reduce -n 2,2 -o RANK -f -,ZERO -i call        WSUM    'weighted sum and weight along rank(s)'
+  register -g reduce -n 2,3 -o RANK -f -,ZERO -i call        WMV     'weighted mean, variance and weights along rank(s)'
 
   # register -g reduce -n 1,1 -i call -p RANK -s 'MIN=' UMIN    'minimum'
   # register -g reduce -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'
@@ -505,7 +508,7 @@ output_register ()
       elif [[ $sweep == reduce ]]; then
         rv=acc_${iv#*_}
         rarg=(ierr "$rv" "acc_pfx // $av")
-        [[ -n $nstack ]] && rarg+=($((nstack[1]+1)) $nstack[2])
+        [[ -n $nstack ]] && rarg+=($nstack)
         [[ -n $conv ]] && rarg+=("conv=result_$conv")
         rarg+=("sweep=sweep_accum")
         fout -t 4 "if (ierr.eq.0) &"
