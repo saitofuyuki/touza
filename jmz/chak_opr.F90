@@ -305,6 +305,23 @@ contains
     if (.not.b) b = handle.eq.opr_ANCHOR
     if (.not.b) b = is_operator_shape(handle)
   end function is_operator_stacks
+!!!_   . is_operator_cumlative()
+  logical function is_operator_cumulative(handle) result(b)
+    implicit none
+    integer,intent(in) :: handle
+    integer pop, push
+    integer jerr
+    call inquire_opr_nstack(jerr, pop, push, handle)
+    if (jerr.eq.0) then
+       if ((grp_reduce_bgn.le.handle).and.(handle.lt.grp_reduce_end)) then
+          b = push.eq.pop
+       else
+          b = push.eq.1.and.pop.gt.push
+       endif
+    else
+       b = .FALSE.
+    endif
+  end function is_operator_cumulative
 !!!_   . is_operator_reusable()
   logical function is_operator_reusable(handle) result(b)
     implicit none
@@ -3229,7 +3246,6 @@ contains
        Z = Y
     endif
   end function elem_LAY
-
 !!!_   & elem_XOR() - Y if X == NAN, X if Y == NAN, else NAN
   ! (cf. gmtmath) Y if X == NAN, else X (AND identical)
   !    operands  jmz  gmt
@@ -3254,6 +3270,7 @@ contains
        Z = FX
     endif
   end function elem_XOR
+!!!_  - conditional operators (binary)
 !!!_   & elem_EQB() - binary for if X == Y
   ELEMENTAL &
   real(kind=KBUF) function elem_EQB (X, Y, FX, FY) result(Z)
@@ -3338,6 +3355,7 @@ contains
        Z = FALSE
     endif
   end function elem_GEB
+!!!_  - conditional operators (filter)
 !!!_   & elem_EQF() - X if X == Y, else NAN
   ELEMENTAL &
   real(kind=KBUF) function elem_EQF (X, Y, FX, FY) result(Z)
@@ -3506,6 +3524,7 @@ contains
        Z = FX
     endif
   end function elem_GE
+!!!_  - mathematic binary operators
 !!!_   & elem_ATAN2() - TAN2(X, Y)
   ELEMENTAL &
   real(kind=KBUF) function elem_ATAN2 (X, Y, FX, FY) result(Z)
@@ -3558,6 +3577,7 @@ contains
        Z = SIGN(X, Y)
     endif
   end function elem_SIGN
+!!!_  - bitwise binary operators
 !!!_   & elem_BITNOT () - (integer only) bitwise not
   ELEMENTAL &
   real(kind=KBUF) function elem_BITNOT (X, F) result(Z)
@@ -3689,7 +3709,7 @@ contains
     endif
   end function elem_BLEND
 !!!_  - elemental reduction operators
-!!!_   . elem_SUM() - X + Y, ignore undef
+!!!_   & elem_SUM() - X + Y, ignore undef
   ELEMENTAL &
   real(kind=KBUF) function elem_SUM (X, Y, FX, FY) result(Z)
     implicit none
@@ -3707,7 +3727,7 @@ contains
        Z = X + Y
     endif
   end function elem_SUM
-!!!_   . elem_COUNT()
+!!!_   & elem_COUNT()
   ELEMENTAL &
   real(kind=KBUF) function elem_COUNT (X, Y, FX, FY) result(Z)
     implicit none
