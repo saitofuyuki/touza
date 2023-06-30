@@ -1745,6 +1745,8 @@ contains
        if (ierr.eq.0) call stack_REPEAT(ierr, hopr, ntup, niter)
     case(opr_DUP)
        if (ierr.eq.0) call stack_DUP(ierr, hopr, ntup, niter)
+    case(opr_FLOAT)
+       if (ierr.eq.0) call stack_DUP(ierr, hopr, 0,    niter)
     case(opr_COPY,opr_CLONE)
        if (ierr.eq.0) call stack_COPY(ierr, hopr, ntup, niter)
     case(opr_ROLL)
