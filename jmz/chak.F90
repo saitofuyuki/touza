@@ -2180,7 +2180,7 @@ contains
           call query_opr_name(ierr, copr, hopr)
           ierr = ERR_NOT_IMPLEMENTED
           call message(ierr, 'reserved operator(CUMulated) ' // trim(copr))
-       else if (upush.ne.1.or.upop.le.upush) then
+       else if (.not.is_operator_cumulative(hopr)) then
           ierr = ERR_INVALID_ITEM
           call message(ierr, 'invalid operation for CUM')
        endif
@@ -2188,9 +2188,11 @@ contains
     if (ierr.eq.0) then
        apos = last_anchor()
        nopr = mstack - (apos + 1)
-       if (mod(nopr - upush, upop - upush).ne.0) then
-          ierr = ERR_INVALID_ITEM
-          call message(ierr, 'invalid operands to CUMulate')
+       if (upop.gt.upush) then
+          if (mod(nopr - upush, upop - upush).ne.0) then
+             ierr = ERR_INVALID_ITEM
+             call message(ierr, 'invalid operands to CUMulate')
+          endif
        endif
     endif
     if (ierr.eq.0) then
