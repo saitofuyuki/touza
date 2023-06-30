@@ -1,6 +1,6 @@
 !!!_! jmz/chak_decl.F90 - TOUZA/Jmz CH(swiss) army knife operator symbol declaration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-06-29T13:53:05+09:00
+! Created by genopr.sh at 2023-06-30T16:16:14+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -37,6 +37,7 @@
   character(len=*),parameter :: str_FLUSH = 'FLUSH'
   character(len=*),parameter :: str_DFLUSH = 'DFLUSH'
   character(len=*),parameter :: str_CFLUSH = 'CFLUSH'
+  character(len=*),parameter :: str_FLOAT = 'FLOAT'
   !! group: queue
   character(len=*),parameter :: str_ITER = 'ITER'
   character(len=*),parameter :: str_CUM = 'CUM'
@@ -84,6 +85,7 @@
   character(len=*),parameter :: str_SUB = 'SUB'
   character(len=*),parameter :: str_MUL = 'MUL'
   character(len=*),parameter :: str_DIV = 'DIV'
+  character(len=*),parameter :: str_RDIV = 'RDIV'
   character(len=*),parameter :: str_IDIV = 'IDIV'
   character(len=*),parameter :: str_MOD = 'MOD'
   character(len=*),parameter :: str_POW = 'POW'
@@ -157,6 +159,7 @@
   character(len=*),parameter :: str_SUM = 'SUM'
   character(len=*),parameter :: str_COUNT = 'COUNT'
   character(len=*),parameter :: str_WSUM = 'WSUM'
+  character(len=*),parameter :: str_WMV = 'WMV'
   !! group: other
   !! group: index
   character(len=*),parameter :: str_C0 = 'C0'
@@ -225,198 +228,204 @@
   integer,parameter :: opr_FLUSH = 20
   integer,parameter :: opr_DFLUSH = 21
   integer,parameter :: opr_CFLUSH = 22
-  integer,parameter :: grp_stack_end = 23
+  integer,parameter :: opr_FLOAT = 23
+  integer,parameter :: grp_stack_end = 24
   !! group: queue
-  integer,parameter :: grp_queue_bgn = 23
-  integer,parameter :: opr_ITER = 23
-  integer,parameter :: opr_CUM = 24
-  integer,parameter :: opr_MAP = 25
-  integer,parameter :: grp_queue_end = 26
+  integer,parameter :: grp_queue_bgn = 24
+  integer,parameter :: opr_ITER = 24
+  integer,parameter :: opr_CUM = 25
+  integer,parameter :: opr_MAP = 26
+  integer,parameter :: grp_queue_end = 27
   !! group: unary
-  integer,parameter :: grp_unary_bgn = 26
-  integer,parameter :: opr_NEG = 26
-  integer,parameter :: opr_INV = 27
-  integer,parameter :: opr_ABS = 28
-  integer,parameter :: opr_SQR = 29
-  integer,parameter :: opr_SIGN1 = 30
-  integer,parameter :: opr_ZSIGN = 31
-  integer,parameter :: opr_FLOOR = 32
-  integer,parameter :: opr_CEIL = 33
-  integer,parameter :: opr_ROUND = 34
-  integer,parameter :: opr_TRUNC = 35
-  integer,parameter :: opr_INT = 36
-  integer,parameter :: opr_BITNOT = 37
-  integer,parameter :: grp_unary_end = 38
+  integer,parameter :: grp_unary_bgn = 27
+  integer,parameter :: opr_NEG = 27
+  integer,parameter :: opr_INV = 28
+  integer,parameter :: opr_ABS = 29
+  integer,parameter :: opr_SQR = 30
+  integer,parameter :: opr_SIGN1 = 31
+  integer,parameter :: opr_ZSIGN = 32
+  integer,parameter :: opr_FLOOR = 33
+  integer,parameter :: opr_CEIL = 34
+  integer,parameter :: opr_ROUND = 35
+  integer,parameter :: opr_TRUNC = 36
+  integer,parameter :: opr_INT = 37
+  integer,parameter :: opr_BITNOT = 38
+  integer,parameter :: grp_unary_end = 39
   !! group: ubool
-  integer,parameter :: grp_ubool_bgn = 38
-  integer,parameter :: opr_NOT = 38
-  integer,parameter :: opr_BOOL = 39
-  integer,parameter :: opr_BIN = 40
-  integer,parameter :: grp_ubool_end = 41
+  integer,parameter :: grp_ubool_bgn = 39
+  integer,parameter :: opr_NOT = 39
+  integer,parameter :: opr_BOOL = 40
+  integer,parameter :: opr_BIN = 41
+  integer,parameter :: grp_ubool_end = 42
   !! group: bool
-  integer,parameter :: grp_bool_bgn = 41
-  integer,parameter :: opr_EQB = 41
-  integer,parameter :: opr_NEB = 42
-  integer,parameter :: opr_LTB = 43
-  integer,parameter :: opr_GTB = 44
-  integer,parameter :: opr_LEB = 45
-  integer,parameter :: opr_GEB = 46
-  integer,parameter :: opr_EQ = 47
-  integer,parameter :: opr_NE = 48
-  integer,parameter :: opr_LT = 49
-  integer,parameter :: opr_GT = 50
-  integer,parameter :: opr_LE = 51
-  integer,parameter :: opr_GE = 52
+  integer,parameter :: grp_bool_bgn = 42
+  integer,parameter :: opr_EQB = 42
+  integer,parameter :: opr_NEB = 43
+  integer,parameter :: opr_LTB = 44
+  integer,parameter :: opr_GTB = 45
+  integer,parameter :: opr_LEB = 46
+  integer,parameter :: opr_GEB = 47
+  integer,parameter :: opr_EQ = 48
+  integer,parameter :: opr_NE = 49
+  integer,parameter :: opr_LT = 50
+  integer,parameter :: opr_GT = 51
+  integer,parameter :: opr_LE = 52
+  integer,parameter :: opr_GE = 53
   integer,parameter :: opr_EQU = opr_EQ
   integer,parameter :: opr_NEU = opr_NE
   integer,parameter :: opr_LTU = opr_LT
   integer,parameter :: opr_GTU = opr_GT
   integer,parameter :: opr_LEU = opr_LE
   integer,parameter :: opr_GEU = opr_GE
-  integer,parameter :: grp_bool_end = 53
+  integer,parameter :: grp_bool_end = 54
   !! group: binary
-  integer,parameter :: grp_binary_bgn = 53
-  integer,parameter :: opr_AND = 53
-  integer,parameter :: opr_MASK = 54
-  integer,parameter :: opr_ADD = 55
+  integer,parameter :: grp_binary_bgn = 54
+  integer,parameter :: opr_AND = 54
+  integer,parameter :: opr_MASK = 55
+  integer,parameter :: opr_ADD = 56
   integer,parameter :: rdc_ADD = opr_ADD + 1
-  integer,parameter :: opr_SUB = 57
-  integer,parameter :: opr_MUL = 58
-  integer,parameter :: opr_DIV = 59
-  integer,parameter :: opr_IDIV = 60
-  integer,parameter :: opr_MOD = 61
-  integer,parameter :: opr_POW = 62
-  integer,parameter :: opr_MODULO = 63
-  integer,parameter :: opr_SIGN = 64
-  integer,parameter :: opr_BITAND = 65
-  integer,parameter :: opr_BITOR = 66
-  integer,parameter :: opr_BITXOR = 67
-  integer,parameter :: opr_LSHIFT = 68
-  integer,parameter :: opr_RSHIFT = 69
-  integer,parameter :: opr_MIN = 70
+  integer,parameter :: opr_SUB = 58
+  integer,parameter :: opr_MUL = 59
+  integer,parameter :: rdc_MUL = opr_MUL + 1
+  integer,parameter :: opr_DIV = 61
+  integer,parameter :: opr_RDIV = 62
+  integer,parameter :: opr_IDIV = 63
+  integer,parameter :: opr_MOD = 64
+  integer,parameter :: opr_POW = 65
+  integer,parameter :: opr_MODULO = 66
+  integer,parameter :: opr_SIGN = 67
+  integer,parameter :: opr_BITAND = 68
+  integer,parameter :: opr_BITOR = 69
+  integer,parameter :: opr_BITXOR = 70
+  integer,parameter :: opr_LSHIFT = 71
+  integer,parameter :: opr_RSHIFT = 72
+  integer,parameter :: opr_MIN = 73
   integer,parameter :: rdc_MIN = opr_MIN + 1
-  integer,parameter :: opr_MAX = 72
+  integer,parameter :: opr_MAX = 75
   integer,parameter :: rdc_MAX = opr_MAX + 1
-  integer,parameter :: opr_EXTR = 74
-  integer,parameter :: opr_CDIFF = 75
-  integer,parameter :: opr_FDIFF = 76
-  integer,parameter :: opr_BDIFF = 77
-  integer,parameter :: grp_binary_end = 78
+  integer,parameter :: opr_EXTR = 77
+  integer,parameter :: opr_CDIFF = 78
+  integer,parameter :: opr_FDIFF = 79
+  integer,parameter :: opr_BDIFF = 80
+  integer,parameter :: grp_binary_end = 81
   !! group: filter
-  integer,parameter :: grp_filter_bgn = 78
-  integer,parameter :: opr_EQF = 78
-  integer,parameter :: opr_NEF = 79
-  integer,parameter :: opr_LTF = 80
-  integer,parameter :: opr_GTF = 81
-  integer,parameter :: opr_LEF = 82
-  integer,parameter :: opr_GEF = 83
-  integer,parameter :: grp_filter_end = 84
+  integer,parameter :: grp_filter_bgn = 81
+  integer,parameter :: opr_EQF = 81
+  integer,parameter :: opr_NEF = 82
+  integer,parameter :: opr_LTF = 83
+  integer,parameter :: opr_GTF = 84
+  integer,parameter :: opr_LEF = 85
+  integer,parameter :: opr_GEF = 86
+  integer,parameter :: grp_filter_end = 87
   !! group: lazy
-  integer,parameter :: grp_lazy_bgn = 84
-  integer,parameter :: opr_OR = 84
+  integer,parameter :: grp_lazy_bgn = 87
+  integer,parameter :: opr_OR = 87
   integer,parameter :: opr_LOR = opr_OR
-  integer,parameter :: opr_ROR = 85
-  integer,parameter :: opr_XOR = 86
-  integer,parameter :: opr_LAND = 87
-  integer,parameter :: opr_LMASK = 88
-  integer,parameter :: opr_LLAY = 89
+  integer,parameter :: opr_ROR = 88
+  integer,parameter :: opr_XOR = 89
+  integer,parameter :: opr_LAND = 90
+  integer,parameter :: opr_LMASK = 91
+  integer,parameter :: opr_LLAY = 92
   integer,parameter :: opr_LAY = opr_LLAY
-  integer,parameter :: opr_RLAY = 90
-  integer,parameter :: opr_LADD = 91
+  integer,parameter :: opr_RLAY = 93
+  integer,parameter :: opr_LADD = 94
   integer,parameter :: rdc_LADD = opr_LADD + 1
-  integer,parameter :: opr_LSUB = 93
-  integer,parameter :: opr_LMUL = 94
-  integer,parameter :: opr_LDIV = 95
-  integer,parameter :: opr_LMIN = 96
+  integer,parameter :: opr_LSUB = 96
+  integer,parameter :: opr_LMUL = 97
+  integer,parameter :: rdc_LMUL = opr_LMUL + 1
+  integer,parameter :: opr_LDIV = 99
+  integer,parameter :: opr_LMIN = 100
   integer,parameter :: rdc_LMIN = opr_LMIN + 1
-  integer,parameter :: opr_LMAX = 98
+  integer,parameter :: opr_LMAX = 102
   integer,parameter :: rdc_LMAX = opr_LMAX + 1
-  integer,parameter :: grp_lazy_end = 100
+  integer,parameter :: grp_lazy_end = 104
   !! group: float
-  integer,parameter :: grp_float_bgn = 100
-  integer,parameter :: opr_SQRT = 100
-  integer,parameter :: opr_EXP = 101
-  integer,parameter :: opr_LOG = 102
-  integer,parameter :: opr_LOG10 = 103
-  integer,parameter :: opr_SIN = 104
-  integer,parameter :: opr_COS = 105
-  integer,parameter :: opr_TAN = 106
-  integer,parameter :: opr_ASIN = 107
-  integer,parameter :: opr_ACOS = 108
-  integer,parameter :: opr_ATAN = 109
-  integer,parameter :: opr_ATAN2 = 110
-  integer,parameter :: opr_SINH = 111
-  integer,parameter :: opr_COSH = 112
-  integer,parameter :: opr_TANH = 113
-  integer,parameter :: opr_R2D = 114
-  integer,parameter :: opr_D2R = 115
-  integer,parameter :: opr_HYPOT = 116
-  integer,parameter :: opr_EXPONENT = 117
-  integer,parameter :: opr_FRACTION = 118
-  integer,parameter :: opr_SCALE = 119
-  integer,parameter :: opr_NEAREST = 120
-  integer,parameter :: opr_SPACING = 121
-  integer,parameter :: opr_RRSP = 122
-  integer,parameter :: grp_float_end = 123
+  integer,parameter :: grp_float_bgn = 104
+  integer,parameter :: opr_SQRT = 104
+  integer,parameter :: opr_EXP = 105
+  integer,parameter :: opr_LOG = 106
+  integer,parameter :: opr_LOG10 = 107
+  integer,parameter :: opr_SIN = 108
+  integer,parameter :: opr_COS = 109
+  integer,parameter :: opr_TAN = 110
+  integer,parameter :: opr_ASIN = 111
+  integer,parameter :: opr_ACOS = 112
+  integer,parameter :: opr_ATAN = 113
+  integer,parameter :: opr_ATAN2 = 114
+  integer,parameter :: opr_SINH = 115
+  integer,parameter :: opr_COSH = 116
+  integer,parameter :: opr_TANH = 117
+  integer,parameter :: opr_R2D = 118
+  integer,parameter :: opr_D2R = 119
+  integer,parameter :: opr_HYPOT = 120
+  integer,parameter :: opr_EXPONENT = 121
+  integer,parameter :: opr_FRACTION = 122
+  integer,parameter :: opr_SCALE = 123
+  integer,parameter :: opr_NEAREST = 124
+  integer,parameter :: opr_SPACING = 125
+  integer,parameter :: opr_RRSP = 126
+  integer,parameter :: grp_float_end = 127
   !! group: ternary
-  integer,parameter :: grp_ternary_bgn = 123
-  integer,parameter :: opr_IFELSE = 123
-  integer,parameter :: opr_INRANGE = 124
-  integer,parameter :: opr_BLEND = 125
-  integer,parameter :: grp_ternary_end = 126
+  integer,parameter :: grp_ternary_bgn = 127
+  integer,parameter :: opr_IFELSE = 127
+  integer,parameter :: opr_INRANGE = 128
+  integer,parameter :: opr_BLEND = 129
+  integer,parameter :: grp_ternary_end = 130
   !! group: reduce
-  integer,parameter :: grp_reduce_bgn = 126
-  integer,parameter :: acc_NORM = 126
-  integer,parameter :: opr_NORM = 127
-  integer,parameter :: acc_AVR = 128
-  integer,parameter :: opr_AVR = 129
-  integer,parameter :: acc_SUM = 130
-  integer,parameter :: opr_SUM = 131
-  integer,parameter :: acc_COUNT = 132
-  integer,parameter :: opr_COUNT = 133
-  integer,parameter :: acc_WSUM = 134
-  integer,parameter :: opr_WSUM = 135
-  integer,parameter :: grp_reduce_end = 136
+  integer,parameter :: grp_reduce_bgn = 130
+  integer,parameter :: acc_NORM = 130
+  integer,parameter :: opr_NORM = 131
+  integer,parameter :: acc_AVR = 132
+  integer,parameter :: opr_AVR = 133
+  integer,parameter :: acc_SUM = 134
+  integer,parameter :: opr_SUM = 135
+  integer,parameter :: acc_COUNT = 136
+  integer,parameter :: opr_COUNT = 137
+  integer,parameter :: acc_WSUM = 138
+  integer,parameter :: opr_WSUM = 139
+  integer,parameter :: acc_WMV = 140
+  integer,parameter :: opr_WMV = 141
+  integer,parameter :: grp_reduce_end = 142
   !! group: other
-  integer,parameter :: grp_other_bgn = 136
-  integer,parameter :: grp_other_end = 136
+  integer,parameter :: grp_other_bgn = 142
+  integer,parameter :: grp_other_end = 142
   !! group: index
-  integer,parameter :: grp_index_bgn = 136
-  integer,parameter :: opr_C0 = 136
-  integer,parameter :: opr_C1 = 137
-  integer,parameter :: opr_C2 = 138
-  integer,parameter :: opr_C3 = 139
-  integer,parameter :: opr_X = 140
-  integer,parameter :: opr_Y = 141
-  integer,parameter :: opr_Z = 142
-  integer,parameter :: opr_FLAT = 143
+  integer,parameter :: grp_index_bgn = 142
+  integer,parameter :: opr_C0 = 142
+  integer,parameter :: opr_C1 = 143
+  integer,parameter :: opr_C2 = 144
+  integer,parameter :: opr_C3 = 145
+  integer,parameter :: opr_X = 146
+  integer,parameter :: opr_Y = 147
+  integer,parameter :: opr_Z = 148
+  integer,parameter :: opr_FLAT = 149
   integer,parameter :: opr_INDEX = opr_FLAT
-  integer,parameter :: grp_index_end = 144
+  integer,parameter :: grp_index_end = 150
   !! group: shape
-  integer,parameter :: grp_shape_bgn = 144
-  integer,parameter :: opr_PERM = 144
-  integer,parameter :: opr_SHAPE = 145
-  integer,parameter :: opr_SIZE = 146
-  integer,parameter :: opr_SHIFT = 147
-  integer,parameter :: opr_CSHIFT = 148
-  integer,parameter :: opr_EOSHIFT = 149
-  integer,parameter :: grp_shape_end = 150
+  integer,parameter :: grp_shape_bgn = 150
+  integer,parameter :: opr_PERM = 150
+  integer,parameter :: opr_SHAPE = 151
+  integer,parameter :: opr_SIZE = 152
+  integer,parameter :: opr_SHIFT = 153
+  integer,parameter :: opr_CSHIFT = 154
+  integer,parameter :: opr_EOSHIFT = 155
+  integer,parameter :: grp_shape_end = 156
   !! group: header
-  integer,parameter :: grp_header_bgn = 150
-  integer,parameter :: opr_FMT = 150
-  integer,parameter :: opr_ITEM = 151
-  integer,parameter :: opr_UNIT = 152
-  integer,parameter :: opr_TITLE = 153
-  integer,parameter :: opr_EDIT = 154
-  integer,parameter :: opr_DSET = 155
-  integer,parameter :: opr_TSEL = 156
-  integer,parameter :: opr_RSEL = 157
-  integer,parameter :: opr_MISS = 158
-  integer,parameter :: opr_DUR = 159
-  integer,parameter :: grp_header_end = 160
+  integer,parameter :: grp_header_bgn = 156
+  integer,parameter :: opr_FMT = 156
+  integer,parameter :: opr_ITEM = 157
+  integer,parameter :: opr_UNIT = 158
+  integer,parameter :: opr_TITLE = 159
+  integer,parameter :: opr_EDIT = 160
+  integer,parameter :: opr_DSET = 161
+  integer,parameter :: opr_TSEL = 162
+  integer,parameter :: opr_RSEL = 163
+  integer,parameter :: opr_MISS = 164
+  integer,parameter :: opr_DUR = 165
+  integer,parameter :: grp_header_end = 166
   !! group: buffer
-  integer,parameter :: grp_buffer_bgn = 160
-  integer,parameter :: opr_TAG = 160
-  integer,parameter :: opr_DESC = 161
-  integer,parameter :: opr_FUNC = 162
-  integer,parameter :: grp_buffer_end = 163
+  integer,parameter :: grp_buffer_bgn = 166
+  integer,parameter :: opr_TAG = 166
+  integer,parameter :: opr_DESC = 167
+  integer,parameter :: opr_FUNC = 168
+  integer,parameter :: grp_buffer_end = 169
