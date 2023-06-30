@@ -4864,6 +4864,8 @@ contains
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_MUL)
        else if (handle.eq.opr_DIV) then
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_DIV)
+       else if (handle.eq.opr_RDIV) then
+          call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_DIV)
        else if (handle.eq.opr_IDIV) then
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_IDIV)
        else if (handle.eq.opr_MOD) then
