@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/28 16:46:57 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/01 11:15:10 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1061,6 +1061,7 @@ contains
 
 !!!_   . adjust_reduce_domain
   subroutine adjust_reduce_domain(ierr, domL, domR, pcp, lcp)
+    use TOUZA_Std,only: find_first
     implicit none
     integer,       intent(out)   :: ierr
     type(domain_t),intent(inout) :: domL  ! domain for loop
@@ -1077,8 +1078,9 @@ contains
     ! if (ierr.eq.0) call show_domain(ierr, domR, 'adjust/R0', indent=5)  ! no change
 
     if (ierr.eq.0) then
-       nc = domR%mco
-       nx = count(lcp(0:nc-1)%flg.eq.loop_reduce)
+       nc = domL%mco
+       nx = count(lcp(0:lcoor-1)%flg.eq.loop_reduce)
+       ! write(*, *) 'adjust/nc', nc, nx
        do jo = 0, nc - 1
           pcp(jo)%bgn = domL%bgn(jo)
           pcp(jo)%end = domL%end(jo)
@@ -1088,6 +1090,7 @@ contains
           domR%strd(jo) = 1
        enddo
        do jo = 0, nc - 1
+          if (jo.ge.domR%mco) cycle
           jc = domR%cidx(jo)
           ! write(*, *) '--- ', jc, ' ---'
           ! write(*, *) '    ', jo, domL%cidx(jo)
@@ -1115,6 +1118,21 @@ contains
           endif
        enddo
     endif
+    ! if (ierr.eq.0) then
+    !    do jo = 0, domR%mco - 1
+    !       ! jo = find_first(domR%cidx(0:domR%mco-1), jc, offset=0)
+    !       ! if (jo.lt.0) jo = jc
+    !       jc = domR%cidx(jo)
+    !       write(*, *) jo, jc, domR%lidx(jo)
+    !       ! if (nx.eq.0.or.lcp(jo)%flg.eq.loop_reduce) then
+    !       !    domR%strd(jc) = 0
+    !       !    pcp(jc)%flg = loop_reduce
+    !       ! else
+    !       !    domR%strd(jc) = 1
+    !       !    pcp(jc)%flg = loop_null
+    !       ! endif
+    !    enddo
+    ! endif
     if (ierr.eq.0) then
        domL%strd(0) = 1
        do jo = 1, domL%mco
@@ -1128,6 +1146,7 @@ contains
           domL%end(jo)  = max(domL%end(jo), 1 + domL%bgn(jo))
           domL%iter(jo) = max(1, domL%end(jo) - domL%bgn(jo))
        enddo
+       domR%mco = nc
        domR%n = 1
        do jo = 1, nc
           jc = jo - 1
@@ -1370,8 +1389,8 @@ contains
 
 !!!_   . get_logical_shape
   subroutine get_logical_shape &
-       & (ierr, nrphy, cname, ctype, cpidx, lcp, pcp, mco)
-    use TOUZA_Std,only: find_first, parse_number, begin_with
+       & (ierr, nrphy, cname, ctype, cpidx, lcp, pcp, mco, del)
+    use TOUZA_Std,only: choice, find_first, parse_number, begin_with
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: nrphy        ! array ranks (physical)
@@ -1380,6 +1399,7 @@ contains
     integer,         intent(out) :: cpidx(0:*)   ! corresponding (physical) index
     type(loop_t),    intent(in)  :: lcp(0:*), pcp(0:*)
     integer,         intent(in)  :: mco
+    logical,optional,intent(in)  :: del          ! [T] enable deletion
 
     ! RANGE is parsed at decompose_coordinate_mod()
 
@@ -1439,27 +1459,35 @@ contains
              jco = co_ins
              cold = ' '
           else if (begin_with(cold, delete_coor)) then
-             if (cold.eq.delete_coor_full) then
-                do jco = 0, mco - 1
-                   if (is_null_coor(pcp(jco))) tblp2l(jco) = co_del
-                enddo
-             else if (cold.eq.delete_coor_cont) then
-                do jco = jodr, mco - 1
-                   if (is_null_coor(pcp(jco))) then
-                      tblp2l(jco) = co_del
-                   else
-                      exit
-                   endif
-                enddo
+             if (choice(.TRUE., del)) then
+                if (cold.eq.delete_coor_full) then
+                   do jco = 0, mco - 1
+                      if (is_null_coor(pcp(jco))) tblp2l(jco) = co_del
+                   enddo
+                else if (cold.eq.delete_coor_cont) then
+                   do jco = jodr, mco - 1
+                      if (is_null_coor(pcp(jco))) then
+                         tblp2l(jco) = co_del
+                      else
+                         exit
+                      endif
+                   enddo
+                   cycle
+                else if (cold.eq.delete_coor) then
+                   if (is_null_coor(pcp(jodr))) tblp2l(jodr) = co_del
+                else
+                   ierr = ERR_INVALID_PARAMETER
+                   call message(ierr, 'invalid argument: ' // trim(lcp(jodr)%name))
+                   exit
+                endif
                 cycle
-             else if (cold.eq.delete_coor) then
-                if (is_null_coor(pcp(jodr))) tblp2l(jodr) = co_del
-             else
-                ierr = ERR_INVALID_PARAMETER
-                call message(ierr, 'invalid argument: ' // trim(lcp(jodr)%name))
-                exit
              endif
-             cycle
+             ! if deletion disabled
+             if (xold) then
+                jco = jodr
+             else
+                jco = co_null
+             endif
           else if (cold.eq.' ') then
              if (xold) then
                 jco = jodr
@@ -1534,6 +1562,7 @@ contains
           endif
        enddo
     endif
+    ! write(*, *) 'p2l', tblp2l(0:mco-1)
 
     nrphy = 0
     if (ierr.eq.0) then

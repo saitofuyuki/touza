@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/30 16:56:50 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/01 11:15:24 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -6851,18 +6851,26 @@ contains
        if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 1)
 
        if (ierr.eq.0) call tweak_coordinates(ierr, domR, domX, btmp, stmp, nb, buft(1))
-       if (ierr.eq.0) call tweak_coordinates_core(ierr, domZ, buft, ltmp, 1)  ! cidx
+       ! if (ierr.eq.0) call show_lpp(ierr, buft(1)%pcp, 'reduce/buft')
+       ! if (ierr.eq.0) call show_lpp(ierr, ltmp(0)%lcp, 'reduce/ltmp')
+       if (ierr.eq.0) call tweak_coordinates_core(ierr, domZ, buft, ltmp, 1, del=.FALSE.)  ! cidx
+       ! if (ierr.eq.0) call show_domain(ierr, domZ(1),  'reduce/Z0', indent=4)
        if (ierr.eq.0) call set_inclusive_domain(ierr, domR, domX, btmp, stmp, nb)
 
        if (ierr.eq.0) call adjust_reduce_domain(ierr, domR, domZ(1), buft(1)%pcp, ltmp(0)%lcp)
+       ! if (ierr.eq.0) call show_domain(ierr, domZ(1),  'reduce/Z2', indent=4)
+       ! if (ierr.eq.0) call show_domain(ierr, domR,    'reduce/R2', indent=4)
 
        if (ierr.eq.0) call settle_input_domain(ierr, domX(0), btmp(0), stmp(0), domR)
 
        if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), btmp(0:0), domZ(1), buft(1))
 
-       ! if (ierr.eq.0) call show_domain(ierr, domZ,    'reduce/Z', indent=3)
-       ! if (ierr.eq.0) call show_domain(ierr, domL,    'reduce/L', indent=4)
-       ! if (ierr.eq.0) call show_domain(ierr, domR(1), 'reduce/R', indent=5)
+       if (is_msglev_DEBUG(dbgv)) then
+          if (ierr.eq.0) call show_domain(ierr, domZ(1), 'reduce/Z', indent=3)
+          if (ierr.eq.0) call show_domain(ierr, domR,    'reduce/R', indent=4)
+          if (ierr.eq.0) call show_domain(ierr, domX(0), 'reduce/X', indent=5)
+       endif
+
        fillZ = choice(fillX, neutral)
        obuffer(jbZ)%vd(:) = fillZ
 
@@ -7829,7 +7837,7 @@ contains
 
 !!!_   . tweak_coordinates
   subroutine tweak_coordinates &
-       & (ierr, domL, domR, bufh, lstk, nbuf, bufo, clip)
+       & (ierr, domL, domR, bufh, lstk, nbuf, bufo, clip, del)
     use TOUZA_Std,only: choice, find_first
     implicit none
     integer,       intent(out)            :: ierr
@@ -7840,6 +7848,7 @@ contains
     integer,       intent(in)             :: nbuf
     type(buffer_t),intent(inout),optional :: bufo       ! to store coordinate names only
     logical,       intent(in),   optional :: clip       ! to clip empty coordinates (TRUE)
+    logical,       intent(in),   optional :: del        ! enable coordinate deletion
 
     type(buffer_t):: btmp(0:nbuf-1)   ! pcp holder
     integer nceff
@@ -7850,7 +7859,7 @@ contains
        jb = buf_h2item(bufh(j))
        btmp(j)%pcp(:) = obuffer(jb)%pcp(:)
     enddo
-    call tweak_coordinates_core(ierr, domR, btmp, lstk, nbuf, bufo, clip)
+    call tweak_coordinates_core(ierr, domR, btmp, lstk, nbuf, bufo, clip, del)
     if (ierr.eq.0) then
        nceff = domR(0)%mco   ! same among domR(:)
        domL%mco = nceff
@@ -7866,7 +7875,7 @@ contains
 
 !!!_   . tweak_coordinates_core
   subroutine tweak_coordinates_core &
-       & (ierr, domR, pbuf, lstk, nbuf, bufo, clip)
+       & (ierr, domR, pbuf, lstk, nbuf, bufo, clip, del)
     use TOUZA_Std,only: choice, find_first
     implicit none
     integer,       intent(out)            :: ierr
@@ -7876,6 +7885,7 @@ contains
     integer,       intent(in)             :: nbuf
     type(buffer_t),intent(inout),optional :: bufo       ! to store coordinate names only
     logical,       intent(in),   optional :: clip       ! to clip empty coordinates (TRUE)
+    logical,       intent(in),   optional :: del        ! enable coordinate deletion
 
     integer nceff
     character(len=lname) :: nameL(0:lcoor-1),  nameR(0:lcoor-1, 0:nbuf-1)
@@ -7891,8 +7901,10 @@ contains
     do j = 0, nbuf - 1
        if (ierr.eq.0) then
           call get_logical_shape &
-               & (ierr, nrphy(j), nameR(:,j), ctype(:,j), cpidx(:,j), lstk(j)%lcp, pbuf(j)%pcp, lcoor)
-          ! write(*, *) 'ranks', j, nrphy, obuffer(jb)%pcp(:)%cyc
+               & (ierr, nrphy(j), nameR(:,j), ctype(:,j), cpidx(:,j), &
+               &  lstk(j)%lcp, pbuf(j)%pcp, lcoor, del)
+          ! call show_lpp(uerr, lstk(j)%lcp, 'lcp')
+          ! call show_lpp(uerr, pbuf(j)%pcp, 'pcp')
        endif
     enddo
     if (ierr.eq.0) then
@@ -7902,6 +7914,9 @@ contains
 
     if (ierr.eq.0) then
        do j = 0, nbuf - 1
+          ! write(*, *) 'l', clidx(0:nceff-1, j)
+          ! write(*, *) 'p', cpidx(0:nceff-1, j)
+          ! write(*, *) 't', ctype(0:nceff-1, j)
           domR(j)%mco = nceff
           domR(j)%cidx(0:nceff-1) = -1
           domR(j)%strd(0:nceff) = -1
@@ -7916,6 +7931,8 @@ contains
        if (present(bufo)) then
           bufo%pcp(:)%name = ' '
           bufo%pcp(0:nceff-1)%name = nameL(0:nceff-1)
+          bufo%pcp(0:nceff-1)%flg  = loop_null
+          bufo%pcp(0:nceff-1)%cyc  = 0
        endif
     endif
 
