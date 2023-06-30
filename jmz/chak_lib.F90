@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/28 16:46:57 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/05 13:51:16 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -144,11 +144,18 @@ module chak_lib
   integer,parameter :: cmode_inclusive = 2
   integer,parameter :: cmode_intersect = 3
   integer,parameter :: cmode_first     = 4
+  integer,parameter :: cmode_last      = 5
 
-  integer,parameter :: cmode_compromise = 7  ! mask
-
-  integer,parameter :: cmode_xundef     = 8  ! exclude undefined at flushing
+  integer,parameter :: cmode_xundef     = 8   ! exclude undefined at flushing
   integer,parameter :: cmode_column     = 16  ! columned
+
+  integer,parameter :: cmode_keep       = 32     ! keep blank single-element coordiante
+  integer,parameter :: cmode_hungry     = 64     ! skip blank single-element coordiante
+  integer,parameter :: cmode_greedy     = 64+32  ! skip even non-blank single-element coordiante
+
+  integer,parameter :: cmode_compromise = 7      ! mask
+  integer,parameter :: cmode_flush      = 8+16   ! mask
+  integer,parameter :: cmode_shift      = 32+64  ! mask
 
 !!!_  - shape parser flag
   integer,parameter :: shape_error      = -1
@@ -267,7 +274,10 @@ contains
     integer utmp
     integer lv
     integer tab
+    integer jf
     character(len=64) :: pfx
+    character(len=16) :: cflg
+    character(len=*),parameter :: loopc = 'eu*-n'
     integer jc
     ierr = 0
     lv = choice(lev_verbose, levv)
@@ -279,9 +289,16 @@ contains
        pfx = ' '
     endif
     do jc = 0, size(lpp) - 1
-111    format(A, 'loop', A, ': ', I0, 1x, A, 1x, I0, ':', I0, ':', I0, '+', I0, '/', I0)
+111    format(A, 'loop', A, ': ', I0, 1x, A, 1x, I0, ':', I0, '(', A, ')+', I0, '/', I0)
+112    format('#', I0, '#')
+       jf = lpp(jc)%flg - loop_error
+       if (jf.ge.0.and.jf.lt.len(loopc)) then
+          cflg = loopc(1+jf:1+jf)
+       else
+          write(cflg, 112) lpp(jc)%flg
+       endif
        write(utmp, 111) repeat(' ', tab), trim(pfx), jc, trim(lpp(jc)%name), &
-            & lpp(jc)%bgn, lpp(jc)%end, lpp(jc)%flg, lpp(jc)%ofs, lpp(jc)%cyc
+            & lpp(jc)%bgn, lpp(jc)%end, trim(cflg), lpp(jc)%ofs, lpp(jc)%cyc
     enddo
   end subroutine show_lpp
 !!!_   . show_domain
@@ -606,7 +623,7 @@ contains
     type(loop_t),    intent(in)  :: pcp(0:*)
     integer,optional,intent(in)  :: cbgn, cend
 
-    integer jodr, jphyc
+    integer jc, jodr, jlogc
     character(len=lname)   :: cran
     character(len=lname*2) :: cbuf(0:lcoor-1)
     integer b, e, flg
@@ -614,29 +631,35 @@ contains
 
     ierr = 0
     str = ' '
-    do jodr = 0, dom%mco - 1
-       b = dom%bgn(jodr)
-       e = dom%end(jodr)
+    do jc = 0, dom%mco - 1
+       ! jodr = dom%cidx(jc)
+       jodr = jc
+       ! b = dom%bgn(jodr)
+       ! e = dom%end(jodr)
+       ! packed before call
+       b = dom%bgn(jc)
+       e = dom%end(jc)
        flg = pcp(jodr)%flg
        if (ierr.eq.0) call get_range_string(ierr, cran, b, e, flg)
        if (ierr.eq.0) then
-          jphyc = dom%cidx(jodr)
+          ! jlogc = dom%lidx(jodr)
+          jlogc = jc
 101       format(A, '/', A)
 102       format('/', A)
 ! 103       format('<', A, '>/', A)
-          select case(jphyc)
+          select case(jlogc)
           case(co_wild)
-             write(cbuf(jodr), 101, IOSTAT=ierr) '*', trim(cran)
+             write(cbuf(jc), 101, IOSTAT=ierr) '*', trim(cran)
           case(co_null)
-             write(cbuf(jodr), 101, IOSTAT=ierr) '-', trim(cran)
+             write(cbuf(jc), 101, IOSTAT=ierr) '-', trim(cran)
           case(0:)
              if (pcp(jodr)%name.eq.' ') then
-                write(cbuf(jodr), 102, IOSTAT=ierr) trim(cran)
+                write(cbuf(jc), 102, IOSTAT=ierr) trim(cran)
              else
-                write(cbuf(jodr), 101, IOSTAT=ierr) trim(pcp(jodr)%name), trim(cran)
+                write(cbuf(jc), 101, IOSTAT=ierr) trim(pcp(jodr)%name), trim(cran)
              endif
           case default
-             cbuf(jodr) = trim(cran)
+             cbuf(jc) = trim(cran)
           end select
        endif
     enddo
@@ -667,10 +690,16 @@ contains
 
     integer b, e, flg, odmy, cdmy
     integer cb, ce
+    integer nc
 
     ierr = 0
     str = ' '
-    do jodr = 0, dom%mco - 1
+    ! write(*, *) 'cidx', dom%cidx
+    ! write(*, *) 'lidx', dom%lidx
+    ! write(*, *) 'cidx', ref%cidx
+    ! write(*, *) 'lidx', ref%lidx
+    nc = MAXVAL(ref%cidx(0:lcoor-1)) + 1
+    do jodr = 0, nc - 1
        if (ierr.eq.0) call get_logical_range(ierr, b, e, flg, odmy, cdmy, jodr, lcp, pcp, dom)
        if (ierr.eq.0) call get_range_string(ierr, cran, b, e, flg)
        if (ierr.eq.0) then
@@ -697,11 +726,15 @@ contains
                 cbuf(jodr) = trim(cran)
              endif
           end select
+          if (ref%lidx(jodr).lt.0) then
+             cbuf(jodr) = '-' // trim(cbuf(jodr)) // '-'
+          endif
        endif
     enddo
     if (ierr.eq.0) then
        cb = choice(0, cbgn)
-       ce = choice(dom%mco, cend)
+       ! ce = choice(dom%mco, cend)
+       ce = choice(nc, cend)
        call choice_a(ld, '[', ldelim)
        call choice_a(rd, ']', rdelim)
        call choice_a(sp, ' ', sep)
@@ -1034,14 +1067,20 @@ contains
   end subroutine get_logical_range
 
 !!!_   . settle_output_domain
-  subroutine settle_output_domain(ierr, dom)
+  subroutine settle_output_domain(ierr, dom, bufo, cmode)
     implicit none
     integer,       intent(out)   :: ierr
     type(domain_t),intent(inout) :: dom
+    type(buffer_t),intent(in)    :: bufo   ! coordinate name holder
+    integer,       intent(in)    :: cmode
 
-    integer jo
+    integer jo,  jc
+    integer ksh
+    ! integer nco
 
     ierr = 0
+    ksh = IAND(cmode, cmode_shift)
+
     if (ierr.eq.0) then
        dom%strd(0) = 1
        do jo = 1, dom%mco
@@ -1053,14 +1092,94 @@ contains
        enddo
        do jo = 0, dom%mco - 1
           dom%end(jo) = max(dom%end(jo), 1 + dom%bgn(jo))
-          ! dom%end(jo) = max(dom%end(jo), dom%bgn(jo))
           dom%iter(jo) = max(1, dom%end(jo) - dom%bgn(jo))
+          if (dom%iter(jo).eq.1) then
+             if (bufo%pcp(jo)%flg.eq.loop_reduce &
+                  & .or. bufo%pcp(jo)%flg.eq.loop_null) dom%strd(jo) = 0
+          endif
        enddo
+    endif
+    if (ierr.eq.0) then
+       ! if (ierr.eq.0) call show_domain(ierr, dom, 'sod/input')
+       ! if (ksh.ne.cmode_null) then
+       !    call show_lpp(ierr, bufo%pcp, 'sod')
+       !    call show_domain(ierr, dom, 'sod')
+       ! endif
+       dom%lidx(:) = dom%cidx(:)
+       if (ksh.eq.cmode_hungry) then
+          do jo = 0, dom%mco - 1
+             if (bufo%pcp(jo)%name.eq.' '.and.bufo%pcp(jo)%flg.le.loop_reduce) then
+                if (dom%iter(jo).le.1) dom%lidx(jo) = -1
+             endif
+          enddo
+       else if (ksh.eq.cmode_greedy) then
+          do jo = 0, dom%mco - 1
+             if (bufo%pcp(jo)%flg.le.loop_reduce) then
+                if (dom%iter(jo).le.1) dom%lidx(jo) = -1
+             endif
+          enddo
+       endif
+       dom%cidx(0:lcoor-1) = -1
+       jc = 0
+       do jo = 0, dom%mco - 1
+          if (dom%lidx(jo).ge.0) then
+             dom%cidx(jc) = dom%lidx(jo)
+             jc = jc + 1
+          endif
+       enddo
+       ! call show_lpp(ierr, bufo%pcp, 'sod/result')
+       ! call show_domain(ierr, dom, 'sod/result')
     endif
   end subroutine settle_output_domain
 
+! !!!_   . pack_domain
+  subroutine pack_domain_batch(ierr, domL, domR)
+    implicit none
+    integer,       intent(out)   :: ierr
+    type(domain_t),intent(inout) :: domL
+    type(domain_t),intent(inout) :: domR(0:)
+    integer jo
+    integer nc, mc, jc, jr
+    ierr = 0
+    mc = domL%mco
+    nc = COUNT(domL%lidx(0:mc-1).ge.0)
+    if (nc.eq.mc) return
+    do jc = 0, nc - 1
+       jo = domL%cidx(jc)
+       if (jo.lt.jc) then
+          ierr = ERR_PANIC
+          exit
+       endif
+       if (jo.gt.jc) then
+          call pack_domain(domL, jc, jo)
+          do jr = 0, size(domR) - 1
+             call pack_domain(domR(jr), jc, jo)
+          enddo
+       endif
+    enddo
+    if (ierr.eq.0) then
+       domL%mco = nc
+       domR(:)%mco = nc
+    endif
+  end subroutine pack_domain_batch
+!!!_    * pack_domain
+  subroutine pack_domain(dom, dest, src)
+    implicit none
+    type(domain_t),intent(inout) :: dom
+    integer,       intent(in)    :: dest, src
+
+    dom%ofs(dest)  = dom%ofs(src)
+    dom%cyc(dest)  = dom%cyc(src)
+    dom%iter(dest) = dom%iter(src)
+    dom%strd(dest) = dom%strd(src)
+    dom%bgn(dest)  = dom%bgn(src)
+    dom%end(dest)  = dom%end(src)
+
+  end subroutine pack_domain
+
 !!!_   . adjust_reduce_domain
   subroutine adjust_reduce_domain(ierr, domL, domR, pcp, lcp)
+    use TOUZA_Std,only: find_first
     implicit none
     integer,       intent(out)   :: ierr
     type(domain_t),intent(inout) :: domL  ! domain for loop
@@ -1077,8 +1196,9 @@ contains
     ! if (ierr.eq.0) call show_domain(ierr, domR, 'adjust/R0', indent=5)  ! no change
 
     if (ierr.eq.0) then
-       nc = domR%mco
-       nx = count(lcp(0:nc-1)%flg.eq.loop_reduce)
+       nc = domL%mco
+       nx = count(lcp(0:lcoor-1)%flg.eq.loop_reduce)
+       ! write(*, *) 'adjust/nc', nc, nx
        do jo = 0, nc - 1
           pcp(jo)%bgn = domL%bgn(jo)
           pcp(jo)%end = domL%end(jo)
@@ -1088,6 +1208,7 @@ contains
           domR%strd(jo) = 1
        enddo
        do jo = 0, nc - 1
+          if (jo.ge.domR%mco) cycle
           jc = domR%cidx(jo)
           ! write(*, *) '--- ', jc, ' ---'
           ! write(*, *) '    ', jo, domL%cidx(jo)
@@ -1103,7 +1224,7 @@ contains
                 domL%bgn(jc) = b
                 domL%end(jc) = e
                 domR%bgn(jc) = 0
-                domR%end(jc) = e - b
+                domR%end(jc) = max(1, e - b)
                 if (nx.eq.0.or.lcp(jo)%flg.eq.loop_reduce) then
                    domR%strd(jc) = 0
                    pcp(jc)%flg = loop_reduce
@@ -1115,6 +1236,21 @@ contains
           endif
        enddo
     endif
+    ! if (ierr.eq.0) then
+    !    do jo = 0, domR%mco - 1
+    !       ! jo = find_first(domR%cidx(0:domR%mco-1), jc, offset=0)
+    !       ! if (jo.lt.0) jo = jc
+    !       jc = domR%cidx(jo)
+    !       write(*, *) jo, jc, domR%lidx(jo)
+    !       ! if (nx.eq.0.or.lcp(jo)%flg.eq.loop_reduce) then
+    !       !    domR%strd(jc) = 0
+    !       !    pcp(jc)%flg = loop_reduce
+    !       ! else
+    !       !    domR%strd(jc) = 1
+    !       !    pcp(jc)%flg = loop_null
+    !       ! endif
+    !    enddo
+    ! endif
     if (ierr.eq.0) then
        domL%strd(0) = 1
        do jo = 1, domL%mco
@@ -1128,6 +1264,7 @@ contains
           domL%end(jo)  = max(domL%end(jo), 1 + domL%bgn(jo))
           domL%iter(jo) = max(1, domL%end(jo) - domL%bgn(jo))
        enddo
+       domR%mco = nc
        domR%n = 1
        do jo = 1, nc
           jc = jo - 1
@@ -1195,7 +1332,7 @@ contains
     use TOUZA_Std,only: split_list, condop, find_next_sep, parse_number
     implicit none
     integer,         intent(out)            :: ierr
-    integer,         intent(out)            :: jrep     ! name/rename as (1:jrep)
+    integer,         intent(out)            :: jrep     ! name/rename[/] as (1:jrep)
     type(loop_t),    intent(inout),optional :: lpp
     character(len=*),intent(in)             :: arg
     integer,         intent(in)             :: flag     ! prefered style
@@ -1213,11 +1350,10 @@ contains
 
     ! default rename_sep = '/'
 
-    ! NAME/REPL//RANGE   == NAME/REPL/  RANGE      / before RANGE is absorbed
     ! NAME/REPL/RANGE    == NAME/REPL   RANGE
-    ! NAME//RANGE        == NAME/       RANGE
-    ! NAME/RANGE         == NAME        RANGE
-    ! NAME/REPL/                                   no / absorption
+    ! NAME//RANGE        == NAME//      RANGE
+    ! NAME/RANGE         == NAME/       RANGE
+    ! NAME/REPL/         == NAME/REPL
     ! NAME/REPL
     !  NAME REPL  alpha+alnum
     !  RANGE      [num][:[num[:[num]]]]   begin:end:shift:cycle
@@ -1238,13 +1374,13 @@ contains
           ! second /
           jran = js0 - 1 + js1 + lsep
           jrep = jran - lsep
-          if (jran.le.larg) then
-             if (arg(jran:jran+lsep-1).eq.rename_sep) then
-                jran = jran + lsep
-             else
-                jrep = jrep - lsep
-             endif
-          endif
+          ! if (jran.le.larg) then
+          !    if (arg(jran:jran+lsep-1).eq.rename_sep) then
+          !       jran = jran + lsep
+          !    else
+          !       jrep = jrep - lsep
+          !    endif
+          ! endif
        endif
     else if (flag.eq.shape_coordinate.or.flag.eq.shape_reduction) then
        call parse_number(ierr, itmp, arg(1:larg))
@@ -1370,8 +1506,8 @@ contains
 
 !!!_   . get_logical_shape
   subroutine get_logical_shape &
-       & (ierr, nrphy, cname, ctype, cpidx, lcp, pcp, mco)
-    use TOUZA_Std,only: find_first, parse_number, begin_with
+       & (ierr, nrphy, cname, ctype, cpidx, lcp, pcp, mco, del)
+    use TOUZA_Std,only: choice, find_first, parse_number, begin_with
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: nrphy        ! array ranks (physical)
@@ -1380,28 +1516,24 @@ contains
     integer,         intent(out) :: cpidx(0:*)   ! corresponding (physical) index
     type(loop_t),    intent(in)  :: lcp(0:*), pcp(0:*)
     integer,         intent(in)  :: mco
+    logical,optional,intent(in)  :: del          ! [T] enable deletion
 
     ! RANGE is parsed at decompose_coordinate_mod()
 
-    ! NAME/REPL//RANGE   == NAME/REPL/  RANGE      slash (/) before RANGE is absorbed
     ! NAME/REPL/RANGE    == NAME/REPL   RANGE
-    ! NAME///RANGE       == NAME//      RANGE
-    ! NAME//RANGE        == NAME/       RANGE
-    ! NAME/RANGE         == NAME        RANGE
+    ! +REPL/RANGE        == +/REPL      RANGE
     !  NAME REPL  alpha+alnum
     !  RANGE      [num][:[num]]
 
-    ! NAME        order NAME (insert if new)
-    ! NAME/       order NAME (error if new)
-    ! NAME/REPL   order NAME and rename to REPL
-    ! NAME//      order NAME and rename to blank (==wildcard)
+    ! NAME[/]      order NAME (error if non-blank and not found )
+    ! +NAME[/]     order new NAME (error if found), shift
+    ! NAME/REPL[/] order NAME and rename to REPL
+    ! NAME//       order NAME and rename to blank (==wildcard)
     ! (idx)       not parsed (interpreted as bgn)
     ! idx/        idx coordinate (error if new)
-    ! idx/REPL    idx coordinate and rename to REPL
+    ! idx/REPL[/] idx coordinate and rename to REPL
     ! idx//       order NAME and rename to blank
     ! +           insert null(dummy) rank
-    ! +[/]REPL    insert empty rank with REPL name
-    ! -           delete null(dummy) rank and shift
     ! /           keep the order, same name
     ! //          keep the order and rename to blank
     ! (null)      no touch
@@ -1423,7 +1555,7 @@ contains
     cname(0:mco-1) = ' '
     ctype(0:mco-1) = co_unset
     ! count ranks
-    nranks = 1
+    nranks = 0
     do jco = mco - 1, 0, -1
        if (pcp(jco)%flg.ge.loop_null.or.pcp(jco)%name.ne.' ') then
           nranks = jco + 1
@@ -1435,31 +1567,23 @@ contains
     do jodr = 0, mco - 1
        if (ierr.eq.0) then
           call parse_coordinate_repl(ierr, cold, xold, crep, xrep, lcp(jodr)%name)
+       endif
+       if (ierr.eq.0) then
+          ! write(*, *) '<<' // trim(lcp(jodr)%name) // '>>', nranks
+          ! write(*, *) xold, xrep, '<' // trim(cold) // '><' // trim(crep) // '>'
+          if (xrep.and.crep.ne.' ' &
+               .and. ANY(pcp(0:nranks-1)%name.eq.crep)) then
+             ierr = ERR_NOT_IMPLEMENTED
+             call message(ierr, 'Coordinate already exists: ' // trim(crep))
+             exit
+          endif
           if (cold.eq.insert_coor) then
              jco = co_ins
              cold = ' '
           else if (begin_with(cold, delete_coor)) then
-             if (cold.eq.delete_coor_full) then
-                do jco = 0, mco - 1
-                   if (is_null_coor(pcp(jco))) tblp2l(jco) = co_del
-                enddo
-             else if (cold.eq.delete_coor_cont) then
-                do jco = jodr, mco - 1
-                   if (is_null_coor(pcp(jco))) then
-                      tblp2l(jco) = co_del
-                   else
-                      exit
-                   endif
-                enddo
-                cycle
-             else if (cold.eq.delete_coor) then
-                if (is_null_coor(pcp(jodr))) tblp2l(jodr) = co_del
-             else
-                ierr = ERR_INVALID_PARAMETER
-                call message(ierr, 'invalid argument: ' // trim(lcp(jodr)%name))
-                exit
-             endif
-             cycle
+             ierr = ERR_NOT_IMPLEMENTED
+             call message(ierr, 'Coordinate deletion is no more supported.')
+             call message(ierr, 'Instead run with -C or +C option.')
           else if (cold.eq.' ') then
              if (xold) then
                 jco = jodr
@@ -1479,14 +1603,28 @@ contains
                 jco = find_first(pcp(0:nranks-1)%name, cold, offset=0)
              endif
              if (jco.lt.0) then
-                if (xold) then
+                if (pcp(jodr)%name.ne.' '.or.xold) then
                    ierr = ERR_INVALID_PARAMETER
                    call message(ierr, 'no coordinate ' // cold)
                    exit
+                else if (pcp(jodr)%name.eq.' ') then
+                   jco = jodr
+                   xrep = .TRUE.
+                   crep = cold
                 else
                    jco = co_ins
                    nins = nins + 1
                 endif
+                ! if (pcp(jodr)%name.eq.' ') then
+                !    jco = jodr
+                ! else if (xold.and.nranks.gt.0) then
+                !    ierr = ERR_INVALID_PARAMETER
+                !    call message(ierr, 'no coordinate ' // cold)
+                !    exit
+                ! else
+                !    jco = co_ins
+                !    nins = nins + 1
+                ! endif
              endif
           endif
           if (jco.ge.0) then
@@ -1534,6 +1672,7 @@ contains
           endif
        enddo
     endif
+    ! write(*, *) 'p2l', tblp2l(0:mco-1)
 
     nrphy = 0
     if (ierr.eq.0) then
@@ -1975,18 +2114,22 @@ contains
 !!!_   . parse_coordinate_repl - parse coordinate argument complex
   subroutine parse_coordinate_repl &
        & (ierr, cold, xold, crep, xrep, str)
-    use TOUZA_Std,only: parse_number
+    use TOUZA_Std,only: parse_number, find_next_sep
     implicit none
     integer,         intent(out) :: ierr
-    character(len=*),intent(out) :: cold, crep
+    character(len=*),intent(out) :: cold, crep   ! old name, new name
     logical,         intent(out) :: xold, xrep
-    character(len=*),intent(in)  :: str          ! range parameter must be deleted before call
+    character(len=*),intent(in)  :: str          ! range parameter must be excluded before call
 
     integer lstr,  lsep
     integer jsep0, jsep1
     integer jp
     integer idmy
     ierr = 0
+
+    ! INDEX/[[REPL][/]]
+    ! NAME[/[[REPL][/]]]
+    ! +[[/][REPL][/]]
 
     lstr = len_trim(str)
     if (lstr.eq.0) then
@@ -1997,27 +2140,22 @@ contains
        crep = ' '
        return
     endif
-    jsep0 = index(str, rename_sep)
-    if (jsep0.eq.0) then
-       call parse_number(ierr, idmy, str(1:lstr))
-       if (ierr.eq.0) then
-          ! [+]NUMBER
-          xold = .FALSE.
-          xrep = .FALSE.
-          cold = str(1:lstr)
-          crep = ' '
-          return
-       endif
-       ierr = 0
-       if (index(str(1:lstr), insert_coor).eq.1) then
-          ! +REPL
-          xold = .FALSE.
-          xrep = .TRUE.
-          jp = len_trim(insert_coor)
-          cold = str(1:jp)
-          crep = str(jp+1:lstr)
+
+    lsep = len(rename_sep)
+    jsep0 = find_next_sep(str, rename_sep, offset=0)
+    jsep1 = find_next_sep(str, rename_sep, jsep0+lsep, offset=0)
+
+    call parse_number(ierr, idmy, str(1:jsep0))
+    if (ierr.eq.0) then
+       ! integer[/...]
+       if (jsep0.lt.lstr) then
+          ! INDEX/[...[/]]
+          xold = .TRUE.
+          cold = str(1:jsep0)
+          crep = str(jsep0+lsep+1:jsep1)
+          xrep = (jsep0+lsep) .lt. lstr
        else
-          ! NAME
+          ! integer --- not parsed here
           xold = .FALSE.
           xrep = .FALSE.
           cold = str(1:lstr)
@@ -2026,23 +2164,73 @@ contains
        return
     endif
 
-    ! [NAME]/[REPL[/]]
-    xold = .TRUE.
-    cold = str(1:jsep0-1)
-    lsep = len(rename_sep)
-    jsep1 = index(str(jsep0+lsep:), rename_sep)
-    if (jsep1.eq.0) then
-       ! [NAME]/REPL
-       crep = str(jsep0+lsep:lstr)
-       xrep = (jsep0+lsep) .le. lstr
-    else
-       ! [NAME]/REPL/
-       jsep1 = jsep0 + lsep + jsep1 - 2
-       crep = str(jsep0+lsep:jsep1)
-       xrep = .TRUE.
+    ierr = 0 ! need to reset
+    if (index(str(1:lstr), insert_coor).eq.1) then
+       ! +[/]REPL[/]
+       xold = .FALSE.
+       cold = insert_coor
+       if (str(1:jsep0).eq.insert_coor) then
+          ! +/....
+          crep = str(jsep0+lsep+1:jsep1)
+          xrep = (jsep0+lsep) .lt. lstr
+       else if (jsep1.lt.lstr) then
+          ! error +REPL/.../
+          ierr = ERR_INVALID_PARAMETER
+          call message(ierr, 'invalid coordinate parameter: ' // trim(str))
+       else
+          ! +REPL/...
+          jp = len_trim(insert_coor)
+          crep = str(jp+1:jsep0)
+          xrep = jp .lt. jsep0
+       endif
+       return
     endif
 
+    cold = str(1:jsep0)
+    if (jsep0.ge.lstr) then
+       ! NAME
+       xold = .FALSE.
+       ! xold = .TRUE.
+       crep = ' '
+       xrep = .FALSE.
+    else
+       ! NAME/...
+       xold = .TRUE.
+       crep = str(jsep0+lsep+1:jsep1)
+       xrep = (jsep0+lsep) .lt. lstr
+    endif
+    ! write(*, *) '<<' // trim(str) // '>>'
+    ! write(*, *) '  ', xold, xrep, '<' // trim(cold) // '><' // trim(crep) // '>'
+    return
   end subroutine parse_coordinate_repl
+
+!!!_   . adjust_cmode ()
+  integer function adjust_cmode(cmode, def) result(n)
+    implicit none
+    integer,intent(in) :: cmode
+    integer,intent(in) :: def
+    integer k
+
+    n = 0
+
+    k = IAND(cmode, cmode_compromise)
+    if (k.eq.cmode_null) k = IAND(def, cmode_compromise)
+    n = IOR(n, k)
+
+    k = IAND(cmode, cmode_shift)
+    if (k.eq.cmode_null) k = IAND(def, cmode_shift)
+    n = IOR(n, k)
+
+  end function adjust_cmode
+
+!!!_   . replace_cmode ()
+  integer function replace_cmode(cmode, def) result(n)
+    implicit none
+    integer,intent(in) :: cmode
+    integer,intent(in) :: def
+    n = IOR(IAND(cmode, NOT(cmode_compromise)), &
+         &  IAND(def,       cmode_compromise))
+  end function replace_cmode
 
 !!!_ + end chak
 end module chak_lib
