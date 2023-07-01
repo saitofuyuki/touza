@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/07/01 11:15:10 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/02 16:04:03 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -144,11 +144,17 @@ module chak_lib
   integer,parameter :: cmode_inclusive = 2
   integer,parameter :: cmode_intersect = 3
   integer,parameter :: cmode_first     = 4
+  integer,parameter :: cmode_last      = 5
 
-  integer,parameter :: cmode_compromise = 7  ! mask
-
-  integer,parameter :: cmode_xundef     = 8  ! exclude undefined at flushing
+  integer,parameter :: cmode_xundef     = 8   ! exclude undefined at flushing
   integer,parameter :: cmode_column     = 16  ! columned
+
+  integer,parameter :: cmode_hungry     = 32     ! skip blank single-element coordiante
+  integer,parameter :: cmode_greedy     = 64     ! skip even non-blank single-element coordiante
+
+  integer,parameter :: cmode_compromise = 7      ! mask
+  integer,parameter :: cmode_flush      = 8+16   ! mask
+  integer,parameter :: cmode_shift      = 32+64  ! mask
 
 !!!_  - shape parser flag
   integer,parameter :: shape_error      = -1
@@ -1214,7 +1220,7 @@ contains
     use TOUZA_Std,only: split_list, condop, find_next_sep, parse_number
     implicit none
     integer,         intent(out)            :: ierr
-    integer,         intent(out)            :: jrep     ! name/rename as (1:jrep)
+    integer,         intent(out)            :: jrep     ! name/rename[/] as (1:jrep)
     type(loop_t),    intent(inout),optional :: lpp
     character(len=*),intent(in)             :: arg
     integer,         intent(in)             :: flag     ! prefered style
@@ -1232,11 +1238,10 @@ contains
 
     ! default rename_sep = '/'
 
-    ! NAME/REPL//RANGE   == NAME/REPL/  RANGE      / before RANGE is absorbed
     ! NAME/REPL/RANGE    == NAME/REPL   RANGE
-    ! NAME//RANGE        == NAME/       RANGE
-    ! NAME/RANGE         == NAME        RANGE
-    ! NAME/REPL/                                   no / absorption
+    ! NAME//RANGE        == NAME//      RANGE
+    ! NAME/RANGE         == NAME/       RANGE
+    ! NAME/REPL/         == NAME/REPL
     ! NAME/REPL
     !  NAME REPL  alpha+alnum
     !  RANGE      [num][:[num[:[num]]]]   begin:end:shift:cycle
@@ -1257,13 +1262,13 @@ contains
           ! second /
           jran = js0 - 1 + js1 + lsep
           jrep = jran - lsep
-          if (jran.le.larg) then
-             if (arg(jran:jran+lsep-1).eq.rename_sep) then
-                jran = jran + lsep
-             else
-                jrep = jrep - lsep
-             endif
-          endif
+          ! if (jran.le.larg) then
+          !    if (arg(jran:jran+lsep-1).eq.rename_sep) then
+          !       jran = jran + lsep
+          !    else
+          !       jrep = jrep - lsep
+          !    endif
+          ! endif
        endif
     else if (flag.eq.shape_coordinate.or.flag.eq.shape_reduction) then
        call parse_number(ierr, itmp, arg(1:larg))
@@ -1403,25 +1408,20 @@ contains
 
     ! RANGE is parsed at decompose_coordinate_mod()
 
-    ! NAME/REPL//RANGE   == NAME/REPL/  RANGE      slash (/) before RANGE is absorbed
     ! NAME/REPL/RANGE    == NAME/REPL   RANGE
-    ! NAME///RANGE       == NAME//      RANGE
-    ! NAME//RANGE        == NAME/       RANGE
-    ! NAME/RANGE         == NAME        RANGE
+    ! +REPL/RANGE        == +/REPL      RANGE
     !  NAME REPL  alpha+alnum
     !  RANGE      [num][:[num]]
 
-    ! NAME        order NAME (insert if new)
-    ! NAME/       order NAME (error if new)
-    ! NAME/REPL   order NAME and rename to REPL
-    ! NAME//      order NAME and rename to blank (==wildcard)
+    ! NAME[/]      order NAME (error if non-blank and not found )
+    ! +NAME[/]     order new NAME (error if found), shift
+    ! NAME/REPL[/] order NAME and rename to REPL
+    ! NAME//       order NAME and rename to blank (==wildcard)
     ! (idx)       not parsed (interpreted as bgn)
     ! idx/        idx coordinate (error if new)
-    ! idx/REPL    idx coordinate and rename to REPL
+    ! idx/REPL[/] idx coordinate and rename to REPL
     ! idx//       order NAME and rename to blank
     ! +           insert null(dummy) rank
-    ! +[/]REPL    insert empty rank with REPL name
-    ! -           delete null(dummy) rank and shift
     ! /           keep the order, same name
     ! //          keep the order and rename to blank
     ! (null)      no touch
@@ -1443,7 +1443,7 @@ contains
     cname(0:mco-1) = ' '
     ctype(0:mco-1) = co_unset
     ! count ranks
-    nranks = 1
+    nranks = 0
     do jco = mco - 1, 0, -1
        if (pcp(jco)%flg.ge.loop_null.or.pcp(jco)%name.ne.' ') then
           nranks = jco + 1
@@ -1455,39 +1455,23 @@ contains
     do jodr = 0, mco - 1
        if (ierr.eq.0) then
           call parse_coordinate_repl(ierr, cold, xold, crep, xrep, lcp(jodr)%name)
+       endif
+       if (ierr.eq.0) then
+          ! write(*, *) '<<' // trim(lcp(jodr)%name) // '>>', nranks
+          ! write(*, *) xold, xrep, '<' // trim(cold) // '><' // trim(crep) // '>'
+          if (xrep.and.crep.ne.' ' &
+               .and. ANY(pcp(0:nranks-1)%name.eq.crep)) then
+             ierr = ERR_NOT_IMPLEMENTED
+             call message(ierr, 'Coordinate already exists: ' // trim(crep))
+             exit
+          endif
           if (cold.eq.insert_coor) then
              jco = co_ins
              cold = ' '
           else if (begin_with(cold, delete_coor)) then
-             if (choice(.TRUE., del)) then
-                if (cold.eq.delete_coor_full) then
-                   do jco = 0, mco - 1
-                      if (is_null_coor(pcp(jco))) tblp2l(jco) = co_del
-                   enddo
-                else if (cold.eq.delete_coor_cont) then
-                   do jco = jodr, mco - 1
-                      if (is_null_coor(pcp(jco))) then
-                         tblp2l(jco) = co_del
-                      else
-                         exit
-                      endif
-                   enddo
-                   cycle
-                else if (cold.eq.delete_coor) then
-                   if (is_null_coor(pcp(jodr))) tblp2l(jodr) = co_del
-                else
-                   ierr = ERR_INVALID_PARAMETER
-                   call message(ierr, 'invalid argument: ' // trim(lcp(jodr)%name))
-                   exit
-                endif
-                cycle
-             endif
-             ! if deletion disabled
-             if (xold) then
-                jco = jodr
-             else
-                jco = co_null
-             endif
+             ierr = ERR_NOT_IMPLEMENTED
+             call message(ierr, 'Coordinate deletion is no more supported.')
+             call message(ierr, 'Instead run with -C or +C option.')
           else if (cold.eq.' ') then
              if (xold) then
                 jco = jodr
@@ -1507,14 +1491,28 @@ contains
                 jco = find_first(pcp(0:nranks-1)%name, cold, offset=0)
              endif
              if (jco.lt.0) then
-                if (xold) then
+                if (pcp(jodr)%name.ne.' '.or.xold) then
                    ierr = ERR_INVALID_PARAMETER
                    call message(ierr, 'no coordinate ' // cold)
                    exit
+                else if (pcp(jodr)%name.eq.' ') then
+                   jco = jodr
+                   xrep = .TRUE.
+                   crep = cold
                 else
                    jco = co_ins
                    nins = nins + 1
                 endif
+                ! if (pcp(jodr)%name.eq.' ') then
+                !    jco = jodr
+                ! else if (xold.and.nranks.gt.0) then
+                !    ierr = ERR_INVALID_PARAMETER
+                !    call message(ierr, 'no coordinate ' // cold)
+                !    exit
+                ! else
+                !    jco = co_ins
+                !    nins = nins + 1
+                ! endif
              endif
           endif
           if (jco.ge.0) then
@@ -2004,18 +2002,22 @@ contains
 !!!_   . parse_coordinate_repl - parse coordinate argument complex
   subroutine parse_coordinate_repl &
        & (ierr, cold, xold, crep, xrep, str)
-    use TOUZA_Std,only: parse_number
+    use TOUZA_Std,only: parse_number, find_next_sep
     implicit none
     integer,         intent(out) :: ierr
-    character(len=*),intent(out) :: cold, crep
+    character(len=*),intent(out) :: cold, crep   ! old name, new name
     logical,         intent(out) :: xold, xrep
-    character(len=*),intent(in)  :: str          ! range parameter must be deleted before call
+    character(len=*),intent(in)  :: str          ! range parameter must be excluded before call
 
     integer lstr,  lsep
     integer jsep0, jsep1
     integer jp
     integer idmy
     ierr = 0
+
+    ! INDEX/[[REPL][/]]
+    ! NAME[/[[REPL][/]]]
+    ! +[[/][REPL][/]]
 
     lstr = len_trim(str)
     if (lstr.eq.0) then
@@ -2026,27 +2028,22 @@ contains
        crep = ' '
        return
     endif
-    jsep0 = index(str, rename_sep)
-    if (jsep0.eq.0) then
-       call parse_number(ierr, idmy, str(1:lstr))
-       if (ierr.eq.0) then
-          ! [+]NUMBER
-          xold = .FALSE.
-          xrep = .FALSE.
-          cold = str(1:lstr)
-          crep = ' '
-          return
-       endif
-       ierr = 0
-       if (index(str(1:lstr), insert_coor).eq.1) then
-          ! +REPL
-          xold = .FALSE.
-          xrep = .TRUE.
-          jp = len_trim(insert_coor)
-          cold = str(1:jp)
-          crep = str(jp+1:lstr)
+
+    lsep = len(rename_sep)
+    jsep0 = find_next_sep(str, rename_sep, offset=0)
+    jsep1 = find_next_sep(str, rename_sep, jsep0+lsep, offset=0)
+
+    call parse_number(ierr, idmy, str(1:jsep0))
+    if (ierr.eq.0) then
+       ! integer[/...]
+       if (jsep0.lt.lstr) then
+          ! INDEX/[...[/]]
+          xold = .TRUE.
+          cold = str(1:jsep0)
+          crep = str(jsep0+lsep+1:jsep1)
+          xrep = (jsep0+lsep) .lt. lstr
        else
-          ! NAME
+          ! integer --- not parsed here
           xold = .FALSE.
           xrep = .FALSE.
           cold = str(1:lstr)
@@ -2055,22 +2052,44 @@ contains
        return
     endif
 
-    ! [NAME]/[REPL[/]]
-    xold = .TRUE.
-    cold = str(1:jsep0-1)
-    lsep = len(rename_sep)
-    jsep1 = index(str(jsep0+lsep:), rename_sep)
-    if (jsep1.eq.0) then
-       ! [NAME]/REPL
-       crep = str(jsep0+lsep:lstr)
-       xrep = (jsep0+lsep) .le. lstr
-    else
-       ! [NAME]/REPL/
-       jsep1 = jsep0 + lsep + jsep1 - 2
-       crep = str(jsep0+lsep:jsep1)
-       xrep = .TRUE.
+    ierr = 0 ! need to reset
+    if (index(str(1:lstr), insert_coor).eq.1) then
+       ! +[/]REPL[/]
+       xold = .FALSE.
+       cold = insert_coor
+       if (str(1:jsep0).eq.insert_coor) then
+          ! +/....
+          crep = str(jsep0+lsep+1:jsep1)
+          xrep = (jsep0+lsep) .lt. lstr
+       else if (jsep1.lt.lstr) then
+          ! error +REPL/.../
+          ierr = ERR_INVALID_PARAMETER
+          call message(ierr, 'invalid coordinate parameter: ' // trim(str))
+       else
+          ! +REPL/...
+          jp = len_trim(insert_coor)
+          crep = str(jp+1:jsep0)
+          xrep = jp .lt. jsep0
+       endif
+       return
     endif
 
+    cold = str(1:jsep0)
+    if (jsep0.ge.lstr) then
+       ! NAME
+       xold = .FALSE.
+       ! xold = .TRUE.
+       crep = ' '
+       xrep = .FALSE.
+    else
+       ! NAME/...
+       xold = .TRUE.
+       crep = str(jsep0+lsep+1:jsep1)
+       xrep = (jsep0+lsep) .lt. lstr
+    endif
+    ! write(*, *) '<<' // trim(str) // '>>'
+    ! write(*, *) '  ', xold, xrep, '<' // trim(cold) // '><' // trim(crep) // '>'
+    return
   end subroutine parse_coordinate_repl
 
 !!!_ + end chak

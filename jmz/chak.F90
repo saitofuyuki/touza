@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/07/01 15:10:16 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/02 08:42:41 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -233,7 +233,7 @@ contains
     integer cmode
     character(len=128) :: buf
     character(len=lpath) :: str
-    character cmd
+    character(len=2) cmd
     integer jfile
 
     ierr = 0
@@ -247,7 +247,7 @@ contains
        if (ierr.eq.0) then
           cmode = aqueue(j)%cmode
           if (cmode.eq.cmode_null) cmode = def_cmode
-          select case(cmode)
+          select case(IAND(cmode, cmode_compromise))
           case(cmode_each)
              cmd = 'e'
           case(cmode_first)
@@ -258,6 +258,14 @@ contains
              cmd = 'x'
           case default
              cmd = ' '
+          end select
+          select case(IAND(cmode, cmode_shift))
+          case(cmode_greedy)
+             cmd(2:2) = 'g'
+          case(cmode_hungry)
+             cmd(2:2) = 'h'
+          case default
+             cmd(2:2) = ' '
           end select
        endif
        if (ierr.eq.0) then
@@ -681,6 +689,10 @@ contains
        cmd = cmode_intersect
     else if (abuf.eq.'-l') then
        cmd = cmode_first
+    else if (abuf.eq.'-C') then
+       cmd = cmode_hungry
+    else if (abuf.eq.'+C') then
+       cmd = cmode_greedy
     else if (abuf.eq.'-N') then
        hflag = hflag_nulld        ! file or default read
        hsub = -1
@@ -881,12 +893,23 @@ contains
     implicit none
     integer,intent(out) :: ierr
     integer,intent(in)  :: mode
+    integer m
 
     ierr = 0
-    if (mqueue.le.0) then
-       def_cmode = mode
+    if (IAND(mode, cmode_compromise).ne.0) then
+       m = IOR(IAND(NOT(cmode_compromise), def_cmode), mode)
+    else if (IAND(mode, cmode_shift).ne.0) then
+       m = IOR(IAND(NOT(cmode_shift), def_cmode), mode)
     else
-       aqueue(mqueue-1)%cmode = mode
+       ierr = ERR_INVALID_PARAMETER
+       call message(ierr, 'assertion. invalid cmode.')
+    endif
+    if (ierr.eq.0) then
+       if (mqueue.le.0) then
+          def_cmode = mode
+       else
+          aqueue(mqueue-1)%cmode = mode
+       endif
     endif
     return
   end subroutine parse_operator_option
