@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/06/08 10:16:10 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/01 18:10:58 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2023
@@ -158,7 +158,11 @@ contains
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
        endif
-       find_offset = choice(find_offset, offset)
+       if (find_offset.ne.choice(find_offset, offset)) then
+          ierr = ERR_NOT_IMPLEMENTED - ERR_MASK_STD_UTL
+          write(*, *) 'cannot change offset to ', offset
+          stop
+       endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_UTL
     endif
