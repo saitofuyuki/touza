@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/07/01 11:15:24 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/01 15:10:16 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -6381,7 +6381,7 @@ contains
        return
     endif
 
-    do jout = nout - 1 , 0, -1
+    do jout = nout - 1, 0, -1
        jinp = jout * nopr + ofsi
 
        ntmp = 0
@@ -6540,7 +6540,7 @@ contains
        return
     endif
 
-    do jout = nout - 1 , 0, -1
+    do jout = nout - 1, 0, -1
        jinp = jout * nopr + ofsi
 
        ntmp = 0
@@ -6683,7 +6683,7 @@ contains
        return
     endif
 
-    do jout = nout - 1 , 0, -1
+    do jout = nout - 1, 0, -1
        jinp = jout * nopr + ofsi
 
        ntmp = 0
@@ -6959,7 +6959,7 @@ contains
 
        ! write(*, *) 'wreduce/begin'
        if (ierr.eq.0) call tweak_coordinates(ierr, domR, domX, btmp, stmp, nb, buft(1))
-       if (ierr.eq.0) call tweak_coordinates_core(ierr, domZ, buft, ltmp, 1)  ! cidx
+       if (ierr.eq.0) call tweak_coordinates_core(ierr, domZ, buft, ltmp, 1, del=.FALSE.)  ! cidx
        if (ierr.eq.0) call set_inclusive_domain(ierr, domR, domX, btmp, stmp, nb)
 
        if (ierr.eq.0) call adjust_reduce_domain(ierr, domR, domZ(1), buft(1)%pcp, ltmp(0)%lcp)
@@ -7089,7 +7089,7 @@ contains
 
        ! write(*, *) 'wreduce/begin'
        if (ierr.eq.0) call tweak_coordinates(ierr, domR, domX, btmp, stmp, nb, buft(1))
-       if (ierr.eq.0) call tweak_coordinates_core(ierr, domZ, buft, ltmp, 1)  ! cidx
+       if (ierr.eq.0) call tweak_coordinates_core(ierr, domZ, buft, ltmp, 1, del=.FALSE.)  ! cidx
        if (ierr.eq.0) call set_inclusive_domain(ierr, domR, domX, btmp, stmp, nb)
 
        if (ierr.eq.0) call adjust_reduce_domain(ierr, domR, domZ(1), buft(1)%pcp, ltmp(0)%lcp)
@@ -7205,7 +7205,7 @@ contains
        return
     endif
 
-    do jout = nout - 1 , 0, -1
+    do jout = nout - 1, 0, -1
        jinp = jout * nopr + ofsi
 
        ntmp = 0
