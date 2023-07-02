@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/07/02 16:04:03 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/03 16:01:26 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -149,8 +149,9 @@ module chak_lib
   integer,parameter :: cmode_xundef     = 8   ! exclude undefined at flushing
   integer,parameter :: cmode_column     = 16  ! columned
 
-  integer,parameter :: cmode_hungry     = 32     ! skip blank single-element coordiante
-  integer,parameter :: cmode_greedy     = 64     ! skip even non-blank single-element coordiante
+  integer,parameter :: cmode_keep       = 32     ! keep blank single-element coordiante
+  integer,parameter :: cmode_hungry     = 64     ! skip blank single-element coordiante
+  integer,parameter :: cmode_greedy     = 64+32  ! skip even non-blank single-element coordiante
 
   integer,parameter :: cmode_compromise = 7      ! mask
   integer,parameter :: cmode_flush      = 8+16   ! mask
@@ -273,7 +274,10 @@ contains
     integer utmp
     integer lv
     integer tab
+    integer jf
     character(len=64) :: pfx
+    character(len=16) :: cflg
+    character(len=*),parameter :: loopc = 'eu*-n'
     integer jc
     ierr = 0
     lv = choice(lev_verbose, levv)
@@ -285,9 +289,16 @@ contains
        pfx = ' '
     endif
     do jc = 0, size(lpp) - 1
-111    format(A, 'loop', A, ': ', I0, 1x, A, 1x, I0, ':', I0, ':', I0, '+', I0, '/', I0)
+111    format(A, 'loop', A, ': ', I0, 1x, A, 1x, I0, ':', I0, '(', A, ')+', I0, '/', I0)
+112    format('#', I0, '#')
+       jf = lpp(jc)%flg - loop_error
+       if (jf.ge.0.and.jf.lt.len(loopc)) then
+          cflg = loopc(1+jf:1+jf)
+       else
+          write(cflg, 112) lpp(jc)%flg
+       endif
        write(utmp, 111) repeat(' ', tab), trim(pfx), jc, trim(lpp(jc)%name), &
-            & lpp(jc)%bgn, lpp(jc)%end, lpp(jc)%flg, lpp(jc)%ofs, lpp(jc)%cyc
+            & lpp(jc)%bgn, lpp(jc)%end, trim(cflg), lpp(jc)%ofs, lpp(jc)%cyc
     enddo
   end subroutine show_lpp
 !!!_   . show_domain
@@ -612,7 +623,7 @@ contains
     type(loop_t),    intent(in)  :: pcp(0:*)
     integer,optional,intent(in)  :: cbgn, cend
 
-    integer jodr, jphyc
+    integer jc, jodr, jlogc
     character(len=lname)   :: cran
     character(len=lname*2) :: cbuf(0:lcoor-1)
     integer b, e, flg
@@ -620,29 +631,31 @@ contains
 
     ierr = 0
     str = ' '
-    do jodr = 0, dom%mco - 1
+    do jc = 0, dom%mco - 1
+       jodr = dom%cidx(jc)
        b = dom%bgn(jodr)
        e = dom%end(jodr)
        flg = pcp(jodr)%flg
        if (ierr.eq.0) call get_range_string(ierr, cran, b, e, flg)
        if (ierr.eq.0) then
-          jphyc = dom%cidx(jodr)
+          ! jlogc = dom%lidx(jodr)
+          jlogc = jc
 101       format(A, '/', A)
 102       format('/', A)
 ! 103       format('<', A, '>/', A)
-          select case(jphyc)
+          select case(jlogc)
           case(co_wild)
-             write(cbuf(jodr), 101, IOSTAT=ierr) '*', trim(cran)
+             write(cbuf(jc), 101, IOSTAT=ierr) '*', trim(cran)
           case(co_null)
-             write(cbuf(jodr), 101, IOSTAT=ierr) '-', trim(cran)
+             write(cbuf(jc), 101, IOSTAT=ierr) '-', trim(cran)
           case(0:)
              if (pcp(jodr)%name.eq.' ') then
-                write(cbuf(jodr), 102, IOSTAT=ierr) trim(cran)
+                write(cbuf(jc), 102, IOSTAT=ierr) trim(cran)
              else
-                write(cbuf(jodr), 101, IOSTAT=ierr) trim(pcp(jodr)%name), trim(cran)
+                write(cbuf(jc), 101, IOSTAT=ierr) trim(pcp(jodr)%name), trim(cran)
              endif
           case default
-             cbuf(jodr) = trim(cran)
+             cbuf(jc) = trim(cran)
           end select
        endif
     enddo
@@ -703,6 +716,9 @@ contains
                 cbuf(jodr) = trim(cran)
              endif
           end select
+          if (ref%lidx(jodr).lt.0) then
+             cbuf(jodr) = '-' // trim(cbuf(jodr)) // '-'
+          endif
        endif
     enddo
     if (ierr.eq.0) then
@@ -1040,14 +1056,20 @@ contains
   end subroutine get_logical_range
 
 !!!_   . settle_output_domain
-  subroutine settle_output_domain(ierr, dom)
+  subroutine settle_output_domain(ierr, dom, bufo, cmode)
     implicit none
     integer,       intent(out)   :: ierr
     type(domain_t),intent(inout) :: dom
+    type(buffer_t),intent(in)    :: bufo   ! coordinate name holder
+    integer,       intent(in)    :: cmode
 
-    integer jo
+    integer jo,  jc
+    integer ksh
+    ! integer nco
 
     ierr = 0
+    ksh = IAND(cmode, cmode_shift)
+
     if (ierr.eq.0) then
        dom%strd(0) = 1
        do jo = 1, dom%mco
@@ -1059,11 +1081,102 @@ contains
        enddo
        do jo = 0, dom%mco - 1
           dom%end(jo) = max(dom%end(jo), 1 + dom%bgn(jo))
-          ! dom%end(jo) = max(dom%end(jo), dom%bgn(jo))
           dom%iter(jo) = max(1, dom%end(jo) - dom%bgn(jo))
        enddo
     endif
+    if (ierr.eq.0) then
+       ! if (ksh.ne.cmode_null) then
+       !    call show_lpp(ierr, bufo%pcp, 'sod')
+       !    call show_domain(ierr, dom, 'sod')
+       ! endif
+       dom%lidx(:) = dom%cidx(:)
+       if (ksh.eq.cmode_hungry) then
+          do jo = 0, dom%mco - 1
+             if (bufo%pcp(jo)%name.eq.' '.and.bufo%pcp(jo)%flg.le.loop_reduce) then
+                if (dom%iter(jo).le.1) dom%lidx(jo) = -1
+             endif
+          enddo
+       else if (ksh.eq.cmode_greedy) then
+          do jo = 0, dom%mco - 1
+             if (bufo%pcp(jo)%flg.le.loop_reduce) then
+                if (dom%iter(jo).le.1) dom%lidx(jo) = -1
+             endif
+          enddo
+       endif
+       dom%cidx(0:lcoor-1) = -1
+       jc = 0
+       do jo = 0, dom%mco - 1
+          if (dom%lidx(jo).ge.0) then
+             dom%cidx(jc) = dom%lidx(jo)
+             jc = jc + 1
+          endif
+       enddo
+       ! nco = jc
+       ! if (nco.lt.dom%mco) then
+       !    do jc = 0, nco - 1
+       !       jo = dom%cidx(jc)
+       !       if (jo.lt.jc) then
+       !          ierr = ERR_PANIC
+       !          exit
+       !       else if (jo.gt.jc) then
+       !          dom%bgn(jc) = dom%bgn(jo)
+       !          dom%end(jc) = dom%end(jo)
+       !          dom%iter(jc) = dom%iter(jo)
+       !          dom%strd(jc) = dom%strd(jo)
+       !       endif
+       !    enddo
+       !    if (ierr.eq.0) dom%mco = nco
+       ! endif
+
+       ! call show_lpp(ierr, bufo%pcp, 'sod')
+       ! call show_domain(ierr, dom, 'sod')
+    endif
   end subroutine settle_output_domain
+
+! !!!_   . pack_domain
+  subroutine pack_domain_batch(ierr, domL, domR)
+    implicit none
+    integer,       intent(out)   :: ierr
+    type(domain_t),intent(inout) :: domL
+    type(domain_t),intent(inout) :: domR(0:)
+    integer jo
+    integer nc, mc, jc, jr
+    ierr = 0
+    mc = domL%mco
+    nc = COUNT(domL%lidx(0:mc-1).ge.0)
+    if (nc.eq.mc) return
+    do jc = 0, nc - 1
+       jo = domL%cidx(jc)
+       if (jo.lt.jc) then
+          ierr = ERR_PANIC
+          exit
+       endif
+       if (jo.gt.jc) then
+          call pack_domain(domL, jc, jo)
+          do jr = 0, size(domR) - 1
+             call pack_domain(domR(jr), jc, jo)
+          enddo
+       endif
+    enddo
+    if (ierr.eq.0) then
+       domL%mco = nc
+       domR(:)%mco = nc
+    endif
+  end subroutine pack_domain_batch
+!!!_    * pack_domain
+  subroutine pack_domain(dom, dest, src)
+    implicit none
+    type(domain_t),intent(inout) :: dom
+    integer,       intent(in)    :: dest, src
+
+    dom%ofs(dest)  = dom%ofs(src)
+    dom%cyc(dest)  = dom%cyc(src)
+    dom%iter(dest) = dom%iter(src)
+    dom%strd(dest) = dom%strd(src)
+    dom%bgn(dest)  = dom%bgn(src)
+    dom%end(dest)  = dom%end(src)
+
+  end subroutine pack_domain
 
 !!!_   . adjust_reduce_domain
   subroutine adjust_reduce_domain(ierr, domL, domR, pcp, lcp)
@@ -2091,6 +2204,34 @@ contains
     ! write(*, *) '  ', xold, xrep, '<' // trim(cold) // '><' // trim(crep) // '>'
     return
   end subroutine parse_coordinate_repl
+
+!!!_   . adjust_cmode ()
+  integer function adjust_cmode(cmode, def) result(n)
+    implicit none
+    integer,intent(in) :: cmode
+    integer,intent(in) :: def
+    integer k
+
+    n = 0
+
+    k = IAND(cmode, cmode_compromise)
+    if (k.eq.cmode_null) k = IAND(def, cmode_compromise)
+    n = IOR(n, k)
+
+    k = IAND(cmode, cmode_shift)
+    if (k.eq.cmode_null) k = IAND(def, cmode_shift)
+    n = IOR(n, k)
+
+  end function adjust_cmode
+
+!!!_   . replace_cmode ()
+  integer function replace_cmode(cmode, def) result(n)
+    implicit none
+    integer,intent(in) :: cmode
+    integer,intent(in) :: def
+    n = IOR(IAND(cmode, NOT(cmode_compromise)), &
+         &  IAND(def,       cmode_compromise))
+  end function replace_cmode
 
 !!!_ + end chak
 end module chak_lib
