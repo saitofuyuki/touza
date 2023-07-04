@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/07/03 22:03:00 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/04 11:22:59 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -6339,11 +6339,25 @@ contains
        if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 1)
 
        if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, obuffer(jbL), pbuf, lstk, nb)
+#define DEBUG_UNARY 0
+#if DEBUG_UNARY
+       if (ierr.eq.0) call show_domain(ierr, domL, 'unary/0', indent=3)
+       if (ierr.eq.0) call show_lpp(ierr, obuffer(jbL)%pcp, 'aou/0')
+#endif
        if (ierr.eq.0) call set_inclusive_domain(ierr, domL, obuffer(jbL), domR, pbuf, lstk, nb)
+#if DEBUG_UNARY
+       if (ierr.eq.0) call show_domain(ierr, domL, 'unary/1', indent=3)
+#endif
        if (ierr.eq.0) call settle_output_domain(ierr, domL, obuffer(jbL), cmode)
+#if DEBUG_UNARY
+       if (ierr.eq.0) call show_domain(ierr, domL, 'unary/2', indent=3)
+       if (ierr.eq.0) call show_lpp(ierr, obuffer(jbL)%pcp, 'aou/2')
+#endif
        if (ierr.eq.0) call settle_input_domain(ierr, domR(1), pbuf(1), lstk(1), domL)
        if (ierr.eq.0) call set_output_buffer_h(ierr, lefts(jout)%bh, pbuf, domL)
-
+#if DEBUG_UNARY
+       if (ierr.eq.0) call show_lpp(ierr, obuffer(jbL)%pcp, 'aou/9')
+#endif
        ! if (ierr.eq.0) call show_domain(ierr, domL,    'unary/L', indent=3)
        ! if (ierr.eq.0) call show_domain(ierr, domR(1), 'unary/R', indent=4)
 
@@ -7931,6 +7945,7 @@ contains
        domL%ofs(0:nceff-1) = null_range
        domL%cyc(0:nceff-1) = 0
        domL%strd(0:nceff) = -1
+       domL%iter(0:nceff) = 0
        do jc = 0, nceff - 1
           domL%cidx(jc) = jc
           domL%lidx(jc) = jc
@@ -7995,6 +8010,7 @@ contains
              endif
           enddo
        enddo
+       bufo%pcp(:) = def_loop
        bufo%pcp(:)%name = ' '
        bufo%pcp(0:nceff-1)%name = nameL(0:nceff-1)
        bufo%pcp(0:nceff-1)%cyc  = 0
@@ -8265,7 +8281,7 @@ contains
     implicit none
     integer,       intent(out)   :: ierr
     type(buffer_t),intent(inout) :: buf
-    type(buffer_t),intent(in)    :: tbuf(0:)  ! buffers merely to control type
+    type(buffer_t),intent(in)    :: tbuf(0:)  ! control type, reff
     type(domain_t),intent(in)    :: dom
     integer kv
     integer jinp, ninp
@@ -8291,9 +8307,9 @@ contains
     if (ierr.eq.0) then
        do jc = 0, dom%mco - 1
           if (dom%strd(jc).le.0) then
-             buf%pcp(jc)%bgn = dom%bgn(jc)
-             ! buf%pcp(jc)%end = dom%bgn(jc)
-             buf%pcp(jc)%end = dom%end(jc)
+             ! buf%pcp(jc)%bgn = dom%bgn(jc)
+             ! ! buf%pcp(jc)%end = dom%bgn(jc)
+             ! buf%pcp(jc)%end = dom%end(jc)
              buf%pcp(jc)%flg = loop_null
           else
              buf%pcp(jc)%bgn = dom%bgn(jc)
@@ -8306,6 +8322,7 @@ contains
        do jc = dom%mco, lcoor - 1
           buf%pcp(jc) = def_loop
        enddo
+       ! call show_lpp(ierr, buf%pcp, 'sob')
        call alloc_buffer_t(ierr, buf, dom%n)
     endif
   end subroutine set_output_buffer
@@ -8325,6 +8342,7 @@ contains
     call set_output_buffer(ierr, buf, tbuf(:), dom)
     if (ierr.eq.0) buf%pcp(:)%name = bref%pcp(:)%name
     do jo = 0, dom%mco - 1
+       ! write(*, *) 'srb', jo, bref%pcp(jo)%flg
        if (bref%pcp(jo)%flg .eq. loop_reduce) then
           buf%pcp(jo)%flg = loop_reduce
        endif

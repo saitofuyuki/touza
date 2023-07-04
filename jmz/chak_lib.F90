@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/07/03 16:01:26 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/04 10:53:51 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1085,6 +1085,7 @@ contains
        enddo
     endif
     if (ierr.eq.0) then
+       ! if (ierr.eq.0) call show_domain(ierr, dom, 'sod/input')
        ! if (ksh.ne.cmode_null) then
        !    call show_lpp(ierr, bufo%pcp, 'sod')
        !    call show_domain(ierr, dom, 'sod')
@@ -1111,25 +1112,8 @@ contains
              jc = jc + 1
           endif
        enddo
-       ! nco = jc
-       ! if (nco.lt.dom%mco) then
-       !    do jc = 0, nco - 1
-       !       jo = dom%cidx(jc)
-       !       if (jo.lt.jc) then
-       !          ierr = ERR_PANIC
-       !          exit
-       !       else if (jo.gt.jc) then
-       !          dom%bgn(jc) = dom%bgn(jo)
-       !          dom%end(jc) = dom%end(jo)
-       !          dom%iter(jc) = dom%iter(jo)
-       !          dom%strd(jc) = dom%strd(jo)
-       !       endif
-       !    enddo
-       !    if (ierr.eq.0) dom%mco = nco
-       ! endif
-
-       ! call show_lpp(ierr, bufo%pcp, 'sod')
-       ! call show_domain(ierr, dom, 'sod')
+       ! call show_lpp(ierr, bufo%pcp, 'sod/result')
+       ! call show_domain(ierr, dom, 'sod/result')
     endif
   end subroutine settle_output_domain
 
