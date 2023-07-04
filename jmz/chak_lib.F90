@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/07/04 10:53:51 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/05 12:18:10 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -632,9 +632,13 @@ contains
     ierr = 0
     str = ' '
     do jc = 0, dom%mco - 1
-       jodr = dom%cidx(jc)
-       b = dom%bgn(jodr)
-       e = dom%end(jodr)
+       ! jodr = dom%cidx(jc)
+       jodr = jc
+       ! b = dom%bgn(jodr)
+       ! e = dom%end(jodr)
+       ! packed before call
+       b = dom%bgn(jc)
+       e = dom%end(jc)
        flg = pcp(jodr)%flg
        if (ierr.eq.0) call get_range_string(ierr, cran, b, e, flg)
        if (ierr.eq.0) then
@@ -686,10 +690,16 @@ contains
 
     integer b, e, flg, odmy, cdmy
     integer cb, ce
+    integer nc
 
     ierr = 0
     str = ' '
-    do jodr = 0, dom%mco - 1
+    ! write(*, *) 'cidx', dom%cidx
+    ! write(*, *) 'lidx', dom%lidx
+    ! write(*, *) 'cidx', ref%cidx
+    ! write(*, *) 'lidx', ref%lidx
+    nc = MAXVAL(ref%cidx(0:lcoor-1)) + 1
+    do jodr = 0, nc - 1
        if (ierr.eq.0) call get_logical_range(ierr, b, e, flg, odmy, cdmy, jodr, lcp, pcp, dom)
        if (ierr.eq.0) call get_range_string(ierr, cran, b, e, flg)
        if (ierr.eq.0) then
@@ -723,7 +733,8 @@ contains
     enddo
     if (ierr.eq.0) then
        cb = choice(0, cbgn)
-       ce = choice(dom%mco, cend)
+       ! ce = choice(dom%mco, cend)
+       ce = choice(nc, cend)
        call choice_a(ld, '[', ldelim)
        call choice_a(rd, ']', rdelim)
        call choice_a(sp, ' ', sep)
@@ -1082,6 +1093,10 @@ contains
        do jo = 0, dom%mco - 1
           dom%end(jo) = max(dom%end(jo), 1 + dom%bgn(jo))
           dom%iter(jo) = max(1, dom%end(jo) - dom%bgn(jo))
+          if (dom%iter(jo).eq.1) then
+             if (bufo%pcp(jo)%flg.eq.loop_reduce &
+                  & .or. bufo%pcp(jo)%flg.eq.loop_null) dom%strd(jo) = 0
+          endif
        enddo
     endif
     if (ierr.eq.0) then

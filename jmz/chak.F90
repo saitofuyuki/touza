@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/07/04 11:22:59 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/05 12:49:54 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -4169,7 +4169,7 @@ contains
   end subroutine set_buffer_attrs
 
 !!!_   . write_file
-  subroutine write_file(ierr, file, bufh, jstk, levv)
+  subroutine write_file(ierr, file, bufh, jstk, cmode, levv)
     use TOUZA_Std,only: new_unit, sus_open, is_error_match
     use TOUZA_Std,only: get_login_name
     use TOUZA_Nio,only: nio_write_header, parse_header_size, nio_write_data
@@ -4185,6 +4185,7 @@ contains
     type(file_t),intent(inout)       :: file
     integer,     intent(in)          :: bufh
     integer,     intent(in)          :: jstk
+    integer,     intent(in)          :: cmode
     integer,     intent(in),optional :: levv
     integer n
     integer jc
@@ -4199,6 +4200,10 @@ contains
     real(kind=KBUF) :: undef
     character(len=litem) :: head(nitem)
     integer jsi, jdi
+    integer,parameter :: nb = 1
+    type(domain_t) :: domL, domR(nb)
+    type(buffer_t) :: pbuf(nb)
+    integer lcm
 
     ierr = 0
     jb = 0
@@ -4263,7 +4268,15 @@ contains
        if (jerr.ne.0) tstr = ' '
        if (tstr.eq.' ') call put_item(ierr, head, 0,  hi_TIME)
     endif
+    if (ierr.eq.0) call copy_buffer_pcp(ierr, pbuf, nb, (/bufh/))
+    lcm = replace_cmode(cmode, cmode_inclusive)
+    if (ierr.eq.0) then
+       call get_compromise_domain(ierr, domL, domR, btmp, pbuf, bstack(jstk:jstk), nb, lcm)
+    endif
+    ! if (ierr.eq.0) call show_lpp(ierr, btmp%pcp, 'write')
+
     is_tweak = .FALSE.
+
     if (ierr.eq.0) then
        if (.not.is_tweak) then
           is_tweak = ANY(bstack(jstk)%lcp(:)%flg.ge.loop_null)
@@ -4272,11 +4285,21 @@ contains
           is_tweak = ANY(bstack(jstk)%lcp(:)%name.ne.' ')
        endif
        if (is_tweak) then
-          call tweak_buffer(ierr, btmp, bufh, jstk, cmode_null)
-          if (ierr.eq.0) call put_header_lprops(ierr, head, btmp%pcp, file%hflag)
-       else if (ANY(obuffer(jb)%pcp(:)%flg.eq.loop_null) &
-            & .or. ANY(obuffer(jb)%pcp(:)%flg.eq.loop_reduce)) then
-          btmp%pcp(:) = obuffer(jb)%pcp(:)
+          ! call tweak_buffer(ierr, btmp, bufh, jstk, cmode)
+          ! call show_lpp(ierr, btmp%pcp, 'is_tweak')
+          call apply_COPY &
+               & (ierr, &
+               &  btmp%vd,        domL, &
+               &  obuffer(jb)%vd, domR(1), undef)
+          ! if (ierr.eq.0) call put_header_lprops(ierr, head, btmp%pcp, file%hflag)
+       endif
+    endif
+    if (ierr.eq.0) then
+       ! if (ANY(obuffer(jb)%pcp(:)%flg.eq.loop_null) &
+       !      & .or. ANY(obuffer(jb)%pcp(:)%flg.eq.loop_reduce)) then
+       if (ANY(btmp%pcp(:)%flg.eq.loop_null) &
+            & .or. ANY(btmp%pcp(:)%flg.eq.loop_reduce)) then
+          ! btmp%pcp(:) = obuffer(jb)%pcp(:)
           if (file%hflag.eq.hflag_nulld) then
              do jc = 0, lcoor - 1
                 if (btmp%pcp(jc)%flg.eq.loop_null &
@@ -4293,10 +4316,13 @@ contains
                 endif
              enddo
           endif
-          call put_header_lprops(ierr, head, btmp%pcp, file%hflag)
-       else
-          call put_header_lprops(ierr, head, obuffer(jb)%pcp, file%hflag)
+          ! call show_lpp(ierr, btmp%pcp, 'null')
+       ! else
+       !    ! call show_lpp(ierr, btmp%pcp, 'else')
+       !    ! call put_header_lprops(ierr, head, obuffer(jb)%pcp, file%hflag)
+       !    call put_header_lprops(ierr, head, btmp%pcp, file%hflag)
        endif
+       call put_header_lprops(ierr, head, btmp%pcp, file%hflag)
     endif
     if (ierr.eq.0) then
        if (file%fmt.ne.' ') then
@@ -4432,8 +4458,6 @@ contains
     if (ierr.eq.0) call settle_output_domain(ierr, domL, bdest, cmode)
     if (ierr.eq.0) call settle_input_domain(ierr, domR(1), pbuf(1), lstk(1), domL)
     if (ierr.eq.0) call set_output_buffer(ierr, bdest, pbuf, domL)
-
-    ! if (ierr.eq.0) call show_domain(ierr, domL)
 
     if (ierr.eq.0) then
        jbR = buf_h2item(hsrc)
@@ -4644,7 +4668,10 @@ contains
        select case(termk)
        case(hk_file)
           pop = aqueue(jq)%nopr
-          if (ierr.eq.0) call push_file(ierr, hterm, pop, push, aqueue(jq)%lefts, levv)
+          if (ierr.eq.0) then
+             cmode = adjust_cmode(aqueue(jq)%cmode, def_cmode)
+             call push_file(ierr, hterm, pop, push, cmode, aqueue(jq)%lefts, levv)
+          endif
        case(hk_buffer)
           if (ierr.eq.0) call push_buffer(ierr, hterm, levv)
        case(hk_opr)
@@ -4711,11 +4738,12 @@ contains
 
 !!!_   . push_file
   subroutine push_file &
-       & (ierr, handle, pop, push, lefts, levv)
+       & (ierr, handle, pop, push, cmode, lefts, levv)
     implicit none
     integer,       intent(out) :: ierr
     integer,       intent(in)  :: handle
     integer,       intent(in)  :: pop, push
+    integer,       intent(in)  :: cmode
     type(stack_t), intent(in)  :: lefts(*)
     integer,       intent(in)  :: levv
     integer jfile
@@ -4734,7 +4762,7 @@ contains
              do jx = 0, pop - 1
                 if (is_anchor(bufh(jx))) cycle
                 if (ierr.eq.0) then
-                   call write_file(ierr, ofile(jfile), bufh(jx), mstack-pop+jx, levv)
+                   call write_file(ierr, ofile(jfile), bufh(jx), mstack-pop+jx, cmode, levv)
                 endif
              enddo
           endif
@@ -5195,12 +5223,13 @@ contains
           if (ierr.eq.0) call get_domain_string(ierr, pcstr, obuffer(jb)%pcp)
           if (ierr.eq.0) then
              call get_domain_shape(ierr, dstr, domR(1), obuffer(jb)%pcp, lstk(jbuf)%lcp, domL)
+             ! call get_domain_shape(ierr, dstr, domR(1), htmp%pcp, lstk(jbuf)%lcp, domL)
           endif
           if (ierr.eq.0) write(utmp, 231) trim(pcstr)
           if (ierr.eq.0) write(utmp, 232) trim(lcstr)
           if (ierr.eq.0) write(utmp, 233) trim(dstr)
        endif
-       if (ierr.eq.0) call pack_domain_batch(ierr, domL, domR)
+       ! if (ierr.eq.0) call pack_domain_batch(ierr, domL, domR)
        if (is_msglev(lev_verbose, -levq_column)) then
           if (ierr.eq.0) call get_domain_result(ierr, cjoin, domL, htmp%pcp)
           if (ierr.eq.0) write(utmp, 211) trim(cjoin), trim(val)
@@ -5376,7 +5405,7 @@ contains
           if (ierr.eq.0) write(utmp, 232) trim(lcstr)
           if (ierr.eq.0) write(utmp, 233) trim(dstr)
        endif
-       if (ierr.eq.0) call pack_domain_batch(ierr, domL, domR)
+       ! if (ierr.eq.0) call pack_domain_batch(ierr, domL, domR)
        if (is_msglev(lev_verbose, -levq_column)) then
           if (ierr.eq.0) call get_domain_result(ierr, cjoin, domL, htmp%pcp, 1)
           if (ierr.eq.0) call get_domain_result(ierr, ccols, domL, htmp%pcp, 0, 1)
@@ -5560,7 +5589,7 @@ contains
           enddo
        endif
     endif
-    if (ierr.eq.0) call pack_domain_batch(ierr, domL, domR)
+    ! if (ierr.eq.0) call pack_domain_batch(ierr, domL, domR)
     if (lev_verbose.ge.levq_column) then
        if (ierr.eq.0) call get_domain_result(ierr, cjoin, doml, htmp%pcp)
        if (ierr.eq.0) call join_list(ierr, vjoin, vals(0:nbuf-1))
@@ -5735,7 +5764,7 @@ contains
           enddo
        endif
     endif
-    if (ierr.eq.0) call pack_domain_batch(ierr, domL, domR)
+    ! if (ierr.eq.0) call pack_domain_batch(ierr, domL, domR)
     if (lev_verbose.ge.levq_column) then
        if (ierr.eq.0) call get_domain_result(ierr, cjoin, doml, htmp%pcp, cline + 1)
        if (ierr.eq.0) call join_list(ierr, vjoin, vals(0:nbuf-1))
@@ -5906,6 +5935,7 @@ contains
        jref = buf_h2item(bref)
        jb = buf_h2item(bufh)
        obuffer(jb)%pcp(:) = obuffer(jref)%pcp(:)
+       ! obuffer(jb)%pcp(:) = def_loop
        obuffer(jb)%undef = obuffer(jref)%undef
     else
        jb = buf_h2item(bufh)
@@ -5956,12 +5986,6 @@ contains
        if (ierr.eq.0) call settle_output_domain(ierr, domL, buf, cmode)
        if (ierr.eq.0) call set_output_buffer(ierr, buf, pbuf, domL)
     endif
-    ! debug
-    ! if (ierr.eq.0) call show_domain(ierr, domL,    'index/L', indent=3)
-    ! if (ierr.eq.0) call show_domain(ierr, domR(1), 'index/R', indent=4)
-    ! if (ierr.eq.0) then
-    !    write(*, *) '     index/c:', jotgt, domL%mco, domR(1)%mco
-    ! endif
 
     if (ierr.eq.0) then
        if (jotgt.lt.domL%mco) then
@@ -6242,13 +6266,9 @@ contains
              if (m.lt.0) cycle
           endif
           if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 1)
-
-          if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, obuffer(jbL), pbuf, lstk, nb)
-          if (ierr.eq.0) call set_inclusive_domain(ierr, domL, obuffer(jbL), domR, pbuf, lstk, nb)
-          if (ierr.eq.0) call settle_output_domain(ierr, domL, obuffer(jbL), cmode)
-          if (ierr.eq.0) call settle_input_domain(ierr, domR(1), pbuf(1), lstk(1), domL)
-          if (ierr.eq.0) call set_output_buffer_h(ierr, lefts(jout)%bh, pbuf, domL)
-
+          if (ierr.eq.0) then
+             call get_compromise_domain(ierr, domL, domR, obuffer(jbL), pbuf, lstk, nb, cmode)
+          endif
           if (ierr.eq.0) then
              call func &
                   & (ierr, &
@@ -6319,13 +6339,14 @@ contains
     do jout = ninp - 1, 0, -1
        jinp = ofsi + jout
        lstk(nb) = bstack(mstack - ninp + jout)
+
+       hbL = lefts(jout)%bh
+       hbR = bufi(jinp)
+       jbL = buf_h2item(hbL)
+       jbR = buf_h2item(hbR)
+
+       fillR = obuffer(jbR)%undef
        if (ierr.eq.0) then
-          hbL = lefts(jout)%bh
-          hbR = bufi(jinp)
-          jbL = buf_h2item(hbL)
-          jbR = buf_h2item(hbR)
-          fillR = obuffer(jbR)%undef
-          call copy_buffer_pcp(ierr, pbuf, nb, (/hbR/))
           if (check.and. (fillR.eq.TRUE.or.fillR.eq.FALSE)) then
              ierr = ERR_PANIC
              call message(ierr, 'MISS value cannot be 1 nor 0')
@@ -6336,30 +6357,18 @@ contains
           m = buffer_vmems(obuffer(jbR))
           if (m.lt.0) cycle
        endif
-       if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 1)
 
-       if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, obuffer(jbL), pbuf, lstk, nb)
-#define DEBUG_UNARY 0
-#if DEBUG_UNARY
-       if (ierr.eq.0) call show_domain(ierr, domL, 'unary/0', indent=3)
-       if (ierr.eq.0) call show_lpp(ierr, obuffer(jbL)%pcp, 'aou/0')
-#endif
-       if (ierr.eq.0) call set_inclusive_domain(ierr, domL, obuffer(jbL), domR, pbuf, lstk, nb)
-#if DEBUG_UNARY
-       if (ierr.eq.0) call show_domain(ierr, domL, 'unary/1', indent=3)
-#endif
-       if (ierr.eq.0) call settle_output_domain(ierr, domL, obuffer(jbL), cmode)
-#if DEBUG_UNARY
-       if (ierr.eq.0) call show_domain(ierr, domL, 'unary/2', indent=3)
-       if (ierr.eq.0) call show_lpp(ierr, obuffer(jbL)%pcp, 'aou/2')
-#endif
-       if (ierr.eq.0) call settle_input_domain(ierr, domR(1), pbuf(1), lstk(1), domL)
-       if (ierr.eq.0) call set_output_buffer_h(ierr, lefts(jout)%bh, pbuf, domL)
-#if DEBUG_UNARY
-       if (ierr.eq.0) call show_lpp(ierr, obuffer(jbL)%pcp, 'aou/9')
-#endif
-       ! if (ierr.eq.0) call show_domain(ierr, domL,    'unary/L', indent=3)
-       ! if (ierr.eq.0) call show_domain(ierr, domR(1), 'unary/R', indent=4)
+       if (ierr.eq.0) call copy_buffer_pcp(ierr, pbuf, nb, (/hbR/))
+       if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 1)
+       ! if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 0)
+       if (ierr.eq.0) then
+          call get_compromise_domain &
+               & (ierr, domL, domR, obuffer(jbL), pbuf, lstk, nb, cmode)
+       endif
+       ! if (ierr.eq.0) call pack_domain_batch(ierr, domL, domR)
+
+       ! if (ierr.eq.0) call show_domain(ierr, domL,    'unary/pack/L')
+       ! if (ierr.eq.0) call show_domain(ierr, domR(1), 'unary/pack/R')
 
        if (ierr.eq.0) then
           call func &
@@ -6852,14 +6861,14 @@ contains
     real(kind=KBUF),intent(in),optional :: neutral
     interface
        subroutine func &
-            & (ierr, Z, domZ, X, domX, domR, F)
+            & (ierr, Z, domR, X, domX, domL, F)
          use chak_lib,only: KFLT, KDBL, domain_t
          implicit none
          integer,          intent(out)   :: ierr
          real(kind=__KBUF),intent(inout) :: Z(0:*)
          real(kind=__KBUF),intent(in)    :: X(0:*)
-         type(domain_t),   intent(in)    :: domZ, domX
-         type(domain_t),   intent(in)    :: domR
+         type(domain_t),   intent(in)    :: domR, domX
+         type(domain_t),   intent(in)    :: domL
          real(kind=__KBUF),intent(in)    :: F
        end subroutine func
     end interface
@@ -6874,13 +6883,14 @@ contains
 
     integer jx
     integer,parameter :: nb = 1
-    type(domain_t) :: domZ(1)
     type(buffer_t) :: pbuf(0:nb-1)
     type(stack_t)  :: lstk(0:nb-1)
+    type(domain_t) :: domL, domX(0:nb-1)
 
-    type(buffer_t) :: buft(1), bufz
-    type(domain_t) :: domR, domX(0:nb-1)
-    type(stack_t)  :: ltmp(0:nb-1)
+    type(buffer_t) :: buft(1)
+    type(domain_t) :: domR(1)
+    type(stack_t)  :: lrdc(1)
+    integer lcm
 
     ierr = 0
 
@@ -6904,7 +6914,6 @@ contains
           jout = nout - jx
           jinp = ofsi + jout
 
-          ltmp(0) = lefts(jout)   ! use logical coordinate at left
           hbZ = lefts(jout)%bh
           hbX = bufi(jinp)
           jbZ = buf_h2item(hbZ)
@@ -6913,6 +6922,7 @@ contains
 
           call copy_buffer_pcp(ierr, pbuf, nb, bufi(jinp:jinp))
           lstk(0) = bstack(mstack-jx)
+          lrdc = lefts(jout)   ! use logical coordinate at left
        endif
 
        if (ierr.eq.0) then
@@ -6920,27 +6930,11 @@ contains
           if (m.lt.0) cycle
        endif
        if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 1)
-
-       if (ierr.eq.0) call tweak_coordinates(ierr, domR, domX, buft(1), pbuf, lstk, nb)
-       ! if (ierr.eq.0) call show_lpp(ierr, buft(1)%pcp, 'reduce/buft')
-       ! if (ierr.eq.0) call show_lpp(ierr, ltmp(0)%lcp, 'reduce/ltmp')
-       if (ierr.eq.0) call tweak_coordinates_core(ierr, domZ, bufz, buft, ltmp, 1, del=.FALSE.)  ! cidx
-       ! if (ierr.eq.0) call show_domain(ierr, domZ(1),  'reduce/Z0', indent=4)
-       if (ierr.eq.0) call set_inclusive_domain(ierr, domR, buft(1), domX, pbuf, lstk, nb)
-
-       if (ierr.eq.0) call adjust_reduce_domain(ierr, domR, domZ(1), buft(1)%pcp, ltmp(0)%lcp)
-       ! if (ierr.eq.0) call show_domain(ierr, domZ(1),  'reduce/Z2', indent=4)
-       ! if (ierr.eq.0) call show_domain(ierr, domR,    'reduce/R2', indent=4)
-
-       if (ierr.eq.0) call settle_input_domain(ierr, domX(0), pbuf(0), lstk(0), domR)
-
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(0:0), domZ(1), buft(1))
-
-       if (is_msglev_DEBUG(dbgv)) then
-          if (ierr.eq.0) call show_domain(ierr, domZ(1), 'reduce/Z', indent=3)
-          if (ierr.eq.0) call show_domain(ierr, domR,    'reduce/R', indent=4)
-          if (ierr.eq.0) call show_domain(ierr, domX(0), 'reduce/X', indent=5)
+       if (ierr.eq.0) then
+          call get_compromise_reduce &
+               & (ierr, domR, domL, buft, domX, pbuf, lstk, lrdc, nb, cmode)
        endif
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(0:0), domR(1), domL, buft(1))
 
        fillZ = choice(fillX, neutral)
        obuffer(jbZ)%vd(:) = fillZ
@@ -6948,9 +6942,9 @@ contains
        if (ierr.eq.0) then
           call func &
                & (ierr, &
-               &  obuffer(jbZ)%vd, domZ(1), &
+               &  obuffer(jbZ)%vd, domR(1), &
                &  obuffer(jbX)%vd, domX(0), &
-               &  domR, fillX)
+               &  domL, fillX)
        endif
        if (ierr.eq.0) call set_unary_descr(ierr, hbZ, hbX, hopr)
     enddo
@@ -6970,14 +6964,14 @@ contains
     real(kind=KBUF),intent(in),optional :: neutral
     interface
        subroutine func &
-            & (ierr, Z, W, domZ, X, domX, Y, domY, domR, FZ, FX, FY)
+            & (ierr, Z, W, domR, X, domX, Y, domY, domL, FZ, FX, FY)
          use chak_lib,only: KFLT, KDBL, domain_t
          implicit none
          integer,          intent(out)   :: ierr
          real(kind=__KBUF),intent(inout) :: Z(0:*), W(0:*)
          real(kind=__KBUF),intent(in)    :: X(0:*), Y(0:*)
-         type(domain_t),   intent(in)    :: domZ, domX, domY
-         type(domain_t),   intent(in)    :: domR
+         type(domain_t),   intent(in)    :: domR, domX, domY
+         type(domain_t),   intent(in)    :: domL
          real(kind=__KBUF),intent(in)    :: FZ,   FX,   FY
        end subroutine func
     end interface
@@ -6993,13 +6987,13 @@ contains
     integer j, m
 
     integer,parameter :: nb = upop
-    type(domain_t) :: domZ(1)
     type(stack_t)  :: lstk(0:nb-1)
     type(buffer_t) :: pbuf(0:nb-1)
+    type(domain_t) :: domL, domX(0:nb-1)
 
-    type(buffer_t) :: buft(1), bufz
-    type(domain_t) :: domR, domX(0:nb-1)
-    type(stack_t)  :: ltmp(0:nb-1)
+    type(domain_t) :: domR(1)
+    type(buffer_t) :: buft(1)
+    type(stack_t)  :: lrdc(1)
 
     ierr = 0
 
@@ -7020,27 +7014,18 @@ contains
        if (ierr.eq.0) then
           jout = nout - jx * upush
           jinp = ofsi + ninp - jx * upop
-          ltmp(0:upush-1) = lefts(jout:jout+upush-1)   ! use logical coordinate at left
           call copy_buffer_pcp(ierr, pbuf, upop, bufi(jinp:jinp+upop-1))
-          ! pbuf(0:upop-1)  = bufi(jinp:jinp+upop-1)
           lstk(0:upop-1)  = bstack(mstack-jx*upop:mstack-jx*upop+upop-1)
+          lrdc(1) = lefts(jout)   ! use logical coordinate at most left
        endif
 
        do j = 0, upush - 1
           if (ierr.eq.0) call copy_set_header(ierr, lefts(jout+j)%bh, bufi(jinp+j), 1)
        enddo
-
-       ! write(*, *) 'wreduce/begin'
-       if (ierr.eq.0) call tweak_coordinates(ierr, domR, domX, buft(1), pbuf, lstk, nb)
-       if (ierr.eq.0) call tweak_coordinates_core(ierr, domZ, bufz, buft, ltmp, 1, del=.FALSE.)  ! cidx
-       if (ierr.eq.0) call set_inclusive_domain(ierr, domR, buft(1), domX, pbuf, lstk, nb)
-
-       if (ierr.eq.0) call adjust_reduce_domain(ierr, domR, domZ(1), buft(1)%pcp, ltmp(0)%lcp)
-
-       do j = 0, upop - 1
-          if (ierr.eq.0) call settle_input_domain(ierr, domX(j), pbuf(j), lstk(j), domR)
-       enddo
-
+       if (ierr.eq.0) then
+          call get_compromise_reduce &
+               & (ierr, domR, domL, buft, domX, pbuf, lstk, lrdc, nb, cmode)
+       endif
        if (ierr.eq.0) then
           hbZ(0) = lefts(jout)%bh
           hbZ(1) = lefts(jout+1)%bh
@@ -7055,14 +7040,9 @@ contains
           enddo
        endif
 
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(0:0), domZ(1), buft(1))
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbW), pbuf(1:1), domZ(1), buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(0:0), domR(1), domL, buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbW), pbuf(1:1), domR(1), domL, buft(1))
        ! if (ierr.eq.0) write(*, *) 'wreduce/end'
-
-       ! if (ierr.eq.0) call show_domain(ierr, domR,    'reduce/R', indent=3)
-       ! if (ierr.eq.0) call show_domain(ierr, domZ(1), 'reduce/Z', indent=4)
-       ! if (ierr.eq.0) call show_domain(ierr, domX(0), 'reduce/X', indent=5)
-       ! if (ierr.eq.0) call show_domain(ierr, domX(1), 'reduce/Y', indent=5)
 
        if (ierr.eq.0) then
           fillX(0) = obuffer(jbX(0))%undef
@@ -7074,10 +7054,10 @@ contains
        if (ierr.eq.0) then
           call func &
                & (ierr, &
-               &  obuffer(jbZ)%vd,    obuffer(jbW)%vd, domZ(1), &
+               &  obuffer(jbZ)%vd,    obuffer(jbW)%vd, domR(1), &
                &  obuffer(jbX(0))%vd, domX(0), &
                &  obuffer(jbX(1))%vd, domX(1), &
-               &  domR, fillZ, fillX(0),    fillX(1))
+               &  domL, fillZ, fillX(0),    fillX(1))
        endif
        if (ierr.eq.0) call set_multiv_descr(ierr, hbZ, hbX, hopr)
        ! if (ierr.eq.0) then
@@ -7101,14 +7081,14 @@ contains
     real(kind=KBUF),intent(in),optional :: neutral
     interface
        subroutine func &
-            & (ierr, Z, V, W, domZ, X, domX, Y, domY, domR, FZ, FX, FY)
+            & (ierr, Z, V, W, domR, X, domX, Y, domY, domL, FZ, FX, FY)
          use chak_lib,only: KFLT, KDBL, domain_t
          implicit none
          integer,          intent(out)   :: ierr
          real(kind=__KBUF),intent(inout) :: Z(0:*), V(0:*), W(0:*)
          real(kind=__KBUF),intent(in)    :: X(0:*), Y(0:*)
-         type(domain_t),   intent(in)    :: domZ, domX, domY
-         type(domain_t),   intent(in)    :: domR
+         type(domain_t),   intent(in)    :: domR, domX, domY
+         type(domain_t),   intent(in)    :: domL
          real(kind=__KBUF),intent(in)    :: FZ,   FX,   FY
        end subroutine func
     end interface
@@ -7124,13 +7104,13 @@ contains
     integer j, m
 
     integer,parameter :: nb = upop
-    type(domain_t) :: domZ(1)
     type(buffer_t) :: pbuf(0:nb-1)
     type(stack_t)  :: lstk(0:nb-1)
+    type(domain_t) :: domL, domX(0:nb-1)
 
-    type(buffer_t) :: buft(1), bufz
-    type(domain_t) :: domR, domX(0:nb-1)
-    type(stack_t)  :: ltmp(0:upush-1)
+    type(domain_t) :: domR(1)
+    type(buffer_t) :: buft(1)
+    type(stack_t)  :: lrdc(1)
 
     ierr = 0
 
@@ -7151,28 +7131,20 @@ contains
        if (ierr.eq.0) then
           jout = nout - jx * upush
           jinp = ofsi + ninp - jx * upop
-          ltmp(0:upush-1) = lefts(jout:jout+upush-1)   ! use logical coordinate at left
           call copy_buffer_pcp(ierr, pbuf, upop, bufi(jinp:jinp+upop-1))
           ! pbuf(0:upop-1)  = bufi(jinp:jinp+upop-1)
           lstk(0:upop-1)  = bstack(mstack-jx*upop:mstack-jx*upop+upop-1)
+          lrdc(1) = lefts(jout)   ! use logical coordinate at left
        endif
 
        if (ierr.eq.0) call copy_set_header(ierr, lefts(jout)%bh, bufi(jinp), 1)
        do j = 1, upush - 1
           if (ierr.eq.0) call copy_set_header(ierr, lefts(jout+j)%bh, bufi(jinp+1), 1)
        enddo
-
-       ! write(*, *) 'wreduce/begin'
-       if (ierr.eq.0) call tweak_coordinates(ierr, domR, domX, buft(1), pbuf, lstk, nb)
-       if (ierr.eq.0) call tweak_coordinates_core(ierr, domZ, bufz, buft, ltmp, 1, del=.FALSE.)  ! cidx
-       if (ierr.eq.0) call set_inclusive_domain(ierr, domR, buft(1), domX, pbuf, lstk, nb)
-
-       if (ierr.eq.0) call adjust_reduce_domain(ierr, domR, domZ(1), buft(1)%pcp, ltmp(0)%lcp)
-
-       do j = 0, upop - 1
-          if (ierr.eq.0) call settle_input_domain(ierr, domX(j), pbuf(j), lstk(j), domR)
-       enddo
-
+       if (ierr.eq.0) then
+          call get_compromise_reduce &
+               & (ierr, domR, domL, buft, domX, pbuf, lstk, lrdc, nb, cmode)
+       endif
        if (ierr.eq.0) then
           hbZ(0) = lefts(jout)%bh
           hbZ(1) = lefts(jout+1)%bh
@@ -7189,9 +7161,9 @@ contains
           enddo
        endif
 
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(0:0), domZ(1), buft(1))
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbV), pbuf(1:1), domZ(1), buft(1))
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbW), pbuf(1:1), domZ(1), buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(0:0), domR(1), domL, buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbV), pbuf(1:1), domR(1), domL, buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbW), pbuf(1:1), domR(1), domL, buft(1))
 
        if (ierr.eq.0) then
           fillX(0) = obuffer(jbX(0))%undef
@@ -7204,10 +7176,10 @@ contains
        if (ierr.eq.0) then
           call func &
                & (ierr, &
-               &  obuffer(jbZ)%vd,    obuffer(jbV)%vd, obuffer(jbW)%vd, domZ(1), &
+               &  obuffer(jbZ)%vd,    obuffer(jbV)%vd, obuffer(jbW)%vd, domR(1), &
                &  obuffer(jbX(0))%vd, domX(0), &
                &  obuffer(jbX(1))%vd, domX(1), &
-               &  domR, fillZ, fillX(0),    fillX(1))
+               &  domL, fillZ, fillX(0),    fillX(1))
        endif
        if (ierr.eq.0) call set_multiv_descr(ierr, hbZ, hbX, hopr)
     enddo outer
@@ -7885,7 +7857,7 @@ contains
     integer nceff
 
     ierr = 0
-
+#define DEBUG_COMPROMISE 0
     if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, bufo, pbuf, lstk, nbuf)
     if (ierr.eq.0) call set_inclusive_domain(ierr, domL, bufo, domR, pbuf, lstk, nbuf)
     if (ierr.eq.0) then
@@ -7901,6 +7873,7 @@ contains
     do j = 0, nbuf - 1
        if (ierr.eq.0) call settle_input_domain(ierr, domR(j), pbuf(j), lstk(j), domL)
     enddo
+    if (ierr.eq.0) call pack_domain_batch(ierr, domL, domR(0:nbuf-1))
     if (ierr.eq.0) then
        call set_output_buffer(ierr, bufo, pbuf(0:nbuf-1), domL)
     endif
@@ -7912,6 +7885,45 @@ contains
        enddo
     endif
   end subroutine get_compromise_domain
+
+!!!_   . get_compromise_reduce
+  subroutine get_compromise_reduce &
+       & (ierr, domR, domL, bufL, domX, pbuf, lstk, lrdc, nbuf, cmode)
+    use TOUZA_Std,only: choice, find_first
+    implicit none
+    integer,       intent(out)   :: ierr
+    type(domain_t),intent(inout) :: domR(1)     ! reduction, size=1
+    type(domain_t),intent(inout) :: domL        ! loop
+    type(buffer_t),intent(inout) :: bufL(1)
+    type(domain_t),intent(inout) :: domX(0:*)
+    type(buffer_t),intent(in)    :: pbuf(0:*)   ! buffer array only for physical coordinates
+    type(stack_t), intent(in)    :: lstk(0:*)   ! stack array only for source logical coordinates
+    type(stack_t), intent(in)    :: lrdc(1)     ! stack array only for reduction logical coordinates
+    integer,       intent(in)    :: nbuf
+    integer,       intent(in)    :: cmode
+
+    integer j
+    integer nceff
+    type(buffer_t) :: bdmy
+
+    ierr = 0
+    if (ierr.eq.0) call tweak_coordinates(ierr, domL, domX, bufL(1), pbuf, lstk, nbuf)
+    if (ierr.eq.0) call set_inclusive_domain(ierr, domL, bufL(1), domX, pbuf, lstk, nbuf)
+
+    if (ierr.eq.0) call tweak_coordinates_core(ierr, domR, bdmy, bufL, lrdc, 1)
+    if (ierr.eq.0) call adjust_reduce_domain(ierr, domL, domR(1), bufL(1)%pcp, lrdc(1)%lcp)
+
+    do j = 0, nbuf - 1
+       if (ierr.eq.0) call settle_input_domain(ierr, domX(j), pbuf(j), lstk(j), domL)
+    enddo
+    if (is_msglev_DEBUG(lev_verbose)) then
+       if (ierr.eq.0) call show_domain(ierr, domL,    'reduce/L', indent=6)
+       if (ierr.eq.0) call show_domain(ierr, domR(1), 'reduce/R', indent=6)
+       do j = 0, nbuf - 1
+          if (ierr.eq.0) call show_domain(ierr, domX(j), 'reduce/X', indent=6)
+       enddo
+    endif
+  end subroutine get_compromise_reduce
 
 !!!_   . tweak_coordinates
   subroutine tweak_coordinates &
@@ -8285,8 +8297,9 @@ contains
     type(domain_t),intent(in)    :: dom
     integer kv
     integer jinp, ninp
-    integer jc
+    integer jc,   jo
     integer reff
+    type(loop_t) :: lpbuf(0:lcoor-1)
 
     ierr = 0
     ninp = size(tbuf)
@@ -8306,6 +8319,12 @@ contains
     endif
     if (ierr.eq.0) then
        do jc = 0, dom%mco - 1
+          jo = dom%cidx(jc)
+          lpbuf(jc) = buf%pcp(jo)
+       enddo
+       buf%pcp(0:dom%mco-1) = lpbuf(0:dom%mco-1)
+       buf%pcp(dom%mco:) = def_loop
+       do jc = 0, dom%mco - 1
           if (dom%strd(jc).le.0) then
              ! buf%pcp(jc)%bgn = dom%bgn(jc)
              ! ! buf%pcp(jc)%end = dom%bgn(jc)
@@ -8319,9 +8338,9 @@ contains
           buf%pcp(jc)%ofs = 0
           buf%pcp(jc)%cyc = 0
        enddo
-       do jc = dom%mco, lcoor - 1
-          buf%pcp(jc) = def_loop
-       enddo
+       ! do jo = dom%mco, lcoor - 1
+       !    buf%pcp(jo) = def_loop
+       ! enddo
        ! call show_lpp(ierr, buf%pcp, 'sob')
        call alloc_buffer_t(ierr, buf, dom%n)
     endif
@@ -8329,22 +8348,24 @@ contains
 
 !!!_   . set_reduce_buffer - set result buffer as reduction
   subroutine set_reduce_buffer &
-       & (ierr, buf, tbuf, dom, bref)
+       & (ierr, buf, tbuf, domR, domL, bref)
     implicit none
     integer,       intent(out)   :: ierr
     type(buffer_t),intent(inout) :: buf
     type(buffer_t),intent(inout) :: tbuf(0:)
-    type(domain_t),intent(in)    :: dom
+    type(domain_t),intent(in)    :: domR, domL
     type(buffer_t),intent(in)    :: bref    ! for coordinate name
     integer jo
 
     ierr = 0
-    call set_output_buffer(ierr, buf, tbuf(:), dom)
+    call set_output_buffer(ierr, buf, tbuf(:), domR)
     if (ierr.eq.0) buf%pcp(:)%name = bref%pcp(:)%name
-    do jo = 0, dom%mco - 1
+    do jo = 0, domL%mco - 1
        ! write(*, *) 'srb', jo, bref%pcp(jo)%flg
        if (bref%pcp(jo)%flg .eq. loop_reduce) then
           buf%pcp(jo)%flg = loop_reduce
+          buf%pcp(jo)%bgn = domL%bgn(jo)
+          buf%pcp(jo)%end = domL%end(jo)
        endif
     enddo
   end subroutine set_reduce_buffer
