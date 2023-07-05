@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/07/05 12:18:10 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/05 13:51:16 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1224,7 +1224,7 @@ contains
                 domL%bgn(jc) = b
                 domL%end(jc) = e
                 domR%bgn(jc) = 0
-                domR%end(jc) = e - b
+                domR%end(jc) = max(1, e - b)
                 if (nx.eq.0.or.lcp(jo)%flg.eq.loop_reduce) then
                    domR%strd(jc) = 0
                    pcp(jc)%flg = loop_reduce
