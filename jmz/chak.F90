@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/07/05 12:49:54 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/05 15:01:44 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -6934,7 +6934,7 @@ contains
           call get_compromise_reduce &
                & (ierr, domR, domL, buft, domX, pbuf, lstk, lrdc, nb, cmode)
        endif
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(0:0), domR(1), domL, buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(:), domR(1), domL, buft(1))
 
        fillZ = choice(fillX, neutral)
        obuffer(jbZ)%vd(:) = fillZ
@@ -7040,8 +7040,8 @@ contains
           enddo
        endif
 
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(0:0), domR(1), domL, buft(1))
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbW), pbuf(1:1), domR(1), domL, buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(:), domR(1), domL, buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbW), pbuf(:), domR(1), domL, buft(1))
        ! if (ierr.eq.0) write(*, *) 'wreduce/end'
 
        if (ierr.eq.0) then
@@ -7161,9 +7161,9 @@ contains
           enddo
        endif
 
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(0:0), domR(1), domL, buft(1))
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbV), pbuf(1:1), domR(1), domL, buft(1))
-       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbW), pbuf(1:1), domR(1), domL, buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbZ), pbuf(:), domR(1), domL, buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbV), pbuf(:), domR(1), domL, buft(1))
+       if (ierr.eq.0) call set_reduce_buffer(ierr, obuffer(jbW), pbuf(:), domR(1), domL, buft(1))
 
        if (ierr.eq.0) then
           fillX(0) = obuffer(jbX(0))%undef
