@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2023/03/30 13:02:35 fuyuki Makefile.am>
+# Time-stamp: <2023/07/05 19:08:59 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -13,7 +13,7 @@ ACLOCAL_AMFLAGS	=	-I m4c
 EXTRA_DIST	=	autogen.sh README-touza.org LICENSE NOTICE
 include $(top_srcdir)/aminclude_static.am
 
-lib@TOUZA_NAME@_la_LDFLAGS = -version-info 1:1:0
+lib@TOUZA_NAME@_la_LDFLAGS = -version-info 1:2:0
 
 noinst_SCRIPTS 	= makeshift
 CLEANFILES += $(noinst_bin_SCRIPTS)
