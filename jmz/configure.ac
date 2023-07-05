@@ -3,11 +3,11 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Nov 24 2021
-# Time-stamp: <2023/03/25 21:01:32 fuyuki configure.ac>
+# Time-stamp: <2023/07/05 22:46:55 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
-AC_INIT([touza-jmz],[1.2.0],[saitofuyuki@jamstec.go.jp])
+AC_INIT([touza-jmz],[1.3.0],[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
 Copyright (C) 2022,2023 Japan Agency for Marine-Earth Science and Technology
