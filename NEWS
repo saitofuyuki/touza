@@ -1,10 +1,47 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2023/03/30 11:54:41 fuyuki NEWS>
+# Time-stamp: <2023/07/05 17:53:38 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.12 from 1.11.2
+** Major changes
+*** SHAPE-like operators
+- Coordinate deletion by SHAPE parameters is no more supported.
+  Instead, hungry-mode or greedy-mode option is introduced as
+  command-line argument (-C and +C, respectively).
+- SHIFT operator is introduced to shift elements along coordinates.
+  Cyclic condition is also supported.
+- According to the modification above, SHAPE parameter complex are now
+  slightly simplified.
+- The SHAPE family: SHAPE, PERM, SIZE, and SHIFT share procedures
+  instead of the case when the option is single integer.  This may
+  help easier representation of simple shapes.
+*** Sweep operators
+- Operators COUNT, SUM, WSUM, and WMV are introduced.  These operators
+  works as reduction operators (to compute along specified coordinates)
+  and/or accumulation operators (to compute along stacks).
+  - Normal operators ADD, MAX, MIN, MUL have now option to work as
+    reduction operators.  If enabled, it computes not along stacks but
+    along specified coordinates.
+*** Stack and queue operators
+- Stack operators such as DUP, REPEAT, POP, DIST, INSERT, EXCH are
+  much improved.  They can contain optional parameter (called tuple)
+  to control (mostly) iteration.  The sequence DUP DUP is now
+  represented by DUP=2, etc.  The old notation is supported but
+  deprecated.
+- Anchor treatment near stack operators are modified.  Some of them
+  are incompatible with the older versions, but much simpler.
+- Queue operators ITER, CUM for the stack operators are simplified.
+** Minor changes
+- Ternary operators IFELSE, INRANGE, BLEND are introduced.
+- SIGN is now compatible with FORTRAN intrinsic.
+- Output can be ITERated.  Now '= output ITER' output all the stacks
+  to the single output file.
+** Bug fixes
+- Fix the reshaping on DUPed, EXCHanged, CLONEd, COPYed buffers.
 
 * Changes in 1.11.2 from 1.11.1
 ** Bug fixes

@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:58:20 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/08 10:53:56 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2023
@@ -811,7 +811,13 @@ contains
           if (ierr.eq.0) call get_comm(ierr, icomm)
        endif
     endif
-    if (ierr.eq.0) call get_ni(ierr, nrank, irank, icomm)
+    if (ierr.eq.0) then
+       call get_ni(ierr, nrank, irank, icomm)
+    else
+       nrank = -1
+       irank = -1
+       icomm = MPI_COMM_NULL
+    endif
     if (ierr.eq.0) then
        if (nrank.gt.0.and.iroot.ge.nrank) ierr = _ERROR(ERR_FAILURE_INIT)
     endif
@@ -1633,6 +1639,7 @@ contains
     character(len=8) :: CS
 
     ierr = 0
+    lustr = (- HUGE(0)) - 1
 #if HAVE_FORTRAN_OPEN_STREAM
     if (ierr.ne.0) return
 #   if HAVE_FORTRAN_INQUIRE_POS
@@ -1940,7 +1947,12 @@ contains
           call msg_mdl &
                & ('(''endianness:'', I0, 1x, I0)', (/utest, kendi/), __MDL__, ul)
        endif
-       if (kendi.ne.kendi_file) then
+       if (kendi_file.eq.endian_UNKNOWN) then
+          if (VCHECK_SEVERE(lv)) then
+             call msg_mdl &
+                  & ('file endianness not set', __MDL__, ul)
+          endif
+       else if (kendi.ne.kendi_file) then
           if (VCHECK_SEVERE(lv)) then
              call msg_mdl &
                   & ('(''endianness incompatible:'', I0, 1x, I0)', (/utest, kendi/), __MDL__, ul)

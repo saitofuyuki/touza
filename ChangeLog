@@ -1,3 +1,37 @@
+Release-1.12 / 2023-07-05
+=========================
+
+  * Import many improvment and bug-fix of jmz/chak, etc into dev
+  * doc: (jmz) description updated to the latest design.
+  * doc: (std) add some description.
+  * jmz: (chak) Hungry-mode introduced to replace coordinate deletion.
+  * jmz: (chak) Sweep/Accumulation/Reduction operators.
+  * jmz: (chak) Lazy-mode operators redesigned.
+  * jmz: (chak) [SEVERE] logical coordinates must be refreshed at push.
+  * jmz: (chak) [FATAL] Fix normal reduction application.
+  * jmz: (chak) [FATAL] Fix physical_index() when cyclic.
+  * jmz: (chak) ITERated output implemented.
+  * jmz: (chak) ternary operators introduced.
+  * jmz: (chak) [IMPORTANT] Stack operators redesigned and improved.
+  * jmz: (chak) SHAPE families improved.  Shifts and cyclic shifts introduced.
+  * jmz: (chak) [incompatible] SIGN function modified.
+  * jmz: (chak) [SEVERE] wrong intent for binary operators.
+  * jmz: (chak) PROP operator introduced.
+  * jmz: (chak) introduce ATAN (unary) operator.
+  * jmz: (chak) write-file tag operation modified.
+  * jmz: (chak) coordinate names can be set at shaping of ascii files.
+  * jmz: (chak) a new operator CFLUSH introduced.
+  * nio: (nio_control) safer intent(out) variables.
+  * nio: (nio_cache) safer intent(out) variables.
+  * nio: (nctcdf) improvement in treatment of empty dimension.
+  * nio: (bindc) tnb_file_close implemented.
+  * std: (utl) [FATAL] disable to change default find_offset.
+  * std: (env) warn if init_file_bodr not called.
+  * std: (arg) increase argument-entry size.
+  * std: (log) slight improvement in messaging.
+  * std: (utl) implement some new subroutines.
+  * m4c: import latest ax_lib_netcdf4.m4 from autoconf-archive.
+
 Release-1.11.2 / 2023-03-30
 ===========================
 
