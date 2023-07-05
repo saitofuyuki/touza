@@ -54,6 +54,9 @@
 /* whether module f90_unix_env works with getlogin */
 #undef HAVE_FORTRAN_F90_UNIX_ENV_GETLOGIN
 
+/* whether statement flush works with unit specifier */
+#undef HAVE_FORTRAN_FLUSH_UNIT
+
 /* whether function fseek works */
 #undef HAVE_FORTRAN_FSEEK
 

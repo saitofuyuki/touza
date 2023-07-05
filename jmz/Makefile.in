@@ -17,7 +17,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/03/30 11:35:35 fuyuki Makefile.am>
+# Time-stamp: <2023/06/30 07:19:20 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -101,7 +101,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 noinst_PROGRAMS =
-EXTRA_PROGRAMS = jmzex$(EXEEXT) jmzconv$(EXEEXT) jmzcmp$(EXEEXT)
+EXTRA_PROGRAMS = jmzcmp$(EXEEXT)
 bin_PROGRAMS = chak$(EXEEXT)
 check_PROGRAMS = test_chak_file$(EXEEXT)
 subdir = .
@@ -138,14 +138,6 @@ am_jmzcmp_OBJECTS = jmzcmp.$(OBJEXT)
 jmzcmp_OBJECTS = $(am_jmzcmp_OBJECTS)
 jmzcmp_LDADD = $(LDADD)
 jmzcmp_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_2)
-am_jmzconv_OBJECTS = jmzconv.$(OBJEXT)
-jmzconv_OBJECTS = $(am_jmzconv_OBJECTS)
-jmzconv_LDADD = $(LDADD)
-jmzconv_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_2)
-am_jmzex_OBJECTS = jmzex.$(OBJEXT)
-jmzex_OBJECTS = $(am_jmzex_OBJECTS)
-jmzex_LDADD = $(LDADD)
-jmzex_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_2)
 am_test_chak_file_OBJECTS = test_chak_file-chak_file.$(OBJEXT)
 test_chak_file_OBJECTS = $(am_test_chak_file_OBJECTS)
 am__DEPENDENCIES_3 = libjmz_local.la $(am__DEPENDENCIES_2)
@@ -202,10 +194,9 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libjmz_local_la_SOURCES) $(chak_SOURCES) $(jmzcmp_SOURCES) \
-	$(jmzconv_SOURCES) $(jmzex_SOURCES) $(test_chak_file_SOURCES)
-DIST_SOURCES = $(libjmz_local_la_SOURCES) $(chak_SOURCES) \
-	$(jmzcmp_SOURCES) $(jmzconv_SOURCES) $(jmzex_SOURCES) \
 	$(test_chak_file_SOURCES)
+DIST_SOURCES = $(libjmz_local_la_SOURCES) $(chak_SOURCES) \
+	$(jmzcmp_SOURCES) $(test_chak_file_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -463,8 +454,6 @@ LDADD = libjmz_local.la $(TOUZA_LIBS)
 noinst_SCRIPTS = jmzdepf90 demo-chak.sh ocheck.sh
 noinst_LTLIBRARIES = libjmz_local.la
 libjmz_local_la_SOURCES = jmzlib.F90 chak_lib.F90 chak_opr.F90 chak_file.F90
-jmzex_SOURCES = jmzex.F90 jmz.h
-jmzconv_SOURCES = jmzconv.F90 jmz.h
 jmzcmp_SOURCES = jmzcmp.F90 jmz.h
 chak_SOURCES = chak.F90 jmz.h
 chak_to_include = chak_decl.F90 chak_reg.F90
@@ -619,14 +608,6 @@ chak$(EXEEXT): $(chak_OBJECTS) $(chak_DEPENDENCIES) $(EXTRA_chak_DEPENDENCIES)
 jmzcmp$(EXEEXT): $(jmzcmp_OBJECTS) $(jmzcmp_DEPENDENCIES) $(EXTRA_jmzcmp_DEPENDENCIES) 
 	@rm -f jmzcmp$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(jmzcmp_OBJECTS) $(jmzcmp_LDADD) $(LIBS)
-
-jmzconv$(EXEEXT): $(jmzconv_OBJECTS) $(jmzconv_DEPENDENCIES) $(EXTRA_jmzconv_DEPENDENCIES) 
-	@rm -f jmzconv$(EXEEXT)
-	$(AM_V_FCLD)$(FCLINK) $(jmzconv_OBJECTS) $(jmzconv_LDADD) $(LIBS)
-
-jmzex$(EXEEXT): $(jmzex_OBJECTS) $(jmzex_DEPENDENCIES) $(EXTRA_jmzex_DEPENDENCIES) 
-	@rm -f jmzex$(EXEEXT)
-	$(AM_V_FCLD)$(FCLINK) $(jmzex_OBJECTS) $(jmzex_LDADD) $(LIBS)
 
 test_chak_file$(EXEEXT): $(test_chak_file_OBJECTS) $(test_chak_file_DEPENDENCIES) $(EXTRA_test_chak_file_DEPENDENCIES) 
 	@rm -f test_chak_file$(EXEEXT)
@@ -1104,7 +1085,6 @@ uninstall-am: uninstall-binPROGRAMS
 
 
 # Following dependencies are necesary, as workaround
-$(jmzconv_OBJECTS): $(noinst_LTLIBRARIES)
 $(jmzcmp_OBJECTS): $(noinst_LTLIBRARIES)
 $(chak_OBJECTS): $(noinst_LTLIBRARIES)
 # $(chak_lib_OBJECTS): $(noinst_LTLIBRARIES)
@@ -1115,17 +1095,13 @@ jmzdepf90: jmzdepf90.sh.in
 	chmod +x $@
 
 demo-chak.sh: demo-chak.sh.in
-	@sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@; chmod +x $@
+	@sed -e 's,[@]ZSH[@],$(ZSH),g' \
+         -e 's,[@]srcdir[@],$(srcdir),g' \
+		$< >$@; chmod +x $@
 
 ocheck.sh: ocheck.sh.in
 	@sed -e 's,[@]CHAK[@],$(abs_builddir)/chak,g' \
 		 -e 's,[@]CHAK_OPTS[@],$(CHAK_OPTS),g' < $< >$@; chmod +x $@
-
-genx.sh: genx.sh.in
-	if test -e $<; then \
-		sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@; \
-		chmod +x $@; \
-	fi
 
 genx2.sh: genx2.sh.in
 	if test -e $<; then \
