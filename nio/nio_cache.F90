@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:42:57 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/08 13:15:35 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -564,6 +564,8 @@ contains
     endif
     if (ierr.eq.0) then
        name = v%co(jeff)
+    else
+       name = ' '
     endif
   end subroutine cache_co_name
 

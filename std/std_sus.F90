@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:21:07 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/08 13:01:59 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023
@@ -90,6 +90,8 @@ module TOUZA_Std_sus
   integer,parameter,public :: suspend_begin = +1  ! suspend-mode record begin
   integer,parameter,public :: suspend_mid   = 0
   integer,parameter,public :: suspend_end   = -1
+
+  integer(kind=KIOFS),parameter,public :: POS_INVALID = - HUGE(0_KIOFS) - 1
 !!!_  - static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -750,7 +752,11 @@ contains
        enddo
     endif
     if (present(jopos)) then
-       if (ierr.eq.0) jopos = sus_pos_a2rel(apos, u, whence)
+       if (ierr.eq.0) then
+          jopos = sus_pos_a2rel(apos, u, whence)
+       else
+          jopos = POS_INVALID
+       endif
     endif
     ! reset to initial position
 #if OPT_STREAM_RPOS_WORKAROUND
@@ -813,7 +819,11 @@ contains
        enddo
     endif
     if (present(jopos)) then
-       if (ierr.eq.0) jopos = sus_pos_a2rel(apos, u, whence)
+       if (ierr.eq.0) then
+          jopos = sus_pos_a2rel(apos, u, whence)
+       else
+          jopos = POS_INVALID
+       endif
     endif
     ! reset to initial position
 #if OPT_STREAM_RPOS_WORKAROUND

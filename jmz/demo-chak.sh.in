@@ -1,5 +1,7 @@
-#!/usr/bin/zsh -f
-# Time-stamp: <2023/03/28 07:17:22 fuyuki demo-chak.sh.in>
+#!@ZSH@ -f
+# Time-stamp: <2023/07/04 13:57:35 fuyuki demo-chak.sh.in>
+
+srcdir=@srcdir@
 
 main ()
 {
@@ -9,21 +11,73 @@ main ()
   local ngtls=ngtls
   local ngtmean=ngtmean
   local ngtconv=ngtconv
+  local repl=
 
-  demo_inputs $demod || return $?
-  demo_tutorial || return $?
-  demo_operation || return $?
+  local DRY=
+
+  while [[ $# -gt 0 ]]
+  do
+    case $1 in
+    (-n) DRY=T;;
+    (+r) repl=$srcdir/README-jmz.org;;
+    (-r) repl=$2; shift ;;
+    (-*) print -u2 - "Unknown argument $1"; return 1;;
+    (--) shift; break;;
+    (*)  break;;
+    esac
+    shift
+  done
+
+  local DEMO=()
+  set_demo_filter DEMO "$@" || return $?
+  if [[ -z $repl ]]; then
+    demo_inputs $demod || return $?
+    demo_tutorial || return $?
+    demo_operation || return $?
+  elif [[ ! -e $repl ]]; then
+    print -u2 - "cannot find $repl"
+    return 1
+  else
+    local rfile=$(mktemp) wfile=$(mktemp) mfile=$(mktemp)
+    {
+      demo_inputs $demod || return $?
+      demo_tutorial || return $?
+      demo_operation || return $?
+    } > $rfile
+    csplit -q -f $rfile. $rfile '%^# ## %' '/^# ## /' '{*}'
+    cp $repl $mfile
+    for f in $rfile.*
+    do
+       pat=($(sed -ne 1p $f))
+       shift 2 pat
+       if grep --silent "^# ## $pat\$" $mfile; then
+         {
+           sed -e "\@^# ## $pat\$@,\$d" $mfile
+           sed -e '/^$/d' -e 's/ *$//' $f
+           sed -e "1,\@^# ##DONE $pat\$@d" $mfile
+         } > $wfile
+         cp $wfile $mfile
+       fi
+    done
+    cp $wfile $repl.new
+    rm -f $rfile $rfile.* $wfile $mfile
+  fi
   return 0
 }
 
 demo_tutorial ()
 {
   local src=(demo/base)
+  run_demo tutorial:dump     -E -S -TRIM 5 -C "simple dump" -- $src =
+
   run_demo tutorial:index0/p -E -C "default, count from 0" --      $src POP
   run_demo tutorial:index0/f -E -C "count from 1"          --   -F $src POP
 
   run_demo tutorial:index1/p -E -C "default, count from 0" --   -n    $src =
   run_demo tutorial:index1/f -E -C "count from 1"          --   -n -F $src =
+
+  run_demo tutorial:flush/p -S -TRIM 4 -C "record, stack, coordinate count from 0" --    demo/base FLUSH
+  run_demo tutorial:flush/f -S -TRIM 4 -C "record, stack, coordinate count from 1" -- -F demo/base FLUSH
 
   src=demo/single
   local opr=($src DUP 1 ADD FLUSH -i)
@@ -52,20 +106,21 @@ demo_operation ()
 
   src=(T=3 demo/x.base INT)
   run_demo source:2d $src                 =
-  run_demo perm:2d/c   $src X=lev         =
-  run_demo perm:3d+1/c $src Z=lat         =
-  run_demo perm:3d+0/c $src Y=lat Z=lev   =
-  run_demo perm:2d/o   $src PERM=lev      =
-  run_demo perm:3d+1/o $src PERM=,,lat    =
-  run_demo perm:3d+0/o $src PERM=,lat,lev =
+  run_demo perm:2d/c    $src X=lev         =
+  run_demo perm:3d+1/c  $src Z=lat         =
+  run_demo perm:3d+0/c  $src Y=lat Z=lev   =
+  run_demo perm:2d/o    $src SHAPE=lev      =
+  run_demo perm:3d+1/o  $src SHAPE=,,lat    =
+  run_demo perm:3d+0/o  $src SHAPE=,lat,lev =
+  run_demo perm:3d+0ins $src SHAPE=+        =
 
-  run_demo_add add:1d    demo/yz.base T=3 demo/sub3.yz.base T=3
-  run_demo_add add:1d    demo/zx.base T=3 demo/sub2.zx.base T=5
-  run_demo_add add:2d+1d demo/z.base  T=3 demo/sub2.zx.base T=0
+  run_demo_add add:1d    -- demo/yz.base T=3 -- demo/sub3.yz.base T=3
+  run_demo_add add:1d:zx -- demo/zx.base T=3 -- demo/sub2.zx.base T=5
+  run_demo_add add:2d+1d 10 - 10:10 -- demo/z.base  T=3 -- demo/sub2.zx.base T=0
 
-  run_demo_add fail/add:2d    demo/zx.base T=3       demo/yz.base  T=3
-  run_demo_add auto/add:2d    demo/zx.base T=5       demo/yz.base  T=3
-  run_demo_add manual/add:2d  demo/zx.base T=3 Y=lat demo/yz.base  T=3
+  run_demo_add fail/add:2d           -- demo/zx.base T=3       -- demo/yz.base  T=3
+  run_demo_add auto/add:2d    - - 18 -- demo/zx.base T=5       -- demo/yz.base  T=3
+  run_demo_add manual/add:2d  - - 10 -- demo/zx.base T=3 Y=lat -- demo/yz.base  T=3
 
   src=(demo/sub5.yz.base INT demo/sub3.yz.base INT)
   run_demo compromise:source   -NOCOL    T=3 $src FLUSH
@@ -74,36 +129,43 @@ demo_operation ()
   run_demo compromise:x                  T=3 $src FLUSH -x
   run_demo compromise:l                  T=3 $src FLUSH -l
 
+  # hungry
+  src=(-n -qqq demo/x.base =)
+  run_demo hungry/N -- -N -qqq demo/x.base PROP
+  run_demo hungry/0 --    $src 
+  run_demo hungry/1 -- -C $src 
+  run_demo hungry/2 -- +C $src 
+
   # permutation
   src=(T=0 demo/base INT)
   run_demo source:3d     -n $src =
 
-  run_demo perm:3d/102a  -n $src PERM=lat  =
-  run_demo perm:3d/102b  -n $src PERM=,lon =
+  run_demo perm:3d/102a  -n $src SHAPE=lat  =
+  run_demo perm:3d/102b  -n $src SHAPE=,lon =
 
-  run_demo perm:3d/201   -n $src PERM=lev =
-  run_demo perm:3d/210a  -n $src PERM=lev,lat =
-  run_demo perm:3d/210b  -n $src PERM=lev,/   =
+  run_demo perm:3d/201   -n $src SHAPE=lev =
+  run_demo perm:3d/210a  -n $src SHAPE=lev,lat =
+  run_demo perm:3d/210b  -n $src SHAPE=lev,/   =
 
-  run_demo perm:3d/.012        -n $src PERM=+       =
-  run_demo perm:3d/s012        -n $src PERM=set     =
-  run_demo perm:3d/0s12        -n $src PERM=,set    =
-  run_demo perm:3d/012s        -n $src PERM=,,,set  =
-  run_demo perm:3d/s012:error  -n $src PERM=set/    =
+  run_demo perm:3d/.012        -n $src SHAPE=+       =
+  run_demo perm:3d/s012        -n $src SHAPE=+set    =
+  run_demo perm:3d/0s12        -n $src SHAPE=,+set   =
+  run_demo perm:3d/012s        -n $src SHAPE=,,,+set =
+  run_demo perm:3d/s012:error  -n $src SHAPE=set     =
 
-  run_demo perm:3d/r2          -n $src PERM=lon/glon   =
-  run_demo perm:3d/r2          -n $src PERM=,,lon/glon =
-  run_demo perm:3d/r2          -n $src PERM=,,lon/lat  =
+  run_demo perm:3d/r2          -n $src SHAPE=lon/glon   =
+  run_demo perm:3d/r2          -n $src SHAPE=,,lon/glon =
+  run_demo perm:3d/r2          -n $src SHAPE=,,lon/lat  =
 
   src=(T=5 demo/zx.base INT)
   run_demo source:y      -n $src =
-  run_demo perm:y+x      -n $src PERM=lon =
-  run_demo perm:y+s      -n $src PERM=+ =
-  run_demo perm:y+sx     -n $src PERM=lon,+ =
-  run_demo perm:y+y      -n $src PERM=,set =
-  run_demo perm:y+sy     -n $src PERM=+,set =
-  run_demo perm:y+z      -n $src PERM=,,lev =
-  run_demo perm:y+z:keep -n $src PERM=/,/,lev =
+  run_demo perm:y+x      -n $src SHAPE=lon =
+  run_demo perm:y+s      -n $src SHAPE=+ =
+  run_demo perm:y+sx     -n $src SHAPE=lon,+ =
+  run_demo perm:y+y      -n $src SHAPE=,+set =
+  run_demo perm:y+sy     -n $src SHAPE=+,+set =
+  run_demo perm:y+z      -n $src SHAPE=,,/lev =
+  run_demo perm:y+z:keep -n $src SHAPE=/,/,/lev =
 
   # flat index
   src=(T=0 demo/base INT)
@@ -128,50 +190,129 @@ demo_operation ()
 
   run_demo flat:flat/0+1 -TRIM 9     $src FLAT=0 FLAT=1 FLUSH -i
 
+  # shift
+  src=(T=0 demo/base INT DUP)
+  run_demo shift:0+1 -TRIM 18 $src C0=::+1 FLUSH -i
+  run_demo shift:0-1 -TRIM 18 $src C0=::-1 FLUSH -i
+  run_demo shift:1+1 -TRIM 10:10 $src C1=::+1 FLUSH -i
+  run_demo shift:1-1 -TRIM 10:10 $src C1=::-1 FLUSH -i
+  run_demo shift:2+1 -TRIM 10:10 $src C2=::+1 FLUSH -i
+  run_demo shift:2-1 -TRIM 10:10 $src C2=::-1 FLUSH -i
+
+  run_demo shift:0+1a -TRIM 18 $src SHIFT=+1 FLUSH -i
+  run_demo shift:0-1a -TRIM 18 $src SHIFT=-1 FLUSH -i
+  run_demo shift:1+1a -TRIM 10:10 $src SHIFT=,+1 FLUSH -i
+  run_demo shift:1-1a -TRIM 10:10 $src SHIFT=,-1 FLUSH -i
+
+  run_demo shift:part/0+1 -TRIM 18 $src C0=1:4:+1 FLUSH -i
+  run_demo shift:part/0-1 -TRIM 18 $src C0=1:4:-1 FLUSH -i
+
+  local w=8
+  run_demo cshift:0+1 -TRIM 18 $src C0=::+1:$w FLUSH -i
+  run_demo cshift:0-1 -TRIM 18 $src C0=::-1:$w FLUSH -i
+  run_demo cshiftP:0+1err -TRIM 18 $src C0=::+1:$((w+1)) FLUSH -i
+
+  run_demo cshiftP:0+1 -TRIM 18 $src C0=:$((w+1)) CLONE C0=::+1:$((w+1)) FLUSH -i
+  run_demo cshiftP:0-1 -TRIM 18 $src C0=:$((w+1)) CLONE C0=::-1:$((w+1)) FLUSH -i
+
+  run_demo cshiftM:0+1 -TRIM 18 $src C0=::+1:$((w-1)) FLUSH -i
+  run_demo cshiftM:0-1 -TRIM 18 $src C0=::-1:$((w-1)) FLUSH -i
+
+  local oshape=1:8 cycle=9
+  src=(0 SHAPE=2:6 X ADD SIZE=$cycle CLONE)
+  run_demo cshift/x:src -- -qqqq $src SHAPE=0:9 CFLUSH
+  for sh in 0 1 2 3 4 5 6 7 8 9 -1 -2 -3
+  do
+    run_demo cshift/x:$sh -- -qqqq $src SHAPE=$oshape:$sh:$cycle CLONE SHAPE=0:$cycle CFLUSH
+  done
+
+  # count
+  src=(demo/bool)
+  run_demo count:all $src COUNT   =
+  run_demo count:0   -TRIM 10 $src COUNT=0 =
+  run_demo count:1   -TRIM 10 $src COUNT=1 =
+  run_demo count:2   -TRIM 10 $src COUNT=2 =
+  run_demo count:0/p -TRIM 10 $src COUNT=0/2:6 =
+
+  run_demo count:0p  -TRIM 10 $src COUNT=2:6 =
+  run_demo count:yb  -TRIM 10 $src COUNT=,: =
+  run_demo count:ya  -TRIM 10 $src COUNT=,1 =
+  run_demo count:20  -TRIM 10 $src COUNT=2,0 =
+
   return 0
 }
 
 run_demo_add ()
 {
   local tag=$1; shift
-  local op0=($1); shift
+  local trim=() op0=() op1=()
+
   while [[ $# -gt 0 ]]
   do
-    [[ -e $1 ]] && break
+    [[ $1 == -- ]] && shift && break
+    trim+=($1)
+    shift
+  done
+  while [[ $# -gt 0 ]]
+  do
+    [[ $1 == -- ]] && shift && break
     op0+=($1)
     shift
   done
+
   local op1=("$@")
-  run_demo "$tag/op0" $op0 INT FLUSH
-  run_demo "$tag/op1" $op1 INT FLUSH
-  run_demo "$tag" $op0 INT $op1 INT REPEAT ADD FLUSH -i
+  run_demo "$tag/op0" -TRIM ${trim[1]:--}  $op0 INT FLUSH
+  run_demo "$tag/op1" -TRIM ${trim[2]:--}  $opts    $op1 INT FLUSH
+  run_demo "$tag"     -TRIM ${trim[3]:--}  $opts    $op0 INT $op1 INT REPEAT ADD FLUSH -i
 }
 run_demo ()
 {
   local tag=$1; shift
-  local col=T trim= edup=
+  local col=T trim= edup= split=
   local hcom=
   while [[ $# -gt 0 ]]
   do
     case $1 in
-    (-NOCOL) col=; shift;;
-    (-TRIM)  trim=$2; shift 2;;
+    (-NOCOL) col=;;
+    (-TRIM)  trim=$2; shift;;
     (-E)     edup=T;;
     (-C)     hcom="$2"; shift;;
+    (-S)     split=T;;
     (--)     shift; break;;
     (*) break;;
     esac
     shift
   done
+  [[ x$trim == x- ]] && trim=
+
+  if [[ -z $DEMO ]]; then
+    :
+  else
+    local d= match=
+    for d in "${(@)DEMO}"
+    do
+      [[ $tag =~ "$d" ]] && match=T && break
+    done
+    [[ -z $match ]] && return 0
+  fi
+
   local err=
   local args=("$@")
-  local tmp=$(mktemp) tmp2=$(mktemp) tmp3=$(mktemp) log=$(mktemp)
+
+  if [[ -n $DRY ]]; then
+    print - "# ## $tag"
+    print - "$chak ${(@q-)args}"
+    return 0
+  fi
+
+  local tmp=$(mktemp) log=$(mktemp)
+  local f=
   if [[ -n $edup ]]; then
     $chak --demo "${(@)args}" > $tmp 2>&1; err=$?
   else
     $chak        "${(@)args}" > $tmp 2> $log; err=$?
   fi
-  [[ -n $trim ]] && trim=(${(s/:/)trim})
+  # [[ -n $trim ]] && trim=(${(s/:/)trim})
   # print - "--- tmp"
   # cat $tmp
   # print - "--- log"
@@ -183,23 +324,32 @@ run_demo ()
     [[ -n $hcom ]] && print -n - "   # $hcom"
     print -
     if [[ $err -eq 0 ]]; then
-      sed -e  '/^ \?[0-9]/,$d' $tmp
-      sed -ne '/^ \?[0-9]/,$p' $tmp > $tmp2
-      if [[ $#trim -eq 1 ]]; then
-        head --lines=$trim $tmp2 > $tmp3
-        print - ":" >> $tmp3
-        mv $tmp3 $tmp2
-      elif [[ $#trim -eq 2 ]]; then
-        head --lines=$trim[1] $tmp2 > $tmp3
-        print - ":" >> $tmp3
-        tail --lines=$trim[2] $tmp2 >> $tmp3
-        mv $tmp3 $tmp2
-      fi
-      if [[ -z $col ]]; then
-        cat $tmp2
+      if [[ -z $split ]]; then
+        demo_trim "$trim" "$col" $tmp
       else
-        column -t $tmp2
+        csplit -q $tmp '%^###%' '/^###/' '{*}' -f ${tmp}.
+        for f in $tmp.*
+        do
+          demo_trim "$trim" "$col" $f
+        done
       fi
+      # sed -e  '/^ \?-\?[0-9]/,$d' $tmp
+      # sed -ne '/^ \?-\?[0-9]/,$p' $tmp > $tmp2
+      # if [[ $#trim -eq 1 ]]; then
+      #   head --lines=$trim $tmp2 > $tmp3
+      #   print - ":" >> $tmp3
+      #   mv $tmp3 $tmp2
+      # elif [[ $#trim -eq 2 ]]; then
+      #   head --lines=$trim[1] $tmp2 > $tmp3
+      #   print - ":" >> $tmp3
+      #   tail --lines=$trim[2] $tmp2 >> $tmp3
+      #   mv $tmp3 $tmp2
+      # fi
+      # if [[ -z $col ]]; then
+      #   cat $tmp2
+      # else
+      #   column -t $tmp2
+      # fi
     else
       cat $tmp
       cat $log
@@ -207,7 +357,38 @@ run_demo ()
   } | sed -e 's/^/: /'
   print "# ##DONE $tag"
   print
-  rm -f $tmp $tmp2 $tmp3 $log
+  setopt nullglob
+  rm -f $tmp $tmp.* $log
+}
+
+demo_trim ()
+{
+  local trim="$1" col="$2"; shift 2 || return $?
+  [[ -n $trim ]] && trim=(${(s/:/)trim})
+
+  local tmp=$1
+
+  local tmp2=$(mktemp) tmp3=$(mktemp)
+
+  sed -e  '/^ \?-\?[0-9]/,$d' $tmp
+  sed -ne '/^ \?-\?[0-9]/,$p' $tmp > $tmp2
+  if [[ $#trim -eq 1 ]]; then
+    head --lines=$trim $tmp2 > $tmp3
+    print - ":" >> $tmp3
+    mv $tmp3 $tmp2
+  elif [[ $#trim -eq 2 ]]; then
+    head --lines=$trim[1] $tmp2 > $tmp3
+    print - ":" >> $tmp3
+    tail --lines=$trim[2] $tmp2 >> $tmp3
+    mv $tmp3 $tmp2
+  fi
+  if [[ -z $col ]]; then
+    cat $tmp2
+  else
+    column -t $tmp2
+  fi
+  rm -f $tmp2 $tmp3
+  return 0
 }
 
 demo_inputs ()
@@ -237,6 +418,9 @@ demo_inputs ()
 
   gen_subr suby:bs $outd/sub2.zx.base $outd/zx.base lat 2:3 || return $?
   gen_subr suby:bs $outd/sub1.zx.base $outd/zx.base lat 1:1 || return $?
+
+  local bool=$outd/bool
+  gen_flat bool $bool $nx $((nx-1)) $((nx-2)) || return $?
 
   return 0
 }
@@ -277,6 +461,33 @@ gen_source ()
            -e "date:c19730130 $tm" $E $ofile
     let jt++
   done
+
+  return 0
+}
+
+gen_flat ()
+{
+  local item=$1 ofile=$2; shift 2
+  local nx=$1 ny=$2 nz=$3
+
+  local C=()
+  [[ x${nx:--} != x- ]] && C+=(X=lon/:$nx)
+  [[ x${ny:--} != x- ]] && C+=(Y=lat/:$ny)
+  [[ x${nz:--} != x- ]] && C+=(Z=lev/:$nz)
+
+  local opr=(0 $C FLAT ADD X Y GEF MASK X Z GEF MASK BOOL INT)
+
+  local PROPS=(TITLE='demonstration source'
+               UNIT='shaku' ITEM="$item")
+
+  $chak -H0 -f $opr = $ofile $PROPS || return $?
+
+  local jt=1
+  tm="$(printf '%02d' $jt)0000"
+  $ngted -t $((jt+1)) \
+         -e "dset:ctouza-jmz" \
+         -e "time:c$((jt+100))" \
+         -e "date:c19730130 $tm" $ofile
 
   return 0
 }
@@ -375,6 +586,27 @@ gen_subr ()
   return 0
 }
 
+set_demo_filter ()
+{
+  local _var=$1; shift
+  local _r=()
+  local d= dd=
+  for d in "$@"
+  do
+    dd=()
+    for d in "${(@s/:/)d}"
+    do
+      if [[ -z $d ]]; then
+        dd+=("*")
+      else
+        dd+=("$d")
+      fi
+    done
+    _r+=("${(j/:/)dd}")
+  done
+  set -A "$_var" "${(@)_r}"
+  return $?
+}
 
 main "$@"; err=$?
 exit $err

@@ -1,7 +1,7 @@
 !!!_! nio_bindc.F90 - TOUZA/Nio bind(c) interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2023
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:41:57 fuyuki nio_bindc.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/07 14:43:38 fuyuki nio_bindc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -43,7 +43,7 @@ module TOUZA_Nio_bindc
 !!!_  - interfaces
 !!!_  - public procedures
   public :: tnb_init,          tnb_diag,       tnb_finalize
-  public :: tnb_file_is_nio,   tnb_file_open,  tnb_file_diag
+  public :: tnb_file_is_nio,   tnb_file_open,  tnb_file_diag, tnb_file_close
   public :: tnb_file_groups,   tnb_group_vars, tnb_group_recs
   public :: tnb_var_nco
   public :: tnb_var_name,      tnb_var_id
@@ -143,6 +143,21 @@ contains
     call show_cache(jerr, int(handle), levv=int(lev))
     ierr = jerr
   end function tnb_file_diag
+
+!!!_  & tnb_file_close()
+  integer(kind=C_INT) function tnb_file_close &
+       & (handle) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_close
+    implicit none
+    integer(kind=C_INT),intent(in),value :: handle
+    integer jerr
+    integer h
+
+    ierr = 0
+    h = handle
+    call cache_close(jerr, h)
+    if (jerr.lt.0) ierr = jerr
+  end function tnb_file_close
 
 !!!_  & tnb_file_groups()
   integer(kind=C_INT) function tnb_file_groups &
