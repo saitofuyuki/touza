@@ -1,7 +1,7 @@
 !!!_! std_htb.F90 - touza/std simple hash table manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 10:01:41 fuyuki std_htb.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/08 12:04:14 fuyuki std_htb.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -102,6 +102,9 @@ module TOUZA_Std_htb
   integer,parameter :: kmin = min(0, eundef)
   integer,parameter :: def_ikey = +HUGE(0)
   character,parameter :: cunset = '_'
+
+  integer,parameter          :: dummy_ikey = unset
+  character(len=*),parameter :: dummy_akey = ' '
 !!!_  - tables
   integer,parameter :: lname = OPT_HASH_NAME_LENGTH
 #if HAVE_F2003_DEFERRED_TYPE
@@ -1370,11 +1373,11 @@ contains
   subroutine query_key_h &
        & (ierr, handle, entr, akey, ikey)
     implicit none
-    integer,         intent(out)          :: ierr
-    integer,         intent(in)           :: handle
-    integer,         intent(in)           :: entr
-    character(len=*),intent(out),optional :: akey
-    integer,         intent(out),optional :: ikey(0:)
+    integer,         intent(out)            :: ierr
+    integer,         intent(in)             :: handle
+    integer,         intent(in)             :: entr
+    character(len=*),intent(inout),optional :: akey
+    integer,         intent(inout),optional :: ikey(0:)
     integer jk
 
     jk = check_ktable(handle)
@@ -1385,11 +1388,11 @@ contains
   subroutine query_key_k &
        & (ierr, ktb, entr, akey, ikey)
     implicit none
-    integer,         intent(out)          :: ierr
-    type(ktable_t),  intent(in)           :: ktb
-    integer,         intent(in)           :: entr
-    character(len=*),intent(out),optional :: akey
-    integer,         intent(out),optional :: ikey(0:)
+    integer,         intent(out)            :: ierr
+    type(ktable_t),  intent(in)             :: ktb
+    integer,         intent(in)             :: entr
+    character(len=*),intent(inout),optional :: akey
+    integer,         intent(inout),optional :: ikey(0:)
 
     ierr = restore_keys(ktb, entr, akey, ikey)
   end subroutine query_key_k
@@ -1399,7 +1402,7 @@ contains
        & (ierr, status, handle, akey, ikey)
     implicit none
     integer,         intent(out)         :: ierr
-    integer,         intent(out)         :: status(0:)
+    integer,         intent(inout)       :: status(0:)
     integer,         intent(in)          :: handle
     character(len=*),intent(in),optional :: akey
     integer,         intent(in),optional :: ikey(0:)
@@ -1414,13 +1417,14 @@ contains
        & (ierr, status, ktb, akey, ikey)
     implicit none
     integer,         intent(out)         :: ierr
-    integer,         intent(out)         :: status(0:)
+    integer,         intent(inout)       :: status(0:)
     type(ktable_t),  intent(in)          :: ktb
     character(len=*),intent(in),optional :: akey
     integer,         intent(in),optional :: ikey(0:)
 
     integer ee, jerr
 
+    ierr = 0
     if (check_key_args(ktb, akey, ikey)) then
        ee = query_entry_core(ktb, akey, ikey)
     else
@@ -1460,24 +1464,24 @@ contains
   subroutine query_status_entr_ah &
        & (ierr, status, handle, entr)
     implicit none
-    integer,intent(out) :: ierr
-    integer,intent(out) :: status(0:)
-    integer,intent(in)  :: handle
-    integer,intent(in)  :: entr
+    integer,intent(out)   :: ierr
+    integer,intent(inout) :: status(0:)
+    integer,intent(in)    :: handle
+    integer,intent(in)    :: entr
     integer jk
 
     ierr = 0
     jk = check_ktable(handle)
     ierr = min(0, jk)
-    call query_status_entr_ak(ierr, status, ktable(jk), entr)
+    if (ierr.eq.0) call query_status_entr_ak(ierr, status, ktable(jk), entr)
   end subroutine query_status_entr_ah
   subroutine query_status_entr_ak &
        & (ierr, status, ktb, entr)
     implicit none
-    integer,       intent(out) :: ierr
-    integer,       intent(out) :: status(0:)
-    type(ktable_t),intent(in)  :: ktb
-    integer,       intent(in)  :: entr
+    integer,       intent(out)   :: ierr
+    integer,       intent(inout) :: status(0:)
+    type(ktable_t),intent(in)    :: ktb
+    integer,       intent(in)    :: entr
     ierr = 0
     call load_status(ierr, status, ktb%jctrl, entr, 0)
   end subroutine query_status_entr_ak
@@ -1567,6 +1571,9 @@ contains
           akey = trim(bs)
 #       endif
        endif
+    else
+       ! set dummy values
+       call set_dummy_keys(ikey, akey)
     endif
   end function restore_keys
 
@@ -2024,7 +2031,7 @@ contains
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(out)   :: ierr
-    integer,         intent(out)   :: status(0:)
+    integer,         intent(inout) :: status(0:)
     integer,         intent(in)    :: jctrl
     integer,         intent(in)    :: entr
     integer,optional,intent(in)    :: k     ! status id
@@ -2039,7 +2046,7 @@ contains
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(out)   :: ierr
-    integer,         intent(out)   :: status(0:)
+    integer,         intent(inout) :: status(0:)
     type(ctable_t),  intent(in)    :: ctb
     integer,         intent(in)    :: entr
     integer,optional,intent(in)    :: k     ! status id
@@ -2195,6 +2202,7 @@ contains
        call repr_ctable_c(ierr, txt, ctable(jc))
     else
        ierr = jc
+       txt = ' '
     endif
   end subroutine repr_ctable_j
 
@@ -2232,6 +2240,7 @@ contains
        call repr_ctl_c(ierr, txt, ctable(jc), entr)
     else
        ierr = jc
+       txt  = ' '
     endif
   end subroutine repr_ctl_j
 
@@ -2388,6 +2397,8 @@ contains
     ierr = min(0, jw)
     if (ierr.eq.0) then
        call reg_item_core(ierr, handle, wmarks(jw), flag, akey, ikey)
+    else
+       handle = ierr
     endif
 
   end subroutine reg_item
@@ -2416,7 +2427,11 @@ contains
        e = new_entry(wtb%kh, akey, ikey)
        ierr = min(0, e)
     endif
-    if (ierr.eq.0) call settle_item_core(ierr, handle, wtb, e)
+    if (ierr.eq.0) then
+       call settle_item_core(ierr, handle, wtb, e)
+    else
+       handle = ierr
+    endif
     return
   end subroutine reg_item_core
 
@@ -2435,6 +2450,8 @@ contains
     ierr = min(0, jw)
     if (ierr.eq.0) then
        call search_item_core(ierr, handle, wmarks(jw), akey, ikey)
+    else
+       handle = ierr
     endif
   end subroutine search_item
 !!!_  & search_item_core
@@ -2449,7 +2466,11 @@ contains
     integer,         intent(in),optional :: ikey(0:)
 
     ierr = 0
-    if (ierr.eq.0) call query_status(ierr, handle, wtb%kh, akey, ikey)
+    if (ierr.eq.0) then
+       call query_status(ierr, handle, wtb%kh, akey, ikey)
+    else
+       handle = ierr
+    endif
     return
   end subroutine search_item_core
 
@@ -2544,6 +2565,9 @@ contains
     ierr = min(0, jw)
     if (ierr.eq.0) then
        call get_keys_core(ierr, handle, wmarks(jw), akey, ikey)
+    else
+       ! set dummy values
+       call set_dummy_keys(ikey, akey)
     endif
   end subroutine get_keys
 !!!_  & get_keys_core
@@ -2562,6 +2586,9 @@ contains
     if (ierr.eq.0) then
        e = wtb%entr(e)
        call query_key(ierr, wtb%kh, e, akey, ikey)
+    else
+       ! set dummy values
+       call set_dummy_keys(ikey, akey)
     endif
   end subroutine get_keys_core
 
@@ -2690,6 +2717,20 @@ contains
     integer,intent(in) :: idx
     h = watermark(idx, ksystem)
   end function ktable_j2handle
+
+!!!_  - set_dummy_keys
+  subroutine set_dummy_keys (ikey, akey)
+    implicit none
+    character(len=*),intent(out),optional :: akey
+    integer,         intent(out),optional :: ikey(0:)
+    if (present(akey)) then
+       akey = dummy_akey
+    endif
+    if (present(ikey)) then
+       ikey(:) = dummy_ikey
+    endif
+  end subroutine set_dummy_keys
+
 !!!_ + end TOUZA_Std_htb
 end module TOUZA_Std_htb
 

@@ -1,10 +1,10 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:56:03 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/01 18:10:58 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020,2021,2022,2023
+! Copyright (C) 2020-2023
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -25,8 +25,9 @@
 #else
 #  define _ELEMENTAL
 #endif
-#define _CHOICE_DECL _ELEMENTAL
-#define _CONDOP_DECL _ELEMENTAL
+#define _CHOICE_DECL  _ELEMENTAL
+#define _CONDOP_DECL  _ELEMENTAL
+#define _CONDREP_DECL _ELEMENTAL
 !!!_@ TOUZA_Std_utl - small utilities
 module TOUZA_Std_utl
   use TOUZA_Std_prc, only: KFLT, KDBL, KI64
@@ -57,6 +58,10 @@ module TOUZA_Std_utl
   interface condop
      module procedure condop_i, condop_f, condop_d, condop_l
   end interface condop
+
+  interface condrep
+     module procedure condrep_i, condrep_f, condrep_d
+  end interface condrep
 
   interface upcase
      module procedure upcase_m, upcase_o
@@ -101,7 +106,7 @@ module TOUZA_Std_utl
   public init, diag, finalize
   public choice, choice_a
   public set_if_present
-  public condop
+  public condop, condrep
   public chcount
   public upcase, downcase
   public ndigits
@@ -114,7 +119,7 @@ module TOUZA_Std_utl
   public find_first, find_first_range
   public jot
   public inrange
-  public begin_with
+  public begin_with, find_next_sep
 !!!_  - static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -153,7 +158,11 @@ contains
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
        endif
-       find_offset = choice(find_offset, offset)
+       if (find_offset.ne.choice(find_offset, offset)) then
+          ierr = ERR_NOT_IMPLEMENTED - ERR_MASK_STD_UTL
+          write(*, *) 'cannot change offset to ', offset
+          stop
+       endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT - ERR_MASK_STD_UTL
     endif
@@ -495,6 +504,43 @@ contains
     return
   end subroutine set_if_present_a
 
+!!!_  & condrep() - conditional replace operator
+  _CONDREP_DECL integer function condrep_i (v, src, rep) result(r)
+    implicit none
+    integer,intent(in) :: v
+    integer,intent(in) :: src, rep
+    if (v.eq.src) then
+       r = rep
+    else
+       r = v
+    endif
+    return
+  end function condrep_i
+  _CONDREP_DECL real(kind=KTGT) function condrep_f (v, src, rep) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    real(kind=KTGT),intent(in) :: v
+    real(kind=KTGT),intent(in) :: src, rep
+    if (v.eq.src) then
+       r = rep
+    else
+       r = v
+    endif
+    return
+  end function condrep_f
+  _CONDREP_DECL real(kind=KTGT) function condrep_d (v, src, rep) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: v
+    real(kind=KTGT),intent(in) :: src, rep
+    if (v.eq.src) then
+       r = rep
+    else
+       r = v
+    endif
+    return
+  end function condrep_d
+
 !!!_  & condop() - conditional operator
   _CONDOP_DECL integer function condop_i (l, vt, vf) result(r)
     implicit none
@@ -795,6 +841,8 @@ contains
     integer p
 
     ierr = 0
+    ufc = ' '
+    ofc = ' '
     if (present(single)) then
        fmt = single
     else
@@ -1106,7 +1154,7 @@ contains
        & (n, h, str, sep, lim, empty)
     implicit none
     integer,          intent(out)         :: n         ! number of elements or error code
-    integer,          intent(out)         :: h(0:)
+    integer,          intent(out)         :: h(0:*)
     character(len=*), intent(in)          :: str
     character(len=*), intent(in)          :: sep
     integer,          intent(in),optional :: lim       ! negative to count only; 0 to infinite
@@ -1578,6 +1626,24 @@ contains
     endif
   end function begin_with
 
+!!!_  & find_next_sep - return separator position or end
+  integer function find_next_sep(str, sep, pos, offset) result(n)
+    implicit none
+    character(len=*),intent(in) :: str
+    character(len=*),intent(in) :: sep   ! use as it is (no trimming)
+    integer,optional,intent(in) :: pos
+    integer,optional,intent(in) :: offset   ! default == find_offset
+    integer p, o
+    o = choice(find_offset, offset)
+    p = choice(o, pos) - o
+    n = index(str(p+1:), sep)
+    if (n.gt.0) then
+       n = n + p + (o - 1)
+    else
+       n = len(str) + o
+    endif
+  end function find_next_sep
+
 !!!_ + (system) control procedures
 !!!_  & is_first_force () - check if first time or force
   logical function is_first_force(n, mode) result(b)
@@ -1745,6 +1811,10 @@ program test_std_utl
   call test_jot(n=10,      e=8)
   call test_jot(      b=1, e=8)
   call test_jot(n=10, b=1, e=8)
+
+  call test_find_next_sep('abcabcabc', 'ab')
+  call test_find_next_sep('abcabcabc', 'ab', 2)
+  call test_find_next_sep('abcabcabc', 'ca', 8)
 
   stop
 contains
@@ -2028,6 +2098,23 @@ contains
        str = '-'
     endif
   end subroutine fmt_or_null
+
+  subroutine test_find_next_sep(str, sep, pos)
+    implicit none
+    character(len=*),intent(in) :: str
+    character(len=*),intent(in) :: sep
+    integer,optional,intent(in) :: pos
+    integer r
+
+101 format('find_next_sep: [', A, '][', A,'] <', A, '> ', 1x, I0)
+102 format('find_next_sep: [', A, '] <', A, '> ', 1x, I0)
+    r = find_next_sep(str, sep, pos)
+    if (present(pos)) then
+       write(*, 101) str(1:pos-1), str(pos:), sep, r
+    else
+       write(*, 102) str, sep, r
+    endif
+  end subroutine test_find_next_sep
 
 end program test_std_utl
 #endif /* TEST_STD_UTL */

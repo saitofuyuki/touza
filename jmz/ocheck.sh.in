@@ -1,5 +1,5 @@
 #!/bin/sh
-# Time-stamp: <2023/03/28 16:41:43 fuyuki ocheck.sh.in>
+# Time-stamp: <2023/06/20 17:21:57 fuyuki ocheck.sh.in>
 
 set -u
 
@@ -39,9 +39,18 @@ gen_input ()
   ib=$(basename $bb)
   ic=$(basename $cc)
 
-  $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/:3,$CY/:4 X 2 NEF 1 ADD MUL INT = $aa ITEM=$ia FMT=ui4 || return $?
-  $CHAK -H0 $FORCE $CHAK_OPTS 11 SHAPE=$CX/:4,$CY/:3 Y 2 NEF 1 ADD MUL INT = $bb ITEM=$ib FMT=ui4 || return $?
-  $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/:4,$CY/:3 Y 2 NEF 1 ADD MUL INT = $cc ITEM=$ic FMT=ui4 || return $?
+  # $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/:3,$CY/:4 X 2 NEF 1 ADD MUL INT = $aa ITEM=$ia FMT=ui4 || return $?
+  # $CHAK -H0 $FORCE $CHAK_OPTS 11 SHAPE=$CX/:4,$CY/:3 Y 2 NEF 1 ADD MUL INT = $bb ITEM=$ib FMT=ui4 || return $?
+  # $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/:4,$CY/:3 Y 2 NEF 1 ADD MUL INT = $cc ITEM=$ic FMT=ui4 || return $?
+  
+  local bgn=0 mem=3
+  local end=$((bgn+mem))
+  local nan=$((end-1))
+  local ofs=$((1-bgn))
+
+  $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/$bgn:$end       X $nan NEF $ofs ADD MUL INT = $aa ITEM=$ia FMT=ui4 || return $?
+  $CHAK -H0 $FORCE $CHAK_OPTS 11 SHAPE=,$CY/$bgn:$end      Y $nan NEF $ofs ADD MUL INT = $bb ITEM=$ib FMT=ui4 || return $?
+  # $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/:4,$CY/:3 Y 3 NEF 1 ADD MUL INT = $cc ITEM=$ic FMT=ui4 || return $?
 
   return 0
 }
@@ -55,7 +64,7 @@ test_binary ()
   for bo in "$@"
   do
     bout=$boutd/out.$bo
-    bcmd="$CHAK -qq -H0 $FORCE $CHAK_OPTS $bin0 $bin1 MARK REPEAT $bo FLUSH -i"
+    bcmd="$CHAK -qq -H0 $FORCE $CHAK_OPTS $bin0 $bin1 REPEAT $bo FLUSH"
     case $TEST in
     create) test x"$FORCE" != x && rm -f $bout
             test -e $bout && echo "Exists $bout" >&2 && return 1
