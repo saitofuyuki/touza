@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/28 12:00:15 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/30 17:08:38 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -18,7 +18,7 @@
 module chak_opr
 !!!_ + Declaration
 !!!_  - modules
-  use chak_lib,lib_init=>init
+  use chak_lib,lib_init=>init,lib_finalize=>finalize
   implicit none
   public
 !!!_  - declaration
@@ -39,12 +39,33 @@ module chak_opr
   integer,parameter :: ilev_or = 10
   integer,parameter :: ilev_logical = 11
 
-!!!_   . operator properties
+!!!_   . type conversion
+  integer,parameter :: result_error = -1
+  integer,parameter :: result_asis  = 0
+  integer,parameter :: result_int   = 1
+  integer,parameter :: result_float = 2
+
+!!!_   . other properties
+  ! reduction:     operator along coordinate
+  ! accumulation:  operator stack coordinate
+  ! sweep: reduction + accumulation
+  integer,parameter :: sweep_none   = 0  ! empty parameter, no reduction
+  integer,parameter :: sweep_stack  = 1  ! stack if no parameter, reduction enabled
+  integer,parameter :: sweep_accum  = 2  ! accumulate if no parameter, reduction enabled
+  integer,parameter :: sweep_reduce = 3  ! reduce if no parameter
+
+!!!_   . operator variation
+  integer,parameter :: var_reduce = +1
+  character(len=*),parameter :: rdc_pfx = ' R:'
+  character(len=*),parameter :: acc_pfx = ' A:'
+!!!_   . operator-property holder
   type opr_t
      integer :: push = -1
      integer :: pop = -1
      integer :: entr = -1
      integer :: ilev = ilev_unset
+     integer :: conv = result_asis
+     integer :: sweep = sweep_none
      character(len=8) :: istr = ' '
   end type opr_t
   type(opr_t),save,private :: oprop(0:lopr-1)
@@ -105,7 +126,7 @@ contains
   end subroutine register_operators
 !!!_   . reg_opr_prop
   subroutine reg_opr_prop &
-       & (ierr, idopr, str, pop, push, ilev, istr)
+       & (ierr, idopr, str, pop, push, ilev, istr, conv, sweep)
     use TOUZA_Std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
@@ -115,6 +136,8 @@ contains
     integer,         intent(in),optional :: push
     integer,         intent(in),optional :: ilev
     character(len=*),intent(in),optional :: istr
+    integer,         intent(in),optional :: conv
+    integer,         intent(in),optional :: sweep
     integer entr
     if (idopr.ge.lopr.or.idopr.lt.0) then
        ierr = ERR_PANIC
@@ -129,6 +152,8 @@ contains
           oprop(idopr)%push = choice(-1, push)
           oprop(idopr)%pop = choice(-1, pop)
           oprop(idopr)%ilev = choice(ilev_unset, ilev)
+          oprop(idopr)%conv = choice(result_asis, conv)
+          oprop(idopr)%sweep = choice(sweep_none, sweep)
           if (present(istr)) then
              oprop(idopr)%istr = istr
           else
@@ -143,22 +168,21 @@ contains
   end subroutine reg_opr_prop
 !!!_   . reg_fake_opr
   subroutine reg_fake_opr &
-       & (ierr, handle, str)
+       & (entr, handle, str)
     use TOUZA_Std,only: query_entry
     implicit none
-    integer,         intent(out) :: ierr
+    integer,         intent(out) :: entr
     integer,         intent(in)  :: handle
     character(len=*),intent(in)  :: str
-    integer entr, ho
-    ierr = 0
+    integer ho
     entr = query_entry(htopr, str)
     if (entr.ge.0) then
        ho = query_opr_handle_e(entr)
        if (ho.eq.handle) then
           continue
        else
-          ierr = ERR_DUPLICATE_SET
-          call message(ierr, 'duplicate registration ' // trim(str))
+          entr = ERR_DUPLICATE_SET
+          call message(entr, 'duplicate registration ' // trim(str))
        endif
     else
        entr = reg_opr_core(str, handle)
@@ -222,22 +246,121 @@ contains
        endif
     endif
   end subroutine inquire_opr_infix
+
+!!!_   . check_operator_sweep()
+  integer function check_operator_sweep(handle) result(n)
+    implicit none
+    integer,intent(in) :: handle
+    if (handle.lt.0.or.handle.ge.mopr) then
+       n = ERR_INVALID_PARAMETER
+       call message(n, 'invalid operator handle to inquire', (/handle/))
+    else
+       n = oprop(handle)%sweep
+    endif
+  end function check_operator_sweep
+!!!_   . adj_operator_type()
+  integer function adj_operator_type(handle, kv) result(n)
+    implicit none
+    integer,intent(in) :: handle
+    integer,intent(in) :: kv
+    if (handle.lt.0.or.handle.ge.mopr) then
+       n = ERR_INVALID_PARAMETER
+       call message(n, 'invalid operator handle to inquire', (/handle/))
+    else
+       n = oprop(handle)%conv
+       select case(n)
+       case (result_asis)
+          n = kv
+       case (result_int)
+          n = kv_int
+       case (result_float)
+          if (kv.eq.kv_flt) then
+             n = kv_flt
+          else
+             n = kv_dbl
+          endif
+       case default
+          n = kv_null
+       end select
+    endif
+  end function adj_operator_type
 !!!_   . is_operator_modify()
   logical function is_operator_modify(handle) result(b)
     implicit none
     integer,intent(in) :: handle
     b = handle.eq.opr_TRANSF
   end function is_operator_modify
-!!!_   . is_operator_reusable()
-  logical function is_operator_reusable(handle) result(b)
+!!!_   . is_operator_shape()
+  logical function is_operator_shape(handle) result(b)
+    implicit none
+    integer,intent(in) :: handle
+    b = ((grp_shape_bgn.le.handle).and.(handle.lt.grp_shape_end)) &
+         & .or. handle.eq.opr_TRANSF
+  end function is_operator_shape
+!!!_   . is_operator_stacks()
+  logical function is_operator_stacks(handle) result(b)
+    implicit none
+    integer,intent(in) :: handle
+    b = ((grp_stack_bgn.le.handle).and.(handle.lt.grp_stack_end))
+    if (.not.b) b = handle.eq.opr_ANCHOR
+    if (.not.b) b = is_operator_shape(handle)
+  end function is_operator_stacks
+!!!_   . is_operator_cumlative()
+  logical function is_operator_cumulative(handle) result(b)
     implicit none
     integer,intent(in) :: handle
     integer pop, push
     integer jerr
     call inquire_opr_nstack(jerr, pop, push, handle)
-    b = pop.eq.1 .and. push.eq.1
-    ! b = .FALSE.
+    if (jerr.eq.0) then
+       if ((grp_reduce_bgn.le.handle).and.(handle.lt.grp_reduce_end)) then
+          b = push.eq.pop
+       else
+          b = push.eq.1.and.pop.gt.push
+       endif
+    else
+       b = .FALSE.
+    endif
+  end function is_operator_cumulative
+!!!_   . is_operator_reusable()
+  logical function is_operator_reusable(handle) result(b)
+    implicit none
+    integer,intent(in) :: handle
+    ! integer pop, push
+    ! integer jerr
+    ! always FALSE
+    b = .FALSE.
+    ! call inquire_opr_nstack(jerr, pop, push, handle)
+    ! b = pop.eq.1 .and. push.eq.1
   end function is_operator_reusable
+!!!_   . switch_shape_operator ()
+  integer function switch_shape_operator(opr) result(n)
+    implicit none
+    integer,intent(in) :: opr
+    select case(opr)
+    case(opr_SHAPE,opr_TRANSF)
+       n = shape_element
+    case(opr_PERM)
+       n = shape_coordinate
+    case(opr_SIZE)
+       n = shape_size
+    case(opr_SHIFT)
+       n = shape_shift
+    case(opr_FLAT)
+       n = shape_coordinate
+    case(grp_reduce_bgn:grp_reduce_end-1)
+       n = shape_reduction
+    case default
+       n = check_operator_sweep(opr)
+       if (n.gt.0) then
+          n = shape_reduction
+       else
+          n = shape_error
+       endif
+    end select
+    return
+  end function switch_shape_operator
+
 !!!_  - htb wrappers
 !!!_   . reg_opr_core
   integer function reg_opr_core &
@@ -254,9 +377,9 @@ contains
        & (ierr, str, handle)
     use TOUZA_Std,only: query_key
     implicit none
-    integer,         intent(out)         :: ierr
-    character(len=*),intent(out)         :: str
-    integer,         intent(in)          :: handle
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: str
+    integer,         intent(in)  :: handle
     if (handle.lt.0.or.handle.ge.mopr) then
        ierr = ERR_INVALID_ITEM
        call message(ierr, 'invalid operator handle', (/handle/))
@@ -264,6 +387,16 @@ contains
     endif
     call query_key(ierr, htopr, oprop(handle)%entr, str)
   end subroutine query_opr_name
+!!!_   . query_opr_name_e - query operator name by entry
+  subroutine query_opr_name_e &
+       & (ierr, str, entr)
+    use TOUZA_Std,only: query_key
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: str
+    integer,         intent(in)  :: entr
+    call query_key(ierr, htopr, entr, str)
+  end subroutine query_opr_name_e
 !!!_   . query_opr_handle_n - query operator handle by name
   integer function query_opr_handle_n &
        & (name) &
@@ -311,11 +444,11 @@ contains
   subroutine apply_BINARY_template &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -331,11 +464,11 @@ contains
   subroutine apply_BINARY_lazy_template &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -347,6 +480,30 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_lazy_template
+!!!_   . apply_REDUCE_template
+  subroutine apply_REDUCE_template &
+       & (ierr, Z, domZ, X, domX, domR, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jr, jx
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_BINARY_template(Z(jz), X(jx), F, F)
+          else
+             Z(jz) = elem_BINARY_template(Z(jz), F, F, F)
+          endif
+       endif
+    enddo
+  end subroutine apply_REDUCE_template
 !!!_  - unary operations
 !!!_   . apply_UNARY_NEG
   subroutine apply_UNARY_NEG &
@@ -448,8 +605,8 @@ contains
        endif
     enddo
   end subroutine apply_UNARY_SQRT
-!!!_   . apply_UNARY_SIGN
-  subroutine apply_UNARY_SIGN &
+!!!_   . apply_UNARY_SIGN1
+  subroutine apply_UNARY_SIGN1 &
        & (ierr, Z, domZ, X, domX, F)
     implicit none
     integer,        intent(out) :: ierr
@@ -462,12 +619,12 @@ contains
     do jz = 0, domZ%n - 1
        jx = conv_physical_index(jz, domZ, domX)
        if (jx.ge.0) then
-          Z(jz) = elem_SIGN(X(jx), F)
+          Z(jz) = elem_SIGN1(X(jx), F)
        else
           Z(jz) = F
        endif
     enddo
-  end subroutine apply_UNARY_SIGN
+  end subroutine apply_UNARY_SIGN1
 !!!_   . apply_UNARY_ZSIGN
   subroutine apply_UNARY_ZSIGN &
        & (ierr, Z, domZ, X, domX, F)
@@ -728,6 +885,26 @@ contains
        endif
     enddo
   end subroutine apply_UNARY_ACOS
+!!!_   . apply_UNARY_ATAN
+  subroutine apply_UNARY_ATAN &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_ATAN(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_ATAN
 !!!_   . apply_UNARY_SINH
   subroutine apply_UNARY_SINH &
        & (ierr, Z, domZ, X, domX, F)
@@ -832,11 +1009,11 @@ contains
   subroutine apply_BINARY_HYPOT &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -976,11 +1153,11 @@ contains
   subroutine apply_BINARY_EQB &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -996,11 +1173,11 @@ contains
   subroutine apply_BINARY_NEB &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1016,11 +1193,11 @@ contains
   subroutine apply_BINARY_LTB &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1036,11 +1213,11 @@ contains
   subroutine apply_BINARY_GTB &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1056,11 +1233,11 @@ contains
   subroutine apply_BINARY_LEB &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1076,11 +1253,11 @@ contains
   subroutine apply_BINARY_GEB &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1096,11 +1273,11 @@ contains
   subroutine apply_BINARY_EQ &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1116,11 +1293,11 @@ contains
   subroutine apply_BINARY_NE &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1136,11 +1313,11 @@ contains
   subroutine apply_BINARY_LT &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1156,11 +1333,11 @@ contains
   subroutine apply_BINARY_GT &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1176,11 +1353,11 @@ contains
   subroutine apply_BINARY_LE &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1196,11 +1373,11 @@ contains
   subroutine apply_BINARY_GE &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1217,11 +1394,11 @@ contains
   subroutine apply_BINARY_AND &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1237,11 +1414,11 @@ contains
   subroutine apply_BINARY_MASK &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1257,11 +1434,11 @@ contains
   subroutine apply_BINARY_ADD &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1277,11 +1454,11 @@ contains
   subroutine apply_BINARY_SUB &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1297,11 +1474,11 @@ contains
   subroutine apply_BINARY_MUL &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1317,11 +1494,11 @@ contains
   subroutine apply_BINARY_DIV &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1337,11 +1514,11 @@ contains
   subroutine apply_BINARY_IDIV &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1357,11 +1534,11 @@ contains
   subroutine apply_BINARY_MOD &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1377,11 +1554,11 @@ contains
   subroutine apply_BINARY_POW &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1397,11 +1574,11 @@ contains
   subroutine apply_BINARY_MODULO &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1413,15 +1590,96 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_MODULO
+!!!_   . apply_BINARY_LADD
+  subroutine apply_BINARY_LADD &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_LADD(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_LADD
+!!!_   . apply_BINARY_LSUB
+  subroutine apply_BINARY_LSUB &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_LSUB(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_LSUB
+!!!_   . apply_BINARY_LMUL
+  subroutine apply_BINARY_LMUL &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_LMUL(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_LMUL
+!!!_   . apply_BINARY_LDIV
+  subroutine apply_BINARY_LDIV &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_LDIV(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_LDIV
+
 !!!_   . apply_BINARY_ATAN2
   subroutine apply_BINARY_ATAN2 &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1437,11 +1695,11 @@ contains
   subroutine apply_BINARY_SCALE &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1457,11 +1715,11 @@ contains
   subroutine apply_BINARY_MIN &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1477,11 +1735,11 @@ contains
   subroutine apply_BINARY_MAX &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1497,11 +1755,11 @@ contains
   subroutine apply_BINARY_EQF &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1517,11 +1775,11 @@ contains
   subroutine apply_BINARY_NEF &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1537,11 +1795,11 @@ contains
   subroutine apply_BINARY_LTF &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1557,11 +1815,11 @@ contains
   subroutine apply_BINARY_GTF &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1577,11 +1835,11 @@ contains
   subroutine apply_BINARY_LEF &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1597,11 +1855,11 @@ contains
   subroutine apply_BINARY_GEF &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1618,11 +1876,11 @@ contains
   subroutine apply_BINARY_lazy_OR &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1638,11 +1896,11 @@ contains
   subroutine apply_BINARY_lazy_ROR &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1658,11 +1916,11 @@ contains
   subroutine apply_BINARY_lazy_XOR &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1678,11 +1936,11 @@ contains
   subroutine apply_BINARY_lazy_AND &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1698,11 +1956,11 @@ contains
   subroutine apply_BINARY_lazy_MASK &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1718,11 +1976,11 @@ contains
   subroutine apply_BINARY_lazy_LAY &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1734,95 +1992,95 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_lazy_LAY
-!!!_   . apply_BINARY_lazy_ADD
-  subroutine apply_BINARY_lazy_ADD &
+!!!_   . apply_BINARY_lazy_LADD
+  subroutine apply_BINARY_lazy_LADD &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
        jx = conv_physical_index(jz, domZ, domX)
        if (jx.ge.0) then
-          Z(jz) = elem_ADD(Z(jz), X(jx), FZ, FX)
+          Z(jz) = elem_LADD(Z(jz), X(jx), FZ, FX)
        else
           continue
        endif
     enddo
-  end subroutine apply_BINARY_lazy_ADD
-!!!_   . apply_BINARY_lazy_SUB
-  subroutine apply_BINARY_lazy_SUB &
+  end subroutine apply_BINARY_lazy_LADD
+!!!_   . apply_BINARY_lazy_LSUB
+  subroutine apply_BINARY_lazy_LSUB &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
        jx = conv_physical_index(jz, domZ, domX)
        if (jx.ge.0) then
-          Z(jz) = elem_SUB(Z(jz), X(jx), FZ, FX)
+          Z(jz) = elem_LSUB(Z(jz), X(jx), FZ, FX)
        else
           continue
        endif
     enddo
-  end subroutine apply_BINARY_lazy_SUB
-!!!_   . apply_BINARY_lazy_MUL
-  subroutine apply_BINARY_lazy_MUL &
+  end subroutine apply_BINARY_lazy_LSUB
+!!!_   . apply_BINARY_lazy_LMUL
+  subroutine apply_BINARY_lazy_LMUL &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
        jx = conv_physical_index(jz, domZ, domX)
        if (jx.ge.0) then
-          Z(jz) = elem_MUL(Z(jz), X(jx), FZ, FX)
+          Z(jz) = elem_LMUL(Z(jz), X(jx), FZ, FX)
        else
           continue
        endif
     enddo
-  end subroutine apply_BINARY_lazy_MUL
-!!!_   . apply_BINARY_lazy_DIV
-  subroutine apply_BINARY_lazy_DIV &
+  end subroutine apply_BINARY_lazy_LMUL
+!!!_   . apply_BINARY_lazy_LDIV
+  subroutine apply_BINARY_lazy_LDIV &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
        jx = conv_physical_index(jz, domZ, domX)
        if (jx.ge.0) then
-          Z(jz) = elem_DIV(Z(jz), X(jx), FZ, FX)
+          Z(jz) = elem_LDIV(Z(jz), X(jx), FZ, FX)
        else
           continue
        endif
     enddo
-  end subroutine apply_BINARY_lazy_DIV
+  end subroutine apply_BINARY_lazy_LDIV
 !!!_   . apply_BINARY_lazy_LMIN
   subroutine apply_BINARY_lazy_LMIN &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1838,11 +2096,11 @@ contains
   subroutine apply_BINARY_lazy_LMAX &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1858,11 +2116,11 @@ contains
   subroutine apply_BINARY_NEAREST &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1936,15 +2194,35 @@ contains
     enddo
   end subroutine apply_UNARY_RRSP
 
+!!!_   . apply_BINARY_SIGN
+  subroutine apply_BINARY_SIGN &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_SIGN(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_SIGN
 !!!_   . apply_BINARY_BITAND
   subroutine apply_BINARY_BITAND &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1960,11 +2238,11 @@ contains
   subroutine apply_BINARY_BITOR &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -1980,11 +2258,11 @@ contains
   subroutine apply_BINARY_BITXOR &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -2000,11 +2278,11 @@ contains
   subroutine apply_BINARY_LSHIFT &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -2020,11 +2298,11 @@ contains
   subroutine apply_BINARY_RSHIFT &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -2036,6 +2314,478 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_RSHIFT
+
+!!!_  - ternary operations
+!!!_   . apply_TERNARY_IFELSE
+  subroutine apply_TERNARY_IFELSE &
+       & (ierr, Z, domZ, FZ, X, domX, FX, Y, domY, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    real(kind=KBUF),intent(in)    :: Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    real(kind=KBUF),intent(in)    :: FZ, FX, FY
+    integer jz, jx, jy
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       jy = conv_physical_index(jz, domZ, domY)
+       if (jx.ge.0.and.jy.ge.0) then
+          Z(jz) = elem_IFELSE(Z(jz), X(jx), Y(jy), FZ, FX, FY)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_TERNARY_IFELSE
+!!!_   . apply_TERNARY_INRANGE
+  subroutine apply_TERNARY_INRANGE &
+       & (ierr, Z, domZ, FZ, X, domX, FX, Y, domY, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    real(kind=KBUF),intent(in)    :: Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    real(kind=KBUF),intent(in)    :: FZ, FX, FY
+    integer jz, jx, jy
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       jy = conv_physical_index(jz, domZ, domY)
+       if (jx.ge.0.and.jy.ge.0) then
+          Z(jz) = elem_INRANGE(Z(jz), X(jx), Y(jy), FZ, FX, FY)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_TERNARY_INRANGE
+!!!_   . apply_TERNARY_BLEND
+  subroutine apply_TERNARY_BLEND &
+       & (ierr, Z, domZ, FZ, X, domX, FX, Y, domY, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    real(kind=KBUF),intent(in)    :: Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    real(kind=KBUF),intent(in)    :: FZ, FX, FY
+    integer jz, jx, jy
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       jy = conv_physical_index(jz, domZ, domY)
+       if (jx.ge.0.and.jy.ge.0) then
+          Z(jz) = elem_BLEND(Z(jz), X(jx), Y(jy), FZ, FX, FY)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_TERNARY_BLEND
+
+!!!_  - reduction operations
+!!!_   . apply_REDUCE_ADD
+  subroutine apply_REDUCE_ADD &
+       & (ierr, Z, domZ, X, domX, domR, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jr, jx
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_ADD(Z(jz), X(jx), F, F)
+          else
+             Z(jz) = elem_ADD(Z(jz), F, F, F)
+          endif
+       endif
+    enddo
+  end subroutine apply_REDUCE_ADD
+!!!_   . apply_REDUCE_LADD
+  subroutine apply_REDUCE_LADD &
+       & (ierr, Z, domZ, X, domX, domR, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jr, jx
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_LADD(Z(jz), X(jx), F, F)
+          else
+             continue
+          endif
+       endif
+    enddo
+  end subroutine apply_REDUCE_LADD
+!!!_   . apply_REDUCE_MUL
+  subroutine apply_REDUCE_MUL &
+       & (ierr, Z, domZ, X, domX, domR, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jr, jx
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_MUL(Z(jz), X(jx), F, F)
+          else
+             Z(jz) = elem_MUL(Z(jz), F, F, F)
+          endif
+       endif
+    enddo
+  end subroutine apply_REDUCE_MUL
+!!!_   . apply_REDUCE_LMUL
+  subroutine apply_REDUCE_LMUL &
+       & (ierr, Z, domZ, X, domX, domR, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jr, jx
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_LMUL(Z(jz), X(jx), F, F)
+          else
+             continue
+          endif
+       endif
+    enddo
+  end subroutine apply_REDUCE_LMUL
+!!!_   . apply_REDUCE_MAX
+  subroutine apply_REDUCE_MAX &
+       & (ierr, Z, domZ, X, domX, domR, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jr, jx
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_MAX(Z(jz), X(jx), F, F)
+          else
+             Z(jz) = elem_MAX(Z(jz), F, F, F)
+          endif
+       endif
+    enddo
+  end subroutine apply_REDUCE_MAX
+!!!_   . apply_REDUCE_LMAX
+  subroutine apply_REDUCE_LMAX &
+       & (ierr, Z, domZ, X, domX, domR, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jr, jx
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_LMAX(Z(jz), X(jx), F, F)
+          else
+             continue
+          endif
+       endif
+    enddo
+  end subroutine apply_REDUCE_LMAX
+!!!_   . apply_REDUCE_MIN
+  subroutine apply_REDUCE_MIN &
+       & (ierr, Z, domZ, X, domX, domR, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jr, jx
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_MIN(Z(jz), X(jx), F, F)
+          else
+             Z(jz) = elem_MIN(Z(jz), F, F, F)
+          endif
+       endif
+    enddo
+  end subroutine apply_REDUCE_MIN
+!!!_   . apply_REDUCE_LMIN
+  subroutine apply_REDUCE_LMIN &
+       & (ierr, Z, domZ, X, domX, domR, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jr, jx
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_LMIN(Z(jz), X(jx), F, F)
+          else
+             continue
+          endif
+       endif
+    enddo
+  end subroutine apply_REDUCE_LMIN
+!!!_   . apply_REDUCE_COUNT
+  subroutine apply_REDUCE_COUNT &
+       & (ierr, Z, domZ, X, domX, domR, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jr, jx
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       ! write(*, *) 'count', jr, jz, jx
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+             Z(jz) = elem_COUNT(Z(jz), X(jx), F, F)
+          else
+             Z(jz) = elem_COUNT(Z(jz), F, F, F)
+          endif
+       endif
+    enddo
+  end subroutine apply_REDUCE_COUNT
+!!!_   . apply_REDUCE_SUM
+  subroutine apply_REDUCE_SUM &
+       & (ierr, Z, domZ, X, domX, domR, F)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: F
+    integer jz, jr, jx
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jz = conv_physical_index(jr, domR, domZ)
+       ! write(*, *) 'sum', jr, jz, jx
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+            Z(jz) = elem_SUM(Z(jz), X(jx), F, F)
+         else
+            Z(jz) = elem_SUM(Z(jz), F, F, F)
+         endif
+       endif
+    end do
+  end subroutine apply_REDUCE_SUM
+!!!_   . apply_REDUCE_WSUM
+  subroutine apply_REDUCE_WSUM &
+       & (ierr, Z, W, domZ, X, domX, Y, domY, domR, FZ, FX, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(inout) :: W(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    real(kind=KBUF),intent(in)    :: Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: FZ,   FX,   FY
+    integer jz, jr, jx, jy
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jy = conv_physical_index(jr, domR, domY)
+       jz = conv_physical_index(jr, domR, domZ)
+       ! write(*, *) 'wsum', jr, jz, jx, jy
+       if (jz.ge.0) then
+          if (jx.ge.0.and.jy.ge.0) then
+             ! write(*, *) jr, jz, jx, jy, Z(jz), W(jz), X(jx), Y(jy)
+             if (X(jx).ne.FX.and.Y(jy).ne.FY) then
+                Z(jz) = Z(jz) + Y(jy) * X(jx)
+                W(jz) = W(jz) + Y(jy)
+             endif
+          endif
+       endif
+    end do
+  end subroutine apply_REDUCE_WSUM
+!!!_   . apply_REDUCE_WMV
+  subroutine apply_REDUCE_WMV &
+       & (ierr, Z, V, W, domZ, X, domX, Y, domY, domR, FZ, FX, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(inout) :: V(0:*)
+    real(kind=KBUF),intent(inout) :: W(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    real(kind=KBUF),intent(in)    :: Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    type(domain_t), intent(in)    :: domR
+    real(kind=KBUF),intent(in)    :: FZ,   FX,   FY
+    integer jz, jr, jx, jy
+    real(kind=KBUF) :: PZ, PW, PV, T
+
+    ierr = 0
+    do jr = 0, domR%n - 1
+       jx = conv_physical_index(jr, domR, domX)
+       jy = conv_physical_index(jr, domR, domY)
+       jz = conv_physical_index(jr, domR, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0.and.jy.ge.0) then
+             if (X(jx).ne.FX.and.Y(jy).ne.FY) then
+                PZ = Z(jz)
+                PV = V(jz)
+                PW = W(jz)
+                W(jz) = PW + Y(jy)
+                T     = Y(jy) * (X(jx) - PZ)
+                Z(jz) = PZ + T / W(jz)
+                V(jz) = PV + T * (X(jx) - Z(jz))
+             endif
+          endif
+       endif
+    end do
+  end subroutine apply_REDUCE_WMV
+!!!_   . apply_ACCUM_COUNT
+  subroutine apply_ACCUM_COUNT &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_COUNT(Z(jz), X(jx), FZ, FX)
+       else
+          continue
+       endif
+    enddo
+  end subroutine apply_ACCUM_COUNT
+
+!!!_   . apply_ACCUM_SUM
+  subroutine apply_ACCUM_SUM &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_SUM(Z(jz), X(jx), FZ, FX)
+       else
+          continue
+       endif
+    enddo
+  end subroutine apply_ACCUM_SUM
+
+!!!_   . apply_ACCUM_WSUM
+  subroutine apply_ACCUM_WSUM &
+       & (ierr, Z, W, domZ, FZ, X, domX, Y, domY, FX, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(inout) :: W(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*), Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    real(kind=KBUF),intent(in)    :: FZ, FX, FY
+    integer jz, jx, jy
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       jy = conv_physical_index(jz, domZ, domY)
+       if (jx.ge.0.and.jy.ge.0) then
+          if (X(jx).ne.FX.and.Y(jy).ne.FY) then
+             Z(jz) = Z(jz) + Y(jy) * X(jx)
+             W(jz) = W(jz) + Y(jy)
+          endif
+       endif
+    enddo
+  end subroutine apply_ACCUM_WSUM
+!!!_   . apply_ACCUM_WMV
+  subroutine apply_ACCUM_WMV &
+       & (ierr, Z, V, W, domZ, FZ, X, domX, Y, domY, FX, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(inout) :: V(0:*), W(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*), Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    real(kind=KBUF),intent(in)    :: FZ, FX, FY
+    real(kind=KBUF) :: PZ, PW, PV, T
+    integer jz, jx, jy
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       jy = conv_physical_index(jz, domZ, domY)
+       if (jx.ge.0.and.jy.ge.0) then
+          if (X(jx).ne.FX.and.Y(jy).ne.FY) then
+                PZ = Z(jz)
+                PV = V(jz)
+                PW = W(jz)
+                W(jz) = PW + Y(jy)
+                T     = Y(jy) * (X(jx) - PZ)
+                Z(jz) = PZ + T / W(jz)
+                V(jz) = PV + T * (X(jx) - Z(jz))
+          endif
+       endif
+    enddo
+  end subroutine apply_ACCUM_WMV
 
 !!!_  - elemental operatior templates
 !!!_   . elem_UNARY_template()
@@ -2062,6 +2812,18 @@ contains
        Z = X + Y
     endif
   end function elem_BINARY_template
+! !!!_   . elem_REDUCE_template()
+!   ELEMENTAL &
+!   real(kind=KBUF) function elem_REDUCE_template (X, Y, F) result(Z)
+!     implicit none
+!     real(kind=KBUF),intent(in) :: X,  Y
+!     real(kind=KBUF),intent(in) :: F
+!     if (X.eq.F.or.Y.eq.F) then
+!        Z = F
+!     else
+!        Z = X + ONE
+!     endif
+!   end function elem_REDUCE_template
 !!!_  - elemental unary operators
 !!!_   & elem_ABS()
   ELEMENTAL &
@@ -2101,9 +2863,9 @@ contains
        Z = SIGN(ONE, X)
     endif
   end function elem_ZSIGN
-!!!_   & elem_SIGN() - SIGN(1,Z)
+!!!_   & elem_SIGN1() - SIGN(1,Z)
   ELEMENTAL &
-  real(kind=KBUF) function elem_SIGN (X, F) result(Z)
+  real(kind=KBUF) function elem_SIGN1 (X, F) result(Z)
     implicit none
     real(kind=KBUF),intent(in) :: X
     real(kind=KBUF),intent(in) :: F
@@ -2112,7 +2874,7 @@ contains
     else
        Z = SIGN(ONE, X)
     endif
-  end function elem_SIGN
+  end function elem_SIGN1
 !!!_   & elem_INV()
   ELEMENTAL &
   real(kind=KBUF) function elem_INV (X, F) result(Z)
@@ -2253,6 +3015,18 @@ contains
        Z = ACOS(X)
     endif
   end function elem_ACOS
+!!!_   & elem_ATAN()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_ATAN (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = ATAN(X)
+    endif
+  end function elem_ATAN
 !!!_   & elem_SINH ()
   ELEMENTAL &
   real(kind=KBUF) function elem_SINH (X, F) result(Z)
@@ -2576,20 +3350,71 @@ contains
        Z = MAX(X, Y)
     endif
   end function elem_MAX
+!!!_  - elemental binary operators (lazy-mode)
+!!!_   & elem_LADD() - X + Y if defined, X or Y if the other undefined
+  ELEMENTAL &
+  real(kind=KBUF) function elem_LADD (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (Y.eq.FY) then
+       Z = X
+    else if (X.eq.FX) then
+       Z = Y
+    else
+       Z = X + Y
+    endif
+  end function elem_LADD
+!!!_   & elem_LSUB() - X - Y if defined, else X
+  ELEMENTAL &
+  real(kind=KBUF) function elem_LSUB (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = X
+    else
+       Z = X - Y
+    endif
+  end function elem_LSUB
+!!!_   & elem_LMUL() - X * Y if defined, X or Y if the other undefined
+  ELEMENTAL &
+  real(kind=KBUF) function elem_LMUL (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (Y.eq.FY) then
+       Z = X
+    else if (X.eq.FX) then
+       Z = Y
+    else
+       Z = X * Y
+    endif
+  end function elem_LMUL
+!!!_   & elem_LDIV() - X / Y if defined, else X
+  ELEMENTAL &
+  real(kind=KBUF) function elem_LDIV (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = X
+    else if (Y.eq.ZERO) then
+       Z = FX
+    else
+       Z = X / Y
+    endif
+  end function elem_LDIV
 !!!_   & elem_LMIN() - MIN(X, Y) lazy  (X or Y if the other == NAN)
   ELEMENTAL &
   real(kind=KBUF) function elem_LMIN (X, Y, FX, FY) result(Z)
     implicit none
     real(kind=KBUF),intent(in) :: X,  Y
     real(kind=KBUF),intent(in) :: FX, FY
-    if (X.eq.FX) then
-       if (Y.eq.FY) then
-          Z = FX
-       else
-          Z = Y
-       endif
-    else if (Y.eq.FY) then
-       Z = X
+    if (Y.eq.FY) then
+       Z = FX
+    else if (X.eq.FX) then
+       Z = Y
     else
        Z = MIN(X, Y)
     endif
@@ -2600,18 +3425,15 @@ contains
     implicit none
     real(kind=KBUF),intent(in) :: X,  Y
     real(kind=KBUF),intent(in) :: FX, FY
-    if (X.eq.FX) then
-       if (Y.eq.FY) then
-          Z = FX
-       else
-          Z = Y
-       endif
-    else if (Y.eq.FY) then
-       Z = X
+    if (Y.eq.FY) then
+       Z = FX
+    else if (X.eq.FX) then
+       Z = Y
     else
        Z = MAX(X, Y)
     endif
   end function elem_LMAX
+!!!_  - logical operators
 !!!_   & elem_AND() - Y if X != NAN else X
   ! (cf. gmtmath) Y if X == NAN, else X
   !    operands  jmz  gmt
@@ -2690,7 +3512,6 @@ contains
        Z = Y
     endif
   end function elem_LAY
-
 !!!_   & elem_XOR() - Y if X == NAN, X if Y == NAN, else NAN
   ! (cf. gmtmath) Y if X == NAN, else X (AND identical)
   !    operands  jmz  gmt
@@ -2715,6 +3536,7 @@ contains
        Z = FX
     endif
   end function elem_XOR
+!!!_  - conditional operators (binary)
 !!!_   & elem_EQB() - binary for if X == Y
   ELEMENTAL &
   real(kind=KBUF) function elem_EQB (X, Y, FX, FY) result(Z)
@@ -2799,6 +3621,7 @@ contains
        Z = FALSE
     endif
   end function elem_GEB
+!!!_  - conditional operators (filter)
 !!!_   & elem_EQF() - X if X == Y, else NAN
   ELEMENTAL &
   real(kind=KBUF) function elem_EQF (X, Y, FX, FY) result(Z)
@@ -2883,6 +3706,7 @@ contains
        Z = FX
     endif
   end function elem_GEF
+!!!_  - conditional operators (undef)
 !!!_   & elem_EQ() - binary or UNDEF for if X == Y
   ELEMENTAL &
   real(kind=KBUF) function elem_EQ (X, Y, FX, FY) result(Z)
@@ -2967,6 +3791,7 @@ contains
        Z = FX
     endif
   end function elem_GE
+!!!_  - mathematic binary operators
 !!!_   & elem_ATAN2() - TAN2(X, Y)
   ELEMENTAL &
   real(kind=KBUF) function elem_ATAN2 (X, Y, FX, FY) result(Z)
@@ -3007,6 +3832,19 @@ contains
        Z = SCALE(X, INT(Y))
     endif
   end function elem_SCALE
+!!!_   & elem_SIGN()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_SIGN (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else
+       Z = SIGN(X, Y)
+    endif
+  end function elem_SIGN
+!!!_  - bitwise binary operators
 !!!_   & elem_BITNOT () - (integer only) bitwise not
   ELEMENTAL &
   real(kind=KBUF) function elem_BITNOT (X, F) result(Z)
@@ -3091,7 +3929,89 @@ contains
        Z = NEAREST(X, Y)
     endif
   end function elem_NEAREST
-
+!!!_    * elem_IFELSE()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_IFELSE (X, Y, Z, FX, FY, FZ) result(W)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y,  Z
+    real(kind=KBUF),intent(in) :: FX, FY, FZ
+    if (X.eq.FX) then
+       if (Z.eq.FZ) then
+          W = FX
+       else
+          W = Z
+       endif
+    else
+       if (Y.eq.FY) then
+          W = FX
+       else
+          W = Y
+       endif
+    endif
+  end function elem_IFELSE
+!!!_    * elem_INRANGE()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_INRANGE (X, Y, Z, FX, FY, FZ) result(W)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y,  Z
+    real(kind=KBUF),intent(in) :: FX, FY, FZ
+    if (X.eq.FX.or.Y.eq.FY.or.Z.eq.FZ) then
+       W = FX
+    else if (X.GE.Y.and.X.LE.Z) then
+       W = X
+    else
+       W = FX
+    endif
+  end function elem_INRANGE
+!!!_    * elem_BLEND()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_BLEND (X, Y, Z, FX, FY, FZ) result(W)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y,  Z
+    real(kind=KBUF),intent(in) :: FX, FY, FZ
+    if (X.eq.FX.or.Y.eq.FY.or.Z.eq.FZ) then
+       W = FX
+    else
+       W = X * Z + Y * (ONE - Z)
+    endif
+  end function elem_BLEND
+!!!_  - elemental reduction operators
+!!!_   & elem_SUM() - X + Y, ignore undef
+  ELEMENTAL &
+  real(kind=KBUF) function elem_SUM (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX) then
+       if (Y.eq.FY) then
+          Z = ZERO
+       else
+          Z = Y
+       endif
+    else if (Y.eq.FY) then
+       Z = X
+    else
+       Z = X + Y
+    endif
+  end function elem_SUM
+!!!_   & elem_COUNT()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_COUNT (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX) then
+       if (Y.eq.FY) then
+          Z = ZERO
+       else
+          Z = ONE
+       endif
+    else if (Y.eq.FY) then
+       Z = X
+    else
+       Z = X + ONE
+    endif
+  end function elem_COUNT
 !!!_ + end chak_opr
 end module chak_opr
 !!!_! FOOTER

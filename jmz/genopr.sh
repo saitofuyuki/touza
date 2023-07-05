@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/03/28 16:17:59 fuyuki genopr.sh>
+# Time-stamp: <2023/06/30 16:12:12 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -23,7 +23,7 @@ main ()
   local -A GRP=() SUBG=()
   local -A NSTACK=() ALIAS=() SYM=()
   local -A DSTACK=() # stack properties for description
-  local -A OPT=() PARAM=() INFIX=()
+  local -A OPT=() PARAM=() INFIX=() CONV=() PROPS=()
   local -A FUNC=()
   local -A IVAR=() AVAR=()
   local -A GRANGE=()
@@ -31,7 +31,7 @@ main ()
 
   register_all || return $?
 
-  local GODR=(system output anchor stack queue unary ubool bool binary filter lazy float other)
+  local GODR=(system output anchor stack queue unary ubool bool binary filter lazy float ternary reduce other)
   GODR=($GODR ${(k)GRP})
   GODR=(${(u)GODR})
   local grp=
@@ -108,13 +108,17 @@ register_all ()
   register -g stack -n 1,2         COPY     'copy top stack on new buffer'
   register -g stack -n 1,1         CLONE    'copy top stack on new buffer and discard the original'
   register -g stack -n 1,0 -o NAME POP      'discard top stack and optionally tag'
+  register -g stack -n 1,0         PROP     'show stack properties and pop'
   register -g stack -n 2,2         EXCH     'B A; exchange two top stacks'
   register -g stack -n 0,0         NOP      'no operation; do nothing'
   register -g stack +n m,'2(m-1)'  DIST     'distribute top stack for every stack from last anchor'
+  register -g stack +n m,m         ROLL     'rotate from last anchor'
   register -g stack +n m,m         INSERT   'move top stack after last anchor'
   register -g stack +n m,'2m'      REPEAT   'repeat from last non-adjacent anchor'
   register -g stack +n m,0         FLUSH    'flush-out from last anchor'
   register -g stack +n m,0         DFLUSH   'flush-out from last anchor (defined only)'
+  register -g stack +n m,0         CFLUSH   'flush-out from last anchor (columnized)'
+  register -g stack -n 1,1 -f DUP -c float FLOAT 'change type as floating point'
 
   # queue manipulation
   register -g queue ITER   'iterate last queue operator for each set from last anchor'
@@ -126,9 +130,9 @@ register_all ()
   register -n 2,1 -i call          MASK  'A if both A and B are defined, else MISS'
 
   # logical unary
-  register -g ubool -n 1,1            -i neg,'!'  NOT   'logical not; 1 if undefined, else MISS'
-  register -g ubool -n 1,1            -i call     BOOL  'boolean; 1 if defined, else MISS'
-  register -g ubool -n 1,1 -f -,FALSE -i call     BIN   'binary; 1 if defined, else 0'
+  register -g ubool -n 1,1            -i neg,'!' -c int  NOT   'logical not; 1 if undefined, else MISS'
+  register -g ubool -n 1,1            -i call    -c int  BOOL  'boolean; 1 if defined, else MISS'
+  register -g ubool -n 1,1 -f -,FALSE -i call    -c int  BIN   'binary; 1 if defined, else 0'
 
   # logical operation, inclusive
   register -g lazy -n 2,1            -i logical,'||'  OR      'logical or; A if defined, else B if defined, else MISS'
@@ -140,23 +144,25 @@ register_all ()
   register -g lazy -n 2,1 -f LAY,-,T -i call          LLAY    'background layer; B if A outside, else A'
   register -a LLAY                                    LAY
   register -g lazy -n 2,1 -f LAY,-,F -i call          RLAY    'background layer; A if B outside, else B'
+  register         -n 3,1            -i call          IFELSE  'B if A defined, else C'
 
   # primitive binary
-  register -n 2,1 -i add,'+'  ADD     'A+B'
-  register -n 2,1 -i add,'-'  SUB     'A-B'
-  register -n 2,1 -i mul,'*'  MUL     'A*B'
-  register -n 2,1 -i mul,'/'  DIV     'A/B'
-  register -n 2,1 -i mul,'//' IDIV    'A//B'
-  register -n 2,1 -i mul,'%'  MOD     'mod(A,B)'
-  register -n 2,1 -i exp,'**' POW     'pow(A,B)'
+  register -n 2,1 -i add,'+'  -P sweep=stack ADD         'A+B'
+  register -n 2,1 -i add,'-'                 SUB         'A-B'
+  register -n 2,1 -i mul,'*'  -P sweep=stack MUL         'A*B'
+  register -n 2,1 -i mul,'/'                 DIV         'A/B'
+  register -n 2,1 -i mul,'/'  -c float -f DIV RDIV        'A/B'
+  register -n 2,1 -i mul,'//' -c int          IDIV        'A//B'
+  register -n 2,1 -i mul,'%'                  MOD         'mod(A,B)'
+  register -n 2,1 -i exp,'**'                 POW         'pow(A,B)'
 
   register -n 2,1 -i call MODULO      'modulo(A,B)'
 
   # primitive binary inclusive
-  register -g lazy -n 2,1 -i add,'+'  -f ADD,ZERO LADD    'lazy ADD'
-  register -g lazy -n 2,1 -i add,'-'  -f SUB,ZERO LSUB    'lazy SUB'
-  register -g lazy -n 2,1 -i mul,'*'  -f MUL,ONE  LMUL    'lazy MUL'
-  register -g lazy -n 2,1 -i mul,'/'  -f DIV,ONE  LDIV    'lazy DIV'
+  register -g lazy -n 2,1 -i add,'+' -P sweep=stack LADD    'lazy ADD'
+  register -g lazy -n 2,1 -i add,'-'                LSUB    'lazy SUB'
+  register -g lazy -n 2,1 -i mul,'*' -P sweep=stack LMUL    'lazy MUL'
+  register -g lazy -n 2,1 -i mul,'/'                LDIV    'lazy DIV'
 
   # primitive unary
   register          -n 1,1 -i neg,'-'  NEG     '-A'
@@ -164,15 +170,16 @@ register_all ()
   register          -n 1,1 -i call     ABS     'abs(A)'
   register          -n 1,1 -i call     SQR     'A*A'
   register -g float -n 1,1 -i call     SQRT    'square root'
-  register          -n 1,1 -i call     SIGN    'copy A sign on 1'
-  register          -n 1,1 -i call     ZSIGN   '-1,0,+1 if negative,zero,positive'
+  register          -n 2,1 -i call         SIGN    'copy B sign on A'
+  register          -n 1,1 -i call -c int  SIGN1   'copy A sign on 1'
+  register          -n 1,1 -i call -c int  ZSIGN   '-1,0,+1 if negative,zero,positive'
 
-  # integer opration
-  register -n 1,1 -i call          FLOOR   'largest integer <= A'
-  register -n 1,1 -i call          CEIL    'smallest integer >=A'
-  register -n 1,1 -i call          ROUND   'nearest integer of A'
-  register -n 1,1 -i call          TRUNC   'truncate toward 0'
-  register -n 1,1 -i call -f TRUNC INT     'truncate toward 0 and convert'
+  # integer operation
+  register -n 1,1 -i call          -c int FLOOR   'largest integer <= A'
+  register -n 1,1 -i call          -c int CEIL    'smallest integer >=A'
+  register -n 1,1 -i call          -c int ROUND   'nearest integer of A'
+  register -n 1,1 -i call                 TRUNC   'truncate toward 0'
+  register -n 1,1 -i call -f TRUNC -c int INT     'truncate toward 0 and convert'
 
   # math operation
   register -g float -n 1,1 -i call EXP      'exp(A)'
@@ -183,6 +190,7 @@ register_all ()
   register -g float -n 1,1 -i call TAN      'tan(A)'
   register -g float -n 1,1 -i call ASIN     'arcsin(A)'
   register -g float -n 1,1 -i call ACOS     'arccos(A)'
+  register -g float -n 1,1 -i call ATAN     'arctan(A)'
   register -g float -n 2,1 -i call ATAN2    'arctan(A/B)'
   register -g float -n 1,1 -i call SINH     'sinh(A)'
   register -g float -n 1,1 -i call COSH     'cosh(A)'
@@ -202,34 +210,34 @@ register_all ()
   register -n 2,1 -i shift,'>>' RSHIFT   'bitwise right shift'
 
   # floating-point operation
-  register -g float -n 1,1 -i call EXPONENT  'exponent(A)'
-  register -g float -n 1,1 -i call FRACTION  'fraction(A)'
-  register -g float -n 2,1 -i call SCALE     'scale(A,B)'
-  register -g float -n 2,1 -i call NEAREST   'nearest(A,B)'
-  register -g float -n 1,1 -i call SPACING   'spacing(A)'
-  register -g float -n 1,1 -i call RRSP      'rrspacing(A)'
+  register -g float -n 1,1 -i call -c int EXPONENT  'exponent(A)'
+  register -g float -n 1,1 -i call        FRACTION  'fraction(A)'
+  register -g float -n 2,1 -i call        SCALE     'scale(A,B)'
+  register -g float -n 2,1 -i call        NEAREST   'nearest(A,B)'
+  register -g float -n 1,1 -i call        SPACING   'spacing(A)'
+  register -g float -n 1,1 -i call        RRSP      'rrspacing(A)'
 
   # other operation
-  register         -n 2,1 -i call             MIN    'min(A,B)'
-  register         -n 2,1 -i call             MAX    'max(A,B)'
-  register -g lazy -n 2,1 -i call -f -,ULIMIT LMIN   'lazy MIN'
-  register -g lazy -n 2,1 -i call -f -,LLIMIT LMAX   'lazy MAX'
+  register         -n 2,1 -i call -P sweep=stack  MIN    'min(A,B)'
+  register         -n 2,1 -i call -P sweep=stack  MAX    'max(A,B)'
+  register -g lazy -n 2,1 -i call -P sweep=stack  LMIN   'lazy MIN'
+  register -g lazy -n 2,1 -i call -P sweep=stack  LMAX   'lazy MAX'
 
   # conditional operation (binary)
-  register -g bool -n 2,1 -f -,FALSE -i call EQB       '1 if A==B, else 0'
-  register -g bool -n 2,1 -f -,FALSE -i call NEB       '1 if A!=B, else 0'
-  register -g bool -n 2,1 -f -,FALSE -i call LTB       '1 if A<B, else 0'
-  register -g bool -n 2,1 -f -,FALSE -i call GTB       '1 if A>B, else 0'
-  register -g bool -n 2,1 -f -,FALSE -i call LEB       '1 if A<=B, else 0'
-  register -g bool -n 2,1 -f -,FALSE -i call GEB       '1 if A>=B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int EQB       '1 if A==B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int NEB       '1 if A!=B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int LTB       '1 if A<B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int GTB       '1 if A>B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int LEB       '1 if A<=B, else 0'
+  register -g bool -n 2,1 -f -,FALSE -i call -c int GEB       '1 if A>=B, else 0'
 
   # conditional operation (binary or MISS)
-  register -g bool -n 2,1 -i call EQ      '1, 0, MISS for A==B, not, either MISS'
-  register -g bool -n 2,1 -i call NE      '1, 0, MISS for A!=B, not, either MISS'
-  register -g bool -n 2,1 -i call LT      '1, 0, MISS for A<B, not, either MISS'
-  register -g bool -n 2,1 -i call GT      '1, 0, MISS for A>B, not, either MISS'
-  register -g bool -n 2,1 -i call LE      '1, 0, MISS for A<=B, not, either MISS'
-  register -g bool -n 2,1 -i call GE      '1, 0, MISS for A>=B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int EQ      '1, 0, MISS for A==B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int NE      '1, 0, MISS for A!=B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int LT      '1, 0, MISS for A<B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int GT      '1, 0, MISS for A>B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int LE      '1, 0, MISS for A<=B, not, either MISS'
+  register -g bool -n 2,1 -i call -c int GE      '1, 0, MISS for A>=B, not, either MISS'
 
   register -a EQ EQU
   register -a NE NEU
@@ -246,6 +254,10 @@ register_all ()
   register -g filter -n 2,1 -i call LEF      'A if A<=B, else MISS'
   register -g filter -n 2,1 -i call GEF      'A if A>=B, else MISS'
 
+  # ternary operation
+  register -n 3,1 -i call INRANGE 'A if B<=A<=C else MISS'
+  register -n 3,1 -i call BLEND   'C A + (1 - C) B; blend A and B with weight C.'
+
   # transform
   register -n 2,1 -i call EXTR            'extraction'
   register -n 2,1 -i call -p COOR CDIFF   'central difference'
@@ -253,13 +265,15 @@ register_all ()
   register -n 2,1 -i call -p COOR BDIFF   'backward difference'
 
   # reduction operation
-  register -g reduction -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
-  register -g reduction -o RANK -i call SUM     'sum through stacks or rank(s)'
-  register -g reduction -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
-  register -g reduction -o RANK -i call COUNT   'count defined elements through stacks or rank(s)'
+  register -g reduce -o RANK -i call NORM    'normalize (0:1) through stacks or rank(s)'
+  register -g reduce -o RANK -i call AVR     'arithmetic mean through stacks or rank(s)'
+  register -g reduce -n 1,1 -o RANK -f -,ZERO -i call        SUM     'sum along rank(s)'
+  register -g reduce -n 1,1 -o RANK -f -,ZERO -i call -c int COUNT   'count defined elements along rank(s)'
+  register -g reduce -n 2,2 -o RANK -f -,ZERO -i call        WSUM    'weighted sum and weight along rank(s)'
+  register -g reduce -n 2,3 -o RANK -f -,ZERO -i call        WMV     'weighted mean, variance and weights along rank(s)'
 
-  register -g reduction -n 1,1 -i call -p RANK -s 'MIN=' UMIN    'minimum'
-  register -g reduction -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'
+  # register -g reduce -n 1,1 -i call -p RANK -s 'MIN=' UMIN    'minimum'
+  # register -g reduce -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'
 
   # transform operation
   #### coor=0,1,2,name,alias for coodinate, -1 or s for stack
@@ -271,19 +285,24 @@ register_all ()
 
   # property manipulation
   register -g buffer -p NAME              TAG
-  register -g buffer -p NAME/REPL/RANGE,.. -n 1,1 PERM   'array shape permutatation'
-  register -a PERM SHAPE
-  register -g buffer -p NAME/REPL/SIZE,..  -n 1,1 SIZE    'array size(shape) permutatation'
-  register -g buffer -p NAME/SHIFT         -n 1,1 CSHIFT  'circular shift along coordinate'
-  register -g buffer -p NAME/SHIFT         -n 1,1 EOSHIFT 'end-off shift along coordinate'
+  register -g buffer -p NAME              DESC           'description'
+  register -g buffer -o NAME              FUNC           'function declaration'
 
-  register -g buffer,index -o NAME/REPL/RANGE    C0  'put top stack coordinate[0] index'
-  register -g buffer,index -o NAME/REPL/RANGE    C1  'put top stack coordinate[1] index'
-  register -g buffer,index -o NAME/REPL/RANGE    C2  'put top stack coordinate[2] index'
-  register -g buffer,index -o NAME/REPL/RANGE    C3  'put top stack coordinate[3] index'
-  register -g buffer,index -o NAME/REPL/RANGE    X   'put top stack coordinate[0] index'
-  register -g buffer,index -o NAME/REPL/RANGE    Y   'put top stack coordinate[1] index'
-  register -g buffer,index -o NAME/REPL/RANGE    Z   'put top stack coordinate[2] index'
+  # shape manipulation
+  register -g shape -p NAME/REPL/RANGE,.. -n 1,1 PERM    'array shape permutation'
+  register -g shape -p NAME/REPL/RANGE,.. -n 1,1 SHAPE   'array range(shape) permutation'
+  register -g shape -p NAME/REPL/SIZE,..  -n 1,1 SIZE    'array size(shape) permutation'
+  register -g shape -p NAME/REPL/SHIFT    -n 1,1 SHIFT   'simple shift along coordinate'
+  register -g shape -p NAME/REPL/SHIFT    -n 1,1 CSHIFT  'circular shift along coordinate'
+  register -g shape -p NAME/REPL/SHIFT    -n 1,1 EOSHIFT 'end-off shift along coordinate'
+
+  register -g index,shape -o NAME/REPL/RANGE    C0  'put top stack coordinate[0] index'
+  register -g index,shape -o NAME/REPL/RANGE    C1  'put top stack coordinate[1] index'
+  register -g index,shape -o NAME/REPL/RANGE    C2  'put top stack coordinate[2] index'
+  register -g index,shape -o NAME/REPL/RANGE    C3  'put top stack coordinate[3] index'
+  register -g index,shape -o NAME/REPL/RANGE    X   'put top stack coordinate[0] index'
+  register -g index,shape -o NAME/REPL/RANGE    Y   'put top stack coordinate[1] index'
+  register -g index,shape -o NAME/REPL/RANGE    Z   'put top stack coordinate[2] index'
 
   register -g index        -o NAME,...           FLAT  'flat index'
   register -a FLAT INDEX
@@ -305,13 +324,13 @@ register_all ()
 }
 
 # register [-g GROUP[,SUBGROUP]][-n POP,PUSH][-a ALIAS][-s SYMBOL]
-#          [-o OPTION][-p PARAM][-i INFIX][-f FUNC]
+#          [-o OPTION][-p PARAM][-i INFIX][-c CONV][-f FUNC]
 #          OPERATOR [DESCRIPTION]
 
 register ()
 {
   local grp= subg= nstack= alias= sym=
-  local opt= param= infix= func=
+  local opt= param= infix= conv= func= props=()
   local opr= descr= dstack=
   while [[ $# -gt 0 ]]
   do
@@ -324,7 +343,9 @@ register ()
     (-o) opt=$2; shift;;
     (-p) param=$2; shift;;
     (-i) infix=(${(s:,:)2}); shift;;
+    (-c) conv=$2; shift;;
     (-f) func=$2; shift;;
+    (-P) props+=(${(s:,:)2}); shift;;
     (--) shift; break;;
     (-*) print -u2 - "unknown option $1"; exit 1;;
     (*)  break;;
@@ -345,6 +366,8 @@ register ()
       grp=${(k)GRP[(r)* $alias *]}
       [[ -z $grp ]] && grp=${(k)GRP[(r)* $alias]}
       [[ -z $grp ]] && print -u2 - "cannot find alias source for $key ($alias)" && return 1
+    elif [[ $nstack[1] -eq 3 && $nstack[2] -eq 1 ]]; then
+      grp='ternary'
     elif [[ $nstack[1] -eq 2 && $nstack[2] -eq 1 ]]; then
       grp='binary'
     elif [[ $nstack[1] -eq 1 && $nstack[2] -eq 1 ]]; then
@@ -361,6 +384,8 @@ register ()
   PARAM[$key]="$param"
   FUNC[$key]="$func"
   INFIX[$key]="$infix"
+  CONV[$key]="$conv"
+  PROPS[$key]="$props"
   SYM[$key]="$sym"
   NSTACK[$key]="$nstack"
   DSTACK[$key]="$dstack"
@@ -375,7 +400,7 @@ output_decl ()
 {
   local of=$1; shift
   local grp= key=
-  local iv= av= gv=()
+  local iv= av= gv=() rv=
   local subg=
   # symbol
   output_f90_header "$of" "operator symbol declaration"
@@ -396,7 +421,7 @@ output_decl ()
   # id
   fout "!! operation id"
   local jnum=0
-  local ref=
+  local ref= sweep=
   for grp in $@
   do
     gv=($=GRANGE[$grp])
@@ -411,8 +436,22 @@ output_decl ()
         ref=$IVAR[$ALIAS[$key]]
         fout "integer,parameter :: $iv = $ref"
       else
-        fout "integer,parameter :: $iv = $jnum"
-        let jnum++
+        check_props sweep sweep $key
+        if [[ $grp == reduce ]]; then
+          rv=acc_${iv#*_}
+          fout "integer,parameter :: $rv = $jnum"
+          let jnum++
+          fout "integer,parameter :: $iv = $jnum"
+          let jnum++
+        else
+          fout "integer,parameter :: $iv = $jnum"
+          let jnum++
+          if [[ -n $sweep ]]; then
+            rv=rdc_${iv#*_}
+            fout "integer,parameter :: $rv = $iv + 1"
+            let jnum++
+          fi
+        fi
       fi
     done
     fout "integer,parameter :: $gv[2] = $jnum"
@@ -424,10 +463,10 @@ output_register ()
 {
   local of="$1"; shift
   local grp= key=
-  local iv= av=
+  local iv= av= rv=
   local nstack=()
-  local infix=() rarg=()
-  local sub=
+  local infix=() rarg=() conv=
+  local sub= sweep=
   output_f90_header "$of" "operator registration"
   # symbol
   for grp in "$@"
@@ -441,11 +480,42 @@ output_register ()
       iv=$IVAR[$key]
       nstack=(${=NSTACK[$key]})
       infix=(${=INFIX[$key]})
+      conv=$CONV[$key]
+      check_props sweep sweep $key
+      [[ -z $sweep && $grp == reduce ]] && sweep=reduce
       rarg=(ierr "$iv" "$av")
+      [[ -z $conv && $grp == float ]] && conv=float
+
       [[ -n $nstack ]] && rarg+=($nstack[1] $nstack[2])
       [[ -n $infix[1] ]] && rarg+=("ilev=ilev_$infix[1]")
       [[ -n $infix[2] ]] && rarg+=("istr='$infix[2]'")
-      fout -t 4 "if (ierr.eq.0) call reg_opr_prop(${(j:, :)rarg})"
+      [[ -n $conv ]] && rarg+=("conv=result_$conv")
+      [[ -n $sweep ]] && rarg+=("sweep=sweep_$sweep")
+      fout -t 4 "if (ierr.eq.0) &"
+      fout -t 0 "call reg_opr_prop(${(j:, :)rarg})" |\
+          fold -w 80 -s |\
+          sed -e 's/$/ \&/' -e 's/^/      \& /' -e '$s/ *\&$//'
+      if [[ $sweep == accum || $sweep = stack ]]; then
+        rv=rdc_${iv#*_}
+        rarg=(ierr "$rv" "rdc_pfx // $av")
+        [[ -n $nstack ]] && rarg+=($((nstack[1]-1)) $nstack[2])
+        [[ -n $conv ]] && rarg+=("conv=result_$conv")
+        rarg+=("sweep=sweep_reduce")
+        fout -t 4 "if (ierr.eq.0) &"
+        fout -t 0 "call reg_opr_prop(${(j:, :)rarg})" |\
+            fold -w 80 -s |\
+            sed -e 's/$/ \&/' -e 's/^/      \& /' -e '$s/ *\&$//'
+      elif [[ $sweep == reduce ]]; then
+        rv=acc_${iv#*_}
+        rarg=(ierr "$rv" "acc_pfx // $av")
+        [[ -n $nstack ]] && rarg+=($nstack)
+        [[ -n $conv ]] && rarg+=("conv=result_$conv")
+        rarg+=("sweep=sweep_accum")
+        fout -t 4 "if (ierr.eq.0) &"
+        fout -t 0 "call reg_opr_prop(${(j:, :)rarg})" |\
+            fold -w 80 -s |\
+            sed -e 's/$/ \&/' -e 's/^/      \& /' -e '$s/ *\&$//'
+      fi
       # if [[ -z $nstack ]]; then
       #   fout -t 4 "if (ierr.eq.0) call reg_opr_prop(ierr, $iv, $av)"
       # else
@@ -476,6 +546,8 @@ output_call ()
     (ubool) apply=apply_opr_UNARY;;
     (bool)  apply=apply_opr_BINARY;;
     (filter)  apply=apply_opr_BINARY;;
+    (reduce)  apply=apply_opr_REDUCE;;
+    (ternary)  apply=apply_opr_TERNARY;;
     (float) apply=;;
     (*)    continue;;
     esac
@@ -514,6 +586,8 @@ output_call ()
           afunc=apply_opr_UNARY
         elif [[ $pop -eq 2 && $push -eq 1 ]]; then
           afunc=apply_opr_BINARY
+        elif [[ $pop -eq 3 && $push -eq 1 ]]; then
+          afunc=apply_opr_TERNARY
         else
           print -u2 - "Cannot determine apply function for $key"
           return 1
@@ -532,7 +606,7 @@ output_sub ()
   local grp= key=
   local nstack=() push= pop=
   local sub= stype=
-  local candi=(unary binary lazy ubool bool filter float)
+  local candi=(unary binary lazy ternary ubool bool filter float reduce)
   local elem=
   local DONE=()
   local extval=
@@ -565,6 +639,8 @@ fout -t 0 "!!!_  - $grp operations"
           stype=unary
         elif [[ $pop -eq 2 && $push -eq 1 ]]; then
           stype=binary
+        elif [[ $pop -eq 3 && $push -eq 1 ]]; then
+          stype=ternary
         else
           print -u2 - "Cannot determine subroutine for $key"
           return 1
@@ -601,11 +677,11 @@ UNARY
   subroutine $sub &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -625,11 +701,11 @@ BINARY
   subroutine $sub &
        & (ierr, Z, domZ, FZ, X, domX, FX)
     implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KBUF),intent(out) :: Z(0:*)
-    real(kind=KBUF),intent(in)  :: X(0:*)
-    type(domain_t), intent(in)  :: domZ, domX
-    real(kind=KBUF),intent(in)  :: FZ, FX
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
     integer jz, jx
     ierr = 0
     do jz = 0, domZ%n - 1
@@ -643,6 +719,59 @@ BINARY
   end subroutine $sub
 LAZY
           ;;
+      (ternary)
+          cat <<TERNARY
+!!!_   . $sub
+  subroutine $sub &
+       & (ierr, Z, domZ, FZ, X, domX, FX, Y, domY, FY)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    real(kind=KBUF),intent(in)    :: Y(0:*)
+    type(domain_t), intent(in)    :: domZ, domX, domY
+    real(kind=KBUF),intent(in)    :: FZ, FX, FY
+    integer jz, jx, jy
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       jy = conv_physical_index(jz, domZ, domY)
+       if (jx.ge.0.and.jy.ge.0) then
+          Z(jz) = $elem(Z(jz), X(jx), Y(jy), FZ, FX, FY)
+       else
+          Z(jz) = ${extval:-FZ}
+       endif
+    enddo
+  end subroutine $sub
+TERNARY
+          ;;
+      (reduce)
+          cat <<REDUCE
+!!!_   . $sub
+  subroutine $sub &
+       & (ierr, Z, domZ, FZ, domY, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domY, domX
+    real(kind=KBUF),intent(in)    :: FZ,   FX
+    integer jz, jy, jx
+    ierr = 0
+    do jy = 0, domY%n - 1
+       jx = conv_physical_index(jy, domY, domX)
+       jz = conv_physical_index(jy, domY, domZ)
+       if (jz.ge.0) then
+          if (jx.ge.0) then
+            Z(jz) = $elem(Z(jz), FZ, X(jx), FX)
+         else
+            Z(jz) = $elem(Z(jz), FZ, FX,    FX)
+         endif
+       endif
+    enddo
+  end subroutine $sub
+REDUCE
+          ;;
       (*) print -u2 - "unknown subroutine type $stype"; return 1;;
       esac
     done
@@ -653,7 +782,7 @@ output_elem ()
   local grp= key=
   local nstack=() push= pop=
   local sub= stype=
-  local candi=(unary binary lazy ubool bool filter float)
+  local candi=(unary binary lazy ternary ubool bool filter float reduce)
   local elem=
   local DONE=()
   for grp in "$@"
@@ -676,6 +805,8 @@ output_elem ()
           stype=unary
         elif [[ $pop -eq 2 && $push -eq 1 ]]; then
           stype=binary
+        elif [[ $pop -eq 3 && $push -eq 1 ]]; then
+          stype=ternary
         else
           print -u2 - "Cannot determine elemental for $key"
           return 1
@@ -698,7 +829,7 @@ output_elem ()
   end function $elem
 UNARY
           ;;
-      (binary|lazy)
+      (binary|lazy|reduce)
           cat <<BINARY
 !!!_    * $elem()
   ELEMENTAL &
@@ -714,6 +845,38 @@ UNARY
   end function $elem
 BINARY
           ;;
+      (ternary)
+          cat <<TERNARY
+!!!_    * $elem()
+  ELEMENTAL &
+  real(kind=KBUF) function $elem (X, Y, Z, FX, FY, FZ) result(W)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y,  Z
+    real(kind=KBUF),intent(in) :: FX, FY, FZ
+    if (X.eq.FX.or.Y.eq.FY.or.Z.eq.FZ) then
+       W = FX
+    else
+       W = X + Y + Z
+    endif
+  end function $elem
+TERNARY
+          ;;
+#       (reduce)
+#           cat <<REDUCE
+# !!!_    * $elem()
+#   ELEMENTAL &
+#   real(kind=KBUF) function $elem (X, Y, F) result(Z)
+#     implicit none
+#     real(kind=KBUF),intent(in) :: X,  Y
+#     real(kind=KBUF),intent(in) :: F
+#     if (X.eq.F.or.Y.eq.F) then
+#        Z = F
+#     else
+#        Z = X + Y
+#     endif
+#   end function $elem
+# REDUCE
+#           ;;
       (*) print -u2 - "unknown subroutine type $stype"; return 1;;
       esac
     done
@@ -729,13 +892,19 @@ get_sub_name ()
   local ssfx=
   [[ ${__sub:--} == - ]] && __sub=$key
   if [[ $pop -eq 1 ]]; then
-    ssfx=UNARY
+    if [[ $grp == reduce ]]; then
+      ssfx=REDUCE
+    else
+      ssfx=UNARY
+    fi
   elif [[ $pop -eq 2 ]]; then
     if [[ $grp == lazy ]]; then
       ssfx=BINARY_lazy
     else
       ssfx=BINARY
     fi
+  elif [[ $pop -eq 3 ]]; then
+    ssfx=TERNARY
   else
     print -u2 - "$key/$grp subroutine is not prepared"
     return 1
@@ -783,7 +952,7 @@ output_table ()
   local grp= key=
   local nstack=() push= pop=
   local sym= alias= opt=
-  local candi=(unary binary lazy ubool bool filter stack index float)
+  local candi=(unary binary lazy ternary ubool bool filter stack index float)
   local aapp=
   for grp in "$@"
   do
@@ -823,6 +992,33 @@ output_table ()
   done | sort | column -s '|' -o '|' -t
   print -
 
+  local sweep=
+  candi=(reduce binary lazy)
+  for grp in "$@"
+  do
+    [[ $candi[(I)$grp] -eq 0 ]] && continue
+    for key in ${=GRP[$grp]}
+    do
+      [[ -n $ALIAS[$key] ]] && continue
+      if [[ $grp != reduce ]]; then
+        check_props sweep sweep $key
+        [[ -z $sweep ]] && continue
+        opt='=RANK'
+        desc="$key with sweeping"
+      else
+        opt="[=$OPT[$key]]"
+        desc="$DESCR[$key]"
+      fi
+
+      sym=$SYM[$key]
+      alias=(${(k)ALIAS[(R)$key]})
+      syms=($sym $alias)
+      [[ -n $opt ]] && syms=(${^syms}"$opt")
+      print - "| $syms | $desc | "
+    done | sort | column -s '|' -o '|' -t
+  done
+  print -
+
   candi=(anchor queue)
   for grp in "$@"
   do
@@ -842,7 +1038,7 @@ output_table ()
     print -
   done
 
-  candi=(buffer header)
+  candi=(shape buffer header)
   for grp in "$@"
   do
     [[ $candi[(I)$grp] -eq 0 ]] && continue
@@ -893,7 +1089,7 @@ output_list ()
 {
   local grp= key=
   local sym= list=()
-  local candi=(unary binary lazy ubool bool filter stack index float)
+  local candi=(unary binary lazy ternary ubool bool filter stack index float)
 
   for grp in "$@"
   do
@@ -912,6 +1108,18 @@ output_list ()
   print -
 
 }
+
+check_props ()
+{
+  local __var=$1; shift || return $?
+  local pk=$1 key=$2
+  local pv=(${=PROPS[$key]})
+  local pp="${pv[(r)$pk=*]}"
+  [[ -n $pp ]] && pp=${pp#*=}
+  : ${(P)__var::=$pp}
+  return 0
+}
+
 
 main "$@"; err=$?
 exit $err

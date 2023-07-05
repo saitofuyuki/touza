@@ -1,7 +1,7 @@
 /* touza_nio_interface.h - TOUZA/Nio c interfaces */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Feb 16 2023 */
-/* Time-stamp: <2023/03/19 16:03:53 fuyuki touza_nio_interface.h> */
+/* Time-stamp: <2023/04/07 14:41:21 fuyuki touza_nio_interface.h> */
 /* Copyright (C) 2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -21,6 +21,7 @@ extern int tnb_finalize(const int levv, const int mode);
 extern int tnb_file_is_nio(const char *path);
 extern int tnb_file_open(const char *path, const int flag);
 extern int tnb_file_diag(const int handle, const int lev);
+extern int tnb_file_close(const int handle);
 extern int tnb_file_groups(const int handle);
 extern int tnb_group_vars(const int handle, const int gid);
 extern int tnb_group_recs(const int handle, const int gid);
