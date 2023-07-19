@@ -1,10 +1,20 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2023/07/05 17:53:38 fuyuki NEWS>
+# Time-stamp: <2023/07/19 18:06:54 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.12.1 from 1.12
+** Bug fixes
+- (jmz/chak) Fix operator GEU computation
+- (jmz/chak) Fix operator ZSIGN compuration
+- (jmz/chak) Fix DUP after MARK operation.
+- (jmz/chak) Reject invalid index coordinates
+** Other changes
+- (jmz/chak) introduce DEAL DSET ID operators
+- (jmz/chak) buffers separated by blank line at FLUSHing
 
 * Changes in 1.12 from 1.11.2
 ** Major changes
