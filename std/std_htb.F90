@@ -1,7 +1,7 @@
 !!!_! std_htb.F90 - touza/std simple hash table manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/08 12:04:14 fuyuki std_htb.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/19 23:19:38 fuyuki std_htb.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -2053,6 +2053,7 @@ contains
     integer jb, je
     integer e
 
+    ierr = 0
     jb = choice(0, k)
     je = min(size(ctb%stt, 1), jb + size(status))
     e = entr
