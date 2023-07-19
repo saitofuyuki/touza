@@ -1,7 +1,7 @@
 !!!_! std_htb.F90 - touza/std simple hash table manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2023/07/19 23:19:38 fuyuki std_htb.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/10/27 10:57:04 fuyuki std_htb.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -1096,12 +1096,12 @@ contains
     endif
     if (ierr.eq.0) then
        if (lk.gt.0) then
-          if (kunit.eq.0) then
-             u = 1
-          else
-             u = max(1, (lk - 1) / kunit + 1)
-             lk = kunit * u
-          endif
+#      if HAVE_F2003_DEFERRED_TYPE
+          u = 1
+#      else /* not HAVE_F2003_DEFERRED_TYPE */
+          u = max(1, (lk - 1) / kunit + 1)
+          lk = kunit * u
+#      endif /* not HAVE_F2003_DEFERRED_TYPE */
        else
           u = 0
        endif
