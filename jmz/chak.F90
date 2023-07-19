@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/07/05 15:01:44 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/13 13:46:27 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -69,6 +69,7 @@ program chak
   character(len=lfmt),save :: afmt_flt = '(es16.12)'
   character(len=lfmt),save :: afmt_dbl = '(es16.12)'
 
+  logical,save :: blank_line = .FALSE.
 !!!_  - misc
   integer irecw
 
@@ -1766,6 +1767,8 @@ contains
        if (ierr.eq.0) call stack_ROLL(ierr, hopr, ntup, niter)
     case(opr_EXCH)
        if (ierr.eq.0) call stack_EXCH(ierr, hopr, ntup, niter)
+    case(opr_DEAL)
+       if (ierr.eq.0) call stack_DEAL(ierr, hopr, ntup, niter)
     case(opr_POP,opr_PROP)
        if (ierr.eq.0) call stack_POP(ierr, hopr, ntup, niter)
     case(opr_FLUSH, opr_DFLUSH, opr_CFLUSH)
@@ -1780,7 +1783,7 @@ contains
 
 !!!_   . parse_header_opr
   subroutine parse_header_opr (ierr, hopr, arg)
-    use TOUZA_Nio,only: hi_ITEM, hi_TITL1, hi_UNIT, hi_EDIT1
+    use TOUZA_Nio,only: hi_ITEM, hi_TITL1, hi_UNIT, hi_EDIT1, hi_DSET
     use TOUZA_Nio,only: hi_MISS
     use TOUZA_Nio,only: put_item, store_item
     use TOUZA_Std,only: parse_number
@@ -1849,7 +1852,7 @@ contains
              ierr = ERR_INVALID_ITEM
              call message(ierr, 'no file to set record filter' // trim(arg))
           endif
-       case(opr_ITEM, opr_UNIT, opr_TITLE, opr_EDIT)
+       case(opr_ITEM, opr_UNIT, opr_TITLE, opr_EDIT, opr_DSET)
           select case(hopr)
           case(opr_ITEM)
              jitem = hi_ITEM
@@ -1859,6 +1862,8 @@ contains
              jitem = hi_TITL1
           case(opr_EDIT)
              jitem = hi_EDIT1
+          case(opr_DSET)
+             jitem = hi_DSET
           end select
           if (jfw.ge.0) then
              call put_item(ierr, ofile(jfw)%h, arg(jpar:), jitem, 0)
@@ -2491,12 +2496,9 @@ contains
        do jp = 0, ntgt - 1
           jdst = jp * (nopr + 1)
           jrel = jp - nsrc
-          if (ierr.eq.0) call queue_fetch_stack(ierr, 1, jdst, ssrc=jrel)
+          if (ierr.eq.0) call queue_fetch_stack(ierr, 1+apush, jdst, ssrc=jrel)
           if (ierr.eq.0) call queue_clone_stack(ierr, jdst+1+apush, nopr, jdst, 1)
        enddo
-    endif
-    if (ierr.eq.0) then
-       if (apush.gt.0) call queue_fetch_stack(ierr, 1)
     endif
     if (ierr.eq.0) call mset_stack_queue(ierr)
   end subroutine stack_DUP
@@ -2761,6 +2763,59 @@ contains
     if (ierr.eq.0) call mset_stack_queue(ierr)
   end subroutine stack_POP
 
+!!!_   . stack_DEAL
+  subroutine stack_DEAL(ierr, hopr, ntup, iter)
+    use TOUZA_Std,only: choice
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in)          :: hopr
+    integer,intent(in)          :: ntup
+    integer,intent(in),optional :: iter
+
+    integer niter,  npop,  npush, nopr
+    integer nfetch, ntgt
+    integer apush
+    integer jsrc,   jdst,  jp
+!!!_    * note
+    !      MARK A B C D E F DEAL    ==  A D   B E   C F
+    !      MARK A B C D E F DEAL=1  ==  A D   B E   C F
+    !      STOP A B C D E F DEAL=2  ==  A C E    B D F
+!!!_    * body
+    ierr = 0
+
+    niter = adj_iterates(1, iter)
+    nopr  = max(0, adj_iterates(1, ntup))
+
+    if (ierr.eq.0) call check_fetch(ierr, nfetch, npop, niter, -1, hopr, apush)
+
+    if (niter.gt.0) then
+       ierr = ERR_INVALID_ITEM
+       call message(ierr, 'ITER conflicts with DEAL.')
+    endif
+    if (ierr.eq.0) then
+       nfetch = nfetch - apush
+       npop   = npop - apush
+       npush  = nfetch
+
+       nopr = nopr + 1
+       ntgt = npush / nopr
+       if (mod(npush, nopr).ne.0) then
+          ierr = ERR_INVALID_ITEM
+          call message(ierr, 'invalid operands for DEAL sequence.')
+       endif
+    endif
+
+    if (ierr.eq.0) call append_queue(ierr, hopr, npop, npush)
+    if (ierr.eq.0) then
+       do jp = 0, nopr - 1
+          jsrc = - npush + jp * ntgt
+          jdst = jp
+          call queue_fetch_stack(ierr, ntgt, jdst, qstep=nopr, ssrc=jsrc)
+       enddo
+    endif
+    if (ierr.eq.0) call mset_stack_queue(ierr)
+  end subroutine stack_DEAL
+
 !!!_   . parse_anchor_opr
   subroutine parse_anchor_opr (ierr, hopr, arg, japos)
     use TOUZA_Std,only: parse_number
@@ -2945,7 +3000,7 @@ contains
     integer,intent(out)          :: nfetch   ! to fetch by queue
     integer,intent(out)          :: npop     ! to pop by queue (nfetch + fragile anchor)
     integer,intent(in)           :: niter    ! number of iterates
-    integer,intent(in)           :: upop     ! unit pop
+    integer,intent(in)           :: upop     ! unit pop  (negative to disable bare OPR)
     integer,intent(in)           :: hopr
     integer,intent(out),optional :: apush
 
@@ -2955,7 +3010,7 @@ contains
     ierr = 0
 
     apos = last_anchor()
-    if (niter.le.0) then
+    if (niter.le.0.and.upop.ge.0) then
        ! bare operation
        nfetch = upop
        if (present(apush)) then
@@ -4944,6 +4999,8 @@ contains
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_LEF)
        else if (handle.eq.opr_GEF) then
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_GEF)
+       else if (handle.eq.opr_ID) then
+          call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_ID)
        else if (handle.eq.opr_OR) then
           call apply_opr_BINARY_lazy(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_lazy_OR)
        else if (handle.eq.opr_ROR) then
@@ -5211,6 +5268,10 @@ contains
 
        if (ierr.eq.0) call get_obj_string(ierr, val, hb)
 
+       if (ierr.eq.0) then
+          if (blank_line) write(utmp, '()')
+       endif
+
        if (is_msglev(lev_verbose, -levq_rec)) then
           if (ierr.eq.0) write(utmp, 213) &
                & user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc), trim(obuffer(jb)%desc2)
@@ -5315,6 +5376,7 @@ contains
                 enddo
              end select
           endif
+          if (ierr.eq.0) blank_line = .TRUE.
        endif
     enddo
   end subroutine flush_buffer_each
@@ -5378,6 +5440,9 @@ contains
 211 format('#', A, 1x, A, 1x, A)
 
     ! write(*, *) def_write%kfmt, trim(def_write%fmt)
+    if (ierr.eq.0) then
+       if (blank_line) write(utmp, '()')
+    endif
 
     do jbuf = 0, nbuf - 1
        jb = bufj(jbuf)
@@ -5517,6 +5582,7 @@ contains
           endif
        endif
     enddo
+    if (ierr.eq.0) blank_line = .TRUE.
     if (ierr.eq.0) then
        if (allocated(vals)) deallocate(vals, STAT=ierr)
     endif
@@ -5561,6 +5627,9 @@ contains
     if (ierr.eq.0) call copy_buffer_pcp(ierr, pbuf, nbuf, bufh)
     if (ierr.eq.0) call get_compromise_domain(ierr, doml, domr, htmp, pbuf, lstk, nbuf, cmode)
 
+    if (ierr.eq.0) then
+       if (blank_line) write(utmp, '()')
+    endif
     if (lev_verbose.ge.levq_column) then
        do j = 0, nbuf - 1
           hb = bufh(j)
@@ -5656,6 +5725,7 @@ contains
              call incr_logical_index(lidx, doml)
           enddo
        endif
+       if (ierr.eq.0) blank_line = .TRUE.
     endif
 
   end subroutine flush_buffer_horizontally
@@ -5732,6 +5802,9 @@ contains
        nline = doml%iter(cline)
     endif
 
+    if (ierr.eq.0) then
+       if (blank_line) write(utmp, '()')
+    endif
     if (lev_verbose.ge.levq_column) then
        do j = 0, nbuf - 1
           hb = bufh(j)
@@ -5858,6 +5931,7 @@ contains
              call incr_logical_index(lidx, doml, nline)
           enddo
        endif
+       if (ierr.eq.0) blank_line = .TRUE.
     endif
 
   end subroutine flush_buffer_horizontally_column
@@ -7859,6 +7933,9 @@ contains
     ierr = 0
 #define DEBUG_COMPROMISE 0
     if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, bufo, pbuf, lstk, nbuf)
+    ! do j = 0, nbuf - 1
+    !    if (ierr.eq.0) write(*, *) 'tc/cidx', j, domR(j)%cidx
+    ! enddo
     if (ierr.eq.0) call set_inclusive_domain(ierr, domL, bufo, domR, pbuf, lstk, nbuf)
     if (ierr.eq.0) then
        nceff = domL%mco
@@ -8188,6 +8265,8 @@ contains
 
     ierr = 0
 
+    ! call show_lpp(ierr, lcp(0:lcoor-1), 'lcp')
+    ! call show_lpp(ierr, pcp(0:lcoor-1), 'pcp')
     do jc = 0, ref%mco - 1
        ! jo = ref%cidx(jc)
        jo = jc
@@ -8195,6 +8274,7 @@ contains
           call get_logical_range &
                & (ierr, b, e, flg, osh, cyc, jo, lcp, pcp, dom, ref)
        endif
+       ! write(*, *) 'glr', jo, jc, b, e, flg
        if (ierr.eq.0) then
           dom%bgn(jo) = b
           dom%end(jo) = max(e, 1+b)

@@ -1,3 +1,11 @@
+Release-1.12.1 / 2023-07-19
+===========================
+
+  * jmz: (chak) [SEVERE] reject invalid index coordinates.
+  * jmz: (chak) [FATAL] fix DUP, ZSIGN, GEU.
+  * jmz: (chak) introduce ID, DEAL, DSET.
+  * jmz: (chak) buffers separated by blank line at FLUSHing.
+
 Release-1.12 / 2023-07-05
 =========================
 
