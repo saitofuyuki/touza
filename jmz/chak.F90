@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/07/05 15:01:44 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/13 13:46:27 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -69,6 +69,7 @@ program chak
   character(len=lfmt),save :: afmt_flt = '(es16.12)'
   character(len=lfmt),save :: afmt_dbl = '(es16.12)'
 
+  logical,save :: blank_line = .FALSE.
 !!!_  - misc
   integer irecw
 
@@ -5267,6 +5268,10 @@ contains
 
        if (ierr.eq.0) call get_obj_string(ierr, val, hb)
 
+       if (ierr.eq.0) then
+          if (blank_line) write(utmp, '()')
+       endif
+
        if (is_msglev(lev_verbose, -levq_rec)) then
           if (ierr.eq.0) write(utmp, 213) &
                & user_index_bgn(jbuf), trim(val), trim(obuffer(jb)%desc), trim(obuffer(jb)%desc2)
@@ -5371,6 +5376,7 @@ contains
                 enddo
              end select
           endif
+          if (ierr.eq.0) blank_line = .TRUE.
        endif
     enddo
   end subroutine flush_buffer_each
@@ -5434,6 +5440,9 @@ contains
 211 format('#', A, 1x, A, 1x, A)
 
     ! write(*, *) def_write%kfmt, trim(def_write%fmt)
+    if (ierr.eq.0) then
+       if (blank_line) write(utmp, '()')
+    endif
 
     do jbuf = 0, nbuf - 1
        jb = bufj(jbuf)
@@ -5573,6 +5582,7 @@ contains
           endif
        endif
     enddo
+    if (ierr.eq.0) blank_line = .TRUE.
     if (ierr.eq.0) then
        if (allocated(vals)) deallocate(vals, STAT=ierr)
     endif
@@ -5617,6 +5627,9 @@ contains
     if (ierr.eq.0) call copy_buffer_pcp(ierr, pbuf, nbuf, bufh)
     if (ierr.eq.0) call get_compromise_domain(ierr, doml, domr, htmp, pbuf, lstk, nbuf, cmode)
 
+    if (ierr.eq.0) then
+       if (blank_line) write(utmp, '()')
+    endif
     if (lev_verbose.ge.levq_column) then
        do j = 0, nbuf - 1
           hb = bufh(j)
@@ -5712,6 +5725,7 @@ contains
              call incr_logical_index(lidx, doml)
           enddo
        endif
+       if (ierr.eq.0) blank_line = .TRUE.
     endif
 
   end subroutine flush_buffer_horizontally
@@ -5788,6 +5802,9 @@ contains
        nline = doml%iter(cline)
     endif
 
+    if (ierr.eq.0) then
+       if (blank_line) write(utmp, '()')
+    endif
     if (lev_verbose.ge.levq_column) then
        do j = 0, nbuf - 1
           hb = bufh(j)
@@ -5914,6 +5931,7 @@ contains
              call incr_logical_index(lidx, doml, nline)
           enddo
        endif
+       if (ierr.eq.0) blank_line = .TRUE.
     endif
 
   end subroutine flush_buffer_horizontally_column
@@ -7915,6 +7933,9 @@ contains
     ierr = 0
 #define DEBUG_COMPROMISE 0
     if (ierr.eq.0) call tweak_coordinates(ierr, domL, domR, bufo, pbuf, lstk, nbuf)
+    ! do j = 0, nbuf - 1
+    !    if (ierr.eq.0) write(*, *) 'tc/cidx', j, domR(j)%cidx
+    ! enddo
     if (ierr.eq.0) call set_inclusive_domain(ierr, domL, bufo, domR, pbuf, lstk, nbuf)
     if (ierr.eq.0) then
        nceff = domL%mco
@@ -8244,6 +8265,8 @@ contains
 
     ierr = 0
 
+    ! call show_lpp(ierr, lcp(0:lcoor-1), 'lcp')
+    ! call show_lpp(ierr, pcp(0:lcoor-1), 'pcp')
     do jc = 0, ref%mco - 1
        ! jo = ref%cidx(jc)
        jo = jc
@@ -8251,6 +8274,7 @@ contains
           call get_logical_range &
                & (ierr, b, e, flg, osh, cyc, jo, lcp, pcp, dom, ref)
        endif
+       ! write(*, *) 'glr', jo, jc, b, e, flg
        if (ierr.eq.0) then
           dom%bgn(jo) = b
           dom%end(jo) = max(e, 1+b)
