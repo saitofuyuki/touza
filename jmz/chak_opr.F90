@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/30 17:08:38 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/09 10:31:38 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1871,6 +1871,26 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_GEF
+!!!_   . apply_BINARY_ID
+  subroutine apply_BINARY_ID &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_ID(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = elem_ID(Z(jz), FX,    FZ, FX)
+       endif
+    enddo
+  end subroutine apply_BINARY_ID
 !!!_  - lazy operations
 !!!_   . apply_BINARY_lazy_OR
   subroutine apply_BINARY_lazy_OR &
@@ -2850,14 +2870,14 @@ contains
     endif
   end function elem_NEG
 !!!_   & elem_ZSIGN() - return -1,0,+1 if negative, zero, positive
-  ELEMENTAL &
+  ! ELEMENTAL &
   real(kind=KBUF) function elem_ZSIGN (X, F) result(Z)
     implicit none
     real(kind=KBUF),intent(in) :: X
     real(kind=KBUF),intent(in) :: F
     if (X.eq.F) then
        Z = F
-    else if (F.eq.ZERO) then
+    else if (X.eq.ZERO) then
        Z = ZERO
     else
        Z = SIGN(ONE, X)
@@ -3706,6 +3726,26 @@ contains
        Z = FX
     endif
   end function elem_GEF
+!!!_   & elem_ID() - 1 if X==Y else MISS
+  ELEMENTAL &
+  real(kind=KBUF) function elem_ID (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX) then
+       if (Y.eq.FY) then
+          Z = TRUE
+       else
+          Z = FX
+       endif
+    else if (Y.eq.FY) then
+       Z = FX
+    else if (X.eq.Y) then
+       Z = TRUE
+    else
+       Z= FX
+    endif
+  end function elem_ID
 !!!_  - conditional operators (undef)
 !!!_   & elem_EQ() - binary or UNDEF for if X == Y
   ELEMENTAL &
@@ -3786,9 +3826,9 @@ contains
     if (X.eq.FX.or.Y.eq.FY) then
        Z = FX
     else if (X.ge.Y) then
-       Z = X
+       Z = TRUE
     else
-       Z = FX
+       Z = FALSE
     endif
   end function elem_GE
 !!!_  - mathematic binary operators

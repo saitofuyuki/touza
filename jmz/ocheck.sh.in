@@ -1,5 +1,5 @@
 #!/bin/sh
-# Time-stamp: <2023/06/20 17:21:57 fuyuki ocheck.sh.in>
+# Time-stamp: <2023/07/18 14:59:40 fuyuki ocheck.sh.in>
 
 set -u
 
@@ -8,95 +8,341 @@ this=$0
 CHAK=@CHAK@
 CHAK_OPTS=@CHAK_OPTS@
 FORCE=
-test x"$CHAK" = x && echo "CHAK not defined" && exit 1
-test ! -x "$CHAK" && echo "cannot run $CHAK" && exit 1
+test x"$CHAK" = x && echo "CHAK not defined" >&2 && exit 1
+test ! -x "$CHAK" && echo "cannot run $CHAK" >&2 && exit 1
 
-# stack
-OPRS_stack='DUP COPY CLONE POP EXCH NOP DIST INSERT REPEAT FLUSH DFLUSH'
-# unary
-OPRS_unary='NEG INV ABS SQR SIGN ZSIGN FLOOR CEIL ROUND TRUNC INT BITNOT'
-# ubool
-OPRS_ubool='NOT BOOL BIN'
-# bool
-OPRS_bool='EQB NEB LTB GTB LEB GEB EQ NE LT GT LE GE EQU NEU LTU GTU LEU GEU'
 # binary
-OPRS_binary='AND MASK ADD SUB MUL DIV IDIV MOD POW MODULO BITAND BITOR BITXOR LSHIFT RSHIFT MIN MAX EXTR CDIFF FDIFF BDIFF'
-# filter
-OPRS_filter='EQF NEF LTF GTF LEF GEF'
+OPRS_binary='AND MASK ADD SUB MUL DIV RDIV IDIV MOD POW MODULO SIGN BITAND BITOR BITXOR LSHIFT RSHIFT MIN MAX EXTR CDIFF FDIFF BDIFF'
 # lazy
 OPRS_lazy='OR LOR ROR XOR LAND LMASK LLAY LAY RLAY LADD LSUB LMUL LDIV LMIN LMAX'
+# bool
+OPRS_bool='EQB NEB LTB GTB LEB GEB EQ NE LT GT LE GE EQU NEU LTU GTU LEU GEU'
+# filter
+OPRS_filter='EQF NEF LTF GTF LEF GEF ID'
+# unary
+OPRS_unary='NEG INV ABS SQR SIGN1 ZSIGN FLOOR CEIL ROUND TRUNC INT BITNOT'
+# ubool
+OPRS_ubool='NOT BOOL BIN'
+# stack
+OPRS_stack='DUP COPY CLONE POP PROP EXCH NOP DIST ROLL DEAL INSERT REPEAT FLUSH DFLUSH CFLUSH FLOAT'
 # float
-OPRS_float='SQRT EXP LOG LOG10 SIN COS TAN ASIN ACOS ATAN2 SINH COSH TANH R2D D2R HYPOT EXPONENT FRACTION SCALE NEAREST SPACING RRSP'
+OPRS_float='SQRT EXP LOG LOG10 SIN COS TAN ASIN ACOS ATAN ATAN2 SINH COSH TANH R2D D2R HYPOT EXPONENT FRACTION SCALE NEAREST SPACING RRSP'
+# ternary
+OPRS_ternary='IFELSE INRANGE BLEND'
 # index
 OPRS_index='C0 C1 C2 C3 X Y Z FLAT INDEX'
 
+# ---------------------------------------- input file
 gen_input ()
 {
-  CX=xx; CY=yy
-  aa=$1; bb=$2;  shift 2 || return $?
-  cc=$1; shift || return $?
-  ia=$(basename $aa)
-  ib=$(basename $bb)
-  ic=$(basename $cc)
+  :
+}
 
-  # $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/:3,$CY/:4 X 2 NEF 1 ADD MUL INT = $aa ITEM=$ia FMT=ui4 || return $?
-  # $CHAK -H0 $FORCE $CHAK_OPTS 11 SHAPE=$CX/:4,$CY/:3 Y 2 NEF 1 ADD MUL INT = $bb ITEM=$ib FMT=ui4 || return $?
-  # $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/:4,$CY/:3 Y 2 NEF 1 ADD MUL INT = $cc ITEM=$ic FMT=ui4 || return $?
-  
-  local bgn=0 mem=3
-  local end=$((bgn+mem))
-  local nan=$((end-1))
-  local ofs=$((1-bgn))
+# ---------------------------------------- binary
+check_binary ()
+{
+  opr=$1
+  case $opr in
+  ADD)     test_binary $opr 33 11  44;;
+  SUB)     test_binary $opr 33 11  22;;
+  MUL)     test_binary $opr 33 11  363;;
+  DIV)     test_binary $opr 33 11  3;;
 
-  $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/$bgn:$end       X $nan NEF $ofs ADD MUL INT = $aa ITEM=$ia FMT=ui4 || return $?
-  $CHAK -H0 $FORCE $CHAK_OPTS 11 SHAPE=,$CY/$bgn:$end      Y $nan NEF $ofs ADD MUL INT = $bb ITEM=$ib FMT=ui4 || return $?
-  # $CHAK -H0 $FORCE $CHAK_OPTS 1  SHAPE=$CX/:4,$CY/:3 Y 3 NEF 1 ADD MUL INT = $cc ITEM=$ic FMT=ui4 || return $?
+  LADD)    test_binary $opr 33 11  44;;
+  LSUB)    test_binary $opr 33 11  22;;
+  LMUL)    test_binary $opr 33 11  363;;
+  LDIV)    test_binary $opr 33 11  3;;
 
-  return 0
+  IDIV)    test_binary $opr 24 16  1;;
+  RDIV)    test_binary $opr 24 16  1.5;;
+  MOD)     test_binary $opr 37 11  4;;
+  POW)     test_binary $opr 37 3   50653;;
+  MODULO)  test_binary $opr -3 11  8;;
+  SIGN)    test_binary $opr 3  -1  -3;;
+
+  BITAND)  test_binary $opr 10 12  8;;
+  BITOR)   test_binary $opr 10 12 14;;
+  BITXOR)  test_binary $opr 10 12  6;;
+  LSHIFT)  test_binary $opr 12 2  48;;
+  RSHIFT)  test_binary $opr 12 2   3;;
+
+  AND)     test_binary $opr 33 11  11;;
+  MASK)    test_binary $opr 33 11  33;;
+
+  LAND)    test_binary $opr 33 11  11;;
+  LMASK)   test_binary $opr 33 11  11;;
+
+  OR)      test_binary $opr 33 11  11;;
+  LOR)     test_binary $opr 33 11  11;;
+  ROR)     test_binary $opr 33 11  11;;
+
+  XOR)     test_binary $opr 33 11  11;;
+
+  LLAY)    test_binary $opr 33 11  11;;
+  LAY)     test_binary $opr 33 11  11;;
+  RLAY)    test_binary $opr 33 11  11;;
+
+  # MIN|MAX) echo "To implement: $opr" >&2;;
+  MIN)     test_binary $opr 2  1 1  3 2;;
+  MAX)     test_binary $opr 2  1 2  3 3;;
+
+  LMIN)    test_binary $opr 2  1 1  3 2;;
+  LMAX)    test_binary $opr 2  1 2  3 3;;
+
+  EQ*)     test_binary $opr 3  3 1  2 0;;
+  NE*)     test_binary $opr 3  3 0  2 1;;
+  GT*)     test_binary $opr 3  2 1  3 0 4 0;;
+  GE*)     test_binary $opr 3  2 1  3 1 4 0;;
+  LT*)     test_binary $opr 3  2 0  3 0 4 1;;
+  LE*)     test_binary $opr 3  2 0  3 1 4 1;;
+
+  ID)      test_binary $opr 3  3 1  2 0;;
+
+  EXTR|CDIFF|FDIFF|BDIFF) echo "Reserved: $opr" >&2;;
+  *)   echo "Not implemented operator: $opr" >&2; exit 1;;
+  esac
 }
 
 test_binary ()
 {
-  bin0=$1; bin1=$2; shift 2 || return $?
-  boutd=$1; shift || return $?
-  bcmd=
-  bfile=
-  for bo in "$@"
+  opr=$1; shift
+  vx=$1
+  shift || return $?
+
+  testd=$workd/$opr
+  mkdir -p $testd || return $?
+
+  fx=$testd/x
+  fy=$testd/y
+  fz=$testd/z
+
+  seq=""
+  vy=; vz=
+  VZ=""
+  col=2
+  while test $# -gt 0
   do
-    bout=$boutd/out.$bo
-    bcmd="$CHAK -qq -H0 $FORCE $CHAK_OPTS $bin0 $bin1 REPEAT $bo FLUSH"
-    case $TEST in
-    create) test x"$FORCE" != x && rm -f $bout
-            test -e $bout && echo "Exists $bout" >&2 && return 1
-            eval "$bcmd" > $bout
-            ;;
-    compare)
-            test ! -e $bout && echo "Not exists $bout" >&2 && return 1
-            eval "$bcmd" | diff - $bout
-            ;;
-    esac
+    vy=$1 vz=$2
+    shift 2 || return $?
+    seq="$seq $vy SHAPE=$col ROR"
+    VZ="$VZ $vz"
+    col=$(expr $col + 1)
   done
+
+  run_chak -qq $force $vy SHAPE=1:3 X 1 NEF MASK $seq SHAPE=+/0:3,0/1: = $fy FMT=ui4 ITEM=y || return $?
+  run_chak -qq $force $vx SHAPE=1:3 X 1 NEF MASK      SHAPE=:,0:$col   = $fx FMT=ui4 ITEM=x || return $?
+
+  run_chak -qq $force $fx $fy $opr = $fz FMT=ui4  || return $?
+
+  echo "## $opr $VZ"
+  run_chak -qqq $fx $fy REPEAT $opr FLUSH -i | column -t || return $?
+  run_chak -qqq $fx $fy $fz FLUSH -i | column -t || return $?
+  echo
+  return 0
 }
 
+# unary
+check_unary ()
+{
+  opr=$1
+  case $opr in
+  NEG)     test_unary $opr 3  -3;;
+  INV)     test_unary $opr 4.0 0.25;;
+  ABS)     test_unary $opr -3  3;;
+  SQR)     test_unary $opr -4  16;;
+  SQRT)    test_unary $opr 16  4;;
+  SIGN1)   test_unary $opr -4  -1;;
+  ZSIGN)   test_unary $opr 2  1  0 0  -2 -1;;
+  FLOOR)   test_unary $opr -3.5  -4   3.5 3;;
+  CEIL)    test_unary $opr -3.5  -3   3.5 4;;
+  ROUND)   test_unary $opr -3.5  -4   -3.25 -3  3.25 3 3.5 4;;
+  TRUNC)   test_unary $opr -3.5  -3   -3.25 -3  3.25 3 3.5 3;;
+  INT)     test_unary $opr -3.5  -3   -3.25 -3  3.25 3 3.5 3;;
+  BITNOT)  test_unary $opr 10   -11   -10   9;;
+  NOT)     test_unary $opr 3   3;;
+  BOOL)    test_unary $opr 3   1;;
+  BIN)     test_unary $opr 3   1;;
+  *)   echo "Not implemented operator: $opr" >&2; exit 1;;
+  esac
+}
 
+test_unary ()
+{
+  opr=$1; shift
+
+  testd=$workd/$opr
+  mkdir -p $testd || return $?
+
+  fx=$testd/x
+  fz=$testd/z
+
+  seq=""
+  vx=; vz=
+  VZ=""
+  col=2
+  while test $# -gt 0
+  do
+    vx=$1 vz=$2
+    shift 2 || return $?
+    seq="$seq $vx SHAPE=$col ROR"
+    VZ="$VZ $vz"
+    col=$(expr $col + 1)
+  done
+
+  run_chak -qq $force $vx SHAPE=1:3 X 1 NEF MASK $seq = $fx FMT=ur4 ITEM=x || return $?
+  run_chak -qq $force $fx $opr = $fz FMT=ur4  || return $?
+
+  echo "## $opr $VZ"
+  run_chak -qqq $fx REPEAT $opr FLUSH -i | column -t || return $?
+  run_chak -qqq $fx $fz FLUSH -i | column -t || return $?
+  echo
+  return 0
+}
+
+# stack
+check_stack ()
+{
+  opr=$1
+  ## OPRS_stack='COPY CLONE POP NOP FLUSH DFLUSH CFLUSH FLOAT'
+  case $opr in
+  DIST)   check_stack_DUP  $opr || return $?;;
+  DUP)    check_stack_DUP  $opr || return $?;;
+  EXCH)   check_stack_DUP  $opr || return $?;;
+  INSERT) check_stack_DUP  $opr || return $?;;
+  PROP)   check_stack_DUP  $opr || return $?;;
+  REPEAT) check_stack_DUP  $opr || return $?;;
+  ROLL)   check_stack_DUP  $opr || return $?;;
+  DEAL)   check_stack_DUP  $opr 1 2 3 4 5 6 7 8 || return $?;;
+  *)   echo "Not implemented operator: $opr" >&2; exit 1;;
+  esac
+}
+
+check_stack_DUP ()
+{
+  opr=$1; shift
+  input="$*"
+  test x"$input" = x && input="1 2 3 4"
+  output="FLUSH -i"
+  run_chak -qq $force $input $opr   $output
+  run_chak -qq $force $input $opr=2 $output
+  run_chak -qq $force $input $opr=3 $output
+  run_chak -qq $force $input $opr=4 $output
+
+  run_chak -qq $force $input $opr   ITER $output
+  run_chak -qq $force $input $opr=2 ITER $output
+  run_chak -qq $force $input $opr=3 ITER $output
+  run_chak -qq $force $input $opr=4 ITER $output
+
+  minput="9 MARK $input"
+  run_chak -qq $force $minput $opr   ITER $output
+  run_chak -qq $force $minput $opr=2 ITER $output
+  run_chak -qq $force $minput $opr=3 ITER $output
+  run_chak -qq $force $minput $opr=4 ITER $output
+
+  minput="9 STOP $input"
+  run_chak -qq $force $minput $opr   ITER $output
+  run_chak -qq $force $minput $opr=2 ITER $output
+  run_chak -qq $force $minput $opr=3 ITER $output
+  run_chak -qq $force $minput $opr=4 ITER $output
+
+  minput="$input MARK"
+  run_chak -qq $force $minput $opr   ITER $output
+  minput="$input MARK 8"
+  run_chak -qq $force $minput $opr   ITER $output
+}
+
+# ---------------------------------------- run_chak
+run_chak ()
+{
+  echo "run: chak $CHAK_OPTS $*" >&2
+  eval $CHAK $CHAK_OPTS "$@"; err=$?
+  return $err
+}
+# ---------------------------------------- is_incl
+is_incl ()
+{
+  __o=$1; shift
+  while test $# -gt 0
+  do
+    test $__o = $1 && return 0
+    shift
+  done
+  return 1
+}
 # ---------------------------------------- dispatcher
-workd=log
-test0=$workd/aa
-test1=$workd/bb
-test00=$workd/cc
-mkdir -p $workd
+workd=log/$(basename $this)
+workd=${workd%%.*}
 force=
-TEST=create
 
-for sub in $@
+while test $# -gt 0
 do
-  case $sub in
-  -f) FORCE=-f;;
-  -c) TEST=compare;;
-  input)  gen_input $test0 $test1 $test00 || exit $?;;
-  binary) test_binary $test0 $test1  $workd  $OPRS_binary
-          test_binary $test0 $test00 $workd  $OPRS_lazy $OPRS_bool $OPRS_filter
-          ;;
-  *) echo "$this: Aborts. Unknown test $sub." >&2; exit 1;;
+  case $1 in
+  -f) force=-f;;
+  -*) echo "Invalid argument: $1" >&2; exit 1;;
+  *)  break;;
+  esac
+  shift
+done
+
+for opr in "$@"
+do
+  case $opr in
+  bin*)
+    for opr in $OPRS_binary
+    do
+      check_binary $opr || exit $?
+    done;;
+  laz*)
+    for opr in $OPRS_lazy
+    do
+      check_binary $opr || exit $?
+    done;;
+  boo*)
+    for opr in $OPRS_bool
+    do
+      check_binary $opr || exit $?
+    done;;
+  fil*)
+    for opr in $OPRS_filter
+    do
+      check_binary $opr || exit $?
+    done;;
+  un*)
+    for opr in $OPRS_unary
+    do
+      check_unary $opr || exit $?
+    done;;
+  ub*)
+    for opr in $OPRS_ubool
+    do
+      check_unary $opr || exit $?
+    done;;
+  st*)
+    for opr in $OPRS_stack
+    do
+      check_stack $opr || exit $?
+    done;;
+  *)
+    if is_incl $opr $OPRS_binary; then
+      check_binary $opr || exit $?
+    elif is_incl $opr $OPRS_lazy; then
+      check_binary $opr || exit $?
+    elif is_incl $opr $OPRS_bool; then
+      check_binary $opr || exit $?
+    elif is_incl $opr $OPRS_filter; then
+      check_binary $opr || exit $?
+    elif is_incl $opr $OPRS_unary; then
+      check_unary $opr || exit $?
+    elif is_incl $opr $OPRS_ubool; then
+      check_unary $opr || exit $?
+    elif is_incl $opr $OPRS_stack; then
+      check_stack $opr || exit $?
+    else
+      echo "Unknown operator to test: $opr" >&2
+      exit 1
+    fi
+    ;;
   esac
 done
+
+exit 0

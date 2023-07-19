@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/06/30 16:12:12 fuyuki genopr.sh>
+# Time-stamp: <2023/07/08 16:59:37 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -104,20 +104,22 @@ register_all ()
   register -g anchor GO   'remove last anchor'
 
   # stack manipulation
-  register -g stack -n 1,2         DUP      'duplicate top stack'
-  register -g stack -n 1,2         COPY     'copy top stack on new buffer'
-  register -g stack -n 1,1         CLONE    'copy top stack on new buffer and discard the original'
-  register -g stack -n 1,0 -o NAME POP      'discard top stack and optionally tag'
-  register -g stack -n 1,0         PROP     'show stack properties and pop'
-  register -g stack -n 2,2         EXCH     'B A; exchange two top stacks'
-  register -g stack -n 0,0         NOP      'no operation; do nothing'
-  register -g stack +n m,'2(m-1)'  DIST     'distribute top stack for every stack from last anchor'
-  register -g stack +n m,m         ROLL     'rotate from last anchor'
-  register -g stack +n m,m         INSERT   'move top stack after last anchor'
-  register -g stack +n m,'2m'      REPEAT   'repeat from last non-adjacent anchor'
-  register -g stack +n m,0         FLUSH    'flush-out from last anchor'
-  register -g stack +n m,0         DFLUSH   'flush-out from last anchor (defined only)'
-  register -g stack +n m,0         CFLUSH   'flush-out from last anchor (columnized)'
+  register -g stack -n 1,2         -o TUPLE DUP      'duplicate top stack'
+  register -g stack -n 1,2         -o TUPLE COPY     'copy top stack on new buffer'
+  register -g stack -n 1,1         -o TUPLE CLONE    'copy top stack on new buffer and discard the original'
+  register -g stack -n 1,0 -o 'NAME|TUPLE'  POP      'discard top stack and optionally tag'
+  register -g stack -n 1,0         -o TUPLE PROP     'show stack properties and pop'
+  register -g stack -n 2,2         -o TUPLE EXCH     'B A; exchange two top stacks'
+  register -g stack -n 0,0                  NOP      'no operation; do nothing'
+  register -g stack +n m,'2(m-1)'  -o TUPLE DIST     'distribute top stack for every stack from last anchor'
+  register -g stack +n m,m         -o TUPLE ROLL     'rotate from last anchor'
+  register -g stack +n m,m         -o TUPLE DEAL     'shuffle (transpose)'
+  register -g stack +n m,m         -o TUPLE INSERT   'move top stack after last anchor'
+  register -g stack +n m,'2m'      -o TUPLE REPEAT   'repeat from last non-adjacent anchor'
+  register -g stack +n m,0         -o TUPLE FLUSH    'flush-out from last anchor'
+  register -g stack +n m,0         -o TUPLE DFLUSH   'flush-out from last anchor (defined only)'
+  register -g stack +n m,0         -o TUPLE CFLUSH   'flush-out from last anchor (columnized)'
+
   register -g stack -n 1,1 -f DUP -c float FLOAT 'change type as floating point'
 
   # queue manipulation
@@ -253,6 +255,9 @@ register_all ()
   register -g filter -n 2,1 -i call GTF      'A if A>B, else MISS'
   register -g filter -n 2,1 -i call LEF      'A if A<=B, else MISS'
   register -g filter -n 2,1 -i call GEF      'A if A>=B, else MISS'
+
+  # special
+  register -g filter -n 2,1 -i call -c int ID 'identical; 1 if identical, else MISS.'
 
   # ternary operation
   register -n 3,1 -i call INRANGE 'A if B<=A<=C else MISS'

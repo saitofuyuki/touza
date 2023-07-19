@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/07/05 13:51:16 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/07 16:12:37 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -998,6 +998,8 @@ contains
 
     jlogc = dom%lidx(jodr)
     jphyc = dom%cidx(jodr)
+    ! write(*, *) 'odr', jodr, jlogc, jphyc
+
     if (jlogc.ge.0) then
        osh = lcp(jlogc)%ofs
        cyc = lcp(jlogc)%cyc
@@ -1028,7 +1030,6 @@ contains
 
     flg = loop_unset
     if (jphyc.ge.0) then
-       ! write(*, *) b, e, pcp(jphyc)%bgn, pcp(jphyc)%end, pcp(jphyc)%flg
        bp = pcp(jphyc)%bgn
        ep = pcp(jphyc)%end
        flg = pcp(jphyc)%flg
@@ -1554,6 +1555,7 @@ contains
     cpidx(0:mco-1) = co_unset
     cname(0:mco-1) = ' '
     ctype(0:mco-1) = co_unset
+    ! write(*, *) 'cp/0', cpidx(0:mco-1)
     ! count ranks
     nranks = 0
     do jco = mco - 1, 0, -1
@@ -1592,9 +1594,13 @@ contains
              endif
           else
              call parse_number(jerr, jco, cold)
+             ! write (*,*) 'jco/0', jco, trim(cold)
              if (jerr.eq.0) then
                 jco = system_index_bgn(jco)
                 if (jco.lt.0.or.jco.ge.nranks) then
+                   ierr = ERR_INVALID_PARAMETER
+                   call message(ierr, 'no coordinate ' // trim(cold))
+                   exit
                    jco = co_unset
                 else
                    cold = pcp(jco)%name
@@ -1602,10 +1608,11 @@ contains
              else
                 jco = find_first(pcp(0:nranks-1)%name, cold, offset=0)
              endif
+             ! write (*,*) 'jco/1', jco, nranks
              if (jco.lt.0) then
                 if (pcp(jodr)%name.ne.' '.or.xold) then
                    ierr = ERR_INVALID_PARAMETER
-                   call message(ierr, 'no coordinate ' // cold)
+                   call message(ierr, 'no coordinate ' // trim(cold))
                    exit
                 else if (pcp(jodr)%name.eq.' ') then
                    jco = jodr
@@ -1626,6 +1633,7 @@ contains
                 !    nins = nins + 1
                 ! endif
              endif
+             ! write (*,*) 'jco/2', jco, nranks
           endif
           if (jco.ge.0) then
              tblp2l(jco) = jodr
@@ -1635,11 +1643,13 @@ contains
              cpidx(jodr) = jco
              cname(jodr) = cold
           endif
+          ! write(*, *) 'cp/00', jodr, cpidx(0:mco-1)
           if (xrep) cname(jodr) = crep
 ! 101       format('parse_shape:', I0, 1x, I0, ' [', A, '] > ', '[', A, ',', L1,'][', A, ',', L1, ']')
 !           write(*, 101) jodr, jco, trim(lcp(jodr)%name), trim(cold), xold, trim(crep), xrep
        endif
     enddo
+    ! write(*, *) 'cp/1', cpidx(0:mco-1)
     if (ierr.eq.0) then
        ! adjust unset
        jnull = 0
@@ -1672,6 +1682,7 @@ contains
           endif
        enddo
     endif
+    ! write(*, *) 'cp/2', cpidx(0:mco-1)
     ! write(*, *) 'p2l', tblp2l(0:mco-1)
 
     nrphy = 0
@@ -1689,6 +1700,7 @@ contains
           if ((cpidx(jodr).ge.0.or.ctype(jodr).ne.co_null) .and. ceff) nrphy = jodr + 1
        enddo
     endif
+    ! write(*, *) 'cp/9', cpidx(0:mco-1)
 
   end subroutine get_logical_shape
 
