@@ -5,18 +5,18 @@
 #define VCS_TYPE		'git'
 #define VCS_BASENAME	'package'
 #define VCS_UUID		'9a261761c4ebd54bb1c70f170b6a035a99a92914'
-#define VCS_NUM			355
-#define VCS_DATE		'2023-07-05T10:10:09Z'
+#define VCS_NUM			366
+#define VCS_DATE		'2023-07-19T23:25:22Z'
 #define VCS_BRANCH		'debian/base'
-#define VCS_TAG			'Release-1.12'
+#define VCS_TAG			'upstream/1.12'
 #define VCS_TAG_OPENPGP	' '
-#define VCS_TICK		16
+#define VCS_TICK		11
 #define VCS_EXTRA		' '
 
-#define VCS_ACTION_STAMP	'2023-07-05T10:10:09Z!saitofuyuki@jamstec.go.jp'
-#define VCS_FULL_HASH		'fe4941c474f23fd6bf105c2323fb7781ad271a30'
+#define VCS_ACTION_STAMP	'2023-07-19T23:25:22Z!saitofuyuki@jamstec.go.jp'
+#define VCS_FULL_HASH		'26fca1fa59440eace2ca6e6ac418ee6bd7aa5ffa'
 #define VCS_COMMIT_OPENPGP	' '
-#define VCS_SHORT_HASH		'fe4941c4'
+#define VCS_SHORT_HASH		'26fca1fa'
 
 #define VCS_WC_MODIFIED		1
 
