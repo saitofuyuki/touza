@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/07/09 10:31:38 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/25 17:26:53 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -2152,6 +2152,26 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_NEAREST
+!!!_   . apply_BINARY_SETE
+  subroutine apply_BINARY_SETE &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_SETE(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_SETE
 
 !!!_   . apply_UNARY_BITNOT
   subroutine apply_UNARY_BITNOT &
@@ -3969,6 +3989,18 @@ contains
        Z = NEAREST(X, Y)
     endif
   end function elem_NEAREST
+!!!_    * elem_SETE()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_SETE (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else
+       Z = SET_EXPONENT(X, INT(Y))
+    endif
+  end function elem_SETE
 !!!_    * elem_IFELSE()
   ELEMENTAL &
   real(kind=KBUF) function elem_IFELSE (X, Y, Z, FX, FY, FZ) result(W)

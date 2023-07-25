@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/07/08 16:59:37 fuyuki genopr.sh>
+# Time-stamp: <2023/07/28 15:19:26 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -218,6 +218,7 @@ register_all ()
   register -g float -n 2,1 -i call        NEAREST   'nearest(A,B)'
   register -g float -n 1,1 -i call        SPACING   'spacing(A)'
   register -g float -n 1,1 -i call        RRSP      'rrspacing(A)'
+  register -g float -n 2,1 -i call        SETE      'set_exponent(A)'
 
   # other operation
   register         -n 2,1 -i call -P sweep=stack  MIN    'min(A,B)'
@@ -318,6 +319,7 @@ register_all ()
   register -g header        -p STRING      ITEM    "item replacement or filter"
   register -g header        -p STRING      UNIT
   register -g header        -p STRING      TITLE
+  register -g header        -p STRING      ETITLE
   register -g header        -p STRING      EDIT
   register -g header        -p STRING      DSET
   register -g header        -p LIST   -s T TSEL    "time filter"

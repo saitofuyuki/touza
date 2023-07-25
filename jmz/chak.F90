@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/07/13 13:46:27 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/07/28 15:20:56 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1784,7 +1784,7 @@ contains
 !!!_   . parse_header_opr
   subroutine parse_header_opr (ierr, hopr, arg)
     use TOUZA_Nio,only: hi_ITEM, hi_TITL1, hi_UNIT, hi_EDIT1, hi_DSET
-    use TOUZA_Nio,only: hi_MISS
+    use TOUZA_Nio,only: hi_MISS, hi_ETTL1
     use TOUZA_Nio,only: put_item, store_item
     use TOUZA_Std,only: parse_number
     implicit none
@@ -1852,7 +1852,7 @@ contains
              ierr = ERR_INVALID_ITEM
              call message(ierr, 'no file to set record filter' // trim(arg))
           endif
-       case(opr_ITEM, opr_UNIT, opr_TITLE, opr_EDIT, opr_DSET)
+       case(opr_ITEM, opr_UNIT, opr_TITLE, opr_EDIT, opr_DSET, opr_ETITLE)
           select case(hopr)
           case(opr_ITEM)
              jitem = hi_ITEM
@@ -1860,6 +1860,8 @@ contains
              jitem = hi_UNIT
           case(opr_TITLE)
              jitem = hi_TITL1
+          case(opr_ETITLE)
+             jitem = hi_ETTL1
           case(opr_EDIT)
              jitem = hi_EDIT1
           case(opr_DSET)
@@ -5073,6 +5075,8 @@ contains
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_SPACING)
        else if (handle.eq.opr_RRSP) then
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_RRSP)
+       else if (handle.eq.opr_SETE) then
+          call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_SETE)
 !!!_    * ternary
        else if (handle.eq.opr_IFELSE) then
           call apply_opr_TERNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_TERNARY_IFELSE)

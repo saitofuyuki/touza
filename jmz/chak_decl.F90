@@ -1,6 +1,6 @@
 !!!_! jmz/chak_decl.F90 - TOUZA/Jmz CH(swiss) army knife operator symbol declaration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-07-08T16:59:48+09:00
+! Created by genopr.sh at 2023-07-28T15:20:10+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -151,6 +151,7 @@
   character(len=*),parameter :: str_NEAREST = 'NEAREST'
   character(len=*),parameter :: str_SPACING = 'SPACING'
   character(len=*),parameter :: str_RRSP = 'RRSP'
+  character(len=*),parameter :: str_SETE = 'SETE'
   !! group: ternary
   character(len=*),parameter :: str_IFELSE = 'IFELSE'
   character(len=*),parameter :: str_INRANGE = 'INRANGE'
@@ -185,6 +186,7 @@
   character(len=*),parameter :: str_ITEM = 'ITEM'
   character(len=*),parameter :: str_UNIT = 'UNIT'
   character(len=*),parameter :: str_TITLE = 'TITLE'
+  character(len=*),parameter :: str_ETITLE = 'ETITLE'
   character(len=*),parameter :: str_EDIT = 'EDIT'
   character(len=*),parameter :: str_DSET = 'DSET'
   character(len=*),parameter :: str_TSEL = 'T'
@@ -368,68 +370,70 @@
   integer,parameter :: opr_NEAREST = 126
   integer,parameter :: opr_SPACING = 127
   integer,parameter :: opr_RRSP = 128
-  integer,parameter :: grp_float_end = 129
+  integer,parameter :: opr_SETE = 129
+  integer,parameter :: grp_float_end = 130
   !! group: ternary
-  integer,parameter :: grp_ternary_bgn = 129
-  integer,parameter :: opr_IFELSE = 129
-  integer,parameter :: opr_INRANGE = 130
-  integer,parameter :: opr_BLEND = 131
-  integer,parameter :: grp_ternary_end = 132
+  integer,parameter :: grp_ternary_bgn = 130
+  integer,parameter :: opr_IFELSE = 130
+  integer,parameter :: opr_INRANGE = 131
+  integer,parameter :: opr_BLEND = 132
+  integer,parameter :: grp_ternary_end = 133
   !! group: reduce
-  integer,parameter :: grp_reduce_bgn = 132
-  integer,parameter :: acc_NORM = 132
-  integer,parameter :: opr_NORM = 133
-  integer,parameter :: acc_AVR = 134
-  integer,parameter :: opr_AVR = 135
-  integer,parameter :: acc_SUM = 136
-  integer,parameter :: opr_SUM = 137
-  integer,parameter :: acc_COUNT = 138
-  integer,parameter :: opr_COUNT = 139
-  integer,parameter :: acc_WSUM = 140
-  integer,parameter :: opr_WSUM = 141
-  integer,parameter :: acc_WMV = 142
-  integer,parameter :: opr_WMV = 143
-  integer,parameter :: grp_reduce_end = 144
+  integer,parameter :: grp_reduce_bgn = 133
+  integer,parameter :: acc_NORM = 133
+  integer,parameter :: opr_NORM = 134
+  integer,parameter :: acc_AVR = 135
+  integer,parameter :: opr_AVR = 136
+  integer,parameter :: acc_SUM = 137
+  integer,parameter :: opr_SUM = 138
+  integer,parameter :: acc_COUNT = 139
+  integer,parameter :: opr_COUNT = 140
+  integer,parameter :: acc_WSUM = 141
+  integer,parameter :: opr_WSUM = 142
+  integer,parameter :: acc_WMV = 143
+  integer,parameter :: opr_WMV = 144
+  integer,parameter :: grp_reduce_end = 145
   !! group: other
-  integer,parameter :: grp_other_bgn = 144
-  integer,parameter :: grp_other_end = 144
+  integer,parameter :: grp_other_bgn = 145
+  integer,parameter :: grp_other_end = 145
   !! group: index
-  integer,parameter :: grp_index_bgn = 144
-  integer,parameter :: opr_C0 = 144
-  integer,parameter :: opr_C1 = 145
-  integer,parameter :: opr_C2 = 146
-  integer,parameter :: opr_C3 = 147
-  integer,parameter :: opr_X = 148
-  integer,parameter :: opr_Y = 149
-  integer,parameter :: opr_Z = 150
-  integer,parameter :: opr_FLAT = 151
+  integer,parameter :: grp_index_bgn = 145
+  integer,parameter :: opr_C0 = 145
+  integer,parameter :: opr_C1 = 146
+  integer,parameter :: opr_C2 = 147
+  integer,parameter :: opr_C3 = 148
+  integer,parameter :: opr_X = 149
+  integer,parameter :: opr_Y = 150
+  integer,parameter :: opr_Z = 151
+  integer,parameter :: opr_FLAT = 152
   integer,parameter :: opr_INDEX = opr_FLAT
-  integer,parameter :: grp_index_end = 152
+  integer,parameter :: grp_index_end = 153
   !! group: shape
-  integer,parameter :: grp_shape_bgn = 152
-  integer,parameter :: opr_PERM = 152
-  integer,parameter :: opr_SHAPE = 153
-  integer,parameter :: opr_SIZE = 154
-  integer,parameter :: opr_SHIFT = 155
-  integer,parameter :: opr_CSHIFT = 156
-  integer,parameter :: opr_EOSHIFT = 157
-  integer,parameter :: grp_shape_end = 158
+  integer,parameter :: grp_shape_bgn = 153
+  integer,parameter :: opr_PERM = 153
+  integer,parameter :: opr_SHAPE = 154
+  integer,parameter :: opr_SIZE = 155
+  integer,parameter :: opr_SHIFT = 156
+  integer,parameter :: opr_CSHIFT = 157
+  integer,parameter :: opr_EOSHIFT = 158
+  integer,parameter :: grp_shape_end = 159
   !! group: header
-  integer,parameter :: grp_header_bgn = 158
-  integer,parameter :: opr_FMT = 158
-  integer,parameter :: opr_ITEM = 159
-  integer,parameter :: opr_UNIT = 160
-  integer,parameter :: opr_TITLE = 161
-  integer,parameter :: opr_EDIT = 162
-  integer,parameter :: opr_DSET = 163
-  integer,parameter :: opr_TSEL = 164
-  integer,parameter :: opr_RSEL = 165
-  integer,parameter :: opr_MISS = 166
-  integer,parameter :: opr_DUR = 167
-  integer,parameter :: grp_header_end = 168
+  integer,parameter :: grp_header_bgn = 159
+  integer,parameter :: opr_FMT = 159
+  integer,parameter :: opr_ITEM = 160
+  integer,parameter :: opr_UNIT = 161
+  integer,parameter :: opr_TITLE = 162
+  integer,parameter :: opr_ETITLE = 163
+  integer,parameter :: opr_EDIT = 164
+  integer,parameter :: opr_DSET = 165
+  integer,parameter :: opr_TSEL = 166
+  integer,parameter :: opr_RSEL = 167
+  integer,parameter :: opr_MISS = 168
+  integer,parameter :: opr_DUR = 169
+  integer,parameter :: grp_header_end = 170
   !! group: buffer
-  integer,parameter :: grp_buffer_bgn = 168
-  integer,parameter :: opr_TAG = 168
-  integer,parameter :: opr_DESC = 169
-  integer,parameter :: opr_FUNC = 170
-  integer,parameter :: grp_buffer_end = 171
+  integer,parameter :: grp_buffer_bgn = 170
+  integer,parameter :: opr_TAG = 170
+  integer,parameter :: opr_DESC = 171
+  integer,parameter :: opr_FUNC = 172
+  integer,parameter :: grp_buffer_end = 173
