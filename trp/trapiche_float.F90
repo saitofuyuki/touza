@@ -582,6 +582,7 @@ contains
     endif
     mbits = ixh - ixr + 1
     xbtm = ixl
+    ! write(*,*) 'helper input', ixh, ixl, ixone, mbits, xbits, xbtm
     return
   end subroutine helper_props_d
   subroutine helper_props_f &
@@ -4458,6 +4459,8 @@ program test_trapiche_float
   if (ierr.eq.0) call test_helper(ierr, 255.0_KRFLD, 1.0_KRFLD)
   do jx = 16, 14, -1
      if (ierr.eq.0) call test_helper(ierr, real(jx, kind=KRFLD), 1.0_KRFLD)
+     if (ierr.eq.0) call test_helper(ierr, real(jx, kind=KRFLD), real(jx, kind=KRFLD), 1.0_KRFLD)
+     if (ierr.eq.0) call test_helper(ierr, real(jx, kind=KRFLD), 1.0_KRFLD, 1.0_KRFLD)
      if (ierr.eq.0) call test_helper(ierr, real(jx, kind=KRFLD), 1.0_KRFLD, 0.25_KRFLD)
   enddo
   do jx = 9, 2, -1
