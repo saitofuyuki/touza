@@ -1,0 +1,225 @@
+#!/bin/sh
+# Maintainer: SAITO Fuyuki
+# Time-stamp: <2023/07/29 10:10:19 fuyuki gtfna.in>
+
+# Copyright (C) 2022,2023
+#           Japan Agency for Marine-Earth Science and Technology
+# Licensed under the Apache License, Version 2.0
+#   (https://www.apache.org/licenses/LICENSE-2.0)
+
+ref=gtfna
+
+@GTEML@
+
+show_help ()
+{
+  echo "$base - gtool-3.5 emulator for unary operation"
+  echo "  with touza-jmz $JMZ_VERSION; touza $TOUZA_VERSION"
+  echo
+  if test $base = $ref; then
+    echo "usage: $base [OPTIONS..] OPERATOR [INPUT] [out:OUTPUT] [OPTIONS..]"
+  else
+    echo "usage: $base [OPTIONS..] [INPUT] [out:OUTPUT] [OPTIONS..]"
+  fi
+
+  echo
+  echo "parameters:"
+  if test $base = $ref; then
+    olist="sqrt sqr inv abs log log10 exp sin cos tan asin acos atan sinh cosh tanh d2r r2d"
+    echo "  OPERATOR   $olist"
+  fi
+  echo "  INPUT      input file  (default: GTTMPDIR/gtool.out)"
+  echo "  out:OUTPUT output file (default: GTTMPDIR/gtool.out)"
+  echo "             if OUTPUT equals INPUT, INPUT renamed as GTTMPDIR/gtool.in"
+
+  echo
+  echo "options:"
+  echo "  -h         show this help"
+  echo "  -n         dry-run"
+  echo "  -v         verbose"
+  echo "  -q         quiet"
+  echo "  -f         overwrite OUTPUT if exists"
+  echo
+  echo "compatible options:"
+  echo "  -apnd         append to OUTPUT"
+  echo "  ofs=VALUE     set offset"
+  echo "  fact=VALUE    set factor"
+  echo "  deg=BOOLEAN   use degree unit for input (default T)"
+  echo "  t=[START][,[END][,[STEP]]]"
+  echo "                record selection"
+  echo "  item:STRING   edit header entries"
+  echo "  unit:STRING"
+  echo "  title:STRING"
+  echo "  dset:STRING"
+  echo "  edit:STRING"
+  echo "  ettl:STRING"
+  echo
+  echo "  Both KEY=VALUE and KEY:VALUE are accepted."
+  echo "  Other original options are not implemented."
+  echo
+  echo "notes (factor and offset):"
+  echo "  out = func(in) * fact + ofs"
+  echo "  Although the original manual describes that the result"
+  echo "  is func(in * fact + ofs), this is *THE* implemented"
+  echo "  behaviour of the gt* commands."
+  echo
+  echo "notes (edit and ettl entries):"
+  echo "  EDIT and ETTL setting of original commands are not implemented."
+  return 0
+}
+
+# cmd2opr <command>
+#    return <opr> as chak unary operator
+#    return nonblank <ft> if deg argument is acceptable
+cmd2opr ()
+{
+  opr="" ft=""
+  _cmd=$1
+  _cmd=`downcase "${_cmd#gt}"`|| return $?
+  case "$_cmd" in
+  sqrt)  opr="SQRT";;
+  sqr)   opr="SQR";;
+  inv)   opr="INV";;
+  abs)   opr="ABS";;
+  log)   opr="LOG";;
+  log10) opr="LOG10";;
+  exp)   opr="EXP";;
+  sin)   opr="SIN"; ft=tri;;
+  cos)   opr="COS"; ft=tri;;
+  tan)   opr="TAN"; ft=tri;;
+  asin)  opr="ASIN"; ft=atri;;
+  acos)  opr="ACOS"; ft=atri;;
+  atan)  opr="ATAN"; ft=atri;;
+  sinh)  opr="SINH"; ft=tri;;
+  cosh)  opr="COSH"; ft=tri;;
+  tanh)  opr="TANH"; ft=tri;;
+  d2r)   opr="D2R";;
+  r2d)   opr="R2D";;
+  sign|nint|gus|pos|rand|nrand)
+         msg "error: not implemented operator $_cmd" >&2
+         return 1;;
+  *)     msg "error: unknown operator $_cmd" >&2
+         return 1;;
+  esac
+  test x"$opr" = x && return 1
+  return 0
+}
+
+main ()
+{
+  verbose=0
+  base=`basename $1` || return $?
+  shift
+  opr="$base"
+  test "$base" = $ref && opr=
+
+  opts='-F -H0'
+  fact=''
+  ofs=''
+  out=''
+  in=''
+  dry=
+  head=''
+  str=
+  end=
+  step=
+  help=
+
+  while test $# -gt 0
+  do
+    case $1 in
+    -h) help=T;;
+    -n) dry=T;;
+    -f) opts="$opts $1";;
+    -v) verbose=1;  opts="$opts $1";;
+    -q) verbose=-1; opts="$opts $1";;
+    [a-zA-Z]*[:=]*)
+       a=`downcase "$1"` || return $?
+       v=${1#*[=:]}
+       a=${a%%[=:]*}
+       case $a in
+       ofs|offset)   ofs="$v ADD";;
+       fact|factor)  fact="$v MUL";;
+       out)   out="$v";;
+       item)  head="$head ITEM='$v'";;
+       unit)  head="$head UNIT='$v'";;
+       title) head="$head TITLE='$v'";;
+       dset)  head="$head DSET='$v'";;
+       edit)  head="$head EDIT='$v'";;
+       ettl)  head="$head ETITLE='$v'";;
+       deg|degree)
+              case $v in
+              [Tt]) deg=T;;
+              [Ff]) deg=F;;
+              *) msg "error: invalid value $1" >&2
+                 return 1;;
+              esac
+              ;;
+       str|start|end|step)
+          msg "error: cannot handle argument $1.  use T=START:END:STEP" >&2
+          return 1;;
+       t) v=`echo "$v" | tr '[,]', '[:]'` || return $?
+          case $v in
+          *:*:*) : ;;
+          *:*)   : ;;
+          *)     v="$v":;;
+          esac
+          opts="$opts T=$v"
+          ;;
+       *) msg "error: cannot handle argument $1" >&2
+          msg "please contact the maintainer" >&2
+          return 1
+          ;;
+       esac
+       ;;
+    -apnd|-append) opts="$opts -a";;
+    -*) msg "error: unknown argument $1" >&2; return 1;;
+    *) if test x"$opr" = x; then
+         opr="$1"
+       elif test -f $1; then
+         if test x"$in" = x; then
+           in=$1
+         else
+           msg "error: too many input $1" >&2; return 1
+         fi
+       else
+         msg "error: invalid argument $1" >&2
+         return 1
+       fi;;
+    esac
+    shift
+  done
+  test x$help != x && show_help && return 0
+
+  cmd2opr "$opr" || return $?
+  test x"$in" = x && in=$GTTMPDIR/gtool.out
+  test x"$out" = x && out=$GTTMPDIR/gtool.out
+
+  if test "$in" = "$out"; then
+    in=$GTTMPDIR/gtool.in
+    if test $verbose -ge 0; then
+      msg "warning: rename $out to $in" >&2
+    fi
+    if test -e $out; then
+      run mv $out $in || return $?
+    else
+      msg "error: no file: $out" >&2
+      return 1
+    fi
+  fi
+  if test ! -e $in -o x"$in" = x; then
+    msg "error: no input file: $in" >&2
+    return 1
+  fi
+  case $ft in
+  tri)   test x${deg-} != xF && opr="D2R $opr";;
+  atri)  test x${deg-} != xF && opr="$opr R2D";;
+  *)     test x${deg-} = x || msg "warning: ignore deg=$deg" >&2;;
+  esac
+  # test ! -f $in && echo "not found $in" && return 1
+  run $CHAK $opts $in $opr $fact $ofs = $out $head || return $?
+  return 0
+}
+
+main "$this" "$@"; err=$?
+exit $err
