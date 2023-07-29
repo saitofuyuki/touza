@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/07/28 15:20:56 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/10/19 16:18:33 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -1786,6 +1786,7 @@ contains
     use TOUZA_Nio,only: hi_ITEM, hi_TITL1, hi_UNIT, hi_EDIT1, hi_DSET
     use TOUZA_Nio,only: hi_MISS, hi_ETTL1
     use TOUZA_Nio,only: put_item, store_item
+    use TOUZA_Nio,only: show_header
     use TOUZA_Std,only: parse_number
     implicit none
     integer,         intent(out) :: ierr
@@ -1814,7 +1815,6 @@ contains
        endif
        jfw = jfr
     endif
-
     if (ierr.eq.0) then
        jpar = index(arg, param_sep) + 1
        jend = len_trim(arg) + 1
@@ -1869,6 +1869,7 @@ contains
           end select
           if (jfw.ge.0) then
              call put_item(ierr, ofile(jfw)%h, arg(jpar:), jitem, 0)
+             ! call show_header(ierr, ofile(jfw)%h)
           else
              ierr = ERR_INVALID_ITEM
              call message(ierr, 'no file to set header ' // trim(arg))
@@ -4113,7 +4114,6 @@ contains
     integer n
     character(len=litem) :: head(nitem)
     integer xrec, crec
-    ! integer(kind=KIOFS) :: jpos
 
     ierr = 0
     nrg = size(file%rgrp)
@@ -4126,32 +4126,24 @@ contains
        ns = count_filter_records(file%rgrp(jrg)%filter(jrf))
        jse = jsb + ms
        ji  = file%rgrp(jrg)%sub
-       ! write(*, *) 'push_file', jrg, jrf, ji, file%rgrp(jrg)%pos, ns, push
        crec = get_current_rec(file%rgrp(jrg)%filter(jrf), ji)
        if (file%kfmt.eq.cfmt_ascii) then
           continue
        else
           if (ierr.eq.0) call sus_rseek(ierr, file%u, file%rgrp(jrg)%pos, WHENCE_ABS)
        endif
-       ! write(*, *) 'rseek', ierr
        do js = 0, ns - 1
           jb = buf_h2item(lefts(jsb + js)%bh)
           xrec = get_current_rec(file%rgrp(jrg)%filter(jrf), ji, js)
-          ! inquire(file%u, POS=jpos)
-          ! write(*, *) jrg, js, xrec, crec
           if (ierr.eq.0) call read_file_header(ierr, head, file, xrec, crec, ofile(def_read))
-          ! write(*, *) 'read_header', ierr
-          ! inquire(file%u, POS=jpos)
-          ! write(*, *) 'after', jpos - 1
           if (ierr.eq.0) then
-             if (jsb + js.eq.0) file%h(:) = head(:)
+             file%h(:) = head(:)
              n = parse_header_size(head, 0, lazy=1)
              obuffer(jb)%k = suggest_type(head)
              call alloc_buffer_t(ierr, obuffer(jb), n)
           endif
           if (ierr.eq.0) then
              call read_file_data(ierr, obuffer(jb)%vd, n, file)
-             ! write(*, *) 'read_push_file', jg, js, ji, xrec, n, ierr
           endif
           if (ierr.eq.0) then
              call set_buffer_attrs(ierr, obuffer(jb), head, handle, file%hflag)
@@ -5077,6 +5069,8 @@ contains
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_RRSP)
        else if (handle.eq.opr_SETE) then
           call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_SETE)
+       else if (handle.eq.opr_FTRUNC) then
+          call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_FTRUNC)
 !!!_    * ternary
        else if (handle.eq.opr_IFELSE) then
           call apply_opr_TERNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_TERNARY_IFELSE)
@@ -5273,7 +5267,7 @@ contains
        if (ierr.eq.0) call get_obj_string(ierr, val, hb)
 
        if (ierr.eq.0) then
-          if (blank_line) write(utmp, '()')
+          ! if (blank_line) write(utmp, '()')
        endif
 
        if (is_msglev(lev_verbose, -levq_rec)) then
@@ -5302,7 +5296,7 @@ contains
        ! write(*, *) 'flush/end'
        if (ierr.eq.0) then
           if (dryrun.gt.0) then
-             write(utmp, '()')
+             ! write(utmp, '()')
           else
              mco = doml%mco
              nco = 0
@@ -5380,6 +5374,7 @@ contains
                 enddo
              end select
           endif
+          write(utmp, '()')
           if (ierr.eq.0) blank_line = .TRUE.
        endif
     enddo
@@ -5445,7 +5440,7 @@ contains
 
     ! write(*, *) def_write%kfmt, trim(def_write%fmt)
     if (ierr.eq.0) then
-       if (blank_line) write(utmp, '()')
+       ! if (blank_line) write(utmp, '()')
     endif
 
     do jbuf = 0, nbuf - 1
@@ -5632,7 +5627,7 @@ contains
     if (ierr.eq.0) call get_compromise_domain(ierr, doml, domr, htmp, pbuf, lstk, nbuf, cmode)
 
     if (ierr.eq.0) then
-       if (blank_line) write(utmp, '()')
+       ! if (blank_line) write(utmp, '()')
     endif
     if (lev_verbose.ge.levq_column) then
        do j = 0, nbuf - 1
@@ -5807,7 +5802,7 @@ contains
     endif
 
     if (ierr.eq.0) then
-       if (blank_line) write(utmp, '()')
+       ! if (blank_line) write(utmp, '()')
     endif
     if (lev_verbose.ge.levq_column) then
        do j = 0, nbuf - 1
