@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/07/29 10:35:00 fuyuki Makefile.am>
+# Time-stamp: <2023/07/29 14:26:02 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -60,6 +60,9 @@ GTFNA_NAMES += gttan gttanh
 
 GTFNB_NAMES =  gtadd gtamp gtarg gtdiv gtmask gtmlt gtmod gtpwr gtsub
 
+noinst_SCRIPTS += wtest_gt.sh
+EXTRA_DIST     += wtest_gt.sh.in
+
 # Following dependencies are necesary, as workaround
 $(jmzcmp_OBJECTS): $(noinst_LTLIBRARIES)
 $(chak_OBJECTS): $(noinst_LTLIBRARIES)
@@ -93,8 +96,22 @@ gtfna gtfnb:
 	sed -e '1,/@GTEML@/d' $(srcdir)/$@.in >> $@
 	chmod +x $@
 
+wtest_gt.sh: wtest_gt.sh.in
+	@if test -e $<; then \
+		sed -e 's,[@]ZSH[@],$(ZSH),g' \
+            -e 's,[@]PACKAGE_STRING[@],$(PACKAGE_STRING),g' \
+            -e 's,[@]TOUZA_VERSION[@],$(TOUZA_VERSION),g' \
+            -e 's,[@]VERSION[@],$(VERSION),g' \
+            -e 's,[@]TR[@],$(TR),g' \
+            -e 's,[@]srcdir[@],$(srcdir),g' \
+            -e 's,[@]builddir[@],$(builddir),g' \
+            -e 's,[@]CHAK[@],$(bindir)/$(CHAK),g' \
+			 < $< >$@; \
+		chmod +x $@; \
+	fi
+
 genx2.sh: genx2.sh.in
-	if test -e $<; then \
+	@if test -e $<; then \
 		sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@; \
 		chmod +x $@; \
 	fi
