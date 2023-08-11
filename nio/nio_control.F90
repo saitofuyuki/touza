@@ -21,7 +21,7 @@
 module TOUZA_Nio_control
 !!!_ = declaration
   use TOUZA_Nio_std,only: KI32, KI64, KDBL, KFLT, KIOFS
-  use TOUZA_Nio_std,only: get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Nio_std,only: get_logu,    unit_global,   trace_fine,   trace_control
   use TOUZA_Nio_header, nh_init=>init, nh_diag=>diag, nh_finalize=>finalize
   implicit none
   private
@@ -32,6 +32,9 @@ module TOUZA_Nio_control
 
   integer,parameter,public :: enable_cache      = 1    ! enable cache-mode
   integer,parameter,public :: enable_sequential = 2    ! enable sequential-mode
+  integer,parameter,public :: enable_auto       = 4    ! enable auto detection
+
+  character(len=*),parameter,public :: seps_file_item = '/?'   ! separators between file and item
 
   ! integer,parameter,public :: flag_default = enable_cache + enable_sequential
   integer,parameter,public :: flag_default = enable_cache

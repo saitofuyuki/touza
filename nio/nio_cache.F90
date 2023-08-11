@@ -342,8 +342,10 @@ contains
     if (ierr.eq.0) then
        ufile = cache_h2unit(handle)
        close(unit=ufile, IOSTAT=ierr)
+       ! write(*, *) 'cache_close', handle, ufile, ierr
     endif
     if (ierr.eq.0) call free_cache(ierr, ctables(jc))
+    ! write(*, *) 'cache_close', ierr
   end subroutine cache_close
 
 !!!_  - cache_h2index()
@@ -1679,7 +1681,15 @@ contains
           if (ierr.eq.0) call free_group(ierr, c%g(jg))
        enddo
     endif
-    if (ierr.eq.0) deallocate(c%g, c%v, c%o, STAT=ierr)
+    if (ierr.eq.0) then
+       if (associated(c%g)) deallocate(c%g, STAT=ierr)
+    endif
+    if (ierr.eq.0) then
+       if (associated(c%v)) deallocate(c%v, STAT=ierr)
+    endif
+    if (ierr.eq.0) then
+       if (associated(c%o)) deallocate(c%o, STAT=ierr)
+    endif
     if (ierr.eq.0) then
        c%g => NULL()
        c%v => NULL()
@@ -1694,8 +1704,18 @@ contains
     type(group_t),intent(inout)       :: grp
     ierr = 0
     if (ierr.eq.0) then
-       deallocate(grp%d, grp%t, grp%rpos, grp%rlen, STAT=ierr)
+       if (associated(grp%d)) deallocate(grp%d, STAT=ierr)
     endif
+    if (ierr.eq.0) then
+       if (associated(grp%t)) deallocate(grp%t, STAT=ierr)
+    endif
+    if (ierr.eq.0) then
+       if (associated(grp%rpos)) deallocate(grp%rpos, STAT=ierr)
+    endif
+    if (ierr.eq.0) then
+       if (associated(grp%rlen)) deallocate(grp%rlen, STAT=ierr)
+    endif
+    ! deallocate(grp%d, grp%t, grp%rpos, grp%rlen, STAT=ierr)
     if (ierr.eq.0) then
        grp%v => NULL()
        grp%d => NULL()
