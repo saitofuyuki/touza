@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/07/29 14:26:02 fuyuki Makefile.am>
+# Time-stamp: <2023/10/06 15:02:37 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -21,7 +21,10 @@ noinst_PROGRAMS = $(JMZ_EXTRA)
 EXTRA_PROGRAMS = jmzcmp
 
 noinst_LTLIBRARIES	=	libjmz_local.la
-libjmz_local_la_SOURCES = jmzlib.F90 chak_lib.F90 chak_opr.F90 chak_file.F90
+libjmz_local_la_SOURCES =
+
+libjmz_local_la_SOURCES += jmz_param.F90 jmz_coor.F90 jmz_buf.F90
+libjmz_local_la_SOURCES += jmzlib.F90 chak_lib.F90 chak_opr.F90 chak_file.F90
 
 jmzcmp_SOURCES = jmzcmp.F90 jmz.h
 
