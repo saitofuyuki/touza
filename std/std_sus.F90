@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2023/06/08 13:01:59 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/10/19 16:12:14 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023
@@ -272,10 +272,8 @@ module TOUZA_Std_sus
   public max_members, is_irec_overflow, is_irec_overflow_mix
   public sus_size_irec
   public sus_is_stream_unit
-
-#if TEST_STD_SUS
+  public debug_status
   public set_slice_loop, init_offset, next_offset
-#endif
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -6844,6 +6842,40 @@ contains
        rj = rj + 1
     enddo
   end subroutine next_offset
+!!!_  - debug_status
+  subroutine debug_status(ierr, ufile, u, tag)
+    use TOUZA_Std_utl,only: choice, choice_a
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(in)          :: ufile
+    integer,         intent(in),optional :: u
+    character(len=*),intent(in),optional :: tag
+    integer utmp
+    integer(kind=KIOFS) :: pos
+    character(len=128)  :: pfx
+    ierr = 0
+
+    call choice_a(pfx, 'status', tag)
+    utmp = choice(ulog, u)
+
+    call sus_getpos(ierr, pos, ufile, WHENCE_BEGIN)
+
+101 format(A, '(', I0, '): ', I0, 1x, Z8.8)
+111 format(A, '(', I0, '): error=', I0)
+    if (ierr.eq.0) then
+       if (utmp.ge.0) then
+          write(utmp, 101) trim(pfx), ufile, pos, pos
+       else
+          write(*, 101) trim(pfx), ufile, pos, pos
+       endif
+    else
+       if (utmp.ge.0) then
+          write(utmp, 111) trim(pfx), ufile, ierr
+       else
+          write(*, 111) trim(pfx), ufile, ierr
+       endif
+    endif
+  end subroutine debug_status
 !!!_ + end module TOUZA_Std_sus
 end module TOUZA_Std_sus
 
