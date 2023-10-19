@@ -1,7 +1,7 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:34:39 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/10/19 16:16:37 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -20,6 +20,7 @@ module TOUZA_Nio_std
 !!!_  - modules
   use TOUZA_Std,only: KI32,             KI64,           KDBL,             KFLT
   use TOUZA_Std,only: choice,           choice_a,       condop,           upcase
+  use TOUZA_Std,only: set_if_present
   use TOUZA_Std,only: control_deep,     control_mode,   is_first_force,   parse_number
   use TOUZA_Std,only: split_list,       join_list
   use TOUZA_Std,only: is_msglev
@@ -49,6 +50,7 @@ module TOUZA_Nio_std
   use TOUZA_Std,only: max_members,      is_irec_overflow, sus_record_mems_irec
   use TOUZA_Std,only: def_block,        ignore_small,     ignore_bigger,  ignore_always
   use TOUZA_Std,only: sus_is_status_new
+  use TOUZA_Std,only: debug_status
   use TOUZA_Std,only: new_htable,       reg_entry,        query_status
 !!!_  - default
   implicit none
@@ -78,6 +80,7 @@ module TOUZA_Nio_std
 !!!_   . TOUZA_Std
   public :: KI32,             KI64,           KDBL,             KFLT
   public :: choice,           choice_a,       condop,           upcase
+  public :: set_if_present
   public :: control_deep,     control_mode,   is_first_force,   parse_number
   public :: split_list,       join_list
   public :: is_msglev
@@ -107,6 +110,7 @@ module TOUZA_Nio_std
   public :: max_members,      is_irec_overflow, sus_record_mems_irec
   public :: def_block,        ignore_small,     ignore_bigger,  ignore_always
   public :: sus_is_status_new
+  public :: debug_status
   public :: new_htable,       reg_entry,        query_status
 contains
 !!!_ + common interfaces
