@@ -1,7 +1,7 @@
 !!!_! ami_std.F90 - TOUZA/Ami bridge to Std
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2023/05/23 08:27:55 fuyuki ami_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/10/26 14:07:42 fuyuki ami_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -26,6 +26,7 @@ module TOUZA_Ami_std
   use TOUZA_Std_log,only: is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
   use TOUZA_Std_log,only: is_msglev_severe, is_msglev_fatal
   use TOUZA_Std_log,only: get_logu,         unit_global,      trace_fine,       trace_control
+  use TOUZA_Std_log,only: is_error_match
   use TOUZA_Std_env,only: conv_b2strm,      KIOFS
   use TOUZA_Std_env,only: endian_BIG,       endian_LITTLE
   use TOUZA_Std_fun,only: new_unit
@@ -68,6 +69,7 @@ module TOUZA_Ami_std
   public is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
   public is_msglev_severe, is_msglev_fatal
   public get_logu,         unit_global,      trace_fine,       trace_control
+  public is_error_match
   public conv_b2strm,      KIOFS
   public new_unit
   public sus_open, sus_close, sus_skip_irec
