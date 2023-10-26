@@ -1,7 +1,7 @@
 !!!_! ami_legacy.F90 - TOUZA/Ami/legacy
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 19 2023
-#define TIME_STAMP 'Time-stamp: <2023/04/05 12:55:06 fuyuki ami_legacy.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/10/26 15:52:46 fuyuki ami_legacy.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -24,6 +24,9 @@ module TOUZA_Ami_legacy
   implicit none
   private
 !!!_ + parameter
+  integer,parameter,public :: legacy_error = -1
+  integer,parameter,public :: legacy_miroc4 = 1
+  integer,parameter,public :: legacy_miroc5 = 2
 !!!_ + static
 !!!_  - buffer
   integer,allocatable,save :: buf_ijo(:)
@@ -57,15 +60,23 @@ module TOUZA_Ami_legacy
   interface read_rofile_legacy2
      module procedure read_rofile_legacy2_d
   end interface read_rofile_legacy2
-  interface write_rofile_legacy
-     module procedure write_rofile_legacy_d
-  end interface write_rofile_legacy
+  interface read_rofile_legacy3
+     module procedure read_rofile_legacy3_d
+  end interface read_rofile_legacy3
+  interface write_rofile_legacy1
+     module procedure write_rofile_legacy1_d
+  end interface write_rofile_legacy1
+  interface write_rofile_legacy2
+     module procedure write_rofile_legacy2_d
+  end interface write_rofile_legacy2
 
 !!!_ + public procedures
   public init, diag, finalize
   public open_rafile_legacy,  open_rofile_legacy
-  public read_rafile_legacy,  read_rofile_legacy1, read_rofile_legacy2
-  public write_rafile_legacy, write_rofile_legacy
+  public read_rafile_legacy
+  public read_rofile_legacy1, read_rofile_legacy2, read_rofile_legacy3
+  public write_rafile_legacy
+  public write_rofile_legacy1, write_rofile_legacy2
 !!!_ + function-like macros
 !!!_ + procedures
 contains
@@ -176,13 +187,15 @@ contains
 !!!_ + user procedures
 !!!_  - open_rafile_legacy - open RAFILE to read and check basic properties
   subroutine open_rafile_legacy_d &
-       & (ierr, &
+       & (ierr, klegacy, &
        &  swap, ij_amax, len_a2m, nxygdm, &
        &  file, u,       mold)
     use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: is_error_match
     use TOUZA_Ami_std,only: sus_open, sus_read_irec, sus_skip_irec
     implicit none
     integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: klegacy
     integer,         intent(out)         :: ij_amax, len_a2m, nxygdm
     logical,         intent(out)         :: swap
     character(len=*),intent(in)          :: file
@@ -194,6 +207,7 @@ contains
     integer v(1)
 
     ierr = 0
+    klegacy = legacy_error
 
     ij_amax = 0
     len_a2m = 0
@@ -212,47 +226,78 @@ contains
           endif
        endif
        if (ierr.ne.0.or.l.gt.tol) then
-          ierr = ERR_PANIC
+          ierr = _ERROR(ERR_PANIC)
           return
        endif
     endif
     if (ierr.eq.0) rewind(u, IOSTAT=ierr)
+    ! record 0
     if (ierr.eq.0) call sus_read_irec(ierr, u, v, 1, swap)
     if (ierr.eq.0) ij_amax = v(1)
+    ! record 1
     if (ierr.eq.0) call sus_skip_irec(ierr, u, 1, swap=swap)
+    ! record 2
     if (ierr.eq.0) call sus_read_irec(ierr, u, v, 1, swap)
     if (ierr.eq.0) len_a2m = v(1)
-    if (ierr.eq.0) call sus_skip_irec(ierr, u, 4, swap=swap)
-    if (ierr.eq.0) call sus_record_mems_irec(ierr, l, u, mold=real(0,kind=kind(mold)), swap=swap)
-    if (ierr.eq.0) nxygdm = l
+    ! record 3 4 5
+    if (ierr.eq.0) call sus_skip_irec(ierr, u, 3, swap=swap)
+    ! record 6
+    if (ierr.eq.0) call sus_record_mems_irec(ierr, l, u, mold, swap=swap)
+    if (ierr.eq.0) then
+       if (mod(l, 2).eq.0) then
+          nxygdm = l / 2
+       else
+          ierr = _ERROR(ERR_BROKEN_RECORD)
+       endif
+    endif
+    if (ierr.eq.0) call sus_skip_irec(ierr, u, 1, swap=swap)
+    ! record 7
+    if (ierr.eq.0) then
+       call sus_record_mems_irec(ierr, l, u, mold, swap=swap)
+       if (is_error_match(ierr, ERR_EOF)) then
+          ierr = 0
+          klegacy = legacy_miroc4
+       else if (ierr.eq.0) then
+          if (nxygdm.ne.l) then
+             ierr = _ERROR(ERR_BROKEN_RECORD)
+          else
+             klegacy = legacy_miroc5
+          endif
+       endif
+    endif
     if (ierr.eq.0) rewind(u, IOSTAT=ierr)
 
     if (ierr.ne.0) then
-       ierr = ERR_BROKEN_RECORD
+       ierr = _ERROR(ERR_BROKEN_RECORD)
     endif
 
   end subroutine open_rafile_legacy_d
 !!!_  - read_rafile_legacy - read RAFILE
   subroutine read_rafile_legacy_d &
        & (ierr,     &
-       &  ij_ahead, ijrecov_a2m, ijc2o,  satm, ru, rv, rocn, &
-       &  ij_amax,  len_a2m,     nxygdm, u,    swap)
+       &  ij_ahead, ijrecov_a2m, ijc2o,  satm, ru, rv,  rocn, &
+       &  ij_amax,  len_a2m,     nxygdm, u,    swap,    klegacy)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     use TOUZA_Ami_std,only: sus_is_stream_unit, sus_read_irec, sus_suspend_read_irec
     implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: ij_ahead(0:*)                ! ij_amax
-    integer,         intent(out) :: ijrecov_a2m(*), ijc2o(*)     ! len_a2m
-    real(kind=KTGT), intent(out) :: satm(*)                      ! len_a2m
-    real(kind=KTGT), intent(out) :: ru(*), rv(*), rocn(*)        ! nxygdm
-    integer,         intent(in)  :: ij_amax, len_a2m, nxygdm
-    integer,         intent(in)  :: u
-    logical,optional,intent(in)  :: swap
+    integer,        intent(out)          :: ierr
+    integer,        intent(out)          :: ij_ahead(0:*)                ! ij_amax
+    integer,        intent(out)          :: ijrecov_a2m(*), ijc2o(*)     ! len_a2m
+    real(kind=KTGT),intent(out)          :: satm(*)                      ! len_a2m
+    real(kind=KTGT),intent(out)          :: ru(*), rv(*)                 ! nxygdm
+    real(kind=KTGT),intent(out),optional :: rocn(*)                      ! nxygdm
+    integer,        intent(in)           :: ij_amax, len_a2m, nxygdm
+    integer,        intent(in)           :: u
+    logical,        intent(in),optional  :: swap
+    integer,        intent(in),optional  :: klegacy
     integer v(2)
     logical sw
+    integer kfmt
 
     ierr = 0
+    kfmt = choice(legacy_miroc5, klegacy)
+
     if (sus_is_stream_unit(u)) then
        if (ierr.eq.0) call sus_read_irec(ierr, u, v(1:1),      1,         swap)
        if (ierr.eq.0) call sus_read_irec(ierr, u, ij_ahead,    ij_amax+1, swap)
@@ -263,11 +308,15 @@ contains
        ! ru rv are in the same record
        if (ierr.eq.0) call sus_suspend_read_irec(ierr, u, ru, nxygdm, suspend_begin, swap)
        if (ierr.eq.0) call sus_suspend_read_irec(ierr, u, rv, nxygdm, suspend_end,   swap)
-       if (ierr.eq.0) call sus_read_irec(ierr, u, rocn,        nxygdm,    swap)
+       if (ierr.eq.0) then
+          if (kfmt.ne.legacy_miroc4.and.present(rocn)) then
+             call sus_read_irec(ierr, u, rocn,        nxygdm,    swap)
+          endif
+       endif
     else
        sw = choice(.FALSE., swap)
        if (swap) then
-          ierr = ERR_INVALID_PARAMETER
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
        else
           if (ierr.eq.0) read(u, IOSTAT=ierr) v(1:1)
           if (ierr.eq.0) read(u, IOSTAT=ierr) ij_ahead(0:ij_amax)
@@ -276,12 +325,16 @@ contains
           if (ierr.eq.0) read(u, IOSTAT=ierr) ijc2o(1:len_a2m)
           if (ierr.eq.0) read(u, IOSTAT=ierr) satm(1:len_a2m)
           if (ierr.eq.0) read(u, IOSTAT=ierr) ru(1:nxygdm), rv(1:nxygdm)
-          if (ierr.eq.0) read(u, IOSTAT=ierr) rocn(1:nxygdm)
+          if (ierr.eq.0) then
+             if (kfmt.ne.legacy_miroc4.and.present(rocn)) then
+                read(u, IOSTAT=ierr) rocn(1:nxygdm)
+             endif
+          endif
        endif
     endif
     if (ierr.eq.0) then
        if (v(1).ne.ij_amax .or. v(2).ne.len_a2m) then
-          ierr = ERR_BROKEN_RECORD
+          ierr = _ERROR(ERR_BROKEN_RECORD)
        endif
     endif
   end subroutine read_rafile_legacy_d
@@ -289,26 +342,31 @@ contains
   subroutine write_rafile_legacy_d &
        & (ierr,     &
        &  ij_ahead, ijrecov_a2m, ijc2o,  satm, ru, rv, rocn, &
-       &  len_a2m,  ij_amax,     nxygdm, u,    swap)
+       &  len_a2m,  ij_amax,     nxygdm, u,    swap,   klegacy)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: conv_b2strm, choice
     use TOUZA_Ami_std,only: sus_is_stream_unit, sus_write_irec, sus_suspend_write_irec
     use TOUZA_Ami_std,only: suspend_begin, suspend_end
     implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(in)  :: ij_ahead(0:*)                ! ij_amax
-    integer,         intent(in)  :: ijrecov_a2m(*), ijc2o(*)     ! len_a2m
-    real(kind=KTGT), intent(in)  :: satm(*)                      ! len_a2m
-    real(kind=KTGT), intent(in)  :: ru(*), rv(*), rocn(*)        ! nxygdm
-    integer,         intent(in)  :: len_a2m
-    integer,         intent(in)  :: ij_amax, nxygdm
-    integer,         intent(in)  :: u
-    logical,optional,intent(in)  :: swap
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: ij_ahead(0:*)            ! ij_amax
+    integer,        intent(in)          :: ijrecov_a2m(*), ijc2o(*) ! len_a2m
+    real(kind=KTGT),intent(in)          :: satm(*)                  ! len_a2m
+    real(kind=KTGT),intent(in)          :: ru(*), rv(*)             ! nxygdm
+    real(kind=KTGT),intent(in),optional :: rocn(*)                  ! nxygdm
+    integer,        intent(in)          :: len_a2m
+    integer,        intent(in)          :: ij_amax, nxygdm
+    integer,        intent(in)          :: u
+    logical,        intent(in),optional :: swap
+    integer,        intent(in),optional :: klegacy
     character(len=16) :: ans
     integer v(2)
     logical sw
+    integer kfmt
 
     ierr = 0
+    kfmt = choice(legacy_miroc5, klegacy)
+
     inquire(unit=u, STREAM=ans, IOSTAT=ierr)
     v(1) = ij_amax
     v(2) = len_a2m
@@ -328,11 +386,15 @@ contains
           if (ierr.eq.0) then
              call sus_suspend_write_irec(ierr, u, rv, nxygdm, suspend_end, swap)
           endif
-          if (ierr.eq.0) call sus_write_irec(ierr, u, rocn,        nxygdm,    swap)
+          if (ierr.eq.0) then
+             if (kfmt.ne.legacy_miroc4.and.present(rocn)) then
+                call sus_write_irec(ierr, u, rocn,        nxygdm,    swap)
+             endif
+          endif
        case default
           sw = choice(.FALSE., swap)
           if (swap) then
-             ierr = ERR_INVALID_PARAMETER
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
           else
              if (ierr.eq.0) write(u, IOSTAT=ierr) v(1:1)
              if (ierr.eq.0) write(u, IOSTAT=ierr) ij_ahead(ij_amax+1)
@@ -341,7 +403,11 @@ contains
              if (ierr.eq.0) write(u, IOSTAT=ierr) ijc2o(1:len_a2m)
              if (ierr.eq.0) write(u, IOSTAT=ierr) satm(1:len_a2m)
              if (ierr.eq.0) write(u, IOSTAT=ierr) ru(1:nxygdm), rv(1:nxygdm)
-             if (ierr.eq.0) write(u, IOSTAT=ierr) rocn(1:nxygdm)
+             if (ierr.eq.0) then
+                if (kfmt.ne.legacy_miroc4.and.present(rocn)) then
+                   write(u, IOSTAT=ierr) rocn(1:nxygdm)
+                endif
+             endif
           endif
        end select
     endif
@@ -349,13 +415,14 @@ contains
 !!!_  - open_rofile_legacy - open ROFILE to read and check basic properties
   subroutine open_rofile_legacy_d &
        & (ierr, &
-       &  swap, ijdim, file, u, mold)
+       &  klegacy, swap, ijdim, file, u, mold)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: sus_open, sus_read_irec, sus_skip_irec
     implicit none
     integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: klegacy
+    logical,         intent(inout)       :: swap       ! need initial guess
     integer,         intent(out)         :: ijdim
-    logical,         intent(inout)       :: swap
     character(len=*),intent(in)          :: file
     integer,         intent(in)          :: u
     real(kind=KTGT), intent(in),optional :: mold
@@ -363,11 +430,13 @@ contains
     integer l
 
     ierr = 0
+    klegacy = legacy_error
 
     ijdim = 0
     if (ierr.eq.0) call sus_open(ierr, u, file, ACTION='R', STATUS='O')
     if (ierr.eq.0) then
        ! check first record
+       ! record 0
        call sus_record_mems_irec(ierr, l, u, mold=INT(0), swap=swap)
        if (ierr.ne.0) then
           rewind(u, IOSTAT=ierr)
@@ -377,11 +446,36 @@ contains
           endif
        endif
        if (ierr.ne.0) then
-          ierr = ERR_PANIC
+          ierr = _ERROR(ERR_PANIC)
           return
        endif
     endif
     if (ierr.eq.0) ijdim = l
+    if (ierr.eq.0) then
+       ! record 0..ijdim
+       call sus_skip_irec(ierr, u, ijdim + 1, swap=swap)
+    endif
+    if (ierr.eq.0) then
+       call sus_record_mems_irec(ierr, l, u, mold, swap=swap)
+    endif
+    if (ierr.eq.0) then
+       if (l.eq.ijdim) then
+          klegacy = legacy_miroc5
+       else
+          call sus_record_mems_irec(ierr, l, u, mold=INT(0), swap=swap)
+          if (ierr.eq.0) then
+             if (l.ne.ijdim) ierr = _ERROR(ERR_BROKEN_RECORD)
+          endif
+          if (ierr.eq.0) then
+             call sus_skip_irec(ierr, u, ijdim + 1, swap=swap)
+          endif
+          if (ierr.eq.0) then
+             klegacy = legacy_miroc4
+          else
+             ierr = _ERROR(ERR_BROKEN_RECORD)
+          endif
+       endif
+    endif
     if (ierr.eq.0) rewind(u, IOSTAT=ierr)
   end subroutine open_rofile_legacy_d
 !!!_  - read_rofile_legacy1_core - read ROFILE first step
@@ -408,7 +502,7 @@ contains
     else
        sw = choice(.FALSE., swap)
        if (swap) then
-          ierr = ERR_INVALID_PARAMETER
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
        else
           if (ierr.eq.0) read(u, IOSTAT=ierr) ij_o(1:ijdim)
        endif
@@ -450,28 +544,29 @@ contains
 !!!_  - read_rofile_legacy2_core - read ROFILE second step
   subroutine read_rofile_legacy2_core_d &
        & (ierr,   &
-       &  ij_ohead, ijrecov_o2c, ijo2c,   socn, flandg, ruo, rvo, &
+       &  ij_ohead, ijrecov_o2c, ijo2c,   socn, &
        &  ij_o,     ijdim,       ij_omax, u,    swap)
     use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: choice
     use TOUZA_Ami_std,only: sus_is_stream_unit, sus_read_irec, sus_suspend_read_irec
     implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: ij_ohead(0:*)
-    integer,         intent(out) :: ijrecov_o2c(*)
-    integer,         intent(out) :: ijo2c(*)
-    real(kind=KTGT), intent(out) :: socn (*)
-    real(kind=KTGT), intent(out) :: flandg(*), ruo(*), rvo(*)   ! ijdim
-    integer,         intent(in)  :: ij_o(*)                     ! ijdim
-    integer,         intent(in)  :: ij_omax
-    integer,         intent(in)  :: ijdim
-    integer,         intent(in)  :: u
-    logical,optional,intent(in)  :: swap
+    integer,        intent(out)          :: ierr
+    integer,        intent(out)          :: ij_ohead(0:*)
+    integer,        intent(out)          :: ijrecov_o2c(*)
+    integer,        intent(out)          :: ijo2c(*)
+    real(kind=KTGT),intent(out)          :: socn (*)
+    integer,        intent(in)           :: ij_o(*)                     ! ijdim
+    integer,        intent(in)           :: ij_omax
+    integer,        intent(in)           :: ijdim
+    integer,        intent(in)           :: u
+    logical,        intent(in),optional  :: swap
     logical sw
     integer jo, jz
     integer vi(ij_omax), np(ij_omax)
     real(kind=KTGT) :: vv(ij_omax)
 
     ierr = 0
+
     ij_ohead(0:ij_omax) = 0
     do jo = 1, ijdim
        jz = ij_o(jo)
@@ -503,14 +598,10 @@ contains
              enddo
           endif
        enddo
-       if (ierr.eq.0) call sus_read_irec(ierr, u, flandg, ijdim, swap)
-       ! ruo rvo are in the same record
-       if (ierr.eq.0) call sus_suspend_read_irec(ierr, u, ruo, ijdim, suspend_begin, swap)
-       if (ierr.eq.0) call sus_suspend_read_irec(ierr, u, rvo, ijdim, suspend_end,   swap)
     else
        sw = choice(.FALSE., swap)
        if (swap) then
-          ierr = ERR_INVALID_PARAMETER
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
        else
           do jo = 1, ijdim
              if (ierr.eq.0) read(u, IOSTAT=ierr) vi(1:ij_o(jo)), vv(1:ij_o(jo))
@@ -526,35 +617,36 @@ contains
              !      & (ijo2c(jz), jz = jo, jo+ijdim*ij_o(jo)-1, ijdim), &
              !      & (socn (jz), jz = jo, jo+ijdim*ij_o(jo)-1, ijdim)
        endif
-       if (ierr.eq.0) read(u, IOSTAT=ierr) flandg(1:ijdim)
-       if (ierr.eq.0) read(u, IOSTAT=ierr) ruo(1:ijdim), rvo(1:ijdim)
     endif
   end subroutine read_rofile_legacy2_core_d
 
 !!!_  - read_rofile_legacy2 - read ROFILE second step
   subroutine read_rofile_legacy2_d &
        & (ierr,   &
-       &  ij_ohead, ijrecov_o2c, ijo2c,   socn, flandg, ruo, rvo, &
-       &  ijdim,    ij_omax, u,  swap,    ij_o)
+       &  ij_ohead, ijrecov_o2c, ijo2c,   socn,    flandg, ruo, rvo, &
+       &  ijdim,    ij_omax, u,  swap,    klegacy, ij_o)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: sus_is_stream_unit, sus_read_irec, sus_suspend_read_irec
     implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: ij_ohead(0:*)
-    integer,         intent(out) :: ijrecov_o2c(*)
-    integer,         intent(out) :: ijo2c(*)
-    real(kind=KTGT), intent(out) :: socn (*)
-    real(kind=KTGT), intent(out) :: flandg(*), ruo(*), rvo(*)   ! ijdim
-    integer,         intent(in)  :: ij_omax
-    integer,         intent(in)  :: ijdim
-    integer,         intent(in)  :: u
-    logical,optional,intent(in)  :: swap
-    integer,optional,intent(out) :: ij_o(*)
+    integer,        intent(out)          :: ierr
+    integer,        intent(out)          :: ij_ohead(0:*)
+    integer,        intent(out)          :: ijrecov_o2c(*)
+    integer,        intent(out)          :: ijo2c(*)
+    real(kind=KTGT),intent(out)          :: socn (*)
+    real(kind=KTGT),intent(out),optional :: flandg(*), ruo(*), rvo(*)   ! ijdim
+    integer,        intent(in)           :: ij_omax
+    integer,        intent(in)           :: ijdim
+    integer,        intent(in)           :: u
+    logical,        intent(in),optional  :: swap
+    integer,        intent(in),optional  :: klegacy
+    integer,        intent(out),optional :: ij_o(*)
+
+    integer kfmt
 
     if (present(ij_o)) then
        call read_rofile_legacy2_core_d &
             & (ierr,   &
-            &  ij_ohead, ijrecov_o2c, ijo2c,   socn, flandg, ruo, rvo, &
+            &  ij_ohead, ijrecov_o2c, ijo2c,   socn, &
             &  ij_o,     ijdim,       ij_omax, u,    swap)
     else
        ierr = 0
@@ -566,29 +658,101 @@ contains
        if (ierr.eq.0) then
           call read_rofile_legacy2_core_d &
                & (ierr,   &
-               &  ij_ohead, ijrecov_o2c, ijo2c,   socn, flandg, ruo, rvo, &
+               &  ij_ohead, ijrecov_o2c, ijo2c,   socn, &
                &  buf_ijo,  ijdim,       ij_omax, u,    swap)
        endif
        if (ierr.eq.0) deallocate(buf_ijo, STAT=ierr)
     endif
+
+    kfmt = choice(legacy_miroc5, klegacy)
+    if (kfmt.ne.legacy_miroc4) then
+       if (sus_is_stream_unit(u)) then
+          if (present(flandg)) then
+             if (ierr.eq.0) call sus_read_irec(ierr, u, flandg, ijdim, swap)
+          endif
+          ! ruo rvo are in the same record
+          if (present(ruo).and.present(rvo)) then
+             if (ierr.eq.0) call sus_suspend_read_irec(ierr, u, ruo, ijdim, suspend_begin, swap)
+             if (ierr.eq.0) call sus_suspend_read_irec(ierr, u, rvo, ijdim, suspend_end,   swap)
+          endif
+       else
+          if (present(flandg)) then
+             if (ierr.eq.0) read(u, IOSTAT=ierr) flandg(1:ijdim)
+          endif
+          if (present(ruo).and.present(rvo)) then
+             if (ierr.eq.0) read(u, IOSTAT=ierr) ruo(1:ijdim), rvo(1:ijdim)
+          endif
+       endif
+    endif
   end subroutine read_rofile_legacy2_d
-!!!_  - write_rofile_legacy - write ROFILE
-  subroutine write_rofile_legacy_d &
+
+!!!_  - read_rofile_legacy3 - read ROFILE third step (miroc4 only)
+  subroutine read_rofile_legacy3_d &
+       & (ierr,   &
+       &  ij_olhead, ijrecov_o2cl, ijo2cl, slnd,    &
+       &  ijdim,     ij_omax,      u,      swap,    klegacy, ij_o)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: sus_is_stream_unit, sus_read_irec, sus_suspend_read_irec
+    implicit none
+    integer,        intent(out)          :: ierr
+    integer,        intent(out)          :: ij_olhead(0:*)
+    integer,        intent(out)          :: ijrecov_o2cl(*)
+    integer,        intent(out)          :: ijo2cl(*)
+    real(kind=KTGT),intent(out)          :: slnd (*)
+    integer,        intent(in)           :: ij_omax
+    integer,        intent(in)           :: ijdim
+    integer,        intent(in)           :: u
+    logical,        intent(in),optional  :: swap
+    integer,        intent(in),optional  :: klegacy
+    integer,        intent(out),optional :: ij_o(*)
+
+    integer kfmt
+
+    kfmt = choice(legacy_miroc5, klegacy)
+
+    if (kfmt.ne.legacy_miroc4) then
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
+       return
+    endif
+
+    if (present(ij_o)) then
+       call read_rofile_legacy2_core_d &
+            & (ierr,   &
+            &  ij_olhead, ijrecov_o2cl, ijo2cl,  slnd, &
+            &  ij_o,      ijdim,        ij_omax, u,    swap)
+    else
+       ierr = 0
+       if (allocated(buf_ijo)) then
+          if (size(buf_ijo).ne.ijdim) ierr = _ERROR(ERR_INVALID_ITEM)
+       else
+          ierr = _ERROR(ERR_PANIC)
+       endif
+       if (ierr.eq.0) then
+          call read_rofile_legacy2_core_d &
+               & (ierr,   &
+               &  ij_olhead, ijrecov_o2cl, ijo2cl,  slnd, &
+               &  buf_ijo,   ijdim,        ij_omax, u,    swap)
+       endif
+       if (ierr.eq.0) deallocate(buf_ijo, STAT=ierr)
+    endif
+  end subroutine read_rofile_legacy3_d
+
+!!!_  - write_rofile_legacy1 - write ROFILE
+  subroutine write_rofile_legacy1_d &
        & (ierr,     &
-       &  ij_ohead, ijrecov_o2c, ijo2c, socn, ruo, rvo, flandg, &
+       &  ij_ohead, ijrecov_o2c, ijo2c, socn, &
        &  ij_omax,  ijdim,       u,     swap)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: sus_read_irec, sus_is_stream_unit
     implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(in)  :: ij_ohead(0:*)
-    integer,         intent(in)  :: ijrecov_o2c(*)
-    integer,         intent(in)  :: ijo2c(*)                    ! ijdim, ij_omax
-    real(kind=KTGT), intent(in)  :: socn (*)                    ! ijdim, ij_omax
-    real(kind=KTGT), intent(in)  :: ruo(*), rvo(*), flandg(*)   ! ijdim
-    integer,         intent(in)  :: ij_omax,  ijdim
-    integer,         intent(in)  :: u
-    logical,optional,intent(in)  :: swap
+    integer,        intent(out)         :: ierr
+    integer,        intent(in)          :: ij_ohead(0:*)
+    integer,        intent(in)          :: ijrecov_o2c(*)
+    integer,        intent(in)          :: ijo2c(*)                    ! ijdim, ij_omax
+    real(kind=KTGT),intent(in)          :: socn (*)                    ! ijdim, ij_omax
+    integer,        intent(in)          :: ij_omax,  ijdim
+    integer,        intent(in)          :: u
+    logical,        intent(in),optional :: swap
 
     logical sw
     integer jo, jz
@@ -618,14 +782,10 @@ contains
           if (ierr.eq.0) call sus_suspend_write_irec(ierr, u, vi, ij_o(jo), suspend_begin, swap)
           if (ierr.eq.0) call sus_suspend_write_irec(ierr, u, vv, ij_o(jo), suspend_end,   swap)
        enddo
-       if (ierr.eq.0) call sus_write_irec(ierr, u, flandg, ijdim, swap)
-       ! ruo rvo are in the same record
-       if (ierr.eq.0) call sus_suspend_write_irec(ierr, u, ruo, ijdim, suspend_begin, swap)
-       if (ierr.eq.0) call sus_suspend_write_irec(ierr, u, rvo, ijdim, suspend_end,   swap)
     else
        sw = choice(.FALSE., swap)
        if (swap) then
-          ierr = ERR_INVALID_PARAMETER
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
        else
           if (ierr.eq.0) write(u, IOSTAT=ierr) ij_o(1:ijdim)
           do jo = 1, ijdim
@@ -637,11 +797,45 @@ contains
              if (ierr.eq.0) write(u, IOSTAT=ierr) vi(1:ij_o(jo)), vv(1:ij_o(jo))
           enddo
        endif
+    endif
+    if (ierr.eq.0) deallocate(ij_o, STAT=ierr)
+  end subroutine write_rofile_legacy1_d
+
+!!!_  - write_rofile_legacy2 - write ROFILE second step (for miroc5)
+  subroutine write_rofile_legacy2_d &
+       & (ierr,     &
+       &  ruo, rvo, flandg, &
+       &  ijdim,    u,      swap, klegacy)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: sus_read_irec, sus_is_stream_unit
+    implicit none
+    integer,        intent(out)         :: ierr
+    real(kind=KTGT),intent(in)          :: ruo(*), rvo(*), flandg(*)   ! ijdim
+    integer,        intent(in)          :: ijdim
+    integer,        intent(in)          :: u
+    logical,        intent(in),optional :: swap
+    integer,        intent(in),optional :: klegacy
+
+    integer kfmt
+
+    ierr = 0
+    kfmt = choice(legacy_miroc5, klegacy)
+
+    if (kfmt.eq.legacy_miroc4) then
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
+       return
+    endif
+
+    if (sus_is_stream_unit(u)) then
+       if (ierr.eq.0) call sus_write_irec(ierr, u, flandg, ijdim, swap)
+       ! ruo rvo are in the same record
+       if (ierr.eq.0) call sus_suspend_write_irec(ierr, u, ruo, ijdim, suspend_begin, swap)
+       if (ierr.eq.0) call sus_suspend_write_irec(ierr, u, rvo, ijdim, suspend_end,   swap)
+    else
        if (ierr.eq.0) write(u, IOSTAT=ierr) flandg(1:ijdim)
        if (ierr.eq.0) write(u, IOSTAT=ierr) ruo(1:ijdim), rvo(1:ijdim)
     endif
-    if (ierr.eq.0) deallocate(ij_o, STAT=ierr)
-  end subroutine write_rofile_legacy_d
+  end subroutine write_rofile_legacy2_d
 
 !!!_ + end Ami_legacy
 end module TOUZA_Ami_legacy
@@ -672,7 +866,12 @@ program test_ami_legacy
   integer,       allocatable :: ij_ohead(:), ijrecov_o2c(:), ijo2c(:)
   real(kind=KMD),allocatable :: socn (:), ruo(:), rvo(:), flandg(:)
 
+  integer ij_olmax, len_o2cl
+  integer,       allocatable :: ij_olhead(:), ijrecov_o2cl(:), ijo2cl(:)
+  real(kind=KMD),allocatable :: slnd(:)
+
   integer mdomo, mdoma
+  integer kraf,  krof
 
   ierr = 0
   jarg = 0
@@ -707,44 +906,55 @@ program test_ami_legacy
      if (rafile.eq.' ') then
         write(*, *) 'need rafile path'
      else
-        call open_rafile_legacy(ierr, swap, ij_amax, len_a2m, nxygdm, rafile, u)
-101     format('open/rafile: ', A, 1x, L1, 2(1x, I0), 1x, I0, ' / ', I0)
+        call open_rafile_legacy &
+             & (ierr, kraf, swap, ij_amax, len_a2m, nxygdm, rafile, u)
+101     format('open/rafile: ', A, 1x, L1, 1x, '(', I0, ') ', 2(1x, I0), 1x, I0, ' / ', I0)
         mdoma = nxygdm * ij_amax
-        write(*, 101) trim(rafile), swap, ij_amax, nxygdm, len_a2m, mdoma
+        write(*, 101) trim(rafile), swap, kraf, ij_amax, nxygdm, len_a2m, mdoma
         if (ierr.eq.0) then
            allocate(ij_ahead(0:ij_amax), &
                 &   ijrecov_a2m(len_a2m), ijc2o(len_a2m), satm(len_a2m), &
-                &   ru(nxygdm),           rv(nxygdm),     rocn(nxygdm),  &
+                &   ru(nxygdm),           rv(nxygdm),     &
                 &   STAT=ierr)
         endif
         if (ierr.eq.0) then
+           if (kraf.ne.legacy_miroc4) then
+              allocate(rocn(nxygdm),  STAT=ierr)
+           endif
+        endif
+        if (ierr.eq.0) then
            call read_rafile_legacy &
-                & (ierr, &
+                & (ierr,     &
                 &  ij_ahead, ijrecov_a2m, ijc2o,  satm, ru, rv, rocn, &
-                &  ij_amax,  len_a2m,     nxygdm, u,    swap)
+                &  ij_amax,  len_a2m,     nxygdm, u,  swap, kraf)
         endif
      endif
      if (ierr.eq.0) call sus_close(ierr, u, rafile)
   endif
   if (ierr.eq.0) then
      if (rofile.ne.' ') then
-        call open_rofile_legacy(ierr, swap, ijdim, rofile, u)
-111     format('open/rofile: ', A, 1x, L1, 1x, I0)
-        write(*, 111) trim(rofile), swap, ijdim
+        call open_rofile_legacy(ierr, krof, swap, ijdim, rofile, u)
+111     format('open/rofile: ', A, 1x, L1, 1x, '(', I0, ') ', I0)
+        write(*, 111) trim(rofile), swap, krof, ijdim
         if (ierr.eq.0) then
            call read_rofile_legacy1 &
                 & (ierr,     &
                 &  ij_omax,  len_o2a, &
                 &  ijdim,    u,       swap)
         endif
-112     format('open/rofile: ', A, 1x, L1, 2(1x, I0), 1x, I0, ' / ', I0)
+112     format('open/rofile: ', A, 1x, L1, 1x, '(', I0, ') ', 2(1x, I0), 1x, I0, ' / ', I0)
         mdomo = ijdim * ij_omax
-        write(*, 112) trim(rofile), swap, ij_omax, ijdim, len_o2a, mdomo
+        write(*, 112) trim(rofile), swap, krof, ij_omax, ijdim, len_o2a, mdomo
         if (ierr.eq.0) then
            allocate(ij_ohead(0:ij_omax),  &
                 &   ijrecov_o2c(len_o2a), ijo2c(len_o2a), socn(len_o2a), &
-                &   ruo(ijdim),           rvo(ijdim),     flandg(ijdim), &
                 &   STAT=ierr)
+        endif
+        if (ierr.eq.0) then
+           if (krof.ne.legacy_miroc4) then
+              allocate(ruo(ijdim),           rvo(ijdim),     flandg(ijdim), &
+                   &   STAT=ierr)
+           endif
         endif
         if (ierr.eq.0) then
            ijo2c(:) = 0
@@ -752,7 +962,28 @@ program test_ami_legacy
            call read_rofile_legacy2 &
                 & (ierr,     &
                 &  ij_ohead, ijrecov_o2c, ijo2c, socn, flandg, ruo, rvo, &
-                &  ijdim,    ij_omax,     u,     swap)
+                &  ijdim,    ij_omax,     u,     swap, krof)
+        endif
+        if (ierr.eq.0) then
+           if (krof.eq.legacy_miroc4) then
+              call read_rofile_legacy1 &
+                   & (ierr,     &
+                   &  ij_olmax, len_o2cl, &
+                   &  ijdim,    u,       swap)
+              if (ierr.eq.0) then
+                 allocate(ij_olhead(0:ij_olmax),  &
+                      &   ijrecov_o2cl(len_o2cl), ijo2cl(len_o2cl), slnd(len_o2cl), &
+                      &   STAT=ierr)
+              endif
+              if (ierr.eq.0) then
+                 ijo2cl(:) = 0
+                 slnd(:)  = 0.0_KDBL
+                 call read_rofile_legacy3 &
+                      & (ierr,      &
+                      &  ij_olhead, ijrecov_o2cl, ijo2cl, slnd, &
+                      &  ijdim,     ij_omax,      u,      swap, krof)
+              endif
+           endif
         endif
      endif
      if (ierr.eq.0) call sus_close(ierr, u, rofile)
@@ -766,15 +997,28 @@ program test_ami_legacy
            call write_rafile_legacy &
                 & (ierr,     &
                 &  ij_ahead, ijrecov_a2m, ijc2o,  satm, ru, rv, rocn, &
-                &  len_a2m,  ij_amax,     nxygdm, u,    swap)
+                &  len_a2m,  ij_amax,     nxygdm, u,  swap, kraf)
         endif
         if (ierr.eq.0) opath = trim(opfx) // '-ro.dat'
         if (ierr.eq.0) call sus_open(ierr, u, opath, ACTION='W', STATUS='R')
         if (ierr.eq.0) then
-           call write_rofile_legacy &
+           call write_rofile_legacy1 &
                 & (ierr,     &
-                &  ij_ohead, ijrecov_o2c, ijo2c, socn, ruo, rvo, flandg, &
+                &  ij_ohead, ijrecov_o2c, ijo2c, socn, &
                 &  ij_omax,  ijdim,       u,     swap)
+        endif
+        if (ierr.eq.0) then
+           if (krof.eq.legacy_miroc4) then
+              call write_rofile_legacy1 &
+                   & (ierr,     &
+                   &  ij_olhead, ijrecov_o2cl, ijo2cl, slnd, &
+                   &  ij_omax,   ijdim,        u,      swap)
+           else
+              call write_rofile_legacy2 &
+                   & (ierr,     &
+                   &  ruo, rvo, flandg, &
+                   &  ijdim,    u,     swap, krof)
+           endif
         endif
      endif
   endif
