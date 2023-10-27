@@ -1,7 +1,7 @@
 # touza/ami Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 2 2022
-# Time-stamp: <2023/07/20 15:13:50 fuyuki Makefile.am>
+# Time-stamp: <2023/10/27 11:58:53 c0210 Makefile.am>
 
 # Copyright (C) 2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -35,10 +35,14 @@ TEST_COMMON_LIBS += $(FC_LDADD_touza_nio) $(FC_LDADD_touza_trp)
 TEST_COMMON_LIBS += $(FC_LDADD_touza_emu)
 TEST_COMMON_LIBS += $(FC_LDADD_touza_std)
 
+lib-nio:
+	cd ../nio; $(MAKE)
+
 if with_nctcdf
 TEST_COMMON_LIBS += $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 endif
 
+AM_FCFLAGS_MODULE += $(FC_MODULE_touza_trp)
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_nio)
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_emu)
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_std)
