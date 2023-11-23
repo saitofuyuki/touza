@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2023/11/21 16:33:39 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/11/27 15:09:01 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -39,6 +39,13 @@
 #ifndef   OPT_PSGINV_ITER_LIMIT
 #  define OPT_PSGINV_ITER_LIMIT 30
 #endif
+
+#define _SIN(TERM) TERM(1)
+#define _COS(TERM) TERM(2)
+#define _ANGLE(TERM) TERM(3)
+#define _SIN2(TERM) (_SIN(TERM)**2)
+#define _COS2(TERM) (_COS(TERM)**2)
+
 !!!_@ TOUZA_Emu_ugg - Geometry procedures
 module TOUZA_Emu_ugg
 !!!_ = declaration
@@ -59,23 +66,25 @@ module TOUZA_Emu_ugg
   integer,parameter,public :: DIV_ACCUMULATE = 2          !! legacy, accumulate from the origin
 
 !!!_ + cache size and index
-  integer,parameter,public :: ncache_stereog_lo = 2
-  integer,parameter,public :: ncache_stereog_la = 2
-  integer,parameter,public :: ncache_stereog_co = 6
+  integer,parameter,public :: ncache_psgp_lo = 2
+  integer,parameter,public :: ncache_psgp_la = 2
+  integer,parameter,public :: ncache_psgp_co = 9
 
-  integer,parameter :: icache_stereog_sindlo = 1
-  integer,parameter :: icache_stereog_cosdlo = 2
+  integer,parameter :: icache_psgp_sindlo = 1
+  integer,parameter :: icache_psgp_cosdlo = 2
 
-  integer,parameter :: icache_stereog_xrho   = 1
-  integer,parameter :: icache_stereog_yrho   = 2
+  integer,parameter :: icache_psgp_xrho   = 1
+  integer,parameter :: icache_psgp_yrho   = 2
 
-  integer,parameter :: icache_stereog_xco    = 1
-  integer,parameter :: icache_stereog_yco    = 2
-  integer,parameter :: icache_stereog_sign   = 3
-  integer,parameter :: icache_stereog_ecc    = 4
-  integer,parameter :: icache_stereog_olon   = 5
-  integer,parameter :: icache_stereog_tcf    = 6
-  integer,parameter :: icache_stereog_tol    = 7
+  integer,parameter :: icache_psgp_xco  = 1
+  integer,parameter :: icache_psgp_yco  = 2
+  integer,parameter :: icache_psgp_sign = 3
+  integer,parameter :: icache_psgp_ecc  = 4
+  integer,parameter :: icache_psgp_olon = 5
+  integer,parameter :: icache_psgp_tcf  = 6  ! rho factor
+  integer,parameter :: icache_psgp_tol  = 7  !
+  integer,parameter :: icache_psgp_maj  = 8  ! major
+  integer,parameter :: icache_psgp_psf  = 9  ! scale factor at pole
 
   integer,parameter :: lim_psginv = OPT_PSGINV_ITER_LIMIT
 !!!_  - static
@@ -138,62 +147,46 @@ module TOUZA_Emu_ugg
      module procedure span_latitude_d
   end interface span_latitude
 
-  interface proj_stereog_npset
-     module procedure proj_stereog_npset_d
-  end interface proj_stereog_npset
-  interface proj_stereog_npfwd
-     module procedure proj_stereog_npfwd_d
-  end interface proj_stereog_npfwd
-
-  interface proj_stereog_spset
-     module procedure proj_stereog_spset_d
-  end interface proj_stereog_spset
-  interface proj_stereog_spfwd
-     module procedure proj_stereog_spfwd_d
-  end interface proj_stereog_spfwd
-
-  interface proj_stereog_set
-     module procedure proj_stereog_set_d
-  end interface proj_stereog_set
-  interface proj_stereog_fwd
-     module procedure proj_stereog_fwd_d
-  end interface proj_stereog_fwd
-  interface proj_stereog_xfwd
-     module procedure proj_stereog_xfwd_d
-  end interface proj_stereog_xfwd
-  interface proj_stereog_yfwd
-     module procedure proj_stereog_yfwd_d
-  end interface proj_stereog_yfwd
-
   interface conformal_latitude
      module procedure conformal_latitude_d
   end interface conformal_latitude
-  interface proj_tsfactor
-     module procedure proj_tsfactor_d
-  end interface proj_tsfactor
   interface flatten_to_ecc
      module procedure flatten_to_ecc_d
   end interface flatten_to_ecc
-  interface local_radius
-     module procedure local_radius_d
-  end interface local_radius
 
-  interface proj_pstereog
-     module procedure proj_pstereog_core_d, proj_pstereog_once_d
-  end interface proj_pstereog
-
-  interface proj_pstereog_set
-     module procedure proj_pstereog_set_d
-  end interface proj_pstereog_set
-  interface proj_pstereog_cachelo
-     module procedure proj_pstereog_cachelo_d
-  end interface proj_pstereog_cachelo
-  interface proj_pstereog_cachela
-     module procedure proj_pstereog_cachela_d
-  end interface proj_pstereog_cachela
-  interface proj_pstereog_inv
-     module procedure proj_pstereog_inv_d
-  end interface proj_pstereog_inv
+  interface psgp_set
+     module procedure psgp_set_d
+  end interface psgp_set
+  interface psgp_fwd
+     module procedure psgp_fwd_core_d, psgp_fwd_once_d
+  end interface psgp_fwd
+  interface psgp_bwd_ll
+     module procedure psgp_bwd_ll_d
+  end interface psgp_bwd_ll
+  interface psgp_bwd_tr
+     module procedure psgp_bwd_tr_d
+  end interface psgp_bwd_tr
+  interface psgp_bwd_sf
+     module procedure psgp_bwd_sf_d
+  end interface psgp_bwd_sf
+  interface psgp_bwd_isf
+     module procedure psgp_bwd_isf_d
+  end interface psgp_bwd_isf
+  interface psgp_bwd_iaf
+     module procedure psgp_bwd_iaf_d
+  end interface psgp_bwd_iaf
+  interface psgp_bwd_core
+     module procedure psgp_bwd_core_d
+  end interface psgp_bwd_core
+  interface psgp_fwd_core
+     module procedure psgp_fwd_core_d
+  end interface psgp_fwd_core
+  interface psgp_cachela
+     module procedure psgp_cachela_d
+  end interface psgp_cachela
+  interface psgp_cachelo
+     module procedure psgp_cachelo_d
+  end interface psgp_cachelo
 
   interface pi_
      module procedure pi_d
@@ -310,15 +303,13 @@ module TOUZA_Emu_ugg
      module procedure setd_sincos_d
   end interface setd_sincos
 
-  interface comp_I3
-     module procedure comp_I3_d
-  end interface comp_I3
-  interface comp_I1
-     module procedure comp_I1_d
-  end interface comp_I1
-  interface comp_J
-     module procedure comp_J_d
-  end interface comp_J
+  interface sin_canonical
+     module procedure sin_canonical_d
+  end interface sin_canonical
+  interface cos_canonical
+     module procedure cos_canonical_d
+  end interface cos_canonical
+
   interface diag_sc
      module procedure diag_sc_d
   end interface diag_sc
@@ -335,13 +326,12 @@ module TOUZA_Emu_ugg
   public deg2rad, rad2deg
 
   public flatten_to_ecc
-  public conformal_latitude,  local_radius
-  public proj_stereog_set,   proj_stereog_fwd
-  public proj_stereog_npset, proj_stereog_npfwd
-  public proj_stereog_spset, proj_stereog_spfwd
-  public proj_stereog_xfwd,  proj_stereog_yfwd
-  public proj_pstereog, proj_pstereog_set, proj_pstereog_cachelo, proj_pstereog_cachela
-  public proj_pstereog_inv
+
+  public psgp_set, psgp_cachela, psgp_cachelo
+  public psgp_fwd
+  public psgp_bwd_ll, psgp_bwd_tr
+  public psgp_bwd_sf, psgp_bwd_isf, psgp_bwd_iaf
+
   public reduced_lat, reduced_lat_tan
   public aux_dspherical_lon, aux_dspherical_lon_cos
   public aux_arcl_eetri, aux_arcl_eetri_trig
@@ -358,6 +348,9 @@ module TOUZA_Emu_ugg
   public gen_ctable_I1, gen_ctable_I2b, gen_ctable_I2a
 
   public set_sincos, setd_sincos
+  public sin_canonical, cos_canonical
+
+  public diag_sc, diag_ph
 
 contains
 !!!_ + common interfaces
@@ -1269,101 +1262,115 @@ contains
 
 !!!_ + polar stereographic projection
 !!!_  - note
-  ! see Snyder(1987) (https://doi.org/10.3133/pp1395)
-!!!_  & proj_tsfactor()
-  ELEMENTAL &
-  real(kind=KTGT) function proj_tsfactor_d (lat, ecc) result (x)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: lat ! in radian
-    real(kind=KTGT),intent(in) :: ecc
-    ! real(kind=KTGT) :: p
-    real(kind=KTGT) :: esl, thl
-    real(kind=KTGT),parameter :: ONE  = 1.0_KTGT
-    real(kind=KTGT),parameter :: HALF = 0.5_KTGT
-
-    ! tan(a-b)    = (tan(a) - tan(b))/(1 + tan(a)tan(b))
-    ! tan(pi/4-b) = (1      - tan(b))/(1 +       tan(b))
-
-    ! p = pi_(lat)
-    esl = ecc * sin(lat)
-    thl = tan(HALF * lat)
-    x = (ONE - thl) / (ONE + thl) &
-         & / (((ONE - esl) / (ONE + esl)) ** (HALF * ecc))
-    ! x = tan(HALF * (HALF * p - lat)) &
-    !      & / (((ONE - esl) / (ONE + esl)) ** (HALF * ecc))
-    return
-  end function proj_tsfactor_d
-!!!_  & local_radius() - return local radius factor (m)
-  ELEMENTAL &
-  real(kind=KTGT) function local_radius_d(lat, ecc) result (m)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: lat ! in radian
-    real(kind=KTGT),intent(in) :: ecc
-    m = cos(lat) / sqrt(1.0_KTGT - (ecc * sin(lat))**2.0_KTGT)
-  end function local_radius_d
-
-
-!!!_  & proj_pstereog_set - coeff cache for sterographic projection (pole)
-  subroutine proj_pstereog_set_d &
-    & (cco, ecc, a, latts, lonorg, pole, xs, ys, tol)
+  ! Conformal latitude computation using Gudermannian function.
+  ! See Karney(2011).
+  subroutine psgp_set_d &
+       & (cco, ecc, a, latts, lonorg, pole, xs, ys, tol)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
     real(kind=KTGT),intent(out)         :: cco(*)
-    real(kind=KTGT),intent(in)          :: ecc, a, latts
+    real(kind=KTGT),intent(in)          :: ecc, a
+    real(kind=KTGT),intent(in)          :: latts
     real(kind=KTGT),intent(in)          :: lonorg
     integer,        intent(in)          :: pole    ! north pole == +1, south pole == -1
     real(kind=KTGT),intent(in),optional :: xs, ys  ! scale for x,y (default == 1)
     real(kind=KTGT),intent(in),optional :: tol
 
-    real(kind=KTGT) :: mc, tc, lt, c, s
     real(kind=KTGT),parameter :: ONE=1.0_KTGT, ZERO=0.0_KTGT
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+    real(kind=KTGT) :: s, d
+    real(kind=KTGT) :: tcf, lt
+    real(kind=KTGT) :: tglat, tclat, cc, e2c
+    real(kind=KTGT) :: fc, c
 
     if (pole.lt.0) then
+       cco(icache_psgp_sign) = - ONE
        lt = - latts
-       cco(icache_stereog_sign) = - ONE
     else
-       lt = + latts
-       cco(icache_stereog_sign) = + ONE
+       cco(icache_psgp_sign) = + ONE
+       lt = latts
     endif
-    tc = proj_tsfactor(lt, ecc)
-    mc = local_radius(lt, ecc)
 
-    c = a * mc / tc
+    ! 1 - f = sqrt(1-e^2)
+    ! c = (1-f) * exp[e atanh (e)]
+    fc = SQRT((ONE + ecc) * (ONE - ecc))
+    c = fc * EXP(ecc * ATANH (ecc))
+
+    tglat = TAN(lt)
+    e2c = (ONE - ecc) * (ONE + ecc)
+    d = SQRT(ONE + e2c * (tglat * tglat))
+    tcf = ONE / d
+    ! psf = c / TWO / d
+
+    tclat = conformal_latitude(tglat, ecc)
+    cc = _hypot(ONE, tclat) + ABS(tclat)
+    if (tclat.lt.ZERO) then
+       tcf = tcf / cc
+       ! psf = psf / cc
+    else
+       tcf = tcf * cc
+       ! psf = psf * cc
+    endif
+
+    cco(icache_psgp_tcf)  = tcf * a
+    cco(icache_psgp_psf)  = tcf * (c / TWO)
+    cco(icache_psgp_maj)  = a
+    cco(icache_psgp_ecc)  = ecc
+    cco(icache_psgp_olon) = lonorg
+
     s = choice(ONE, xs)
     if (s.le.ZERO) s = ONE
-    cco(icache_stereog_xco)  = c / s
+    cco(icache_psgp_xco)  = s
+
     s = choice(ONE, ys)
     if (s.le.ZERO) s = ONE
-    cco(icache_stereog_yco)  = c / s
+    cco(icache_psgp_yco)  = s
 
-    cco(icache_stereog_ecc)  = ecc
-    cco(icache_stereog_olon) = lonorg
+    cco(icache_psgp_tol) = choice(ONE, tol)
 
-    ! for inversion
-    cco(icache_stereog_tcf) = tc / (a * mc)
-    cco(icache_stereog_tol) = choice(1.0_KTGT, tol)
-  end subroutine proj_pstereog_set_d
-!!!_  & proj_pstereog_cachela - lat cache for sterographic projection (pole)
-  subroutine proj_pstereog_cachela_d &
+  end subroutine psgp_set_d
+
+!!!_  & psgp_cachela - lat cache for sterographic projection (pole)
+  subroutine psgp_cachela_d &
     & (cla, lat, cco)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(out) :: cla(*)
     real(kind=KTGT),intent(in)  :: lat
     real(kind=KTGT),intent(in)  :: cco(*)
-    real(kind=KTGT) :: ecc, es
-    real(kind=KTGT) :: lt
 
-    ecc = cco(icache_stereog_ecc)
-    lt = lat * cco(icache_stereog_sign)
-    es = proj_tsfactor(lt, ecc) * cco(icache_stereog_sign)
-    cla(icache_stereog_xrho) = cco(icache_stereog_xco) * es
-    cla(icache_stereog_yrho) = cco(icache_stereog_yco) * es
-  end subroutine proj_pstereog_cachela_d
-!!!_  & proj_pstereog_cachelo - lon cache for sterographic projection (pole)
-  subroutine proj_pstereog_cachelo_d &
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+    real(kind=KTGT) :: ecc
+    real(kind=KTGT) :: tglat
+    real(kind=KTGT) :: tclat, cc,     tcf
+
+    ecc = cco(icache_psgp_ecc)
+    tcf = cco(icache_psgp_tcf)
+
+    if (abs(lat).eq.pi_(ZERO)/2.0_KTGT) then
+       cla(icache_psgp_xrho) = ZERO
+       cla(icache_psgp_yrho) = ZERO
+    else
+       tglat = TAN(lat) * cco(icache_psgp_sign)
+       tclat = conformal_latitude(tglat, ecc)
+
+       cc = _hypot(ONE, tclat) + ABS(tclat)
+       if (tclat.lt.ZERO) then
+          tcf = tcf * cc
+       else
+          tcf = tcf / cc
+       endif
+       tcf = tcf * cco(icache_psgp_sign)
+       ! write(*, *) 'psgp:l', tglat, tclat, tcf, cco(icache_psgp_xco)
+
+       cla(icache_psgp_xrho) = tcf / cco(icache_psgp_xco)
+       cla(icache_psgp_yrho) = tcf / cco(icache_psgp_yco)
+    endif
+  end subroutine psgp_cachela_d
+
+!!!_  & psgp_cachelo - lon cache for sterographic projection (pole)
+  subroutine psgp_cachelo_d &
     & (clo, lon, cco)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
@@ -1373,31 +1380,31 @@ contains
 
     real(kind=KTGT) :: lonorg
     real(kind=KTGT) :: dlo
-    lonorg = cco(icache_stereog_olon)
-    dlo = (lon - lonorg) * cco(icache_stereog_sign)
-    clo(icache_stereog_sindlo) = sin(dlo)
-    clo(icache_stereog_cosdlo) = cos(dlo)
-  end subroutine proj_pstereog_cachelo_d
+    lonorg = cco(icache_psgp_olon)
+    dlo = (lon - lonorg) * cco(icache_psgp_sign)
+    clo(icache_psgp_sindlo) = sin_canonical(dlo)
+    clo(icache_psgp_cosdlo) = cos_canonical(dlo)
+  end subroutine psgp_cachelo_d
 
-!!!_  & proj_pstereog_once()
-  function proj_pstereog_once_d &
+!!!_  & psgp_fwd_once()
+  function psgp_fwd_once_d &
        & (lon, lat, cco) result (xy)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT) :: xy(2)
     real(kind=KTGT),intent(in) :: lon, lat
     real(kind=KTGT),intent(in) :: cco(*)
-    real(kind=KTGT) :: tlo(ncache_stereog_la)
-    real(kind=KTGT) :: tla(ncache_stereog_lo)
+    real(kind=KTGT) :: tlo(ncache_psgp_la)
+    real(kind=KTGT) :: tla(ncache_psgp_lo)
 
-    call proj_pstereog_cachela(tla, lat, cco)
-    call proj_pstereog_cachelo(tlo, lon, cco)
+    call psgp_cachela(tla, lat, cco)
+    call psgp_cachelo(tlo, lon, cco)
 
-    xy(:) = proj_pstereog_core_d(tlo, tla)
-  end function proj_pstereog_once_d
+    xy(:) = psgp_fwd_core_d(tlo, tla)
+  end function psgp_fwd_once_d
 
-!!!_  & proj_pstereog_core()
-  function proj_pstereog_core_d &
+!!!_  & psgp_fwd_core()
+  function psgp_fwd_core_d &
        & (clo, cla) result (xy)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
@@ -1405,219 +1412,193 @@ contains
     real(kind=KTGT),intent(in) :: clo(*)
     real(kind=KTGT),intent(in) :: cla(*)
 
-    xy(1) = + cla(icache_stereog_xrho) * clo(icache_stereog_sindlo)
-    xy(2) = - cla(icache_stereog_yrho) * clo(icache_stereog_cosdlo)
-    ! xy(1:2) = xy(1:2) * cco(icache_stereog_sign)
-  end function proj_pstereog_core_d
+    ! write(*, *) 'psgp:x', cla(icache_psgp_xrho), clo(icache_psgp_sindlo)
+    xy(1) = + cla(icache_psgp_xrho) * clo(icache_psgp_sindlo)
+    xy(2) = - cla(icache_psgp_yrho) * clo(icache_psgp_cosdlo)
+  end function psgp_fwd_core_d
 
-!!!_  & proj_pstereog_inv
-  function proj_pstereog_inv_d &
+!!!_  & psgp_bwd_tr()
+  subroutine psgp_bwd_tr_d &
+       & (gla, dlo, x, y, cco)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out):: gla(*)
+    real(kind=KTGT),intent(out):: dlo(*)
+    real(kind=KTGT),intent(in) :: x, y
+    real(kind=KTGT),intent(in) :: cco(*)
+
+    real(kind=KTGT) :: s, d
+    real(kind=KTGT) :: rho
+    real(kind=KTGT) :: tglat
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+
+    s   = cco(icache_psgp_sign)
+    rho = _hypot(x, y)
+    if (rho.eq.ZERO) then
+       _SIN(gla) = s * ONE
+       _COS(gla) = ZERO
+       _SIN(dlo) = ZERO
+       _COS(dlo) = ONE
+    else
+       tglat = psgp_bwd_core(rho, cco)
+       d = _hypot(ONE, tglat)
+       _SIN(gla) = s * tglat / d
+       _COS(gla) = ONE / d
+
+       _SIN(dlo) =  (x * s) / rho * s
+       _COS(dlo) = -(y * s) / rho
+    endif
+  end subroutine psgp_bwd_tr_d
+
+!!!_  & psgp_bwd_ll()
+  function psgp_bwd_ll_d &
        & (x, y, cco) result(ll)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT) :: ll(2)
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
-    real(kind=KTGT) :: rho, t, e,   he, lo,  la
-    real(kind=KTGT) :: HPI, z, esl, p,  tol, s
-    integer j
 
-    HPI = pi_(0.0_KTGT) * 0.5_KTGT
-    e   = cco(icache_stereog_ecc)
-    tol = cco(icache_stereog_tol)
-    s   = cco(icache_stereog_sign)
-    he = e * 0.5_KTGT
+    real(kind=KTGT) :: s, lo
+    real(kind=KTGT) :: rho
+    real(kind=KTGT) :: tglat
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+
+    s   = cco(icache_psgp_sign)
+    rho = _hypot(x, y)
+    if (rho.eq.ZERO) then
+       ll(2) = s * (pi_(ZERO) / 2.0_KTGT)
+       ll(1) = cco(icache_psgp_olon)
+    else
+       tglat = psgp_bwd_core(rho, cco)
+
+       ll(2) = s * ATAN(tglat)
+
+       lo = s * cco(icache_psgp_olon) + ATAN2(x * s, - y * s)
+       ll(1) = lo * s
+    endif
+  end function psgp_bwd_ll_d
+
+!!!_  & psgp_bwd_sf() - scale factor
+  real(kind=KTGT) function psgp_bwd_sf_d &
+       & (x, y, cco) result(sf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: x, y
+    real(kind=KTGT),intent(in) :: cco(*)
+
+    real(kind=KTGT) :: ecc, e2c
+    real(kind=KTGT) :: rho
+    real(kind=KTGT) :: tglat
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
 
     rho = _hypot(x, y)
-    t = cco(icache_stereog_tcf) * rho
-    p = t
-    la = hpi - 2.0_KTGT * atan(p)
+    if (rho.eq.ZERO) then
+       sf = cco(icache_psgp_psf)
+    else
+       ecc = cco(icache_psgp_ecc)
+       e2c = (ONE - ecc) * (ONE + ecc)
+       tglat = psgp_bwd_core(rho, cco)
+       sf = (rho / cco(icache_psgp_maj)) * SQRT(ONE + e2c * (tglat * tglat))
+    endif
+  end function psgp_bwd_sf_d
 
-    do j = 0, lim_psginv
-       esl = e * sin(p)
-       z = ((1.0_KTGT - esl) / (1.0_KTGT + esl)) ** he
-       la = hpi - 2.0_KTGT * atan(t * z)
-       if (abs(p-la).le.spacing(la) * tol) exit
-       p = la
-    enddo
-    ll(2) = la * s
-
-    lo = s * cco(icache_stereog_olon) + atan2(x * s, - y * s)
-    ll(1) = lo * s
-  end function proj_pstereog_inv_d
-
-!!!_ + stereographic projection (reserved)
-!!!_  & proj_stereog_npset
-  subroutine proj_stereog_npset_d &
-       & (cc, ecc, a, latts)
+!!!_  & psgp_bwd_isf() - inverse scale factor
+  real(kind=KTGT) function psgp_bwd_isf_d &
+       & (x, y, cco) result(sf)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(out) :: cc
-    real(kind=KTGT),intent(in)  :: ecc, a, latts
+    real(kind=KTGT),intent(in) :: x, y
+    real(kind=KTGT),intent(in) :: cco(*)
 
-    real(kind=KTGT) :: mc, t
-
-    t  = proj_tsfactor(latts, ecc)
-    mc = local_radius(latts, ecc)
-    cc = a * mc / t
-  end subroutine proj_stereog_npset_d
-
-!!!_  & proj_stereog_npfwd
-  function proj_stereog_npfwd_d &
-       & (ll, ecc, cc, llorg) result (xy)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT) :: xy(2)
-    real(kind=KTGT),intent(in) :: ll(2)
-    real(kind=KTGT),intent(in) :: ecc
-    real(kind=KTGT),intent(in) :: llorg(2)
-    real(kind=KTGT),intent(in) :: cc           ! coefficient cache
-
-    real(kind=KTGT) :: lon, lat
+    real(kind=KTGT) :: ecc, e2c
     real(kind=KTGT) :: rho
-    real(kind=KTGT) :: cdl, sdl
+    real(kind=KTGT) :: tglat
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
 
-    lon = ll(1)
-    lat = ll(2)
-    sdl = sin(lon - llorg(1))
-    cdl = cos(lon - llorg(1))
-    rho = cc * proj_tsfactor(lat, ecc)
+    rho = _hypot(x, y)
+    if (rho.eq.ZERO) then
+       sf = ONE / cco(icache_psgp_psf)
+    else
+       ecc = cco(icache_psgp_ecc)
+       e2c = (ONE - ecc) * (ONE + ecc)
+       tglat = psgp_bwd_core(rho, cco)
+       sf = (cco(icache_psgp_maj) / rho) / SQRT(ONE + e2c * (tglat * tglat))
+    endif
+  end function psgp_bwd_isf_d
 
-    xy(1) = + rho * sdl
-    xy(2) = - rho * cdl
-  end function proj_stereog_npfwd_d
-
-!!!_  & proj_stereog_spset
-  subroutine proj_stereog_spset_d &
-       & (cc, ecc, a, latts)
+!!!_  & psgp_bwd_iaf() - inverse area factor
+  real(kind=KTGT) function psgp_bwd_iaf_d &
+       & (x, y, cco) result(sf)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(out) :: cc
-    real(kind=KTGT),intent(in)  :: ecc, a, latts
+    real(kind=KTGT),intent(in) :: x, y
+    real(kind=KTGT),intent(in) :: cco(*)
 
-    real(kind=KTGT) :: mc, t
-
-    t  = proj_tsfactor(-latts, ecc)
-    mc = local_radius(-latts, ecc)
-    cc = a * mc / t
-  end subroutine proj_stereog_spset_d
-
-!!!_  & proj_stereog_spfwd
-  function proj_stereog_spfwd_d &
-       & (ll, ecc, cc, llorg) result (xy)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT) :: xy(2)
-    real(kind=KTGT),intent(in) :: ll(2)
-    real(kind=KTGT),intent(in) :: ecc
-    real(kind=KTGT),intent(in) :: llorg(2)
-    real(kind=KTGT),intent(in) :: cc           ! coefficient cache
-
-    real(kind=KTGT) :: lon, lat
+    real(kind=KTGT) :: ecc, e2c
     real(kind=KTGT) :: rho
-    real(kind=KTGT) :: cdl, sdl
+    real(kind=KTGT) :: tglat
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
 
-    lon = -ll(1)
-    lat = -ll(2)
-    sdl = sin(lon + llorg(1))
-    cdl = cos(lon + llorg(1))
-    rho = cc * proj_tsfactor(lat, ecc)
+    rho = _hypot(x, y)
+    if (rho.eq.ZERO) then
+       sf = ONE / cco(icache_psgp_psf)
+    else
+       ecc = cco(icache_psgp_ecc)
+       e2c = (ONE - ecc) * (ONE + ecc)
+       tglat = psgp_bwd_core(rho, cco)
+       sf = (cco(icache_psgp_maj) / rho) ** 2 / (ONE + e2c * (tglat * tglat))
+    endif
+  end function psgp_bwd_iaf_d
 
-    xy(1) = - rho * sdl
-    xy(2) = + rho * cdl
-  end function proj_stereog_spfwd_d
-
-!!!_  & proj_stereog_set
-  subroutine proj_stereog_set_d &
-       & (cc, sinx1, cosx1, llorg, ecc, a, k0)
+!!!_  & psgp_bwd_core
+  real(kind=KTGT) function psgp_bwd_core_d &
+       & (rho, cco) result(tlat)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(out) :: cc, sinx1, cosx1
-    real(kind=KTGT),intent(in)  :: llorg(2)
-    real(kind=KTGT),intent(in)  :: ecc, a, k0
+    real(kind=KTGT),intent(in) :: rho
+    real(kind=KTGT),intent(in) :: cco(*)
 
-    real(kind=KTGT) :: lc, m1
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+    real(kind=KTGT) :: ecc, tol, e2c
+    real(kind=KTGT) :: t
+    real(kind=KTGT) :: tclat, tglat
+    real(kind=KTGT) :: z, dz
+    ! real(kind=KTGT) :: scf
+    integer j
 
-    lc = conformal_latitude(llorg(2), ecc)
-    cosx1 = cos(lc)
-    sinx1 = sin(lc)
-    m1 = local_radius(llorg(2), ecc)
-    cc = 2.0_KTGT * a * k0 * m1
-  end subroutine proj_stereog_set_d
+    if (rho.eq.ZERO) then
+       tlat = cco(icache_psgp_sign) * HUGE(ZERO)
+    else
+       tol = cco(icache_psgp_tol)
+       ecc = cco(icache_psgp_ecc)
+       e2c = (ONE - ecc) * (ONE + ecc)
 
-!!!_  & proj_stereog_fwd
-  function proj_stereog_fwd_d &
-       & (ll, ecc, cc, llorg, sinx1, cosx1) result (xy)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT) :: xy(2)
-    real(kind=KTGT),intent(in) :: ll(2)
-    real(kind=KTGT),intent(in) :: ecc
-    real(kind=KTGT),intent(in) :: llorg(2)
-    real(kind=KTGT),intent(in) :: cc           ! coefficient cache == (2 a m1 k)
-    real(kind=KTGT),intent(in) :: sinx1, cosx1
-
-    real(kind=KTGT) :: lon, lat
-    real(kind=KTGT) :: lc, sx, cx, sdl, cdl, AA
-
-    lon = ll(1)
-    lat = ll(2)
-
-    lc = conformal_latitude(lat, ecc)
-    cx = cos(lc)
-    sx = sin(lc)
-    sdl = sin(lon - llorg(1))
-    cdl = cos(lon - llorg(1))
-
-    AA = cc / (cosx1 * (1.0_KTGT + sinx1 * sx + cosx1 * cx * cdl))
-
-    xy(1) = AA * cx * sdl
-    xy(2) = AA * (cosx1 * sx - sinx1 * cx * cdl)
-  end function proj_stereog_fwd_d
-
-!!!_  & proj_stereog_xfwd
-  ELEMENTAL &
-  real(kind=KTGT) function proj_stereog_xfwd_d &
-       & (lon, lat, ecc, lon0, cc, sinx1, cosx1) result (x)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: lon, lat
-    real(kind=KTGT),intent(in) :: ecc
-    real(kind=KTGT),intent(in) :: lon0
-    real(kind=KTGT),intent(in) :: cc, sinx1, cosx1
-
-    real(kind=KTGT) :: lc, sx, cx, sdl, cdl, AA
-    lc = conformal_latitude(lat, ecc)
-    cx = cos(lc)
-    sx = sin(lc)
-    sdl = sin(lon - lon0)
-    cdl = cos(lon - lon0)
-
-    AA = cc / (cosx1 * (1.0_KTGT + sinx1 * sx + cosx1 * cx * cdl))
-
-    x = AA * cx * sdl
-  end function proj_stereog_xfwd_d
-!!!_  & proj_stereog_yfwd
-  ELEMENTAL &
-  real(kind=KTGT) function proj_stereog_yfwd_d &
-       & (lon, lat, ecc, lon0, cc, sinx1, cosx1) result (y)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: lon, lat
-    real(kind=KTGT),intent(in) :: ecc
-    real(kind=KTGT),intent(in) :: lon0
-    real(kind=KTGT),intent(in) :: cc, sinx1, cosx1
-
-    real(kind=KTGT) :: lc, sx, cx, cdl, AA
-    lc = conformal_latitude(lat, ecc)
-    cx = cos(lc)
-    sx = sin(lc)
-    cdl = cos(lon - lon0)
-
-    AA = cc / (cosx1 * (1.0_KTGT + sinx1 * sx + cosx1 * cx * cdl))
-
-    y = AA * (cosx1 * sx - sinx1 * cx * cdl)
-  end function proj_stereog_yfwd_d
+       t = rho / cco(icache_psgp_tcf)
+       tclat = (ONE / t - t) / TWO
+       ! tglat = tclat
+       ! Taylor expansion of conformal latitude with e is
+       !   tclat = tglat - e^2 tglat + ....,
+       ! thus use tglat = tclat/ (1-e^2) as initial guess
+       tglat = tclat / e2c
+       do j = 0, lim_psginv
+          z = conformal_latitude(tglat, ecc)
+          dz = (tclat - z) * (ONE + e2c * (tglat * tglat)) &
+               & / (e2c * _hypot(ONE, z) * _hypot(ONE, tglat))
+          tglat = tglat + dz
+          if (abs(dz).le.spacing(tglat) * tol) exit
+       enddo
+       tlat = tglat
+       ! scf = (rho / cco(icache_psgp_maj)) * SQRT(ONE + e2c * (tglat * tglat))
+       ! write(*, *) 'scale =', scf, tglat, tclat, rho, cco(icache_psgp_maj)
+    endif
+  end function psgp_bwd_core_d
 
 !!!_  & flatten_to_ecc ()
   ELEMENTAL &
@@ -1627,24 +1608,20 @@ contains
     e = sqrt(2.0_KTGT * f - f * f)
   end function flatten_to_ecc_d
 
-!!!_  & conformal_latitude()
+!!!_  & conformal_latitude() - tan(conf. lat)
   ELEMENTAL &
-  real(kind=KTGT) function conformal_latitude_d (lat, ecc) result (x)
+  real(kind=KTGT) function conformal_latitude_d (tglat, ecc) result (x)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(in) :: lat ! in radian
+    real(kind=KTGT),intent(in) :: tglat ! tan(geod.lat)
     real(kind=KTGT),intent(in) :: ecc
-    real(kind=KTGT) :: p
-    real(kind=KTGT) :: esl
-    real(kind=KTGT),parameter :: TWO  = 2.0_KTGT
+    real(kind=KTGT) :: seglat, gd
     real(kind=KTGT),parameter :: ONE  = 1.0_KTGT
-    real(kind=KTGT),parameter :: HALF = 0.5_KTGT
 
-    p = pi_(lat)
-    esl = ecc * sin(lat)
-    x = tan(HALF * (HALF * p + lat)) &
-         & * (((ONE - esl) / (ONE + esl)) ** (HALF * ecc))
-    x = TWO * atan(x) - HALF * p
+    seglat = _hypot(ONE, tglat)
+    gd = SINH(ecc * ATANH(ecc * tglat / seglat))
+    x = tglat * _hypot(ONE, gd) - gd * seglat
+
     return
   end function conformal_latitude_d
 
@@ -1663,12 +1640,6 @@ contains
   !   earea:  (S)       the area between the geodesic and the equator
 
   !   node == the point where the geodesic crosses the equator
-
-#define _SIN(TERM) TERM(1)
-#define _COS(TERM) TERM(2)
-#define _ANGLE(TERM) TERM(3)
-#define _SIN2(TERM) (_SIN(TERM)**2)
-#define _COS2(TERM) (_COS(TERM)**2)
 
 !!!_  & geodesic_inverse
   subroutine geodesic_inverse_core_d &
@@ -1716,12 +1687,8 @@ contains
     real(kind=KTGT) :: C2(0:lodr), C1(0:lodr)
     real(kind=KTGT) :: JJ(0:lodr)
 
-    real(kind=KTGT) :: I31, I32, dI3b
-    real(kind=KTGT) :: I11, I12, s1, s2
-
-    real(kind=KTGT) :: dI3, dJJ, JJ1, JJ2
+    real(kind=KTGT) :: dI3, dJJ
     real(kind=KTGT) :: AA(2,2)
-    real(kind=KTGT) :: B0(2,2), B1(2,2), B2(2,2)
     real(kind=KTGT) :: F1(2)
 
     real(kind=KTGT) :: ddx, ddy, dsol
@@ -1732,7 +1699,6 @@ contains
     integer miter
 
     integer iter
-    real(kind=KTGT) :: tmp
 
     ierr = 0
 
@@ -1922,7 +1888,7 @@ contains
 
     e2 = f * (TWO - f)
     wd = sqrt(ONE - e2 * ((_COS(plat1) + _COS(plat2)) / TWO)**2)
-    write(*, *) 'guess: ', wd, rad2deg(dglon / wd)
+    ! write(*, *) 'guess: ', wd, rad2deg(dglon / wd)
 
     _SIN(dalon) = sin(dglon / wd)
     _COS(dalon) = cos(dglon / wd)
@@ -1964,95 +1930,6 @@ contains
     enddo
     z = (B1(1,2) * F1(1) + B1(2,2) * F1(2)) * TWO
   end subroutine comp_diff_xinteg_d
-
-!!!_  - comp_I3
-  real(kind=KTGT) function comp_I3_d &
-       & (CT, no, cs, ss) result(r)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in)  :: CT(0:*)
-    integer,        intent(in)  :: no          ! limit order
-    real(kind=KTGT),intent(in)  :: cs, ss      ! cos(sigma), sin(sigma)
-
-    integer jo
-    real(kind=KTGT) :: sig
-    real(kind=KTGT) :: c2s, s2s
-    real(kind=KTGT) :: b0, b1, b2
-
-    sig = atan2(ss, cs)
-    c2s = (cs - ss) * (cs + ss)
-    s2s = (ss * cs) * 2.0_KTGT
-
-    b1 = 0.0_KTGT
-    b2 = 0.0_KTGT
-    do jo = no, 1, -1
-       b0 = (2.0_KTGT * c2s) * b1 - b2 + CT(jo)
-       ! write(*, *) b0
-       b2 = b1
-       b1 = b0
-    enddo
-
-    ! r  = (sig + b1 * s2s) * CT(0)
-    r  = b1 * s2s
-  end function comp_I3_d
-
-!!!_  - comp_I1
-  real(kind=KTGT) function comp_I1_d &
-       & (CT, no, cs, ss) result(r)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in)  :: CT(0:*)
-    integer,        intent(in)  :: no          ! limit order
-    real(kind=KTGT),intent(in)  :: cs, ss      ! cos(sigma), sin(sigma)
-
-    integer jo
-    real(kind=KTGT) :: sig
-    real(kind=KTGT) :: c2s, s2s
-    real(kind=KTGT) :: b0, b1, b2
-
-    sig = atan2(ss, cs)
-    c2s = (cs - ss) * (cs + ss)
-    s2s = (ss * cs) * 2.0_KTGT
-
-    b1 = 0.0_KTGT
-    b2 = 0.0_KTGT
-    do jo = no, 1, -1
-       b0 = CT(jo) + (2.0_KTGT * c2s) * b1 - b2
-       b2 = b1
-       b1 = b0
-    enddo
-
-    r  = (sig + b1 * s2s) * (CT(0) + 1.0_KTGT)
-  end function comp_I1_d
-
-!!!_  - comp_J
-  real(kind=KTGT) function comp_J_d &
-       & (CT, no, cs, ss) result(r)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in)  :: CT(0:*)
-    integer,        intent(in)  :: no          ! limit order
-    real(kind=KTGT),intent(in)  :: cs, ss      ! cos(sigma), sin(sigma)
-
-    integer jo
-    real(kind=KTGT) :: sig
-    real(kind=KTGT) :: c2s, s2s
-    real(kind=KTGT) :: b0, b1, b2
-
-    sig = atan2(ss, cs)
-    c2s = (cs - ss) * (cs + ss)
-    s2s = (ss * cs) * 2.0_KTGT
-
-    b1 = 0.0_KTGT
-    b2 = 0.0_KTGT
-    do jo = no, 1, -1
-       b0 = CT(jo) + (2.0_KTGT * c2s) * b1 - b2
-       b2 = b1
-       b1 = b0
-    enddo
-
-    r  = sig * CT(0) + b1 * s2s
-  end function comp_J_d
 
 !!!_  & arcl_auxsph()
   function arcl_auxsph_d &
@@ -2128,19 +2005,69 @@ contains
     c = cos(r)
     select case(n)
     case(0)
-       _SIN(sc) = s
-       _COS(sc) = c
+       _SIN(sc) = +s
+       _COS(sc) = +c
     case(1)
-       _SIN(sc) = c
+       _SIN(sc) = +c
        _COS(sc) = -s
     case(2)
        _SIN(sc) = -s
        _COS(sc) = -c
     case default
        _SIN(sc) = -c
-       _COS(sc) = s
+       _COS(sc) = +s
     end select
   end function set_sincos_d
+
+!!!_  & sin_canonical()
+  real(kind=KTGT) function sin_canonical_d (angl) result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: angl
+
+    real(kind=KTGT) r, a, q
+    integer n
+
+    q = pi_(angl) / 2.0_KTGT
+    a = ANINT(angl / q)
+    r = angl - q * a
+    n = modulo(int(a), 4)
+    select case(n)
+    case(0)
+       v = + sin(r)
+    case(1)
+       v = + cos(r)
+    case(2)
+       v = - sin(r)
+    case default
+       v = - cos(r)
+    end select
+  end function sin_canonical_d
+
+!!!_  & cos_canonical()
+  real(kind=KTGT) function cos_canonical_d (angl) result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: angl
+
+    real(kind=KTGT) r, a, q
+    integer n
+
+    q = pi_(angl) / 2.0_KTGT
+    a = ANINT(angl / q)
+    r = angl - q * a
+    n = modulo(int(a), 4)
+    select case(n)
+    case(0)
+       v = + cos(r)
+    case(1)
+       v = - sin(r)
+    case(2)
+       v = - cos(r)
+    case default
+       v = + sin(r)
+    end select
+  end function cos_canonical_d
 
 !!!_  & setd_sincos() - set sine and cosine array (degree)
   function setd_sincos_d(angl) &
@@ -2792,7 +2719,7 @@ program test_emu_ugg
   integer ierr
   integer nlat(2)
   integer nlon(2)
-  integer stereo,  geod
+  integer stereo,  geod, prec
   integer levv
 
   real(kind=KDBL) :: PI = ATAN2(0.0_KDBL, -1.0_KDBL)
@@ -2821,8 +2748,11 @@ program test_emu_ugg
 
   if (ierr.eq.0) call get_option(ierr, stereo, 'stereo', 0)
   if (ierr.eq.0) call get_option(ierr, geod,   'geod', 0)
+  if (ierr.eq.0) call get_option(ierr, prec,   'prec', 0)
 
-  if (ierr.eq.0) call test_ugg_prec(ierr)
+  if (ierr.eq.0) then
+     if (prec.ge.0) call test_ugg_prec(ierr)
+  endif
 
   if (ierr.eq.0) then
      if (nlat(1).gt.0) call test_ugg_lat(ierr, nlat(1), nlat(2))
@@ -2841,6 +2771,8 @@ program test_emu_ugg
         call batch_test_geod_filter(ierr)
      endif
   endif
+  call batch_test_section(ierr)
+  call batch_test_length(ierr)
 
   call finalize(ierr)
   write(*, 101) 'fine', ierr
@@ -3065,19 +2997,39 @@ contains
     ierr = 0
     if (test.lt.0) return ! dummy procedure
 
+    ! snyder example
     a = 6378388.0_KTGT
     e = 0.0819919_KTGT
+
     latts = -71.0_KTGT
     lon0  = -100.0_KTGT
     call test_stereog_single(ierr, a, e, latts, lon0, (/150.0_KTGT, -75.0_KTGT/))
+    !  (x, y) = (-1540033.6, -560526.4)
+    !       k = 0.9896255
+    call test_stereog_single(ierr, a, e, latts, lon0, (/150.0_KTGT, +75.0_KTGT/))
     latts = +71.0_KTGT
     lon0  = +100.0_KTGT
     call test_stereog_single(ierr, a, e, latts, lon0, (/-150.0_KTGT, +75.0_KTGT/))
     call test_stereog_single(ierr, a, e, latts, lon0, (/-150.0_KTGT, -75.0_KTGT/))
 
+    ! pole
+    call test_stereog_single(ierr, a, e, latts, lon0, (/0.0_KTGT, 90.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/0.0_KTGT, 89.9_KTGT/))
+
+    ! k0 = 0
+    latts = 90.0_KTGT
+    lon0  = 0.0_KTGT
+    call test_stereog_single(ierr, a, e, latts, lon0, (/0.0_KTGT, 90.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/0.0_KTGT, 0.0_KTGT/))
+
+    ! scale factor as 1, e = 0
+    latts = +90.0_KTGT
+    lon0  = +100.0_KTGT
+    e = 0.0_KTGT
+    call test_stereog_single(ierr, a, e, latts, lon0, (/-150.0_KTGT, +75.0_KTGT/))
+
     a = 6378137.0_KTGT
     e = flatten_to_ecc(1.0_KTGT/298.257223563_KTGT)
-    ! latts = 0.0_KTGT
     latts = +70.0_KTGT
     lon0  = -45.0_KTGT
     call test_stereog_single(ierr, a, e, latts, lon0, (/-55.7362542291_KTGT, 59.0479222286_KTGT/))
@@ -3090,48 +3042,473 @@ contains
     integer,intent(out) :: ierr
     real(kind=KTGT),intent(in) :: a, e, latts, lon0
     real(kind=KTGT),intent(in) :: ll(2)
-    real(kind=KTGT) :: cc
+    real(kind=KTGT) :: sf
     real(kind=KTGT) :: rr(2), rts, llorg(2)
-    real(kind=KTGT) :: xx(2), xxo(2), xxc(2), lli(2)
-    real(kind=KTGT) :: cco(ncache_stereog_co), clo(ncache_stereog_lo), cla(ncache_stereog_la)
+    real(kind=KTGT) :: xxo(2), xxc(2), lli(2)
+    real(kind=KTGT) :: cco2(ncache_psgp_co), clo2(ncache_psgp_lo), cla2(ncache_psgp_la)
+    real(kind=KTGT) :: gla(2), dlo(2)
     integer pole
+
     ierr = 0
+
     rts = deg2rad(latts)
     rr(1:2) = deg2rad(ll(1:2))
-    if (latts.ge.0.0_KTGT) then
-       llorg(1:2) = deg2rad((/lon0, 90.0_KTGT/))
-       call proj_stereog_npset(cc, e, a,  rts)
-       xx = proj_stereog_npfwd(rr, e, cc, llorg)
-    else
-       llorg(1:2) = deg2rad((/lon0, -90.0_KTGT/))
-       call proj_stereog_spset(cc, e, a,  rts)
-       xx = proj_stereog_spfwd(rr, e, cc, llorg)
-    endif
-101 format('stereog[', 2F9.1, '] ', '(', 2E16.8, ') >> (', 2E16.8, ')')
-102 format('  pstereog[', A, '] ', L1, 1x, ' >> (', 2E16.8, ')')
-103 format('  inverse', 2E16.8, 1x, 2E16.8, 2E16.8)
-    write(*, 101) lon0, latts, ll, xx
-    ! test cache once
     if (latts.ge.0.0_KTGT) then
        pole = +1
     else
        pole = -1
     endif
-    call proj_pstereog_set(cco, e, a, rts, llorg(1), pole)
-    ! write(*, *) cc.eq.cco(1), cc, cco
-    xxo = proj_pstereog(rr(1), rr(2), cco)
-    write(*, 102) 'once', ALL(xxo(:).eq.xx(:)), xxo
-    ! test cache core
-    call proj_pstereog_cachela(cla, rr(2), cco)
-    call proj_pstereog_cachelo(clo, rr(1), cco)
-    xxc = proj_pstereog(clo, cla)
-    write(*, 102) 'cache', ALL(xxc(:).eq.xx(:)), xxc
+    llorg(1) = deg2rad(lon0)
+    llorg(2) = deg2rad(90.0_KTGT) * real(pole, kind=KTGT)
 
-    lli = proj_pstereog_inv(xxc(1), xxc(2), cco)
+101 format('## stereog[', 2F9.1, '] ', '(', 2ES16.8, ')', ' [', 2ES16.8, ']')
+    write(*, 101) lon0, latts, ll, a, e
 
-    write(*, 103) rad2deg(lli(:)), rad2deg(rr(:)), rad2deg(rr(:) - lli(:))
+112 format('  psgp[', A, '] ', 1x, ' >> (', 2ES16.8, ')')
+113 format('  inverse', 2ES16.8, 1x, 2ES16.8, 2ES16.8, 1x, F16.13)
+
+    call psgp_set(cco2, e, a, rts, llorg(1), pole)
+
+    xxo = psgp_fwd(rr(1), rr(2), cco2)
+    write(*, 112) 'once', xxo
+    call psgp_cachela(cla2, rr(2), cco2)
+    call psgp_cachelo(clo2, rr(1), cco2)
+    xxc = psgp_fwd(clo2, cla2)
+    write(*, 112) 'cache', xxc
+
+    lli = psgp_bwd_ll(xxc(1), xxc(2), cco2)
+    sf = psgp_bwd_sf(xxc(1), xxc(2), cco2)
+    write(*, 113) rad2deg(lli(:)), rad2deg(rr(:)), rad2deg(rr(:) - lli(:)), sf
+
+    call psgp_bwd_tr(gla, dlo, xxc(1), xxc(2), cco2)
+121 format(2x, A, ':', A, 1x, 2ES16.8)
+    write(*, 121) 'sin', 'lat', _SIN(gla), sin(rr(2))
+    write(*, 121) 'cos', 'lat', _COS(gla), cos(rr(2))
+    write(*, 121) 'sin', 'dlon', _SIN(dlo), sin(rr(1) - llorg(1))
+    write(*, 121) 'cos', 'dlon', _COS(dlo), cos(rr(1) - llorg(1))
 
   end subroutine test_stereog_single
+
+!!!_ + batch_test_length
+  subroutine batch_test_length &
+       & (ierr)
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    real(kind=KTGT) :: xl, xh, dx
+    real(kind=KTGT) :: yl, yh, dy
+
+    real(kind=KTGT) :: a, e, rf
+    real(kind=KTGT) :: lonorg, tslat
+    integer pole
+    integer ji, jj, n
+
+    real(kind=KTGT) :: x0, y0, x1, y1, xo, yo
+
+    a = 6378137.0_KTGT
+    rf = 298.257223563_KTGT
+    e = flatten_to_ecc(1.0_KTGT/rf)
+    tslat = deg2rad(70.0_KTGT)
+    lonorg = deg2rad(-45.0_KTGT)
+    pole = +1
+
+    xl = -641150.0_KTGT - 1500.0_KTGT
+    xh = +867850.0_KTGT + 1500.0_KTGT
+    yl = -3375050.0_KTGT - 1500.0_KTGT
+    yh = -642050.0_KTGT  + 1500.0_KTGT
+    dx = 6000.0_KTGT
+    dy = 6000.0_KTGT
+
+    x0 = xl + 0.0_KTGT * dx
+    y0 = yl + 0.0_KTGT * dy
+    x1 = x0 + dx
+    y1 = y0
+    call test_length(ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+
+    x1 = xh + 0.0_KTGT * dx
+    y1 = yh + 0.0_KTGT * dy
+    x0 = x1 - dx
+    y0 = y1
+    call test_length(ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+
+    x1 = xh + 0.0_KTGT * dx
+    y1 = yh + 0.0_KTGT * dy
+    x0 = x1
+    y0 = y1 - dy
+    call test_length(ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+
+    x1 = 0.0_KTGT
+    y1 = yh + 0.0_KTGT * dy
+    x0 = x1
+    y0 = y1 - dy
+    call test_length(ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+
+    x1 = 0.0_KTGT
+    y1 = yh + 0.0_KTGT * dy
+    x0 = x1 - dx
+    y0 = y1
+    call test_length(ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+
+    y0 = y1 - dy
+    call test_area(ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+    return
+
+    e = 0.0_KTGT
+    tslat = deg2rad(90.0_KTGT)
+    lonorg = 0.0_KTGT
+    x0 = - dx / 2
+    y0 = - dy / 2
+    x1 = + dx / 2
+    y1 = + dy / 2
+    call test_area(ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+
+    ! x0 = x1 - dx / 4.0_KTGT
+    ! y0 = y1 - dy / 4.0_KTGT
+    ! call test_area(ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+
+    ! x0 = x1 - dx / 16.0_KTGT
+    ! y0 = y1 - dy / 16.0_KTGT
+    ! call test_area(ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+
+    ! x0 = x1 - dx / 64.0_KTGT
+    ! y0 = y1 - dy / 64.0_KTGT
+    ! call test_area(ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+    ! return
+
+    n = 6
+    xo = 0.0_KTGT
+    yo = yh
+    do jj = 0, n - 1
+       do ji = 0, n - 1
+          x0 = xo + (ji - 1) * (dx / n)
+          y1 = yo - (jj - 1) * (dy / n)
+          x1 = x0 + (dx / n)
+          y0 = y1 - (dy / n)
+          write(*, *) ji, jj
+          call test_area(ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+       enddo
+    enddo
+  end subroutine batch_test_length
+
+!!!_ + test_length
+  subroutine test_length &
+       & (ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,        intent(out) :: ierr
+    real(kind=KTGT),intent(in) :: x0, y0
+    real(kind=KTGT),intent(in) :: x1, y1
+    real(kind=KTGT),intent(in) :: a, e
+    real(kind=KTGT),intent(in) :: tslat, lonorg
+    integer,        intent(in) :: pole
+
+    real(kind=KTGT),parameter :: HALF = 0.5_KTGT
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT),parameter :: TWO = 2.0_KTGT
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
+
+    real(kind=KTGT) :: xp,  yp
+    real(kind=KTGT) :: ddx, ddy
+    real(kind=KTGT) :: sc,  k,  scp
+    real(kind=KTGT) :: ll(2)
+    real(kind=KTGT) :: tol
+    real(kind=KTGT) :: re, rt, rc
+
+    integer,parameter :: llev = 16
+    ! integer,parameter :: llev = 10
+
+    integer jlev, jini
+    integer jj,   nd
+    real(kind=KTGT) :: cco(ncache_psgp_co)
+    real(kind=KTGT) :: buf(0:llev), bp
+    integer bpos, bj
+
+    ierr = 0
+    tol = 2.0_KTGT
+
+    call psgp_set(cco, e, a, tslat, lonorg, pole)
+
+    ddx = x1 - x0
+    ddy = y1 - y0
+
+    xp = (x0 + x1) / TWO
+    yp = (y0 + y1) / TWO
+
+    ll = psgp_bwd_ll(xp, yp, cco)
+    sc = psgp_bwd_isf(xp, yp, cco)
+
+111 format('length:input ','(', 2ES16.8, ')--', &
+         & '(', 2ES16.8, ')', &
+         & '  [', 2F12.8 ,']', 1x, ES16.8)
+
+    write(*, 111) x0, y0, x1, y1, rad2deg(ll(1)), rad2deg(ll(2)), sc
+
+101 format('length:level ', I0, ' ', ES16.9)
+102 format('length:level ', I0, ' ', ES16.9, 1x, ES16.9)
+103 format('length:result ', ES16.9, 1x, 2ES16.8)
+    scp = 0.0_KTGT
+    bp = 0.0_KTGT
+    jini = min(6, llev - 1)
+
+    do jlev = jini, llev - 1
+       nd = 2 ** jlev
+       sc = 0.0_KTGT
+       rc = 0.0_KTGT
+       bpos = 0
+       do jj = 0, nd - 1
+          xp = x0 + (ddx / real(nd, kind=KTGT)) * (real(jj, kind=KTGT) + HALF)
+          yp = y0 + (ddy / real(nd, kind=KTGT)) * (real(jj, kind=KTGT) + HALF)
+          ! write(*, *) jlev, jj, xp, yp
+          k = psgp_bwd_isf(xp, yp, cco)
+          re = k - rc
+          rt = sc + re
+          rc = (rt - sc) - re
+          sc = rt
+          buf(bpos) = k
+          bj = jj
+          do
+             if (mod(bj, 2).eq.0) exit
+             buf(bpos - 1) = buf(bpos - 1) + buf(bpos)
+             bj = bj / 2
+             bpos = bpos - 1
+          enddo
+          bpos = bpos + 1
+          ! write(*, *) jj, bpos, buf(0:bpos-1)
+       enddo
+       sc = sc / real(nd, kind=KTGT)
+       buf(0) = buf(0) / real(nd, kind=KTGT)
+       if (jlev.gt.jini) then
+          write(*, 102) jlev, sc, sc - scp
+          write(*, 102) jlev, buf(0), buf(0) - bp
+       else
+          write(*, 101) jlev, sc
+          write(*, 101) jlev, buf(0)
+       endif
+       if (abs(sc-scp).le.spacing(scp) * tol) exit
+       if (abs(buf(0)-bp).le.spacing(bp) * tol) exit
+       scp = sc
+       bp = buf(0)
+    enddo
+    write(*, 103) max(ddx, ddy) * scp, scp, spacing(scp)
+
+  end subroutine test_length
+
+!!!_ + test_area
+  subroutine test_area &
+       & (ierr, x0, y0, x1, y1, a, e, tslat, lonorg, pole)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,        intent(out) :: ierr
+    real(kind=KTGT),intent(in) :: x0, y0
+    real(kind=KTGT),intent(in) :: x1, y1
+    real(kind=KTGT),intent(in) :: a, e
+    real(kind=KTGT),intent(in) :: tslat, lonorg
+    integer,        intent(in) :: pole
+
+    real(kind=KTGT),parameter :: HALF = 0.5_KTGT
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT),parameter :: TWO = 2.0_KTGT
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
+
+    real(kind=KTGT) :: xp,  yp
+    real(kind=KTGT) :: ddx, ddy
+    real(kind=KTGT) :: k
+    real(kind=KTGT) :: ll(2)
+    real(kind=KTGT) :: tol
+
+    real(kind=KTGT) :: aref
+
+    integer,parameter :: llev = 16
+    ! integer,parameter :: llev = 12
+    ! integer,parameter :: llev = 12
+
+    integer jlev, jini
+    integer ji,   jj,   nd
+    real(kind=KTGT) :: cco(ncache_psgp_co)
+    real(kind=KTGT) :: buf(0:llev*2), bp, be
+    integer bpos, bj
+
+    ierr = 0
+    tol = 512.0_KTGT
+    ! tol = 128.0_KTGT
+    ! tol = 32.0_KTGT
+    jini = min(8, llev - 2)
+
+    call psgp_set(cco, e, a, tslat, lonorg, pole)
+
+    ddx = x1 - x0
+    ddy = y1 - y0
+    aref = (ddx * ddy)
+
+    xp = (x0 + x1) / TWO
+    yp = (y0 + y1) / TWO
+
+    ll = psgp_bwd_ll(xp, yp, cco)
+    k  = psgp_bwd_iaf(xp, yp, cco)
+
+111 format('area:input ','(', 2ES16.8, ')--', &
+         & '(', 2ES16.8, ')', &
+         & '  [', 2F12.8 ,']', 1x, ES16.8)
+
+    write(*, 111) x0, y0, x1, y1, rad2deg(ll(1)), rad2deg(ll(2)), k
+
+102 format('area:level ', I0, ' ', ES16.9, 1x, ES16.9, 1x, ES16.9)
+103 format('area:result ', ES16.9, 1x, ES16.8, 1x, 2ES16.9)
+
+    bp = 0.0_KTGT
+    do jlev = jini, llev - 1
+       nd = 2 ** jlev
+       bpos = 0
+       do jj = 0, nd - 1
+          yp = y0 + (ddy / real(nd, kind=KTGT)) * (real(jj, kind=KTGT) + HALF)
+          do ji = 0, nd - 1
+             xp = x0 + (ddx / real(nd, kind=KTGT)) * (real(ji, kind=KTGT) + HALF)
+             ! write(*, *) jlev, jj, xp, yp
+             k = psgp_bwd_iaf(xp, yp, cco)
+             buf(bpos) = k
+             bj = jj * nd + ji
+             do
+                if (mod(bj, 2).eq.0) exit
+                buf(bpos - 1) = buf(bpos - 1) + buf(bpos)
+                bj = bj / 2
+                bpos = bpos - 1
+             enddo
+             bpos = bpos + 1
+          enddo
+       enddo
+       buf(0) = buf(0) / real(nd * nd, kind=KTGT)
+       be = buf(0) - bp
+       write(*, 102) jlev, buf(0), be / buf(0), aref * be
+       if (abs(be).le.spacing(bp) * tol) exit
+       bp = buf(0)
+    enddo
+    write(*, 103) buf(0), aref * buf(0), aref * be, spacing(buf(0))
+
+  end subroutine test_area
+
+!!!_ + batch_test_section
+  subroutine batch_test_section &
+       & (ierr)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    real(kind=KTGT) :: a, e, rf
+    real(kind=KTGT) :: x
+    real(kind=KTGT) :: y1, y2, y3
+
+    ! WGS84 a=6378137.0 rf=298.257223563
+
+    ierr = 0
+    a = 6378137.0_KTGT
+    rf = 298.257223563_KTGT
+    e = flatten_to_ecc(1.0_KTGT/rf)
+
+    x = 1000.0e3_KTGT
+    y1= 2000.0e3_KTGT
+    y2= -y1
+    y3 = 0.0_KTGT
+    call test_section(ierr, a, e, x, y1, y2, y3)
+
+    e = 0.0_KTGT
+    call test_section(ierr, a, e, x, y1, y2, y3)
+
+    e = 0.5_KTGT
+    call test_section(ierr, a, e, x, y1, y2, y3)
+
+  end subroutine batch_test_section
+!!!_ + test_section
+  subroutine test_section &
+       & (ierr, a, e, x, y1, y2, y3)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,        intent(out) :: ierr
+    real(kind=KTGT),intent(in) :: a, e
+    real(kind=KTGT),intent(in) :: x
+    real(kind=KTGT),intent(in) :: y1, y2, y3
+
+    integer j
+    integer,parameter :: npos = 4
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
+    real(kind=KTGT),parameter :: ONE  = 1.0_KTGT
+
+    real(kind=KTGT) :: b, e2
+    real(kind=KTGT) :: ll(2, 1:npos-1)
+    real(kind=KTGT) :: xy(2, 1:npos-1)
+
+    real(kind=KTGT) :: pp(3, 0:npos-1)
+    real(kind=KTGT) :: uu(3, 1:npos-1)
+    real(kind=KTGT) :: un
+
+    real(kind=KTGT) :: nv(3, 1:npos-1)
+
+    real(kind=KTGT) :: cco(ncache_psgp_co)
+
+    real(kind=KTGT) :: lonorg, tslat
+    integer pole
+
+    real(kind=KTGT) :: rn, clat, slat, clon, slon
+
+    ! (a-b)/a = 1 - sqrt(1-e2)
+    ! 1-  b/a = 1 - sqrt(1-e2)
+    ! b = a * sqrt(1-e2)
+
+    ierr = 0
+
+    e2 = e * e
+    b = a * sqrt((ONE - e) * (ONE + e))
+
+    xy(1:2, 1) = (/x, y1/)
+    xy(1:2, 2) = (/x, y2/)
+    xy(1:2, 3) = (/x, y3/)
+
+    pole = +1
+    lonorg = ZERO
+    tslat = deg2rad(90.0_KTGT)
+
+    call psgp_set(cco, e, a, tslat, lonorg, pole)
+
+101 format('section:input[', I0, '] ', 2ES17.9, 1x, 2F14.9)
+102 format('section:pos[', I0, '] ', 3ES17.9)
+103 format('section:u[', I0, '] ', 3ES17.9)
+104 format('section:normal[', I0, '] ', 3ES17.9)
+    do j = 1, npos - 1
+       ll(:, j) = psgp_bwd_ll(xy(1,j), xy(2,j), cco)
+       write(*, 101) j, xy(:,j), rad2deg(ll(:,j))
+    enddo
+    do j = 1, npos - 1
+       clat = cos(ll(2, j))
+       slat = sin(ll(2, j))
+       if (abs(slat).eq.ONE) clat = ZERO
+       clon = cos(ll(1,j))
+       slon = sin(ll(1,j))
+       if (abs(slon).eq.ONE) clon = ZERO
+
+       rn = a / sqrt(ONE - e2 * (slat * slat))
+       pp(1, j) = rn * clat * clon
+       pp(2, j) = rn * clat * slon
+       pp(3, j) = rn * slat * ((ONE - e) * (ONE - e))
+    enddo
+    pp(:, 0) = (/ZERO, ZERO, -b/)
+
+    do j = 0, npos - 1
+       write(*, 102) j, pp(:,j)
+    enddo
+    do j = 1, npos - 1
+       uu(:, j) = pp(:, j) - pp(:, 0)
+       un = HYPOT(HYPOT(uu(1,j), uu(2,j)), uu(3,j))
+       uu(:, j) = uu(:, j) / un
+       write(*, 103) j, uu(:,j)
+    enddo
+    do j = 2, npos - 1
+       nv(1, j) = uu(2, 1) * uu(3, j) - uu(3, 1) * uu(2, j)
+       nv(2, j) = uu(3, 1) * uu(1, j) - uu(1, 1) * uu(3, j)
+       nv(3, j) = uu(1, 1) * uu(2, j) - uu(2, 1) * uu(1, j)
+
+       un = HYPOT(HYPOT(nv(1,j), nv(2,j)), nv(3,j))
+       nv(:, j) = nv(:, j) / un
+       write(*, 104) j, nv(:,j)
+    enddo
+
+  end subroutine test_section
 
 !!!_ + batch_test_geod_filter
   subroutine batch_test_geod_filter(ierr)
@@ -3342,9 +3719,7 @@ contains
     real(kind=KTGT) :: C3(0:lodr)
 
     real(kind=KTGT) :: sa0, s2s, c2s
-    real(kind=KTGT) :: b0, b1, b2, i3
     real(kind=KTGT) :: dl
-    integer jo
 
     ierr = 0
 
