@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/07/29 20:29:55 fuyuki genopr.sh>
+# Time-stamp: <2023/11/19 09:38:51 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -197,6 +197,9 @@ register_all ()
   register -g float -n 1,1 -i call SINH     'sinh(A)'
   register -g float -n 1,1 -i call COSH     'cosh(A)'
   register -g float -n 1,1 -i call TANH     'tanh(A)'
+  register -g float -n 1,1 -i call ASINH    'arcsinh(A)'
+  register -g float -n 1,1 -i call ACOSH    'arccosh(A)'
+  register -g float -n 1,1 -i call ATANH    'arctanh(A)'
 
   register -g float -n 1,1 -i call R2D      'Convert radian to degree'
   register -g float -n 1,1 -i call D2R      'Convert degree to radian'
