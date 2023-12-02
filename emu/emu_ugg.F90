@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2023/12/01 08:54:50 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/12/24 11:43:54 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -40,11 +40,22 @@
 #  define OPT_PSGINV_ITER_LIMIT 30
 #endif
 
-#define _SIN(TERM) TERM(1)
-#define _COS(TERM) TERM(2)
+#define _SINIDX 1
+#define _COSIDX 2
+
+#define _SIN(TERM) TERM(_SINIDX)
+#define _COS(TERM) TERM(_COSIDX)
 #define _ANGLE(TERM) TERM(3)
 #define _SIN2(TERM) (_SIN(TERM)**2)
 #define _COS2(TERM) (_COS(TERM)**2)
+
+#define _TRIG(TERM) TERM(_SINIDX:_COSIDX)
+
+#define _LAIDX 1
+#define _LOIDX 2
+
+#define _LATI(TERM)  TERM(_LAIDX)
+#define _LONGI(TERM) TERM(_LOIDX)
 
 !!!_@ TOUZA_Emu_ugg - Geometry procedures
 module TOUZA_Emu_ugg
@@ -65,26 +76,38 @@ module TOUZA_Emu_ugg
   integer,parameter,public :: DIV_EACH_INCR  = 1          !! divide each cells, accumulate from lower edge
   integer,parameter,public :: DIV_ACCUMULATE = 2          !! legacy, accumulate from the origin
 
+  integer,parameter,public :: NTRIG = 2
+  integer,parameter,public :: JSIN = _SINIDX, JCOS = _COSIDX
+
+  integer,parameter,public :: NGEOG = 2
+  integer,parameter,public :: JLATI = _LAIDX, JLONGI = _LOIDX
 !!!_ + cache size and index
   integer,parameter,public :: ncache_psgp_lo = 2
-  integer,parameter,public :: ncache_psgp_la = 2
-  integer,parameter,public :: ncache_psgp_co = 9
+  integer,parameter,public :: ncache_psgp_la = 5
+  integer,parameter,public :: ncache_psgp_co = 13
 
   integer,parameter :: icache_psgp_sindlo = 1
   integer,parameter :: icache_psgp_cosdlo = 2
 
   integer,parameter :: icache_psgp_xrho   = 1
   integer,parameter :: icache_psgp_yrho   = 2
+  integer,parameter :: icache_psgp_sf     = 3
+  integer,parameter :: icache_psgp_sinla  = 4
+  integer,parameter :: icache_psgp_cosla  = 5
 
-  integer,parameter :: icache_psgp_xco  = 1
-  integer,parameter :: icache_psgp_yco  = 2
+  integer,parameter :: icache_psgp_xco  = 1  ! major / x-scale
+  integer,parameter :: icache_psgp_yco  = 2  ! major / y-scale
   integer,parameter :: icache_psgp_sign = 3
   integer,parameter :: icache_psgp_ecc  = 4
-  integer,parameter :: icache_psgp_olon = 5
-  integer,parameter :: icache_psgp_tcf  = 6  ! rho factor
-  integer,parameter :: icache_psgp_tol  = 7  !
-  integer,parameter :: icache_psgp_maj  = 8  ! major
-  integer,parameter :: icache_psgp_psf  = 9  ! scale factor at pole
+  integer,parameter :: icache_psgp_flat = 5
+  integer,parameter :: icache_psgp_olon = 6
+  integer,parameter :: icache_psgp_tcf  = 7  ! scale factor parameter
+  integer,parameter :: icache_psgp_atcf = 8  ! rho factor
+  integer,parameter :: icache_psgp_tol  = 9  !
+  integer,parameter :: icache_psgp_maj  = 10 ! major
+  integer,parameter :: icache_psgp_psf  = 11 ! scale factor at pole
+  integer,parameter :: icache_psgp_e2c  = 12 ! (1 - e^2)
+  integer,parameter :: icache_psgp_aco  = 13 ! 1 + e2c (atanh(e) / e)
 
   integer,parameter :: lim_psginv = OPT_PSGINV_ITER_LIMIT
 !!!_  - static
@@ -97,6 +120,7 @@ module TOUZA_Emu_ugg
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
 
+#define _ERROR(E) (E - ERR_MASK_EMU_UGG)
 # define __MDL__ 'ugg'
 !!!_  - interfaces
   interface get_longitude
@@ -167,12 +191,25 @@ module TOUZA_Emu_ugg
      module procedure flatten_to_ecc_d
   end interface flatten_to_ecc
 
+  interface psgp_set_byf
+     module procedure psgp_set_byf_d
+  end interface psgp_set_byf
   interface psgp_set
      module procedure psgp_set_d
   end interface psgp_set
   interface psgp_fwd
      module procedure psgp_fwd_core_d, psgp_fwd_once_d
   end interface psgp_fwd
+  interface psgp_fwd_cis
+     module procedure psgp_fwd_cis_core_d, psgp_fwd_cis_once_d
+  end interface psgp_fwd_cis
+  interface psgp_fwd_cis_core
+     module procedure psgp_fwd_cis_core_d
+  end interface psgp_fwd_cis_core
+
+  interface psgp_fwd_isf
+     module procedure psgp_fwd_isf_d
+  end interface psgp_fwd_isf
   interface psgp_bwd_ll
      module procedure psgp_bwd_ll_d
   end interface psgp_bwd_ll
@@ -185,12 +222,28 @@ module TOUZA_Emu_ugg
   interface psgp_bwd_isf
      module procedure psgp_bwd_isf_d
   end interface psgp_bwd_isf
+  ! interface psgp_bwd_risf
+  !    module procedure psgp_bwd_risf_d
+  ! end interface psgp_bwd_risf
+
   interface psgp_bwd_iaf
      module procedure psgp_bwd_iaf_d
   end interface psgp_bwd_iaf
+  interface psgp_bwd_rho
+     module procedure psgp_bwd_rho_d
+  end interface psgp_bwd_rho
+  interface psgp_bwd_rhonml
+     module procedure psgp_bwd_rhonml_d
+  end interface psgp_bwd_rhonml
   interface psgp_bwd_core
      module procedure psgp_bwd_core_d
   end interface psgp_bwd_core
+  interface psgp_bwd_length
+     module procedure psgp_bwd_length_d
+  end interface psgp_bwd_length
+  interface psgp_bwd_area
+     module procedure psgp_bwd_area_d
+  end interface psgp_bwd_area
   interface psgp_fwd_core
      module procedure psgp_fwd_core_d
   end interface psgp_fwd_core
@@ -198,8 +251,54 @@ module TOUZA_Emu_ugg
      module procedure psgp_cachela_d
   end interface psgp_cachela
   interface psgp_cachelo
-     module procedure psgp_cachelo_d
+     module procedure psgp_cachelo_d, psgp_cachelo_tr_d
   end interface psgp_cachelo
+  interface psgp_bwd_geod
+     module procedure psgp_bwd_geod_d
+  end interface psgp_bwd_geod
+
+  interface psgp_xlo_tr
+     module procedure psgp_xlo_tr_d
+  end interface psgp_xlo_tr
+  interface psgp_ylo_tr
+     module procedure psgp_ylo_tr_d
+  end interface psgp_ylo_tr
+  interface psgp_xla_tr
+     module procedure psgp_xla_tr_d
+  end interface psgp_xla_tr
+  interface psgp_yla_tr
+     module procedure psgp_yla_tr_d
+  end interface psgp_yla_tr
+
+  interface psgp_xla_once_tr
+     module procedure psgp_xla_once_tr_d
+  end interface psgp_xla_once_tr
+  interface psgp_yla_once_tr
+     module procedure psgp_yla_once_tr_d
+  end interface psgp_yla_once_tr
+  interface psgp_xlo_once_tr
+     module procedure psgp_xlo_once_tr_d
+  end interface psgp_xlo_once_tr
+  interface psgp_ylo_once_tr
+     module procedure psgp_ylo_once_tr_d
+  end interface psgp_ylo_once_tr
+
+  interface psgp_dlo_tr
+     module procedure psgp_dlo_tr_d
+  end interface psgp_dlo_tr
+  interface psgp_gla_tr
+     module procedure psgp_gla_tr_d
+  end interface psgp_gla_tr
+  interface psgp_sinlat
+     module procedure psgp_sinlat_d
+  end interface psgp_sinlat
+  interface psgp_comp_dlon
+     module procedure psgp_comp_dlon_d
+  end interface psgp_comp_dlon
+
+  interface psgp_surf_area
+     module procedure psgp_surf_area_d
+  end interface psgp_surf_area
 
   interface pi_
      module procedure pi_d
@@ -270,6 +369,10 @@ module TOUZA_Emu_ugg
   interface geodesic_area_core
      module procedure geodesic_area_core_d
   end interface geodesic_area_core
+  interface geodesic_dazim
+     module procedure geodesic_dazim_d
+  end interface geodesic_dazim
+
   interface set_diff_xinteg
      module procedure set_diff_xinteg_d
   end interface set_diff_xinteg
@@ -286,6 +389,11 @@ module TOUZA_Emu_ugg
      module procedure comp_series_sine_d
   end interface comp_series_sine
 
+  interface phase
+     module procedure phase_1_d
+     module procedure phase_2_d
+  end interface phase
+
   interface nml_sincos
      module procedure nml_sincos_d
   end interface nml_sincos
@@ -296,6 +404,9 @@ module TOUZA_Emu_ugg
      module procedure setd_sincos_d
   end interface setd_sincos
 
+  interface angle_canonical
+     module procedure angle_canonical_d
+  end interface angle_canonical
   interface sin_canonical
      module procedure sin_canonical_d
   end interface sin_canonical
@@ -331,21 +442,32 @@ module TOUZA_Emu_ugg
 
   public flatten_to_ecc
 
-  public psgp_set, psgp_cachela, psgp_cachelo
-  public psgp_fwd
+  public psgp_set_byf, psgp_set, psgp_cachela, psgp_cachelo
+  public psgp_fwd,    psgp_fwd_isf, psgp_fwd_cis
   public psgp_bwd_ll, psgp_bwd_tr
   public psgp_bwd_sf, psgp_bwd_isf, psgp_bwd_iaf
+  public psgp_bwd_length, psgp_bwd_area
+  public psgp_comp_dlon
+  public psgp_bwd_geod
+  public psgp_surf_area
+  public psgp_xlo_tr, psgp_ylo_tr
+  public psgp_xla_tr, psgp_yla_tr, psgp_xla_once_tr, psgp_yla_once_tr
+  public psgp_dlo_tr, psgp_gla_tr, psgp_sinlat
 
   public geodesic_direct, geodesic_target
   public geodesic_inverse
   public geodesic_inverse_canonical, geodesic_inverse_guess
   public geodesic_direct_core,       geodesic_inverse_core
   public geodesic_area_core
+  public geodesic_dazim
 
   public set_dlongi
   public set_sincos, setd_sincos
-  public sin_canonical, cos_canonical
+  public angle_canonical, sin_canonical, cos_canonical
   public reduced_latitude, azimuth_node, alon_auxsph_ph
+
+  public phase
+  public add_angle, sub_angle
 
   public diag_sc, diag_ph
 
@@ -421,7 +543,6 @@ contains
     endif
     return
   end subroutine diag
-
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
@@ -649,6 +770,20 @@ contains
     s = sign(ONE, rad)
     d = s * ((modulo(abs(rad), p2)) / p2) * w
   end function rad2deg_d
+!!!_  & array_reverse
+  subroutine array_reverse_d &
+       & (v, n)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(inout) :: v(*)
+    integer,        intent(in)    :: n
+    real(kind=KTGT) :: b(n)
+    integer j
+    do j = 1, n
+       b (n - j + 1) = v(j)
+    enddo
+    v(1:n) = b(1:n)
+  end subroutine array_reverse_d
 
 !!!_ + user subroutines (longitude)
 !!!_  & get_longitude
@@ -739,7 +874,6 @@ contains
     longm(n)     = longi(n-1)   + weight(n-1)   * wc
 
   end subroutine mid_longitude_d
-
 !!!_  & div_longitude
   subroutine div_longitude_d &
        & (ierr, longi, div, boundary, longi_c, longi_b, base, method, span)
@@ -765,8 +899,7 @@ contains
     call div_coordinate &
          & (ierr, longi, div, boundary, longi_c, longi_b, base, sp, method)
   end subroutine div_longitude_d
-
-!!!_  - check_longitude
+!!!_  & check_longitude
   subroutine check_longitude_d &
        & (ierr, longi, n, div, span, tag, u, tol)
     use TOUZA_Std,only: KTGT=>KDBL, choice
@@ -806,7 +939,7 @@ contains
     endif
     call msg_grp(txt, __GRP__, __MDL__, utmp)
   end subroutine check_longitude_d
-!!!_  - check_div_longitude
+!!!_  & check_div_longitude
   subroutine check_div_longitude_d &
        & (ierr, longi, div, boundary, longi_c, longi_b, base, span, &
        &  tag,  u,     tol)
@@ -866,6 +999,7 @@ contains
     endif
 
   end subroutine check_div_longitude_d
+
 !!!_ + user subroutines (latitude)
 !!!_  & get_latitude - latitude computation with poles as boundaries
   subroutine get_latitude_d &
@@ -931,8 +1065,7 @@ contains
        ierr = ERR_INVALID_SWITCH
     end select
   end subroutine get_latitude_d
-
-!!!_   & gauss_latitude - compute gauss latitudes (inherit gauss())
+!!!_  & gauss_latitude - compute gauss latitudes (inherit gauss())
   subroutine gauss_latitude_d &
        & (ierr, CTHETA,  GW, NLATS, span, wnml, method, &
        &  prec, max_iter)
@@ -1041,7 +1174,6 @@ contains
     if (ierr.eq.0) deallocate(QPN, EPS, STAT=ierr)
     return
   end subroutine gauss_latitude_d
-
 !!!_  & mid_latitude - emulate mklatm1
   subroutine mid_latitude_d &
        & (ierr,   latm, &
@@ -1117,7 +1249,6 @@ contains
          & (ierr, lati, div, boundary, lati_c, lati_b, base, sp, method)
 
   end subroutine div_latitude_d
-
 !!!_  & div_coordinate
   subroutine div_coordinate_d &
        & (ierr, co, div, boundary, cc, cb, base, span, method)
@@ -1242,27 +1373,51 @@ contains
     if (ierr.eq.0) deallocate(dxd, STAT=ierr)
   end subroutine div_coordinate_d
 
-!!!_  & array_reverse
-  subroutine array_reverse_d &
-       & (v, n)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(inout) :: v(*)
-    integer,        intent(in)    :: n
-    real(kind=KTGT) :: b(n)
-    integer j
-    do j = 1, n
-       b (n - j + 1) = v(j)
-    enddo
-    v(1:n) = b(1:n)
-  end subroutine array_reverse_d
-
 !!!_ + polar stereographic projection
 !!!_  - note
   ! Conformal latitude computation using Gudermannian function.
   ! See Karney(2011).
+!!!_  & psgp_set_byf - psgp_set wrapper (using flattening and projection center)
+  subroutine psgp_set_byf_d &
+       & (ierr, cco, f, a, latts, cproj, xs, ys, tol)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    integer,        intent(out)         :: ierr
+    real(kind=KTGT),intent(out)         :: cco(*)
+    real(kind=KTGT),intent(in)          :: f, a
+    real(kind=KTGT),intent(in)          :: latts
+    real(kind=KTGT),intent(in)          :: cproj(*)
+    real(kind=KTGT),intent(in),optional :: xs, ys  ! scale for x,y (default == 1)
+    real(kind=KTGT),intent(in),optional :: tol
+
+    real(kind=KTGT) :: sp, e
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    integer pole
+
+    ierr = 0
+    sp = sin_canonical(_LATI(cproj))
+
+    if (sp.eq.+ONE) then
+       pole = +1
+    else if (sp.eq.-ONE) then
+       pole = -1
+    else
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
+    endif
+
+    if (ierr.eq.0) then
+       e = flatten_to_ecc(f)
+       call psgp_set(cco, e, a, latts, _LONGI(cproj), pole, xs, ys, tol, f)
+    endif
+
+  end subroutine psgp_set_byf_d
+
+!!!_  & psgp_set
   subroutine psgp_set_d &
-       & (cco, ecc, a, latts, lonorg, pole, xs, ys, tol)
+       & (cco, ecc, a, latts, lonorg, pole, xs, ys, tol, f)
+    ! [caution]
+    ! xs ys != 1 are special configuration for amida,
+    ! which are not fully tested on consistency.
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
     real(kind=KTGT),intent(out)         :: cco(*)
@@ -1272,6 +1427,7 @@ contains
     integer,        intent(in)          :: pole    ! north pole == +1, south pole == -1
     real(kind=KTGT),intent(in),optional :: xs, ys  ! scale for x,y (default == 1)
     real(kind=KTGT),intent(in),optional :: tol
+    real(kind=KTGT),intent(in),optional :: f
 
     real(kind=KTGT),parameter :: ONE=1.0_KTGT, ZERO=0.0_KTGT
     real(kind=KTGT),parameter :: TWO=2.0_KTGT
@@ -1282,52 +1438,60 @@ contains
 
     if (pole.lt.0) then
        cco(icache_psgp_sign) = - ONE
-       lt = - latts
     else
        cco(icache_psgp_sign) = + ONE
-       lt = latts
     endif
+    lt = latts * cco(icache_psgp_sign)
 
     ! 1 - f = sqrt(1-e^2)
     ! c = (1-f) * exp[e atanh (e)]
-    fc = SQRT((ONE + ecc) * (ONE - ecc))
+    e2c = (ONE - ecc) * (ONE + ecc)
+    fc = SQRT(e2c)
     c = fc * EXP(ecc * ATANH (ecc))
 
     tglat = TAN(lt)
-    e2c = (ONE - ecc) * (ONE + ecc)
     d = SQRT(ONE + e2c * (tglat * tglat))
     tcf = ONE / d
-    ! psf = c / TWO / d
 
     tclat = conformal_latitude(tglat, ecc)
     cc = _hypot(ONE, tclat) + ABS(tclat)
     if (tclat.lt.ZERO) then
        tcf = tcf / cc
-       ! psf = psf / cc
     else
        tcf = tcf * cc
-       ! psf = psf * cc
     endif
 
-    cco(icache_psgp_tcf)  = tcf * a
+    cco(icache_psgp_tcf)  = tcf
+    cco(icache_psgp_atcf) = tcf * a
     cco(icache_psgp_psf)  = tcf * (c / TWO)
     cco(icache_psgp_maj)  = a
     cco(icache_psgp_ecc)  = ecc
+    cco(icache_psgp_e2c)  = e2c
     cco(icache_psgp_olon) = lonorg
+    if (ecc.eq.ZERO) then
+       cco(icache_psgp_aco) = ONE + e2c
+    else
+       cco(icache_psgp_aco) = ONE + e2c * (ATANH(ecc) / ecc)
+    endif
+
+    if (present(f)) then
+       cco(icache_psgp_flat) = f
+    else
+       cco(icache_psgp_flat) = ONE - fc
+    endif
 
     s = choice(ONE, xs)
-    if (s.le.ZERO) s = ONE
-    cco(icache_psgp_xco)  = s
+    if (s.eq.ZERO) s = ONE
+    cco(icache_psgp_xco)  = a / s
 
     s = choice(ONE, ys)
-    if (s.le.ZERO) s = ONE
-    cco(icache_psgp_yco)  = s
+    if (s.eq.ZERO) s = ONE
+    cco(icache_psgp_yco)  = a / s
 
     cco(icache_psgp_tol) = choice(ONE, tol)
 
   end subroutine psgp_set_d
-
-!!!_  & psgp_cachela - lat cache for sterographic projection (pole)
+!!!_  & psgp_cachela - lat cache for stereographic projection (pole)
   subroutine psgp_cachela_d &
     & (cla, lat, cco)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -1338,17 +1502,29 @@ contains
 
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
     real(kind=KTGT),parameter :: ZERO=0.0_KTGT
-    real(kind=KTGT) :: ecc
+    real(kind=KTGT),parameter :: OPPO=HUGE(ZERO)
+    real(kind=KTGT) :: ecc, e2c
     real(kind=KTGT) :: tglat
-    real(kind=KTGT) :: tclat, cc,     tcf
+    real(kind=KTGT) :: tclat, cc, tcf
+    real(kind=KTGT) :: scl(NTRIG)
+    real(kind=KTGT) :: hpi, s
 
-    ecc = cco(icache_psgp_ecc)
-    tcf = cco(icache_psgp_tcf)
-
-    if (abs(lat).eq.pi_(ZERO)/2.0_KTGT) then
-       cla(icache_psgp_xrho) = ZERO
-       cla(icache_psgp_yrho) = ZERO
+    hpi = pi_(ZERO)/2.0_KTGT
+    if (lat.eq.hpi * cco(icache_psgp_sign)) then
+       s = cco(icache_psgp_xco) * cco(icache_psgp_sign)
+       cla(icache_psgp_xrho) = SIGN(ZERO, s)
+       s = cco(icache_psgp_yco) * cco(icache_psgp_sign)
+       cla(icache_psgp_yrho) = SIGN(ZERO, s)
+       cla(icache_psgp_sf)   = cco(icache_psgp_psf)
+    else if (abs(lat).eq.hpi) then
+       cla(icache_psgp_xrho) = OPPO
+       cla(icache_psgp_yrho) = OPPO
+       cla(icache_psgp_sf)   = OPPO
     else
+       ecc = cco(icache_psgp_ecc)
+       e2c = cco(icache_psgp_e2c)
+       tcf = cco(icache_psgp_tcf)
+
        tglat = TAN(lat) * cco(icache_psgp_sign)
        tclat = conformal_latitude(tglat, ecc)
 
@@ -1358,15 +1534,20 @@ contains
        else
           tcf = tcf / cc
        endif
-       tcf = tcf * cco(icache_psgp_sign)
-       ! write(*, *) 'psgp:l', tglat, tclat, tcf, cco(icache_psgp_xco)
 
-       cla(icache_psgp_xrho) = tcf / cco(icache_psgp_xco)
-       cla(icache_psgp_yrho) = tcf / cco(icache_psgp_yco)
+       s = cco(icache_psgp_xco) * cco(icache_psgp_sign)
+       cla(icache_psgp_xrho) = SIGN(cco(icache_psgp_xco) * tcf, s)
+       s = cco(icache_psgp_yco) * cco(icache_psgp_sign)
+       cla(icache_psgp_yrho) = SIGN(cco(icache_psgp_yco) * tcf, s)
+
+       cla(icache_psgp_sf)   = tcf * SQRT(ONE + e2c * (tglat * tglat))
     endif
+    ! no sign adjustment
+    _TRIG(scl) = set_sincos(lat)
+    cla(icache_psgp_cosla) = _COS(scl)
+    cla(icache_psgp_sinla) = _SIN(scl)
   end subroutine psgp_cachela_d
-
-!!!_  & psgp_cachelo - lon cache for sterographic projection (pole)
+!!!_  & psgp_cachelo - lon cache for stereographic projection (pole)
   subroutine psgp_cachelo_d &
     & (clo, lon, cco)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -1383,6 +1564,74 @@ contains
     clo(icache_psgp_cosdlo) = cos_canonical(dlo)
   end subroutine psgp_cachelo_d
 
+!!!_  & psgp_cachelo_tr - lon cache for stereographic projection (pole)
+  subroutine psgp_cachelo_tr_d &
+    & (clo, slon, clon, cco)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: clo(*)
+    real(kind=KTGT),intent(in)  :: slon, clon
+    real(kind=KTGT),intent(in)  :: cco(*)
+
+    real(kind=KTGT) :: lonorg
+    real(kind=KTGT) :: lo0(NTRIG), lo1(NTRIG), dlo(NTRIG)
+    lonorg = cco(icache_psgp_olon)
+    _TRIG(lo0) = set_sincos(lonorg)
+    _SIN(lo1) = slon
+    _COS(lo1) = clon
+    _TRIG(dlo) = sub_angle(lo1, lo0)
+    clo(icache_psgp_sindlo) = _SIN(dlo) * cco(icache_psgp_sign)
+    clo(icache_psgp_cosdlo) = _COS(dlo)
+  end subroutine psgp_cachelo_tr_d
+
+!!!_  & psgp_comp_dlon - compute longitude properties relative to projection center
+  subroutine psgp_comp_dlon_d &
+    & (dlon, lon, cco)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: dlon
+    real(kind=KTGT),intent(in)  :: lon
+    real(kind=KTGT),intent(in)  :: cco(*)
+    dlon = lon - cco(icache_psgp_olon)
+  end subroutine psgp_comp_dlon_d
+
+!!!_  & psgp_dlo_tr - extract dlon properties from cache
+  subroutine psgp_dlo_tr_d &
+    & (dlon, clo, cco)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: dlon(*)
+    real(kind=KTGT),intent(in)  :: clo(*)
+    real(kind=KTGT),intent(in)  :: cco(*)
+
+    _SIN(dlon) = clo(icache_psgp_sindlo) * cco(icache_psgp_sign)
+    _COS(dlon) = clo(icache_psgp_cosdlo)
+  end subroutine psgp_dlo_tr_d
+
+!!!_  & psgp_gla_tr - extract lat properties from cache
+  subroutine psgp_gla_tr_d &
+    & (glat, cla, cco)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: glat(*)
+    real(kind=KTGT),intent(in)  :: cla(*)
+    real(kind=KTGT),intent(in)  :: cco(*)
+
+    _SIN(glat) = cla(icache_psgp_sinla)
+    _COS(glat) = cla(icache_psgp_cosla)
+  end subroutine psgp_gla_tr_d
+
+!!!_  & psgp_sinlat - extract sine lat properties from cache
+  PURE &
+  real(kind=KTGT) function psgp_sinlat_d (cla, cco) result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in)  :: cla(*)
+    real(kind=KTGT),intent(in)  :: cco(*)
+
+    v = cla(icache_psgp_sinla)
+  end function psgp_sinlat_d
+
 !!!_  & psgp_fwd_once()
   function psgp_fwd_once_d &
        & (lon, lat, cco) result (xy)
@@ -1391,15 +1640,14 @@ contains
     real(kind=KTGT) :: xy(2)
     real(kind=KTGT),intent(in) :: lon, lat
     real(kind=KTGT),intent(in) :: cco(*)
-    real(kind=KTGT) :: tlo(ncache_psgp_la)
-    real(kind=KTGT) :: tla(ncache_psgp_lo)
+    real(kind=KTGT) :: tlo(ncache_psgp_lo)
+    real(kind=KTGT) :: tla(ncache_psgp_la)
 
     call psgp_cachela(tla, lat, cco)
     call psgp_cachelo(tlo, lon, cco)
 
     xy(:) = psgp_fwd_core_d(tlo, tla)
   end function psgp_fwd_once_d
-
 !!!_  & psgp_fwd_core()
   function psgp_fwd_core_d &
        & (clo, cla) result (xy)
@@ -1414,69 +1662,118 @@ contains
     xy(2) = - cla(icache_psgp_yrho) * clo(icache_psgp_cosdlo)
   end function psgp_fwd_core_d
 
+!!!_  & psgp_fwd_cis_once()
+  function psgp_fwd_cis_once_d &
+       & (lon, lat, cco) result (xyf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: xyf(3)
+    real(kind=KTGT),intent(in) :: lon, lat
+    real(kind=KTGT),intent(in) :: cco(*)
+    real(kind=KTGT) :: tlo(ncache_psgp_lo)
+    real(kind=KTGT) :: tla(ncache_psgp_la)
+
+    call psgp_cachela(tla, lat, cco)
+    call psgp_cachelo(tlo, lon, cco)
+
+    xyf(:) = psgp_fwd_cis_core(tlo, tla)
+  end function psgp_fwd_cis_once_d
+!!!_  & psgp_fwd_cis_core()
+  function psgp_fwd_cis_core_d &
+       & (clo, cla) result (xyf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: xyf(3)
+    real(kind=KTGT),intent(in) :: clo(*)
+    real(kind=KTGT),intent(in) :: cla(*)
+
+    xyf(1) = + cla(icache_psgp_xrho) * clo(icache_psgp_sindlo)
+    xyf(2) = - cla(icache_psgp_yrho) * clo(icache_psgp_cosdlo)
+    xyf(3) = psgp_fwd_isf(cla)
+  end function psgp_fwd_cis_core_d
+
+!!!_  & psgp_fwd_isf()
+  real(kind=KTGT) function psgp_fwd_isf_d &
+       & (cla) result (isf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: cla(*)
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+    isf = ONE / cla(icache_psgp_sf)
+  end function psgp_fwd_isf_d
 !!!_  & psgp_bwd_tr()
   subroutine psgp_bwd_tr_d &
        & (gla, dlo, x, y, cco)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(out):: gla(*)
-    real(kind=KTGT),intent(out):: dlo(*)
+    real(kind=KTGT),intent(out):: gla(*)  ! geographic latitude
+    real(kind=KTGT),intent(out):: dlo(*)  ! difference in longitude
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
 
     real(kind=KTGT) :: s, d
-    real(kind=KTGT) :: rho
+    real(kind=KTGT) :: rhonml
     real(kind=KTGT) :: tglat
     real(kind=KTGT),parameter :: ZERO=0.0_KTGT
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
 
+    real(kind=KTGT) :: xx, yy
+
     s   = cco(icache_psgp_sign)
-    rho = _hypot(x, y)
-    if (rho.eq.ZERO) then
+    xx = x / cco(icache_psgp_xco)
+    yy = y / cco(icache_psgp_yco)
+    rhonml = _hypot(xx, yy)
+    if (rhonml.eq.ZERO) then
        _SIN(gla) = s * ONE
        _COS(gla) = ZERO
+       ! undetermined longitude
        _SIN(dlo) = ZERO
        _COS(dlo) = ONE
     else
-       tglat = psgp_bwd_core(rho, cco)
+       tglat = psgp_bwd_core(rhonml, cco)
        d = _hypot(ONE, tglat)
        _SIN(gla) = s * tglat / d
        _COS(gla) = ONE / d
 
-       _SIN(dlo) =  (x * s) / rho * s
-       _COS(dlo) = -(y * s) / rho
+       _SIN(dlo) =   xx / rhonml
+       _COS(dlo) = - yy / rhonml * s
     endif
   end subroutine psgp_bwd_tr_d
-
 !!!_  & psgp_bwd_ll()
   function psgp_bwd_ll_d &
        & (x, y, cco) result(ll)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT) :: ll(2)
+    real(kind=KTGT) :: ll(NGEOG)
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
 
     real(kind=KTGT) :: s, lo
-    real(kind=KTGT) :: rho
+    real(kind=KTGT) :: rhonml
     real(kind=KTGT) :: tglat
     real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+    real(kind=KTGT) :: xx, yy
 
     s   = cco(icache_psgp_sign)
-    rho = _hypot(x, y)
-    if (rho.eq.ZERO) then
-       ll(2) = s * (pi_(ZERO) / 2.0_KTGT)
-       ll(1) = cco(icache_psgp_olon)
+    xx = x / cco(icache_psgp_xco)
+    yy = y / cco(icache_psgp_yco)
+    rhonml = _hypot(xx, yy)
+    ! rho = psgp_bwd_rho(x, y, cco)
+    if (rhonml.eq.ZERO) then
+       _LATI(ll)  = s * (pi_(ZERO) / 2.0_KTGT)
+       ! undetermined longitude
+       _LONGI(ll) = cco(icache_psgp_olon)
     else
-       tglat = psgp_bwd_core(rho, cco)
+       tglat = psgp_bwd_core(rhonml, cco)
 
-       ll(2) = s * ATAN(tglat)
+       _LATI(ll) = s * ATAN(tglat)
 
-       lo = s * cco(icache_psgp_olon) + ATAN2(x * s, - y * s)
-       ll(1) = lo * s
+       ! lo = s * cco(icache_psgp_olon) + ATAN2(xx * s, - yy * s)
+       ! _LONGI(ll) = lo * s
+       lo = cco(icache_psgp_olon) + s * ATAN2(xx * s, - yy * s)
+       _LONGI(ll) = lo
     endif
   end function psgp_bwd_ll_d
-
 !!!_  & psgp_bwd_sf() - scale factor
   real(kind=KTGT) function psgp_bwd_sf_d &
        & (x, y, cco) result(sf)
@@ -1485,23 +1782,21 @@ contains
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
 
-    real(kind=KTGT) :: ecc, e2c
-    real(kind=KTGT) :: rho
+    real(kind=KTGT) :: e2c
+    real(kind=KTGT) :: rhonml
     real(kind=KTGT) :: tglat
     real(kind=KTGT),parameter :: ZERO=0.0_KTGT
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
 
-    rho = _hypot(x, y)
-    if (rho.eq.ZERO) then
+    rhonml = psgp_bwd_rhonml(x, y, cco)
+    if (rhonml.eq.ZERO) then
        sf = cco(icache_psgp_psf)
     else
-       ecc = cco(icache_psgp_ecc)
-       e2c = (ONE - ecc) * (ONE + ecc)
-       tglat = psgp_bwd_core(rho, cco)
-       sf = (rho / cco(icache_psgp_maj)) * SQRT(ONE + e2c * (tglat * tglat))
+       e2c = cco(icache_psgp_e2c)
+       tglat = psgp_bwd_core(rhonml, cco)
+       sf = rhonml * SQRT(ONE + e2c * (tglat * tglat))
     endif
   end function psgp_bwd_sf_d
-
 !!!_  & psgp_bwd_isf() - inverse scale factor
   real(kind=KTGT) function psgp_bwd_isf_d &
        & (x, y, cco) result(sf)
@@ -1510,23 +1805,21 @@ contains
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
 
-    real(kind=KTGT) :: ecc, e2c
-    real(kind=KTGT) :: rho
+    real(kind=KTGT) :: e2c
+    real(kind=KTGT) :: rhonml
     real(kind=KTGT) :: tglat
     real(kind=KTGT),parameter :: ZERO=0.0_KTGT
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
 
-    rho = _hypot(x, y)
-    if (rho.eq.ZERO) then
+    rhonml = psgp_bwd_rhonml(x, y, cco)
+    if (rhonml.eq.ZERO) then
        sf = ONE / cco(icache_psgp_psf)
     else
-       ecc = cco(icache_psgp_ecc)
-       e2c = (ONE - ecc) * (ONE + ecc)
-       tglat = psgp_bwd_core(rho, cco)
-       sf = (cco(icache_psgp_maj) / rho) / SQRT(ONE + e2c * (tglat * tglat))
+       e2c = cco(icache_psgp_e2c)
+       tglat = psgp_bwd_core(rhonml, cco)
+       sf = (ONE / rhonml) / SQRT(ONE + e2c * (tglat * tglat))
     endif
   end function psgp_bwd_isf_d
-
 !!!_  & psgp_bwd_iaf() - inverse area factor
   real(kind=KTGT) function psgp_bwd_iaf_d &
        & (x, y, cco) result(sf)
@@ -1535,29 +1828,46 @@ contains
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
 
-    real(kind=KTGT) :: ecc, e2c
-    real(kind=KTGT) :: rho
+    real(kind=KTGT) :: e2c
+    real(kind=KTGT) :: rhonml
     real(kind=KTGT) :: tglat
     real(kind=KTGT),parameter :: ZERO=0.0_KTGT
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
 
-    rho = _hypot(x, y)
-    if (rho.eq.ZERO) then
-       sf = ONE / cco(icache_psgp_psf)
+    rhonml = psgp_bwd_rhonml(x, y, cco)
+    if (rhonml.eq.ZERO) then
+       sf = ONE / (cco(icache_psgp_psf) ** 2)
     else
-       ecc = cco(icache_psgp_ecc)
-       e2c = (ONE - ecc) * (ONE + ecc)
-       tglat = psgp_bwd_core(rho, cco)
-       sf = (cco(icache_psgp_maj) / rho) ** 2 / (ONE + e2c * (tglat * tglat))
+       e2c = cco(icache_psgp_e2c)
+       tglat = psgp_bwd_core(rhonml, cco)
+       sf = (ONE / rhonml) ** 2 / (ONE + e2c * (tglat * tglat))
     endif
   end function psgp_bwd_iaf_d
-
-!!!_  & psgp_bwd_core
-  real(kind=KTGT) function psgp_bwd_core_d &
-       & (rho, cco) result(tlat)
+!!!_  & psgp_bwd_rhonml
+  real(kind=KTGT) function psgp_bwd_rhonml_d &
+       & (x, y, cco) result(rhonml)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(in) :: rho
+    real(kind=KTGT),intent(in) :: x, y
+    real(kind=KTGT),intent(in) :: cco(*)
+    rhonml = _hypot(x / cco(icache_psgp_xco), y / cco(icache_psgp_yco))
+  end function psgp_bwd_rhonml_d
+!!!_  & psgp_bwd_rho
+  real(kind=KTGT) function psgp_bwd_rho_d &
+       & (x, y, cco) result(rho)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: x, y
+    real(kind=KTGT),intent(in) :: cco(*)
+    ! rho = _hypot(x * cco(icache_psgp_xco), y * cco(icache_psgp_yco))
+    rho = psgp_bwd_rhonml(x, y, cco) * cco(icache_psgp_maj)
+  end function psgp_bwd_rho_d
+!!!_  & psgp_bwd_core
+  real(kind=KTGT) function psgp_bwd_core_d &
+       & (rhonml, cco) result(tlat)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: rhonml   ! normalized rho
     real(kind=KTGT),intent(in) :: cco(*)
 
     real(kind=KTGT),parameter :: ZERO=0.0_KTGT
@@ -1570,14 +1880,15 @@ contains
     ! real(kind=KTGT) :: scf
     integer j
 
-    if (rho.eq.ZERO) then
+    if (rhonml.eq.ZERO) then
        tlat = cco(icache_psgp_sign) * HUGE(ZERO)
     else
        tol = cco(icache_psgp_tol)
        ecc = cco(icache_psgp_ecc)
-       e2c = (ONE - ecc) * (ONE + ecc)
+       ! e2c = (ONE - ecc) * (ONE + ecc)
+       e2c = cco(icache_psgp_e2c)
 
-       t = rho / cco(icache_psgp_tcf)
+       t = rhonml / cco(icache_psgp_tcf)
        tclat = (ONE / t - t) / TWO
        ! tglat = tclat
        ! Taylor expansion of conformal latitude with e is
@@ -1592,10 +1903,569 @@ contains
           if (abs(dz).le.spacing(tglat) * tol) exit
        enddo
        tlat = tglat
-       ! scf = (rho / cco(icache_psgp_maj)) * SQRT(ONE + e2c * (tglat * tglat))
-       ! write(*, *) 'scale =', scf, tglat, tclat, rho, cco(icache_psgp_maj)
     endif
   end function psgp_bwd_core_d
+!!!_  & psgp_bwd_length
+  subroutine psgp_bwd_length_d &
+       & (dis, x0, y0, x1, y1, cco, levbgn, levend, tol, res)
+    ! (caution) return non-adjusted length
+    !           input coordinate should be scaled with xco yco parameters,
+    !           but return distance is actual value
+    use TOUZA_Std,only: KTGT=>KDBL
+    use TOUZA_Std,only: choice
+    implicit none
+    real(kind=KTGT),intent(out)          :: dis
+    real(kind=KTGT),intent(in)           :: x0, y0, x1, y1
+    real(kind=KTGT),intent(in)           :: cco(*)
+    integer,        intent(in)           :: levbgn, levend
+    real(kind=KTGT),intent(in)           :: tol
+    real(kind=KTGT),intent(out),optional :: res
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+    real(kind=KTGT),parameter :: HALF=0.5_KTGT
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+
+    real(kind=KTGT) :: xs, ys, tx, ty
+    real(kind=KTGT) :: xp, yp
+    real(kind=KTGT) :: k, kprev
+    real(kind=KTGT) :: etol
+    real(kind=KTGT) :: dref, rsol
+
+    integer,parameter :: llev = BIT_SIZE(0) - 1
+    real(kind=KTGT) :: buf(0:llev)
+    integer jlev
+    integer bpos, bj
+    integer jdiv, ndiv
+
+    xs = x1 - x0
+    ys = y1 - y0
+    xp = (x1 + x0) / TWO
+    yp = (y1 + y0) / TWO
+
+    ! dref = _hypot(xs, ys)
+    dref = psgp_bwd_rho(xs, ys, cco)
+    kprev = psgp_bwd_isf(xp, yp, cco)
+
+    if (tol.lt.ZERO) then
+       etol = abs(tol) / dref
+    else
+       etol = spacing(kprev) * tol
+    endif
+
+    rsol = ZERO
+    k = ZERO
+    do jlev = max(levbgn, 1), min(levend, llev) - 1
+       bpos = 0
+       ndiv = 2 ** jlev
+       tx = xs / real(ndiv, kind=KTGT)
+       ty = ys / real(ndiv, kind=KTGT)
+       do jdiv = 0, ndiv - 1
+          xp = x0 + tx * (real(jdiv, kind=KTGT) + HALF)
+          yp = y0 + ty * (real(jdiv, kind=KTGT) + HALF)
+          k = psgp_bwd_isf(xp, yp, cco)
+          buf(bpos) = k
+          bj = jdiv
+          do
+             if (mod(bj, 2).eq.0) exit
+             buf(bpos - 1) = buf(bpos - 1) + buf(bpos)
+             bj = bj / 2
+             bpos = bpos - 1
+          enddo
+          bpos = bpos + 1
+       enddo
+       k = buf(0) / real(ndiv, kind=KTGT)
+       rsol = k - kprev
+       if (abs(rsol).le.etol) exit
+       kprev = k
+    enddo
+    dis = k * dref
+
+    if (present(res)) then
+       res = rsol * dref
+    endif
+  end subroutine psgp_bwd_length_d
+!!!_  & psgp_bwd_area
+  subroutine psgp_bwd_area_d &
+       & (area, x0, y0, x1, y1, cco, levbgn, levend, tol, res)
+    use TOUZA_Std,only: KTGT=>KDBL
+    use TOUZA_Std,only: choice
+    implicit none
+    real(kind=KTGT),intent(out)          :: area
+    real(kind=KTGT),intent(in)           :: x0, y0, x1, y1
+    real(kind=KTGT),intent(in)           :: cco(*)
+    integer,        intent(in)           :: levbgn, levend
+    real(kind=KTGT),intent(in)           :: tol
+    real(kind=KTGT),intent(out),optional :: res
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+    real(kind=KTGT),parameter :: HALF=0.5_KTGT
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+
+    real(kind=KTGT) :: xs, ys, tx, ty
+    real(kind=KTGT) :: xp, yp
+    real(kind=KTGT) :: k, kprev
+    real(kind=KTGT) :: etol
+    real(kind=KTGT) :: dref, rsol
+
+    integer,parameter :: llev = BIT_SIZE(0) - 1
+    real(kind=KTGT) :: buf(0:llev * 2)
+    integer jlev
+    integer jdx, jdy
+    integer bpos, bj
+    integer ndiv
+
+    xs = x1 - x0
+    ys = y1 - y0
+    xp = (x1 + x0) / TWO
+    yp = (y1 + y0) / TWO
+
+    dref = xs * ys
+    kprev = psgp_bwd_iaf(xp, yp, cco)
+
+    if (tol.lt.ZERO) then
+       etol = abs(tol) / dref
+    else
+       etol = spacing(kprev) * tol
+    endif
+
+    rsol = ZERO
+    k = ZERO
+    do jlev = max(levbgn, 1), min(levend, llev) - 1
+       bpos = 0
+       ndiv = 2 ** jlev
+       tx = xs / real(ndiv, kind=KTGT)
+       ty = ys / real(ndiv, kind=KTGT)
+       do jdy = 0, ndiv - 1
+          yp = y0 + ty * (real(jdy, kind=KTGT) + HALF)
+          do jdx = 0, ndiv - 1
+             xp = x0 + tx * (real(jdx, kind=KTGT) + HALF)
+
+             k = psgp_bwd_iaf(xp, yp, cco)
+             buf(bpos) = k
+             bj = jdy * ndiv + jdx
+             do
+                if (mod(bj, 2).eq.0) exit
+                buf(bpos - 1) = buf(bpos - 1) + buf(bpos)
+                bj = bj / 2
+                bpos = bpos - 1
+             enddo
+             bpos = bpos + 1
+          enddo
+       enddo
+       k = buf(0) / real(ndiv * ndiv, kind=KTGT)
+       rsol = k - kprev
+       if (abs(rsol).le.etol) exit
+       kprev = k
+    enddo
+    area = k * dref
+
+    if (present(res)) then
+       res = rsol * dref
+    endif
+  end subroutine psgp_bwd_area_d
+
+!!!_  & psgp_bwd_geod
+  subroutine psgp_bwd_geod_d &
+       & (garea, gdis, x0, y0, x1, y1, cco, levbgn, levend, tol, ares, dres)
+    use TOUZA_Std,only: KTGT=>KDBL
+    use TOUZA_Std,only: choice
+    implicit none
+    real(kind=KTGT),intent(out)          :: garea, gdis
+    real(kind=KTGT),intent(in)           :: x0, y0, x1, y1
+    real(kind=KTGT),intent(in)           :: cco(*)
+    integer,        intent(in)           :: levbgn, levend
+    real(kind=KTGT),intent(in)           :: tol
+    real(kind=KTGT),intent(out),optional :: ares,   dres
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+    real(kind=KTGT),parameter :: HALF=0.5_KTGT
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+
+    real(kind=KTGT) :: xs, ys, tx, ty
+    real(kind=KTGT) :: xp, yp, xo, yo
+
+    real(kind=KTGT) :: gla1(NTRIG), glo1(NTRIG+1)
+    real(kind=KTGT) :: gla2(NTRIG), glo2(NTRIG+1)
+    real(kind=KTGT) :: dglon(NTRIG+1)
+
+    real(kind=KTGT) :: a, f
+
+    real(kind=KTGT) :: aprev, dprev, asol, dsol
+    real(kind=KTGT) :: etol
+    real(kind=KTGT) :: aerr, derr
+
+    integer,parameter :: llev = BIT_SIZE(0) - 1
+    real(kind=KTGT) :: abuf(0:llev), dbuf(0:llev)
+    real(kind=KTGT) :: gd, ga
+    integer jlev
+    integer bpos, bj
+    integer jdiv, ndiv
+    integer jerr
+
+    xs = x1 - x0
+    ys = y1 - y0
+
+    xo = x0
+    yo = y0
+    xp = x1
+    yp = y1
+
+    a = cco(icache_psgp_maj)
+    f = cco(icache_psgp_flat)
+
+    call psgp_bwd_tr(gla1, glo1, xo, yo, cco)
+    call psgp_bwd_tr(gla2, glo2, xp, yp, cco)
+    dglon(:) = set_dlongi(glo1, glo2)
+    call geodesic_inverse &
+         (jerr, gd, gla1, gla2, dglon, f, a, garea=ga)
+
+    if (tol.lt.ZERO) then
+       etol = abs(tol)
+    else
+       etol = spacing(ga) * tol
+    endif
+
+    aprev = ga
+    dprev = gd
+    asol = ZERO
+    dsol = ZERO
+    aerr = ZERO
+    derr = ZERO
+    do jlev = max(levbgn, 1), min(levend, llev) - 1
+       bpos = 0
+       ndiv = 2 ** jlev
+       tx = xs / real(ndiv, kind=KTGT)
+       ty = ys / real(ndiv, kind=KTGT)
+       xo = x0
+       yo = y0
+       call psgp_bwd_tr(gla1, glo1, xo, yo, cco)
+       do jdiv = 0, ndiv - 1
+          xp = x0 + tx * (real(jdiv+1, kind=KTGT))
+          yp = y0 + ty * (real(jdiv+1, kind=KTGT))
+          call psgp_bwd_tr(gla2, glo2, xp, yp, cco)
+          dglon(:) = set_dlongi(glo1, glo2)
+          call geodesic_inverse &
+               (jerr, gd, gla1, gla2, dglon, f, a, garea=ga)
+          abuf(bpos) = ga
+          dbuf(bpos) = gd
+          bj = jdiv
+          do
+             if (mod(bj, 2).eq.0) exit
+             abuf(bpos - 1) = abuf(bpos - 1) + abuf(bpos)
+             dbuf(bpos - 1) = dbuf(bpos - 1) + dbuf(bpos)
+             bj = bj / 2
+             bpos = bpos - 1
+          enddo
+          bpos = bpos + 1
+          gla1(:) = gla2(:)
+          glo1(:) = glo2(:)
+       enddo
+       dsol = dbuf(0)
+       asol = abuf(0)
+       aerr = asol - aprev
+       derr = dsol - dprev
+       ! write(*, *) 'pgeod:', jlev, dsol, derr, asol, aerr
+       if (abs(asol).le.etol) exit
+       aprev = asol
+       dprev = dsol
+    enddo
+    gdis  = dsol
+    garea = asol
+
+    if (present(ares)) then
+       ares = aerr
+    endif
+    if (present(dres)) then
+       dres = derr
+    endif
+  end subroutine psgp_bwd_geod_d
+
+!!!_  & psgp_surf_area ()
+  real(kind=KTGT) function psgp_surf_area_d(cco) result (v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    real(kind=KTGT),intent(in) :: cco(*)
+    real(kind=KTGT) :: a, aco
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+    a = cco(icache_psgp_maj)
+    ! e = cco(icache_psgp_ecc)
+    ! e2c = cco(icache_psgp_e2c)
+    aco = cco(icache_psgp_aco)
+
+    ! v = (((a * a) * (pi_(ONE))) * (ONE + ((ONE - e) * (ONE + e) * ATANH(e)) / e)) * TWO
+    v = (((a * a) * (pi_(ONE))) * aco) * TWO
+
+  end function psgp_surf_area_d
+!!!_  & psgp_xlo - solve (x, lon) from (y, lat)
+  subroutine psgp_xlo_tr_d &
+       & (x, dlo, y, cla, cco, xs, sf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out)          :: x
+    real(kind=KTGT),intent(out)          :: dlo(*)
+    real(kind=KTGT),intent(in)           :: y
+    real(kind=KTGT),intent(in)           :: cla(*)
+    real(kind=KTGT),intent(in)           :: cco(*)
+    real(kind=KTGT),intent(in)           :: xs   ! sign of sin(dlo) or x
+    real(kind=KTGT),intent(out),optional :: sf
+
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+    real(kind=KTGT) :: cdl
+
+    if (cla(icache_psgp_yrho).eq.ZERO) then
+       _COS(dlo) = ZERO
+       _SIN(dlo) = SIGN(ONE, xs)
+       x = SIGN(ZERO, xs)
+       ! s = + SIGN(ONE, cla(icache_psgp_xrho)) * SIGN(ONE, xs)
+       ! _SIN(dlo) = SIGN(_SIN(dlo), s) * cco(icache_psgp_sign)
+    else
+       cdl = - y / cla(icache_psgp_yrho)
+       if (ABS(cdl).gt.ONE) then
+          _SIN(dlo) = SIGN(TWO, xs) !  no solution
+          x = + SIGN(HUGE(ZERO), xs)
+       else
+          _COS(dlo) = cdl
+          ! _SIN(dlo) = SQRT((ONE + cdl) * (ONE - cdl))
+          ! x = + SIGN(cla(icache_psgp_xrho) * _SIN(dlo), xs)
+          ! s = + SIGN(ONE, cla(icache_psgp_xrho)) * SIGN(ONE, xs)
+          ! _SIN(dlo) = SIGN(_SIN(dlo), s) * cco(icache_psgp_sign)
+          ! if (ABS(cdl).gt.1.0_KTGT) then
+          !    write(*, *) 'xlo/2', cla(icache_psgp_yrho), y
+          !    write(*, *) 'xlo/2', cdl, (ONE + cdl) * (ONE - cdl)
+          !    write(*, *) 'xlo/2', cla(icache_psgp_sinla), cla(icache_psgp_cosla)
+          !    write(*, *) 'xlo/2', rad2deg(ATAN2(cla(icache_psgp_sinla), cla(icache_psgp_cosla)))
+          ! endif
+          ! return
+          !! caution: sign must be adjusted by the caller
+          _SIN(dlo) = SIGN(SQRT((ONE + cdl) * (ONE - cdl)), xs)
+          x = + SIGN(cla(icache_psgp_xrho) * _SIN(dlo), xs)
+       endif
+    endif
+
+    if (present(sf)) then
+       sf = cla(icache_psgp_sf)
+    endif
+  end subroutine psgp_xlo_tr_d
+
+!!!_  & psgp_xlo_once - solve (x, lon) from (y, lat)
+  subroutine psgp_xlo_once_tr_d &
+       & (x, dlo, y, lat, xs, cco, sf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out)          :: x
+    real(kind=KTGT),intent(out)          :: dlo(*)
+    real(kind=KTGT),intent(in)           :: y
+    real(kind=KTGT),intent(in)           :: lat
+    real(kind=KTGT),intent(in)           :: cco(*)
+    real(kind=KTGT),intent(in)           :: xs   ! sign of x
+    real(kind=KTGT),intent(out),optional :: sf
+
+    real(kind=KTGT) :: tla(ncache_psgp_la)
+
+    call psgp_cachela(tla, lat, cco)
+    call psgp_xlo_tr(x, dlo, y, tla, cco, xs, sf)
+  end subroutine psgp_xlo_once_tr_d
+
+!!!_  & psgp_ylo - solve (y,lon) from (x,lat)
+  subroutine psgp_ylo_tr_d &
+       & (y, dlo, x, cla, cco, ys, sf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out)          :: y
+    real(kind=KTGT),intent(out)          :: dlo(*)
+    real(kind=KTGT),intent(in)           :: x
+    real(kind=KTGT),intent(in)           :: cla(*)
+    real(kind=KTGT),intent(in)           :: cco(*)
+    real(kind=KTGT),intent(in)           :: ys   ! sign of y (or s cos(lo))
+    real(kind=KTGT),intent(out),optional :: sf
+
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+    real(kind=KTGT) :: sdl
+
+    if (cla(icache_psgp_xrho).eq.ZERO) then
+       _SIN(dlo) = ZERO
+       _COS(dlo) = - SIGN(ONE, ys) * cco(icache_psgp_sign)
+       y = SIGN(ZERO, ys)
+    else
+       sdl = + x / cla(icache_psgp_xrho)
+       if (ABS(sdl).gt.ONE) then
+          _SIN(dlo) = TWO * cco(icache_psgp_sign) ! no solution
+          _COS(dlo) = - SIGN(TWO, ys) * cco(icache_psgp_sign)
+          y = + SIGN(HUGE(ZERO), ys)
+       else
+          _SIN(dlo) = sdl * cco(icache_psgp_sign)
+          !! caution: sign must be adjusted by the caller
+          _COS(dlo) = SQRT((ONE + sdl) * (ONE - sdl))
+          ! y = + SIGN(cla(icache_psgp_yrho) * _COS(dlo), ys)
+          ! s = - SIGN(ONE, cla(icache_psgp_yrho)) * SIGN(ONE, ys)
+          ! _COS(dlo) = SIGN(_COS(dlo), s)
+          _COS(dlo) = - SIGN(_COS(dlo), ys) * cco(icache_psgp_sign)
+          y = + SIGN(cla(icache_psgp_yrho) * _COS(dlo), ys)
+       endif
+    endif
+
+    if (present(sf)) then
+       sf = cla(icache_psgp_sf)
+    endif
+  end subroutine psgp_ylo_tr_d
+
+!!!_  & psgp_ylo_once - solve (y, lon) from (x, lat)
+  subroutine psgp_ylo_once_tr_d &
+       & (y, dlo, x, lat, ys, cco, sf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out)          :: y
+    real(kind=KTGT),intent(out)          :: dlo(*)
+    real(kind=KTGT),intent(in)           :: x
+    real(kind=KTGT),intent(in)           :: lat
+    real(kind=KTGT),intent(in)           :: cco(*)
+    real(kind=KTGT),intent(in)           :: ys   ! sign of y
+    real(kind=KTGT),intent(out),optional :: sf
+
+    real(kind=KTGT) :: tla(ncache_psgp_la)
+
+    call psgp_cachela(tla, lat, cco)
+    call psgp_ylo_tr(y, dlo, x, tla, cco, ys, sf)
+  end subroutine psgp_ylo_once_tr_d
+
+!!!_  & psgp_xla - solve (x,lat) from (y,lon)
+  subroutine psgp_xla_tr_d &
+       & (x, gla, y, clo, cco, sf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out)          :: x
+    real(kind=KTGT),intent(out)          :: gla(*)
+    real(kind=KTGT),intent(in)           :: y
+    real(kind=KTGT),intent(in)           :: clo(*)
+    real(kind=KTGT),intent(in)           :: cco(*)
+    real(kind=KTGT),intent(out),optional :: sf
+
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+
+    real(kind=KTGT) :: rhonml, tglat, s, d, e2c
+
+    if (clo(icache_psgp_cosdlo).eq.ZERO) then
+       ! undetermined
+       ! return invalid values
+       _SIN(gla) = ZERO
+       _COS(gla) = ZERO
+       x = ZERO
+       if (present(sf)) then
+          sf = ONE
+       endif
+    else
+       s   = cco(icache_psgp_sign)
+
+       rhonml = ABS(y / cco(icache_psgp_yco) / clo(icache_psgp_cosdlo))
+       if (rhonml.eq.ZERO) then
+          _SIN(gla) = s * ONE
+          _COS(gla) = ZERO
+          if (present(sf)) then
+             sf = cco(icache_psgp_psf)
+          endif
+       else
+          tglat = psgp_bwd_core(rhonml, cco)
+
+          d = _hypot(ONE, tglat)
+          _SIN(gla) = s * tglat / d
+          _COS(gla) = ONE / d
+          x = + (rhonml * cco(icache_psgp_xco)) * clo(icache_psgp_sindlo) * s
+          if (present(sf)) then
+             e2c = cco(icache_psgp_e2c)
+             sf = rhonml * SQRT(ONE + e2c * (tglat * tglat))
+          endif
+       endif
+    endif
+  end subroutine psgp_xla_tr_d
+!!!_  & psgp_xla_once - solve (x,lat) from (y,lon)
+  subroutine psgp_xla_once_tr_d &
+       & (x, gla, y, lon, cco, sf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out)          :: x
+    real(kind=KTGT),intent(out)          :: gla(*)
+    real(kind=KTGT),intent(in)           :: y
+    real(kind=KTGT),intent(in)           :: lon
+    real(kind=KTGT),intent(in)           :: cco(*)
+    real(kind=KTGT),intent(out),optional :: sf
+
+    real(kind=KTGT) :: tlo(ncache_psgp_lo)
+
+    call psgp_cachelo(tlo, lon, cco)
+    call psgp_xla_tr(x, gla, y, tlo, cco, sf)
+
+  end subroutine psgp_xla_once_tr_d
+!!!_  & psgp_yla - solve (y,lat) from (x,lon)
+  subroutine psgp_yla_tr_d &
+       & (y, gla, x, clo, cco, sf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out)          :: y
+    real(kind=KTGT),intent(out)          :: gla(*)
+    real(kind=KTGT),intent(in)           :: x
+    real(kind=KTGT),intent(in)           :: clo(*)
+    real(kind=KTGT),intent(in)           :: cco(*)
+    real(kind=KTGT),intent(out),optional :: sf
+
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+
+    real(kind=KTGT) :: rhonml, tglat, s, d, e2c
+
+    if (clo(icache_psgp_sindlo).eq.ZERO) then
+       ! undetermined
+       ! return invalid values
+       _SIN(gla) = ZERO
+       _COS(gla) = ZERO
+       y = ZERO
+       if (present(sf)) then
+          sf = ONE
+       endif
+    else
+       s   = cco(icache_psgp_sign)
+
+       rhonml = ABS(x / cco(icache_psgp_xco) / clo(icache_psgp_sindlo))
+
+       if (rhonml.eq.ZERO) then
+          _SIN(gla) = s * ONE
+          _COS(gla) = ZERO
+          if (present(sf)) then
+             sf = cco(icache_psgp_psf)
+          endif
+       else
+          tglat = psgp_bwd_core(rhonml, cco)
+
+          d = _hypot(ONE, tglat)
+          _SIN(gla) = s * tglat / d
+          _COS(gla) = ONE / d
+          y = - (rhonml * cco(icache_psgp_yco)) * clo(icache_psgp_cosdlo) * s
+          if (present(sf)) then
+             e2c = cco(icache_psgp_e2c)
+             sf = rhonml * SQRT(ONE + e2c * (tglat * tglat))
+          endif
+       endif
+    endif
+  end subroutine psgp_yla_tr_d
+!!!_  & psgp_yla_once - solve (y,lat) from (x,lon)
+  subroutine psgp_yla_once_tr_d &
+       & (y, gla, x, lon, cco, sf)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out)          :: y
+    real(kind=KTGT),intent(out)          :: gla(*)
+    real(kind=KTGT),intent(in)           :: x
+    real(kind=KTGT),intent(in)           :: lon
+    real(kind=KTGT),intent(in)           :: cco(*)
+    real(kind=KTGT),intent(out),optional :: sf
+
+    real(kind=KTGT) :: tlo(ncache_psgp_lo)
+
+    call psgp_cachelo(tlo, lon, cco)
+    call psgp_yla_tr(y, gla, x, tlo, cco, sf)
+
+  end subroutine psgp_yla_once_tr_d
 
 !!!_  & flatten_to_ecc ()
   ELEMENTAL &
@@ -1604,27 +2474,25 @@ contains
     real(kind=KTGT),intent(in) :: f
     e = sqrt(2.0_KTGT * f - f * f)
   end function flatten_to_ecc_d
-
 !!!_  & reduced_latitude() - sin,cos(param. lat.)
   function reduced_latitude_d (glat, f) result (plat)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(in) :: glat(2)
+    real(kind=KTGT),intent(in) :: glat(NTRIG)
     real(kind=KTGT),intent(in) :: f
-    real(kind=KTGT) :: plat(2)
+    real(kind=KTGT) :: plat(NTRIG)
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
 
-    plat(1:2) = nml_sincos(_SIN(glat) * (ONE - f), _COS(glat))
+    plat(1:NTRIG) = nml_sincos(_SIN(glat) * (ONE - f), _COS(glat))
     return
   end function reduced_latitude_d
-
 !!!_  & azimuth_node() - sin,cos(azimuth node)
   function azimuth_node_d (aref, plat) result (eazim)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(in) :: aref(2)
-    real(kind=KTGT),intent(in) :: plat(2)
-    real(kind=KTGT) :: eazim(2)
+    real(kind=KTGT),intent(in) :: aref(NTRIG)
+    real(kind=KTGT),intent(in) :: plat(NTRIG)
+    real(kind=KTGT) :: eazim(NTRIG)
     real(kind=KTGT),parameter :: ZERO=0.0_KTGT
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
 
@@ -1638,7 +2506,6 @@ contains
 
     return
   end function azimuth_node_d
-
 !!!_  & arcl_auxsph()
   function arcl_auxsph_d &
        & (azim, plat) &
@@ -1647,7 +2514,7 @@ contains
     implicit none
     real(kind=KTGT),intent(in) :: azim(*)
     real(kind=KTGT),intent(in) :: plat(*)
-    real(kind=KTGT) :: aarc(2)
+    real(kind=KTGT) :: aarc(NTRIG)
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
 
@@ -1655,27 +2522,25 @@ contains
        _SIN(aarc) = ZERO  ! from _SIN(plat1) == 0
        _COS(aarc) = ONE
     else
-       aarc(1:2)  = nml_sincos(_SIN(plat), _COS(azim) * _COS(plat))
+       aarc(1:NTRIG)  = nml_sincos(_SIN(plat), _COS(azim) * _COS(plat))
     endif
   end function arcl_auxsph_d
-
 !!!_  & alon_auxsph_ph()
   function alon_auxsph_ph_d &
        & (eazim, aref, plat) &
        & result (alonp)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(in) :: eazim(2)
-    real(kind=KTGT),intent(in) :: aref(2)
-    real(kind=KTGT),intent(in) :: plat(2)
-    real(kind=KTGT) :: alonp(2)
+    real(kind=KTGT),intent(in) :: eazim(NTRIG)
+    real(kind=KTGT),intent(in) :: aref(NTRIG)
+    real(kind=KTGT),intent(in) :: plat(NTRIG)
+    real(kind=KTGT) :: alonp(NTRIG)
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
 
-    alonp(1) = _SIN(plat) * _SIN(eazim)
-    alonp(2) = _COS(aref) * _COS(plat)
+    _SIN(alonp) = _SIN(plat) * _SIN(eazim)
+    _COS(alonp) = _COS(plat) * _COS(aref)
   end function alon_auxsph_ph_d
-
 !!!_  & conformal_latitude() - tan(conf. lat)
   ELEMENTAL &
   real(kind=KTGT) function conformal_latitude_d (tglat, ecc) result (x)
@@ -1708,7 +2573,6 @@ contains
   !   earea:  (S)       the area between the geodesic and the equator
 
   !   node == the point where the geodesic crosses the equator
-
 !!!_  & geodesic_direct
   subroutine geodesic_direct_d &
        & (ierr,  &
@@ -1718,17 +2582,17 @@ contains
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
     integer,        intent(out) :: ierr
-    real(kind=KTGT),intent(out) :: glat2(2)    ! geographic latitude of target
+    real(kind=KTGT),intent(out) :: glat2(NTRIG)    ! geographic latitude of target
     real(kind=KTGT),intent(out) :: dglon(3)    ! diffence in geographic longitude
-    real(kind=KTGT),intent(in)  :: glat1(2)    ! geographic latitude of origin
-    real(kind=KTGT),intent(in)  :: azim1(2)    ! azimuth of origin
+    real(kind=KTGT),intent(in)  :: glat1(NTRIG)    ! geographic latitude of origin
+    real(kind=KTGT),intent(in)  :: azim1(NTRIG)    ! azimuth of origin
     real(kind=KTGT),intent(in)  :: gdis        ! geodesic distance toward target
     real(kind=KTGT),intent(in)  :: f, a        ! flattening and equatorial radius
 
-    real(kind=KTGT) :: eazim(2)    ! azimuth of the node [alpha_0]
-    real(kind=KTGT) :: plat1(2)    ! parametric latitude of origin [beta_1]
-    real(kind=KTGT) :: aarc1(2)    ! arc length on auxiliary sphere [sigma_1]
-    real(kind=KTGT) :: alon1_ph(2) ! longitude on the auxiliary sphere [omega_1]  (not sin,cos)
+    real(kind=KTGT) :: eazim(NTRIG)    ! azimuth of the node [alpha_0]
+    real(kind=KTGT) :: plat1(NTRIG)    ! parametric latitude of origin [beta_1]
+    real(kind=KTGT) :: aarc1(NTRIG)    ! arc length on auxiliary sphere [sigma_1]
+    real(kind=KTGT) :: alon1_ph(NTRIG) ! longitude on the auxiliary sphere [omega_1]  (not sin,cos)
 
     integer,parameter :: lodr = 9
     integer,parameter :: i1odr = 6
@@ -1746,10 +2610,10 @@ contains
 
     ierr = 0
 
-    plat1(1:2) = reduced_latitude(glat1, f)
-    eazim(1:2) = azimuth_node(azim1, plat1)
-    aarc1(1:2) = arcl_auxsph(azim1, plat1)
-    alon1_ph(1:2) = alon_auxsph_ph(eazim, azim1, plat1)
+    _TRIG(plat1) = reduced_latitude(glat1, f)
+    _TRIG(eazim) = azimuth_node(azim1, plat1)
+    _TRIG(aarc1) = arcl_auxsph(azim1, plat1)
+    _TRIG(alon1_ph) = alon_auxsph_ph(eazim, azim1, plat1)
 
     fiii = f / (TWO - f)
     ee = f * (TWO - f)
@@ -1772,7 +2636,6 @@ contains
          &  f,     a)
 
   end subroutine geodesic_direct_d
-
 !!!_  & geodesic_target
   subroutine geodesic_target_d &
        & (ierr,  &
@@ -1784,21 +2647,21 @@ contains
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
     integer,        intent(out) :: ierr
-    real(kind=KTGT),intent(out) :: glat2(2)
+    real(kind=KTGT),intent(out) :: glat2(NTRIG)
     real(kind=KTGT),intent(out) :: dglon(3)
-    real(kind=KTGT),intent(in)  :: aarc1(2)
-    real(kind=KTGT),intent(in)  :: alon1_ph(2)
-    real(kind=KTGT),intent(in)  :: eazim(2)
+    real(kind=KTGT),intent(in)  :: aarc1(NTRIG)
+    real(kind=KTGT),intent(in)  :: alon1_ph(NTRIG)
+    real(kind=KTGT),intent(in)  :: eazim(NTRIG)
     real(kind=KTGT),intent(in)  :: gdis
     real(kind=KTGT),intent(in)  :: C1(0:*), C1p(0:*), C3(0:*)
     integer,        intent(in)  :: i1odr,   i3odr
     real(kind=KTGT),intent(in)  :: f, a
 
-    real(kind=KTGT) :: azim2(2)
-    real(kind=KTGT) :: plat2(2)
-    real(kind=KTGT) :: aarc2(2)
-    real(kind=KTGT) :: alon2_ph(2)
-    real(kind=KTGT) :: dalon_ph(2)
+    real(kind=KTGT) :: azim2(NTRIG)
+    real(kind=KTGT) :: plat2(NTRIG)
+    real(kind=KTGT) :: aarc2(NTRIG)
+    real(kind=KTGT) :: alon2_ph(NTRIG)
+    real(kind=KTGT) :: dalon_ph(NTRIG)
 
     real(kind=KTGT) :: ee, ep2, fiii
     real(kind=KTGT) :: b
@@ -1808,12 +2671,12 @@ contains
     real(kind=KTGT) :: AA(2)
     real(kind=KTGT) :: F1(2)
 
-    real(kind=KTGT) :: rarc1(2), rarc2(2)  ! tau_1,2
-    real(kind=KTGT) :: daarc(2)  ! sig_{12}
-    real(kind=KTGT) :: saarc(2)  ! sig_1 + sig_2
+    real(kind=KTGT) :: rarc1(NTRIG), rarc2(NTRIG)  ! tau_1,2
+    real(kind=KTGT) :: daarc(NTRIG)  ! sig_{12}
+    real(kind=KTGT) :: saarc(NTRIG)  ! sig_1 + sig_2
     real(kind=KTGT) :: drarc     ! tau_{12}
     real(kind=KTGT) :: dtmp, daa
-    real(kind=KTGT) :: sctmp(2)
+    real(kind=KTGT) :: sctmp(NTRIG)
 
     real(kind=KTGT),parameter :: ONE  = 1.0_KTGT
     real(kind=KTGT),parameter :: TWO  = 2.0_KTGT
@@ -1829,47 +2692,42 @@ contains
     B1 = comp_series_sine(C1, i1odr, _SIN(aarc1), _COS(aarc1))
     A1 = ONE + C1(0)
     ! rarc1: tau_1 = sigma_1 + B1(sigma_1)
-    _SIN(sctmp) = sin(B1)
-    _COS(sctmp) = cos(B1)
-    rarc1(1:2) = add_angle(aarc1, sctmp)
+    _TRIG(sctmp) = set_sincos(B1)
+    _TRIG(rarc1) = add_angle(aarc1, sctmp)
     ! drarc: tau_12
     drarc = gdis / (b * A1)
     ! rarc2: tau_2 = tau_1 + tau_12
-    _SIN(sctmp) = sin(drarc)
-    _COS(sctmp) = cos(drarc)
-    rarc2(1:2) = add_angle(rarc1, sctmp)
+    _TRIG(sctmp) = set_sincos(drarc)
+    _TRIG(rarc2) = add_angle(rarc1, sctmp)
 
     ! B1p: B1p(tau2) == tau2 - sigma2
     B1p = comp_series_sine(C1p, i1odr, _SIN(rarc2), _COS(rarc2))
 
     ! daarc: sigma_12 = tau_12 + [B1(sigma1) + B1p(tau2)]
     daa = drarc + (B1 + B1p)
-    _SIN(daarc) = sin(daa)
-    _COS(daarc) = cos(daa)
+    _TRIG(daarc) = set_sincos(daa)
 
-    aarc2(1:2) = add_angle(aarc1, daarc)
-    saarc(1:2) = add_angle(aarc1, aarc2)
+    _TRIG(aarc2) = add_angle(aarc1, daarc)
+    _TRIG(saarc) = add_angle(aarc1, aarc2)
 
-    azim2(1:2) = nml_sincos(_SIN(eazim), _COS(eazim) * _COS(aarc2))
+    _TRIG(azim2) = nml_sincos(_SIN(eazim), _COS(eazim) * _COS(aarc2))
     _SIN(plat2) = _COS(eazim) * _SIN(aarc2)
     _COS(plat2) = _hypot(_COS(eazim) * _COS(aarc2), _SIN(eazim))
-    alon2_ph(1) = _SIN(aarc2) * _SIN(eazim)
-    alon2_ph(2) = _COS(aarc2)
+    _SIN(alon2_ph) = _SIN(aarc2) * _SIN(eazim)
+    _COS(alon2_ph) = _COS(aarc2)
 
     call set_diff_xinteg(AA, F1, daarc, saarc)
     call comp_diff_xinteg(dB3, C3, i3odr, AA, F1)
     dI3 = f * C3(0) * _SIN(eazim) * (dB3 + daa)
 
-    dalon_ph(1:2) = sub_angle(alon2_ph, alon1_ph)
-    dtmp = ATAN2(dalon_ph(1), dalon_ph(2))
+    _TRIG(dalon_ph) = sub_angle(alon2_ph, alon1_ph)
+    dtmp = phase(dalon_ph)
     _ANGLE(dglon) = dtmp - dI3
-    _SIN(dglon) = sin(_ANGLE(dglon))
-    _COS(dglon) = cos(_ANGLE(dglon))
+    _TRIG(dglon) = set_sincos(_ANGLE(dglon))
 
-    glat2(1:2) = nml_sincos(_SIN(plat2), _COS(plat2)  * (ONE - f))
+    _TRIG(glat2) = nml_sincos(_SIN(plat2), _COS(plat2)  * (ONE - f))
 
   end subroutine geodesic_target_d
-
 !!!_  & geodesic_direct
   subroutine geodesic_direct_core_d &
        & (ierr,  &
@@ -1880,25 +2738,25 @@ contains
     use TOUZA_Std,only: msg_grp
     implicit none
     integer,        intent(out) :: ierr
-    real(kind=KTGT),intent(out) :: glat2(2)
+    real(kind=KTGT),intent(out) :: glat2(NTRIG)
     real(kind=KTGT),intent(out) :: dglon(3)
-    real(kind=KTGT),intent(in)  :: glat1(2)
-    real(kind=KTGT),intent(in)  :: azim1(2)
+    real(kind=KTGT),intent(in)  :: glat1(NTRIG)
+    real(kind=KTGT),intent(in)  :: azim1(NTRIG)
     real(kind=KTGT),intent(in)  :: gdis
     real(kind=KTGT),intent(in)  :: f, a
 
-    real(kind=KTGT) :: eazim(2)
-    real(kind=KTGT) :: azim2(2)
-    real(kind=KTGT) :: plat1(2), plat2(2)
-    real(kind=KTGT) :: aarc1(2), aarc2(2)
-    real(kind=KTGT) :: alon1_ph(2), alon2_ph(2)
-    real(kind=KTGT) :: dalon_ph(2), dalon(2)
+    real(kind=KTGT) :: eazim(NTRIG)
+    real(kind=KTGT) :: azim2(NTRIG)
+    real(kind=KTGT) :: plat1(NTRIG), plat2(NTRIG)
+    real(kind=KTGT) :: aarc1(NTRIG), aarc2(NTRIG)
+    real(kind=KTGT) :: alon1_ph(NTRIG), alon2_ph(NTRIG)
+    real(kind=KTGT) :: dalon_ph(NTRIG), dalon(NTRIG)
 
     real(kind=KTGT) :: ee, ep2, eps, kk, fiii, b
     real(kind=KTGT) :: dis1, sdis, rdis
     real(kind=KTGT) :: rarc, st, ct
     real(kind=KTGT) :: daarc
-    real(kind=KTGT) :: ds(2), ss(2)
+    real(kind=KTGT) :: ds(NTRIG), ss(NTRIG)
 
     integer,parameter :: lodr = 9
     integer,parameter :: i1odr = 6
@@ -1928,7 +2786,7 @@ contains
     ! NEA
     if (ierr.eq.0) then
        ! parametric latitudes
-       plat1(1:2) = nml_sincos(_SIN(glat1) * (ONE - f), _COS(glat1))
+       _TRIG(plat1) = nml_sincos(_SIN(glat1) * (ONE - f), _COS(glat1))
        ! azimuth at the node
        if (_COS(azim1).eq.ZERO.and._SIN(plat1).eq.ZERO) then
           _SIN(eazim) = ONE
@@ -1937,10 +2795,10 @@ contains
           _SIN(eazim) = _SIN(azim1) * _COS(plat1)
           _COS(eazim) = _hypot(_COS(azim1), _SIN(azim1) * _SIN(plat1))
        endif
-       aarc1(1:2) = arcl_auxsph(azim1, plat1)
+       _TRIG(aarc1) = arcl_auxsph(azim1, plat1)
        ! longitudes on the auxiliary sphere
-       alon1_ph(1) = _SIN(plat1) * _SIN(eazim)
-       alon1_ph(2) = _COS(azim1) * _COS(plat1)
+       _SIN(alon1_ph) = _SIN(plat1) * _SIN(eazim)
+       _COS(alon1_ph) = _COS(azim1) * _COS(plat1)
 
        ! call diag_sc('beta1', plat1)
        ! call diag_sc('alpha0', eazim)
@@ -1956,7 +2814,7 @@ contains
        ! I1 series
        I1 = comp_series_sine(C1, i1odr, _SIN(aarc1), _COS(aarc1))
        ! distance
-       rarc = ATAN2(_SIN(aarc1), _COS(aarc1))
+       rarc = phase(aarc1)
        dis1 = (rarc + I1) * (ONE + C1(0)) * b
        sdis = dis1 + gdis
        rdis = (rarc + I1) + gdis / (b * (ONE + C1(0)))
@@ -1972,11 +2830,11 @@ contains
        _COS(aarc2) = cos(rarc)
        ! call diag_sc('sigma2', aarc2)
        ! NEB
-       azim2(1:2) = nml_sincos(_SIN(eazim), _COS(eazim) * _COS(aarc2))
+       _TRIG(azim2) = nml_sincos(_SIN(eazim), _COS(eazim) * _COS(aarc2))
        _SIN(plat2) = _COS(eazim) * _SIN(aarc2)
        _COS(plat2) = _hypot(_COS(eazim) * _COS(aarc2), _SIN(eazim))
-       alon2_ph(1) = _SIN(aarc2) * _SIN(eazim)
-       alon2_ph(2) = _COS(aarc2)
+       _SIN(alon2_ph) = _SIN(aarc2) * _SIN(eazim)
+       _COS(alon2_ph) = _COS(aarc2)
        ! call diag_sc('azim2', azim2)
        ! call diag_sc('plat2', plat2)
        ! call diag_ph('alon2', alon2_ph)
@@ -1985,7 +2843,7 @@ contains
 
        _SIN(ds) = _COS(aarc1) * _SIN(aarc2) - _SIN(aarc1) * _COS(aarc2)
        _COS(ds) = _COS(aarc1) * _COS(aarc2) + _SIN(aarc1) * _SIN(aarc2)
-       daarc = ATAN2(_SIN(ds), _COS(ds))
+       daarc = phase(ds)
 
        _SIN(ss) = _COS(aarc1) * _SIN(aarc2) + _SIN(aarc1) * _COS(aarc2)
        _COS(ss) = _COS(aarc1) * _COS(aarc2) - _SIN(aarc1) * _SIN(aarc2)
@@ -1998,21 +2856,20 @@ contains
        call comp_diff_xinteg(dI3, C3, i3odr, AA, F1)
        dI3 = f * C3(0) * _SIN(eazim) * (dI3 + daarc)
 
-       dalon_ph(1) = alon1_ph(2) * alon2_ph(1) - alon1_ph(1) * alon2_ph(2)
-       dalon_ph(2) = alon1_ph(2) * alon2_ph(2) + alon1_ph(1) * alon2_ph(1)
+       _SIN(dalon_ph) = _COS(alon1_ph) * _SIN(alon2_ph) - _SIN(alon1_ph) * _COS(alon2_ph)
+       _COS(dalon_ph) = _COS(alon1_ph) * _COS(alon2_ph) + _SIN(alon1_ph) * _SIN(alon2_ph)
 
-       dalon(1:2) = nml_sincos(dalon_ph(1), dalon_ph(2))
+       _TRIG(dalon) = nml_sincos(_SIN(dalon_ph), _COS(dalon_ph))
 
        _SIN(dglon) = _SIN(dalon)*cos(dI3) - _COS(dalon)*sin(dI3)
        _COS(dglon) = _COS(dalon)*cos(dI3) + _SIN(dalon)*sin(dI3)
-       _ANGLE(dglon) = ATAN2(_SIN(dglon), _COS(dglon))
+       _ANGLE(dglon) = phase(dglon)
 
-       glat2(1:2) = nml_sincos(_SIN(plat2), _COS(plat2)  * (ONE - f))
+       _TRIG(glat2) = nml_sincos(_SIN(plat2), _COS(plat2)  * (ONE - f))
     endif
     ! geographic longitude (relative)
     ! solution
   end subroutine geodesic_direct_core_d
-
 !!!_  & geodesic_inverse
   subroutine geodesic_inverse_d &
        & (ierr,  &
@@ -2025,22 +2882,22 @@ contains
     implicit none
     integer,        intent(out)          :: ierr
     real(kind=KTGT),intent(out)          :: gdis        ! geodesic distance toward target
-    real(kind=KTGT),intent(in)           :: glat1(2)    ! geographic latitude of origin
-    real(kind=KTGT),intent(in)           :: glat2(2)    ! geographic latitude of target
+    real(kind=KTGT),intent(in)           :: glat1(NTRIG)    ! geographic latitude of origin
+    real(kind=KTGT),intent(in)           :: glat2(NTRIG)    ! geographic latitude of target
     real(kind=KTGT),intent(in)           :: dglon(3)    ! diffence in geographic longitude
     real(kind=KTGT),intent(in)           :: f, a        ! flattening and equatorial radius
     integer,        intent(in),optional  :: liter       ! maximum iteration
     real(kind=KTGT),intent(in),optional  :: rtol, atol  ! tolerances
     real(kind=KTGT),intent(out),optional :: garea       ! geodesic quadrilateral area on equator
-    real(kind=KTGT),intent(out),optional :: azim1(2)    ! azimuth of origin
+    real(kind=KTGT),intent(out),optional :: azim1(NTRIG)    ! azimuth of origin
 
-    real(kind=KTGT) :: xlat1(2), xlat2(2) ! canonicalized glat
+    real(kind=KTGT) :: xlat1(NTRIG), xlat2(NTRIG) ! canonicalized glat
     real(kind=KTGT) :: xglon(3)           ! canonicalized dglon
-    real(kind=KTGT) :: eazim(2)           ! azimuth at node
-    real(kind=KTGT) :: xazi1(2), xazi2(2) ! azimuth
-    real(kind=KTGT) :: plat1(2), plat2(2) ! parametric latitude
-    real(kind=KTGT) :: aarc1(2), aarc2(2) ! arc length on auxiliary sphere
-    real(kind=KTGT) :: dalon_ph(2)        ! diffence in longitude on the auxiliary sphere (not sin,cos)
+    real(kind=KTGT) :: eazim(NTRIG)           ! azimuth at node
+    real(kind=KTGT) :: xazi1(NTRIG), xazi2(NTRIG) ! azimuth
+    real(kind=KTGT) :: plat1(NTRIG), plat2(NTRIG) ! parametric latitude
+    real(kind=KTGT) :: aarc1(NTRIG), aarc2(NTRIG) ! arc length on auxiliary sphere
+    real(kind=KTGT) :: dalon_ph(NTRIG)        ! diffence in longitude on the auxiliary sphere (not sin,cos)
 
     real(kind=KTGT) :: asign, lasign, losign
     logical :: gswap
@@ -2065,27 +2922,29 @@ contains
     ep2 = ee / (ONE - ee)
     call gen_ctable_elongi(ierr, C3C, i3odr, fiii)
 
-    xlat1(1:2) = glat1(1:2)
-    xlat2(1:2) = glat2(1:2)
+    _TRIG(xlat1) = _TRIG(glat1)
+    _TRIG(xlat2) = _TRIG(glat2)
     xglon(1:3) = dglon(1:3)
 
-    xazi1(1:2) = ZERO
+    _TRIG(xazi1) = ZERO
 
     if (ierr.eq.0) then
        call geodesic_inverse_canonical &
             & (ierr,  &
             &  xlat1, xlat2, xglon, asign, losign, lasign, gswap)
     endif
+
     if (ierr.eq.0) then
-       plat1(1:2) = reduced_latitude(xlat1, f)
-       plat2(1:2) = reduced_latitude(xlat2, f)
+       _TRIG(plat1) = reduced_latitude(xlat1, f)
+       _TRIG(plat2) = reduced_latitude(xlat2, f)
     endif
     if (ierr.eq.0) then
        call geodesic_inverse_guess &
             & (ierr,  xazi1, &
-            &  glat1, glat2, _ANGLE(dglon), &
+            &  xlat1, xlat2, _ANGLE(xglon), &
             &  f)
     endif
+
     if (ierr.eq.0) then
        call geodesic_inverse_solve &
             & (ierr,  &
@@ -2102,7 +2961,7 @@ contains
 
           call geodesic_area_core &
                & (ierr,  garea, &
-               &  plat1, plat2, dglon, dalon_ph,     &
+               &  plat1, plat2, xglon, dalon_ph,     &
                &  eazim, xazi1, xazi2, aarc1, aarc2, &
                &  f,     a,     C4C,   i4odr)
           garea = asign * garea
@@ -2111,16 +2970,15 @@ contains
     if (present(azim1)) then
        if (ierr.eq.0) then
           if (gswap) then
-             azim1(1:2) = xazi2(1:2)
+             _TRIG(azim1) = _TRIG(xazi2)
           else
-             azim1(1:2) = xazi1(1:2)
+             _TRIG(azim1) = _TRIG(xazi1)
           endif
           _SIN(azim1) = _SIN(azim1) * losign
           _COS(azim1) = _COS(azim1) * lasign
        endif
     endif
   end subroutine geodesic_inverse_d
-
 !!!_  & geodesic_inverse_solve
   subroutine geodesic_inverse_solve_d &
        & (ierr,  &
@@ -2135,12 +2993,12 @@ contains
     implicit none
     integer,        intent(out)          :: ierr
     real(kind=KTGT),intent(out)          :: gdis
-    real(kind=KTGT),intent(out)          :: dalon_ph(2)
-    real(kind=KTGT),intent(out)          :: eazim(2)
-    real(kind=KTGT),intent(in)           :: plat1(2), plat2(2)
-    real(kind=KTGT),intent(inout)        :: azim1(2)
-    real(kind=KTGT),intent(out)          :: azim2(2)
-    real(kind=KTGT),intent(out)          :: aarc1(2), aarc2(2)
+    real(kind=KTGT),intent(out)          :: dalon_ph(NTRIG)
+    real(kind=KTGT),intent(out)          :: eazim(NTRIG)
+    real(kind=KTGT),intent(in)           :: plat1(NTRIG), plat2(NTRIG)
+    real(kind=KTGT),intent(inout)        :: azim1(NTRIG)
+    real(kind=KTGT),intent(out)          :: azim2(NTRIG)
+    real(kind=KTGT),intent(out)          :: aarc1(NTRIG), aarc2(NTRIG)
     real(kind=KTGT),intent(in)           :: dglon(3)
     real(kind=KTGT),intent(in)           :: f, a
     real(kind=KTGT),intent(in)           :: C3C(0:, 0:)
@@ -2152,15 +3010,15 @@ contains
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT),parameter :: TWO = 2.0_KTGT
 
-    real(kind=KTGT) :: alon1_ph(2), alon2_ph(2)  ! omega
-    real(kind=KTGT) :: phtmp(2)
-    real(kind=KTGT) :: dxtmp(2)
+    real(kind=KTGT) :: alon1_ph(NTRIG), alon2_ph(NTRIG)  ! omega
+    real(kind=KTGT) :: phtmp(NTRIG)
+    real(kind=KTGT) :: dxtmp(NTRIG)
     real(kind=KTGT) :: daa
-    real(kind=KTGT) :: daarc(2)  ! sig_{12}
-    real(kind=KTGT) :: saarc(2)  ! sig_1 + sig_2
+    real(kind=KTGT) :: daarc(NTRIG)  ! sig_{12}
+    real(kind=KTGT) :: saarc(NTRIG)  ! sig_1 + sig_2
 
     real(kind=KTGT) :: ee, ep2, eps, kk, fiii
-    real(kind=KTGT) :: nazim(2)
+    real(kind=KTGT) :: nazim(NTRIG)
 
     integer jo
     integer,parameter :: lodr = 9
@@ -2190,7 +3048,7 @@ contains
 
     etol = choice(ONE, rtol)
     if (etol.le.ZERO) etol = 1.0_KTGT
-    if (etol.ge.ONE) etol = (etol * epsilon(ZERO)) * ATAN2(_SIN(dglon), _COS(dglon))
+    if (etol.ge.ONE) etol = (etol * epsilon(ZERO)) * phase(dglon)
 
     dtol = choice(ZERO, atol)
     if (dtol.eq.ZERO) dtol = -4.0_KTGT    ! 0.1mm
@@ -2210,33 +3068,66 @@ contains
           return
        endif
        gdis = a * abs(_ANGLE(dglon))
+    else if (_SIN(plat1).le.-ONE .or. _SIN(dglon).eq.ZERO) then
+       ! meridian
+       ! write(*, *) 'meridian'
+       ! Special treatment on azimuth[1], to be delta longitude
+       ! Actually, no need to set as follows to geodesic computation,
+       ! however, need to allow arbitrary longitude to area computation.
+       _TRIG(azim1) = _TRIG(dglon)
+       _SIN(azim2)  = ZERO
+       _COS(azim2)  = ONE
+       _TRIG(aarc1) = arcl_auxsph(azim1, plat1)
+       _TRIG(aarc2) = arcl_auxsph(azim2, plat2)
+
+       _TRIG(eazim) = azimuth_node(azim1, plat1)
+
+       kk = ep2 * (_COS2(eazim))
+       eps = kk / ((ONE + sqrt(ONE + kk)) * TWO + kk)
+
+       _TRIG(saarc) = add_angle(aarc1, aarc2)
+       _TRIG(daarc) = sub_angle(aarc2, aarc1)
+       daa = phase(daarc)
+       call set_diff_xinteg(AA, F1, daarc, saarc)
+       call gen_ctable_I1(ierr, C1, i1odr, eps)
+       call comp_diff_xinteg(gdis, C1, i1odr, AA, F1)
+       gdis = (gdis + daa) * (C1(0) + ONE)
+       gdis = gdis * (a * (ONE - f))
+
+       ! special value to avoid dalon computation on area
+       _COS(dalon_ph) = -ONE
+       _SIN(dalon_ph) = ZERO
+       ! write(*, *) 'alon_ph', alon2_ph, alon1_ph
     else
+       ! write(*, *) 'dglon', dglon
        do iter = 0, miter - 1
           ! NEA
-          eazim(1:2) = azimuth_node(azim1, plat1)
-          aarc1(1:2) = arcl_auxsph(azim1, plat1)
-          alon1_ph(1:2) = alon_auxsph_ph(eazim, azim1, plat1)
+          _TRIG(eazim) = azimuth_node(azim1, plat1)
+          _TRIG(aarc1) = arcl_auxsph(azim1, plat1)
+          ! write(*, *) 'alon1', eazim, azim1, plat1
+          _TRIG(alon1_ph) = alon_auxsph_ph(eazim, azim1, plat1)
           ! NEB
           ! to check when _COS(plat2)==0 (pole)
           _SIN(azim2) = _SIN(eazim) / _COS(plat2)
           _COS(azim2) = SQRT((_COS(azim1) * _COS(plat1))**2 &
                &             + (_COS(plat2) - _COS(plat1)) * (_COS(plat2) + _COS(plat1))) &
                &         / _COS(plat2)
-          aarc2(1:2) = arcl_auxsph(azim2, plat2)
-          alon2_ph(1:2) = alon_auxsph_ph(eazim, azim2, plat2)
+          _TRIG(aarc2) = arcl_auxsph(azim2, plat2)
+          _TRIG(alon2_ph) = alon_auxsph_ph(eazim, azim2, plat2)
           ! omega2 - omega1 phase
-          dalon_ph(1:2) = sub_angle(alon2_ph, alon1_ph)
+          ! write(*, *) 'alon_ph', alon2_ph, alon1_ph
+          _TRIG(dalon_ph) = sub_angle(alon2_ph, alon1_ph)
           ! omega2 - omega1 - (lambda2 - lambda1) phase
-          phtmp(1:2) = sub_angle(dalon_ph, dglon(1:2))
-          ddx = ATAN2(phtmp(1), phtmp(2))
+          _TRIG(phtmp) = sub_angle(dalon_ph, _TRIG(dglon))
+          ddx = phase(phtmp)
 
           kk = ep2 * (_COS2(eazim))
           eps = kk / ((ONE + sqrt(ONE + kk)) * TWO + kk)
 
           call gen_vtable_elongi(ierr, C3, C3C, i3odr, eps)
-          saarc(1:2) = add_angle(aarc1, aarc2)
-          daarc(1:2) = sub_angle(aarc2, aarc1)
-          daa = ATAN2(_SIN(daarc), _COS(daarc))
+          _TRIG(saarc) = add_angle(aarc1, aarc2)
+          _TRIG(daarc) = sub_angle(aarc2, aarc1)
+          daa = phase(daarc)
 
           call set_diff_xinteg(AA, F1, daarc, saarc)
           call comp_diff_xinteg(dB3, C3, i3odr, AA, F1)
@@ -2268,12 +3159,11 @@ contains
           if (abs(ddx).le.etol) exit
           if (abs(ddx).le.echk.and.abs(dsol).le.dtol) exit
 
-          _COS(dxtmp) = COS(dsol)
-          _SIN(dxtmp) = SIN(dsol)
+          _TRIG(dxtmp) = set_sincos(dsol)
 
-          nazim(1:2) = add_angle(azim1, dxtmp)
+          _TRIG(nazim) = add_angle(azim1, dxtmp)
 
-          azim1(1:2) = nml_sincos(_SIN(nazim), _COS(nazim))
+          _TRIG(azim1) = nml_sincos(_SIN(nazim), _COS(nazim))
        enddo
 
        call comp_diff_xinteg(gdis, C1, i1odr, AA, F1)
@@ -2283,7 +3173,6 @@ contains
     endif
     return
   end subroutine geodesic_inverse_solve_d
-
 !!!_  & geodesic_area_core
   subroutine geodesic_area_core_d &
        & (ierr,  garea, &
@@ -2295,13 +3184,13 @@ contains
     implicit none
     integer,        intent(out) :: ierr
     real(kind=KTGT),intent(out) :: garea
-    real(kind=KTGT),intent(in)  :: plat1(2)      ! sin, cos
-    real(kind=KTGT),intent(in)  :: plat2(2)      ! sin, cos
+    real(kind=KTGT),intent(in)  :: plat1(NTRIG)      ! sin, cos
+    real(kind=KTGT),intent(in)  :: plat2(NTRIG)      ! sin, cos
     real(kind=KTGT),intent(in)  :: dglon(3)
-    real(kind=KTGT),intent(in)  :: dalon_ph(2)      ! phase
-    real(kind=KTGT),intent(in)  :: eazim(2)
-    real(kind=KTGT),intent(in)  :: azim1(2), azim2(2)
-    real(kind=KTGT),intent(in)  :: aarc1(2), aarc2(2)
+    real(kind=KTGT),intent(in)  :: dalon_ph(NTRIG)      ! phase
+    real(kind=KTGT),intent(in)  :: eazim(NTRIG)
+    real(kind=KTGT),intent(in)  :: azim1(NTRIG), azim2(NTRIG)
+    real(kind=KTGT),intent(in)  :: aarc1(NTRIG), aarc2(NTRIG)
     real(kind=KTGT),intent(in)  :: f, a
     real(kind=KTGT),intent(in)  :: C4C(0:, 0:)
     integer,        intent(in)  :: i4odr
@@ -2315,12 +3204,12 @@ contains
     real(kind=KTGT) :: dI4
     real(kind=KTGT) :: AA(2)
     real(kind=KTGT) :: F0(2)
-    real(kind=KTGT) :: daarc(2), saarc(2)
+    real(kind=KTGT) :: daarc(NTRIG), saarc(NTRIG)
 
-    real(kind=KTGT) :: ee, ep2, eps, kk, fiii
-    real(kind=KTGT) :: da(2), dazim, cc, b
+    real(kind=KTGT) :: ee, ep2, eps, kk, fiii, aco
+    real(kind=KTGT) :: da(NTRIG), dazim, cc, b
 
-    real(kind=KTGT) :: cb1d, cb2d, dalon(2)
+    real(kind=KTGT) :: dalon(NTRIG)
 
     ierr = 0
 
@@ -2340,42 +3229,68 @@ contains
     ee = f * (TWO - f)
     ep2 = ee / (ONE - ee)
 
+    if (ee.eq.ZERO) then
+       aco = ONE
+    else
+       aco = SQRT(ee)
+       aco = ATANH(aco) / aco
+    endif
+
     kk = ep2 * (_COS2(eazim))
     eps = kk / ((ONE + sqrt(ONE + kk)) * TWO + kk)
     call gen_vtable_earea(ierr, C4, C4C, i4odr, eps)
 
     A4 = (a * a) * (_COS(eazim) * _SIN(eazim)) * ee
 
-    saarc(1:2) = add_angle(aarc1, aarc2)
-    daarc(1:2) = sub_angle(aarc2, aarc1)
+    _TRIG(saarc) = add_angle(aarc1, aarc2)
+    _TRIG(daarc) = sub_angle(aarc2, aarc1)
 
     call set_diff_ainteg(AA, F0, daarc, saarc, aarc1, aarc2)
     call comp_diff_ainteg(dI4, C4, i4odr, AA, F0)
 
     dI4 = A4 * dI4
 
-    dalon(1:2) = nml_sincos(dalon_ph(1), dalon_ph(2))
+    ! write(*, *) 'dalon_ph', dalon_ph
+    _TRIG(dalon) = nml_sincos(_SIN(dalon_ph), _COS(dalon_ph))
 
     ! if (.false.) then
     if ((_COS(dalon).gt.-SQRT(TWO)/TWO) &
          & .and. (_SIN(plat2)-_SIN(plat1).lt.1.75_KTGT)) then
-       cb1d = ONE + _COS(plat1)
-       cb2d = ONE + _COS(plat2)
-       _SIN(da) = _SIN(dalon) * (_SIN(plat1) * cb2d + _SIN(plat2) * cb1d)
-       _COS(da) = (ONE + _COS(dalon)) * (_SIN(plat1) * _SIN(plat2) + cb1d * cb2d)
-       dazim = ATAN2(_SIN(da), _COS(da)) * TWO
+       dazim = geodesic_dazim(plat1, plat2, dalon)
     else
-       da(1:2) = sub_angle(azim2, azim1)
-       dazim = ATAN2(_SIN(da), _COS(da))
+       _TRIG(da) = sub_angle(azim2, azim1)
+       dazim = phase(da)
     endif
 
     b = a * (ONE - f)
-    cc = (a * a + (b * b) * (ATANH(SQRT(ee)) / SQRT(ee))) / TWO
+    ! cc = (a * a + (b * b) * (ATANH(SQRT(ee)) / SQRT(ee))) / TWO
+    cc = (a * a + (b * b) * aco) / TWO
 
     garea = cc * dazim + dI4
   end subroutine geodesic_area_core_d
 
+!!!_  & geodesic_dazim ()
+  PURE &
+  real(kind=KTGT) function geodesic_dazim_d &
+       & (plat1, plat2, dalon) &
+       & result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: plat1(*), plat2(*), dalon(*)
 
+    real(kind=KTGT) :: cb1d, cb2d
+    real(kind=KTGT) :: da(NTRIG)
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+
+    ! identity
+    ! tan[(a2-a1)/2] = (sin[(b2+b1)/2] / cos[(b2-b1)/2]) * tan[(w2-w1)/2]
+    cb1d = ONE + _COS(plat1)
+    cb2d = ONE + _COS(plat2)
+    _SIN(da) = _SIN(dalon) * (_SIN(plat1) * cb2d + _SIN(plat2) * cb1d)
+    _COS(da) = (ONE + _COS(dalon)) * (_SIN(plat1) * _SIN(plat2) + cb1d * cb2d)
+    v = phase(da) * TWO
+  end function geodesic_dazim_d
 !!!_  & geodesic_inverse
   subroutine geodesic_inverse_core_d &
        & (ierr,  &
@@ -2388,10 +3303,10 @@ contains
     implicit none
     integer,        intent(out)          :: ierr
     real(kind=KTGT),intent(out)          :: gdis
-    real(kind=KTGT),intent(in)           :: glat1(2)      ! sin, cos
-    real(kind=KTGT),intent(in)           :: glat2(2)      ! sin, cos
+    real(kind=KTGT),intent(in)           :: glat1(NTRIG)      ! sin, cos
+    real(kind=KTGT),intent(in)           :: glat2(NTRIG)      ! sin, cos
     real(kind=KTGT),intent(in)           :: dglon(3)      ! sin, cos, rad
-    real(kind=KTGT),intent(in)           :: inia1(2)      ! initial guess of azimuth[1]
+    real(kind=KTGT),intent(in)           :: inia1(NTRIG)      ! initial guess of azimuth[1]
     real(kind=KTGT),intent(in)           :: f, a
     real(kind=KTGT),intent(in),optional  :: rtol, atol    ! tolerances
     integer,        intent(in),optional  :: liter
@@ -2401,20 +3316,20 @@ contains
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT),parameter :: TWO = 2.0_KTGT
 
-    real(kind=KTGT) :: eazim(2)                  ! alpha_0
-    real(kind=KTGT) :: azim1(2), azim2(2)        ! alpha
-    real(kind=KTGT) :: plat1(2), plat2(2)        ! beta
-    real(kind=KTGT) :: aarc1(2), aarc2(2)        ! sigma
-    real(kind=KTGT) :: alon1_ph(2), alon2_ph(2)  ! omega
+    real(kind=KTGT) :: eazim(NTRIG)                  ! alpha_0
+    real(kind=KTGT) :: azim1(NTRIG), azim2(NTRIG)        ! alpha
+    real(kind=KTGT) :: plat1(NTRIG), plat2(NTRIG)        ! beta
+    real(kind=KTGT) :: aarc1(NTRIG), aarc2(NTRIG)        ! sigma
+    real(kind=KTGT) :: alon1_ph(NTRIG), alon2_ph(NTRIG)  ! omega
 
-    real(kind=KTGT) :: dalon_ph(2)
+    real(kind=KTGT) :: dalon_ph(NTRIG)
     real(kind=KTGT) :: dcx, dcy
     ! real(kind=KTGT) :: dpx, dpy, dcx, dcy
     real(kind=KTGT) :: daarc
-    real(kind=KTGT) :: ds(2), ss(2)
+    real(kind=KTGT) :: ds(NTRIG), ss(NTRIG)
 
     real(kind=KTGT) :: ee, ep2, eps, kk, fiii
-    real(kind=KTGT) :: nazim(2)
+    real(kind=KTGT) :: nazim(NTRIG)
 
     integer jo
     integer,parameter :: lodr = 9
@@ -2446,7 +3361,7 @@ contains
 
     etol = choice(ONE, rtol)
     if (etol.le.ZERO) etol = 1.0_KTGT
-    if (etol.ge.ONE) etol = (etol * epsilon(ZERO)) * ATAN2(_SIN(dglon), _COS(dglon))
+    if (etol.ge.ONE) etol = (etol * epsilon(ZERO)) * phase(dglon)
 
     dtol = choice(ZERO, atol)
     if (dtol.eq.ZERO) dtol = -4.0_KTGT    ! 0.1mm
@@ -2459,9 +3374,9 @@ contains
     ep2 = ee / (ONE - ee)
     call gen_ctable_elongi(ierr, C3C, i3odr, fiii)
 
-    azim1(1:2) = inia1(1:2)
-    plat1(1:2) = nml_sincos(_SIN(glat1) * (ONE - f), _COS(glat1))
-    plat2(1:2) = nml_sincos(_SIN(glat2) * (ONE - f), _COS(glat2))
+    _TRIG(azim1) = _TRIG(inia1)
+    _TRIG(plat1) = nml_sincos(_SIN(glat1) * (ONE - f), _COS(glat1))
+    _TRIG(plat2) = nml_sincos(_SIN(glat2) * (ONE - f), _COS(glat2))
 
     if (_SIN(glat1).eq.ZERO) then
        ! equatorial
@@ -2484,30 +3399,30 @@ contains
              _SIN(eazim) = _SIN(azim1) * _COS(plat1)
              _COS(eazim) = _hypot(_COS(azim1), _SIN(azim1) * _SIN(plat1))
           endif
-          eazim(1:2) = nml_sincos(eazim(1), eazim(2))
+          _TRIG(eazim) = nml_sincos(_SIN(eazim), _COS(eazim))
 
-          aarc1(1:2) = arcl_auxsph(azim1, plat1)
-          alon1_ph(1) = _SIN(plat1) * _SIN(eazim)
-          alon1_ph(2) = _COS(azim1) * _COS(plat1)
+          _TRIG(aarc1) = arcl_auxsph(azim1, plat1)
+          _SIN(alon1_ph) = _SIN(plat1) * _SIN(eazim)
+          _COS(alon1_ph) = _COS(azim1) * _COS(plat1)
           ! NEB
           ! to check when _COS(plat2)==0 (pole)
           _SIN(azim2) = _SIN(eazim) / _COS(plat2)
           _COS(azim2) = SQRT((_COS(azim1) * _COS(plat1))**2 &
                &             +(_COS(plat2) - _COS(plat1)) * (_COS(plat2) + _COS(plat1))) &
                &         / _COS(plat2)
-          aarc2(1:2) = arcl_auxsph(azim2, plat2)
-          alon2_ph(1) = _SIN(plat2) * _SIN(eazim)
-          alon2_ph(2) = _COS(azim2) * _COS(plat2)
+          _TRIG(aarc2) = arcl_auxsph(azim2, plat2)
+          _SIN(alon2_ph) = _SIN(plat2) * _SIN(eazim)
+          _COS(alon2_ph) = _COS(azim2) * _COS(plat2)
 
           ! omega2 - omega1 phase
-          dalon_ph(1) = alon1_ph(2) * alon2_ph(1) - alon1_ph(1) * alon2_ph(2)
-          dalon_ph(2) = alon1_ph(2) * alon2_ph(2) + alon1_ph(1) * alon2_ph(1)
+          _SIN(dalon_ph) = _COS(alon1_ph) * _SIN(alon2_ph) - _SIN(alon1_ph) * _COS(alon2_ph)
+          _COS(dalon_ph) = _COS(alon1_ph) * _COS(alon2_ph) + _SIN(alon1_ph) * _SIN(alon2_ph)
           ! dpy = alon1_ph(2) * alon2_ph(1) - alon1_ph(1) * alon2_ph(2)
           ! dpx = alon1_ph(2) * alon2_ph(2) + alon1_ph(1) * alon2_ph(1)
           ! omega2 - omega1 - (lambda2 - lambda1) phase
-          dcy = dalon_ph(1) * _COS(dglon) - dalon_ph(2) * _SIN(dglon)
-          dcx = dalon_ph(2) * _COS(dglon) + dalon_ph(1) * _SIN(dglon)
-          ddx = atan2(dcy, dcx)
+          dcy = _SIN(dalon_ph) * _COS(dglon) - _COS(dalon_ph) * _SIN(dglon)
+          dcx = _COS(dalon_ph) * _COS(dglon) + _SIN(dalon_ph) * _SIN(dglon)
+          ddx = phase(dcy, dcx)
 
           kk = ep2 * (_COS2(eazim))
           eps = kk / ((ONE + sqrt(ONE + kk)) * TWO + kk)
@@ -2516,7 +3431,7 @@ contains
 
           _SIN(ds) = _COS(aarc1) * _SIN(aarc2) - _SIN(aarc1) * _COS(aarc2)
           _COS(ds) = _COS(aarc1) * _COS(aarc2) + _SIN(aarc1) * _SIN(aarc2)
-          daarc = ATAN2(_SIN(ds), _COS(ds))
+          daarc = phase(ds)
 
           _SIN(ss) = _COS(aarc1) * _SIN(aarc2) + _SIN(aarc1) * _COS(aarc2)
           _COS(ss) = _COS(aarc1) * _COS(aarc2) - _SIN(aarc1) * _SIN(aarc2)
@@ -2560,7 +3475,7 @@ contains
           _SIN(nazim) = _COS(azim1) * dcy + _SIN(azim1) * dcx
           _COS(nazim) = _COS(azim1) * dcx - _SIN(azim1) * dcy
 
-          azim1(1:2) = nml_sincos(_SIN(nazim), _COS(nazim))
+          _TRIG(azim1) = nml_sincos(_SIN(nazim), _COS(nazim))
        enddo
        call comp_diff_xinteg(gdis, C1, i1odr, AA, F1)
        gdis = (gdis + daarc) * (C1(0) + ONE)
@@ -2575,7 +3490,6 @@ contains
        endif
     endif
   end subroutine geodesic_inverse_core_d
-
 !!!_  & geodesic_area_obs - obsolete
   subroutine geodesic_area_obs_d &
        & (ierr,  garea, &
@@ -2587,13 +3501,13 @@ contains
     implicit none
     integer,        intent(out) :: ierr
     real(kind=KTGT),intent(out) :: garea
-    real(kind=KTGT),intent(in)  :: plat1(2)      ! sin, cos
-    real(kind=KTGT),intent(in)  :: plat2(2)      ! sin, cos
+    real(kind=KTGT),intent(in)  :: plat1(NTRIG)      ! sin, cos
+    real(kind=KTGT),intent(in)  :: plat2(NTRIG)      ! sin, cos
     real(kind=KTGT),intent(in)  :: dglon(3)
-    real(kind=KTGT),intent(in)  :: dalon_ph(2)      ! phase
-    real(kind=KTGT),intent(in)  :: eazim(2)
-    real(kind=KTGT),intent(in)  :: azim1(2), azim2(2)
-    real(kind=KTGT),intent(in)  :: aarc1(2), aarc2(2)
+    real(kind=KTGT),intent(in)  :: dalon_ph(NTRIG)      ! phase
+    real(kind=KTGT),intent(in)  :: eazim(NTRIG)
+    real(kind=KTGT),intent(in)  :: azim1(NTRIG), azim2(NTRIG)
+    real(kind=KTGT),intent(in)  :: aarc1(NTRIG), aarc2(NTRIG)
     real(kind=KTGT),intent(in)  :: f, a
 
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
@@ -2607,12 +3521,12 @@ contains
     real(kind=KTGT) :: dI4
     real(kind=KTGT) :: AA(2)
     real(kind=KTGT) :: F0(2)
-    real(kind=KTGT) :: ds(2), ss(2)
+    real(kind=KTGT) :: ds(NTRIG), ss(NTRIG)
 
     real(kind=KTGT) :: ee, ep2, eps, kk, fiii
-    real(kind=KTGT) :: da(2), dazim, cc, b
+    real(kind=KTGT) :: da(NTRIG), dazim, cc, b
 
-    real(kind=KTGT) :: cb1d, cb2d, dalon(2)
+    real(kind=KTGT) :: cb1d, cb2d, dalon(NTRIG)
 
     ierr = 0
 
@@ -2658,7 +3572,7 @@ contains
 
     dI4 = A4 * dI4
 
-    dalon(1:2) = nml_sincos(dalon_ph(1), dalon_ph(2))
+    _TRIG(dalon) = nml_sincos(dalon_ph(1), dalon_ph(2))
 
     ! if (.false.) then
     if ((_COS(dalon).gt.-SQRT(TWO)/TWO) &
@@ -2667,11 +3581,11 @@ contains
        cb2d = ONE + _COS(plat2)
        _SIN(da) = _SIN(dalon) * (_SIN(plat1) * cb2d + _SIN(plat2) * cb1d)
        _COS(da) = (ONE + _COS(dalon)) * (_SIN(plat1) * _SIN(plat2) + cb1d * cb2d)
-       dazim = ATAN2(_SIN(da), _COS(da)) * TWO
+       dazim = phase(da) * TWO
     else
        _SIN(da) = _SIN(azim2) * _COS(azim1) - _COS(azim2) * _SIN(azim1)
        _COS(da) = _COS(azim2) * _COS(azim1) + _SIN(azim2) * _SIN(azim1)
-       dazim = ATAN2(_SIN(da), _COS(da))
+       dazim = phase(da)
     endif
 
     b = a * (ONE - f)
@@ -2679,7 +3593,6 @@ contains
 
     garea = cc * dazim + dI4
   end subroutine geodesic_area_obs_d
-
 !!!_  & geodesic_inverse_canonical
   subroutine geodesic_inverse_canonical_d &
        & (ierr,  &
@@ -2698,7 +3611,7 @@ contains
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
 
-    real(kind=KTGT) :: xlat1(2), xlat2(2)
+    real(kind=KTGT) :: xlat1(NTRIG), xlat2(NTRIG)
     real(kind=KTGT) :: as, los, las
     logical bkeep
 
@@ -2716,11 +3629,11 @@ contains
     bkeep = ABS(_SIN(glat1)).gt.ABS(_SIN(glat2))
 
     if (bkeep) then
-       xlat1(1:2) = glat1(1:2)
-       xlat2(1:2) = glat2(1:2)
+       _TRIG(xlat1) = _TRIG(glat1)
+       _TRIG(xlat2) = _TRIG(glat2)
     else
-       xlat2(1:2) = glat1(1:2)
-       xlat1(1:2) = glat2(1:2)
+       _TRIG(xlat2) = _TRIG(glat1)
+       _TRIG(xlat1) = _TRIG(glat2)
     endif
 
     if (_SIN(xlat1).gt.ZERO) then
@@ -2731,8 +3644,8 @@ contains
     _SIN(xlat2) = _SIN(xlat2) * (- SIGN(ONE, _SIN(xlat1)))
     _SIN(xlat1) = - ABS(_SIN(xlat1))
 
-    glat1(1:2) = xlat1(1:2)
-    glat2(1:2) = xlat2(1:2)
+    _TRIG(glat1) = _TRIG(xlat1)
+    _TRIG(glat2) = _TRIG(xlat2)
 
     _SIN(dglon) = ABS(_SIN(dglon))
     _ANGLE(dglon) = ABS(_ANGLE(dglon))
@@ -2757,7 +3670,6 @@ contains
     !    if -lat        pi - azim1
 
   end subroutine geodesic_inverse_canonical_d
-
 !!!_  & geodesic_inverse_guess
   subroutine geodesic_inverse_guess_d &
        & (ierr,  inia1, &
@@ -2766,9 +3678,9 @@ contains
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
     integer,        intent(out) :: ierr
-    real(kind=KTGT),intent(out) :: inia1(2)      ! initial guess of azimuth[1]
-    real(kind=KTGT),intent(in)  :: glat1(2)      ! sin, cos
-    real(kind=KTGT),intent(in)  :: glat2(2)      ! sin, cos
+    real(kind=KTGT),intent(out) :: inia1(NTRIG)      ! initial guess of azimuth[1]
+    real(kind=KTGT),intent(in)  :: glat1(NTRIG)      ! sin, cos
+    real(kind=KTGT),intent(in)  :: glat2(NTRIG)      ! sin, cos
     real(kind=KTGT),intent(in)  :: dglon
     real(kind=KTGT),intent(in)  :: f
 
@@ -2776,23 +3688,22 @@ contains
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT),parameter :: TWO = 2.0_KTGT
 
-    real(kind=KTGT) :: plat1(2), plat2(2)        ! beta
+    real(kind=KTGT) :: plat1(NTRIG), plat2(NTRIG)        ! beta
     real(kind=KTGT) :: e2
     real(kind=KTGT) :: wd
-    real(kind=KTGT) :: dalon(2) ! omega
+    real(kind=KTGT) :: dalon(NTRIG) ! omega
     real(kind=KTGT) :: zx, zy, zz
 
     ierr = 0
 
-    plat1(1:2) = nml_sincos(_SIN(glat1) * (ONE - f), _COS(glat1))
-    plat2(1:2) = nml_sincos(_SIN(glat2) * (ONE - f), _COS(glat2))
+    _TRIG(plat1) = nml_sincos(_SIN(glat1) * (ONE - f), _COS(glat1))
+    _TRIG(plat2) = nml_sincos(_SIN(glat2) * (ONE - f), _COS(glat2))
 
     e2 = f * (TWO - f)
     wd = sqrt(ONE - e2 * ((_COS(plat1) + _COS(plat2)) / TWO)**2)
     ! write(*, *) 'guess: ', wd, rad2deg(dglon / wd)
 
-    _SIN(dalon) = sin(dglon / wd)
-    _COS(dalon) = cos(dglon / wd)
+    _TRIG(dalon) = set_sincos(dglon / wd)
 
     zx = _COS(plat1) * _SIN(plat2) - _SIN(plat1) * _COS(plat2) * _COS(dalon)
     zy = _COS(plat2) * _SIN(dalon)
@@ -2803,8 +3714,7 @@ contains
 
     ! write(*, *) _SIN(glat1), dglon, (ONE - f) * pi_(ZERO)
   end subroutine geodesic_inverse_guess_d
-
-!!!_  - set_diff_xinteg
+!!!_  & set_diff_xinteg
   subroutine set_diff_xinteg_d &
        & (AA, F1, dsc, ssc)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -2822,8 +3732,7 @@ contains
     F1(2) = _SIN(dsc) * _COS(ssc)
 
   end subroutine set_diff_xinteg_d
-
-!!!_  - comp_diff_xinteg
+!!!_  & comp_diff_xinteg
   subroutine comp_diff_xinteg_d &
        & (z, C, modr, AA, F1)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -2854,16 +3763,15 @@ contains
     enddo
     z = (B1(2) * F1(1) + B1(1) * F1(2)) * TWO
   end subroutine comp_diff_xinteg_d
-
-!!!_  - set_diff_ainteg
+!!!_  & set_diff_ainteg
   subroutine set_diff_ainteg_d &
        & (AA, F0, dsc, ssc, a1, a2)
     use TOUZA_Std,only: KTGT=>KDBL
     real(kind=KTGT),intent(out) :: AA(2)
     real(kind=KTGT),intent(out) :: F0(2)
-    real(kind=KTGT),intent(in)  :: dsc(2)   ! sin,cos(A-B)
-    real(kind=KTGT),intent(in)  :: ssc(2)   ! sin,cos(A+B)
-    real(kind=KTGT),intent(in)  :: a1(2), a2(2)
+    real(kind=KTGT),intent(in)  :: dsc(NTRIG)   ! sin,cos(A-B)
+    real(kind=KTGT),intent(in)  :: ssc(NTRIG)   ! sin,cos(A+B)
+    real(kind=KTGT),intent(in)  :: a1(NTRIG), a2(NTRIG)
 
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
@@ -2880,8 +3788,7 @@ contains
     ! F1(2) = AA(2) * F0(1) + (AA(1) - ONE) * F0(2)
 
   end subroutine set_diff_ainteg_d
-
-!!!_  - comp_diff_ainteg
+!!!_  & comp_diff_ainteg
   subroutine comp_diff_ainteg_d &
        & (z, C, modr, AA, F0)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -2914,221 +3821,23 @@ contains
     z = B0(1) * F0(1) + B0(2) * F0(2)
     z = - z * TWO
   end subroutine comp_diff_ainteg_d
-
-!!!_  & diag_sc
-  subroutine diag_sc_d(tag, sc)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    character(len=*),intent(in) :: tag
-    real(kind=KTGT), intent(in) :: sc(*)
-
-    real(kind=KTGT) :: arad, adeg
-
-    arad = atan2(_SIN(sc), _COS(sc))
-    adeg = rad2deg(arad)
-
-101 format('sincos:', A, ': ', ES24.16, 1x, E10.3, ' (', ES24.16, 1x, ES24.16, ')')
-    write(*, 101) trim(tag), adeg, arad, sc(1), sc(2)
-
-  end subroutine diag_sc_d
-
-!!!_  & diag_ph
-  subroutine diag_ph_d(tag, ph)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    character(len=*),intent(in) :: tag
-    real(kind=KTGT), intent(in) :: ph(*)
-
-    real(kind=KTGT) :: sc(2)
-    real(kind=KTGT) :: arad, adeg
-
-    sc = nml_sincos(ph(1), ph(2))
-    arad = atan2(sc(1), sc(2))
-    adeg = rad2deg(arad)
-
-101 format('phase:', A, ': ', ES24.16, 1x, E10.3, ' (', E10.3, 1x, E10.3, ')')
-    write(*, 101) trim(tag), adeg, arad, sc(1), sc(2)
-
-  end subroutine diag_ph_d
-
-!!!_  & set_sincos() - set sine and cosine array
-  function set_sincos_d(angl) &
-       & result(sc)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: angl
-    real(kind=KTGT) :: sc(2)
-    real(kind=KTGT) r, a, q, s, c
-    integer n
-
-    q = pi_(angl) / 2.0_KTGT
-    a = ANINT(angl / q)
-    r = angl - q * a
-    n = modulo(int(a), 4)
-    s = sin(r)
-    c = cos(r)
-    select case(n)
-    case(0)
-       _SIN(sc) = +s
-       _COS(sc) = +c
-    case(1)
-       _SIN(sc) = +c
-       _COS(sc) = -s
-    case(2)
-       _SIN(sc) = -s
-       _COS(sc) = -c
-    case default
-       _SIN(sc) = -c
-       _COS(sc) = +s
-    end select
-  end function set_sincos_d
-
-!!!_  & sin_canonical()
-  real(kind=KTGT) function sin_canonical_d (angl) result(v)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: angl
-
-    real(kind=KTGT) r, a, q
-    integer n
-
-    q = pi_(angl) / 2.0_KTGT
-    a = ANINT(angl / q)
-    r = angl - q * a
-    n = modulo(int(a), 4)
-    select case(n)
-    case(0)
-       v = + sin(r)
-    case(1)
-       v = + cos(r)
-    case(2)
-       v = - sin(r)
-    case default
-       v = - cos(r)
-    end select
-  end function sin_canonical_d
-
-!!!_  & cos_canonical()
-  real(kind=KTGT) function cos_canonical_d (angl) result(v)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: angl
-
-    real(kind=KTGT) r, a, q
-    integer n
-
-    q = pi_(angl) / 2.0_KTGT
-    a = ANINT(angl / q)
-    r = angl - q * a
-    n = modulo(int(a), 4)
-    select case(n)
-    case(0)
-       v = + cos(r)
-    case(1)
-       v = - sin(r)
-    case(2)
-       v = - cos(r)
-    case default
-       v = + sin(r)
-    end select
-  end function cos_canonical_d
-
-!!!_  & setd_sincos() - set sine and cosine array (degree)
-  function setd_sincos_d(angl) &
-       & result(sc)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: angl
-    real(kind=KTGT) :: sc(2)
-    real(kind=KTGT) r, a, q, s, c
-    integer n
-
-    q = 90.0_KTGT
-    a = ANINT(angl / q)
-    r = angl - q * a
-    n = modulo(int(a), 4)
-    s = sin(deg2rad(r))
-    c = cos(deg2rad(r))
-    ! write(*, *) 'setd: ', r, deg2rad(r), n, s, c
-    select case(n)
-    case(0)
-       _SIN(sc) = s
-       _COS(sc) = c
-    case(1)
-       _SIN(sc) = c
-       _COS(sc) = -s
-    case(2)
-       _SIN(sc) = -s
-       _COS(sc) = -c
-    case default
-       _SIN(sc) = -c
-       _COS(sc) = s
-    end select
-  end function setd_sincos_d
-
-!!!_  & nml_sincos() - normalize to compute sine and cosine
-  function nml_sincos_d(py, px) &
-       & result(sc)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: py, px
-    real(kind=KTGT) :: sc(2)
-    real(kind=KTGT) :: d
-
-    d = _hypot(px, py)
-
-    _SIN(sc) = py / d
-    _COS(sc) = px / d
-  end function nml_sincos_d
-
-!!!_  & add_angle
-  function add_angle_d &
-       & (scx, scy) &
-       & result(scz)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: scx(2)
-    real(kind=KTGT),intent(in) :: scy(2)
-    real(kind=KTGT) :: scz(2)
-    ! sin(x+y) = sin(x)cos(y) + cos(x)sin(y)
-    ! cos(x+y) = cos(x)cos(y) - sin(x)sin(y)
-    _SIN(scz) = _SIN(scx)*_COS(scy) + _COS(scx)*_SIN(scy)
-    _COS(scz) = _COS(scx)*_COS(scy) - _SIN(scx)*_SIN(scy)
-  end function add_angle_d
-
-!!!_  & sub_angle
-  function sub_angle_d &
-       & (scx, scy) &
-       & result(scz)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(in) :: scx(2)
-    real(kind=KTGT),intent(in) :: scy(2)
-    real(kind=KTGT) :: scz(2)
-    ! sin(x-y) = sin(x)cos(y) - cos(x)sin(y)
-    ! cos(x-y) = cos(x)cos(y) + sin(x)sin(y)
-    _SIN(scz) = _SIN(scx)*_COS(scy) - _COS(scx)*_SIN(scy)
-    _COS(scz) = _COS(scx)*_COS(scy) + _SIN(scx)*_SIN(scy)
-  end function sub_angle_d
-
 !!!_  & set_dlongi()
   function set_dlongi_d &
        & (lon0, lon1) &
        & result(sca)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(in) :: lon0(2), lon1(2)
+    real(kind=KTGT),intent(in) :: lon0(NTRIG), lon1(NTRIG)
     real(kind=KTGT)            :: sca(3)
 
-    sca(1:2) = sub_angle(lon1, lon0)
+    _TRIG(sca) = sub_angle(lon1, lon0)
     ! _SIN(sca) = _SIN(lon1) * _COS(lon0) -  _COS(lon1) * _SIN(lon0)
     ! _COS(sca) = _COS(lon1) * _COS(lon0) +  _SIN(lon1) * _SIN(lon0)
-    _ANGLE(sca) = ATAN2(_SIN(sca), _COS(sca))
+    _ANGLE(sca) = phase(sca)
 
     return
   end function set_dlongi_d
-
-!!!_  - comp_series_sine
+!!!_  & comp_series_sine
   real(kind=KTGT) function comp_series_sine_d &
        & (CT, no, ss, cs) result(r)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -3162,8 +3871,7 @@ contains
 
     r  = b1 * s2s
   end function comp_series_sine_d
-
-!!!_  - gen_vtable_elongi - (variable) coefficient table for ellipsoidal longitude (I3)
+!!!_  & gen_vtable_elongi - (variable) coefficient table for ellipsoidal longitude (I3)
   subroutine gen_vtable_elongi_d &
        & (ierr, CT, CC, no, eps)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -3189,8 +3897,7 @@ contains
        ep = ep * eps
     enddo
   end subroutine gen_vtable_elongi_d
-
-!!!_  - gen_ctable_elongi - (constant) coefficient table for ellipsoidal longitude (I3)
+!!!_  & gen_ctable_elongi - (constant) coefficient table for ellipsoidal longitude (I3)
   subroutine gen_ctable_elongi_d &
        & (ierr, C3, no, fiii)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -3212,8 +3919,7 @@ contains
        ierr = ERR_NOT_IMPLEMENTED
     endif
   end subroutine gen_ctable_elongi_d
-
-!!!_  - gen_vtable_earea - (variable) coefficient table for geodesic-equator area (I4)
+!!!_  & gen_vtable_earea - (variable) coefficient table for geodesic-equator area (I4)
   subroutine gen_vtable_earea_d &
        & (ierr, CT, CC, no, eps)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -3239,8 +3945,7 @@ contains
        ep = ep * eps
     enddo
   end subroutine gen_vtable_earea_d
-
-!!!_  - gen_ctable_earea - (constant) coefficient table for geodesic-equator area (I4)
+!!!_  & gen_ctable_earea - (constant) coefficient table for geodesic-equator area (I4)
   subroutine gen_ctable_earea_d &
        & (ierr, C4b, no, fiii)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -3262,8 +3967,7 @@ contains
        ierr = ERR_NOT_IMPLEMENTED
     endif
   end subroutine gen_ctable_earea_d
-
-!!!_  - gen_ctable_I1
+!!!_  & gen_ctable_I1
   subroutine gen_ctable_I1_d &
        & (ierr, C1, no, eps)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -3292,8 +3996,7 @@ contains
     !! to keep precision.
     C1(0) = (C1(0) + eps) / (1.0_KTGT - eps)
   end subroutine gen_ctable_I1_d
-
-!!!_  - gen_ctable_I1p
+!!!_  & gen_ctable_I1p
   subroutine gen_ctable_I1p_d &
        & (ierr, C1p, no, eps)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -3318,8 +4021,7 @@ contains
     endif
     C1p(0) = 0.0_KTGT
   end subroutine gen_ctable_I1p_d
-
-!!!_  - gen_ctable_I2b
+!!!_  & gen_ctable_I2b
   subroutine gen_ctable_I2b_d &
        & (ierr, C2b, no, eps)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -3348,8 +4050,7 @@ contains
     !! to keep precision.
     C2b(0) = (C2b(0) - eps) / (1.0_KTGT + eps)
   end subroutine gen_ctable_I2b_d
-
-!!!_  - gen_ctable_I2a
+!!!_  & gen_ctable_I2a
   subroutine gen_ctable_I2a_d &
        & (ierr, C2a, no, eps)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -3379,8 +4080,191 @@ contains
     C2a(0) = C2a(0) * (1.0_KTGT - eps) - eps
   end subroutine gen_ctable_I2a_d
 
+!!!_ + trigonometric function
+!!!_  - phase (atan2() wrapper)
+  PURE &
+  real(kind=KTGT) function phase_1_d(terms) result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: terms(*)
+    v = ATAN2(_SIN(terms), _COS(terms))
+  end function phase_1_d
+
+  PURE &
+  real(kind=KTGT) function phase_2_d(s, c) result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: s, c
+    v = ATAN2(s, c)
+  end function phase_2_d
+
+!!!_  & set_sincos() - set sine and cosine array
+  function set_sincos_d(angl) &
+       & result(sc)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: angl
+    real(kind=KTGT) :: sc(NTRIG)
+    real(kind=KTGT) r, a, q, s, c
+    integer n
+
+    q = pi_(angl) / 2.0_KTGT
+    a = ANINT(angl / q)
+    r = angl - q * a
+    n = modulo(int(a), 4)
+    s = sin(r)
+    c = cos(r)
+    select case(n)
+    case(0)
+       _SIN(sc) = +s
+       _COS(sc) = +c
+    case(1)
+       _SIN(sc) = +c
+       _COS(sc) = -s
+    case(2)
+       _SIN(sc) = -s
+       _COS(sc) = -c
+    case default
+       _SIN(sc) = -c
+       _COS(sc) = +s
+    end select
+  end function set_sincos_d
+!!!_  & angle_canonical()
+  ELEMENTAL &
+  real(kind=KTGT) function angle_canonical_d (angl) result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: angl
+    real(kind=KTGT) a, q
+    q = pi_(angl) / 2.0_KTGT
+    a = ANINT(angl / q)
+    v = angl - q * a
+  end function angle_canonical_d
+!!!_  & sin_canonical()
+  real(kind=KTGT) function sin_canonical_d (angl) result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: angl
+
+    real(kind=KTGT) r, a, q
+    integer n
+
+    q = pi_(angl) / 2.0_KTGT
+    a = ANINT(angl / q)
+    r = angl - q * a
+    n = modulo(int(a), 4)
+    select case(n)
+    case(0)
+       v = + sin(r)
+    case(1)
+       v = + cos(r)
+    case(2)
+       v = - sin(r)
+    case default
+       v = - cos(r)
+    end select
+  end function sin_canonical_d
+!!!_  & cos_canonical()
+  real(kind=KTGT) function cos_canonical_d (angl) result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: angl
+
+    real(kind=KTGT) r, a, q
+    integer n
+
+    q = pi_(angl) / 2.0_KTGT
+    a = ANINT(angl / q)
+    r = angl - q * a
+    n = modulo(int(a), 4)
+    select case(n)
+    case(0)
+       v = + cos(r)
+    case(1)
+       v = - sin(r)
+    case(2)
+       v = - cos(r)
+    case default
+       v = + sin(r)
+    end select
+  end function cos_canonical_d
+!!!_  & setd_sincos() - set sine and cosine array (degree)
+  function setd_sincos_d(angl) &
+       & result(sc)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: angl
+    real(kind=KTGT) :: sc(NTRIG)
+    real(kind=KTGT) r, a, q, s, c
+    integer n
+
+    q = 90.0_KTGT
+    a = ANINT(angl / q)
+    r = angl - q * a
+    n = modulo(int(a), 4)
+    s = sin(deg2rad(r))
+    c = cos(deg2rad(r))
+    ! write(*, *) 'setd: ', r, deg2rad(r), n, s, c
+    select case(n)
+    case(0)
+       _SIN(sc) = s
+       _COS(sc) = c
+    case(1)
+       _SIN(sc) = c
+       _COS(sc) = -s
+    case(2)
+       _SIN(sc) = -s
+       _COS(sc) = -c
+    case default
+       _SIN(sc) = -c
+       _COS(sc) = s
+    end select
+  end function setd_sincos_d
+!!!_  & nml_sincos() - normalize to compute sine and cosine
+  function nml_sincos_d(py, px) &
+       & result(sc)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: py, px
+    real(kind=KTGT) :: sc(NTRIG)
+    real(kind=KTGT) :: d
+
+    d = _hypot(px, py)
+
+    _SIN(sc) = py / d
+    _COS(sc) = px / d
+  end function nml_sincos_d
+!!!_  & add_angle
+  function add_angle_d &
+       & (scx, scy) &
+       & result(scz)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: scx(NTRIG)
+    real(kind=KTGT),intent(in) :: scy(NTRIG)
+    real(kind=KTGT) :: scz(NTRIG)
+    ! sin(x+y) = sin(x)cos(y) + cos(x)sin(y)
+    ! cos(x+y) = cos(x)cos(y) - sin(x)sin(y)
+    _SIN(scz) = _SIN(scx)*_COS(scy) + _COS(scx)*_SIN(scy)
+    _COS(scz) = _COS(scx)*_COS(scy) - _SIN(scx)*_SIN(scy)
+  end function add_angle_d
+!!!_  & sub_angle
+  function sub_angle_d &
+       & (scx, scy) &
+       & result(scz)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: scx(NTRIG)
+    real(kind=KTGT),intent(in) :: scy(NTRIG)
+    real(kind=KTGT) :: scz(NTRIG)
+    ! sin(x-y) = sin(x)cos(y) - cos(x)sin(y)
+    ! cos(x-y) = cos(x)cos(y) + sin(x)sin(y)
+    _SIN(scz) = _SIN(scx)*_COS(scy) - _COS(scx)*_SIN(scy)
+    _COS(scz) = _COS(scx)*_COS(scy) + _SIN(scx)*_SIN(scy)
+  end function sub_angle_d
+
 !!!_ + private procedures
-!!!_  - is_equidistant - check if the array is equidistant under tolerance
+!!!_  & is_equidistant - check if the array is equidistant under tolerance
   logical function is_equidistant_d(x, n, tol, e, r) result(b)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
@@ -3426,8 +4310,7 @@ contains
        endif
     endif
   end function is_equidistant_d
-
-!!!_  - check_precision - epsilon check (inherit gauss())
+!!!_  & check_precision - epsilon check (inherit gauss())
 !!!_   . NOTE
   !  Actualy the return value is NOT epsilon(), but the first
   !  value to be ONE eq ONE + E.
@@ -3559,6 +4442,40 @@ contains
     real(kind=KTGT),parameter  :: p = ATAN(one) * FOUR
     x = p
   end function pi_d
+!!!_  & diag_sc
+  subroutine diag_sc_d(tag, sc)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    character(len=*),intent(in) :: tag
+    real(kind=KTGT), intent(in) :: sc(*)
+
+    real(kind=KTGT) :: arad, adeg
+
+    arad = phase(sc)
+    adeg = rad2deg(arad)
+
+101 format('sincos:', A, ': ', ES24.16, 1x, E10.3, ' (', ES24.16, 1x, ES24.16, ')')
+    write(*, 101) trim(tag), adeg, arad, sc(1), sc(2)
+
+  end subroutine diag_sc_d
+!!!_  & diag_ph
+  subroutine diag_ph_d(tag, ph)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    character(len=*),intent(in) :: tag
+    real(kind=KTGT), intent(in) :: ph(*)
+
+    real(kind=KTGT) :: sc(NTRIG)
+    real(kind=KTGT) :: arad, adeg
+
+    _TRIG(sc) = nml_sincos(_SIN(ph), _COS(ph))
+    arad = phase(sc)
+    adeg = rad2deg(arad)
+
+101 format('phase:', A, ': ', ES24.16, 1x, E10.3, ' (', E10.3, 1x, E10.3, ')')
+    write(*, 101) trim(tag), adeg, arad, sc(1), sc(2)
+
+  end subroutine diag_ph_d
 
 !!!_ + end Emu/ugg
 end module TOUZA_Emu_ugg
@@ -3574,9 +4491,9 @@ program test_emu_ugg
   use TOUZA_Std,only: condop
   implicit none
   integer ierr
-  integer nlat(2)
-  integer nlon(2)
-  integer stereo,  geod, prec, section, length
+  integer nlat(NTRIG)
+  integer nlon(NTRIG)
+  integer stereo,  geod, prec, section, length, cell, dazim
   integer levv
 
   real(kind=KDBL) :: PI = ATAN2(0.0_KDBL, -1.0_KDBL)
@@ -3599,16 +4516,18 @@ program test_emu_ugg
 
   if (ierr.eq.0) call get_option(ierr, prec,   'prec', 0)
 
-  if (ierr.eq.0) call get_option(ierr, nlat(:), 'lat', -1)
+  if (ierr.eq.0) call get_option(ierr, nlat(:), 'lat', 0)
   if (ierr.eq.0) nlat(1) = condop((nlat(1).lt.0), 128, nlat(1))
 
-  if (ierr.eq.0) call get_option(ierr, nlon(:), 'lon', -1)
+  if (ierr.eq.0) call get_option(ierr, nlon(:), 'lon', 0)
   if (ierr.eq.0) nlon(1) = condop((nlon(1).lt.0), 128, nlon(1))
 
   if (ierr.eq.0) call get_option(ierr, stereo, 'stereo', 0)
   if (ierr.eq.0) call get_option(ierr, geod,   'geod', 0)
   if (ierr.eq.0) call get_option(ierr, section, 'sect', 0)
   if (ierr.eq.0) call get_option(ierr, length, 'length', 0)
+  if (ierr.eq.0) call get_option(ierr, cell, 'cell', 0)
+  if (ierr.eq.0) call get_option(ierr, dazim, 'dazim', 0)
 
   if (ierr.eq.0) then
      if (prec.gt.0) call test_ugg_prec(ierr)
@@ -3642,6 +4561,15 @@ program test_emu_ugg
      if (length.gt.0) then
         call batch_test_length(ierr)
      endif
+  endif
+  if (ierr.eq.0) then
+     if (cell.gt.0) then
+        call batch_test_pscell_props(ierr)
+     endif
+  endif
+
+  if (ierr.eq.0) then
+     if (dazim.gt.0) call batch_test_ugg_dazim(ierr)
   endif
 
   call finalize(ierr)
@@ -3864,6 +4792,9 @@ contains
     integer,intent(in)  :: test
     real(kind=KTGT) :: a, e, latts, lon0
 
+    real(kind=KTGT) :: zla, zlo
+    real(kind=KTGT) :: zx,  zy
+
     ierr = 0
     if (test.lt.0) return ! dummy procedure
 
@@ -3871,55 +4802,114 @@ contains
     a = 6378388.0_KTGT
     e = 0.0819919_KTGT
 
-    latts = -71.0_KTGT
-    lon0  = -100.0_KTGT
-    call test_stereog_single(ierr, a, e, latts, lon0, (/150.0_KTGT, -75.0_KTGT/))
+    latts = 71.0_KTGT
+    lon0  = 100.0_KTGT
+    zla = 75.0_KTGT
+    zlo = 150.0_KTGT
+    zx  = 1540033.6_KTGT
+    zy  = 560526.4_KTGT
+    call test_stereog_single(ierr, a, e, -latts, -lon0, (/-zla, +zlo/), -zx, -zy)
     !  (x, y) = (-1540033.6, -560526.4)
     !       k = 0.9896255
-    call test_stereog_single(ierr, a, e, latts, lon0, (/150.0_KTGT, +75.0_KTGT/))
-    latts = +71.0_KTGT
-    lon0  = +100.0_KTGT
-    call test_stereog_single(ierr, a, e, latts, lon0, (/-150.0_KTGT, +75.0_KTGT/))
-    call test_stereog_single(ierr, a, e, latts, lon0, (/-150.0_KTGT, -75.0_KTGT/))
+    call test_stereog_single(ierr, a, e, -latts, -lon0, (/-zla, -zlo/))
+    call test_stereog_single(ierr, a, e, -latts, -lon0, (/+zla, -zlo/))
+    call test_stereog_single(ierr, a, e, -latts, -lon0, (/+zla, +zlo/))
 
+    call test_stereog_single(ierr, a, e, +latts, +lon0, (/+zla, -zlo/), +zx, +zy)
+    call test_stereog_single(ierr, a, e, +latts, +lon0, (/+zla, +zlo/))
+    call test_stereog_single(ierr, a, e, +latts, +lon0, (/-zla, +zlo/))
+    call test_stereog_single(ierr, a, e, +latts, +lon0, (/-zla, -zlo/))
+
+    call test_stereog_single(ierr, a, e, -latts, +lon0, (/-zla, -zlo/), +zx, -zy)
+    call test_stereog_single(ierr, a, e, -latts, +lon0, (/-zla, +zlo/))
+    call test_stereog_single(ierr, a, e, -latts, +lon0, (/+zla, +zlo/))
+    call test_stereog_single(ierr, a, e, -latts, +lon0, (/+zla, -zlo/))
+
+    call test_stereog_single(ierr, a, e, +latts, -lon0, (/+zla, +zlo/), -zx, +zy)
+    call test_stereog_single(ierr, a, e, +latts, -lon0, (/+zla, -zlo/))
+    call test_stereog_single(ierr, a, e, +latts, -lon0, (/-zla, -zlo/))
+    call test_stereog_single(ierr, a, e, +latts, -lon0, (/-zla, +zlo/))
+
+    latts = +71.0_KTGT
+    lon0  = -100.0_KTGT
     ! pole
-    call test_stereog_single(ierr, a, e, latts, lon0, (/0.0_KTGT, 90.0_KTGT/))
-    call test_stereog_single(ierr, a, e, latts, lon0, (/0.0_KTGT, 89.9_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/90.0_KTGT, 0.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/89.9_KTGT, 0.0_KTGT/))
+
+    ! on axis
+    latts = +71.0_KTGT
+    lon0  = 0.0_KTGT
+    zla = 80.0_KTGT
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+90.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+180.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+270.0_KTGT/))
+
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0/))
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+90.0_KTGT/))
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+180.0_KTGT/))
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+270.0_KTGT/))
+
+    ! on pole and axis
+    zla = 90.0_KTGT
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+90.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+180.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+270.0_KTGT/))
+
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0/))
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+90.0_KTGT/))
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+180.0_KTGT/))
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+270.0_KTGT/))
 
     ! k0 = 0
     latts = 90.0_KTGT
     lon0  = 0.0_KTGT
-    call test_stereog_single(ierr, a, e, latts, lon0, (/0.0_KTGT, 90.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/90.0_KTGT, 0.0_KTGT/))
     call test_stereog_single(ierr, a, e, latts, lon0, (/0.0_KTGT, 0.0_KTGT/))
 
     ! scale factor as 1, e = 0
     latts = +90.0_KTGT
     lon0  = +100.0_KTGT
     e = 0.0_KTGT
-    call test_stereog_single(ierr, a, e, latts, lon0, (/-150.0_KTGT, +75.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/+75.0_KTGT, -150.0_KTGT/))
 
     a = 6378137.0_KTGT
     e = flatten_to_ecc(1.0_KTGT/298.257223563_KTGT)
     latts = +70.0_KTGT
     lon0  = -45.0_KTGT
-    call test_stereog_single(ierr, a, e, latts, lon0, (/-55.7362542291_KTGT, 59.0479222286_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/59.0479222286_KTGT, -55.7362542291_KTGT/))
 
   end subroutine batch_test_stereog
 
-  subroutine test_stereog_single(ierr, a, e, latts, lon0, ll)
+  subroutine test_stereog_single(ierr, a, e, latts, lon0, ll, xref, yref)
     implicit none
     integer,parameter :: KTGT=KDBL
     integer,intent(out) :: ierr
     real(kind=KTGT),intent(in) :: a, e, latts, lon0
     real(kind=KTGT),intent(in) :: ll(2)
+    real(kind=KTGT),intent(in),optional :: xref, yref
     real(kind=KTGT) :: sf
     real(kind=KTGT) :: rr(2), rts, llorg(2)
-    real(kind=KTGT) :: xxo(2), xxc(2), lli(2)
+    real(kind=KTGT) :: xxo(3), xxc(3), lli(2), zref(2)
     real(kind=KTGT) :: cco2(ncache_psgp_co), clo2(ncache_psgp_lo), cla2(ncache_psgp_la)
+    real(kind=KTGT) :: cco3(ncache_psgp_co), clo3(ncache_psgp_lo), cla3(ncache_psgp_la)
     real(kind=KTGT) :: gla(2), dlo(2)
+    real(kind=KTGT) :: laref(2), loref(2)
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+    real(kind=KTGT) :: xt, yt
+    real(kind=KTGT),parameter :: ztol = 1.0_KTGT
     integer pole
+    logical bref
+    logical undet
 
     ierr = 0
+    bref = present(xref).and.present(yref)
+    if (bref) then
+       zref(1:2) = (/xref, yref/)
+    endif
+
+    undet = ABS(_LATI(ll)).eq.90.0_KTGT
 
     rts = deg2rad(latts)
     rr(1:2) = deg2rad(ll(1:2))
@@ -3928,36 +4918,158 @@ contains
     else
        pole = -1
     endif
-    llorg(1) = deg2rad(lon0)
-    llorg(2) = deg2rad(90.0_KTGT) * real(pole, kind=KTGT)
+    _LONGI(llorg) = deg2rad(lon0)
+    _LATI(llorg)  = deg2rad(90.0_KTGT) * real(pole, kind=KTGT)
 
-101 format('## stereog[', 2F9.1, '] ', '(', 2ES16.8, ')', ' [', 2ES16.8, ']')
-    write(*, 101) lon0, latts, ll, a, e
+    _TRIG(laref) = setd_sincos(_LATI(ll))
+    _TRIG(loref) = setd_sincos(_LONGI(ll) - lon0)
 
-112 format('  psgp[', A, '] ', 1x, ' >> (', 2ES16.8, ')')
-113 format('  inverse', 2ES16.8, 1x, 2ES16.8, 2ES16.8, 1x, F16.13)
+101 format('## stereog[', SP, 2F6.1, SS, 1x, 2ES16.8, '] ', '(', SP, 2F7.1, ')')
+    write(*, 101) lon0, latts, a, e, ll
 
-    call psgp_set(cco2, e, a, rts, llorg(1), pole)
+112 format('  psgp[', A, ']:', '--', 1x, ' >> (', 2ES16.8, ')', 1x, ES16.8)
+115 format('  psgp[', A, ']:', 2L1,  1x, ' >> (', 2ES16.8, ')', 1x, ES16.8)
+113 format('  backward:', 2L1,  1x, 2ES16.8, 1x, 2ES16.8, 1x, F16.13)
+114 format('  backward:', '--', 1x, 2ES16.8, 1x, 2ES16.8, 1x, F16.13)
 
-    xxo = psgp_fwd(rr(1), rr(2), cco2)
-    write(*, 112) 'once', xxo
-    call psgp_cachela(cla2, rr(2), cco2)
-    call psgp_cachelo(clo2, rr(1), cco2)
-    xxc = psgp_fwd(clo2, cla2)
-    write(*, 112) 'cache', xxc
+    call psgp_set(cco2, e, a, rts, _LONGI(llorg), pole)
+
+    xxo = psgp_fwd_cis(_LONGI(rr), _LATI(rr), cco2)
+    if (bref) then
+       write(*, 115) 'once', ABS(xxo(1:2)-zref(1:2)).lt.ztol, xxo(1:2), ONE / xxo(3)
+    else
+       write(*, 112) 'once', xxo(1:2), ONE / xxo(3)
+    endif
+    call psgp_cachela(cla2, _LATI(rr), cco2)
+    call psgp_cachelo(clo2, _LONGI(rr), cco2)
+    xxc = psgp_fwd_cis(clo2, cla2)
+    if (bref) then
+       write(*, 115) 'cache', ABS(xxc(1:2)-zref(1:2)).lt.ztol, xxc(1:2), ONE / xxc(3)
+    else
+       write(*, 112) 'cache', xxc(1:2), ONE / xxc(3)
+    endif
 
     lli = psgp_bwd_ll(xxc(1), xxc(2), cco2)
     sf = psgp_bwd_sf(xxc(1), xxc(2), cco2)
-    write(*, 113) rad2deg(lli(:)), rad2deg(rr(:)), rad2deg(rr(:) - lli(:)), sf
+    if (undet) then
+       write(*, 114) rad2deg(lli(:)), rad2deg(rr(:)), sf
+    else
+       write(*, 113) is_same_angle(rr(:), lli(:)), rad2deg(lli(:)), rad2deg(rr(:)), sf
+    endif
 
     call psgp_bwd_tr(gla, dlo, xxc(1), xxc(2), cco2)
-121 format(2x, A, ':', A, 1x, 2ES16.8)
-    write(*, 121) 'sin', 'lat', _SIN(gla), sin(rr(2))
-    write(*, 121) 'cos', 'lat', _COS(gla), cos(rr(2))
-    write(*, 121) 'sin', 'dlon', _SIN(dlo), sin(rr(1) - llorg(1))
-    write(*, 121) 'cos', 'dlon', _COS(dlo), cos(rr(1) - llorg(1))
+141 format(2x, 'lat:', 2L1, 1x, 4ES16.8)
+142 format(2x, 'dlon:', 2L1, 1x, 4ES16.8)
+143 format(2x, 'dlon:', '--', 1x, 4ES16.8)
+    write(*, 141) is_same_angle(gla(1:2), laref(1:2)), gla(1:2), laref(1:2)
+    if (undet) then
+       write(*, 143) dlo(1:2), loref(1:2)
+    else
+       write(*, 142) is_same_angle(dlo(1:2), loref(1:2)), dlo(1:2), loref(1:2)
+    endif
+! 121 format(2x, A, ':', A, 1x, 2ES16.8)
+!     write(*, 121) 'sin', 'lat', _SIN(gla), sin(_LATI(rr))
+!     write(*, 121) 'cos', 'lat', _COS(gla), cos(_LATI(rr))
+!     write(*, 121) 'sin', 'dlon', _SIN(dlo), sin(_LONGI(rr) - _LONGI(llorg))
+!     write(*, 121) 'cos', 'dlon', _COS(dlo), cos(_LONGI(rr) - _LONGI(llorg))
+
+122 format(2x, 'xlo:', 3L1, 1x, ES16.8, 1x, 2ES16.8, 1x, ES10.3)
+124 format(2x, 'xlo:', L1, '--', ES16.8, 1x, 2ES16.8, 1x, ES10.3)
+123 format(2x, 'ylo:', 3L1, ES16.8, 1x, 2ES16.8, 1x, ES10.3)
+125 format(2x, 'ylo:', L1, '--', ES16.8, 1x, 2ES16.8, 1x, ES10.3)
+132 format(2x, 'xla:', 3L1, ES16.8, 1x, 2ES16.8)
+133 format(2x, 'yla:', 3L1, ES16.8, 1x, 2ES16.8)
+    call psgp_xlo_tr(xt, dlo, xxc(2), cla2, cco2, xxc(1))
+    if (undet) then
+       write(*, 124) is_same_coor(xt, xxc(1)), xt, dlo, xt-xxc(1)
+    else
+       write(*, 122) is_same_coor(xt, xxc(1)), is_same_angle(dlo(1:2), loref(1:2)), xt, dlo, xt-xxc(1)
+    endif
+    call psgp_ylo_tr(yt, dlo, xxc(1), cla2, cco2, xxc(2))
+    if (undet) then
+       write(*, 125) is_same_coor(yt, xxc(2)), yt, dlo, yt-xxc(2)
+    else
+       write(*, 123) is_same_coor(yt, xxc(2)), is_same_angle(dlo(1:2), loref(1:2)), yt, dlo, yt-xxc(2)
+    endif
+    call psgp_xla_tr(xt, gla, xxc(2), clo2, cco2)
+    write(*, 132) is_same_coor(xt, xxc(1)), is_same_angle(gla(1:2), laref(1:2)), xt, gla
+    call psgp_yla_tr(yt, gla, xxc(1), clo2, cco2)
+    write(*, 133) is_same_coor(yt, xxc(2)), is_same_angle(gla(1:2), laref(1:2)), yt, gla
+
+    ! xy-scale
+    call psgp_set(cco3, e, a, rts, _LONGI(llorg), pole, xs=100.0_KTGT, ys=1000.0_KTGT)
+
+    xxo = psgp_fwd_cis(_LONGI(rr), _LATI(rr), cco3)
+    write(*, 112) 'scale', xxo(1:2), ONE / xxo(3)
+    call psgp_cachela(cla3, _LATI(rr), cco3)
+    call psgp_cachelo(clo3, _LONGI(rr), cco3)
+    xxc = psgp_fwd_cis(clo3, cla3)
+    write(*, 112) 'scale', xxc(1:2), ONE / xxc(3)
+
+    lli = psgp_bwd_ll(xxc(1), xxc(2), cco3)
+    sf = psgp_bwd_sf(xxc(1), xxc(2), cco3)
+    if (undet) then
+       write(*, 114) rad2deg(rr(:)), sf
+    else
+       write(*, 113) is_same_angle(rr(:), lli), rad2deg(lli(:)), rad2deg(rr(:)), sf
+    endif
+
+    call psgp_bwd_tr(gla, dlo, xxc(1), xxc(2), cco3)
+    write(*, 141) is_same_angle(gla(1:2), laref(1:2)), gla(1:2), laref(1:2)
+    if (undet) then
+       write(*, 143) dlo(1:2), loref(1:2)
+    else
+       write(*, 142) is_same_angle(dlo(1:2), loref(1:2)), dlo(1:2), loref(1:2)
+    endif
+    ! write(*, 121) 'sin', 'lat', _SIN(gla), sin(_LATI(rr))
+    ! write(*, 121) 'cos', 'lat', _COS(gla), cos(_LATI(rr))
+    ! write(*, 121) 'sin', 'dlon', _SIN(dlo), sin(_LONGI(rr) - _LONGI(llorg))
+    ! write(*, 121) 'cos', 'dlon', _COS(dlo), cos(_LONGI(rr) - _LONGI(llorg))
+
+    call psgp_xlo_tr(xt, dlo, xxc(2), cla3, cco3, xxc(1))
+    if (undet) then
+       write(*, 124) is_same_coor(xt, xxc(1)), xt, dlo, xt-xxc(1)
+    else
+       write(*, 122) is_same_coor(xt, xxc(1)), is_same_angle(dlo(1:2), loref(1:2)), xt, dlo, xt-xxc(1)
+    endif
+    call psgp_ylo_tr(yt, dlo, xxc(1), cla3, cco3, xxc(2))
+    if (undet) then
+       write(*, 125) is_same_coor(yt, xxc(2)), yt, dlo, yt-xxc(2)
+    else
+       write(*, 123) is_same_coor(yt, xxc(2)), is_same_angle(dlo(1:2), loref(1:2)), yt, dlo, yt-xxc(2)
+    endif
+    call psgp_xla_tr(xt, gla, xxc(2), clo3, cco3)
+    write(*, 132) is_same_coor(xt, xxc(1)), is_same_angle(gla(1:2), laref(1:2)), xt, gla
+    call psgp_yla_tr(yt, gla, xxc(1), clo3, cco3)
+    write(*, 133) is_same_coor(yt, xxc(2)), is_same_angle(gla(1:2), laref(1:2)), yt, gla
 
   end subroutine test_stereog_single
+
+!!!_ + is_same_angle
+  ELEMENTAL &
+  logical function is_same_angle(a1, a2) result(b)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    real(kind=KTGT),intent(in) :: a1, a2
+    real(kind=KTGT),parameter :: tol = 1.0e-13_KTGT
+
+    b = ABS(angle_canonical(a1) - angle_canonical(a2)) .lt. tol
+  end function is_same_angle
+
+!!!_ + is_same_coor
+  ELEMENTAL &
+  logical function is_same_coor(a1, a2) result(b)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    real(kind=KTGT),intent(in) :: a1, a2
+    real(kind=KTGT),parameter :: tol = 1.0e-13_KTGT
+
+    if (a2.eq.0.0_KTGT) then
+       b = ABS(a1 - a2) .lt. tol
+    else
+       b = ABS((a1 - a2) / a2) .lt. tol
+    endif
+  end function is_same_coor
 
 !!!_ + batch_test_length
   subroutine batch_test_length &
@@ -4110,7 +5222,7 @@ contains
          & '(', 2ES16.8, ')', &
          & '  [', 2F12.8 ,']', 1x, ES16.8)
 
-    write(*, 111) x0, y0, x1, y1, rad2deg(ll(1)), rad2deg(ll(2)), sc
+    write(*, 111) x0, y0, x1, y1, rad2deg(ll(1:2)), sc
 
 101 format('length:level ', I0, ' ', ES16.9)
 102 format('length:level ', I0, ' ', ES16.9, 1x, ES16.9)
@@ -4219,7 +5331,7 @@ contains
          & '(', 2ES16.8, ')', &
          & '  [', 2F12.8 ,']', 1x, ES16.8)
 
-    write(*, 111) x0, y0, x1, y1, rad2deg(ll(1)), rad2deg(ll(2)), k
+    write(*, 111) x0, y0, x1, y1, rad2deg(ll(1:2)), k
 
 102 format('area:level ', I0, ' ', ES16.9, 1x, ES16.9, 1x, ES16.9)
 103 format('area:result ', ES16.9, 1x, ES16.8, 1x, 2ES16.9)
@@ -4345,11 +5457,11 @@ contains
        write(*, 101) j, xy(:,j), rad2deg(ll(:,j))
     enddo
     do j = 1, npos - 1
-       clat = cos(ll(2, j))
-       slat = sin(ll(2, j))
+       clat = cos(ll(_LAIDX, j))
+       slat = sin(ll(_LAIDX, j))
        if (abs(slat).eq.ONE) clat = ZERO
-       clon = cos(ll(1,j))
-       slon = sin(ll(1,j))
+       clon = cos(ll(_LOIDX,j))
+       slon = sin(ll(_LOIDX,j))
        if (abs(slon).eq.ONE) clon = ZERO
 
        rn = a / sqrt(ONE - e2 * (slat * slat))
@@ -4427,9 +5539,9 @@ contains
        lon2d = v(3)
        dlon = lon2d - lon1d
 
-       glat1(1:2) = setd_sincos(lat1d)
-       glat2(1:2) = setd_sincos(lat2d)
-       dglon(1:2) = setd_sincos(dlon)
+       _TRIG(glat1) = setd_sincos(lat1d)
+       _TRIG(glat2) = setd_sincos(lat2d)
+       _TRIG(dglon) = setd_sincos(dlon)
        _ANGLE(dglon) = deg2rad(dlon)
 
        xlat1(:) = glat1(:)
@@ -4446,11 +5558,11 @@ contains
        if (ierr.eq.0) then
 101       format('guess: ', 2ES24.16, 1x, F16.11)
           write(*, 101) inia1, rad2deg(atan2(_SIN(inia1), _COS(inia1)))
-          call geodesic_inverse_core &
-               (ierr, gdis, xlat1, xlat2, xglon, inia1, f, a, garea=garea)
-          garea = garea * asign
+          ! call geodesic_inverse_core &
+          !      (ierr, gdis, xlat1, xlat2, xglon, inia1, f, a, garea=garea)
+          ! garea = garea * asign
 111       format('geod:c ', 4ES24.16, 1x, F24.10, 1x, ES24.16)
-          write(*, 111) v(0:3), gdis, garea
+          ! write(*, 111) v(0:3), gdis, garea
           gdis = -999
           garea = -999
           call geodesic_inverse &
@@ -4505,8 +5617,8 @@ contains
        azi1d = v(1)
        gdis  = v(2)
 
-       glat1(1:2) = setd_sincos(lat1d)
-       azim1(1:2) = setd_sincos(azi1d)
+       _TRIG(glat1) = setd_sincos(lat1d)
+       _TRIG(azim1) = setd_sincos(azi1d)
        if (ierr.eq.0) then
           call geodesic_direct_core(ierr, glat2, dglon, glat1, azim1, gdis, f, a)
 111       format('geod:c: ', 3ES24.16, 1x, ES24.16, 1x, ES24.16)
@@ -4525,6 +5637,308 @@ contains
        endif
     enddo
   end subroutine batch_test_geod_dfilter
+
+!!!_ + batch_test_pscell_props
+  subroutine batch_test_pscell_props(ierr)
+    use TOUZA_Std,only: split_list
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+
+    real(kind=KTGT) :: a, f, rf, e
+    integer,parameter :: lline = 1024
+    integer,parameter :: lcols = 16
+    character(len=lline) :: text, tag
+    integer :: nc
+    real(kind=KTGT) :: v(0:lcols)
+    real(kind=KTGT) :: x0, y0, dx, dy
+    real(kind=KTGT) :: tslat, llorg(2)
+
+    ierr = 0
+
+    a = 6378137.0_KTGT
+    rf = 298.257223563_KTGT
+    f = 1.0_KTGT / rf
+    e = flatten_to_ecc(f)
+
+    _LONGI(llorg) = deg2rad(-45.0_KTGT)
+    _LATI(llorg)  = deg2rad(90.0_KTGT)
+    tslat = deg2rad(+70.0_KTGT)
+
+    do
+       read(*, '(A)', IOSTAT=ierr) text
+       if (ierr.ne.0) then
+          ierr = 0
+          exit
+       endif
+       call split_list(nc, v, text, ' ', lcols)
+       if (nc.lt.0) then
+          write(*, *) 'error in split: ', trim(text)
+          ierr = nc
+          exit
+       endif
+       if (nc.lt.4) then
+          write(*, *) 'too few items: ', trim(text)
+          ierr = -1
+          exit
+       endif
+       if (ierr.eq.0) then
+          ! geographic coordinates
+          if (v(2).lt.0.0_KTGT) then
+             v(0) = v(0) + v(2)
+             v(2) = - v(2)
+          endif
+          if (v(3).lt.0.0_KTGT) then
+             v(1) = v(1) + v(3)
+             v(3) = - v(3)
+          endif
+          x0 = v(0)
+          y0 = v(1)
+          dx = v(2)
+          dy = v(3)
+
+          tag = ' '
+          call test_pscell_props &
+               & (ierr, &
+               &  x0, y0, dx,  dy,    tag, &
+               &  a,  e,  f,   llorg, tslat)
+       else
+          ierr = 0
+       endif
+    enddo
+  end subroutine batch_test_pscell_props
+!!!_ + test_pscell_props - show properties of a cell on polar stereographic domain
+  subroutine test_pscell_props &
+       & (ierr, &
+       &  x0, y0, dx,  dy,    tag, &
+       &  a,  e,  f,   llorg, tslat)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    real(kind=KTGT),intent(in) :: x0, y0
+    real(kind=KTGT),intent(in) :: dx, dy
+    character(len=*),intent(in) :: tag
+    real(kind=KTGT),intent(in) :: a,  e,  f
+    real(kind=KTGT),intent(in) :: llorg(*), tslat  ! radian
+
+    integer jp, jpfrm, jpto
+    integer,parameter :: npos = 9
+    real(kind=KTGT) :: cpos(2, 0:npos-1)
+    real(kind=KTGT) :: gpos(2, 0:npos-1)
+
+    integer,parameter :: POSNW = 7, POSN = 6, POSNE = 5
+    integer,parameter :: POSW  = 8, POSO = 0, POSE  = 4
+    integer,parameter :: POSSW = 1, POSS = 2, POSSE = 3
+
+    integer pole
+    real(kind=KTGT) :: cco(ncache_psgp_co)
+
+    character(len=1) :: dtag(0:npos-1) = (/' ', 'S', 'S', 'E', 'E', 'N', 'N', 'W', 'W' /)
+
+    integer js
+    integer,parameter :: nside = 4
+    real(kind=KTGT) :: garea(0:nside-1)
+    real(kind=KTGT) :: asum
+    integer levbgn, levend
+    real(kind=KTGT) :: parea, atol, ares
+
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
+    real(kind=KTGT),parameter :: HALF = 0.5_KTGT
+    integer :: ngdiv = 32
+    character(len=16) :: sub
+
+    ierr = 0
+
+    cpos(1:2, POSSW) = (/x0, y0/)
+    cpos(1:2, POSSE) = cpos(1:2, POSSW) + (/dx, ZERO/)
+    cpos(1:2, POSNE) = cpos(1:2, POSSW) + (/dx, dy/)
+    cpos(1:2, POSNW) = cpos(1:2, POSSW) + (/ZERO, dy/)
+
+    cpos(1:2, POSS)  = (/x0 + HALF * dx, y0/)
+    cpos(1:2, POSW)  = (/x0,             y0 + HALF * dy/)
+    cpos(1:2, POSE)  = (/x0 + dx,        y0 + HALF * dy/)
+    cpos(1:2, POSN)  = (/x0 + HALF * dx, y0 + dy/)
+
+    cpos(1:2, POSO)  = (/x0 + HALF * dx, y0 + HALF * dy/)
+
+    if (_LATI(llorg).gt.ZERO) then
+       pole = +1
+    else
+       pole = -1
+    endif
+
+    call psgp_set(cco, e, a, tslat, _LONGI(llorg), pole)
+
+101 format(A, ':pos: ', I0, 1x, 2F12.0, 1x, 2F17.12)
+
+    do jp = 0, npos - 1
+       gpos(1:2, jp) = psgp_bwd_ll(cpos(1, jp), cpos(2, jp), cco)
+       write(*, 101) trim(tag), &
+            & jp, cpos(1:2, jp), rad2deg(gpos(2:1:-1, jp))
+    enddo
+
+111 format(I1, I1, A1, A1)
+    do jpfrm = 1, npos - 1
+       jpto = jpfrm + 1
+       if (jpto.ge.npos) jpto = jpto - (npos - 1)
+
+       write(sub, 111) jpfrm, jpto, 's', dtag(jpfrm)
+       call diag_pscell_side &
+            & (ierr, gpos(:,jpfrm), gpos(:,jpto), cpos(:,jpfrm), cpos(:,jpto), &
+            &  tag,  sub, f, a, cco, ngdiv)
+    enddo
+
+    jpto = 0
+    do jpfrm = POSS, npos - 1, 2
+       write(sub, 111) jpfrm, jpto, 'c'
+       call diag_pscell_side &
+            & (ierr, gpos(:,jpfrm), gpos(:,jpto), cpos(:,jpfrm), cpos(:,jpto), &
+            &  tag,  sub, f, a, cco, ngdiv)
+    enddo
+
+    jpfrm = POSS
+    jpto = POSN
+    write(sub, 111) jpfrm, jpto, 'v'
+    call diag_pscell_side &
+         & (ierr, gpos(:,jpfrm), gpos(:,jpto), cpos(:,jpfrm), cpos(:,jpto), &
+         &  tag,  sub, f, a, cco, ngdiv)
+
+    jpfrm = POSW
+    jpto = POSE
+    write(sub, 111) jpfrm, jpto, 'h'
+    call diag_pscell_side &
+         & (ierr, gpos(:,jpfrm), gpos(:,jpto), cpos(:,jpfrm), cpos(:,jpto), &
+         &  tag,  sub, f, a, cco, ngdiv)
+
+    js = 0
+    do jpfrm = POSSW, npos - 1, 2
+       jpto = jpfrm + 2
+       if (jpto.ge.npos) jpto = jpto - (npos - 1)
+       write(sub, 111) jpfrm, jpto, 'l', dtag(jpfrm)
+       call diag_pscell_side &
+            & (ierr, gpos(:,jpfrm), gpos(:,jpto), cpos(:,jpfrm), cpos(:,jpto), &
+            &  tag,  sub, f, a, cco, ngdiv, garea(js))
+       js = js + 1
+    enddo
+
+    levbgn = 8
+    levend = 12
+    atol = 0.0_KTGT
+    call psgp_bwd_area &
+         & (parea, &
+         &  cpos(1, POSSW), cpos(2, POSSW), cpos(1, POSNE), cpos(2, POSNE), &
+         &  cco, levbgn, levend, atol, ares)
+
+    asum = - ((garea(0) + garea(2)) + (garea(1) + garea(3)))
+121 format(A, ':area: ', F24.8, 1x, F24.8, 1x, ES8.1)
+    write(*, 121) trim(tag), asum, parea, ares
+
+  end subroutine test_pscell_props
+
+!!!_ + diag_pscell_side
+  subroutine diag_pscell_side &
+       & (ierr, gpos1, gpos2, cpos1, cpos2, tag, sub, f, a, cco, ngdiv, garea)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    real(kind=KTGT),intent(in) :: gpos1(*), gpos2(*)
+    real(kind=KTGT),intent(in) :: cpos1(*), cpos2(*)
+    real(kind=KTGT),intent(in) :: f, a
+    character(len=*),intent(in) :: tag, sub
+    real(kind=KTGT),intent(in) :: cco(*)
+    integer,        intent(in) :: ngdiv
+    real(kind=KTGT),intent(out),optional :: garea
+
+    integer j
+    real(kind=KTGT) :: glat1(2), glat2(2), dglon(3), glon1(2), glon2(2)
+    real(kind=KTGT) :: azim1(2)
+    real(kind=KTGT) :: lltmp(2), xytmp(2)
+    real(kind=KTGT) :: d, gdis
+    real(kind=KTGT) :: pdis,  dtol, dres
+    real(kind=KTGT) :: zdis, zarea, zdres, zares, zatol
+    integer:: levbgn, levend
+
+    ierr = 0
+
+    _TRIG(glat1) = set_sincos(_LATI(gpos1))
+    _TRIG(glat2) = set_sincos(_LATI(gpos2))
+    _TRIG(glon1) = set_sincos(_LONGI(gpos1))
+    _TRIG(glon2) = set_sincos(_LONGI(gpos2))
+    dglon(1:3) = set_dlongi(glon1,  glon2)
+    call geodesic_inverse &
+         (ierr, gdis, glat1, glat2, dglon, f, a, garea=garea, azim1=azim1)
+
+    levbgn = 10
+    levend = 20
+    dtol = 0.0_KTGT
+    call psgp_bwd_length &
+         & (pdis, cpos1(1), cpos1(2), cpos2(1), cpos2(2), cco, levbgn, levend, dtol, dres)
+
+    levbgn = 0
+    levend = 10
+    zatol = -1.e-2_KTGT
+    call psgp_bwd_geod &
+         & (zarea, zdis, cpos1(1), cpos1(2), cpos2(1), cpos2(2), &
+         &  cco, levbgn, levend, zatol, zares, zdres)
+
+102 format(A, ':side:',  A, 1x, 2F19.14, 1x, 2F19.14, 1x, F16.10, 1x, F16.10, 1x, ES8.1)
+103 format(A, ':geod:',  A, 1x, 2F14.6, 1x, 2F19.14, 1x, F16.10)
+104 format(A, ':pgeod:',  A, 1x, 2F19.14, 1x, 2F19.14, 1x, F20.7, 1x, ES8.1, 1x, F16.10, 1x, ES8.1)
+
+    write(*, 102) trim(tag), trim(sub), &
+         & rad2deg(gpos1(2:1:-1)), rad2deg(gpos2(2:1:-1)), &
+         & gdis, pdis, dres
+    write(*, 104) trim(tag), trim(sub), &
+         & rad2deg(gpos1(2:1:-1)), rad2deg(gpos2(2:1:-1)), &
+         & zarea, zares, zdis, zdres
+
+    do j = 0, ngdiv
+       d = gdis * real(j, kind=KTGT) / real(ngdiv, kind=KTGT)
+       call geodesic_direct(ierr, glat2, dglon, glat1, azim1, d, f, a)
+       _TRIG(glon2) = add_angle(glon1, _TRIG(dglon))
+       _LATI(lltmp) = ATAN2(glat2(1), glat2(2))
+       _LONGI(lltmp) = ATAN2(glon2(1), glon2(2))
+       xytmp(1:2) = psgp_fwd(_LONGI(lltmp), _LATI(lltmp), cco)
+       write(*, 103) trim(tag), trim(sub), &
+            & xytmp(1:2) - cpos1(1:2), rad2deg(lltmp(2:1:-1)), d
+    enddo
+  end subroutine diag_pscell_side
+
+!!!_ + test_ugg_dazim
+  subroutine batch_test_ugg_dazim(ierr)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    ierr = 0
+    call test_ugg_dazim(ierr, 90.0_KTGT, 90.0_KTGT, 180.0_KTGT)
+    call test_ugg_dazim(ierr, 90.0_KTGT, 90.0_KTGT, 170.0_KTGT)
+    call test_ugg_dazim(ierr, 90.0_KTGT, 90.0_KTGT, 90.0_KTGT)
+    call test_ugg_dazim(ierr, 45.0_KTGT, 45.0_KTGT, 90.0_KTGT)
+    call test_ugg_dazim(ierr, 45.0_KTGT, 60.0_KTGT, 90.0_KTGT)
+    call test_ugg_dazim(ierr, 15.0_KTGT, 35.0_KTGT, 25.0_KTGT)
+
+    return
+  end subroutine batch_test_ugg_dazim
+
+  subroutine test_ugg_dazim(ierr, lat1, lat2, dlon)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    real(kind=KTGT),intent(in)  :: lat1, lat2, dlon
+    real(kind=KTGT) :: scla1(2), scla2(2), sclo(2)
+
+    real(kind=KTGT) :: dazim
+
+    ierr = 0
+    scla1(:) = setd_sincos(lat1)
+    scla2(:) = setd_sincos(lat2)
+    sclo(:) = setd_sincos(dlon)
+
+    dazim = geodesic_dazim(scla1, scla2, sclo)
+101 format('dazim: ', F9.2, F9.2, F9.2, 1x, F9.2, 1x, E16.9)
+    write(*, 101) lat1, lat2, dlon, rad2deg(dazim), dazim
+    return
+  end subroutine test_ugg_dazim
 
 end program test_emu_ugg
 
