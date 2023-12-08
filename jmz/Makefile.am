@@ -1,9 +1,9 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/10/06 15:02:37 fuyuki Makefile.am>
+# Time-stamp: <2024/04/16 22:12:42 fuyuki Makefile.am>
 
-# Copyright (C) 2021,2022,2023
+# Copyright (C) 2021,2022,2023,2024
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -23,8 +23,12 @@ EXTRA_PROGRAMS = jmzcmp
 noinst_LTLIBRARIES	=	libjmz_local.la
 libjmz_local_la_SOURCES =
 
-libjmz_local_la_SOURCES += jmz_param.F90 jmz_coor.F90 jmz_buf.F90
-libjmz_local_la_SOURCES += jmzlib.F90 chak_lib.F90 chak_opr.F90 chak_file.F90
+libjmz_local_la_SOURCES += jmz_param.F90 jmz_base.F90
+libjmz_local_la_SOURCES += jmz_coor.F90
+libjmz_local_la_SOURCES += jmz_file.F90 jmz_buf.F90 jmzlib.F90
+libjmz_local_la_SOURCES += chak_lib.F90
+libjmz_local_la_SOURCES += chak_opr.F90 chak_file.F90
+# libjmz_local_la_SOURCES += chak_handles.F90
 
 jmzcmp_SOURCES = jmzcmp.F90 jmz.h
 
@@ -37,11 +41,17 @@ chak_SOURCES = chak.F90 jmz.h
 chak_to_include = chak_decl.F90 chak_reg.F90
 EXTRA_chak_DEPENDENCIES = $(TOUZA_LIBRARY)
 
-noinst_SCRIPTS += demo-chak.sh
+QOXI = qoxi
+bin_PROGRAMS += $(QOXI)
+qoxi_SOURCES =  convoy_util.F90 convoy_psprop.F90 convoy_ps2g.F90
+qoxi_SOURCES += qoxi.F90 jmz.h
+EXTRA_qoxi_DEPENDENCIES = $(TOUZA_LIBRARY)
+
+noinst_SCRIPTS += demo-chak.sh demo-convoy.sh
 noinst_SCRIPTS += ocheck.sh
 EXTRA_DIST += ocheck.sh.in
 
-EXTRA_PROGRAMS = convoy
+EXTRA_PROGRAMS += convoy
 convoy_SOURCES = convoy.F90 jmz.h
 convoy_to_include =
 EXTRA_convoy_DEPENDENCIES = $(TOUZA_LIBRARY)
@@ -82,6 +92,11 @@ jmzdepf90: jmzdepf90.sh.in
 	chmod +x $@
 
 demo-chak.sh: demo-chak.sh.in
+	@sed -e 's,[@]ZSH[@],$(ZSH),g' \
+         -e 's,[@]srcdir[@],$(srcdir),g' \
+		$< >$@; chmod +x $@
+
+demo-convoy.sh: demo-convoy.sh.in
 	@sed -e 's,[@]ZSH[@],$(ZSH),g' \
          -e 's,[@]srcdir[@],$(srcdir),g' \
 		$< >$@; chmod +x $@
