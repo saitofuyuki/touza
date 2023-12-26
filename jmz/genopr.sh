@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/11/19 09:38:51 fuyuki genopr.sh>
+# Time-stamp: <2023/12/24 21:28:50 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -228,8 +228,10 @@ register_all ()
   # other operation
   register         -n 2,1 -i call -P sweep=stack  MIN    'min(A,B)'
   register         -n 2,1 -i call -P sweep=stack  MAX    'max(A,B)'
+  register         -n 2,2 -i call -P sweep=stack  RANGE  'min max(A,B)'
   register -g lazy -n 2,1 -i call -P sweep=stack  LMIN   'lazy MIN'
   register -g lazy -n 2,1 -i call -P sweep=stack  LMAX   'lazy MAX'
+  register -g lazy -n 2,2 -i call -P sweep=stack  LRANGE 'lazy min max(A,B)'
 
   # conditional operation (binary)
   register -g bool -n 2,1 -f -,FALSE -i call -c int EQB       '1 if A==B, else 0'
