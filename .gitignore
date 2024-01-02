@@ -109,3 +109,5 @@ stamp-h1
 /trp/test_trapiche_pack_32
 /trp/test_trapiche_pack_64
 /trp/test_trapiche_pack_uip
+/log.agmp-*
+/log.ggf-*
