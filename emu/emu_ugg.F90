@@ -1,10 +1,10 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2023/12/24 11:43:54 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/01/20 17:31:02 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023
+! Copyright (C) 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -122,7 +122,7 @@ module TOUZA_Emu_ugg
 
 #define _ERROR(E) (E - ERR_MASK_EMU_UGG)
 # define __MDL__ 'ugg'
-!!!_  - interfaces
+!!!_ + interfaces
   interface get_longitude
      module procedure get_longitude_d
   end interface get_longitude
@@ -456,6 +456,27 @@ module TOUZA_Emu_ugg
   end interface sub_angle
 #endif
 
+  interface agmpc_gen_table
+     module procedure agmpc_gen_table_d
+  end interface agmpc_gen_table
+  interface agmpc_area_core
+     module procedure agmpc_area_core_d
+  end interface agmpc_area_core
+
+  interface agmpd_gen_table
+     module procedure agmpd_gen_table_d
+  end interface agmpd_gen_table
+  interface agmpd_area_core
+     module procedure agmpd_area_core_d
+  end interface agmpd_area_core
+
+  interface agmpe_gen_table
+     module procedure agmpe_gen_table_d
+  end interface agmpe_gen_table
+  interface agmpe_area_core
+     module procedure agmpe_area_core_d
+  end interface agmpe_area_core
+
   interface hpsub_angle
      module procedure hpsub_angle_d
   end interface hpsub_angle
@@ -483,7 +504,7 @@ module TOUZA_Emu_ugg
      module procedure diag_ph_d
   end interface diag_ph
 
-!!!_  - public
+!!!_ + public
   public init, diag, finalize
   public get_longitude, mid_longitude,  div_longitude
   public check_longitude, check_div_longitude
@@ -516,6 +537,10 @@ module TOUZA_Emu_ugg
   public set_sincos, setd_sincos
   public angle_canonical, sin_canonical, cos_canonical
   public reduced_latitude, azimuth_node, alon_auxsph_ph
+
+  public agmpc_table_size, agmpc_gen_table, agmpc_area_core
+  public agmpd_gen_table, agmpd_area_core
+  public agmpe_gen_table, agmpe_area_core
 
   public nml_sincos
   public phase
@@ -2265,8 +2290,6 @@ contains
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
     real(kind=KTGT),parameter :: TWO=2.0_KTGT
     a = cco(icache_psgp_maj)
-    ! e = cco(icache_psgp_ecc)
-    ! e2c = cco(icache_psgp_e2c)
     aco = cco(icache_psgp_aco)
 
     ! v = (((a * a) * (pi_(ONE))) * (ONE + ((ONE - e) * (ONE + e) * ATANH(e)) / e)) * TWO
@@ -2295,8 +2318,6 @@ contains
        _COS(dlo) = ZERO
        _SIN(dlo) = SIGN(ONE, xs)
        x = SIGN(ZERO, xs)
-       ! s = + SIGN(ONE, cla(icache_psgp_xrho)) * SIGN(ONE, xs)
-       ! _SIN(dlo) = SIGN(_SIN(dlo), s) * cco(icache_psgp_sign)
     else
        cdl = - y / cla(icache_psgp_yrho)
        if (ABS(cdl).gt.ONE) then
@@ -2304,17 +2325,6 @@ contains
           x = + SIGN(HUGE(ZERO), xs)
        else
           _COS(dlo) = cdl
-          ! _SIN(dlo) = SQRT((ONE + cdl) * (ONE - cdl))
-          ! x = + SIGN(cla(icache_psgp_xrho) * _SIN(dlo), xs)
-          ! s = + SIGN(ONE, cla(icache_psgp_xrho)) * SIGN(ONE, xs)
-          ! _SIN(dlo) = SIGN(_SIN(dlo), s) * cco(icache_psgp_sign)
-          ! if (ABS(cdl).gt.1.0_KTGT) then
-          !    write(*, *) 'xlo/2', cla(icache_psgp_yrho), y
-          !    write(*, *) 'xlo/2', cdl, (ONE + cdl) * (ONE - cdl)
-          !    write(*, *) 'xlo/2', cla(icache_psgp_sinla), cla(icache_psgp_cosla)
-          !    write(*, *) 'xlo/2', rad2deg(ATAN2(cla(icache_psgp_sinla), cla(icache_psgp_cosla)))
-          ! endif
-          ! return
           !! caution: sign must be adjusted by the caller
           _SIN(dlo) = SIGN(SQRT((ONE + cdl) * (ONE - cdl)), xs)
           x = + SIGN(cla(icache_psgp_xrho) * _SIN(dlo), xs)
@@ -2377,9 +2387,6 @@ contains
           _SIN(dlo) = sdl * cco(icache_psgp_sign)
           !! caution: sign must be adjusted by the caller
           _COS(dlo) = SQRT((ONE + sdl) * (ONE - sdl))
-          ! y = + SIGN(cla(icache_psgp_yrho) * _COS(dlo), ys)
-          ! s = - SIGN(ONE, cla(icache_psgp_yrho)) * SIGN(ONE, ys)
-          ! _COS(dlo) = SIGN(_COS(dlo), s)
           _COS(dlo) = - SIGN(_COS(dlo), ys) * cco(icache_psgp_sign)
           y = + SIGN(cla(icache_psgp_yrho) * _COS(dlo), ys)
        endif
@@ -2552,7 +2559,8 @@ contains
   real(kind=KTGT) function flatten_to_ecc_d (f) result (e)
     use TOUZA_Std,only: KTGT=>KDBL
     real(kind=KTGT),intent(in) :: f
-    e = sqrt(2.0_KTGT * f - f * f)
+    ! e = sqrt(2.0_KTGT * f - f * f)
+    e = sqrt((2.0_KTGT - f) * f)
   end function flatten_to_ecc_d
 !!!_  & reduced_latitude() - sin,cos(param. lat.)
   function reduced_latitude_d (glat, f) result (plat)
@@ -4572,9 +4580,78 @@ contains
   end function hpSplit_d
 
 !!!_ + geodesic-meridian-parallel segment area
-!!!_  - agmp_table_size
+!!!_  - agmpe_table_size - design [e]
+!!!_  - agmpe_gen_table
+  subroutine agmpe_gen_table_d &
+       & (ierr, C, no, dlh, tdhsq, rel)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KTGT),intent(out) :: C(0:*)
+    integer,        intent(in)  :: no         ! order
+    real(kind=KTGT),intent(in)  :: dlh        ! (dlon/2)
+    real(kind=KTGT),intent(in)  :: tdhsq      ! [tan(dlat/2)]^2
+    logical,        intent(in)  :: rel        ! set true to subtract pmem area
+
+    real(kind=KTGT) :: Ce(0:no * (no + 3))
+    real(kind=KTGT) :: dlhf, dlhsq
+
+    ierr = 0
+    dlhsq = dlh ** 2
+
+    if (no.eq.2) then
+#      include "agmp/agmp-e2.F90"
+    else if (no.eq.3) then
+#      include "agmp/agmp-e3.F90"
+    else if (no.eq.4) then
+#      include "agmp/agmp-e4.F90"
+    else if (no.eq.5) then
+#      include "agmp/agmp-e5.F90"
+    else
+       ierr = ERR_NOT_IMPLEMENTED
+    endif
+  end subroutine agmpe_gen_table_d
+!!!_  - agmpe_area_core
+  real(kind=KTGT) function agmpe_area_core_d &
+       & (slat, clat, tdlath, &
+       &  C,    no) &
+       &  result(a)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in)  :: slat       ! sine latitude
+    real(kind=KTGT),intent(in)  :: clat       ! cosine latitude
+    real(kind=KTGT),intent(in)  :: tdlath     ! tangent[(d latitude)/2]
+    real(kind=KTGT),intent(in)  :: C(0:*)
+    integer,        intent(in)  :: no         ! order
+
+    real(kind=KTGT),parameter  :: ZERO=0.0_KTGT
+    real(kind=KTGT) :: c2
+
+    real(kind=KTGT) :: b2s, b1s
+    real(kind=KTGT) :: b2c, b1c
+    integer j
+
+    c2  = 2.0_KTGT * clat
+    b2s = ZERO
+    b1s = ZERO
+    b2c = ZERO
+    b1c = ZERO
+    do j = no - 1, 1, -1
+       b2s = C(j*2)   + c2 * b1s - b2s
+       b1s =            c2 * b2s - b1s
+       b2c = C(j*2+1) + c2 * b1c - b2c
+       b1c =            c2 * b2c - b1c
+    enddo
+    j = 0
+    b2s = C(j*2)   + c2 * b1s - b2s
+    b2c = C(j*2+1) + c2 * b1c - b2c
+    ! write(*,*) 'e:sc:', b2s, b2c, b2s * slat, b2c * clat, b2c * clat * tdlath
+
+    a = b2s * slat + b2c * clat * tdlath
+  end function agmpe_area_core_d
+!!!_  - agmpc_table_size - design [c]
   PURE &
-  integer function agmp_table_size(no) result(m)
+  integer function agmpc_table_size(no) result(m)
     implicit none
     integer,intent(in) :: no
     if (mod(no,2).eq.0) then
@@ -4582,9 +4659,9 @@ contains
     else
        m = (no / 2 + 4) * (no / 2 + 1) / 2
     endif
-  end function agmp_table_size
-!!!_  - agmp_gen_table
-  subroutine agmp_gen_table_d &
+  end function agmpc_table_size
+!!!_  - agmpc_gen_table
+  subroutine agmpc_gen_table_d &
        & (ierr, Cc, no, s, rel)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
@@ -4597,30 +4674,30 @@ contains
     ierr = 0
     s2 = s ** 2
     if (no.eq.4) then
-#      include "agmp/proc-4.F90"
+#      include "agmp/agmp-c4.F90"
     else if (no.eq.5) then
-#      include "agmp/proc-5.F90"
+#      include "agmp/agmp-c5.F90"
     else if (no.eq.6) then
-#      include "agmp/proc-6.F90"
+#      include "agmp/agmp-c6.F90"
     else if (no.eq.7) then
-#      include "agmp/proc-7.F90"
+#      include "agmp/agmp-c7.F90"
     else if (no.eq.8) then
-#      include "agmp/proc-8.F90"
+#      include "agmp/agmp-c8.F90"
     else if (no.eq.9) then
-#      include "agmp/proc-9.F90"
+#      include "agmp/agmp-c9.F90"
     else if (no.eq.10) then
-#      include "agmp/proc-10.F90"
+#      include "agmp/agmp-c10.F90"
     else if (no.eq.11) then
-#      include "agmp/proc-11.F90"
+#      include "agmp/agmp-c11.F90"
     else if (no.eq.12) then
-#      include "agmp/proc-12.F90"
+#      include "agmp/agmp-c12.F90"
     else
        ierr = ERR_NOT_IMPLEMENTED
     endif
-  end subroutine agmp_gen_table_d
+  end subroutine agmpc_gen_table_d
 
-!!!_  - agmp_area_core
-  real(kind=KTGT) function agmp_area_core_d &
+!!!_  - agmpc_area_core
+  real(kind=KTGT) function agmpc_area_core_d &
        & (clat, tdlath, dlonh, &
        &  Cc,   no) &
        &  result(a)
@@ -4675,8 +4752,85 @@ contains
     do jp = mp - 1, 0, -1
        a = a * ct + buf(jp)
     enddo
-    a = a * 2.0_KTGT
-  end function agmp_area_core_d
+    ! a = a * 2.0_KTGT
+  end function agmpc_area_core_d
+
+!!!_  - agmpd_gen_table
+  subroutine agmpd_gen_table_d &
+       & (ierr, Cd, no, s, rel)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KTGT),intent(out) :: Cd(0:*)
+    integer,        intent(in)  :: no         ! order
+    real(kind=KTGT),intent(in)  :: s          ! sine latitude
+    logical,        intent(in)  :: rel        ! set true to subtract pmem area
+    real(kind=KTGT)  :: s2
+    ierr = 0
+    s2 = s ** 2
+    if (no.eq.4) then
+#      include "agmp/agmp-d4.F90"
+    else if (no.eq.5) then
+#      include "agmp/agmp-d5.F90"
+    else if (no.eq.6) then
+#      include "agmp/agmp-d6.F90"
+    else if (no.eq.7) then
+#      include "agmp/agmp-d7.F90"
+    else if (no.eq.8) then
+#      include "agmp/agmp-d8.F90"
+    else if (no.eq.9) then
+#      include "agmp/agmp-d9.F90"
+    else if (no.eq.10) then
+#      include "agmp/agmp-d10.F90"
+    else
+       ierr = ERR_NOT_IMPLEMENTED
+    endif
+  end subroutine agmpd_gen_table_d
+
+!!!_  - agmpd_area_core
+  real(kind=KTGT) function agmpd_area_core_d &
+       & (clat, tdlath, dlonh, &
+       &  Cd,   no) &
+       &  result(a)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in)  :: clat       ! cosine latitude
+    real(kind=KTGT),intent(in)  :: tdlath     ! tangent[(d latitude)/2]
+    real(kind=KTGT),intent(in)  :: dlonh      ! (d longitude)/2
+    real(kind=KTGT),intent(in)  :: Cd(0:*)
+    integer,        intent(in)  :: no         ! order
+
+    integer jp, mp
+    integer jcb
+    integer jt, jte
+    real(kind=KTGT) :: buf(0:no+1)
+    real(kind=KTGT) :: dlhs, dlht, ct
+
+    jcb = 0
+
+    dlht = dlonh
+    dlhs = dlonh ** 2
+    mp = ((no + 1) / 2) * 2
+    buf(mp) = 0.0_KTGT
+
+    do jp = 0, mp - 1
+       jte = (mp - jp + 1) / 2
+       ! write(*, *) 'area:d', no, jp, jcb, jte, Cd(jcb:jcb+jte)
+       buf(jp) = Cd(jcb + 1)
+       do jt = 2, jte
+          buf(jp) = buf(jp) * dlhs + Cd(jcb + jt)
+       enddo
+       buf(jp) = (buf(jp) * dlht) / Cd(jcb)
+       jcb = jcb + jte + 1
+       dlht = dlht * (dlhs ** mod(jp, 2))
+    enddo
+    ct = clat * tdlath
+    a = buf(mp - 1)
+    ! write(*, *) buf(0:mp - 1)
+    do jp = mp - 2, 0, -1
+       a = a * ct + buf(jp)
+    enddo
+  end function agmpd_area_core_d
 
 !!!_ + private procedures
 !!!_  & is_equidistant - check if the array is equidistant under tolerance
@@ -4919,7 +5073,7 @@ program test_emu_ugg
   integer ierr
   integer nlat(NTRIG)
   integer nlon(NTRIG)
-  integer stereo,  geod, prec, section, length, cell, dazim
+  integer stereo,  geod, prec, section, length, cell, dazim, agmp
   integer hpangle
   integer levv
 
@@ -4955,6 +5109,7 @@ program test_emu_ugg
   if (ierr.eq.0) call get_option(ierr, length, 'length', 0)
   if (ierr.eq.0) call get_option(ierr, cell, 'cell', 0)
   if (ierr.eq.0) call get_option(ierr, dazim, 'dazim', 0)
+  if (ierr.eq.0) call get_option(ierr, agmp, 'agmp', 0)
   if (ierr.eq.0) call get_option(ierr, hpangle, 'hpa', 0)
 
   if (ierr.eq.0) then
@@ -4998,6 +5153,10 @@ program test_emu_ugg
 
   if (ierr.eq.0) then
      if (dazim.gt.0) call batch_test_ugg_dazim(ierr)
+  endif
+
+  if (ierr.eq.0) then
+     if (agmp.gt.0) call batch_test_agmp(ierr, agmp)
   endif
 
   if (ierr.eq.0) then
@@ -6372,6 +6531,437 @@ contains
     return
   end subroutine test_ugg_dazim
 
+!!!_ + test_agmp
+  subroutine batch_test_agmp(ierr, ktest)
+    use TOUZA_Std,only: get_nparam, get_param
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: ktest
+    real(kind=KTGT) :: dlat,   dlon
+    real(kind=KTGT) :: reflat, reflon
+    real(kind=KTGT) :: xbase
+    integer :: xrange(2)
+    integer narg, jarg
+    integer j
+    integer xbgn, xend
+
+    ierr = 0
+
+    xbgn = -1
+    xend = -2
+    ! call test_agmp(ierr, 90.0_KTGT, -0.1_KTGT, 0.1_KTGT, .FALSE.)
+    narg = get_nparam()
+    call get_option(ierr, xrange, 'range',  0)
+    call get_option(ierr, xbase,  'base',   0.0_KTGT)
+    call get_option(ierr, reflon, 'reflon', 0.0_KTGT)
+    call get_option(ierr, dlat,   'dlat',   0.0_KTGT)
+    call get_option(ierr, dlon,   'dlon',   0.0_KTGT)
+
+    if (ktest.eq.1) then
+       if (ierr.eq.0) then
+          xrange(1) = max(0, xrange(1))
+          if (xrange(2).eq.0) then
+             xrange(2) = xrange(1)
+          else if (xrange(2).lt.0) then
+             xrange(2) = 7
+          endif
+          xbgn = xrange(1)
+          xend = max(xrange(1), xrange(2))
+          if (xbase.le.0.0_KTGT) xbase = 10.0_KTGT
+          if (dlat.le.0.0_KTGT) dlat = 1.0_KTGT
+       endif
+       do jarg = 1, narg
+          if (ierr.eq.0) call get_param(ierr, reflat, jarg)
+          if (ierr.eq.0) then
+             dlon = 1.0_KTGT
+             do j = 0, xbgn - 1
+                dlon = dlon / xbase
+             enddo
+             do j = xbgn, xend
+                call test_agmp(ierr, reflat, reflon, dlat, -dlon, .TRUE.)
+                dlon = dlon / xbase
+             enddo
+          endif
+       enddo
+    else
+       reflat = 90.0_KTGT
+       reflon = 0.0_KTGT
+       jarg = 1
+       if (ierr.eq.0) call get_param(ierr, reflat, jarg)
+       jarg = jarg + 1
+       if (ierr.eq.0) call get_param(ierr, reflon, jarg)
+       if (ierr.eq.0) call test_agmp2(ierr, reflat, reflon, dlat, dlon, .TRUE.)
+    endif
+    return
+  end subroutine batch_test_agmp
+
+  subroutine test_agmp2(ierr, reflat, reflon, dlat, dlon, swap)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,parameter :: KREF=KQPL
+
+    integer,        intent(out) :: ierr
+    real(kind=KTGT),intent(in)  :: reflat, reflon
+    real(kind=KTGT),intent(in)  :: dlat,   dlon
+    logical,        intent(in)  :: swap
+
+    real(kind=KTGT) :: xrlat, xdlat
+    real(kind=KTGT) :: lat1,  lat2
+    real(kind=KTGT) :: lon1,  lon2
+
+    ! y series: target kind
+    real(kind=KTGT) :: ylat1(2), ylat2(2), ydlat(2), ytdla(2)
+    real(kind=KTGT) :: ylon1(2), ylon2(2), ydlon(2), ytdlo(2)
+
+    real(kind=KTGT) :: vdlonh, vdlath
+    real(kind=KTGT) :: vag, vap, va
+
+    real(kind=KTGT) :: udlonh, udlath
+
+    ! z series: higher precision kind
+    real(kind=KREF) :: qdlonh, qdlath
+    real(kind=KREF) :: zlat1(2), zlat2(2), zdlat(2)
+    real(kind=KREF) :: zlon1(2), zlon2(2), zdlon(2)
+    real(kind=KREF) :: tqref
+
+    real(kind=KREF) :: qag, qap, qa
+
+    real(kind=KTGT) :: ax
+    integer,parameter :: ltbl = 128
+    real(kind=KTGT) :: CD(0:ltbl)
+    real(kind=KTGT) :: CE(0:ltbl)
+    real(kind=KTGT) :: tdhsq, tdh
+
+    integer jo
+    integer obgn_d, oend_d
+    integer obgn_e, oend_e
+
+    obgn_d = 4
+    oend_d = 10
+    obgn_e = 2
+    oend_e = 5
+
+    if (swap) then
+       xrlat = reflat + dlat
+       xdlat = -dlat
+    else
+       xrlat = reflat
+       xdlat = +dlat
+    endif
+
+    lat1 = xrlat
+    lat2 = xrlat + xdlat
+    lon1 = reflon
+    lon2 = reflon + dlon
+
+    ylat1(:) = setd_sincos(lat1)
+    ylat2(:) = setd_sincos(lat2)
+    ylon1(:) = setd_sincos(lon1)
+    ylon2(:) = setd_sincos(lon2)
+
+    ! ytdla ytdlo: indirect angle subtraction
+    ytdla(:) = hpsub_angle(ylat2, ylat1)
+    ytdlo(:) = hpsub_angle(ylon2, ylon1)
+
+    vdlonh  = deg2rad(dlon)  / 2.0_KTGT
+    vdlath  = deg2rad(xdlat) / 2.0_KTGT
+
+    udlonh = _SIN(ytdlo) / (1.0_KTGT + _COS(ytdlo))   ! tan
+    udlath = _SIN(ytdla) / (1.0_KTGT + _COS(ytdla))
+
+    ! high precision
+    qdlonh  = deg2rad(real(dlon,  kind=KREF)) / 2.0_KQPL
+    qdlath  = deg2rad(real(xdlat, kind=KREF)) / 2.0_KQPL
+
+    zlat1(:) = setd_sincos(real(lat1, kind=KREF))
+    zlat2(:) = setd_sincos(real(lat2, kind=KREF))
+    zlon1(:) = setd_sincos(real(lon1, kind=KREF))
+    zlon2(:) = setd_sincos(real(lon2, kind=KREF))
+
+101 format('agmp:lat:q ', I0, 1x, ES26.18, 1x, ES26.18)
+102 format('agmp:lat:v ', I0, 1x, ES26.18, 1x, ES26.18)
+
+111 format('agmp:tdlath:q ', ES26.18)
+121 format('agmp:tdlath:v ', ES26.18, 1x, ES26.18)
+131 format('agmp:tdlath:u ', ES26.18, 1x, ES26.18)
+
+112 format('agmp:tdlonh:q ', ES26.18)
+122 format('agmp:tdlonh:v ', ES26.18, 1x, ES26.18)
+132 format('agmp:tdlonh:u ', ES26.18, 1x, ES26.18)
+
+201 format('agmp:area:q ', ES26.18, 1x, ES26.18, 1x, ES26.18)
+211 format('agmp:area:v ', ES26.18, 1x, ES26.18, 1x, ES26.18)
+221 format('agmp:area:u ', ES26.18, 1x, ES26.18, 1x, ES26.18)
+231 format('agmp:area:dd ', I0, 1x, ES26.18, 1x, ES26.18, 1x, ES26.18)
+241 format('agmp:area:ed ', I0, 1x, ES26.18, 1x, ES26.18, 1x, ES26.18)
+251 format('agmp:area:di ', I0, 1x, ES26.18, 1x, ES26.18, 1x, ES26.18)
+261 format('agmp:area:ei ', I0, 1x, ES26.18, 1x, ES26.18, 1x, ES26.18)
+
+212 format('agmp:err:v  ', ES26.18, 1x, ES26.18)
+222 format('agmp:err:u  ', ES26.18, 1x, ES26.18)
+
+    write(*, 101) 1, _SIN(zlat1), _COS(zlat1)
+    write(*, 102) 1, _SIN(ylat1), _COS(ylat1)
+
+    write(*, 101) 2, _SIN(zlat2), _COS(zlat2)
+    write(*, 102) 2, _SIN(ylat2), _COS(ylat2)
+
+    tqref = tan(qdlath)
+    write(*, 111) tqref
+    write(*, 121) tan(vdlath), (tan(vdlath) - tqref) / tqref
+    write(*, 131) udlath,      (udlath - tqref) / tqref
+
+    tqref = tan(qdlonh)
+    write(*, 112) tqref
+    write(*, 122) tan(vdlonh), (tan(vdlonh) - tqref) / tqref
+    write(*, 132) udlonh,      (udlonh - tqref) / tqref
+
+    ! reference
+    qag = ATAN((_SIN(zlat1) + _COS(zlat1) * tan(qdlath)) * tan(qdlonh)) * 2.0_KQPL
+    qap = _SIN(zlat1) * (qdlonh * 2.0_KQPL)
+    qa  = qag - qap
+    write(*, 201) qa, qag, qap
+
+    ! target direct diff
+    vag = ATAN((_SIN(ylat1) + _COS(ylat1) * tan(vdlath)) * tan(vdlonh)) * 2.0_KTGT
+    vap = _SIN(ylat1) * (vdlonh * 2.0_KTGT)
+    va  = vag - vap
+    write(*, 211) va, vag, vap
+    write(*, 212) (va - qa) / qa, va - qa
+
+    ! target indirect diff
+    vag = ATAN((_SIN(ylat1) + _COS(ylat1) * udlath) * udlonh) * 2.0_KTGT
+    vap = _SIN(ylat1) * (ATAN(udlonh) * 2.0_KTGT)
+    va  = vag - vap
+    write(*, 221) va, vag, vap
+    write(*, 222) (va - qa) / qa, va - qa
+
+    ! (d) direct diff by tables
+    do jo = obgn_d, oend_d
+       call agmpd_gen_table(ierr, Cd, jo, _SIN(ylat1), .TRUE.)
+       ax = agmpd_area_core(_COS(ylat1), tan(vdlath), vdlonh, Cd, jo)
+       write(*, 231) jo, ax, (ax - qa) / qa, ax - qa
+    enddo
+    ! (d) indirect diff by tables
+    do jo = obgn_d, oend_d
+       call agmpd_gen_table(ierr, Cd, jo, _SIN(ylat1), .TRUE.)
+       ax = agmpd_area_core(_COS(ylat1), udlath, ATAN(udlonh), Cd, jo)
+       write(*, 251) jo, ax, (ax - qa) / qa, ax - qa
+    enddo
+    ! (e) direct diff by tables
+    tdh   = tan(vdlath)
+    tdhsq = tdh ** 2
+    do jo = obgn_e, oend_e
+       call agmpe_gen_table(ierr, Ce, jo, vdlonh, tdhsq, .TRUE.)
+       ax = agmpe_area_core(_SIN(ylat1), _COS(ylat1), tdh, Ce, jo)
+       write(*, 241) jo, ax, (ax - qa) / qa, ax - qa
+    enddo
+    ! (e) indirect diff by tables
+    tdh   = udlath
+    tdhsq = tdh ** 2
+    do jo = obgn_e, oend_e
+       call agmpe_gen_table(ierr, Ce, jo, ATAN(udlonh), tdhsq, .TRUE.)
+       ax = agmpe_area_core(_SIN(ylat1), _COS(ylat1), tdh, Ce, jo)
+       write(*, 261) jo, ax, (ax - qa) / qa, ax - qa
+    enddo
+
+  end subroutine test_agmp2
+
+  subroutine test_agmp(ierr, reflat, reflon, dlat, dlon, swap)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    real(kind=KTGT),intent(in) :: reflat, reflon
+    real(kind=KTGT),intent(in) :: dlat,   dlon
+    logical,        intent(in) :: swap
+    real(kind=KTGT) :: sclat1(2), sclat2(2)
+    real(kind=KTGT) :: sclon1(2), sclon2(2)
+
+    real(kind=KTGT) :: scdla(2), scdlo(2)
+    real(kind=KTGT) :: dlonh,    tdlath
+
+    integer,parameter :: ltbl = 128
+    real(kind=KTGT) :: CC(0:ltbl)
+    real(kind=KTGT) :: ax, ag, ap, ad
+
+    real(kind=KTGT) :: CD(0:ltbl)
+
+    real(kind=KTGT) :: CE(0:ltbl)
+    real(kind=KTGT) :: tdhsq, xtdhsq
+
+    real(kind=KTGT) :: xrlat, xrlon, xdlat, xdlonh, xtdlath
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+    integer,parameter :: KHPR=KQPL
+    real(kind=KHPR) :: qlat1(2), qlat2(2)
+    real(kind=KHPR) :: qlon1(2), qlon2(2)
+    real(kind=KHPR) :: qdla(2),  qdlo(2)
+    real(kind=KHPR) :: qdlonh,   qtdlath
+    real(kind=KHPR) :: qag, qap, qad
+    real(kind=KHPR) :: qaref
+#endif
+
+    integer jo, jt, nt
+
+    CC(:) = 0.0_KTGT
+
+    if (swap) then
+       xrlat = reflat + dlat
+       xdlat = -dlat
+    else
+       xrlat = reflat
+       xdlat = +dlat
+    endif
+
+    sclat1(:) = setd_sincos(xrlat)
+    sclat2(:) = setd_sincos(xrlat + xdlat)
+    sclon1(:) = setd_sincos(reflon)
+    sclon2(:) = setd_sincos(reflon + dlon)
+
+    xdlonh = deg2rad(dlon) / 2.0_KTGT
+    xtdlath = tan(deg2rad(xdlat) / 2.0_KTGT)
+
+    scdla(:) = hpsub_angle(sclat2, sclat1)
+    scdlo(:) = hpsub_angle(sclon2, sclon1)
+
+    dlonh  = ATAN2(_SIN(scdlo), 1.0_KTGT + _COS(scdlo))
+    tdlath = _SIN(scdla) / (1.0_KTGT + _COS(scdla))
+
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+    ! write(*, *) 'rad:xrlat', real(xrlat, kind=KHPR), &
+    !      & real(xrlat, kind=KHPR) * (atan2(0.0_KHPR, -1.0_KHPR) / 180.0_KHPR), &
+    !      & (real(xrlat, kind=KHPR) / 180.0_KHPR) * atan2(0.0_KHPR, -1.0_KHPR), &
+    !      & (xrlat / 180.0_KTGT) * atan2(0.0_KTGT, -1.0_KTGT), &
+    !      & deg2rad(real(xrlat, kind=KHPR))
+    ! write(*, *) sin(deg2rad(real(xrlat, kind=KHPR)))
+    ! write(*, *) sin(1.39626322706253841833309025603579_KHPR)
+    qlat1(:) = setd_sincos(real(xrlat, kind=KHPR))
+    qlat2(:) = setd_sincos(real(xrlat + xdlat, kind=KHPR))
+    qdla(:)  = setd_sincos(real(xdlat, kind=KHPR))
+
+    qdlo(:)  = setd_sincos(real(dlon, kind=KHPR))
+    ! qref(:) = real(scref(:), kind=KHPR)
+    ! qtgt(:) = real(sctgt(:), kind=KHPR)
+    ! qdla(:) = real(scdla(:), kind=KHPR)
+    ! qdlo(:) = real(scdlo(:), kind=KHPR)
+
+    qdlonh  = deg2rad(real(dlon, kind=KHPR)) / 2.0_KQPL
+    qtdlath = _SIN(qdla) / (1.0_KQPL + _COS(qdla))
+#endif
+
+101 format('agmp:in ',  F11.7, 1x, ES9.1, 2x, F11.7, 1x, ES9.1)
+109 format('agmp:dev ', I0, 2(1x, ES26.18))
+111 format('agmp:lon ', I0, 1x, ES26.18, 2(1x, ES26.18))
+112 format('agmp:dlat ', I0, 1x, 2(1x, ES26.18))
+
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+102 format('agmp:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
+103 format('agmp:eq   ', I0, 1x, ES26.18, 1x, ES16.8, 1x, 2(1x, ES26.18))
+122 format('agmp:e:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
+132 format('agmp:d:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
+#else
+102 format('agmp:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8)
+103 format('agmp:eq   ', I0, 1x, ES26.18, 1x, 2(1x, ES26.18))
+122 format('agmp:e:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8)
+132 format('agmp:d:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8)
+#endif
+    write(*, 101) xrlat, xdlat, reflon, dlon
+    write(*, 109) 1, tdlath, dlonh
+    write(*, 109) 1, xtdlath, xdlonh
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+    write(*, 109) 2, qtdlath, qdlonh
+#endif
+    write(*, 111) 1, dlonh,  scdlo(1), scdlo(2)
+    ! write(*, 111) 1, dlonh,  sub_angle(sclon2, sclon1)
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+    write(*, 111) 2, qdlonh, qdlo(1), qdlo(2)
+#endif
+    write(*, 112) 1, scdla(1), scdla(2)
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+    write(*, 112) 2, qdla(1),  qdla(2)
+#endif
+
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+    ! qag = geodesic_dazim(qlat1, qlat2, qdlo)
+    ! ! qap = _SIN(qref) * real(deg2rad(dlon), kind=KHPR)
+    ! qap = _SIN(qlat1) * deg2rad(real(dlon, kind=KHPR))
+    ! qad = qag - qap
+    ! qaref = qad
+    ! write(*, 103) 2, qad, (qad - qaref) / qaref, qag, qap
+
+    qag = ATAN((_SIN(qlat1) + _COS(qlat1) * qtdlath) * tan(qdlonh)) * 2.0_KQPL
+    qap = _SIN(qlat1) * deg2rad(real(dlon, kind=KHPR))
+    qad = qag - qap
+
+    qaref = qad
+    write(*, 103) 2, qad, (qad - qaref) / qaref, qag, qap
+    ! write(*, *) _SIN(qref), _COS(qref), _COS(qref) * qtdlath
+    ! write(*, *) 'qtdlath', qtdlath, _SIN(qref) + _COS(qref) * qtdlath
+    ! write(*, *) qag
+    ! write(*, *) _SIN(qref) + _COS(qref) * qtdlath
+    ! write(*, *) tan(qdlonh), _SIN(qdlo) / (1.0_KQPL + _COS(qdlo))
+    ! write(*, *) qap, _SIN(qref), real(deg2rad(dlon), kind=KHPR), deg2rad(real(dlon, kind=KHPR))
+    ! write(*, *) atan2(0.0_KHPR,-1.0_KHPR)
+    ! write(*, *) atan2(0.0_KHPR,-1.0_KHPR) * real((dlon/180.0_KTGT), kind=KHPR)
+    ! write(*, *) real(dlon, kind=KHPR), real(dlon, kind=KHPR) * atan2(0.0_KHPR,-1.0_KHPR) / 180.0_KHPR
+#endif
+    ag = geodesic_dazim(sclat1, sclat2, scdlo)
+    ap = _SIN(sclat1) * (dlonh * 2.0_KTGT)
+    ad = ag - ap
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+    write(*, 103) 1, ad, (ad - qaref) / qaref, ag, ap
+#else
+    write(*, 103) 1, ad, ag, ap
+#endif
+    ag = ATAN((_SIN(sclat1) + _COS(sclat1) * tdlath) * tan(dlonh)) * 2.0_KTGT
+    ap = _SIN(sclat1) * (dlonh * 2.0_KTGT)
+    ad = ag - ap
+    write(*, 103) 1, ad, (ad - qaref) / qaref, ag, ap
+
+    ag = ATAN((_SIN(sclat1) + _COS(sclat1) * xtdlath) * tan(xdlonh)) * 2.0_KTGT
+    ap = _SIN(sclat1) * (xdlonh * 2.0_KTGT)
+    ad = ag - ap
+    write(*, 103) 1, ad, (ad - qaref) / qaref, ag, ap
+    ! write(*, *) ap, _SIN(scref), deg2rad(dlon)
+    do jo = 8, 12
+       nt = agmpc_table_size(jo)
+       call agmpc_gen_table(ierr, Cc, jo, _SIN(sclat1), .TRUE.)
+       ! do jt = 0, nt - 1
+       !    write(*, *) 'CC', jo, jt, Cc(jt)
+       ! enddo
+       ax = agmpc_area_core(_COS(sclat1), tdlath, dlonh, Cc, jo)
+       write(*, 102) jo, ax, (ax - qaref) / qaref, ad - ax, (ad - ax) / ax
+       ax = agmpc_area_core(_COS(sclat1), xtdlath, xdlonh, Cc, jo)
+       write(*, 102) jo, ax, (ax - qaref) / qaref, ad - ax, (ad - ax) / ax
+    enddo
+    do jo = 4, 10
+       ! nt = agmpd_table_size(jo)
+       call agmpd_gen_table(ierr, Cd, jo, _SIN(sclat1), .TRUE.)
+       ! do jt = 0, nt - 1
+       !    write(*, *) 'CC', jo, jt, Cc(jt)
+       ! enddo
+       ax = agmpd_area_core(_COS(sclat1), tdlath, dlonh, Cd, jo)
+       write(*, 132) jo, ax, (ax - qaref) / qaref, ad - ax, (ad - ax) / ax
+       ax = agmpd_area_core(_COS(sclat1), xtdlath, xdlonh, Cd, jo)
+       write(*, 132) jo, ax, (ax - qaref) / qaref, ad - ax, (ad - ax) / ax
+    enddo
+
+    tdhsq = tdlath ** 2
+    xtdhsq = xtdlath ** 2
+    ! do jo = 2, 5
+    ! write(*, *) dlonh, tdlath, tdhsq
+    do jo = 2, 4
+       call agmpe_gen_table(ierr, Ce, jo, dlonh, tdhsq, .TRUE.)
+       ax = agmpe_area_core(_SIN(sclat1), _COS(sclat1), tdlath, Ce, jo)
+       write(*, 122) jo, ax, (ax - qaref) / qaref, ad - ax, (ad - ax) / ax
+
+       call agmpe_gen_table(ierr, Ce, jo, xdlonh, xtdhsq, .TRUE.)
+       ax = agmpe_area_core(_SIN(sclat1), _COS(sclat1), xtdlath, Ce, jo)
+       write(*, 122) jo, ax, (ax - qaref) / qaref, ad - ax, (ad - ax) / ax
+    enddo
+
+  end subroutine test_agmp
+
 !!!_ + test_hpangle
   subroutine batch_test_hpangle(ierr)
     use TOUZA_Std,only: get_nparam, get_param
@@ -6389,6 +6979,7 @@ contains
     narg = get_nparam()
     call get_option(ierr, xrange, 'range', 0)
     call get_option(ierr, xbase,  'base', 0.0_KTGT)
+    xbgn = 0
     if (ierr.eq.0) then
        xrange(1) = max(0, xrange(1))
        if (xrange(2).eq.0) then
