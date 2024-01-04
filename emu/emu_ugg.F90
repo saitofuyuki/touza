@@ -302,7 +302,11 @@ module TOUZA_Emu_ugg
 
   interface pi_
      module procedure pi_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+     module procedure pi_q
+#endif
   end interface pi_
+
 
   interface div_coordinate
      module procedure div_coordinate_d
@@ -313,6 +317,15 @@ module TOUZA_Emu_ugg
   interface rad2deg
      module procedure rad2deg_d
   end interface rad2deg
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  interface deg2rad
+     module procedure deg2rad_q
+  end interface deg2rad
+  interface rad2deg
+     module procedure rad2deg_q
+  end interface rad2deg
+#endif
+
 
   interface gen_ctable_elongi
      module procedure gen_ctable_elongi_d
@@ -371,6 +384,9 @@ module TOUZA_Emu_ugg
   end interface geodesic_area_core
   interface geodesic_dazim
      module procedure geodesic_dazim_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+     module procedure geodesic_dazim_q
+#endif
   end interface geodesic_dazim
 
   interface set_diff_xinteg
@@ -390,8 +406,10 @@ module TOUZA_Emu_ugg
   end interface comp_series_sine
 
   interface phase
-     module procedure phase_1_d
-     module procedure phase_2_d
+     module procedure phase_1_d, phase_2_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+     module procedure phase_1_q, phase_2_q
+#endif
   end interface phase
 
   interface nml_sincos
@@ -403,6 +421,11 @@ module TOUZA_Emu_ugg
   interface setd_sincos
      module procedure setd_sincos_d
   end interface setd_sincos
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  interface setd_sincos
+     module procedure setd_sincos_q
+  end interface setd_sincos
+#endif
 
   interface angle_canonical
      module procedure angle_canonical_d
@@ -424,6 +447,34 @@ module TOUZA_Emu_ugg
   interface sub_angle
      module procedure sub_angle_d
   end interface sub_angle
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  interface add_angle
+     module procedure add_angle_q
+  end interface add_angle
+  interface sub_angle
+     module procedure sub_angle_q
+  end interface sub_angle
+#endif
+
+  interface hpsub_angle
+     module procedure hpsub_angle_d
+  end interface hpsub_angle
+  interface hpadd_angle
+     module procedure hpadd_angle_d
+  end interface hpadd_angle
+
+  interface hpInProduct
+     module procedure hpInProduct_d
+  end interface hpInProduct
+  interface hpAdd
+     module procedure hpAdd_d
+  end interface hpAdd
+  interface hpMult
+     module procedure hpMult_d
+  end interface hpMult
+  interface hpSplit
+     module procedure hpSplit_d
+  end interface hpSplit
 
   interface diag_sc
      module procedure diag_sc_d
@@ -466,9 +517,11 @@ module TOUZA_Emu_ugg
   public angle_canonical, sin_canonical, cos_canonical
   public reduced_latitude, azimuth_node, alon_auxsph_ph
 
+  public nml_sincos
   public phase
   public add_angle, sub_angle
 
+  public hpsub_angle, hpadd_angle
   public diag_sc, diag_ph
 
 contains
@@ -757,6 +810,19 @@ contains
     ! r = s * (modulo(abs(deg), w) / (w / 2.0_KTGT)) * pi_(deg)
     r = s * (modulo(abs(deg), w) * (pi_(deg) / (w / 2.0_KTGT)))
   end function deg2rad_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  ELEMENTAL &
+  real(kind=KTGT) function deg2rad_q(deg) result(r)
+    use TOUZA_Std,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in) :: deg
+    real(kind=KTGT),parameter :: w = 360.0_KTGT
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT) :: s
+    s = sign(ONE, deg)
+    r = s * (modulo(abs(deg), w) * (pi_(deg) / (w / 2.0_KTGT)))
+  end function deg2rad_q
+#endif
 !!!_   . rad2deg
   ELEMENTAL &
   real(kind=KTGT) function rad2deg_d(rad) result(d)
@@ -770,6 +836,20 @@ contains
     s = sign(ONE, rad)
     d = s * ((modulo(abs(rad), p2)) / p2) * w
   end function rad2deg_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  ELEMENTAL &
+  real(kind=KTGT) function rad2deg_q(rad) result(d)
+    use TOUZA_Std,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in) :: rad
+    real(kind=KTGT),parameter :: w = 360.0_KTGT
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT) :: p2, s
+    p2 = 2.0_KTGT * pi_(rad)
+    s = sign(ONE, rad)
+    d = s * ((modulo(abs(rad), p2)) / p2) * w
+  end function rad2deg_q
+#endif
 !!!_  & array_reverse
   subroutine array_reverse_d &
        & (v, n)
@@ -3291,6 +3371,31 @@ contains
     _COS(da) = (ONE + _COS(dalon)) * (_SIN(plat1) * _SIN(plat2) + cb1d * cb2d)
     v = phase(da) * TWO
   end function geodesic_dazim_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  PURE &
+  real(kind=KTGT) function geodesic_dazim_q &
+       & (plat1, plat2, dalon) &
+       & result(v)
+    use TOUZA_Std,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in) :: plat1(*), plat2(*), dalon(*)
+
+    real(kind=KTGT) :: cb1d, cb2d
+    real(kind=KTGT) :: da(NTRIG)
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+
+    ! identity
+    ! tan[(a2-a1)/2] = (sin[(b2+b1)/2] / cos[(b2-b1)/2]) * tan[(w2-w1)/2]
+    cb1d = ONE + _COS(plat1)
+    cb2d = ONE + _COS(plat2)
+    _SIN(da) = _SIN(dalon) * (_SIN(plat1) * cb2d + _SIN(plat2) * cb1d)
+    _COS(da) = (ONE + _COS(dalon)) * (_SIN(plat1) * _SIN(plat2) + cb1d * cb2d)
+    ! write(*, *) (_SIN(plat1) * cb2d + _SIN(plat2) * cb1d), (_SIN(plat1) * _SIN(plat2) + cb1d * cb2d)
+    ! write(*, *) (_SIN(plat1) * cb2d + _SIN(plat2) * cb1d) / (_SIN(plat1) * _SIN(plat2) + cb1d * cb2d)
+    v = phase(da) * TWO
+  end function geodesic_dazim_q
+#endif
 !!!_  & geodesic_inverse
   subroutine geodesic_inverse_core_d &
        & (ierr,  &
@@ -4098,6 +4203,24 @@ contains
     v = ATAN2(s, c)
   end function phase_2_d
 
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  PURE &
+  real(kind=KTGT) function phase_1_q(terms) result(v)
+    use TOUZA_Std,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in) :: terms(*)
+    v = ATAN2(_SIN(terms), _COS(terms))
+  end function phase_1_q
+
+  PURE &
+  real(kind=KTGT) function phase_2_q(s, c) result(v)
+    use TOUZA_Std,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in) :: s, c
+    v = ATAN2(s, c)
+  end function phase_2_q
+#endif
+
 !!!_  & set_sincos() - set sine and cosine array
   function set_sincos_d(angl) &
        & result(sc)
@@ -4220,6 +4343,39 @@ contains
        _COS(sc) = s
     end select
   end function setd_sincos_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  function setd_sincos_q(angl) &
+       & result(sc)
+    use TOUZA_Std,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in) :: angl
+    real(kind=KTGT) :: sc(NTRIG)
+    real(kind=KTGT) r, a, q, s, c
+    integer n
+
+    q = 90.0_KTGT
+    a = ANINT(angl / q)
+    r = angl - q * a
+    n = modulo(int(a), 4)
+    s = sin(deg2rad(r))
+    c = cos(deg2rad(r))
+    ! write(*, *) 'setd: ', r, deg2rad(r), n, s, c
+    select case(n)
+    case(0)
+       _SIN(sc) = s
+       _COS(sc) = c
+    case(1)
+       _SIN(sc) = c
+       _COS(sc) = -s
+    case(2)
+       _SIN(sc) = -s
+       _COS(sc) = -c
+    case default
+       _SIN(sc) = -c
+       _COS(sc) = s
+    end select
+  end function setd_sincos_q
+#endif
 !!!_  & nml_sincos() - normalize to compute sine and cosine
   function nml_sincos_d(py, px) &
        & result(sc)
@@ -4248,6 +4404,22 @@ contains
     _SIN(scz) = _SIN(scx)*_COS(scy) + _COS(scx)*_SIN(scy)
     _COS(scz) = _COS(scx)*_COS(scy) - _SIN(scx)*_SIN(scy)
   end function add_angle_d
+
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  function add_angle_q &
+       & (scx, scy) &
+       & result(scz)
+    use TOUZA_Std,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in) :: scx(NTRIG)
+    real(kind=KTGT),intent(in) :: scy(NTRIG)
+    real(kind=KTGT) :: scz(NTRIG)
+    ! sin(x+y) = sin(x)cos(y) + cos(x)sin(y)
+    ! cos(x+y) = cos(x)cos(y) - sin(x)sin(y)
+    _SIN(scz) = _SIN(scx)*_COS(scy) + _COS(scx)*_SIN(scy)
+    _COS(scz) = _COS(scx)*_COS(scy) - _SIN(scx)*_SIN(scy)
+  end function add_angle_q
+#endif
 !!!_  & sub_angle
   function sub_angle_d &
        & (scx, scy) &
@@ -4262,6 +4434,249 @@ contains
     _SIN(scz) = _SIN(scx)*_COS(scy) - _COS(scx)*_SIN(scy)
     _COS(scz) = _COS(scx)*_COS(scy) + _SIN(scx)*_SIN(scy)
   end function sub_angle_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  function sub_angle_q &
+       & (scx, scy) &
+       & result(scz)
+    use TOUZA_Std,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in) :: scx(NTRIG)
+    real(kind=KTGT),intent(in) :: scy(NTRIG)
+    real(kind=KTGT) :: scz(NTRIG)
+    ! sin(x-y) = sin(x)cos(y) - cos(x)sin(y)
+    ! cos(x-y) = cos(x)cos(y) + sin(x)sin(y)
+    _SIN(scz) = _SIN(scx)*_COS(scy) - _COS(scx)*_SIN(scy)
+    _COS(scz) = _COS(scx)*_COS(scy) + _SIN(scx)*_SIN(scy)
+  end function sub_angle_q
+#endif
+
+!!!_  & hpsub_angle - high precision subtraction
+  function hpsub_angle_d &
+       & (scx, scy) &
+       & result(scz)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: scx(NTRIG)
+    real(kind=KTGT),intent(in) :: scy(NTRIG)
+    real(kind=KTGT) :: scz(NTRIG)
+
+    real(kind=KTGT) :: t1(2), t2(2)
+
+    t1(1:2) = (/+ _SIN(scx), - _COS(scx)/)
+    t2(1:2) = (/+ _COS(scy), + _SIN(scy)/)
+
+    _SIN(scz) = hpInProduct(t1(1:2), t2(1:2))
+
+    t1(1:2) = (/+ _COS(scx), + _SIN(scx)/)
+
+    _COS(scz) = hpInProduct(t1(1:2), t2(1:2))
+    ! sin(x-y) = sin(x)cos(y) - cos(x)sin(y)
+    ! cos(x-y) = cos(x)cos(y) + sin(x)sin(y)
+  end function hpsub_angle_d
+
+!!!_  & hpadd_angle - high precision addition
+  function hpadd_angle_d &
+       & (scx, scy) &
+       & result(scz)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: scx(NTRIG)
+    real(kind=KTGT),intent(in) :: scy(NTRIG)
+    real(kind=KTGT) :: scz(NTRIG)
+
+    real(kind=KTGT) :: t1(2), t2(2)
+
+    t1(1:2) = (/+ _SIN(scx), + _COS(scx)/)
+    t2(1:2) = (/+ _COS(scy), + _SIN(scy)/)
+
+    _SIN(scz) = hpInProduct(t1(1:2), t2(1:2))
+
+    t1(1:2) = (/+ _COS(scx), - _SIN(scx)/)
+
+    _COS(scz) = hpInProduct(t1(1:2), t2(1:2))
+    ! sin(x+y) = sin(x)cos(y) + cos(x)sin(y)
+    ! cos(x+y) = cos(x)cos(y) - sin(x)sin(y)
+  end function hpadd_angle_d
+
+!!!_  & hpInProduct - high precision inner product
+  PURE &
+  real(kind=KTGT) function hpInProduct_d(x, y) result (r)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: x(:), y(:)
+    real(kind=KTGT) :: p(2), h(2), s
+    integer j
+    p(:) = hpMult(x(1), y(1))
+    ! write(*, *) p(:)
+    s = p(2)
+    do j = 2, size(x)
+       h(:) = hpMult(x(j), y(j))
+       ! write(*,*) h(:), s
+       p(:) = hpAdd(p(1), h(1))
+       s = (s + (h(2) + p(2)))
+    enddo
+    ! write(*,*) p(1), s
+    r = p(1) + s
+  end function hpInProduct_d
+
+!!!_  - hpAdd
+  PURE &
+  function hpAdd_d(a, b) result (hl)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: hl(2)
+    real(kind=KTGT),intent(in):: a, b
+
+    real(kind=KTGT) :: z
+    hl(1) = a + b
+    z = hl(1) - a
+    hl(2) = (a - (hl(1) - z)) + (b - z)
+  end function hpAdd_d
+
+!!!_  - hpMult
+  PURE &
+  function hpMult_d(a, b) result (hl)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: hl(2)
+    real(kind=KTGT),intent(in):: a, b
+
+    real(kind=KTGT) :: aa(2), bb(2)
+    hl(1) = a * b
+    aa(:) = hpSplit(a)
+    bb(:) = hpSplit(b)
+    hl(2) = aa(2) * bb(2) &
+         & - (((hl(1) - aa(1) * bb(1)) &
+         &      - aa(2) * bb(1)) &
+         &    - aa(1) * bb(2))
+  end function hpMult_d
+
+!!!_  - hpSplit
+  PURE &
+  function hpSplit_d(a) result (hl)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: hl(2)
+    real(kind=KTGT),intent(in):: a
+
+    real(kind=KTGT) :: c
+    integer,parameter :: ss = DIGITS(0.0_KTGT)
+    integer,parameter :: s = ss / 2 + mod(ss, 2)
+
+    real(kind=KTGT),parameter :: f = 2.0_KTGT ** s + 1.0_KTGT
+
+    c = f * a
+    hl(1) = c - (c - a)
+    hl(2) = a - hl(1)
+
+  end function hpSplit_d
+
+!!!_ + geodesic-meridian-parallel segment area
+!!!_  - agmp_table_size
+  PURE &
+  integer function agmp_table_size(no) result(m)
+    implicit none
+    integer,intent(in) :: no
+    if (mod(no,2).eq.0) then
+       m = (no / 4 + 2) * ((no + 2) / 4) * 2
+    else
+       m = (no / 2 + 4) * (no / 2 + 1) / 2
+    endif
+  end function agmp_table_size
+!!!_  - agmp_gen_table
+  subroutine agmp_gen_table_d &
+       & (ierr, Cc, no, s, rel)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KTGT),intent(out) :: Cc(0:*)
+    integer,        intent(in)  :: no         ! order
+    real(kind=KTGT),intent(in)  :: s          ! sine latitude
+    logical,        intent(in)  :: rel        ! set true to subtract pmem area
+    real(kind=KTGT)  :: s2
+    ierr = 0
+    s2 = s ** 2
+    if (no.eq.4) then
+#      include "agmp/proc-4.F90"
+    else if (no.eq.5) then
+#      include "agmp/proc-5.F90"
+    else if (no.eq.6) then
+#      include "agmp/proc-6.F90"
+    else if (no.eq.7) then
+#      include "agmp/proc-7.F90"
+    else if (no.eq.8) then
+#      include "agmp/proc-8.F90"
+    else if (no.eq.9) then
+#      include "agmp/proc-9.F90"
+    else if (no.eq.10) then
+#      include "agmp/proc-10.F90"
+    else if (no.eq.11) then
+#      include "agmp/proc-11.F90"
+    else if (no.eq.12) then
+#      include "agmp/proc-12.F90"
+    else
+       ierr = ERR_NOT_IMPLEMENTED
+    endif
+  end subroutine agmp_gen_table_d
+
+!!!_  - agmp_area_core
+  real(kind=KTGT) function agmp_area_core_d &
+       & (clat, tdlath, dlonh, &
+       &  Cc,   no) &
+       &  result(a)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in)  :: clat       ! cosine latitude
+    real(kind=KTGT),intent(in)  :: tdlath     ! tangent[(d latitude)/2]
+    real(kind=KTGT),intent(in)  :: dlonh      ! (d longitude)/2
+    real(kind=KTGT),intent(in)  :: Cc(0:*)
+    integer,        intent(in)  :: no         ! order
+
+    integer jp, mp
+    integer jcb
+    integer jt, jtb, jte
+    real(kind=KTGT) :: buf(0:no)
+    real(kind=KTGT) :: dlhs, dlht, ct
+
+    jcb = 0
+
+    dlht = dlonh
+    dlhs = dlonh ** 2
+    if (mod(no, 2).eq.0) then
+       mp = ((no + 2) / 4) * 2 - 1
+    else
+       mp = (no / 2)
+    endif
+    buf(mp) = 0.0_KTGT
+    ! 4  2      ((no + 2) / 4) * 2
+    ! 6  4
+    ! 8  4
+    ! 10  6
+    ! 12  6
+
+    ! 5  3      (no / 2) + 1
+    ! 7  4
+    ! 9  5
+    ! 11  6
+    do jp = 0, mp
+       jtb = jp / 2
+       jte = (no - jp + 1) / 2
+       ! write(*, *) 'area', no, jp, jcb, jtb, jte
+       buf(jp) = Cc(jcb + 1)
+       do jt = jtb + 1, jte - 1
+          buf(jp) = buf(jp) * dlhs + Cc(jcb + 1 + jt - jtb)
+       enddo
+       buf(jp) = (buf(jp) * dlht) / Cc(jcb)
+       jcb = jcb + (jte - jtb) + 1
+       dlht = dlht * (dlhs ** mod(jp, 2))
+    enddo
+    ct = clat * tdlath
+    a = buf(mp)
+    do jp = mp - 1, 0, -1
+       a = a * ct + buf(jp)
+    enddo
+    a = a * 2.0_KTGT
+  end function agmp_area_core_d
 
 !!!_ + private procedures
 !!!_  & is_equidistant - check if the array is equidistant under tolerance
@@ -4442,6 +4857,17 @@ contains
     real(kind=KTGT),parameter  :: p = ATAN(one) * FOUR
     x = p
   end function pi_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  PURE real(kind=KTGT) function pi_q(mold) result(x)
+    use TOUZA_Std,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in) :: mold
+    real(kind=KTGT),parameter  :: ONE =  real(1, kind=kind(mold))
+    real(kind=KTGT),parameter  :: FOUR = real(4, kind=kind(mold))
+    real(kind=KTGT),parameter  :: p = ATAN(one) * FOUR
+    x = p
+  end function pi_q
+#endif
 !!!_  & diag_sc
   subroutine diag_sc_d(tag, sc)
     use TOUZA_Std,only: KTGT=>KDBL
@@ -4485,7 +4911,7 @@ end module TOUZA_Emu_ugg
 #if TEST_EMU_UGG
 program test_emu_ugg
   use TOUZA_Emu_ugg
-  use TOUZA_Std,only: KFLT, KDBL
+  use TOUZA_Std,only: KFLT, KDBL, KQPL
   use TOUZA_Std,only: KTGT=>KDBL
   use TOUZA_Std,only: arg_init, arg_diag, parse, get_option
   use TOUZA_Std,only: condop
@@ -4494,6 +4920,7 @@ program test_emu_ugg
   integer nlat(NTRIG)
   integer nlon(NTRIG)
   integer stereo,  geod, prec, section, length, cell, dazim
+  integer hpangle
   integer levv
 
   real(kind=KDBL) :: PI = ATAN2(0.0_KDBL, -1.0_KDBL)
@@ -4528,6 +4955,7 @@ program test_emu_ugg
   if (ierr.eq.0) call get_option(ierr, length, 'length', 0)
   if (ierr.eq.0) call get_option(ierr, cell, 'cell', 0)
   if (ierr.eq.0) call get_option(ierr, dazim, 'dazim', 0)
+  if (ierr.eq.0) call get_option(ierr, hpangle, 'hpa', 0)
 
   if (ierr.eq.0) then
      if (prec.gt.0) call test_ugg_prec(ierr)
@@ -4570,6 +4998,10 @@ program test_emu_ugg
 
   if (ierr.eq.0) then
      if (dazim.gt.0) call batch_test_ugg_dazim(ierr)
+  endif
+
+  if (ierr.eq.0) then
+     if (hpangle.gt.0) call batch_test_hpangle(ierr)
   endif
 
   call finalize(ierr)
@@ -5939,6 +6371,92 @@ contains
     write(*, 101) lat1, lat2, dlon, rad2deg(dazim), dazim
     return
   end subroutine test_ugg_dazim
+
+!!!_ + test_hpangle
+  subroutine batch_test_hpangle(ierr)
+    use TOUZA_Std,only: get_nparam, get_param
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    real(kind=KTGT) :: dlat, reflat
+    real(kind=KTGT) :: xbase
+    integer :: xrange(2)
+    integer narg, jarg
+    integer j
+    integer xbgn, xend
+
+    ierr = 0
+    narg = get_nparam()
+    call get_option(ierr, xrange, 'range', 0)
+    call get_option(ierr, xbase,  'base', 0.0_KTGT)
+    if (ierr.eq.0) then
+       xrange(1) = max(0, xrange(1))
+       if (xrange(2).eq.0) then
+          xrange(2) = xrange(1)
+       else if (xrange(2).lt.0) then
+          xrange(2) = 7
+       endif
+       xbgn = xrange(1)
+       xend = max(xrange(1), xrange(2))
+       if (xbase.le.0.0_KTGT) xbase = 10.0_KTGT
+    endif
+    do jarg = 1, narg
+       if (ierr.eq.0) call get_param(ierr, reflat, jarg)
+       if (ierr.eq.0) then
+          dlat = 1.0_KTGT
+          do j = 0, xbgn - 1
+             dlat = dlat / xbase
+          enddo
+          do j = xbgn, xend
+             call test_hpangle(ierr, reflat, dlat)
+             dlat = dlat / xbase
+          enddo
+       endif
+    enddo
+    return
+  end subroutine batch_test_hpangle
+
+  subroutine test_hpangle(ierr, ref, d)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,parameter :: KHPR=KQPL
+    integer,intent(out) :: ierr
+    real(kind=KTGT),intent(in) :: ref, d
+    real(kind=KTGT) :: scref(2), sctgt(2)
+    real(kind=KTGT) :: scdlp(2), scdhp(2), scd(2)
+    real(kind=KTGT) :: scdnl(2), scdnh(2)
+    real(kind=KTGT) :: scdn1(2), scdn2(2)
+    real(kind=KHPR) :: qscd(2)
+    ierr = 0
+
+    scref(:) = setd_sincos(ref)
+    sctgt(:) = setd_sincos(ref + d)
+    scd(:)   = setd_sincos(d)
+    qscd(:)  = setd_sincos(real(d,kind=KHPR))
+    scdn1(:) = setd_sincos(nearest(d, +1.0_KTGT))
+    scdn2(:) = setd_sincos(nearest(d, -1.0_KTGT))
+
+    scdlp(:) = sub_angle(sctgt, scref)
+    scdhp(:) = hpsub_angle(sctgt, scref)
+
+    scdnl(:) = nml_sincos(_SIN(scdlp), _COS(scdlp))
+    scdnh(:) = nml_sincos(_SIN(scdhp), _COS(scdhp))
+
+101 format('hpangle:', ES16.9, 1x, ES16.9)
+102 format('hpsub:', A, ': ', 2(1x, ES26.18), 2(1x, ES10.3), 2(1x, ES10.3))
+    write(*, 101) ref, d
+    write(*, 102) 'ref', scref
+    write(*, 102) 'tgt', sctgt
+    write(*, 102) 'sol', scd
+    write(*, 102) 'qsl', qscd
+    write(*, 102) 'nd1', scdn1
+    write(*, 102) 'nd2', scdn2
+    write(*, 102) 'lpr', scdlp, (scdlp-scd)/scd, (scdlp-scd)
+    write(*, 102) 'hpr', scdhp, (scdhp-scd)/scd, (scdhp-scd)
+    write(*, 102) 'nlp', scdnl, (scdnl-scd)/scd, (scdnl-scd)
+    write(*, 102) 'nhp', scdnh, (scdnh-scd)/scd, (scdnh-scd)
+
+  end subroutine test_hpangle
 
 end program test_emu_ugg
 
