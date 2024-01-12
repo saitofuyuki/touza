@@ -1,10 +1,10 @@
 !!!_! nio_sparse.F90 - TOUZA/Nio sparse matrix interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Apr 1 2023
-#define TIME_STAMP 'Time-stamp: <2023/10/24 16:04:56 fuyuki nio_sparse.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/04/14 09:46:55 fuyuki nio_sparse.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2023
+! Copyright (C) 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -480,7 +480,8 @@ contains
     ! blank cname when default
     call choice_a(co, ' ', cname)
     if (co.eq.' ') then
-       n = column_def
+       call inquire_header_coor(head, col_coor, idx=n)
+       if (n.le.0) n = column_def
     else
        call inquire_header_coor(head, co, idx=n)
        if (n.le.0) n = column_none
@@ -1032,6 +1033,7 @@ contains
     if (ierr.eq.0) call nio_write_header(ierr, xhd, krect, u)
     if (ierr.eq.0) then
        if (is_match_format(kfmt, st='P')) then
+          ndata = 0
           call ptx_write_data &
                & (ierr,  &
                &  popts, wsubv, mrow,  d,    ndata,   &
@@ -1107,6 +1109,7 @@ contains
     if (ierr.eq.0) call nio_write_header(ierr, xhd, krect, u)
     if (ierr.eq.0) then
        if (is_match_format(kfmt, st='P')) then
+          ndata = 0
           call ptx_write_data &
                & (ierr,  &
                &  popts, wsubv, mrow,  d,    ndata,   &
@@ -1182,6 +1185,7 @@ contains
     if (ierr.eq.0) call nio_write_header(ierr, xhd, krect, u)
     if (ierr.eq.0) then
        if (is_match_format(kfmt, st='P')) then
+          ndata = 0
           call ptx_write_data &
                & (ierr,  &
                &  popts, wsubv, mrow,  d,    ndata,   &
@@ -1202,7 +1206,7 @@ contains
   end subroutine nio_store_csr_i
 
 !!!_ + COO+JDS-like storage procedures
-!!!_  & nio_restore_csr
+!!!_  & nio_restore_qjds
   subroutine nio_restore_qjds_d &
        & (ierr, d,  ridx,  cofs, &
        &  hd,   u,  krect, colc, flag, kopts)
@@ -2222,6 +2226,7 @@ contains
           call inquire_header_coor(hdest, co, idx=colc, mem=mc)
           if (colc.eq.0) colc = column_none
        endif
+       if (co.eq.' ') co = col_coor
        bco = search_null_coor(hdest)
        if (colc.ge.1.and.colc.le.laxs) then
           if (mc.gt.0) then
