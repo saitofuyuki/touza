@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2024/01/20 17:31:02 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/02 22:10:13 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024
@@ -81,10 +81,23 @@ module TOUZA_Emu_ugg
 
   integer,parameter,public :: NGEOG = 2
   integer,parameter,public :: JLATI = _LAIDX, JLONGI = _LOIDX
+
+  ! symmetric properties
+  integer,parameter,public :: symm_error = -1
+  integer,parameter,public :: symm_asymm = 0
+  integer,parameter,public :: symm_odd   = 1        ! 1: symmetric flag
+  integer,parameter,public :: symm_even  = 1 + 2    ! 2: even flag
+  integer,parameter,public :: symm_span  = 4
+
+  ! monotonic properties
+  integer,parameter,public :: non_monotonic = 0
+  integer,parameter,public :: equidistant_strict = 1   ! sign denotes ascending/descending
+  integer,parameter,public :: equidistant_enough = 2
+  integer,parameter,public :: non_equidistant = 4
 !!!_ + cache size and index
   integer,parameter,public :: ncache_psgp_lo = 2
   integer,parameter,public :: ncache_psgp_la = 5
-  integer,parameter,public :: ncache_psgp_co = 13
+  integer,parameter,public :: ncache_psgp_co = 14
 
   integer,parameter :: icache_psgp_sindlo = 1
   integer,parameter :: icache_psgp_cosdlo = 2
@@ -108,6 +121,7 @@ module TOUZA_Emu_ugg
   integer,parameter :: icache_psgp_psf  = 11 ! scale factor at pole
   integer,parameter :: icache_psgp_e2c  = 12 ! (1 - e^2)
   integer,parameter :: icache_psgp_aco  = 13 ! 1 + e2c (atanh(e) / e)
+  integer,parameter :: icache_psgp_tslat= 14 ! true latitude
 
   integer,parameter :: lim_psginv = OPT_PSGINV_ITER_LIMIT
 !!!_  - static
@@ -160,10 +174,6 @@ module TOUZA_Emu_ugg
      module procedure check_precision_d, check_precision_f
   end interface check_precision
 
-  interface is_equidistant
-     module procedure is_equidistant_d
-  end interface is_equidistant
-
   interface span_longitude
      module procedure span_longitude_d
   end interface span_longitude
@@ -197,6 +207,13 @@ module TOUZA_Emu_ugg
   interface psgp_set
      module procedure psgp_set_d
   end interface psgp_set
+  interface psgp_set_step
+     module procedure psgp_set_step_d
+  end interface psgp_set_step
+  interface psgp_inquire
+     module procedure psgp_inquire_d
+  end interface psgp_inquire
+
   interface psgp_fwd
      module procedure psgp_fwd_core_d, psgp_fwd_once_d
   end interface psgp_fwd
@@ -244,6 +261,9 @@ module TOUZA_Emu_ugg
   interface psgp_bwd_area
      module procedure psgp_bwd_area_d
   end interface psgp_bwd_area
+  interface psgp_bwd_area2
+     module procedure psgp_bwd_area2_d
+  end interface psgp_bwd_area2
   interface psgp_fwd_core
      module procedure psgp_fwd_core_d
   end interface psgp_fwd_core
@@ -497,6 +517,16 @@ module TOUZA_Emu_ugg
      module procedure hpSplit_d
   end interface hpSplit
 
+  interface check_symmetric
+     module procedure check_symmetric_d
+  end interface check_symmetric
+  interface check_monotonic
+     module procedure check_monotonic_d
+  end interface check_monotonic
+  interface is_equidistant
+     module procedure is_equidistant_d
+  end interface is_equidistant
+
   interface diag_sc
      module procedure diag_sc_d
   end interface diag_sc
@@ -509,16 +539,19 @@ module TOUZA_Emu_ugg
   public get_longitude, mid_longitude,  div_longitude
   public check_longitude, check_div_longitude
   public get_latitude,  gauss_latitude, mid_latitude, div_latitude
+  public check_symmetric, check_monotonic
   public check_precision, is_equidistant
   public deg2rad, rad2deg
 
   public flatten_to_ecc
 
   public psgp_set_byf, psgp_set, psgp_cachela, psgp_cachelo
+  public psgp_set_step
+  public psgp_inquire
   public psgp_fwd,    psgp_fwd_isf, psgp_fwd_cis
   public psgp_bwd_ll, psgp_bwd_tr
   public psgp_bwd_sf, psgp_bwd_isf, psgp_bwd_iaf
-  public psgp_bwd_length, psgp_bwd_area
+  public psgp_bwd_length, psgp_bwd_area, psgp_bwd_area2
   public psgp_comp_dlon
   public psgp_bwd_geod
   public psgp_surf_area
@@ -1536,7 +1569,7 @@ contains
 
     real(kind=KTGT),parameter :: ONE=1.0_KTGT, ZERO=0.0_KTGT
     real(kind=KTGT),parameter :: TWO=2.0_KTGT
-    real(kind=KTGT) :: s, d
+    real(kind=KTGT) :: d
     real(kind=KTGT) :: tcf, lt
     real(kind=KTGT) :: tglat, tclat, cc, e2c
     real(kind=KTGT) :: fc, c
@@ -1573,6 +1606,7 @@ contains
     cco(icache_psgp_ecc)  = ecc
     cco(icache_psgp_e2c)  = e2c
     cco(icache_psgp_olon) = lonorg
+    cco(icache_psgp_tslat) = latts
     if (ecc.eq.ZERO) then
        cco(icache_psgp_aco) = ONE + e2c
     else
@@ -1585,6 +1619,32 @@ contains
        cco(icache_psgp_flat) = ONE - fc
     endif
 
+    cco(icache_psgp_tol) = choice(ONE, tol)
+    call psgp_set_step(cco, xs, ys)
+    ! s = choice(ONE, xs)
+    ! if (s.eq.ZERO) s = ONE
+    ! cco(icache_psgp_xco)  = a / s
+
+    ! s = choice(ONE, ys)
+    ! if (s.eq.ZERO) s = ONE
+    ! cco(icache_psgp_yco)  = a / s
+  end subroutine psgp_set_d
+!!!_  & psgp_set_step
+  subroutine psgp_set_step_d &
+       & (cco, xs, ys)
+    ! [caution]
+    ! xs ys != 1 are special configuration for amida,
+    ! which are not fully tested on consistency.
+    use TOUZA_Std,only: KTGT=>KDBL, choice
+    implicit none
+    real(kind=KTGT),intent(inout)       :: cco(*)
+    real(kind=KTGT),intent(in),optional :: xs, ys  ! scale for x,y (default == 1)
+
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT, ZERO=0.0_KTGT
+    real(kind=KTGT) :: s, a
+
+    a = cco(icache_psgp_maj)
+
     s = choice(ONE, xs)
     if (s.eq.ZERO) s = ONE
     cco(icache_psgp_xco)  = a / s
@@ -1593,9 +1653,35 @@ contains
     if (s.eq.ZERO) s = ONE
     cco(icache_psgp_yco)  = a / s
 
-    cco(icache_psgp_tol) = choice(ONE, tol)
+  end subroutine psgp_set_step_d
 
-  end subroutine psgp_set_d
+!!!_  & psgp_inquire
+  subroutine psgp_inquire_d &
+       & (ierr, cco, tslat, olat, olon, psign)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    integer,        intent(out)          :: ierr
+    real(kind=KTGT),intent(in)           :: cco(*)
+    real(kind=KTGT),intent(out),optional :: tslat
+    real(kind=KTGT),intent(out),optional :: olat
+    real(kind=KTGT),intent(out),optional :: olon
+    real(kind=KTGT),intent(out),optional :: psign
+    ierr = 0
+    if (present(tslat)) then
+       tslat = cco(icache_psgp_tslat)
+    endif
+    if (present(olon)) then
+       olon = cco(icache_psgp_olon)
+    endif
+    if (present(olat)) then
+       olat = cco(icache_psgp_sign)
+       olat = olat * (pi_(0.0_KTGT)) / 2.0_KTGT
+    endif
+    if (present(psign)) then
+       psign = cco(icache_psgp_sign)
+    endif
+  end subroutine psgp_inquire_d
+
 !!!_  & psgp_cachela - lat cache for stereographic projection (pole)
   subroutine psgp_cachela_d &
     & (cla, lat, cco)
@@ -2166,6 +2252,103 @@ contains
        res = rsol * dref
     endif
   end subroutine psgp_bwd_area_d
+
+!!!_  & psgp_bwd_area2 - sum using difference
+  subroutine psgp_bwd_area2_d &
+       & (area, x0, y0, x1, y1, cco, levbgn, levend, tol, res, kref)
+    use TOUZA_Std,only: KTGT=>KDBL
+    use TOUZA_Std,only: choice
+    implicit none
+    real(kind=KTGT),intent(out)          :: area
+    real(kind=KTGT),intent(in)           :: x0, y0, x1, y1
+    real(kind=KTGT),intent(in)           :: cco(*)
+    integer,        intent(in)           :: levbgn, levend
+    real(kind=KTGT),intent(in)           :: tol
+    real(kind=KTGT),intent(out),optional :: res
+    real(kind=KTGT),intent(in), optional :: kref
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+    real(kind=KTGT),parameter :: ONE=2.0_KTGT
+    real(kind=KTGT),parameter :: HALF=0.5_KTGT
+    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
+
+    real(kind=KTGT) :: xs, ys, tx, ty
+    real(kind=KTGT) :: xp, yp
+    real(kind=KTGT) :: k0, k2prev, dk, k1, k2
+    real(kind=KTGT) :: etol
+    real(kind=KTGT) :: dref, rsol
+
+    integer,parameter :: llev = BIT_SIZE(0) - 1
+    real(kind=KTGT) :: buf1(0:llev * 2)    ! sum (dk)
+    real(kind=KTGT) :: buf2(0:llev * 2)    ! sum (dk**2)
+    integer jlev
+    integer jdx, jdy
+    integer bpos, bj
+    integer ndiv
+
+    xs = x1 - x0
+    ys = y1 - y0
+    xp = (x1 + x0) / TWO
+    yp = (y1 + y0) / TWO
+
+    dref = xs * ys
+    k0 = choice(-ONE, kref)
+    if (k0.lt.ZERO) k0 = psgp_bwd_isf(xp, yp, cco)
+
+    if (tol.lt.ZERO) then
+       etol = abs(tol) / dref
+    else
+       k1 = psgp_bwd_iaf(xp, yp, cco)
+       etol = spacing(k1) * tol
+    endif
+
+    k2prev = ZERO
+    rsol = ZERO
+    ndiv = 1
+    buf2(0) = ZERO
+    do jlev = max(levbgn, 1), min(levend, llev) - 1
+       bpos = 0
+       ndiv = 2 ** jlev
+       tx = xs / real(ndiv, kind=KTGT)
+       ty = ys / real(ndiv, kind=KTGT)
+       do jdy = 0, ndiv - 1
+          yp = y0 + ty * (real(jdy, kind=KTGT) + HALF)
+          do jdx = 0, ndiv - 1
+             xp = x0 + tx * (real(jdx, kind=KTGT) + HALF)
+
+             dk = psgp_bwd_isf(xp, yp, cco) - k0
+             buf1(bpos) = dk
+             buf2(bpos) = dk ** 2
+
+             bj = jdy * ndiv + jdx
+             do
+                if (mod(bj, 2).eq.0) exit
+                buf1(bpos - 1) = buf1(bpos - 1) + buf1(bpos)
+                buf2(bpos - 1) = buf2(bpos - 1) + buf2(bpos)
+                bj = bj / 2
+                bpos = bpos - 1
+             enddo
+             bpos = bpos + 1
+          enddo
+       enddo
+       k2 = buf2(0) / real(ndiv * ndiv, kind=KTGT)
+
+       rsol = k2 - k2prev
+       ! k1 = buf1(0) / real(ndiv * ndiv, kind=KTGT)
+       ! write(*, *) 'area2:', jlev, k0 ** 2, k0 * k1 * TWO, k2, rsol
+       if (abs(rsol).le.etol) exit
+       k2prev = k2
+    enddo
+
+    buf1(0) = buf1(0) / real(ndiv * ndiv, kind=KTGT)
+    buf2(0) = buf2(0) / real(ndiv * ndiv, kind=KTGT)
+    area = k0 * (k0 + TWO * buf1(0)) + buf2(0)
+    ! area = k0 ** 2 + (((TWO * k0 * buf1(0)) + buf2(0)) / real(ndiv * ndiv, kind=KTGT))
+    area = area * dref
+
+    if (present(res)) then
+       res = rsol * dref
+    endif
+  end subroutine psgp_bwd_area2_d
 
 !!!_  & psgp_bwd_geod
   subroutine psgp_bwd_geod_d &
@@ -4832,7 +5015,154 @@ contains
     enddo
   end function agmpd_area_core_d
 
-!!!_ + private procedures
+!!!_ + misc procedures
+!!!_  & check_symmetric - check if the array is equidistant under tolerance
+  integer function check_symmetric_d &
+       & (x, n, tol, e, o) result(k)
+    use TOUZA_Std,only: KTGT=>KDBL, choice
+    implicit none
+    real(kind=KTGT),intent(in)           :: x(0:*)
+    integer,        intent(in)           :: n
+    real(kind=KTGT),intent(in), optional :: tol   ! default: max(x) * 2 eps
+    real(kind=KTGT),intent(out),optional :: e     ! error
+    real(kind=KTGT),intent(in), optional :: o     ! origin
+
+    integer jorg
+    real(kind=KTGT) :: org, t, r, em
+    integer j, nh, nl
+
+    k = symm_error
+
+    org = choice(0.0_KTGT, o)
+
+    t = choice(-1.0_KTGT, tol)
+    if (t.lt.0.0_KTGT) then
+       t = max(abs(x(0)), abs(x(n-1))) * (epsilon(0.0_KTGT) * 2.0_KTGT)
+    endif
+
+    jorg = -1
+    if ((x(0) - org).lt.+t) then
+       do j = 1, n - 1
+          if ((x(j) - org).ge.-t) then
+             jorg = j
+             exit
+          endif
+       enddo
+    else if ((x(0) - org).gt.-t) then
+       do j = 1, n - 1
+          if ((x(j) - org).le.+t) then
+             jorg = j
+             exit
+          endif
+       enddo
+    endif
+
+    if (jorg.lt.0) then
+       k = symm_asymm
+       em = 0.0_KTGT
+    else if (ABS(x(jorg) - org).le.t) then
+       ! origin is member
+       nh = n - 1 - jorg
+       nl = jorg - 0
+       em = 0.0_KTGT
+       if (nh.eq.0.or.nl.eq.0) then
+          k = symm_asymm
+       else
+          k = symm_even
+          if (nh.eq.nl) k = k + symm_span
+          do j = 1, min(nh, nl)
+             r = abs(x(jorg + j) - x(jorg - j))
+             em = max(em, r)
+             if (r.gt.t) k = symm_asymm
+          enddo
+       endif
+    else
+       ! origin is not member
+       nh = n - jorg
+       nl = jorg - 0
+       em = 0.0_KTGT
+       k = symm_odd
+       if (nh.eq.nl) k = k + symm_span
+       do j = 0, min(nh, nl) - 1
+          r = abs(x(jorg + j) - x(jorg - j - 1))
+          em = max(em, r)
+          if (r.gt.t) k = symm_asymm
+       enddo
+    endif
+    if (present(e)) then
+       e = em
+    endif
+  end function check_symmetric_d
+!!!_  - check_monotonic
+  integer function check_monotonic_d &
+       & (x, n, ddev, jbgn, jend) result(k)
+    use TOUZA_Std,only: KTGT=>KDBL, choice, set_if_present
+    implicit none
+    real(kind=KTGT),intent(in)           :: x(0:*)
+    integer,        intent(in)           :: n
+    real(kind=KTGT),intent(out),optional :: ddev  ! delta maximum-minimum
+    integer,        intent(out),optional :: jbgn, jend
+
+    real(kind=KTGT) :: dmax, dmin
+    integer j
+
+    if (n.le.1) then
+       k = non_monotonic
+       continue
+    else if (x(0).lt.x(1)) then
+       ! monotonic increase
+       k = +1
+       do j = 1, n - 1
+          if (x(j-1).ge.x(j)) then
+             k = non_monotonic
+             exit
+          endif
+       enddo
+    else if (x(0).gt.x(1)) then
+       ! monotonic decrease
+       k = -1
+       do j = 1, n - 1
+          if (x(j-1).le.x(j)) then
+             k = non_monotonic
+             exit
+          endif
+       enddo
+    else
+       k = non_monotonic
+    endif
+    if (k.gt.non_monotonic) then
+       call set_if_present(jbgn, 0)
+       call set_if_present(jend, n)
+    else if (k.lt.non_monotonic) then
+       call set_if_present(jbgn, n-1)
+       call set_if_present(jend, -1)
+    else
+       call set_if_present(jbgn, 0)
+       call set_if_present(jend, 0)
+    endif
+    if (present(ddev)) then
+       if (k.eq.non_monotonic) then
+          ddev = +HUGE(0.0_KTGT)
+       else
+          dmax = MAXVAL(x(1:n-1) - x(0:n-2))
+          dmin = MINVAL(x(1:n-1) - x(0:n-2))
+          ddev = dmax - dmin
+          if (ddev.eq.0.0_KTGT) then
+             k = k * equidistant_strict
+          else
+             dmax = MAXVAL(abs(x(0:n-1)))
+             dmin = MINVAL(abs(x(0:n-1)), abs(x(0:n-1)).gt.0.0_KTGT)
+             if (abs(ddev * (dmin/dmax)).lt.epsilon(ddev)) then
+                k = k * equidistant_enough
+             else
+                k = k * non_equidistant
+             endif
+          endif
+       endif
+    endif
+    return
+  end function check_monotonic_d
+
 !!!_  & is_equidistant - check if the array is equidistant under tolerance
   logical function is_equidistant_d(x, n, tol, e, r) result(b)
     use TOUZA_Std,only: KTGT=>KDBL, choice
@@ -4879,6 +5209,7 @@ contains
        endif
     endif
   end function is_equidistant_d
+!!!_ + private procedures
 !!!_  & check_precision - epsilon check (inherit gauss())
 !!!_   . NOTE
   !  Actualy the return value is NOT epsilon(), but the first
@@ -6330,6 +6661,7 @@ contains
     integer,parameter :: nside = 4
     real(kind=KTGT) :: garea(0:nside-1)
     real(kind=KTGT) :: asum
+    integer llev
     integer levbgn, levend
     real(kind=KTGT) :: parea, atol, ares
 
@@ -6412,17 +6744,34 @@ contains
        js = js + 1
     enddo
 
+    asum = - ((garea(0) + garea(2)) + (garea(1) + garea(3)))
+
+123 format(A, ':areag: ', I0, 1x, F24.10)
+121 format(A, ':area1: ', I0, 1x, F24.10, 1x, ES8.1)
+122 format(A, ':area2: ', I0, 1x, F24.10, 1x, ES8.1)
+    write(*, 123) trim(tag), 0, asum
+
     levbgn = 8
     levend = 12
-    atol = 0.0_KTGT
-    call psgp_bwd_area &
-         & (parea, &
-         &  cpos(1, POSSW), cpos(2, POSSW), cpos(1, POSNE), cpos(2, POSNE), &
-         &  cco, levbgn, levend, atol, ares)
+    do llev = levbgn, levend
+       atol = 0.0_KTGT
+       call psgp_bwd_area &
+            & (parea, &
+            &  cpos(1, POSSW), cpos(2, POSSW), cpos(1, POSNE), cpos(2, POSNE), &
+            &  cco, llev, llev+1, atol, ares)
+       write(*, 121) trim(tag), llev, parea, ares
+    enddo
 
-    asum = - ((garea(0) + garea(2)) + (garea(1) + garea(3)))
-121 format(A, ':area: ', F24.8, 1x, F24.8, 1x, ES8.1)
-    write(*, 121) trim(tag), asum, parea, ares
+    ! levbgn = 8
+    ! levend = 13
+    do llev = levbgn, levend
+       atol = 0.0_KTGT
+       call psgp_bwd_area2 &
+            & (parea, &
+            &  cpos(1, POSSW), cpos(2, POSSW), cpos(1, POSNE), cpos(2, POSNE), &
+            &  cco, llev, llev+1, atol, ares)
+       write(*, 122) trim(tag), llev, parea, ares
+    enddo
 
   end subroutine test_pscell_props
 
@@ -6544,8 +6893,8 @@ contains
     integer :: xrange(2)
     integer narg, jarg
     integer j
-    integer xbgn, xend
-
+    integer xbgn, xend, swap
+    logical bswap
     ierr = 0
 
     xbgn = -1
@@ -6557,6 +6906,7 @@ contains
     call get_option(ierr, reflon, 'reflon', 0.0_KTGT)
     call get_option(ierr, dlat,   'dlat',   0.0_KTGT)
     call get_option(ierr, dlon,   'dlon',   0.0_KTGT)
+    call get_option(ierr, swap,   'swap',   1)
 
     if (ktest.eq.1) then
        if (ierr.eq.0) then
@@ -6585,13 +6935,14 @@ contains
           endif
        enddo
     else
+       bswap = swap.eq.1
        reflat = 90.0_KTGT
        reflon = 0.0_KTGT
        jarg = 1
        if (ierr.eq.0) call get_param(ierr, reflat, jarg)
        jarg = jarg + 1
        if (ierr.eq.0) call get_param(ierr, reflon, jarg)
-       if (ierr.eq.0) call test_agmp2(ierr, reflat, reflon, dlat, dlon, .TRUE.)
+       if (ierr.eq.0) call test_agmp2(ierr, reflat, reflon, dlat, dlon, bswap)
     endif
     return
   end subroutine batch_test_agmp
@@ -6679,27 +7030,30 @@ contains
     zlon1(:) = setd_sincos(real(lon1, kind=KREF))
     zlon2(:) = setd_sincos(real(lon2, kind=KREF))
 
-101 format('agmp:lat:q ', I0, 1x, ES26.18, 1x, ES26.18)
-102 format('agmp:lat:v ', I0, 1x, ES26.18, 1x, ES26.18)
+301 format('agmp:in ', 4(1x, ES16.9))
+    write(*, 301) lat1, lat2, lon1, lon2
 
-111 format('agmp:tdlath:q ', ES26.18)
-121 format('agmp:tdlath:v ', ES26.18, 1x, ES26.18)
-131 format('agmp:tdlath:u ', ES26.18, 1x, ES26.18)
+101 format('agmp:lat:q ', I0, 1x, ES23.15, 1x, ES23.15)
+102 format('agmp:lat:v ', I0, 1x, ES23.15, 1x, ES23.15)
 
-112 format('agmp:tdlonh:q ', ES26.18)
-122 format('agmp:tdlonh:v ', ES26.18, 1x, ES26.18)
-132 format('agmp:tdlonh:u ', ES26.18, 1x, ES26.18)
+111 format('agmp:tdlath:q ', ES23.15)
+121 format('agmp:tdlath:v ', ES23.15, 1x, ES23.15)
+131 format('agmp:tdlath:u ', ES23.15, 1x, ES23.15)
 
-201 format('agmp:area:q ', ES26.18, 1x, ES26.18, 1x, ES26.18)
-211 format('agmp:area:v ', ES26.18, 1x, ES26.18, 1x, ES26.18)
-221 format('agmp:area:u ', ES26.18, 1x, ES26.18, 1x, ES26.18)
-231 format('agmp:area:dd ', I0, 1x, ES26.18, 1x, ES26.18, 1x, ES26.18)
-241 format('agmp:area:ed ', I0, 1x, ES26.18, 1x, ES26.18, 1x, ES26.18)
-251 format('agmp:area:di ', I0, 1x, ES26.18, 1x, ES26.18, 1x, ES26.18)
-261 format('agmp:area:ei ', I0, 1x, ES26.18, 1x, ES26.18, 1x, ES26.18)
+112 format('agmp:tdlonh:q ', ES23.15)
+122 format('agmp:tdlonh:v ', ES23.15, 1x, ES23.15)
+132 format('agmp:tdlonh:u ', ES23.15, 1x, ES23.15)
 
-212 format('agmp:err:v  ', ES26.18, 1x, ES26.18)
-222 format('agmp:err:u  ', ES26.18, 1x, ES26.18)
+201 format('agmp:area:q ', ES23.15, 1x, ES23.15, 1x, ES23.15)
+211 format('agmp:area:v ', ES23.15, 1x, ES23.15, 1x, ES23.15)
+221 format('agmp:area:u ', ES23.15, 1x, ES23.15, 1x, ES23.15)
+231 format('agmp:area:dd ', I0, 1x, ES23.15, 1x, ES23.15, 1x, ES23.15)
+241 format('agmp:area:ed ', I0, 1x, ES23.15, 1x, ES23.15, 1x, ES23.15)
+251 format('agmp:area:di ', I0, 1x, ES23.15, 1x, ES23.15, 1x, ES23.15)
+261 format('agmp:area:ei ', I0, 1x, ES23.15, 1x, ES23.15, 1x, ES23.15)
+
+212 format('agmp:err:v  ', ES23.15, 1x, ES23.15)
+222 format('agmp:err:u  ', ES23.15, 1x, ES23.15)
 
     write(*, 101) 1, _SIN(zlat1), _COS(zlat1)
     write(*, 102) 1, _SIN(ylat1), _COS(ylat1)
@@ -6850,20 +7204,20 @@ contains
 #endif
 
 101 format('agmp:in ',  F11.7, 1x, ES9.1, 2x, F11.7, 1x, ES9.1)
-109 format('agmp:dev ', I0, 2(1x, ES26.18))
-111 format('agmp:lon ', I0, 1x, ES26.18, 2(1x, ES26.18))
-112 format('agmp:dlat ', I0, 1x, 2(1x, ES26.18))
+109 format('agmp:dev ', I0, 2(1x, ES23.15))
+111 format('agmp:lon ', I0, 1x, ES23.15, 2(1x, ES23.15))
+112 format('agmp:dlat ', I0, 1x, 2(1x, ES23.15))
 
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
-102 format('agmp:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
-103 format('agmp:eq   ', I0, 1x, ES26.18, 1x, ES16.8, 1x, 2(1x, ES26.18))
-122 format('agmp:e:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
-132 format('agmp:d:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
+102 format('agmp:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
+103 format('agmp:eq   ', I0, 1x, ES23.15, 1x, ES16.8, 1x, 2(1x, ES23.15))
+122 format('agmp:e:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
+132 format('agmp:d:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
 #else
-102 format('agmp:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8)
-103 format('agmp:eq   ', I0, 1x, ES26.18, 1x, 2(1x, ES26.18))
-122 format('agmp:e:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8)
-132 format('agmp:d:area ', I0, 1x, ES26.18, 1x, ES16.8, 1x, ES16.8)
+102 format('agmp:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
+103 format('agmp:eq   ', I0, 1x, ES23.15, 1x, 2(1x, ES23.15))
+122 format('agmp:e:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
+132 format('agmp:d:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
 #endif
     write(*, 101) xrlat, xdlat, reflon, dlon
     write(*, 109) 1, tdlath, dlonh
@@ -7034,7 +7388,7 @@ contains
     scdnh(:) = nml_sincos(_SIN(scdhp), _COS(scdhp))
 
 101 format('hpangle:', ES16.9, 1x, ES16.9)
-102 format('hpsub:', A, ': ', 2(1x, ES26.18), 2(1x, ES10.3), 2(1x, ES10.3))
+102 format('hpsub:', A, ': ', 2(1x, ES23.15), 2(1x, ES10.3), 2(1x, ES10.3))
     write(*, 101) ref, d
     write(*, 102) 'ref', scref
     write(*, 102) 'tgt', sctgt
