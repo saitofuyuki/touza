@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2023/11/26 11:16:10 fuyuki mt_local.m4>
+dnl Time-stamp: <2024/01/31 14:10:39 fuyuki mt_local.m4>
 
 dnl Copyright: 2020-2023 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -13,6 +13,8 @@ MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_command_argument], [1], [])
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getarg], [1, T], [
      character T*30])
 MT_FORTRAN_BATCH_CHECK_FUNCTION([command_argument_count], [])
+
+MT_FORTRAN_BATCH_CHECK_FUNCTION([new_line], ['a'])
 
 dnl Fortran 2008
 MT_FORTRAN_BATCH_CHECK_FUNCTION([hypot], [0.0, 0.0])

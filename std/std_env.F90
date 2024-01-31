@@ -1,10 +1,10 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2023/06/08 10:53:56 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/01/31 14:15:45 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2023
+! Copyright (C) 2020-2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -58,6 +58,10 @@
 #endif
 #ifndef   OPT_INTEGER_OFFSET_KIND
 #  define OPT_INTEGER_OFFSET_KIND 0  /* kind to store file position */
+#endif
+
+#ifndef    ASCII_LF
+#  define  ASCII_LF 10     /* line-feed ascii code */
 #endif
 !!!_ + debug
 #ifndef   TEST_STD_ENV
@@ -179,6 +183,7 @@ module TOUZA_Std_env
   integer,save,public :: uout = OPT_STDOUT_UNIT
   integer,save,public :: uerr = OPT_STDERR_UNIT
 
+  integer,parameter,public :: lpath = OPT_PATH_LEN
   ! direct unformatted
   integer,save,public :: nb_recl = 0          ! number of bytes per unit record length
   ! stream unformatted
@@ -223,6 +228,7 @@ module TOUZA_Std_env
   public init_io_status,   is_eof_ss
   public get_size_bytes,   conv_b2strm,   get_mems_bytes
   public get_login_name,   get_host_name
+  public is_new_line,      new_line_ascii
 #if DEBUG_PRIVATES
   public check_bodr_mem, check_bodr_files
   public brute_force_stdu
@@ -2498,6 +2504,28 @@ contains
 #endif
   end subroutine get_host_name
 !!!_  & get_env_var
+!!!_ + misc
+!!!_  & is_new_line()
+  logical function is_new_line(c) result(b)
+    implicit none
+    character,intent(in) :: c
+#if HAVE_FORTRAN_NEW_LINE
+    b = c .eq. new_line(c)
+#else /* not HAVE_FORTRAN_NEW_LINE */
+    b = IACHAR(c) .eq. ASCII_LF
+#endif
+  end function is_new_line
+
+!!!_  & new_line_ascii()
+  character function new_line_ascii() result(c)
+    implicit none
+#if HAVE_FORTRAN_NEW_LINE
+    c = new_line('A')
+#else /* not HAVE_FORTRAN_NEW_LINE */
+    c = ACHAR(ASCII_LF)
+#endif
+  end function new_line_ascii
+
 !!!_ + end TOUZA_Std_env
 end module TOUZA_Std_env
 
