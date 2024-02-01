@@ -1,10 +1,10 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/07/01 18:10:58 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/02 09:31:16 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2023
+! Copyright (C) 2020-2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -908,15 +908,26 @@ contains
   ! parse_number[,123] = (-999 0)    (-999 1)
   subroutine parse_number_i (ierr, num, str, def)
     implicit none
-    integer,         intent(out)   :: ierr
-    integer,         intent(inout) :: num
-    character(len=*),intent(in)    :: str
-    integer,optional,intent(in)    :: def
+    integer,         intent(out)         :: ierr
+    integer,         intent(inout)       :: num
+    character(len=*),intent(in)          :: str
+    integer,         intent(in),optional :: def
+    integer buf
+    if (str.eq.' ') then
+       if (present(def)) then
+          ierr = 0
+          num = def
+       else
+          ierr = _ERROR(ERR_INVALID_ITEM)
+       endif
+       return
+    endif
     ierr = check_number_string(str)
-    if (ierr.eq.0) then
-       read(str, *, IOSTAT=ierr) num
-    else if (present(def)) then
-       num = def
+    if (ierr.eq.0) read(str, *, IOSTAT=ierr) buf
+    if (ierr.ne.0) then
+       ierr = _ERROR(ERR_STRING_IO)
+    else
+       num = buf
     endif
   end subroutine parse_number_i
   subroutine parse_number_f (ierr, num, str, def)
@@ -926,11 +937,22 @@ contains
     real(kind=KTGT), intent(inout)       :: num
     character(len=*),intent(in)          :: str
     real(kind=KTGT), intent(in),optional :: def
+    real(kind=KTGT) buf
+    if (str.eq.' ') then
+       if (present(def)) then
+          ierr = 0
+          num = def
+       else
+          ierr = _ERROR(ERR_INVALID_ITEM)
+       endif
+       return
+    endif
     ierr = check_number_string(str)
-    if (ierr.eq.0) then
-       read(str, *, IOSTAT=ierr) num
-    else if (present(def)) then
-       num = def
+    if (ierr.eq.0) read(str, *, IOSTAT=ierr) buf
+    if (ierr.ne.0) then
+       ierr = _ERROR(ERR_STRING_IO)
+    else
+       num = buf
     endif
   end subroutine parse_number_f
   subroutine parse_number_d (ierr, num, str, def)
@@ -940,13 +962,25 @@ contains
     real(kind=KTGT), intent(inout)       :: num
     character(len=*),intent(in)          :: str
     real(kind=KTGT), intent(in),optional :: def
+    real(kind=KTGT) buf
+    if (str.eq.' ') then
+       if (present(def)) then
+          ierr = 0
+          num = def
+       else
+          ierr = _ERROR(ERR_INVALID_ITEM)
+       endif
+       return
+    endif
     ierr = check_number_string(str)
-    if (ierr.eq.0) then
-       read(str, *, IOSTAT=ierr) num
-    else if (present(def)) then
-       num = def
+    if (ierr.eq.0) read(str, *, IOSTAT=ierr) buf
+    if (ierr.ne.0) then
+       ierr = _ERROR(ERR_STRING_IO)
+    else
+       num = buf
     endif
   end subroutine parse_number_d
+!!!_    & check_number_string()
   integer function check_number_string(str) result (n)
     implicit none
     character(len=*),intent(in)  :: str
@@ -1266,7 +1300,7 @@ contains
        if (jpos.lt.jh) then
           if (nlim.ge.0) then
              if (n.ge.nlim) then
-                jerr = -1
+                jerr = _ERROR(ERR_OUT_OF_RANGE)
              else
                 call parse_number(jerr, v(n), str(jpos+1:jh))
              endif
@@ -1275,23 +1309,21 @@ contains
        else if (present(def)) then
           if (nlim.ge.0) then
              if (n.ge.nlim) then
-                jerr = -1
+                jerr = _ERROR(ERR_OUT_OF_RANGE)
              else
                 v(n) = def(n)
              endif
           endif
           n = n + 1
        else if (eallow) then
-          if (nlim.ge.0.and.n.ge.nlim) jerr = -1
+          if (nlim.ge.0.and.n.ge.nlim) jerr = _ERROR(ERR_OUT_OF_RANGE)
           n = n + 1
        endif
        jpos = jh + lsep
        if (js.eq.0) exit
        if (jerr.ne.0) exit
     enddo
-    if (jerr.ne.0) then
-       n = _ERROR(ERR_INVALID_PARAMETER)
-    endif
+    if (jerr.lt.0) n = jerr
     return
   end subroutine split_list_i
 
@@ -1334,7 +1366,7 @@ contains
        if (jpos.lt.jh) then
           if (nlim.ge.0) then
              if (n.ge.nlim) then
-                jerr = -1
+                jerr = _ERROR(ERR_OUT_OF_RANGE)
              else
                 call parse_number(jerr, v(n), str(jpos+1:jh))
              endif
@@ -1343,23 +1375,21 @@ contains
        else if (present(def)) then
           if (nlim.ge.0) then
              if (n.ge.nlim) then
-                jerr = -1
+                jerr = _ERROR(ERR_OUT_OF_RANGE)
              else
                 v(n) = def(n)
              endif
           endif
           n = n + 1
        else if (eallow) then
-          if (nlim.ge.0.and.n.ge.nlim) jerr = -1
+          if (nlim.ge.0.and.n.ge.nlim) jerr = _ERROR(ERR_OUT_OF_RANGE)
           n = n + 1
        endif
        jpos = jh + lsep
        if (js.eq.0) exit
        if (jerr.ne.0) exit
     enddo
-    if (jerr.ne.0) then
-       n = _ERROR(ERR_INVALID_PARAMETER)
-    endif
+    if (jerr.lt.0) n = jerr
     return
   end subroutine split_list_f
 
@@ -1402,7 +1432,7 @@ contains
        if (jpos.lt.jh) then
           if (nlim.ge.0) then
              if (n.ge.nlim) then
-                jerr = -1
+                jerr = _ERROR(ERR_OUT_OF_RANGE)
              else
                 call parse_number(jerr, v(n), str(jpos+1:jh))
              endif
@@ -1411,23 +1441,21 @@ contains
        else if (present(def)) then
           if (nlim.ge.0) then
              if (n.ge.nlim) then
-                jerr = -1
+                jerr = _ERROR(ERR_OUT_OF_RANGE)
              else
                 v(n) = def(n)
              endif
           endif
           n = n + 1
        else if (eallow) then
-          if (nlim.ge.0.and.n.ge.nlim) jerr = -1
+          if (nlim.ge.0.and.n.ge.nlim) jerr = _ERROR(ERR_OUT_OF_RANGE)
           n = n + 1
        endif
        jpos = jh + lsep
        if (js.eq.0) exit
        if (jerr.ne.0) exit
     enddo
-    if (jerr.ne.0) then
-       n = _ERROR(ERR_INVALID_PARAMETER)
-    endif
+    if (jerr.lt.0) n = jerr
     return
   end subroutine split_list_d
 
@@ -1946,6 +1974,8 @@ contains
     integer def(0:lim-1)
     integer j
     integer n, m
+    character(len=*),parameter :: sep = ':'
+
     do j = 0, lim - 1
        def(j) = - (j + 1)
     enddo
@@ -1954,14 +1984,15 @@ contains
 
     if (lim.lt.0) then
        ! count only
-       call split_list(n, v, str, ':', lim, empty=empty)
+       call split_list(n, v, str, sep, lim,      empty=empty)
        write(*, 101) 'c', empty, n, trim(str), lim
     else
-       call split_list(n, v, str, ':', lim, def, empty=empty)
+       call split_list(n, v, str, sep, lim, def, empty=empty)
        m = min(n, lim)
        write(*, 101) 'd', empty, n, trim(str), lim, v(0:m-1)
+
        v = def
-       call split_list(n, v, str, ':', lim, empty=empty)
+       call split_list(n, v, str, sep, lim,      empty=empty)
        m = min(n, lim)
        write(*, 101) 'n', empty, n, trim(str), lim, v(0:m-1)
     endif

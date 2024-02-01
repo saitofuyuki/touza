@@ -1,7 +1,7 @@
 /* touza.h - touza definitions */
 /*    Maintainer: SAITO Fuyuki */
 /*    Created: Jun 5 2020 */
-/*     Time-stamp: <2023/04/11 21:48:33 fuyuki touza.h> */
+/*     Time-stamp: <2024/02/02 08:11:28 fuyuki touza.h> */
 
 /* Copyright (C) 2020-2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
@@ -78,6 +78,7 @@
 #define ERR_IO_GENERAL          -49 /* general error at io operation */
 #define ERR_FILE_EXISTS         -50 /* file exists */
 #define ERR_FILE_NOT_EXISTS     -51 /* file not exists */
+#define ERR_STRING_IO           -52 /* general error at io operation on string */
 
 /* module specific errors */
 
