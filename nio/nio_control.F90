@@ -1,7 +1,7 @@
 !!!_! nio_control.F90 - TOUZA/Nio control center
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 12 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/08 13:18:05 fuyuki nio_control.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/02 09:44:17 fuyuki nio_control.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -345,7 +345,7 @@ contains
     integer,         intent(in)  :: flag
     integer,optional,intent(in)  :: unit
     integer f
-    integer ch, stt, m
+    integer ch, m
     logical bcache, bseq
 
     ierr = err_default

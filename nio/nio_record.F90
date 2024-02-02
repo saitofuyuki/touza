@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/30 22:40:04 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/02 09:43:47 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -5164,7 +5164,6 @@ contains
 
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer(kind=KIOFS) :: apini
-    integer f
     integer mfull  ! logical full-size
 
     ierr = 0
