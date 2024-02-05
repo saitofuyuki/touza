@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2024/02/02 09:15:33 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/16 12:46:48 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2024
@@ -96,9 +96,9 @@ module TOUZA_Std_arg
      integer :: lev
      character(len=lpath) :: file
      integer :: prev, next ! pointer
-     integer :: tbgn, tend ! key-value table
+     integer :: ebgn, eend ! key-value table (entry, physical index)
      integer :: pbgn, pend ! positional arguments
-     integer :: abgn, aend ! key-value arguments
+     integer :: abgn, aend ! key-value arguments (logical index)
   end type arg_chunk_t
 
   integer,save :: mchunk = 0
@@ -134,6 +134,11 @@ module TOUZA_Std_arg
      module procedure parse_param_ia, parse_param_fa, parse_param_da
   end interface parse_param
 
+  interface get_entry
+     module procedure get_entry_a
+     module procedure get_entry_i, get_entry_f, get_entry_d
+  end interface get_entry
+
   interface get_arg
      module procedure get_arg_a
   end interface get_arg
@@ -144,11 +149,13 @@ module TOUZA_Std_arg
 
   interface get_value
      module procedure get_value_a
+     module procedure get_value_i,  get_value_f,  get_value_d
+     module procedure get_value_ia, get_value_fa, get_value_da
   end interface get_value
 
-  interface get_value_seq
-     module procedure get_value_seq_a
-  end interface get_value_seq
+  ! interface get_value_seq
+  !    module procedure get_value_seq_a
+  ! end interface get_value_seq
 
   interface default_val
      module procedure default_val_a
@@ -178,10 +185,10 @@ module TOUZA_Std_arg
   public :: decl_pos_arg
   public :: parse
   public :: get_nparam, get_nargs
-  public :: get_param, get_array, get_option, get_arg
-  public :: get_key
-  public :: get_value,     get_value_a
-  public :: get_value_seq, get_value_seq_a
+  public :: get_param, get_array, get_option
+  public :: get_arg,   get_key,   get_value,  get_entry
+  public :: count_entries, query_nth_entry, forward_entry
+  ! public :: get_value_seq, get_value_seq_a
   public :: parse_param
   public :: inq_end_flags
   public :: check_param
@@ -509,8 +516,8 @@ contains
     endif
     if (ierr.eq.0) then
        tmp(lchunk:l-1)%lev  = -1
-       tmp(lchunk:l-1)%tbgn = -1
-       tmp(lchunk:l-1)%tend = -1
+       tmp(lchunk:l-1)%ebgn = -1
+       tmp(lchunk:l-1)%eend = -1
        tmp(lchunk:l-1)%pbgn = -1
        tmp(lchunk:l-1)%pend = -1
        tmp(lchunk:l-1)%abgn = -1
@@ -601,9 +608,9 @@ contains
        endif
     endif
     if (ierr.eq.0) then
-       achunk(jpos)%tbgn = mgtab
+       achunk(jpos)%ebgn = mgtab
        achunk(jpos)%pbgn = 0
-       achunk(jpos)%tend = -1
+       achunk(jpos)%eend = -1
        achunk(jpos)%file = file
 
        achunk(jpos)%prev = jref
@@ -749,7 +756,7 @@ contains
        enddo
        ! settle current chunk
        if (ierr.eq.0) then
-          achunk(jch)%tend = mgtab
+          achunk(jch)%eend = mgtab
        endif
 #else  /* not OPT_USE_COMMAND_LINE_ARGS */
        S = trim(cfile) // trim(cstdin)
@@ -801,9 +808,9 @@ contains
        if (jch.lt.0) ierr = _ERROR(ERR_PANIC)
        if (ierr.ne.0) exit
 
-       if (achunk(jch)%tbgn.lt.0) then
+       if (achunk(jch)%ebgn.lt.0) then
           if (ierr.eq.0) then
-             achunk(jch)%tbgn = mgtab
+             achunk(jch)%ebgn = mgtab
              if (achunk(jch)%file .eq. cstdin) then
                 ucur = uin
                 if (VCHECK_DETAIL(lv)) then
@@ -870,7 +877,7 @@ contains
     integer jch, jarg, jpos
     integer narg
 
-    integer jt, jf
+    integer je, jf
     integer,allocatable :: kpflag(:)
 
     ierr = err_default
@@ -891,18 +898,18 @@ contains
              ierr = _ERROR(ERR_PANIC)
              exit
           endif
-          narg = max(0, achunk(jch)%tend - achunk(jch)%tbgn)
-          achunk(jch)%tend = achunk(jch)%tbgn + narg
+          narg = max(0, achunk(jch)%eend - achunk(jch)%ebgn)
+          achunk(jch)%eend = achunk(jch)%ebgn + narg
           achunk(jch)%abgn = jarg
           achunk(jch)%aend = jarg + narg
 
           ! search alias
-          do jt = achunk(jch)%tbgn, achunk(jch)%tend - 1
-             if (atags(jt).ne.' ') then
+          do je = achunk(jch)%ebgn, achunk(jch)%eend - 1
+             if (atags(je).ne.' ') then
                 do jf = 0, malias - 1
-                   if (atags(jt).eq.ptags(jf) &
+                   if (atags(je).eq.ptags(jf) &
                         & .and. kpflag(jf).lt.0) then
-                      kpflag(jf) = jt
+                      kpflag(jf) = je
                       exit
                    endif
                 enddo
@@ -920,13 +927,13 @@ contains
        jf = 0
        loop_full: do
           if (jch.lt.0) exit
-          loop_chunk: do jt = achunk(jch)%tbgn, achunk(jch)%tend - 1
+          loop_chunk: do je = achunk(jch)%ebgn, achunk(jch)%eend - 1
              if (jf.ge.malias) exit loop_chunk
-             if (atags(jt).eq.' ') then
+             if (atags(je).eq.' ') then
                 do
                    if (jf.ge.malias) exit loop_chunk
                    if (kpflag(jf).lt.0) then
-                      atags(jt) = ptags(jf)
+                      atags(je) = ptags(jf)
                       if (ptags(jf).ne.' ') achunk(jch)%pbgn = achunk(jch)%pbgn - 1
                       jf = jf + 1
                       exit
@@ -1074,11 +1081,11 @@ contains
        achunk(jcx)%prev = jcf
        achunk(jcx)%next = achunk(jchunk)%next
        achunk(jcx)%file = achunk(jchunk)%file
-       achunk(jcx)%tbgn = mgtab
+       achunk(jcx)%ebgn = mgtab
        achunk(jcx)%pbgn = 0
 
        ! settle current chunk
-       achunk(jchunk)%tend = mgtab
+       achunk(jchunk)%eend = mgtab
        achunk(jchunk)%next = jcf
 
        mchunk = mchunk + nadd
@@ -1102,7 +1109,7 @@ contains
        atags(mgtab) = tag
        avals(mgtab) = val
        mgtab = mgtab + 1
-       achunk(jchunk)%tend = mgtab
+       achunk(jchunk)%eend = mgtab
        if (tag.eq.' ') achunk(jchunk)%pbgn = achunk(jchunk)%pbgn + 1
     endif
 
@@ -1143,14 +1150,14 @@ contains
     integer,         intent(in)          :: jpos
     character(len=*),intent(in),optional :: def
     logical,         intent(in),optional :: unset
-    integer jidx
+    integer jentr
 
     ierr = err_default
-    jidx = pos_search(jpos, achunk, mchunk, atags)
-    if (jidx.lt.0) then
+    jentr = pos_search(jpos, achunk, mchunk, atags)
+    if (jentr.lt.0) then
        call default_val(ierr, val, def, unset=unset)
     else
-       call extract_val(ierr, val, avals(jidx), cundef, def, unset=unset)
+       call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
     endif
     return
   end subroutine get_param_a
@@ -1163,14 +1170,14 @@ contains
     integer,intent(in)          :: jpos
     integer,intent(in),optional :: def
     logical,intent(in),optional :: unset
-    integer jidx
+    integer jentr
 
     ierr = err_default
-    jidx = pos_search(jpos, achunk, mchunk, atags)
-    if (jidx.lt.0) then
+    jentr = pos_search(jpos, achunk, mchunk, atags)
+    if (jentr.lt.0) then
        call default_val(ierr, val, def, unset=unset)
     else
-       call extract_val(ierr, val, avals(jidx), cundef, def, unset=unset)
+       call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
     endif
     return
   end subroutine get_param_i
@@ -1184,14 +1191,14 @@ contains
     integer,        intent(in)          :: jpos
     real(kind=KTGT),intent(in),optional :: def
     logical,        intent(in),optional :: unset
-    integer jidx
+    integer jentr
 
     ierr = err_default
-    jidx = pos_search(jpos, achunk, mchunk, atags)
-    if (jidx.lt.0) then
+    jentr = pos_search(jpos, achunk, mchunk, atags)
+    if (jentr.lt.0) then
        call default_val(ierr, val, def, unset=unset)
     else
-       call extract_val(ierr, val, avals(jidx), cundef, def, unset=unset)
+       call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
     endif
     return
   end subroutine get_param_f
@@ -1205,14 +1212,14 @@ contains
     integer,        intent(in)          :: jpos
     real(kind=KTGT),intent(in),optional :: def
     logical,        intent(in),optional :: unset
-    integer jidx
+    integer jentr
 
     ierr = err_default
-    jidx = pos_search(jpos, achunk, mchunk, atags)
-    if (jidx.lt.0) then
+    jentr = pos_search(jpos, achunk, mchunk, atags)
+    if (jentr.lt.0) then
        call default_val(ierr, val, def, unset=unset)
     else
-       call extract_val(ierr, val, avals(jidx), cundef, def, unset=unset)
+       call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
     endif
     return
   end subroutine get_param_d
@@ -1226,14 +1233,14 @@ contains
     integer,         intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
-    integer jidx
+    integer jentr
 
     ierr = err_default
-    jidx = pos_search(jpos, achunk, mchunk, atags)
-    if (jidx.lt.0) then
+    jentr = pos_search(jpos, achunk, mchunk, atags)
+    if (jentr.lt.0) then
        call default_vals(ierr, vals(:), def, unset=unset)
     else
-       call extract_vals(ierr, vals(:), avals(jidx), cundef, def, sep, unset=unset)
+       call extract_vals(ierr, vals(:), avals(jentr), cundef, def, sep, unset=unset)
     endif
     return
   end subroutine get_param_ia
@@ -1248,14 +1255,14 @@ contains
     real(kind=KTGT), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
-    integer jidx
+    integer jentr
 
     ierr = err_default
-    jidx = pos_search(jpos, achunk, mchunk, atags)
-    if (jidx.lt.0) then
+    jentr = pos_search(jpos, achunk, mchunk, atags)
+    if (jentr.lt.0) then
        call default_vals(ierr, vals(:), def, unset=unset)
     else
-       call extract_vals(ierr, vals(:), avals(jidx), cundef, def, sep, unset=unset)
+       call extract_vals(ierr, vals(:), avals(jentr), cundef, def, sep, unset=unset)
     endif
     return
   end subroutine get_param_fa
@@ -1270,14 +1277,14 @@ contains
     real(kind=KTGT), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
-    integer jidx
+    integer jentr
 
     ierr = err_default
-    jidx = pos_search(jpos, achunk, mchunk, atags)
-    if (jidx.lt.0) then
+    jentr = pos_search(jpos, achunk, mchunk, atags)
+    if (jentr.lt.0) then
        call default_vals(ierr, vals(:), def, unset=unset)
     else
-       call extract_vals(ierr, vals(:), avals(jidx), cundef, def, sep, unset=unset)
+       call extract_vals(ierr, vals(:), avals(jentr), cundef, def, sep, unset=unset)
     endif
     return
   end subroutine get_param_da
@@ -1293,14 +1300,14 @@ contains
     integer,         intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
-    integer jidx
+    integer jentr
 
     ierr = err_default
-    jidx = pos_search(jpos, achunk, mchunk, atags)
-    if (jidx.lt.0) then
+    jentr = pos_search(jpos, achunk, mchunk, atags)
+    if (jentr.lt.0) then
        call default_vals(ierr, vals(:), def, nitem, unset=unset)
     else
-       call extract_vals(ierr, vals(:), avals(jidx), cundef, def, sep, nitem, unset=unset)
+       call extract_vals(ierr, vals(:), avals(jentr), cundef, def, sep, nitem, unset=unset)
     endif
     return
   end subroutine get_array_i
@@ -1316,14 +1323,14 @@ contains
     real(kind=KTGT), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
-    integer jidx
+    integer jentr
 
     ierr = err_default
-    jidx = pos_search(jpos, achunk, mchunk, atags)
-    if (jidx.lt.0) then
+    jentr = pos_search(jpos, achunk, mchunk, atags)
+    if (jentr.lt.0) then
        call default_vals(ierr, vals(:), def, nitem, unset=unset)
     else
-       call extract_vals(ierr, vals(:), avals(jidx), cundef, def, sep, nitem, unset=unset)
+       call extract_vals(ierr, vals(:), avals(jentr), cundef, def, sep, nitem, unset=unset)
     endif
     return
   end subroutine get_array_f
@@ -1339,14 +1346,14 @@ contains
     real(kind=KTGT), intent(in),optional :: def
     character(len=*),intent(in),optional :: sep
     logical,         intent(in),optional :: unset
-    integer jidx
+    integer jentr
 
     ierr = err_default
-    jidx = pos_search(jpos, achunk, mchunk, atags)
-    if (jidx.lt.0) then
+    jentr = pos_search(jpos, achunk, mchunk, atags)
+    if (jentr.lt.0) then
        call default_vals(ierr, vals(:), def, nitem, unset=unset)
     else
-       call extract_vals(ierr, vals(:), avals(jidx), cundef, def, sep, nitem, unset=unset)
+       call extract_vals(ierr, vals(:), avals(jentr), cundef, def, sep, nitem, unset=unset)
     endif
     return
   end subroutine get_array_d
@@ -1362,16 +1369,16 @@ contains
     character(len=*),intent(in),optional    :: def
     integer,         intent(inout),optional :: ref    ! reference index to search from
     logical,         intent(in),optional    :: unset
-    integer jidx
+    integer jentr, jch
 
     ierr = err_default
-    jidx = tag_search(tag, achunk, mchunk, atags, ref)
-    if (jidx.lt.0) then
+    call tag_search(jentr, jch, tag, achunk, mchunk, atags, ref)
+    if (jentr.lt.0) then
        call default_val(ierr, val, def, unset=unset)
     else
-       call extract_val(ierr, val, avals(jidx), cundef, def, unset=unset)
+       call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
     endif
-    call set_if_present(ref, jidx)
+    call set_incr_index(ref, jentr, achunk, jch)
     return
   end subroutine get_option_a
 
@@ -1385,16 +1392,16 @@ contains
     integer,         intent(in),optional    :: def
     integer,         intent(inout),optional :: ref
     logical,         intent(in),optional    :: unset
-    integer jidx
+    integer jentr, jch
 
     ierr = err_default
-    jidx = tag_search(tag, achunk, mchunk, atags, ref)
-    if (jidx.lt.0) then
+    call tag_search(jentr, jch, tag, achunk, mchunk, atags, ref)
+    if (jentr.lt.0) then
        call default_val(ierr, val, def, unset=unset)
     else
-       call extract_val(ierr, val, avals(jidx), cundef, def, unset=unset)
+       call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
     endif
-    call set_if_present(ref, jidx)
+    call set_incr_index(ref, jentr, achunk, jch)
     return
   end subroutine get_option_i
 
@@ -1409,16 +1416,16 @@ contains
     real(kind=KTGT), intent(in),optional    :: def
     integer,         intent(inout),optional :: ref
     logical,         intent(in),optional    :: unset
-    integer jidx
+    integer jentr, jch
 
     ierr = err_default
-    jidx = tag_search(tag, achunk, mchunk, atags, ref)
-    if (jidx.lt.0) then
+    call tag_search(jentr, jch, tag, achunk, mchunk, atags, ref)
+    if (jentr.lt.0) then
        call default_val(ierr, val, def, unset=unset)
     else
-       call extract_val(ierr, val, avals(jidx), cundef, def, unset=unset)
+       call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
     endif
-    call set_if_present(ref, jidx)
+    call set_incr_index(ref, jentr, achunk, jch)
     return
   end subroutine get_option_f
 
@@ -1433,16 +1440,16 @@ contains
     real(kind=KTGT), intent(in),optional    :: def
     integer,         intent(inout),optional :: ref
     logical,         intent(in),optional    :: unset
-    integer jidx
+    integer jentr, jch
 
     ierr = err_default
-    jidx = tag_search(tag, achunk, mchunk, atags, ref)
-    if (jidx.lt.0) then
+    call tag_search(jentr, jch, tag, achunk, mchunk, atags, ref)
+    if (jentr.lt.0) then
        call default_val(ierr, val, def, unset=unset)
     else
-       call extract_val(ierr, val, avals(jidx), cundef, def, unset=unset)
+       call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
     endif
-    call set_if_present(ref, jidx)
+    call set_incr_index(ref, jentr, achunk, jch)
     return
   end subroutine get_option_d
 
@@ -1457,16 +1464,16 @@ contains
     integer,         intent(inout),optional :: ref
     character(len=*),intent(in),optional    :: sep
     logical,         intent(in),optional    :: unset
-    integer jidx
+    integer jentr, jch
 
     ierr = err_default
-    jidx = tag_search(tag, achunk, mchunk, atags, ref)
-    if (jidx.lt.0) then
+    call tag_search(jentr, jch, tag, achunk, mchunk, atags, ref)
+    if (jentr.lt.0) then
        call default_vals(ierr, vals(:), def, unset=unset)
     else
-       call extract_vals(ierr, vals(:), avals(jidx), cundef, def, sep, unset=unset)
+       call extract_vals(ierr, vals(:), avals(jentr), cundef, def, sep, unset=unset)
     endif
-    call set_if_present(ref, jidx)
+    call set_incr_index(ref, jentr, achunk, jch)
     return
   end subroutine get_option_ia
 
@@ -1482,16 +1489,16 @@ contains
     integer,         intent(inout),optional :: ref
     character(len=*),intent(in),optional    :: sep
     logical,         intent(in),optional    :: unset
-    integer jidx
+    integer jentr, jch
 
     ierr = err_default
-    jidx = tag_search(tag, achunk, mchunk, atags, ref)
-    if (jidx.lt.0) then
+    call tag_search(jentr, jch, tag, achunk, mchunk, atags, ref)
+    if (jentr.lt.0) then
        call default_vals(ierr, vals(:), def, unset=unset)
     else
-       call extract_vals(ierr, vals(:), avals(jidx), cundef, def, sep, unset=unset)
+       call extract_vals(ierr, vals(:), avals(jentr), cundef, def, sep, unset=unset)
     endif
-    call set_if_present(ref, jidx)
+    call set_incr_index(ref, jentr, achunk, jch)
     return
   end subroutine get_option_fa
 
@@ -1507,16 +1514,16 @@ contains
     integer,         intent(inout),optional :: ref
     character(len=*),intent(in),optional    :: sep
     logical,         intent(in),optional    :: unset
-    integer jidx
+    integer jentr, jch
 
     ierr = err_default
-    jidx = tag_search(tag, achunk, mchunk, atags, ref)
-    if (jidx.lt.0) then
+    call tag_search(jentr, jch, tag, achunk, mchunk, atags, ref)
+    if (jentr.lt.0) then
        call default_vals(ierr, vals(:), def, unset=unset)
     else
-       call extract_vals(ierr, vals(:), avals(jidx), cundef, def, sep, unset=unset)
+       call extract_vals(ierr, vals(:), avals(jentr), cundef, def, sep, unset=unset)
     endif
-    call set_if_present(ref, jidx)
+    call set_incr_index(ref, jentr, achunk, jch)
     return
   end subroutine get_option_da
 
@@ -1600,102 +1607,433 @@ contains
     return
   end function check_param
 
-!!!_  & get_arg - get key/value at given entry (logical index of all the arguments)
-  subroutine get_arg_a &
-       & (ierr, tag, val, jentr)
+!!!_  & count_entries()
+  integer function count_entries(tag) result (n)
     implicit none
-    integer,         intent(out) :: ierr
-    character(len=*),intent(out) :: tag
-    character(len=*),intent(out) :: val
-    integer,         intent(in)  :: jentr
-    integer jidx
+    character(len=*),intent(in) :: tag
+    n = min(0, err_default)
+    if (n.eq.0) then
+       n = count(atags(0:mgtab-1).eq.tag)
+    endif
+  end function count_entries
+!!!_  & query_nth_entry() - return entry (physical storage index)
+  integer function query_nth_entry(tag, n, idx) result (e)
+    implicit none
+    character(len=*),intent(in)  :: tag
+    integer,         intent(in)  :: n
+    integer,optional,intent(out) :: idx
+    integer k, jch
+    e = min(0, err_default)
+    if (e.eq.0) then
+       if (n.lt.0) then
+          k = - count_entries(tag)
+       else
+          k = 0
+       endif
+
+       jch = 0
+       do
+          call tag_search_walk(e, jch, tag, achunk, mchunk, atags)
+          if (e.lt.0) exit
+          if (k.eq.n) exit
+          k = k + 1
+          e = e + 1
+       enddo
+    endif
+    if (present(idx)) then
+       if (e.lt.0) then
+          idx = -1
+       else
+          idx = (e - achunk(jch)%ebgn) + achunk(jch)%abgn
+       endif
+    endif
+  end function query_nth_entry
+
+!!!_  & forward_entry() - return next entry (physical storage index)
+  integer function forward_entry(tag, ref, n, idx) result (e)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    character(len=*),intent(in) :: tag
+    integer,optional,intent(in) :: ref
+    integer,optional,intent(in) :: n      ! non-negative
+    integer,optional,intent(out) :: idx
+
+    integer jch
+    integer xr, xn
+
+    e = min(0, err_default)
+    if (e.eq.0) then
+       xr = choice(-1, ref)
+       if (xr.lt.0) then
+          ! query nth
+          xn = choice(0, n)
+          e = query_nth_entry(tag, xn, idx)
+       else
+          xn = choice(+1, n)
+          if (xn.lt.0) then
+             e = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             jch = chunk_search_entry(achunk, mchunk, mgtab, xr)
+             e = xr
+             do
+                call tag_search_walk(e, jch, tag, achunk, mchunk, atags)
+                if (e.lt.0) exit
+                if (xn.eq.0) exit
+                xn = xn - 1
+                e = e + 1
+             enddo
+          endif
+          if (present(idx)) then
+             if (e.lt.0) then
+                idx = -1
+             else
+                idx = (e - achunk(jch)%ebgn) + achunk(jch)%abgn
+             endif
+          endif
+       endif
+    endif
+  end function forward_entry
+
+!!!_  & get_entry - get value at given entry (physical storage index)
+  subroutine get_entry_i &
+       & (ierr, val, jentr, def, unset, tag)
+    use TOUZA_Std_utl,only: set_if_present
+    implicit none
+    integer,         intent(out)          :: ierr
+    integer,         intent(inout)        :: val
+    integer,         intent(in)           :: jentr
+    integer,         intent(in),optional  :: def
+    logical,         intent(in),optional  :: unset
+    character(len=*),intent(out),optional :: tag
 
     ierr = err_default
 
     if (ierr.eq.0) then
-       jidx = arg_search_entry(jentr, achunk, mchunk, mgtab)
-       if (jidx.lt.0) then
+       if (jentr.lt.0) then
+          call default_val(ierr, val, def, unset=unset)
+       else if (jentr.ge.mgtab) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       else
+          call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
+          if (ierr.eq.0) call set_if_present(tag, atags(jentr))
+       endif
+    endif
+    return
+  end subroutine get_entry_i
+  subroutine get_entry_f &
+       & (ierr, val, jentr, def, unset, tag)
+    use TOUZA_Std_utl,only: set_if_present
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    integer,         intent(out)          :: ierr
+    real(kind=KTGT), intent(inout)        :: val
+    integer,         intent(in)           :: jentr
+    real(kind=KTGT), intent(in),optional  :: def
+    logical,         intent(in),optional  :: unset
+    character(len=*),intent(out),optional :: tag
+
+    ierr = err_default
+
+    if (ierr.eq.0) then
+       if (jentr.lt.0) then
+          call default_val(ierr, val, def, unset=unset)
+       else if (jentr.ge.mgtab) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       else
+          call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
+          if (ierr.eq.0) call set_if_present(tag, atags(jentr))
+       endif
+    endif
+    return
+  end subroutine get_entry_f
+  subroutine get_entry_d &
+       & (ierr, val, jentr, def, unset, tag)
+    use TOUZA_Std_utl,only: set_if_present
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    integer,         intent(out)          :: ierr
+    real(kind=KTGT), intent(inout)        :: val
+    integer,         intent(in)           :: jentr
+    real(kind=KTGT), intent(in),optional  :: def
+    logical,         intent(in),optional  :: unset
+    character(len=*),intent(out),optional :: tag
+
+    ierr = err_default
+
+    if (ierr.eq.0) then
+       if (jentr.lt.0) then
+          call default_val(ierr, val, def, unset=unset)
+       else if (jentr.ge.mgtab) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       else
+          call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
+          if (ierr.eq.0) call set_if_present(tag, atags(jentr))
+       endif
+    endif
+    return
+  end subroutine get_entry_d
+  subroutine get_entry_a &
+       & (ierr, val, jentr, def, unset, tag)
+    use TOUZA_Std_utl,only: set_if_present
+    implicit none
+    integer,         intent(out)          :: ierr
+    character(len=*),intent(inout)        :: val
+    integer,         intent(in)           :: jentr
+    character(len=*),intent(in),optional  :: def
+    logical,         intent(in),optional  :: unset
+    character(len=*),intent(out),optional :: tag
+
+    ierr = err_default
+
+    if (ierr.eq.0) then
+       if (jentr.lt.0) then
+          call default_val(ierr, val, def, unset=unset)
+       else if (jentr.ge.mgtab) then
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       else
+          call extract_val(ierr, val, avals(jentr), cundef, def, unset=unset)
+          if (ierr.eq.0) call set_if_present(tag, atags(jentr))
+       endif
+    endif
+    return
+  end subroutine get_entry_a
+
+!!!_  & get_arg - get key/value at given index (logical index of all the arguments)
+  subroutine get_arg_a &
+       & (ierr, tag, val, idx)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: tag
+    character(len=*),intent(out) :: val
+    integer,         intent(in)  :: idx
+    integer je
+
+    ierr = err_default
+
+    if (ierr.eq.0) then
+       je = arg_search_idx(idx, achunk, mchunk)
+       if (je.lt.0) then
           tag = ' '
           val = ' '
           ierr = _ERROR(ERR_OUT_OF_RANGE)
           return
        endif
 
-       tag = trim(ADJUSTL(atags(jidx)))
-       val = trim(ADJUSTL(avals(jidx)))
+       tag = trim(ADJUSTL(atags(je)))
+       val = trim(ADJUSTL(avals(je)))
     endif
     return
   end subroutine get_arg_a
 
-!!!_  & get_key - get key at given entry
+!!!_  & get_key - get key at given logical index
   subroutine get_key_a &
-       & (ierr, tag, jentr)
+       & (ierr, tag, idx)
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: tag
-    integer,         intent(in)  :: jentr
-    integer jidx
+    integer,         intent(in)  :: idx
+    integer je
 
     ierr = err_default
 
     if (ierr.eq.0) then
-       jidx = arg_search_entry(jentr, achunk, mchunk, mgtab)
-       if (jidx.lt.0) then
+       je = arg_search_idx(idx, achunk, mchunk)
+       if (je.lt.0) then
           tag = ' '
           ierr = _ERROR(ERR_OUT_OF_RANGE)
           return
        endif
 
-       tag = trim(ADJUSTL(atags(jidx)))
+       tag = trim(ADJUSTL(atags(je)))
     endif
     return
   end subroutine get_key_a
 
-!!!_  & get_value - get value at given entry
-  subroutine get_value_a &
-       & (ierr, val, jentr)
+!!!_  & get_value - get value at given logical index
+  subroutine get_value_i &
+       & (ierr, val, idx, def, unset)
     implicit none
-    integer,         intent(out) :: ierr
-    character(len=*),intent(out) :: val
-    integer,         intent(in)  :: jentr
-    integer jidx
+    integer,intent(out)         :: ierr
+    integer,intent(inout)       :: val
+    integer,intent(in)          :: idx
+    integer,intent(in),optional :: def
+    logical,intent(in),optional :: unset
+    integer je
 
     ierr = err_default
 
     if (ierr.eq.0) then
-       jidx = arg_search_entry(jentr, achunk, mchunk, mgtab)
-       if (jidx.lt.0) then
-          val = ' '
-          ierr = _ERROR(ERR_OUT_OF_RANGE)
-          return
+       je = arg_search_idx(idx, achunk, mchunk)
+       if (je.lt.0) then
+          call default_val(ierr, val, def, unset=unset)
+       else
+          call extract_val(ierr, val, avals(je), cundef, def, unset=unset)
        endif
+    endif
+    return
+  end subroutine get_value_i
+  subroutine get_value_f &
+       & (ierr, val, idx, def, unset)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    integer,        intent(out)         :: ierr
+    real(kind=KTGT),intent(inout)       :: val
+    integer,        intent(in)          :: idx
+    real(kind=KTGT),intent(in),optional :: def
+    logical,        intent(in),optional :: unset
+    integer je
 
-       val = trim(ADJUSTL(avals(jidx)))
+    ierr = err_default
+
+    if (ierr.eq.0) then
+       je = arg_search_idx(idx, achunk, mchunk)
+       if (je.lt.0) then
+          call default_val(ierr, val, def, unset=unset)
+       else
+          call extract_val(ierr, val, avals(je), cundef, def, unset=unset)
+       endif
+    endif
+    return
+  end subroutine get_value_f
+  subroutine get_value_d &
+       & (ierr, val, idx, def, unset)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    integer,        intent(out)         :: ierr
+    real(kind=KTGT),intent(inout)       :: val
+    integer,        intent(in)          :: idx
+    real(kind=KTGT),intent(in),optional :: def
+    logical,        intent(in),optional :: unset
+    integer je
+
+    ierr = err_default
+
+    if (ierr.eq.0) then
+       je = arg_search_idx(idx, achunk, mchunk)
+       if (je.lt.0) then
+          call default_val(ierr, val, def, unset=unset)
+       else
+          call extract_val(ierr, val, avals(je), cundef, def, unset=unset)
+       endif
+    endif
+    return
+  end subroutine get_value_d
+  subroutine get_value_a &
+       & (ierr, val, idx, def, unset)
+    implicit none
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(out)         :: val
+    integer,         intent(in)          :: idx
+    character(len=*),intent(in),optional :: def
+    logical,         intent(in),optional :: unset
+    integer je
+
+    ierr = err_default
+
+    if (ierr.eq.0) then
+       je = arg_search_idx(idx, achunk, mchunk)
+       if (je.lt.0) then
+          call default_val(ierr, val, def, unset=unset)
+       else
+          call extract_val(ierr, val, avals(je), cundef, def, unset=unset)
+       endif
     endif
     return
   end subroutine get_value_a
 
-!!!_  & get_value_seq - get value sequence at given entry
-  subroutine get_value_seq_a &
-       & (ierr, val, num, jentr)
+  subroutine get_value_ia &
+       & (ierr, vals, idx, def, sep, unset)
     implicit none
-    integer,         intent(out)   :: ierr
-    character(len=*),intent(out)   :: val(*)
-    integer,         intent(in)    :: num
-    integer,         intent(inout) :: jentr
-
-    integer j
+    integer,         intent(out)         :: ierr
+    integer,         intent(inout)       :: vals(:)
+    integer,         intent(in)          :: idx
+    integer,         intent(in),optional :: def
+    character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
+    integer je
 
     ierr = err_default
-    do j = 1, num
-       if (jentr.lt.0) then
-          ierr = _ERROR(ERR_OUT_OF_RANGE)
-          exit
+
+    if (ierr.eq.0) then
+       je = arg_search_idx(idx, achunk, mchunk)
+       if (je.lt.0) then
+          call default_vals(ierr, vals(:), def, unset=unset)
+       else
+          call extract_vals(ierr, vals(:), avals(je), cundef, def, sep, unset=unset)
        endif
-       call get_value_a(ierr, val(j), jentr)
-    enddo
+    endif
     return
-  end subroutine get_value_seq_a
+  end subroutine get_value_ia
+  subroutine get_value_fa &
+       & (ierr, vals, idx, def, sep, unset)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    integer,         intent(out)         :: ierr
+    real(kind=KTGT), intent(inout)       :: vals(:)
+    integer,         intent(in)          :: idx
+    real(kind=KTGT), intent(in),optional :: def
+    character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
+    integer je
+
+    ierr = err_default
+
+    if (ierr.eq.0) then
+       je = arg_search_idx(idx, achunk, mchunk)
+       if (je.lt.0) then
+          call default_vals(ierr, vals(:), def, unset=unset)
+       else
+          call extract_vals(ierr, vals(:), avals(je), cundef, def, sep, unset=unset)
+       endif
+    endif
+    return
+  end subroutine get_value_fa
+  subroutine get_value_da &
+       & (ierr, vals, idx, def, sep, unset)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    integer,         intent(out)         :: ierr
+    real(kind=KTGT), intent(inout)       :: vals(:)
+    integer,         intent(in)          :: idx
+    real(kind=KTGT), intent(in),optional :: def
+    character(len=*),intent(in),optional :: sep
+    logical,         intent(in),optional :: unset
+    integer je
+
+    ierr = err_default
+
+    if (ierr.eq.0) then
+       je = arg_search_idx(idx, achunk, mchunk)
+       if (je.lt.0) then
+          call default_vals(ierr, vals(:), def, unset=unset)
+       else
+          call extract_vals(ierr, vals(:), avals(je), cundef, def, sep, unset=unset)
+       endif
+    endif
+    return
+  end subroutine get_value_da
+
+! !!!_  & get_value_seq - get value sequence at given entry
+!   subroutine get_value_seq_a &
+!        & (ierr, val, num, jentr)
+!     implicit none
+!     integer,         intent(out)   :: ierr
+!     character(len=*),intent(out)   :: val(*)
+!     integer,         intent(in)    :: num
+!     integer,         intent(inout) :: jentr
+
+!     integer j
+
+!     ierr = err_default
+!     do j = 1, num
+!        if (jentr.lt.0) then
+!           ierr = _ERROR(ERR_OUT_OF_RANGE)
+!           exit
+!        endif
+!        call get_value_a(ierr, val(j), jentr)
+!     enddo
+!     return
+!   end subroutine get_value_seq_a
 
 !!!_  & get_param_seq
 #if 0
@@ -1801,7 +2139,7 @@ contains
 
     character(len=64) :: pfx
     character(len=256) :: txt
-    integer j, jj, jf
+    integer j, je, jf
 
     ierr = 0
     call choice_a(pfx, ' ', tag)
@@ -1839,12 +2177,12 @@ contains
           call msg_mdl(txt, __MDL__, ulog)
           write(txt, 131) j, ach(j)%pbgn, ach(j)%pend, ach(j)%abgn, ach(j)%aend
           call msg_mdl(txt, __MDL__, ulog)
-          do jj = ach(j)%tbgn, ach(j)%tend - 1
-             jf = jj - ach(j)%tbgn + ach(j)%abgn + 1
-             if (gt(jj).ne.' ') then
-                write(txt, 121) jf, trim(gt(jj)), trim(gv(jj))
+          do je = ach(j)%ebgn, ach(j)%eend - 1
+             jf = je - ach(j)%ebgn + ach(j)%abgn
+             if (gt(je).ne.' ') then
+                write(txt, 121) jf, trim(gt(je)), trim(gv(je))
              else
-                write(txt, 141) jf, trim(gv(jj))
+                write(txt, 141) jf, trim(gv(je))
              endif
              call msg_mdl(txt, __MDL__, ulog)
           enddo
@@ -1853,12 +2191,12 @@ contains
           call msg_mdl(txt, __MDL__, ulog)
           write(txt, 132) trim(pfx), j, ach(j)%pbgn, ach(j)%pend, ach(j)%pbgn, ach(j)%aend
           call msg_mdl(txt, __MDL__, ulog)
-          do jj = ach(j)%tbgn, ach(j)%tend - 1
-             jf = jj - ach(j)%tbgn + ach(j)%abgn + 1
-             if (gt(jj).ne.' ') then
-                write(txt, 122) trim(pfx), jf, trim(gt(jj)), trim(gv(jj))
+          do je = ach(j)%ebgn, ach(j)%eend - 1
+             jf = je - ach(j)%ebgn + ach(j)%abgn
+             if (gt(je).ne.' ') then
+                write(txt, 122) trim(pfx), jf, trim(gt(je)), trim(gv(je))
              else
-                write(txt, 142) trim(pfx), jf, trim(gv(jj))
+                write(txt, 142) trim(pfx), jf, trim(gv(je))
              endif
              call msg_mdl(txt, __MDL__, ulog)
           enddo
@@ -1866,6 +2204,24 @@ contains
        j = ach(j)%next
     enddo
   end subroutine report_chunks
+
+!!!_  & set_incr_index
+  subroutine set_incr_index(ref, jentr, ach, jch)
+    implicit none
+    integer,optional, intent(out) :: ref
+    integer,          intent(in)  :: jentr
+    type(arg_chunk_t),intent(in)  :: ach(0:*)
+    integer,          intent(in)  :: jch
+    if (present(ref)) then
+       if (jch.lt.0) then
+          ref = jch
+       else if (jentr.lt.0) then
+          ref = jentr
+       else
+          ref = (jentr - ach(jch)%ebgn) + ach(jch)%abgn + 1
+       endif
+    endif
+  end subroutine set_incr_index
 
 !!!_  & tag_pos
   subroutine tag_pos(tag, jpos)
@@ -1881,22 +2237,22 @@ contains
 !!!_  & pos_search()
   integer function pos_search &
        & (jpos, ach, mch, ttbl) &
-       & result(n)
+       & result(e)
     implicit none
     integer,          intent(in) :: jpos    ! count from 1
     type(arg_chunk_t),intent(in) :: ach(0:*)
     integer,          intent(in) :: mch
     character(len=*), intent(in) :: ttbl(0:*)
-    integer jc, ji, jp
-    n = -1
+    integer jc, je, jp
+    e = -1
     if (jpos.le.nparam) then
        loop_chunk: do jc = 0, mch - 1
           jp = ach(jc)%pbgn + 1
           if (jpos.lt.jp.or.jpos.gt.ach(jc)%pend) cycle
-          do ji = ach(jc)%tbgn, ach(jc)%tend - 1
-             if (ttbl(ji).eq.' ') then
+          do je = ach(jc)%ebgn, ach(jc)%eend - 1
+             if (ttbl(je).eq.' ') then
                 if (jp.eq.jpos) then
-                   n = ji
+                   e = je
                    exit loop_chunk
                 else
                    jp = jp + 1
@@ -1906,79 +2262,101 @@ contains
        enddo loop_chunk
     endif
   end function pos_search
-!!!_  & tag_search()
-  integer function tag_search &
-       & (tag, ach, mch, ttbl, ref) &
-       & result(n)
+!!!_  & tag_search - return entry and chunk
+  subroutine tag_search &
+       & (jentr, jch, tag, ach, mch, ttbl, refidx)
     use TOUZA_Std_utl,only: choice
     implicit none
+    integer,          intent(out)         :: jentr
+    integer,          intent(out)         :: jch
     character(len=*), intent(in)          :: tag
     type(arg_chunk_t),intent(in)          :: ach(0:*)
     integer,          intent(in)          :: mch
     character(len=*), intent(in)          :: ttbl(0:*)
-    integer,          intent(in),optional :: ref
+    integer,          intent(in),optional :: refidx     ! index to start from (inclusive)
 
-    integer jch, jbgn, jt
-
-    jch = chunk_search_idx(ach, mch, ref)
+    jch = chunk_search_idx(ach, mch, refidx)
     if (jch.lt.0) then
-       n = _ERROR(ERR_INVALID_ITEM)
+       jentr = _ERROR(ERR_INVALID_ITEM)
     else
-       jbgn = choice(ach(jch)%tbgn - 1, ref) + 1
-       n = -1
-       do jt = jbgn, ach(jch)%tend - 1
-          if (ttbl(jt).eq.tag) then
-             n = jt
-             exit
-          endif
-       enddo
-       if (n.lt.0) then
-          jch = ach(jch)%next
-          loop_chunk: do
-             if (jch.lt.0) exit
-             do jt = ach(jch)%tbgn, ach(jch)%tend - 1
-                if (ttbl(jt).eq.tag) then
-                   n = jt
-                   exit loop_chunk
-                endif
-             enddo
-             jch = ach(jch)%next
-          enddo loop_chunk
+       if (present(refidx)) then
+          jentr = (refidx - ach(jch)%abgn) + ach(jch)%ebgn
+       else
+          jentr = ach(jch)%ebgn
        endif
-       if (n.lt.0) n = _ERROR(ERR_INVALID_PARAMETER)
+       call tag_search_walk(jentr, jch, tag, ach, mch, ttbl)
     endif
-  end function tag_search
+  end subroutine tag_search
 
-!!!_  & arg_search_entry()
-  integer function arg_search_entry &
-       & (jentr, ach, mch, mtbl) &
-       & result(n)
+!!!_  - tag_search_walk
+  subroutine tag_search_walk &
+       & (jentr, jch, tag, ach, mch, ttbl)
+    use TOUZA_Std_utl,only: choice
     implicit none
-    integer,          intent(in) :: jentr    ! count from 1
+    integer,          intent(inout) :: jentr
+    integer,          intent(inout) :: jch
+    character(len=*), intent(in)    :: tag
+    type(arg_chunk_t),intent(in)    :: ach(0:*)
+    integer,          intent(in)    :: mch
+    character(len=*), intent(in)    :: ttbl(0:*)
+
+    integer re
+    integer je
+
+    re = -1
+    do je = jentr, ach(jch)%eend - 1
+       if (ttbl(je).eq.tag) then
+          re = je
+          exit
+       endif
+    enddo
+    if (re.lt.0) then
+       jch = ach(jch)%next
+       loop_chunk: do
+          if (jch.lt.0) exit
+          do je = ach(jch)%ebgn, ach(jch)%eend - 1
+             if (ttbl(je).eq.tag) then
+                re = je
+                exit loop_chunk
+             endif
+          enddo
+          jch = ach(jch)%next
+       enddo loop_chunk
+    endif
+    if (re.lt.0) re = _ERROR(ERR_INVALID_PARAMETER)
+
+    jentr = re
+  end subroutine tag_search_walk
+
+!!!_  & arg_search_idx() - query entry from logical index
+  integer function arg_search_idx &
+       & (idx, ach, mch) &
+       & result(e)
+    implicit none
+    integer,          intent(in) :: idx
     type(arg_chunk_t),intent(in) :: ach(0:*)
     integer,          intent(in) :: mch
-    integer,          intent(in) :: mtbl
     integer jch
 
-    jch = chunk_search_entry(ach, mch, mtbl, jentr)
+    jch = chunk_search_idx(ach, mch, idx)
     if (jch.lt.0) then
-       n = jch
+       e = jch
     else
-       n = ((jentr - 1) - ach(jch)%abgn) + ach(jch)%tbgn
+       e = (idx - ach(jch)%abgn) + ach(jch)%ebgn
     endif
-  end function arg_search_entry
+  end function arg_search_idx
 
-!!!_  & chunk_search_idx()
-  integer function chunk_search_idx(ach, mch, jidx) result(n)
+!!!_  & chunk_search_idx() - query chunk from logical index
+  integer function chunk_search_idx(ach, mch, idx) result(n)
     implicit none
     type(arg_chunk_t),intent(in)          :: ach(0:*)
     integer,          intent(in)          :: mch
-    integer,          intent(in),optional :: jidx
+    integer,          intent(in),optional :: idx
     integer jch
-    if (present(jidx)) then
+    if (present(idx)) then
        n = -1
        do jch = 0, mch - 1
-          if (ach(jch)%tbgn.le.jidx.and.jidx.lt.ach(jch)%tend) then
+          if (ach(jch)%abgn.le.idx.and.idx.lt.ach(jch)%aend) then
              n = jch
              exit
           endif
@@ -1988,13 +2366,13 @@ contains
     endif
   end function chunk_search_idx
 
-!!!_  & chunk_search_entry()
+!!!_  & chunk_search_entry() - query chunk from entry (physical index)
   integer function chunk_search_entry(ach, mch, mtbl, jentr) result(n)
     implicit none
     type(arg_chunk_t),intent(in) :: ach(0:*)
     integer,          intent(in) :: mch
     integer,          intent(in) :: mtbl
-    integer,          intent(in) :: jentr  ! count from 1
+    integer,          intent(in) :: jentr
     integer jch
 
     if (jentr.lt.1.or.jentr.gt.mtbl) then
@@ -2002,7 +2380,7 @@ contains
     else
        n = _ERROR(ERR_PANIC)
        do jch = 0, mch - 1
-          if (ach(jch)%abgn.lt.jentr.and.jentr.le.ach(jch)%aend) then
+          if (ach(jch)%ebgn.lt.jentr.and.jentr.le.ach(jch)%eend) then
              n = jch
              exit
           endif
@@ -2156,7 +2534,7 @@ contains
     logical us
 
     ierr = err_default
-    us = choice(.false.,unset)
+    us = choice(present(def), unset)
     jv = 0
     if (ierr.eq.0) then
        if (str.eq.cud) then
@@ -2217,7 +2595,7 @@ contains
     logical us
 
     ierr = err_default
-    us = choice(.false.,unset)
+    us = choice(present(def), unset)
 
     jv = 0
     if (ierr.eq.0) then
@@ -2279,7 +2657,7 @@ contains
     logical us
 
     ierr = err_default
-    us = choice(.false.,unset)
+    us = choice(present(def), unset)
 
     jv = 0
     if (ierr.eq.0) then
@@ -2560,7 +2938,6 @@ program test_std_arg
   use TOUZA_Std_arg
   implicit none
   integer ierr
-  character(len=1024) :: val
 
   ierr = 0
   call init(ierr, lrec=0, levv=+9)
@@ -2604,6 +2981,7 @@ contains
 101    format('arg/param:', I0, 2x, I0, '/', I0, 1x, '[', A, ']')
        do jp = 1, np + 1
           call get_param(ierr, arg, jp)
+          if (ierr.ne.0) arg = '(none)'
           write(*, 101) ierr, jp, np, trim(arg)
           ierr = 0
        enddo
@@ -2625,12 +3003,14 @@ contains
     if (ierr.eq.0) then
 111    format('arg/arg:', I0, 2x, I0, '/', I0, 1x, '[', A, ']', 1x, A)
        na = get_nargs()
-       do ja = 1, na + 1
+       do ja = 0, na
           call get_arg(ierr, tag, arg, ja)
           write(*, 111) ierr, ja, na, trim(tag), trim(arg)
           ierr = 0
        enddo
     endif
+
+    if (ierr.eq.0) call test_query_keys(ierr, 'Q')
 
   end subroutine batch_test_arg
 
@@ -2658,6 +3038,27 @@ contains
     ierr = 0
 
   end subroutine test_get_option
+
+  subroutine test_query_keys(ierr, tag)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: tag
+
+    character(len=128) :: val
+    integer jt, nt, je
+
+    ierr = 0
+
+    nt = count_entries(tag)
+101 format('query/count: ', '[', A, '] ', I0)
+102 format('query/nth: ', '[', I0, '] ', I0)
+    write(*, 101) trim(tag), nt
+
+    do jt = - nt - 1, nt
+       je = query_nth_entry(tag, jt)
+       write(*, 102) jt, je
+    enddo
+  end subroutine test_query_keys
 
 end program test_std_arg
 #endif /* TEST_STD_ARG */
