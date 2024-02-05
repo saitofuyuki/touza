@@ -447,15 +447,25 @@ module TOUZA_Emu_ugg
   end interface setd_sincos
 #endif
 
-  interface angle_canonical
-     module procedure angle_canonical_d
-  end interface angle_canonical
+  interface angle_modulo
+     module procedure angle_modulo_d
+  end interface angle_modulo
   interface sin_canonical
      module procedure sin_canonical_d
   end interface sin_canonical
   interface cos_canonical
      module procedure cos_canonical_d
   end interface cos_canonical
+
+  interface degree_modulo
+     module procedure degree_modulo_d
+  end interface degree_modulo
+  interface sind_canonical
+     module procedure sind_canonical_d
+  end interface sind_canonical
+  interface cosd_canonical
+     module procedure cosd_canonical_d
+  end interface cosd_canonical
 
   interface set_dlongi
      module procedure set_dlongi_d
@@ -568,7 +578,8 @@ module TOUZA_Emu_ugg
 
   public set_dlongi
   public set_sincos, setd_sincos
-  public angle_canonical, sin_canonical, cos_canonical
+  public degree_modulo, setd_sincos, sind_canonical, cosd_canonical
+  public angle_modulo,  set_sincos,  sin_canonical,  cos_canonical
   public reduced_latitude, azimuth_node, alon_auxsph_ph
 
   public agmpc_table_size, agmpc_gen_table, agmpc_area_core
@@ -4443,18 +4454,18 @@ contains
        _COS(sc) = +s
     end select
   end function set_sincos_d
-!!!_  & angle_canonical()
+!!!_  & angle_modulo()
   ELEMENTAL &
-  real(kind=KTGT) function angle_canonical_d (angl) result(v)
+  real(kind=KTGT) function angle_modulo_d (angl) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(in) :: angl
-    real(kind=KTGT) a, q
-    q = pi_(angl) / 2.0_KTGT
-    a = ANINT(angl / q)
-    v = angl - q * a
-  end function angle_canonical_d
+    real(kind=KTGT) c
+    c = pi_(angl) * 2.0_KTGT
+    v = modulo(angl, c)
+  end function angle_modulo_d
 !!!_  & sin_canonical()
+  ELEMENTAL &
   real(kind=KTGT) function sin_canonical_d (angl) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
@@ -4479,6 +4490,7 @@ contains
     end select
   end function sin_canonical_d
 !!!_  & cos_canonical()
+  ELEMENTAL &
   real(kind=KTGT) function cos_canonical_d (angl) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
@@ -4502,6 +4514,66 @@ contains
        v = + sin(r)
     end select
   end function cos_canonical_d
+!!!_  & degree_modulo()
+  ELEMENTAL &
+  real(kind=KTGT) function degree_modulo_d (angl) result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: angl
+    real(kind=KTGT),parameter :: c = 360.0_KTGT
+    v = modulo(angl, c)
+  end function degree_modulo_d
+!!!_  & sind_canonical() - sine (degree)
+  ELEMENTAL &
+  real(kind=KTGT) function sind_canonical_d (angl) result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: angl
+    real(kind=KTGT),parameter :: q = 90.0_KTGT
+    real(kind=KTGT) r, a
+    integer n
+
+    a = ANINT(angl / q)
+    r = angl - q * a
+    r = deg2rad(r)
+    n = modulo(int(a), 4)
+    select case(n)
+    case(0)
+       v = + sin(r)
+    case(1)
+       v = + cos(r)
+    case(2)
+       v = - sin(r)
+    case default
+       v = - cos(r)
+    end select
+  end function sind_canonical_d
+!!!_  & cosd_canonical() - sine (degree)
+  ELEMENTAL &
+  real(kind=KTGT) function cosd_canonical_d (angl) result(v)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: angl
+    real(kind=KTGT),parameter :: q = 90.0_KTGT
+    real(kind=KTGT) r, a
+    integer n
+
+    a = ANINT(angl / q)
+    r = angl - q * a
+    r = deg2rad(r)
+    n = modulo(int(a), 4)
+    select case(n)
+    case(0)
+       v = + cos(r)
+    case(1)
+       v = - sin(r)
+    case(2)
+       v = - cos(r)
+    case default
+       v = + sin(r)
+    end select
+  end function cosd_canonical_d
+
 !!!_  & setd_sincos() - set sine and cosine array (degree)
   function setd_sincos_d(angl) &
        & result(sc)
@@ -4509,10 +4581,10 @@ contains
     implicit none
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT) :: sc(NTRIG)
-    real(kind=KTGT) r, a, q, s, c
+    real(kind=KTGT),parameter :: q = 90.0_KTGT
+    real(kind=KTGT) r, a, s, c
     integer n
 
-    q = 90.0_KTGT
     a = ANINT(angl / q)
     r = angl - q * a
     n = modulo(int(a), 4)
@@ -4541,10 +4613,10 @@ contains
     implicit none
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT) :: sc(NTRIG)
-    real(kind=KTGT) r, a, q, s, c
+    real(kind=KTGT),parameter :: q = 90.0_KTGT
+    real(kind=KTGT) r, a, s, c
     integer n
 
-    q = 90.0_KTGT
     a = ANINT(angl / q)
     r = angl - q * a
     n = modulo(int(a), 4)
@@ -5975,7 +6047,7 @@ contains
     real(kind=KTGT),intent(in) :: a1, a2
     real(kind=KTGT),parameter :: tol = 1.0e-13_KTGT
 
-    b = ABS(angle_canonical(a1) - angle_canonical(a2)) .lt. tol
+    b = ABS(angle_modulo(a1) - angle_modulo(a2)) .lt. tol
   end function is_same_angle
 
 !!!_ + is_same_coor
