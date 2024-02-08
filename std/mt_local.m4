@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2024/01/31 14:10:39 fuyuki mt_local.m4>
+dnl Time-stamp: <2024/02/08 15:12:05 fuyuki mt_local.m4>
 
 dnl Copyright: 2020-2023 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -89,6 +89,10 @@ MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [convert],[
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([flush], [unit],[
       flush(unit=1)])
+
+MT_FORTRAN_BATCH_CHECK_STATEMENT([format], [zero_width_real],[
+   102 format(E0.3)
+   write(*, 102) 0.0])
 
 dnl system procedures
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_environment_variable], ['A'])
