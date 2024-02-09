@@ -1,10 +1,10 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2024/02/02 09:43:47 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/09 15:37:49 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022, 2023
+! Copyright (C) 2021, 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -431,6 +431,7 @@ module TOUZA_Nio_record
   public init, diag, finalize
   public set_default_switch
   public set_default_header, get_default_header
+  public nio_record_std, nio_record_def
   public nio_check_magic_file
   public nio_read_header,    nio_write_header
   public nio_read_data,      nio_write_data
@@ -851,6 +852,18 @@ contains
   end subroutine finalize_destroy
 
 !!!_ + user interfaces
+!!!_  & nio_record_std() - get standard record type == (REC_BIG)
+  integer function nio_record_std() result(k)
+    implicit none
+    k = REC_BIG
+  end function nio_record_std
+
+!!!_  & nio_record_def() - get default record type == (REC_DEFAULT)
+  integer function nio_record_def() result(k)
+    implicit none
+    k = REC_DEFAULT
+  end function nio_record_def
+
 !!!_  - get_default_header - get default header
   subroutine get_default_header &
        & (head,  &
