@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/11/01 14:46:01 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/15 13:38:14 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -34,10 +34,10 @@
 module chak_lib
 !!!_ + Declaration
 !!!_  - modules
-  use jmzlib, jl_init=>init, jl_finalize=>finalize
-  use Jmz_param, jp_init=>init, jp_finalize=>finalize
-  use Jmz_coor,  jc_init=>init, jc_finalize=>finalize, lname_co=>lname
-  use TOUZA_Nio,only: litem, nitem, GFMT_END
+  use Jmz_param
+  use Jmz_base, jb_init=>init, jb_finalize=>finalize
+  ! use Jmz_base, jb_open_write_file=>open_write_file
+  use Jmz_coor, lname_co=>lname
   implicit none
   public
 !!!_  - coordinate matching
@@ -154,21 +154,28 @@ module chak_lib
      type(loop_t) :: lcp(0:lcoor-1) ! logical (destination) coordinate properties
   end type stack_t
 
-!!!_  - container (file to read)
+!!!_  - record filter
+  type recf_t
+     integer :: num = 0
+     integer,pointer :: seq(:)
+  end type recf_t
+
+!!!_  - container (record filter on file)
   type container_t
-     ! character(len=lpath)   :: name
-     ! character(len=litem)   :: h(nitem)
-     ! character(len=lfmt)    :: fmt
-     ! integer                :: u
-     ! integer                :: t
-     ! integer                :: irec, nrec
-     ! integer                :: kfmt
-     ! integer                :: mode      ! access mode
-     ! integer                :: hedit     ! header edit level
-     ! integer                :: hflag = hflag_unset ! header parser flag
-     ! type(rgroup_t),pointer :: rgrp(:) => NULL()
-     ! integer                :: bigg
-     ! integer                :: opr       ! fake entry as operator
+     integer :: file                 ! file handle
+     integer :: prop                 ! arbitrary sub property
+     character(len=lname) ::  var    ! variable filter
+
+     type(recf_t),pointer :: filter(:)   ! record filter
+     integer              :: cur ! current filter index
+     integer              :: sub ! sub-index in filter
+     integer              :: term_flag ! terminate flag
+
+     integer             :: rec ! target record
+     integer(kind=KIOFS) :: pos ! file position cache
+
+     integer             :: orec ! record cache
+     integer(kind=KIOFS) :: opos ! file position cache
   end type container_t
 
 !!!_  - argument queue
@@ -193,7 +200,7 @@ contains
     integer,intent(out) :: ierr
 
     ierr = 0
-    if (ierr.eq.0) call jl_init(ierr)
+    if (ierr.eq.0) call jb_init(ierr, basename=' ')
     if (PI.eq.ZERO) PI = ATAN2(ZERO, -ONE)
   end subroutine init
 !!!_   . finalize
@@ -203,7 +210,7 @@ contains
     integer,intent(in),optional :: u
 
     ierr = 0
-    if (ierr.eq.0) call jl_finalize(ierr, u)
+    if (ierr.eq.0) call jb_finalize(ierr, u)
   end subroutine finalize
 !!!_  - utilities
 !!!_   . show_domain
@@ -614,6 +621,29 @@ contains
        n = ERR_INVALID_ITEM
     endif
   end function file_i2handle
+
+!!!_   . container_h2item()
+  integer function container_h2item(handle) result(n)
+    implicit none
+    integer,intent(in) :: handle
+    n = handle - ofs_container
+    if (n.ge.0.and.n.lt.min(mcontainer, lcontainer)) then
+       continue
+    else
+       n = ERR_INVALID_ITEM
+    endif
+  end function container_h2item
+!!!_   . container_i2handle()
+  integer function container_i2handle(item) result(n)
+    implicit none
+    integer,intent(in) :: item
+    if (item.ge.0.and.item.lt.min(mcontainer, lcontainer)) then
+       n = item + ofs_container
+    else
+       n = ERR_INVALID_ITEM
+    endif
+  end function container_i2handle
+
 !!!_   . buf_h2item()
   ELEMENTAL integer function buf_h2item(handle) result(n)
     implicit none
