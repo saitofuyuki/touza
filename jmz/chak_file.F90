@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz CH(swiss) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/11/01 14:47:14 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/04/15 09:20:57 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -22,8 +22,16 @@
 module chak_file
 !!!_ + Declaration
 !!!_  - modules
-  use jmz_param, jp_init=>init,  jp_finalize=>finalize
-  use chak_lib,  lib_init=>init, lib_finalize=>finalize
+  use Jmz_param
+  use Jmz_base, jb_init=>init, jb_finalize=>finalize
+  ! use Jmz_base, jb_open_write_file => open_write_file
+  use Jmz_coor, lname_co=>lname
+  use Jmz_file
+  ! use Jmz_coor,only: loop_null, loop_reduce, loop_normal, null_range
+  ! use Jmz_coor,only: loop_unset
+  use chak_lib,only: lib_init=>init, lib_finalize=>finalize
+  use chak_lib,only: loop_t, lname, user_index_bgn, user_index_end
+  use chak_lib,only: parse_format_shape
   implicit none
   public
 !!!_  - parameters
@@ -43,6 +51,10 @@ module chak_file
   integer,parameter :: hflag_unset   = -1
   integer,parameter :: hflag_default = 0
   integer,parameter :: hflag_nulld   = 1       ! strict null-coordinate mode
+
+  integer,parameter :: iflag_unset   = -1
+  integer,parameter :: iflag_default = 0
+  integer,parameter :: iflag_dset    = 1       ! dset prefix
 
   integer,parameter :: hedit_unset = -9
   integer,parameter :: hedit_sign = 0
@@ -116,6 +128,7 @@ module chak_file
      integer                :: mode      ! access mode
      integer                :: hedit     ! header edit level
      integer                :: hflag = hflag_unset ! header parser flag
+     integer                :: iflag = iflag_unset ! header parser flag (for item)
      type(rgroup_t),pointer :: rgrp(:) => NULL()
      integer                :: bigg
      integer                :: opr       ! fake entry as operator
@@ -155,6 +168,7 @@ contains
     file%mode  = choice(mode_unset, mode)
     file%hflag = choice(hflag_unset, flag)
     file%bigg  = choice(bigg_on, bigg)
+    file%iflag = iflag_unset
     file%opr = -1
     ! file%bh = -1
 
@@ -713,7 +727,7 @@ contains
        & (ierr, file, def, levv)
     use TOUZA_Std,only: new_unit, sus_open, is_error_match, upcase
     use TOUZA_Std,only: check_byte_order
-    use TOUZA_Nio,only: cache_open_read
+    use TOUZA_Nio,only: cache_open_read, show_cache
     implicit none
     integer,     intent(out)         :: ierr
     type(file_t),intent(inout)       :: file
@@ -728,6 +742,7 @@ contains
 
     if (file%u.lt.0) then
        if (file%hflag.eq.hflag_unset) file%hflag = def%hflag
+       if (file%iflag.eq.iflag_unset) file%iflag = def%iflag
        if (file%mode.eq.mode_read) file%mode = def%mode
 
        file%u = new_unit()
@@ -756,12 +771,13 @@ contains
              if (ierr.eq.0) then
                 if (mpath.eq.0) then
                    call sus_open(ierr, file%u, file%name, ACTION='R', STATUS='O', IOMSG=iomsg)
-                else
+                else if (mpath.gt.0) then
                    file%name = file%name(1:mpath)
                    call cache_open_read(ierr, ch, file%name, flag=0, unit=file%u)
                    if (ierr.eq.0) then
                       file%kfmt = cfmt_gtool_cache
                       file%u = ch
+                      ! if (is_msglev_DEBUG(levv)) call show_cache(ierr, ch, levv=levv)
                    endif
                 endif
              endif
@@ -785,86 +801,86 @@ contains
     endif
   end subroutine open_read_file
 
-!!!_   . parse_file_item
-  subroutine parse_file_item &
-       & (ierr, mpath, mitem, &
-       &  file, utest, seps,  rlev)
-    use TOUZA_Std,only: choice, choice_a
-    use TOUZA_Std,only: new_unit, sus_open, sus_close
-    implicit none
-    integer,         intent(out)         :: ierr
-    integer,         intent(out)         :: mpath, mitem
-    character(len=*),intent(in)          :: file
-    integer,         intent(in),optional :: utest
-    character(len=*),intent(in),optional :: seps
-    integer,         intent(in),optional :: rlev
+! !!!_   . parse_file_item
+!   subroutine parse_file_item &
+!        & (ierr, mpath, mitem, &
+!        &  file, utest, seps,  rlev)
+!     use TOUZA_Std,only: choice, choice_a
+!     use TOUZA_Std,only: new_unit, sus_open, sus_close
+!     implicit none
+!     integer,         intent(out)         :: ierr
+!     integer,         intent(out)         :: mpath, mitem
+!     character(len=*),intent(in)          :: file
+!     integer,         intent(in),optional :: utest
+!     character(len=*),intent(in),optional :: seps
+!     integer,         intent(in),optional :: rlev
 
-    integer jerr_full
-    integer jerr_filter
-    integer utmp
-    logical btmp
-    integer lf
-    integer jc
-    character(len=1) :: csep
+!     integer jerr_full
+!     integer jerr_filter
+!     integer utmp
+!     logical btmp
+!     integer lf
+!     integer jc
+!     character(len=1) :: csep
 
-    ! A/B/file             A/B/file   + (null)     sequential
-    ! A/B/file/            A/B/file   + (null)     cache
-    ! A/B/file/item        A/B/file   + item       cache
-    ! A/B/file/group/item  A/B/file   + group/item cache
+!     ! A/B/file             A/B/file   + (null)     sequential
+!     ! A/B/file/            A/B/file   + (null)     cache
+!     ! A/B/file/item        A/B/file   + item       cache
+!     ! A/B/file/group/item  A/B/file   + group/item cache
 
-    ! not implemented
-    ! (deprecated)
-    ! A/B/file?item        A/B/file   + item       cache
-    ! A/B/file?group/item  A/B/file   + group/item cache
-    ! A/B/?file?           A/B/?file  + (null)     sequential
-    ! A/B/?file/           A/B/?file  + (null)     cache
+!     ! not implemented
+!     ! (deprecated)
+!     ! A/B/file?item        A/B/file   + item       cache
+!     ! A/B/file?group/item  A/B/file   + group/item cache
+!     ! A/B/?file?           A/B/?file  + (null)     sequential
+!     ! A/B/?file/           A/B/?file  + (null)     cache
 
-    ierr = 0
-    mpath = 0     ! normal path
-    mitem = -1    ! sequential mode
+!     ierr = 0
+!     mpath = 0     ! normal path
+!     mitem = -1    ! sequential mode
 
-    utmp = choice(-1, utest)
-    if (utmp.lt.0) utmp = new_unit()
-    if (utmp.lt.0) then
-       ierr = utmp
-       return
-    endif
-    if (ierr.eq.0) inquire(unit=utmp, opened=btmp, IOSTAT=ierr)
-    if (ierr.eq.0) then
-       if (btmp) ierr = ERR_PANIC
-    endif
-    jerr_full = -1
-    jerr_filter = -1
-    if (ierr.eq.0) then
-       ! full-name
-       call sus_open(jerr_full, utmp, file, ACTION='R', STATUS='O')
-       if (jerr_full.eq.0) call sus_close(ierr, utmp, file)
-    endif
-    if (ierr.eq.0) then
-       if (jerr_full.ne.0) then
-          lf = len_trim(file)
-          mitem = lf
-          do jc = 0, file_item_level - 1
-             mitem = index(file(1:mitem), path_sep, back=.true.)
-             if (mitem.le.0) exit
-             mitem = mitem - 1
-             call sus_open(jerr_filter, utmp, file(1:mitem), ACTION='R', STATUS='O')
-             if (jerr_filter.eq.0) then
-                mpath = mitem
-                mitem = mitem + 2
-                if (mitem.gt.lf) mitem = 0
-                call sus_close(ierr, utmp, file)
-                exit
-             endif
-          enddo
-       endif
-    endif
-    if (jerr_full.eq.0) then
-       mpath = 0
-       mitem = 0
-    endif
-    ! if (ierr.eq.0) call sus_close(ierr, utmp, file)
-  end subroutine parse_file_item
+!     utmp = choice(-1, utest)
+!     if (utmp.lt.0) utmp = new_unit()
+!     if (utmp.lt.0) then
+!        ierr = utmp
+!        return
+!     endif
+!     if (ierr.eq.0) inquire(unit=utmp, opened=btmp, IOSTAT=ierr)
+!     if (ierr.eq.0) then
+!        if (btmp) ierr = ERR_PANIC
+!     endif
+!     jerr_full = -1
+!     jerr_filter = -1
+!     if (ierr.eq.0) then
+!        ! full-name
+!        call sus_open(jerr_full, utmp, file, ACTION='R', STATUS='O')
+!        if (jerr_full.eq.0) call sus_close(ierr, utmp, file)
+!     endif
+!     if (ierr.eq.0) then
+!        if (jerr_full.ne.0) then
+!           lf = len_trim(file)
+!           mitem = lf
+!           do jc = 0, file_item_level - 1
+!              mitem = index(file(1:mitem), path_sep, back=.true.)
+!              if (mitem.le.0) exit
+!              mitem = mitem - 1
+!              call sus_open(jerr_filter, utmp, file(1:mitem), ACTION='R', STATUS='O')
+!              if (jerr_filter.eq.0) then
+!                 mpath = mitem
+!                 mitem = mitem + 2
+!                 if (mitem.gt.lf) mitem = 0
+!                 call sus_close(ierr, utmp, file)
+!                 exit
+!              endif
+!           enddo
+!        endif
+!     endif
+!     if (jerr_full.eq.0) then
+!        mpath = 0
+!        mitem = 0
+!     endif
+!     ! if (ierr.eq.0) call sus_close(ierr, utmp, file)
+!   end subroutine parse_file_item
 
 !!!_   . cue_read_file
   subroutine cue_read_file &
@@ -878,6 +894,8 @@ contains
     ! integer ji
 
     ierr = 0
+    if (file%kfmt.eq.cfmt_gtool_cache) return
+
     nrg = size(file%rgrp)
     file%rgrp(0:nrg-1)%pos = -1
     do jrg = 0, nrg - 1
@@ -916,6 +934,7 @@ end subroutine cue_read_file
     integer nrf
     integer nc, nw, nt
     ierr = 0
+    if (file%kfmt.eq.cfmt_gtool_cache) return
     ! store current status
     nrg = size(file%rgrp)
     if (file%mode.eq.mode_persistent) then
@@ -2198,34 +2217,13 @@ end subroutine cue_read_file
 #endif /* not OPT_WITH_NCTCDF */
 
   end subroutine write_data_cdf
-!!!_  - is_cfmt_ascii()
-  PURE &
-  logical function is_cfmt_ascii(cfmt) result(b)
-    implicit none
-    integer,intent(in) :: cfmt
-    b = cfmt.eq.cfmt_ascii
-  end function is_cfmt_ascii
-!!!_  - is_cfmt_binary()
-  PURE &
-  logical function is_cfmt_binary(cfmt) result(b)
-    implicit none
-    integer,intent(in) :: cfmt
-    b = (cfmt_binary.le.cfmt) .and. (cfmt.lt.cfmt_cdf)
-  end function is_cfmt_binary
-!!!_  - is_cfmt_nio()
-  PURE &
-  logical function is_cfmt_nio(cfmt) result(b)
-    implicit none
-    integer,intent(in) :: cfmt
-    b = cfmt .le. GFMT_END
-  end function is_cfmt_nio
-!!!_  - is_cfmt_cdf()
-  PURE &
-  logical function is_cfmt_cdf(cfmt) result(b)
-    implicit none
-    integer,intent(in) :: cfmt
-    b = cfmt.eq.cfmt_cdf
-  end function is_cfmt_cdf
+! !!!_  - is_cfmt_nio()
+!   PURE &
+!   logical function is_cfmt_nio(cfmt) result(b)
+!     implicit none
+!     integer,intent(in) :: cfmt
+!     b = cfmt .le. GFMT_END
+!   end function is_cfmt_nio
 !!!_ + end chak_file
 end module chak_file
 !!!_@ test_chak_file
