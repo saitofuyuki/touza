@@ -1,8 +1,8 @@
 /* touza_std.h - touza/std common definition */
 /* Maintainer: SAITO Fuyuki */
 /* Created: May 30 2020 */
-/* Time-stamp: <2023/02/15 08:55:44 fuyuki touza_std.h> */
-/* Copyright (C) 2020,2021,2023 */
+/* Time-stamp: <2024/02/17 14:42:04 fuyuki touza_std.h> */
+/* Copyright (C) 2020,2021,2023,2024 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
 /*   (https://www.apache.org/licenses/LICENSE-2.0) */
@@ -70,6 +70,7 @@
 
 /* message verbose level chech by macro */
 
+#  define MSG_LEVEL_ANYWAY    999
 #  define MSG_LEVEL_PANIC     16
 #  define MSG_LEVEL_FATAL     8
 #  define MSG_LEVEL_CRITICAL  4
@@ -82,6 +83,7 @@
 
 #  define VCHECK(L,C) ((L)+(C)).ge.0
 
+#  define VCHECK_ANYWAY(L)   VCHECK(L,MSG_LEVEL_ANYWAY)
 #  define VCHECK_PANIC(L)    VCHECK(L,MSG_LEVEL_PANIC)
 #  define VCHECK_FATAL(L)    VCHECK(L,MSG_LEVEL_FATAL)
 #  define VCHECK_CRITICAL(L) VCHECK(L,MSG_LEVEL_CRITICAL)
