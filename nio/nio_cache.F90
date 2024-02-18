@@ -1,10 +1,10 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2024/02/25 21:48:41 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/04/05 18:02:46 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022,2023
+! Copyright (C) 2022,2023,2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -22,19 +22,24 @@
 #endif /* not HAVE_F2003_ALLOCATABLE_MEMBER */
 
 #ifndef   OPT_NIO_CACHES_SIZE
-#  define OPT_NIO_CACHES_SIZE 512
+#  define OPT_NIO_CACHES_SIZE  (2**8)
+#endif
+#ifndef   OPT_NIO_UNIT_LIMIT
+#  define OPT_NIO_UNIT_LIMIT   12         /* base 2 power */
+#endif
+#ifndef   OPT_NIO_GROUPS_LIMIT
+#  define OPT_NIO_GROUPS_LIMIT 10         /* base 2 power */
 #endif
 !!!_@ TOUZA_Nio_cache - nio with cache
 module TOUZA_Nio_cache
 !!!_ = declaration
   use TOUZA_Nio_std,only: KI32, KI64, KDBL, KFLT, KIOFS
-  use TOUZA_Nio_std,only: get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Nio_std,only: get_logu,   unit_global,  trace_fine,   trace_control, trace_err
   use TOUZA_Nio_header,nh_init=>init, nh_diag=>diag, nh_finalize=>finalize
+  use TOUZA_Nio_record,only: REC_ERROR
   implicit none
   private
 !!!_  - public parameters
-  integer,parameter :: lax = 3
-
   integer,parameter,public :: coll_default = 0
   integer,parameter,public :: coll_strict    = -1
   integer,parameter,public :: coll_std       = 1    ! ignore DFMT ITEM DATE TIME TDUR TIME2 UTIM2 SIZE MISS AITMn ASTRn AENDn
@@ -43,22 +48,37 @@ module TOUZA_Nio_cache
   integer,parameter,public :: coll_nonum     = 4    ! plus ignore DSET FNUM DNUM
   integer,parameter,public :: coll_nospecial = 8    ! disable DSET special
 
-  integer,parameter,public :: gid_suite = -9   ! special group id to set all the variables in single suite
-                                               ! only meaningful when specify variable id
-  integer,parameter,public :: vid_suite = -99  ! special variable id to set all the records in single suite
+  integer,parameter,public :: var_suite = -99  ! special variable id to set all the records in single suite
+
+  character(len=*),parameter,public :: group_suite = ' '
 !!!_  - private parameter
+  integer,parameter :: lcoor = 4, mcoor = 3
+  integer,parameter :: cmdl = mcoor
+
+  integer,parameter :: pat_file   = OPT_NIO_UNIT_LIMIT
+  integer,parameter :: mdl_file   = 2 ** pat_file
+  integer,parameter :: msk_file   = mdl_file - 1
+  integer,parameter :: lim_groups = 2 ** OPT_NIO_GROUPS_LIMIT
+  integer,parameter :: msk_group  = lim_groups - 1
+  ! special group id to set all the variables in single suite
+  ! only meaningful when specify variable id
+  integer,parameter,public :: grp_suite  = lim_groups - 1   !! 1....1 DO NOT CHANGE
+  integer,parameter :: lgroups    = lim_groups - 4   ! use for handle/group integrated id
+
   integer,parameter :: ucache = 16
   integer,parameter :: lpath = OPT_PATH_LEN
+
+  integer,parameter :: cnull = -1   ! null coordinate (size <=0 and blank)
 !!!_  - types
   type var_t
      character(len=litem) :: item = ' '
      character(len=litem) :: unit = ' '
      character(len=litem) :: dfmt = ' '
-     character(len=litem) :: co(0:lax-1) = ' '
-     integer              :: jbgn(0:lax-1) = 0
-     integer              :: jend(0:lax-1) = 0
+     integer              :: jbgn(0:lcoor-1) = 0
+     integer              :: jend(0:lcoor-1) = 0
      integer              :: neff
-     integer              :: ceff(0:lax-1) = -1  ! effective coordinate index
+     integer              :: xh(0:lcoor-1)   = -1  ! coordinate handle
+     integer              :: ceff(0:lcoor-1) = -1  ! effective coordinate index
      integer              :: flag
      integer              :: rofs                ! start index of cache%rpos
      integer              :: lastrec = -1        ! last accessed record
@@ -67,33 +87,34 @@ module TOUZA_Nio_cache
   type group_t
      integer :: nvar = -1                   ! size of v
      integer :: nrec = -1                   ! number of records
-     character(len=litem) :: g              ! group name
+     integer :: ncoor = -1                  ! number of coordinates
+     character(len=litem) :: name           ! group name
      character(len=litem) :: h(nitem)       ! header
      character(len=litem),pointer :: d(:) => NULL()    ! date [rec]
      character(len=litem),pointer :: t(:) => NULL()    ! time [rec]
-     ! temporary properties, to integrated into cache_t%v
+     ! temporal properties, to integrated into cache_t
      type(var_t),pointer :: v(:) => NULL()
+     character(len=litem),pointer :: x(:) => NULL()    ! coordinates
      integer(kind=KIOFS),pointer  :: rpos(:, :) => NULL() ! record offset [rec, var]
      integer(kind=KIOFS),pointer  :: rlen(:, :) => NULL() ! record size   [rec, var]
   end type group_t
 
   type cache_t
      integer :: ngrp = -1
+     integer :: ncoor = -1
      type(group_t),pointer :: g(:)
      type(var_t),pointer   :: v(:)
      integer,pointer       :: o(:)   ! group-variable offset
-     integer(kind=KIOFS),pointer :: rpos(:) => NULL() ! record offset [var+rec]
-     integer(kind=KIOFS),pointer :: rlen(:) => NULL() ! record size   [var+rec]
-     integer lrec
+     character(len=litem),pointer :: x(:) => NULL()    ! coordinates
+     integer(kind=KIOFS),pointer  :: rpos(:) => NULL() ! record offset [var+rec]
+     integer(kind=KIOFS),pointer  :: dpos(:) => NULL() ! data-part offset [var+rec]
+     integer(kind=KIOFS),pointer  :: rlen(:) => NULL() ! record size   [var+rec]
+     integer :: lrec
+     integer :: krect = REC_ERROR ! record-type, to remember
   end type cache_t
 !!!_  - static
   integer,save :: cache_rev = 0
   integer,parameter :: nloc = 5, nspec = 9
-  character(len=litem),save :: DSET_specials(nspec) = &
-       & (/ 'AXLOC  ', 'IAXLOC ', 'CAXLOC ', 'CIAXLOC', 'CCAXLOC', &
-       &    'AXWGT  ', 'IAXWGT ', 'CAXWGT ', 'CIAXWGT'  /)
-  ! CCAXLOC is used in DIUR02 of official gtool, might be a bug.
-  ! DSET_specials(1:nloc) corresponds to LOC, otherwise WGT.
 
   character(len=4),save :: dup_sep = '~'
 !!!_  - controls
@@ -114,32 +135,59 @@ module TOUZA_Nio_cache
   interface show_cache
      module procedure show_cache_t, show_cache_h
   end interface show_cache
+  interface show_group
+     module procedure show_group_t, show_group_i
+  end interface show_group
   interface cache_get_attr
      module procedure cache_geti_attr_a, cache_getn_attr_a
+     module procedure cache_geti_attr_i, cache_getn_attr_i
      module procedure cache_geti_attr_f, cache_getn_attr_f
+     module procedure cache_geti_attr_d, cache_getn_attr_d
   end interface cache_get_attr
 
   interface cache_var_read
-     module procedure cache_var_read_f
+     module procedure cache_var_read_i, cache_var_read_f, cache_var_read_d
   end interface cache_var_read
 
-  interface cache_rec_id
-     module procedure cache_rec_id_d
-  end interface cache_rec_id
+  interface cache_unit
+     module procedure extr_h2unit
+  end interface cache_unit
+  interface cache_group
+     module procedure cache_group_n, cache_group_j
+  end interface cache_group
+
+  interface cache_time_rec
+     module procedure cache_time_rec_d
+  end interface cache_time_rec
+
+  interface cache_sparse_review
+     module procedure cache_sparse_review_i, cache_sparse_review_f, cache_sparse_review_d
+  end interface cache_sparse_review
+  interface cache_restore_csr
+     module procedure cache_restore_csr_i, cache_restore_csr_d
+  end interface cache_restore_csr
+
+  interface query_rserial_time
+     module procedure query_rserial_time_d
+  end interface query_rserial_time
+
 !!!_  - public procedures
   public init, diag, finalize
   public init_group
   public show_cache
-  public cache_scan_file, cache_settle
+  public cache_open_read,  cache_close
+  public cache_unit
+  public cache_group_size, cache_group,  cache_group_name, cache_group_recs
+  public cache_var_size,   cache_var_id, cache_var_name,   cache_co_size
+  public cache_co_all,     cache_co_idx, cache_co_name,    cache_co_len
+  public cache_co_range,   cache_var_len
+  public cache_time_rec
+
   public cache_store_v0
-  public cache_open_read, cache_groups,   cache_vars
-  public cache_close
-  public cache_group_recs
-  public cache_var_name,  cache_var_nco, cache_var_id
-  public cache_co_name,   cache_co_size, cache_co_idx
   public cache_var_read
-  public cache_rec_id
+  public cache_read_header
   public cache_get_attr
+  public cache_sparse_review, cache_restore_csr
 !!!_  - public shared
 contains
 !!!_ + common interfaces
@@ -150,6 +198,8 @@ contains
     use TOUZA_Nio_std,   only: ns_init=>init, choice, get_size_bytes, KDBL
     use TOUZA_Nio_header,only: nh_init=>init
     use TOUZA_Nio_record,only: nr_init=>init
+    use TOUZA_Nio_axis,only: na_init=>init
+    use TOUZA_Nio_sparse,only: np_init=>init
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in),optional :: u
@@ -176,6 +226,8 @@ contains
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
           if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call nr_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call na_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call np_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
        endif
        if (present(sep)) then
           dup_sep = sep
@@ -195,6 +247,8 @@ contains
     use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
     use TOUZA_Nio_header,only: nh_diag=>diag
     use TOUZA_Nio_record,only: nr_diag=>diag
+    use TOUZA_Nio_axis,only: na_diag=>diag
+    use TOUZA_Nio_sparse,only: np_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -214,6 +268,10 @@ contains
           if (ierr.eq.0) then
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, u=utmp)
              if (is_msglev_normal(lv)) call msg('(''duplicate separator = '', A)', (/dup_sep/), __MDL__, utmp)
+             if (is_msglev_normal(lv)) then
+                call msg('(''OPT_NIO_GROUPS_LIMIT = '', I0)', (/OPT_NIO_GROUPS_LIMIT/), __MDL__, u=utmp)
+                call msg('(''OPT_NIO_CACHES_SIZE = '', I0)', (/OPT_NIO_CACHES_SIZE/), __MDL__, u=utmp)
+             endif
           endif
        endif
        lmd = control_deep(md, mode)
@@ -221,6 +279,8 @@ contains
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call nr_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call na_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call np_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -233,6 +293,8 @@ contains
     use TOUZA_Nio_std,   only: ns_finalize=>finalize, choice
     use TOUZA_Nio_header,only: nh_finalize=>finalize
     use TOUZA_Nio_record,only: nr_finalize=>finalize
+    use TOUZA_Nio_axis,only: na_finalize=>finalize
+    use TOUZA_Nio_sparse,only: np_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -256,13 +318,13 @@ contains
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call nr_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call na_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call np_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
        endif
        fine_counts = fine_counts + 1
     endif
     return
   end subroutine finalize
-!!!_  - init subcontracts
-!!!_ + controls
 !!!_  - init_table - hash table initialization
   subroutine init_table &
        & (ierr, n)
@@ -283,9 +345,11 @@ contains
     if (ierr.eq.0) then
        nctab = 0
        allocate(ctables(0:lctab-1), STAT=ierr)
+       if (ierr.ne.0) ierr = _ERROR(ERR_ALLOCATION)
     endif
     return
   end subroutine init_table
+!!!_ + controls
 !!!_  - cache_open_read
   subroutine cache_open_read &
        & (ierr, handle, path, flag, unit)
@@ -295,8 +359,8 @@ contains
     integer,         intent(out) :: ierr
     integer,         intent(out) :: handle
     character(len=*),intent(in)  :: path
-    integer,         intent(in)  :: flag
-    integer,optional,intent(in)  :: unit
+    integer,optional,intent(in)  :: flag
+    integer,optional,intent(in)  :: unit   ! allocate if not present
     integer u
     integer jc
 
@@ -310,18 +374,18 @@ contains
        nctab = nctab + 1
        if (nctab.ge.lctab) ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
     endif
-    if (ierr.eq.0) then
-       ierr = reg_entry(hh_cache, ikey=(/u/), status=(/jc/))
-       ierr = min(0, ierr)
-    endif
+    if (ierr.eq.0) ierr = register_cache(u, jc)
     if (ierr.eq.0) then
        call sus_open(ierr, u, path, ACTION='R', STATUS='O')
     endif
-    if (ierr.eq.0) call cache_scan_file(ierr, ctables(jc), u)
-    if (ierr.eq.0) call cache_settle(ierr, ctables(jc))
+    if (ierr.eq.0) call scan_file(ierr, ctables(jc), u, flag)
+    if (ierr.eq.0) call settle_cache(ierr, ctables(jc))
 
-    if (ierr.eq.0) handle = u
-
+    if (ierr.eq.0) then
+       handle = conv_u2handle(u)
+       ierr = min(0, handle)
+    endif
+    call trace_err(ierr, asfx=path)
   end subroutine cache_open_read
 
 !!!_  - cache_close
@@ -333,131 +397,205 @@ contains
     integer,         intent(in)          :: handle
     character(len=*),intent(in),optional :: path
 
+    character(len=lpath) :: bufp
     integer ufile
     integer jc
     ierr = 0
 
-    jc = cache_is_valid(handle)
+    jc = is_valid(handle)
     ierr = min(0, jc)
     if (ierr.eq.0) then
-       ufile = cache_h2unit(handle)
-       close(unit=ufile, IOSTAT=ierr)
-       ! write(*, *) 'cache_close', handle, ufile, ierr
+       ufile = extr_h2unit(handle)
+       if (present(path)) then
+          if (path.ne.' ') then
+             inquire(UNIT=ufile, NAME=bufp, IOSTAT=ierr)
+             if (ierr.eq.0) then
+                if (path.ne.bufp) ierr = _ERROR(ERR_PANIC)
+             endif
+          endif
+       endif
+       if (ierr.eq.0) close(unit=ufile, IOSTAT=ierr)
     endif
     if (ierr.eq.0) call free_cache(ierr, ctables(jc))
-    ! write(*, *) 'cache_close', ierr
+    call trace_err(ierr, asfx=path)
   end subroutine cache_close
 
-!!!_  - cache_h2index()
-  integer function cache_h2index(handle) result(j)
-    use TOUZA_Nio_std,only: query_status
-    implicit none
-    integer,intent(in) :: handle
-    integer jerr
-    call query_status(jerr, j, hh_cache, ikey=(/handle/))
-    if (jerr.lt.0) j = jerr
-  end function cache_h2index
-
-!!!_  - cache_h2unit() - identical
-  integer function cache_h2unit(handle) result(u)
-    implicit none
-    integer,intent(in) :: handle
-    u = handle
-  end function cache_h2unit
-!!!_  - cache_groups()
-  integer function cache_groups(handle) result(n)
+!!!_  - cache_group_size()
+  integer function cache_group_size(handle) result(n)
     implicit none
     integer,intent(in)  :: handle
-    integer jc
-    jc = cache_h2index(handle)
-    n = min(0, jc)
-    if (n.eq.0) n = ctables(jc)%ngrp
-  end function cache_groups
-!!!_  - cache_group_recs()
-  integer function cache_group_recs(handle, gid) result(n)
-    implicit none
-    integer,intent(in) :: handle
-    integer,intent(in) :: gid
-    integer jc
-    jc = cache_is_valid(handle, gid)
-    n = min(0, jc)
-    if (n.eq.0) then
-       if (gid.eq.gid_suite) then
-          n = _ERROR(ERR_INVALID_PARAMETER)
-       else
-          n = ctables(jc)%g(gid)%nrec
+    integer jc, gid
+    gid = extr_h2group(handle)
+    ! No hierarchies
+    if (gid.ne.grp_suite) then
+       n = _ERROR(ERR_INVALID_PARAMETER)
+    else
+       jc = extr_h2index(handle)
+       n = min(0, jc)
+       if (n.eq.0) then
+          n = ctables(jc)%ngrp
        endif
     endif
-  end function cache_group_recs
-!!!_  - cache_vars(handle, gid) - return number of variables in a group or total
-  integer function cache_vars(handle, gid) result(n)
+  end function cache_group_size
+!!!_  - cache_group - return group handle corresponding to name or index
+  integer function cache_group_n(name, handle, init) result(h)
     use TOUZA_Nio_std,only: choice
     implicit none
-    integer,intent(in)          :: handle
-    integer,intent(in),optional :: gid
-    integer jc
-    integer jg
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: handle
+    integer,optional,intent(in) :: init     ! for variable duplication
+    integer gid, gini
+    integer jc, jgb, jge
 
-    jg = choice(gid_suite, gid)
-    if (jg.eq.gid_suite) then
-       jc = cache_is_valid(handle)
-       n = min(0, jc)
-       if (n.eq.0) then
-          n = ctables(jc)%o(ctables(jc)%ngrp)
-       else
-          n = _ERROR(ERR_INVALID_ITEM)
-       endif
+    ! Search first occurence of group NAME from INIT.
+
+    gid = extr_h2group(handle)
+    if (gid.ne.grp_suite) then
+       h = _ERROR(ERR_INVALID_PARAMETER)
     else
-       jc = cache_is_valid(handle, gid)
-       n = min(0, jc)
-       if (n.eq.0) then
-          n = ctables(jc)%g(gid)%nvar
-       else
-          n = _ERROR(ERR_INVALID_ITEM)
+       jc = extr_h2index(handle)
+       h = min(0, jc)
+       if (h.eq.0) then
+          if (name.eq.group_suite) then
+             gid = grp_suite
+          else
+             jge = ctables(jc)%ngrp
+             gini = choice(-1, init)
+             if (gini.lt.0) then
+                jgb = 0
+             else
+                jgb = extr_h2group(gini) + 1
+             endif
+             gid = query_gserial(ctables(jc)%g, name, jgb, jge)
+          endif
+          h = conv_h2handle(handle, gid)
        endif
     endif
-  end function cache_vars
+  end function cache_group_n
 
-!!!_  - cache_var_name - return variable name corresponding to group/var id
-  subroutine cache_var_name(ierr, name, handle, gid, vid)
+  integer function cache_group_j(idx, handle) result(h)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,intent(in) :: idx
+    integer,intent(in) :: handle
+    integer gid
+    integer jc
+
+    gid = extr_h2group(handle)
+    if (gid.ne.grp_suite) then
+       h = _ERROR(ERR_INVALID_PARAMETER)
+    else
+       jc = extr_h2index(handle)
+       h = min(0, jc)
+       ! write(*, *) handle, gid, h, idx
+       if (h.eq.0) then
+          if (idx.ge.0.and.idx.lt.ctables(jc)%ngrp) then
+             h = conv_h2handle(handle, idx)
+          else
+             h = _ERROR(ERR_OUT_OF_RANGE)
+          endif
+       endif
+    endif
+  end function cache_group_j
+
+!!!_  - cache_group_name
+  subroutine cache_group_name(ierr, name, handle)
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: name
     integer,         intent(in)  :: handle
-    integer,         intent(in)  :: gid
-    integer,         intent(in)  :: vid
-    integer jc, jv
-
-    jv = cache_gv2vindex(handle, gid, vid)
-    ierr = min(0, jv)
+    integer jc, gid
+    jc = is_valid(handle) ! check gid also
+    ierr = min(0, jc)
+    if (ierr.eq.0) gid = extr_h2group(handle)
+    if (ierr.eq.0) ierr = min(0, gid)
     if (ierr.eq.0) then
-       jc = cache_h2index(handle)
-       name = ctables(jc)%v(jv)%item
+       if (gid.eq.grp_suite) then
+          name = group_suite
+       else
+          name = ctables(jc)%g(gid)%name
+       endif
+    endif
+  end subroutine cache_group_name
+
+!!!_  - cache_group_recs()
+  integer function cache_group_recs(handle, vid) result(n)
+    implicit none
+    integer,intent(in)          :: handle
+    integer,intent(in),optional :: vid
+    integer jc, gser
+    jc = is_valid(handle, vid) ! check gid vid also
+    n = min(0, jc)
+    if (n.eq.0) gser = get_gserial(handle, vid)
+    if (n.eq.0) n = min(0, gser)
+    if (n.eq.0) then
+       n = ctables(jc)%g(gser)%nrec
+    endif
+  end function cache_group_recs
+
+!!!_  & cache_var_size() - return number of variables in a group or total
+  integer function cache_var_size(handle) result(n)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,intent(in) :: handle
+    integer jc
+    integer gid
+
+    jc = is_valid(handle)
+    n = min(0, jc)
+    if (n.lt.0) return
+
+    gid = extr_h2group(handle)
+    if (gid.eq.grp_suite) then
+       n = ctables(jc)%o(ctables(jc)%ngrp)
+    else
+       n = ctables(jc)%g(gid)%nvar
+    endif
+  end function cache_var_size
+
+!!!_  - cache_var_name - return variable name corresponding to group/var id
+  subroutine cache_var_name(ierr, name, handle, vid)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: name
+    integer,         intent(in)  :: handle
+    integer,         intent(in)  :: vid
+    integer jc, vser
+
+    vser = get_vserial(handle, vid)
+    ierr = min(0, vser)
+    if (ierr.eq.0) then
+       jc = extr_h2index(handle)
+       name = ctables(jc)%v(vser)%item
     else
        name = ' '
     endif
   end subroutine cache_var_name
 
 !!!_  - cache_var_id - return variable id corresponding to name
-  integer function cache_var_id(name, handle, gid, init) result(vid)
+  integer function cache_var_id(name, handle, init) result(vid)
     use TOUZA_Nio_std,only: choice
     implicit none
     character(len=*),intent(in) :: name
     integer,         intent(in) :: handle
-    integer,         intent(in) :: gid
     integer,optional,intent(in) :: init     ! for variable duplication
     integer jerr
     integer jc, jvo, jvb, jve
+    integer gid
 
     ! Search first occurence of variable NAME from INIT.
     ! If strict matching is desired, set NAME as {NAME // trim (dup_sep) // index},
     ! e.g., PRCP~2.
 
-    jc = cache_is_valid(handle, gid)
+    jc = is_valid(handle)
     jerr = min(0, jc)
 
     if (jerr.eq.0) then
-       if (gid.eq.gid_suite) then
+       gid = extr_h2group(handle)
+       jerr = min(0, gid)
+    endif
+    if (jerr.eq.0) then
+       if (gid.eq.grp_suite) then
           jvo = 0
           jve = ctables(jc)%o(ctables(jc)%ngrp)
           jvb = choice(jvo, init)
@@ -466,21 +604,43 @@ contains
           jve = ctables(jc)%o(gid + 1)
           jvb = jvo + choice(0, init)
        endif
-       vid = var_query_id(ctables(jc)%v, name, jvb, jve)
+       vid = query_vserial(ctables(jc)%v, name, jvb, jve)
+       ! convert v serial to v index
        if (vid.ge.0) vid = vid - jvo
     else
        vid = jerr
     endif
   end function cache_var_id
 
-!!!_  - cache_rec_id - return record id filtered by time range
-  integer function cache_rec_id_d &
-       & (handle, gid, vid, timel, timeh, func, init) result(ridx)
+!!!_  & cache_var_len() - return array size of variable
+  integer function cache_var_len(handle, vid) result(n)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,intent(in) :: handle
+    integer,intent(in) :: vid
+    integer jc, vser, jx
+    integer jerr
+
+    vser = get_vserial(handle, vid)
+    jerr = min(0, vser)
+    if (jerr.eq.0) then
+       jc = extr_h2index(handle)
+       n = 1
+       do jx = 0, ctables(jc)%v(vser)%neff - 1
+          n = n * (ctables(jc)%v(vser)%jend(jx) - ctables(jc)%v(vser)%jbgn(jx))
+       enddo
+    else
+       n = jerr
+    endif
+  end function cache_var_len
+
+!!!_  - cache_time_rec - return record id filtered by time range
+  integer function cache_time_rec_d &
+       & (handle, vid, timel, timeh, func, init) result(rid)
     use TOUZA_Nio_std,only: KTGT=>KDBL
     use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(in) :: handle
-    integer,         intent(in) :: gid
     integer,         intent(in) :: vid
     real(kind=KTGT), intent(in) :: timel, timeh
     integer,optional,intent(in) :: init     ! for variable duplication
@@ -494,99 +654,63 @@ contains
        end function func
     end interface
 
-    integer jc, jg, jv, jr
+    integer jc, gser, vser, jr
     integer jerr
     integer rbgn, rend, rofs
 
-    ridx = -1
-    jc = cache_is_valid(handle, gid)
+    rid = -1
+    jc = is_valid(handle)
     jerr = min(0, jc)
     if (jerr.eq.0) then
-       jg = cache_gv2gindex(handle, gid, vid)
-       jv = cache_gv2vindex(handle, gid, vid)
-       jerr = min(0, jg, jv)
+       gser = get_gserial(handle, vid)
+       vser = get_vserial(handle, vid)
+       jerr = min(0, gser, vser)
     endif
     if (jerr.eq.0) then
-       rofs = cache_gvr2rindex(handle, gid, vid, 0)
+       rofs = get_rserial(handle, vid, 0)
        rbgn = choice(rofs, init) - rofs
-       rend = ctables(jc)%g(jg)%nrec
+       rend = ctables(jc)%g(gser)%nrec
        do jr = rbgn, rend
-          if (func(ctables(jc)%g(jg)%d(jr), ctables(jc)%g(jg)%t(jr), timel, timeh)) then
-             ridx = jr
+          if (func(ctables(jc)%g(gser)%d(jr), ctables(jc)%g(gser)%t(jr), timel, timeh)) then
+             rid = jr
              exit
           endif
        enddo
     endif
-    if (jerr.eq.0) then
-       if (ridx.ge.0) ridx = ridx + rofs
-    endif
-  end function cache_rec_id_d
-!!!_  - cache_var_nco - return number of effective dimensions
-  integer function cache_var_nco(handle, gid, vid) result(ndim)
+  end function cache_time_rec_d
+!!!_  - cache_co_size - return number of effective dimensions
+  integer function cache_co_size(handle, vid) result(ndim)
     implicit none
     integer,intent(in)  :: handle
-    integer,intent(in)  :: gid
     integer,intent(in)  :: vid
-    integer jc, jv
+    integer jc, vser
     integer jerr
 
-    jv = cache_gv2vindex(handle, gid, vid)
-    jerr = min(0, jv)
+    vser = get_vserial(handle, vid)
+    jerr = min(0, vser)
     if (jerr.eq.0) then
-       jc = cache_h2index(handle)
-       ndim = ctables(jc)%v(jv)%neff
+       jc = extr_h2index(handle)
+       ndim = ctables(jc)%v(vser)%neff
     else
        ndim = jerr
     endif
-  end function cache_var_nco
+  end function cache_co_size
 
-!!!_  - cache_co_name - return coordinate name
-  subroutine cache_co_name(ierr, name, handle, gid, vid, cid)
+!!!_  - cache_co_len - return coordinate length
+  integer function cache_co_len(handle, vid, cid) result(nerr)
     implicit none
-    integer,         intent(out) :: ierr
-    character(len=*),intent(out) :: name
-    integer,         intent(in)  :: handle
-    integer,         intent(in)  :: gid
-    integer,         intent(in)  :: vid
-    integer,         intent(in)  :: cid
-    integer jc, jeff, jv
+    integer,intent(in)  :: handle
+    integer,intent(in)  :: vid
+    integer,intent(in)  :: cid
+    integer jc, jeff, vser
     type(var_t),pointer :: v
 
-    jv = cache_gv2vindex(handle, gid, vid)
+    vser = get_vserial(handle, vid)
+    nerr = min(0, vser)
     v => NULL()
-    ierr = min(0, jv)
-    if (ierr.eq.0) then
-       jc = cache_h2index(handle)
-       v => ctables(jc)%v(jv)
-       if (cid.lt.0.or.cid.ge.v%neff) ierr = _ERROR(ERR_INVALID_ITEM)
-    endif
-    if (ierr.eq.0) then
-       jeff = v%ceff(cid)
-       if (jeff.lt.0) ierr = _ERROR(ERR_PANIC)
-    endif
-    if (ierr.eq.0) then
-       name = v%co(jeff)
-    else
-       name = ' '
-    endif
-  end subroutine cache_co_name
-
-!!!_  - cache_co_size - return coordinate size
-  integer function cache_co_size(handle, gid, vid, cid) result(nerr)
-    implicit none
-    integer,         intent(in)  :: handle
-    integer,         intent(in)  :: gid
-    integer,         intent(in)  :: vid
-    integer,         intent(in)  :: cid
-    integer jc, jeff, jv
-    type(var_t),pointer :: v
-
-    jv = cache_gv2vindex(handle, gid, vid)
-    v => NULL()
-    nerr = min(0, jv)
     if (nerr.eq.0) then
-       jc = cache_h2index(handle)
-       v => ctables(jc)%v(jv)
+       jc = extr_h2index(handle)
+       v => ctables(jc)%v(vser)
        if (cid.lt.0.or.cid.ge.v%neff) nerr = _ERROR(ERR_INVALID_ITEM)
     endif
     if (nerr.eq.0) then
@@ -596,30 +720,117 @@ contains
     if (nerr.eq.0) then
        nerr = max(0, v%jend(jeff) - v%jbgn(jeff))
     endif
-  end function cache_co_size
+  end function cache_co_len
+
+!!!_  - cache_co_range - return coordinate range
+  subroutine cache_co_range(ierr, jbgn, jend, handle, vid, cid)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(out) :: jbgn, jend
+    integer,intent(in)  :: handle
+    integer,intent(in)  :: vid
+    integer,intent(in)  :: cid
+    integer jc, jeff, vser
+    type(var_t),pointer :: v
+
+    vser = get_vserial(handle, vid)
+    ierr = min(0, vser)
+    v => NULL()
+    if (ierr.eq.0) then
+       jc = extr_h2index(handle)
+       v => ctables(jc)%v(vser)
+       if (cid.lt.0.or.cid.ge.v%neff) ierr = _ERROR(ERR_INVALID_ITEM)
+    endif
+    if (ierr.eq.0) then
+       jeff = v%ceff(cid)
+       if (jeff.lt.0) ierr = _ERROR(ERR_PANIC)
+    endif
+    if (ierr.eq.0) then
+       jbgn = v%jbgn(jeff)
+       jend = v%jend(jeff)
+    endif
+  end subroutine cache_co_range
+
+!!!_  - cache_co_all - return coordinate name
+  subroutine cache_co_all(ierr, name, handle, vid)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: name(0:*)
+    integer,         intent(in)  :: handle
+    integer,         intent(in)  :: vid
+    integer jx, nx
+    nx = cache_co_size(handle, vid)
+    ierr = min(0, nx)
+    if (ierr.eq.0) then
+       do jx = 0, nx - 1
+          if (ierr.eq.0) call cache_co_name(ierr, name(jx), handle, vid, jx)
+       enddo
+    endif
+  end subroutine cache_co_all
+!!!_  - cache_co_name - return coordinate name
+  subroutine cache_co_name(ierr, name, handle, vid, cid)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: name
+    integer,         intent(in)  :: handle
+    integer,         intent(in)  :: vid
+    integer,         intent(in)  :: cid
+    integer jc, jeff, vser
+    integer xh
+    type(var_t),pointer :: v
+
+    vser = get_vserial(handle, vid)
+    jc = extr_h2index(handle)
+    ierr = min(0, vser, jc)
+    v => NULL()
+    if (ierr.eq.0) then
+       v => ctables(jc)%v(vser)
+       if (cid.lt.0.or.cid.ge.v%neff) ierr = _ERROR(ERR_INVALID_ITEM)
+    endif
+    if (ierr.eq.0) then
+       jeff = v%ceff(cid)
+       if (jeff.lt.0) ierr = _ERROR(ERR_PANIC)
+    endif
+    if (ierr.eq.0) then
+       xh = v%xh(cid)
+       if (xh.lt.0.or.xh.ge.ctables(jc)%ncoor) then
+          ierr = _ERROR(ERR_PANIC)
+       else
+          name = ctables(jc)%x(xh)
+       endif
+    else
+       name = ' '
+    endif
+  end subroutine cache_co_name
 
 !!!_  - cache_co_idx - return coordinate index
-  integer function cache_co_idx(handle, gid, vid, name) result(jeff)
+  integer function cache_co_idx(handle, vid, name) result(jeff)
     implicit none
     integer,         intent(in)  :: handle
-    integer,         intent(in)  :: gid
     integer,         intent(in)  :: vid
     character(len=*),intent(in)  :: name
     integer jerr
-    integer jc, jx, jv
+    integer jc, jx, vser, xh
     type(var_t),pointer :: v
     integer j
 
-    jeff = -1
+    jeff = _ERROR(ERR_NOT_FOUND)
     v => NULL()
-    jv = cache_gv2vindex(handle, gid, vid)
-    jerr = min(0, jv)
+    jc = extr_h2index(handle)
+    jerr = min(0, jc)
     if (jerr.eq.0) then
-       jc = cache_h2index(handle)
-       v => ctables(jc)%v(jv)
+       xh = query_coor(ctables(jc), name)
+       jerr = min(0, xh)
+    endif
+    if (jerr.eq.0) then
+       vser = get_vserial(handle, vid)
+       jerr = min(0, vser)
+    endif
+    if (jerr.eq.0) then
+       v => ctables(jc)%v(vser)
        do j = 0, v%neff - 1
           jx = v%ceff(j)
-          if (name.eq.v%co(jx)) then
+          if (xh.eq.v%xh(jx)) then
              jeff = j
              return
           endif
@@ -627,8 +838,8 @@ contains
     endif
   end function cache_co_idx
 
-!!!_  - cache_get_attr
-  subroutine cache_geti_attr_a(ierr, attr, item, handle, gid, vid, rec)
+!!!_  - cache_geti_attr - by item id
+  subroutine cache_geti_attr_a(ierr, attr, item, handle, vid, rec)
     use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_std,only: WHENCE_BEGIN
     use TOUZA_Nio_header,only: get_item
@@ -638,77 +849,80 @@ contains
     character(len=*),intent(out) :: attr
     integer,         intent(in)  :: item
     integer,         intent(in)  :: handle
-    integer,optional,intent(in)  :: gid
     integer,optional,intent(in)  :: vid
     integer,optional,intent(in)  :: rec
     character(len=litem) :: h(nitem)
-    integer jc, ridx
+    integer jc, gid, rser
     integer ufile, krect
     integer(kind=KIOFS) rpos
 
-    jc = cache_is_valid(handle, gid, vid)
+    jc = is_valid(handle, vid)
     ierr = min(0, jc)
-    if (ierr.eq.0) then
-       if (.not.present(gid)) ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    endif
-    if (ierr.eq.0) then
-       if (present(vid)) then
-          ufile = cache_h2unit(handle)
-          ridx = cache_gvr2rindex(handle, gid, vid, choice(0, rec))
-          ierr = min(0, ridx)
+    if (present(vid)) then
+       if (ierr.eq.0) then
+          ufile = extr_h2unit(handle)
+          rser = get_rserial(handle, vid, choice(0, rec))
+          ierr = min(0, rser)
           if (ierr.eq.0) then
-             rpos = ctables(jc)%rpos(ridx)
+             rpos = ctables(jc)%rpos(rser)
              call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
              if (ierr.eq.0) call get_item(ierr, h, attr, item)
           endif
-       else if (gid.eq.gid_suite) then
-          ierr = _ERROR(ERR_INVALID_PARAMETER)
-       else
-          call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+       endif
+    else
+       if (ierr.eq.0) gid = extr_h2group(handle)
+       if (ierr.eq.0) ierr = min(0, gid)
+       if (ierr.eq.0) then
+          if (gid.eq.grp_suite) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+          endif
        endif
     endif
   end subroutine cache_geti_attr_a
-  subroutine cache_getn_attr_a(ierr, attr, item, handle, gid, vid, rec)
+  subroutine cache_geti_attr_i(ierr, attr, item, handle, vid, rec)
     use TOUZA_Nio_std,only: choice, WHENCE_BEGIN
     use TOUZA_Nio_header,only: get_item
     use TOUZA_Nio_record,only: nio_read_header
     implicit none
     integer,         intent(out) :: ierr
-    character(len=*),intent(out) :: attr
-    character(len=*),intent(in)  :: item
+    integer,         intent(out) :: attr
+    integer,         intent(in)  :: item
     integer,         intent(in)  :: handle
-    integer,optional,intent(in)  :: gid
     integer,optional,intent(in)  :: vid
     integer,optional,intent(in)  :: rec
-    integer jc, ridx
     character(len=litem) :: h(nitem)
+    integer jc, gid, rser
     integer ufile, krect
     integer(kind=KIOFS) rpos
 
-    jc = cache_is_valid(handle, gid, vid)
+    jc = is_valid(handle, vid)
     ierr = min(0, jc)
-    if (ierr.eq.0) then
-       if (.not.present(gid)) ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    endif
-    if (ierr.eq.0) then
-       if (present(vid)) then
-          ufile = cache_h2unit(handle)
-          ridx = cache_gvr2rindex(handle, gid, vid, choice(0, rec))
-          ierr = min(0, ridx)
+    if (present(vid)) then
+       if (ierr.eq.0) then
+          ufile = extr_h2unit(handle)
+          rser = get_rserial(handle, vid, choice(0, rec))
+          ierr = min(0, rser)
           if (ierr.eq.0) then
-             rpos = ctables(jc)%rpos(ridx)
+             rpos = ctables(jc)%rpos(rser)
              call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
              if (ierr.eq.0) call get_item(ierr, h, attr, item)
           endif
-       else if (gid.eq.gid_suite) then
-          ierr = _ERROR(ERR_INVALID_PARAMETER)
-       else
-          call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+       endif
+    else
+       if (ierr.eq.0) gid = extr_h2group(handle)
+       if (ierr.eq.0) ierr = min(0, gid)
+       if (ierr.eq.0) then
+          if (gid.eq.grp_suite) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+          endif
        endif
     endif
-  end subroutine cache_getn_attr_a
-
-  subroutine cache_geti_attr_f(ierr, attr, item, handle, gid, vid, rec)
+  end subroutine cache_geti_attr_i
+  subroutine cache_geti_attr_f(ierr, attr, item, handle, vid, rec)
     use TOUZA_Nio_std,only: KTGT=>KFLT
     use TOUZA_Nio_std,only: choice, WHENCE_BEGIN
     use TOUZA_Nio_header,only: get_item
@@ -718,37 +932,165 @@ contains
     real(kind=KTGT), intent(out) :: attr
     integer,         intent(in)  :: item
     integer,         intent(in)  :: handle
-    integer,optional,intent(in)  :: gid
     integer,optional,intent(in)  :: vid
     integer,optional,intent(in)  :: rec
     character(len=litem) :: h(nitem)
-    integer jc, ridx
+    integer jc, gid, rser
     integer ufile, krect
     integer(kind=KIOFS) rpos
 
-    jc = cache_is_valid(handle, gid, vid)
+    jc = is_valid(handle, vid)
     ierr = min(0, jc)
-    if (ierr.eq.0) then
-       if (.not.present(gid)) ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    endif
-    if (ierr.eq.0) then
-       if (present(vid)) then
-          ufile = cache_h2unit(handle)
-          ridx = cache_gvr2rindex(handle, gid, vid, choice(0, rec))
-          ierr = min(0, ridx)
+    if (present(vid)) then
+       if (ierr.eq.0) then
+          ufile = extr_h2unit(handle)
+          rser = get_rserial(handle, vid, choice(0, rec))
+          ierr = min(0, rser)
           if (ierr.eq.0) then
-             rpos = ctables(jc)%rpos(ridx)
+             rpos = ctables(jc)%rpos(rser)
              call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
              if (ierr.eq.0) call get_item(ierr, h, attr, item)
           endif
-       else if (gid.eq.gid_suite) then
-          ierr = _ERROR(ERR_INVALID_PARAMETER)
-       else
-          call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+       endif
+    else
+       if (ierr.eq.0) gid = extr_h2group(handle)
+       if (ierr.eq.0) ierr = min(0, gid)
+       if (ierr.eq.0) then
+          if (gid.eq.grp_suite) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+          endif
        endif
     endif
   end subroutine cache_geti_attr_f
-  subroutine cache_getn_attr_f(ierr, attr, item, handle, gid, vid, rec)
+  subroutine cache_geti_attr_d(ierr, attr, item, handle, vid, rec)
+    use TOUZA_Nio_std,only: KTGT=>KDBL
+    use TOUZA_Nio_std,only: choice, WHENCE_BEGIN
+    use TOUZA_Nio_header,only: get_item
+    use TOUZA_Nio_record,only: nio_read_header
+    implicit none
+    integer,         intent(out) :: ierr
+    real(kind=KTGT), intent(out) :: attr
+    integer,         intent(in)  :: item
+    integer,         intent(in)  :: handle
+    integer,optional,intent(in)  :: vid
+    integer,optional,intent(in)  :: rec
+    character(len=litem) :: h(nitem)
+    integer jc, gid, rser
+    integer ufile, krect
+    integer(kind=KIOFS) rpos
+
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (present(vid)) then
+       if (ierr.eq.0) then
+          ufile = extr_h2unit(handle)
+          rser = get_rserial(handle, vid, choice(0, rec))
+          ierr = min(0, rser)
+          if (ierr.eq.0) then
+             rpos = ctables(jc)%rpos(rser)
+             call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
+             if (ierr.eq.0) call get_item(ierr, h, attr, item)
+          endif
+       endif
+    else
+       if (ierr.eq.0) gid = extr_h2group(handle)
+       if (ierr.eq.0) ierr = min(0, gid)
+       if (ierr.eq.0) then
+          if (gid.eq.grp_suite) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+          endif
+       endif
+    endif
+  end subroutine cache_geti_attr_d
+
+!!!_  - cache_getn_attr - by item name
+  subroutine cache_getn_attr_a(ierr, attr, item, handle, vid, rec)
+    use TOUZA_Nio_std,only: choice, WHENCE_BEGIN
+    use TOUZA_Nio_header,only: get_item
+    use TOUZA_Nio_record,only: nio_read_header
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: attr
+    character(len=*),intent(in)  :: item
+    integer,         intent(in)  :: handle
+    integer,optional,intent(in)  :: vid
+    integer,optional,intent(in)  :: rec
+    integer jc, gid, rser
+    character(len=litem) :: h(nitem)
+    integer ufile, krect
+    integer(kind=KIOFS) rpos
+
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (present(vid)) then
+       if (ierr.eq.0) then
+          ufile = extr_h2unit(handle)
+          rser = get_rserial(handle, vid, choice(0, rec))
+          ierr = min(0, rser)
+          if (ierr.eq.0) then
+             rpos = ctables(jc)%rpos(rser)
+             call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
+             if (ierr.eq.0) call get_item(ierr, h, attr, item)
+          endif
+       endif
+    else
+       if (ierr.eq.0) gid = extr_h2group(handle)
+       if (ierr.eq.0) ierr = min(0, gid)
+       if (ierr.eq.0) then
+          if (gid.eq.grp_suite) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+          endif
+       endif
+    endif
+  end subroutine cache_getn_attr_a
+  subroutine cache_getn_attr_i(ierr, attr, item, handle, vid, rec)
+    use TOUZA_Nio_std,only: choice, WHENCE_BEGIN
+    use TOUZA_Nio_header,only: get_item
+    use TOUZA_Nio_record,only: nio_read_header
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: attr
+    character(len=*),intent(in)  :: item
+    integer,         intent(in)  :: handle
+    integer,optional,intent(in)  :: vid
+    integer,optional,intent(in)  :: rec
+    integer jc, gid, rser
+    character(len=litem) :: h(nitem)
+    integer ufile, krect
+    integer(kind=KIOFS) rpos
+
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (present(vid)) then
+       if (ierr.eq.0) then
+          ufile = extr_h2unit(handle)
+          rser = get_rserial(handle, vid, choice(0, rec))
+          ierr = min(0, rser)
+          if (ierr.eq.0) then
+             rpos = ctables(jc)%rpos(rser)
+             call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
+             if (ierr.eq.0) call get_item(ierr, h, attr, item)
+          endif
+       endif
+    else
+       if (ierr.eq.0) gid = extr_h2group(handle)
+       if (ierr.eq.0) ierr = min(0, gid)
+       if (ierr.eq.0) then
+          if (gid.eq.grp_suite) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+          endif
+       endif
+    endif
+  end subroutine cache_getn_attr_i
+  subroutine cache_getn_attr_f(ierr, attr, item, handle, vid, rec)
     use TOUZA_Nio_std,only: KTGT=>KFLT
     use TOUZA_Nio_std,only: choice, WHENCE_BEGIN
     use TOUZA_Nio_header,only: get_item
@@ -758,124 +1100,112 @@ contains
     real(kind=KTGT), intent(out) :: attr
     character(len=*),intent(in)  :: item
     integer,         intent(in)  :: handle
-    integer,optional,intent(in)  :: gid
     integer,optional,intent(in)  :: vid
     integer,optional,intent(in)  :: rec
-    integer jc, ridx
+    integer jc, gid, rser
     character(len=litem) :: h(nitem)
     integer ufile, krect
     integer(kind=KIOFS) rpos
 
-    jc = cache_is_valid(handle, gid, vid)
+    jc = is_valid(handle, vid)
     ierr = min(0, jc)
-    if (ierr.eq.0) then
-       if (.not.present(gid)) ierr = _ERROR(ERR_NOT_IMPLEMENTED)
-    endif
-    if (ierr.eq.0) then
-       if (present(vid)) then
-          ufile = cache_h2unit(handle)
-          ridx = cache_gvr2rindex(handle, gid, vid, choice(0, rec))
-          ierr = min(0, ridx)
+    if (present(vid)) then
+       if (ierr.eq.0) then
+          ufile = extr_h2unit(handle)
+          rser = get_rserial(handle, vid, choice(0, rec))
+          ierr = min(0, rser)
           if (ierr.eq.0) then
-             rpos = ctables(jc)%rpos(ridx)
+             rpos = ctables(jc)%rpos(rser)
              call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
              if (ierr.eq.0) call get_item(ierr, h, attr, item)
           endif
-       else if (gid.eq.gid_suite) then
-          ierr = _ERROR(ERR_INVALID_PARAMETER)
-       else
-          call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+       endif
+    else
+       if (ierr.eq.0) gid = extr_h2group(handle)
+       if (ierr.eq.0) ierr = min(0, gid)
+       if (ierr.eq.0) then
+          if (gid.eq.grp_suite) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
+          endif
        endif
     endif
   end subroutine cache_getn_attr_f
-
-!!!_  - cache_is_valid()
-  integer function cache_is_valid (handle, gid, vid) result(jc)
+  subroutine cache_getn_attr_d(ierr, attr, item, handle, vid, rec)
+    use TOUZA_Nio_std,only: KTGT=>KDBL
+    use TOUZA_Nio_std,only: choice, WHENCE_BEGIN
+    use TOUZA_Nio_header,only: get_item
+    use TOUZA_Nio_record,only: nio_read_header
     implicit none
-    integer,intent(in)          :: handle
-    integer,intent(in),optional :: gid
-    integer,intent(in),optional :: vid
-    jc = cache_h2index(handle)
-    if (jc.lt.0) return
-    if (.not.present(gid)) return
-    if (gid.eq.gid_suite) then
-       if (.not.present(vid)) return
-       if (vid.lt.0.or.vid.ge.ctables(jc)%o(ctables(jc)%ngrp)) jc = _ERROR(ERR_INVALID_ITEM)
-    else
-       if (gid.lt.0.or.gid.ge.ctables(jc)%ngrp) jc = _ERROR(ERR_INVALID_ITEM)
-       if (jc.lt.0) return
-       if (.not.present(vid)) return
-       if (vid.lt.0.or.vid.ge.ctables(jc)%g(gid)%nvar) jc = _ERROR(ERR_INVALID_ITEM)
-    endif
-  end function cache_is_valid
+    integer,         intent(out) :: ierr
+    real(kind=KTGT), intent(out) :: attr
+    character(len=*),intent(in)  :: item
+    integer,         intent(in)  :: handle
+    integer,optional,intent(in)  :: vid
+    integer,optional,intent(in)  :: rec
+    integer jc, gid, rser
+    character(len=litem) :: h(nitem)
+    integer ufile, krect
+    integer(kind=KIOFS) rpos
 
-!!!_ + variable type procedures
-!!!_  - var_query_id
-  integer function var_query_id(var, name, jbgn, jend) result(vid)
-    use TOUZA_Nio_std,only: choice
-    implicit none
-    type(var_t),     intent(in) :: var(0:*)
-    character(len=*),intent(in) :: name
-    integer,         intent(in) :: jbgn, jend
-    integer jv
-
-    integer jp
-    integer lsep, lname
-
-    ! Search first occurence of variable NAME from INIT.
-    ! If strict matching is desired, set NAME as {NAME // trim (dup_sep) // index},
-    ! e.g., PRCP~2.
-
-    lsep = max(1, len_trim(dup_sep))
-    lname = len_trim(name)
-    jp = index(name(1:lname), dup_sep(1:lsep))
-    if (jp.gt.0) then
-       ! strict matching
-       do jv = jbgn, jend - 1
-          if (var(jv)%item.eq.name(1:lname)) then
-             vid = jv
-             return
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (present(vid)) then
+       if (ierr.eq.0) then
+          ufile = extr_h2unit(handle)
+          rser = get_rserial(handle, vid, choice(0, rec))
+          ierr = min(0, rser)
+          if (ierr.eq.0) then
+             rpos = ctables(jc)%rpos(rser)
+             call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
+             if (ierr.eq.0) call get_item(ierr, h, attr, item)
           endif
-       enddo
+       endif
     else
-       ! loose matching
-       do jv = jbgn, jend - 1
-          if (var(jv)%item(1:lname).eq.name(1:lname)) then
-             if (var(jv)%item(lname+1:).eq.' ' &
-                  & .or. var(jv)%item(lname+1:lname+lsep).eq.dup_sep(1:lsep)) then
-                vid = jv
-                return
-             endif
+       if (ierr.eq.0) gid = extr_h2group(handle)
+       if (ierr.eq.0) ierr = min(0, gid)
+       if (ierr.eq.0) then
+          if (gid.eq.grp_suite) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             call get_item(ierr, ctables(jc)%g(gid)%h, attr, item)
           endif
-       enddo
+       endif
     endif
-    vid = _ERROR(ERR_INVALID_PARAMETER)
-  end function var_query_id
+  end subroutine cache_getn_attr_d
 
 !!!_ + derived-type managers
 !!!_  - init_group
-  subroutine init_group (ierr, grp, recs, vars)
+  subroutine init_group (ierr, grp, recs, vars, coors)
     use TOUZA_Nio_std,only: choice
     implicit none
     integer,      intent(out)         :: ierr
     type(group_t),intent(inout)       :: grp
-    integer,      intent(in),optional :: recs, vars
-    integer lr
-    integer lv
+    integer,      intent(in),optional :: recs, vars, coors
+    integer lr, lv, lc
 
     ierr = 0
     grp%nvar = 0
     grp%h(:) = ' '
-    grp%g    = ' '
+    grp%name = ' '
     grp%nrec = 0
+    grp%ncoor = 0
     ! lv = choice(16, vars) ! hard-coded
     ! lr = choice(12, recs) ! hard-coded
     lv = choice(1, vars) ! hard-coded
     lr = choice(1, recs) ! hard-coded
+    lc = choice(lcoor, coors) ! hard-coded
     allocate(grp%v(0:lv-1), &
          &   grp%d(0:lr-1),           grp%t(0:lr-1), &
+         &   grp%x(0:lc-1), &
          &   grp%rpos(0:lr-1,0:lv-1), grp%rlen(0:lr-1,0:lv-1), &
          &   STAT=ierr)
+    ! if (ierr.eq.0) then
+    !    ! add /empty/ coordinate
+    !    ierr = min(0, group_add_coor(grp, ' '))
+    ! endif
+    if (ierr.ne.0) ierr = _ERROR(ERR_ALLOCATION)
   end subroutine init_group
 !!!_  - add_members
   subroutine add_members &
@@ -904,12 +1234,14 @@ contains
           deallocate(grp%v, STAT=ierr)
        endif
        if (ierr.eq.0) grp%v => tmpv
+       if (ierr.ne.0) ierr = _ERROR(ERR_ALLOCATION)
     endif
     if (mv.gt.0.or.mr.gt.0) then
        nr = size(grp%d)
        lr = nr + mr
        allocate(tmpd(0:lr-1), tmpt(0:lr-1), tmpo(0:lr-1,0:lv-1), tmpl(0:lr-1,0:lv-1), &
             &   STAT=ierr)
+       if (ierr.ne.0) ierr = _ERROR(ERR_ALLOCATION)
        if (ierr.eq.0) then
           tmpd(0:nr-1) = grp%d(0:nr-1)
           tmpt(0:nr-1) = grp%t(0:nr-1)
@@ -978,29 +1310,32 @@ contains
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv
     integer utmp, lv
-    integer jg
-    integer jvb, jve
+    integer jx
     character(len=128) :: ttmp
+
     ierr = 0
     utmp = get_logu(u, ulog)
     lv = choice(lev_verbose, levv)
-101 format(A, '/', I0)
-102 format('group/', I0)
-    do jg = 0, c%ngrp - 1
-       if (present(tag)) then
-          write(ttmp, 101) trim(tag), jg
-       else
-          write(ttmp, 102) jg
-       endif
-       jvb = c%o(jg)
-       jve = c%o(jg+1)
-       if (ierr.eq.0) then
-          call show_group &
-               & (ierr, c%g(jg), c%v(jvb:jve-1), c%rpos, c%rlen, ttmp, utmp, lv)
+
+132 format(A, 3x, '{', I0, '}', 1x, A)
+    if (present(tag)) then
+       ttmp = tag
+    else
+       ttmp = 'coor'
+    endif
+
+    ! write(*, *) utmp, lv, c%ncoor
+
+    do jx = 0, c%ncoor - 1
+       if (utmp.ge.0) then
+          write(utmp, 132) trim(ttmp), jx, trim(c%x(jx))
+       else if (utmp.eq.-1) then
+          write(*,    132) trim(ttmp), jx, trim(c%x(jx))
        endif
     enddo
-  end subroutine show_cache_t
 
+    if (ierr.eq.0) call show_group(ierr, c, tag=tag, u=utmp, levv=lv)
+  end subroutine show_cache_t
   subroutine show_cache_h(ierr, handle, tag, u, levv)
     use TOUZA_Nio_std,only: choice
     implicit none
@@ -1009,41 +1344,89 @@ contains
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv
-    integer jc
+    integer jc, gid
     character(len=128)   :: ttmp
     character(len=lpath) :: file
     integer ufile, utmp
     ierr = 0
     utmp = get_logu(u, ulog)
-    jc = cache_h2index(handle)
-    ufile = cache_h2unit(handle)
-    ierr = min(0, jc)
-    if (ierr.eq.0) then
-       if (present(tag)) then
-          ttmp = tag
-       else
-101       format('cache[', I0, ']')
-          write(ttmp, 101) handle
+    jc = extr_h2index(handle)
+    gid = extr_h2group(handle)
+    ierr = min(0, jc, gid)
+    ! if (gid.eq.grp_suite) then
+
+    ! else
+       ufile = extr_h2unit(handle)
+       if (ierr.eq.0) then
+          if (present(tag)) then
+             ttmp = tag
+          else
+101          format('cache[', I0, ']')
+             write(ttmp, 101) handle
+          endif
        endif
-    endif
-    if (ierr.eq.0) then
-       inquire(UNIT=ufile, NAME=file, IOSTAT=ierr)
-       if (ierr.ne.0) file = '(unknown)'
-       ierr = 0
-102    format(A, 1x, A)
-       if (utmp.ge.0) then
-          write(utmp, 102) trim(ttmp), trim(file)
-       else if (utmp.eq.-1) then
-          write(*,    102) trim(ttmp), trim(file)
+       if (ierr.eq.0) then
+          inquire(UNIT=ufile, NAME=file, IOSTAT=ierr)
+          if (ierr.ne.0) file = '(unknown)'
+          ierr = 0
+102       format(A, 1x, A)
+          if (utmp.ge.0) then
+             write(utmp, 102) trim(ttmp), trim(file)
+          else if (utmp.eq.-1) then
+             write(*,    102) trim(ttmp), trim(file)
+          endif
        endif
-    endif
-    if (ierr.eq.0) then
-       call show_cache(ierr, ctables(jc), ttmp, utmp, levv)
-    endif
+       if (ierr.eq.0) then
+          call show_cache(ierr, ctables(jc), ttmp, utmp, levv)
+       endif
+    ! endif
   end subroutine show_cache_h
 
 !!!_  & show_group
-  subroutine show_group &
+  subroutine show_group_t &
+       & (ierr, c, gser, tag, u, levv)
+    use TOUZA_Nio_std,only: choice, join_list, is_msglev_DETAIL, is_msglev_INFO
+    implicit none
+    integer,         intent(out)         :: ierr
+    type(cache_t),   intent(in)          :: c
+    integer,         intent(in),optional :: gser
+    character(len=*),intent(in),optional :: tag
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv
+
+    character(len=128)   :: ttmp
+    integer jg, jgb, jge
+    integer jvb, jve
+
+101 format(A, '/', I0)
+102 format('group/', I0)
+
+    ierr = 0
+    if (present(gser)) then
+       jgb = gser
+       jge = jgb + 1
+       if (gser.lt.0.or.gser.ge.c%ngrp) ierr = _ERROR(ERR_OUT_OF_RANGE)
+    else
+       jgb = 0
+       jge = c%ngrp
+    endif
+
+    do jg = jgb, jge - 1
+       if (ierr.eq.0) then
+          if (present(tag)) then
+             write(ttmp, 101) trim(tag), jg
+          else
+             write(ttmp, 102) jg
+          endif
+          jvb = c%o(jg)
+          jve = c%o(jg + 1)
+          call show_group &
+               & (ierr, c%g(jg), c%v(jvb:jve-1), c%rpos, c%rlen, ttmp, u, levv)
+       endif
+    enddo
+  end subroutine show_group_t
+
+  subroutine show_group_i &
        & (ierr, grp, var, rpos, rlen, tag, u, levv)
     use TOUZA_Nio_std,only: choice, join_list, is_msglev_DETAIL, is_msglev_INFO
     implicit none
@@ -1064,20 +1447,23 @@ contains
     character(len=lcol) :: cbufs(0:mv-1)
     character(len=lline) :: line
     character(len=litem*2+1) :: dt
-    integer jr, jc
+    integer jr, jc, xh, nx
     integer rofs
 
     ierr = 0
     utmp = choice(ulog, u)
     lv = choice(lev_verbose, levv)
-101 format(A, 1x, I0, ':', I0, 1x, A)
-102 format(A, 1x, 'F', 1x, A)
-211 format(A, 1x, I0, ' [', A, '] ', A)
+101 format(A, 2x, I0, ':', I0, 1x, A)
+102 format(A, 3x, 'F', 1x, A)
+211 format(A, 3x, I0, ' [', A, '] ', A)
+202 format(A, 3x, A)
+121 format(A, 3x, I0, 1x, A)
+131 format(A, 1x, '<', A, '>', 1x, I0, 1x, I0)
+! 132 format(A, 3x, '{', I0, '}', 1x, A)
 201 format(Z8.8, '+', Z0)
-202 format(A, 1x, A)
-111 format(A, '/', I0, ':', I0)
-121 format(A, 1x, I0, 1x, A)
-131 format(A, 1x, '<', A, '>', 1x, I0)
+! 111 format(A, '/', I0, ':', I0)
+112 format('{', I0, '}', I0, ':', I0)
+113 format('-')
     ! write(*, *) grp%nvar, grp%nrec
     if (present(tag)) then
        ttmp = tag
@@ -1089,9 +1475,9 @@ contains
     endif
     if (ierr.eq.0) then
        if (utmp.ge.0) then
-          write(utmp, 131) trim(ttmp), trim(grp%g), grp%nvar
+          write(utmp, 131) trim(ttmp), trim(grp%name), grp%nvar, grp%ncoor
        else if (utmp.eq.-1) then
-          write(*,    131) trim(ttmp), trim(grp%g), grp%nvar
+          write(*,    131) trim(ttmp), trim(grp%name), grp%nvar, grp%ncoor
        endif
     endif
     do jvb = 0, grp%nvar - 1, mv
@@ -1122,19 +1508,27 @@ contains
              write(*,    102) trim(ttmp), trim(line)
           endif
        endif
-       do jc = 0, lax - 1
+       do jc = 0, lcoor - 1
           if (ierr.eq.0) then
+             nx = 0
              do jvi = 0, nv - 1
-                write(cbufs(jvi), 111) &
-                     & trim(var(jvb+jvi)%co(jc)), var(jvb+jvi)%jbgn(jc), var(jvb+jvi)%jend(jc)
+                xh = var(jvb+jvi)%xh(jc)
+                if (xh.ge.0) then
+                   write(cbufs(jvi), 112) xh, var(jvb+jvi)%jbgn(jc), var(jvb+jvi)%jend(jc)
+                   nx = nx + 1
+                else
+                   write(cbufs(jvi), 113)
+                endif
              enddo
              call join_list(ierr, line, cbufs(0:nv-1))
           endif
           if (ierr.eq.0) then
-             if (utmp.ge.0) then
-                write(utmp, 121) trim(ttmp), jc, trim(line)
-             else if (utmp.eq.-1) then
-                write(*, 121) trim(ttmp), jc, trim(line)
+             if (nx.gt.0) then
+                if (utmp.ge.0) then
+                   write(utmp, 121) trim(ttmp), jc, trim(line)
+                else if (utmp.eq.-1) then
+                   write(*, 121) trim(ttmp), jc, trim(line)
+                endif
              endif
           endif
        enddo
@@ -1157,10 +1551,10 @@ contains
        endif
     enddo
 
-  end subroutine show_group
+  end subroutine show_group_i
 
-!!!_  & cache_scan_file
-  subroutine cache_scan_file &
+!!!_  & scan_file
+  subroutine scan_file &
        & (ierr, c, u, flag, levv)
     use TOUZA_Nio_std,only: choice, condop, is_error_match
     use TOUZA_Nio_std,only: msg, is_msglev_DETAIL, is_msglev_INFO
@@ -1201,8 +1595,10 @@ contains
     rpos = -1
 
     if (ierr.eq.0) rewind(UNIT=u, IOSTAT=ierr)
-    if (ierr.eq.0) allocate(grp(0:lg-1), STAT=ierr)
-
+    if (ierr.eq.0) then
+       allocate(grp(0:lg-1), STAT=ierr)
+       if (ierr.ne.0) ierr = _ERROR(ERR_ALLOCATION)
+    endif
     do
        if (ierr.ne.0) exit
        if (ierr.eq.0) inquire(UNIT=u, POS=apos, IOSTAT=ierr)
@@ -1214,19 +1610,23 @@ contains
        endif
        if (ierr.eq.0) call collate_header(ierr, jg, grp, ng, h, flag)
        if (ierr.eq.0) then
+          ! write(*, *) 'collate:', jg
           if (jg.lt.0) then
              jg = ng
              if (ng.ge.lg) then
                 ! write(*, *) jg, mg, ng, lg
                 lg = lg + mg
                 allocate(gtmp(0:lg-1), STAT=ierr)
+                if (ierr.ne.0) ierr = _ERROR(ERR_ALLOCATION)
                 if (ierr.eq.0) then
                    gtmp(0:ng-1)%nvar = grp(0:ng-1)%nvar
                    gtmp(0:ng-1)%nrec = grp(0:ng-1)%nrec
-                   gtmp(0:ng-1)%g    = grp(0:ng-1)%g
+                   gtmp(0:ng-1)%ncoor = grp(0:ng-1)%ncoor
+                   gtmp(0:ng-1)%name = grp(0:ng-1)%name
                    do j = 0, ng - 1
                       gtmp(j)%h(:) = grp(j)%h(:)
                       gtmp(j)%v => grp(j)%v
+                      gtmp(j)%x => grp(j)%x
                       gtmp(j)%d => grp(j)%d
                       gtmp(j)%t => grp(j)%t
                       gtmp(j)%rpos => grp(j)%rpos
@@ -1239,7 +1639,7 @@ contains
              ng = ng + 1
              if (ierr.eq.0) call init_group(ierr, grp(jg))
              if (ierr.eq.0) grp(jg)%h(:) = h(:)
-             if (ierr.eq.0) grp(jg)%g = h(hi_DSET)
+             if (ierr.eq.0) grp(jg)%name = h(hi_DSET)
              if (is_msglev_DETAIL(lv)) then
                 call msg('(''group = '', I0)', (/jg/), __MDL__)
              endif
@@ -1247,10 +1647,9 @@ contains
        endif
        if (ierr.eq.0) call nio_skip_records(ierr, 1, u, head=h, krect=rect)
        if (ierr.eq.0) inquire(UNIT=u, POS=msize, IOSTAT=ierr)
-       if (ierr.eq.0) call group_search_var(ierr, jv, grp(jg), h)
-       if (ierr.eq.0) call group_search_rec(ierr, jr, grp(jg), h)
-       ! write(*, *) 'search', ierr, jg, jr, jv, grp(jg)%nrec, grp(jg)%nvar
        if (ierr.eq.0) then
+          jv = group_search_var(grp(jg), h)
+          jr = group_search_rec(grp(jg), h)
           newv = jv.lt.0
           newr = jr.lt.0
           if (.not.newv .and. .not.newr) then
@@ -1264,16 +1663,12 @@ contains
           if (newr) then
              jr = grp(jg)%nrec
              grp(jg)%nrec = grp(jg)%nrec + 1
-             if (is_msglev_DETAIL(lv)) then
-                call msg('(''rec = '', I0)', (/jr/), __MDL__)
-             endif
+             if (is_msglev_DETAIL(lv)) call msg('(''rec = '', I0)', (/jr/), __MDL__)
           endif
           if (newv) then
              jv = grp(jg)%nvar
              grp(jg)%nvar = grp(jg)%nvar + 1
-             if (is_msglev_DETAIL(lv)) then
-                call msg('(''var = '', I0)', (/jv/), __MDL__)
-             endif
+             if (is_msglev_DETAIL(lv)) call msg('(''var = '', I0)', (/jv/), __MDL__)
           endif
           mv = condop(jv.ge.size(grp(jg)%v), mvdef, 0)
           mr = condop(jr.ge.size(grp(jg)%d), mrdef, 0)
@@ -1284,18 +1679,14 @@ contains
        endif
        if (ierr.eq.0) then
           if (newv) call new_var(ierr, grp(jg), jv, h)
-          ! write(*, *) grp(jg)%v(:)
        endif
        if (ierr.eq.0) then
           if (newr) call new_rec(ierr, grp(jg), jr, h)
        endif
-       if (ierr.eq.0) then
-          msize = msize - apos
-       endif
+       if (ierr.eq.0) msize = msize - apos
        if (ierr.eq.0) then
           grp(jg)%rpos(jr, jv) = rpos
           grp(jg)%rlen(jr, jv) = msize
-          ! write(*, *) 'scan', ierr, jg, jr, jv, jpos, msize
        endif
        jdrec = jdrec + 1
     enddo
@@ -1307,7 +1698,7 @@ contains
        c%ngrp = -1
        c%g => NULL()
     endif
-  end subroutine cache_scan_file
+  end subroutine scan_file
 
 !!!_  - copy_var
   subroutine copy_var(dist, src, n)
@@ -1321,18 +1712,19 @@ contains
        dist(j)%item    = src(j)%item
        dist(j)%unit    = src(j)%unit
        dist(j)%dfmt    = src(j)%dfmt
-       dist(j)%co(:)   = src(j)%co(:)
+       ! dist(j)%co(:)   = src(j)%co(:)
        dist(j)%jbgn(:) = src(j)%jbgn(:)
        dist(j)%jend(:) = src(j)%jend(:)
        dist(j)%neff    = src(j)%neff
+       dist(j)%xh(:)   = src(j)%xh(:)
        dist(j)%ceff(:) = src(j)%ceff(:)
        dist(j)%flag    = src(j)%flag
        dist(j)%rofs    = src(j)%rofs
     enddo
   end subroutine copy_var
 
-!!!_  - cache_settle
-  subroutine cache_settle(ierr, c)
+!!!_  - settle_cache
+  subroutine settle_cache(ierr, c)
     implicit none
     integer,      intent(out)   :: ierr
     type(cache_t),intent(inout) :: c
@@ -1348,9 +1740,11 @@ contains
        lrec = lrec + max(0, c%g(jg)%nrec) * max(0, c%g(jg)%nvar)
     enddo
     if (ierr.eq.0) then
-       allocate(c%rpos(0:lrec-1), c%rlen(0:lrec-1), STAT=ierr)
+       allocate(c%rpos(0:lrec-1), c%dpos(0:lrec-1), c%rlen(0:lrec-1), STAT=ierr)
+       if (ierr.ne.0) ierr = _ERROR(ERR_ALLOCATION)
     endif
     if (ierr.eq.0) then
+       c%dpos(0:lrec-1) = -1
        c%lrec = lrec
        jro = 0
        do jg = 0, c%ngrp - 1
@@ -1373,8 +1767,11 @@ contains
           lv = lv + max(0, c%g(jg)%nvar)
        enddo
        allocate(c%v(0:lv-1), c%o(0:lv), STAT=ierr)
+       if (ierr.ne.0) ierr = _ERROR(ERR_ALLOCATION)
     endif
     if (ierr.eq.0) c%o(0) = 0
+    if (ierr.eq.0) call collect_coor(ierr, c)
+
     jvb = 0
     do jg = 0, c%ngrp - 1
        nv = max(0, c%g(jg)%nvar)
@@ -1386,19 +1783,70 @@ contains
     enddo
     ! release temporal variable properties
     do jg = 0, c%ngrp - 1
-       if (ierr.eq.0) deallocate(c%g(jg)%v, c%g(jg)%rpos, c%g(jg)%rlen, STAT=ierr)
+       if (ierr.eq.0) then
+          deallocate(c%g(jg)%v, c%g(jg)%x, c%g(jg)%rpos, c%g(jg)%rlen, STAT=ierr)
+       endif
        !! ! Following works, but need to adjust index (starting from 1).
        ! if (ierr.eq.0) c%g(jg)%v => c%v(c%o(jg):)
        !! ! Requires Fortran 2003, reserved.
        ! if (ierr.eq.0) c%g(jg)%v(0:) => c%v(c%o(jg):)
        c%g(jg)%v => NULL()
+       c%g(jg)%x => NULL()
        c%g(jg)%rpos => NULL()
        c%g(jg)%rlen => NULL()
     enddo
     ! After settlement:
     !   Entity of variable properties are stored in c%v(:)
     !   g(:)%v points to corresponding head of c%v(:)
-  end subroutine cache_settle
+  end subroutine settle_cache
+
+!!!_  - collect_coor
+  subroutine collect_coor(ierr, c)
+    use TOUZA_Nio_std, only: find_first
+    implicit none
+    integer,      intent(out)   :: ierr
+    type(cache_t),intent(inout) :: c
+    integer jg
+    integer jx, jt, jv
+    integer ntmp
+    character(len=litem),allocatable :: xtmp(:)
+    integer,             allocatable :: ktmp(:)
+
+    ierr = 0
+    ntmp = 0
+    do jg = 0, c%ngrp - 1
+       ntmp = ntmp + c%g(jg)%ncoor
+    enddo
+    allocate(xtmp(0:ntmp-1), ktmp(0:ntmp-1), STAT=ierr)
+    if (ierr.eq.0) then
+       ntmp = 0
+       do jg = 0, c%ngrp - 1
+          do jx = 0, c%g(jg)%ncoor - 1
+             jt = find_first(xtmp(0:ntmp-1), c%g(jg)%x(jx))
+             if (jt.lt.0) then
+                jt = ntmp
+                xtmp(jt) = c%g(jg)%x(jx)
+                ntmp = ntmp + 1
+             endif
+             ktmp(jx) = jt
+          enddo
+          do jv = 0, c%g(jg)%nvar - 1
+             do jx = 0, lcoor - 1
+                jt = c%g(jg)%v(jv)%xh(jx)
+                if (jt.ge.0) c%g(jg)%v(jv)%xh(jx) = ktmp(jt)
+             enddo
+          enddo
+       enddo
+    endif
+    if (ierr.eq.0) allocate(c%x(0:ntmp-1), STAT=ierr)
+    if (ierr.eq.0) then
+       c%x(0:ntmp-1) = xtmp(0:ntmp-1)
+       c%ncoor = ntmp
+    endif
+    if (ierr.eq.0) deallocate(xtmp, ktmp, STAT=ierr)
+
+    if (ierr.ne.0) ierr = _ERROR(ERR_ALLOCATION)
+  end subroutine collect_coor
 
 !!!_  - settle_group
   subroutine settle_group(ierr, grp, jvoff, jgrp)
@@ -1465,7 +1913,9 @@ contains
   subroutine collate_header &
        & (ierr, jgrp, grp, ngrp, head, flag, emask)
     use TOUZA_Nio_std,only: choice
+    use TOUZA_Nio_std,only: msg, is_msglev_debug
     use TOUZA_Nio_header
+    use TOUZA_Nio_axis,only: is_axis_set
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: jgrp
@@ -1478,9 +1928,9 @@ contains
     logical :: msk(nitem)
     integer j
     integer f
-#if TEST_NIO_CACHE > 1
     integer ji
-#endif
+    character(len=128) :: txt
+
     ierr = 0
 
     if (present(emask)) then
@@ -1490,8 +1940,10 @@ contains
        if (f.eq.coll_default) f = coll_nosign
        msk(:) = .FALSE.
        gen_mask: do
-          if (IAND(f, coll_nospecial).eq.0) then
-             if (ANY(head(hi_DSET).eq.DSET_specials(:))) then
+          if (IAND(f, coll_nospecial).gt.0) then
+             if (is_axis_set(head)) then
+!!$                msk(:hi_DSET-1) = .TRUE.
+!!$                msk(hi_DSET+1:) = .TRUE.
                 msk(hi_DSET) = .TRUE.
                 exit gen_mask
              endif
@@ -1547,20 +1999,23 @@ contains
     endif
     jgrp = -1
     do j = 0, ngrp - 1
-#if TEST_NIO_CACHE > 1
-       do ji = 1, nitem
-          if (grp(j)%h(ji).ne.head(ji)) then
-             write(*, *) 'collate', j, ji, &
-                  & '[' // trim(grp(j)%h(ji)) // ']', &
-                  & '[' // trim(head(ji)) // ']', msk(ji)
-          endif
-       enddo
-#endif
+       if (is_msglev_DEBUG(lev_verbose)) then
+          do ji = 1, nitem
+             if (grp(j)%h(ji).ne.head(ji)) then
+101             format('collate ', I0, 1x, I0, 1x, &
+                     & '[', A, ']', 1x, &
+                     & '[', A, ']', 1x, L1)
+                write(txt, 101) j, ji, trim(grp(j)%h(ji)), trim(head(ji)), msk(ji)
+                call msg(txt)
+             endif
+          enddo
+       endif
        if (ALL(grp(j)%h(1:nitem).eq.head(1:nitem) .or. msk(1:nitem))) then
           jgrp = j
           exit
        endif
     enddo
+    ! call show_header(ierr, head)
   end subroutine collate_header
 
 !!!_  - new_var
@@ -1575,6 +2030,7 @@ contains
     integer,         intent(in)    :: jvar
     character(len=*),intent(in)    :: head(*)
     integer jc
+    integer xh
     character(len=litem) :: name
     integer irange(2)
     integer neff
@@ -1587,14 +2043,22 @@ contains
        grp%v(jvar)%dfmt =  head(hi_DFMT)
        grp%v(jvar)%ceff(:) = -1
        neff = 0
-       do jc = 0, lax - 1
-          call get_header_cprop(name, irange, head, 1+jc)
-          grp%v(jvar)%co(jc) = trim(name)
-          grp%v(jvar)%jbgn(jc) = irange(1) - 1
-          grp%v(jvar)%jend(jc) = irange(2)
-          if (name.ne.' '.or.irange(2)-irange(1).gt.1) then
-             grp%v(jvar)%ceff(neff) = jc
-             neff = neff + 1
+       do jc = 0, lcoor - 1
+          if (ierr.eq.0) then
+             call get_header_cprop(name, irange, head, 1+jc)
+             ! grp%v(jvar)%co(jc) = trim(name)
+             grp%v(jvar)%jbgn(jc) = irange(1) - 1
+             grp%v(jvar)%jend(jc) = irange(2)
+             if (name.ne.' '.or.irange(2)-irange(1).gt.1) then
+                xh = group_search_coor(grp, name)
+                if (xh.lt.0) xh = group_add_coor(grp, name)
+                ierr = min(0, xh)
+                if (ierr.eq.0) then
+                   grp%v(jvar)%ceff(neff) = jc
+                   grp%v(jvar)%xh(neff) = xh
+                   neff = neff + 1
+                endif
+             endif
           endif
        enddo
        grp%v(jvar)%neff = neff
@@ -1615,58 +2079,115 @@ contains
     grp%t(jrec) = head(hi_TIME)
   end subroutine new_rec
 
-!!!_  - group_search_var
-  subroutine group_search_var &
-       & (ierr, jvar, grp, head)
-    use TOUZA_Nio_record,only: get_header_cprop
+!!!_  & group_add_coor()
+  integer function group_add_coor(grp, coor) result(xh)
+    implicit none
+    type(group_t),   intent(inout)  :: grp
+    character(len=*),intent(in)     :: coor
+
+    character(len=litem),pointer :: tmpx(:)
+    integer m, n
+    integer jerr
+
+    jerr = 0
+    xh = grp%ncoor
+    m = size(grp%x)
+    if (xh.ge.m) then
+       n = max(m + cmdl, xh + 1)
+       allocate(tmpx(0:n-1), STAT=jerr)
+       if (jerr.eq.0) then
+          tmpx(0:m-1) = grp%x(0:m-1)
+          deallocate(grp%x, STAT=jerr)
+       endif
+       if (jerr.eq.0) grp%x => tmpx
+       if (jerr.ne.0) jerr = _ERROR(ERR_ALLOCATION)
+    endif
+    if (jerr.eq.0) then
+       grp%x(xh) = trim(coor)
+       grp%ncoor = grp%ncoor + 1
+    else
+       xh = jerr
+    endif
+  end function group_add_coor
+
+!!!_  & group_search_coor()
+  integer function group_search_coor(grp, coor) result(xh)
+    implicit none
+    type(group_t),   intent(in)  :: grp
+    character(len=*),intent(in)  :: coor
+    integer jx
+    xh = _ERROR(ERR_NOT_FOUND)
+    do jx = 0, grp%ncoor - 1
+       if (grp%x(jx).eq.coor) then
+          xh = jx
+          exit
+       endif
+    enddo
+  end function group_search_coor
+
+!!!_  & group_search_var()
+  integer function group_search_var(grp, head) result(v)
+    use TOUZA_Nio_record,only: get_header_cprop, get_header_cname
     use TOUZA_Nio_header
     implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: jvar
     type(group_t),   intent(in)  :: grp
     character(len=*),intent(in)  :: head(*)
     integer j, jc
     character(len=litem) :: name
     integer irange(2)
-    ierr = 0
+    integer xh, nx
+    integer xhsrc(0:lcoor-1)
+
+    v = _ERROR(ERR_NOT_FOUND)
+
+    nx = 0
+    do jc = 0, lcoor - 1
+       call get_header_cname(name, head, 1+jc)
+       xh = group_search_coor(grp, name)
+       if (xh.ge.0) then
+          xhsrc(nx) = xh
+          nx = nx + 1
+       endif
+    enddo
+
     loop_var: do j = 0, grp%nvar - 1
        ! write(*, *) 'search_var', j, trim(grp%v(j)%item)
+       if (grp%v(j)%neff.ne.nx) cycle loop_var
+       if (ANY(grp%v(j)%xh(0:nx-1).ne.xhsrc(0:nx-1))) cycle loop_var
        if (grp%v(j)%item.ne.head(hi_ITEM)) cycle loop_var
        if (grp%v(j)%unit.ne.head(hi_UNIT)) cycle loop_var
-       do jc = 0, lax - 1
+
+       do jc = 0, lcoor - 1
           call get_header_cprop(name, irange, head, 1+jc)
           irange(1) = irange(1) - 1
-          if (grp%v(j)%co(jc).ne.name) cycle loop_var
+          ! xh = group_search_coor(grp, name)
+          ! if (xh.lt.0) exit loop_var
+          ! if (grp%v(j)%co(jc).ne.name) cycle loop_var
           if (grp%v(j)%jbgn(jc).ne.irange(1)) cycle loop_var
           if (grp%v(j)%jend(jc).ne.irange(2)) cycle loop_var
        enddo
-       jvar = j
+       v = j
        return
     enddo loop_var
-    jvar = -1
-  end subroutine group_search_var
+  end function group_search_var
 
-!!!_  - group_search_rec
-  subroutine group_search_rec &
-       & (ierr, jrec, grp, head)
+!!!_  & group_search_rec()
+  integer function group_search_rec(grp, head) result(r)
     use TOUZA_Nio_header
     implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: jrec
     type(group_t),   intent(in)  :: grp
     character(len=*),intent(in)  :: head(*)
     integer j
 
     ! used only for cache builds
-    ierr = 0
     loop_rec: do j = 0, grp%nrec - 1
        if (grp%d(j).ne.head(hi_DATE)) cycle loop_rec
        if (grp%t(j).ne.head(hi_TIME)) cycle loop_rec
-       jrec = j
+       r = j
        return
     enddo loop_rec
-    jrec = -1
-  end subroutine group_search_rec
+    r = _ERROR(ERR_NOT_FOUND)
+  end function group_search_rec
 
 !!!_  & free_cache
   subroutine free_cache &
@@ -1691,9 +2212,21 @@ contains
        if (associated(c%o)) deallocate(c%o, STAT=ierr)
     endif
     if (ierr.eq.0) then
+       if (associated(c%rpos)) deallocate(c%rpos, STAT=ierr)
+    endif
+    if (ierr.eq.0) then
+       if (associated(c%dpos)) deallocate(c%dpos, STAT=ierr)
+    endif
+    if (ierr.eq.0) then
+       if (associated(c%rlen)) deallocate(c%rlen, STAT=ierr)
+    endif
+    if (ierr.eq.0) then
        c%g => NULL()
        c%v => NULL()
        c%o => NULL()
+       c%rpos => NULL()
+       c%dpos => NULL()
+       c%rlen => NULL()
        c%ngrp = -1
     endif
   end subroutine free_cache
@@ -1724,146 +2257,67 @@ contains
        grp%rlen => NULL()
        grp%nvar = -1
        grp%nrec = -1
-       grp%g = ' '
+       grp%ncoor = -1
+       grp%name = ' '
        grp%h(:) = ' '
     endif
   end subroutine free_group
 !!!_ + cached file access
-!!!_  - cache_var_read
-  subroutine cache_var_read_f &
-       & (ierr, d, handle, gid, vid, rec, start, count)
-    use TOUZA_Nio_std,only: KTGT=>KFLT, KIOFS, WHENCE_BEGIN
-    use TOUZA_Nio_record,only: nio_read_header, nio_read_data
-    integer,        intent(out) :: ierr
-    real(kind=KTGT),intent(out) :: d(*)
-    integer,        intent(in)  :: handle, gid, vid
-    integer,        intent(in)  :: rec
-    integer,        intent(in)  :: start(0:*), count(0:*)
-    integer jc, jvg
-    type(group_t),pointer :: g
-    type(var_t),pointer :: v
-    integer ofs(0:lax-1), mem(0:lax-1)
-    character(len=litem) :: h(nitem)
-    integer(kind=KIOFS) :: rpos
-    integer krect, ufile
-    integer jeff, jco
-    integer n
-    integer ridx
-
-    ierr = 0
-    v => NULL()
-    g => NULL()
-    jc = cache_is_valid(handle, gid, vid)
-    ierr = min(0, jc)
-    if (ierr.eq.0) then
-       ufile = cache_h2unit(handle)
-       ridx = cache_gvr2rindex(handle, gid, vid, rec)
-       ierr = min(0, ridx)
-       if (ierr.eq.0) then
-          rpos = ctables(jc)%rpos(ridx)
-          call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
-       endif
-    endif
-    ! write(*, *) 'var_read/header', ierr, rec, jpos, ufile
-    if (ierr.eq.0) then
-       jvg = cache_gv2vindex(handle, gid, vid)
-       v => ctables(jc)%v(jvg)
-       ofs(0:lax-1) = 0
-       mem(0:lax-1) = v%jend(0:lax-1) - v%jbgn(0:lax-1)
-       do jeff = 0, v%neff - 1
-          jco = v%ceff(jeff)
-          ofs(jco) = start(jeff)
-          mem(jco) = count(jeff)
-       enddo
-       n = -1
-       call nio_read_data &
-            & (ierr, d, n, h, krect, ufile, start=ofs(0:lax-1), count=mem(0:lax-1))
-       ! write(*, *) 'cache_var_read', ierr, n, ofs(0:lax-1), mem(0:lax-1)
-    endif
-  end subroutine cache_var_read_f
-
-!!!_  - cache_gvr2rindex() - return /suite/ record index
-  integer function cache_gvr2rindex(handle, gid, vid, rec) result(ridx)
-    implicit none
-    integer,intent(in) :: handle
-    integer,intent(in) :: gid
-    integer,intent(in) :: vid
-    integer,intent(in) :: rec
-    integer jerr
-    integer jc, jg, jv
-    jc = cache_is_valid(handle, gid, vid)
-    jerr = min(0, jc)
-    if (jerr.eq.0) then
-       if (vid.eq.vid_suite) then
-          if (rec.ge.0.and.rec.lt.ctables(jc)%lrec) then
-             ridx = rec
-          else
-             jerr = -1
-          endif
-       else
-          jg = cache_gv2gindex(handle, gid, vid)
-          jv = cache_gv2vindex(handle, gid, vid)
-          jerr = min(0, jg, jv)
-          if (jerr.eq.0) then
-             if (rec.ge.0.and.rec.lt.ctables(jc)%g(jg)%nrec) then
-                ridx = rec + ctables(jc)%v(jv)%rofs
-             else
-                jerr = -1
-             endif
-          endif
-       endif
-    endif
-    if (jerr.ne.0) then
-       ridx = _ERROR(ERR_INVALID_PARAMETER)
-    endif
-  end function cache_gvr2rindex
-!!!_  - cache_gv2vindex() - return /suite/ variable index
-  integer function cache_gv2vindex(handle, gid, vid) result(jv)
-    implicit none
-    integer,intent(in) :: handle
-    integer,intent(in) :: gid
-    integer,intent(in) :: vid
-    integer jc
-    integer jerr
-    jc = cache_is_valid(handle, gid, vid)
-    jerr = min(0, jc)
-    if (jerr.eq.0) then
-       if (gid.eq.gid_suite) then
-          jv = vid
-       else
-          jv = ctables(jc)%o(gid) + vid
-       endif
-    else
-       jv = jerr
-    endif
-  end function cache_gv2vindex
-
-!!!_  - cache_gv2gindex() - return /suite/ group index
-  integer function cache_gv2gindex(handle, gid, vid) result(jg)
-    implicit none
-    integer,intent(in) :: handle
-    integer,intent(in) :: gid
-    integer,intent(in) :: vid
-    integer jc, j
-    integer jerr
-    jc = cache_is_valid(handle, gid, vid)
-    jerr = min(0, jc)
-    if (jerr.eq.0) then
-       if (gid.eq.gid_suite) then
-          do j = 0, ctables(jc)%ngrp - 1
-             if (ctables(jc)%o(j+1).gt.vid) then
-                jg = j
-                return
-             endif
-          enddo
-          jg = _ERROR(ERR_PANIC)
-       else
-          jg = gid
-       endif
-    else
-       jg = jerr
-    endif
-  end function cache_gv2gindex
+! !!!_  - cache_gvr2rindex() - return /suite/ record index
+!   integer function cache_gvr2rindex(handle, gid, vid, rec) result(ridx)
+!     implicit none
+!     integer,intent(in) :: handle
+!     integer,intent(in) :: gid
+!     integer,intent(in) :: vid
+!     integer,intent(in) :: rec
+!     integer jerr
+!     integer jc, jg, jv
+!     jc = is_valid(handle, gid, vid)
+!     jerr = min(0, jc)
+!     if (jerr.eq.0) then
+!        if (vid.eq.vid_suite) then
+!           if (rec.ge.0.and.rec.lt.ctables(jc)%lrec) then
+!              ridx = rec
+!           else
+!              jerr = -1
+!           endif
+!        else
+!           jg = cache_gv2gindex(handle, gid, vid)
+!           jv = cache_gv2vindex(handle, gid, vid)
+!           jerr = min(0, jg, jv)
+!           if (jerr.eq.0) then
+!              if (rec.ge.0.and.rec.lt.ctables(jc)%g(jg)%nrec) then
+!                 ridx = rec + ctables(jc)%v(jv)%rofs
+!              else
+!                 jerr = -1
+!              endif
+!           endif
+!        endif
+!     endif
+!     if (jerr.ne.0) then
+!        ridx = _ERROR(ERR_INVALID_PARAMETER)
+!     endif
+!   end function cache_gvr2rindex
+! !!!_  - cache_gv2vindex() - return /suite/ variable index
+!   integer function cache_gv2vindex(handle, gid, vid) result(jv)
+!     implicit none
+!     integer,intent(in) :: handle
+!     integer,intent(in) :: gid
+!     integer,intent(in) :: vid
+!     integer jc
+!     integer jerr
+!     jc = is_valid(handle, gid, vid)
+!     jerr = min(0, jc)
+!     if (jerr.eq.0) then
+!        if (gid.eq.gid_suite) then
+!           jv = vid
+!        else
+!           jv = ctables(jc)%o(gid) + vid
+!        endif
+!     else
+!        jv = jerr
+!     endif
+!   end function cache_gv2vindex
 
 !!!_ + cached file manager
 !!!_  & cache_inquire
@@ -1874,8 +2328,221 @@ contains
 !!!_  & cache_open
 !!!_  & cache_close
 !!!_  & cache_read_header
+  subroutine cache_read_header &
+       & (ierr, head, handle, vid, rec, krect)
+    use TOUZA_Nio_std,only: KIOFS, WHENCE_BEGIN, set_if_present, sus_getpos
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: head(*)
+    integer,         intent(in)  :: handle, vid
+    integer,         intent(in)  :: rec
+    integer,optional,intent(out) :: krect
+    integer jc
+    integer ufile
+    integer rser
+
+    ierr = 0
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       ufile = extr_h2unit(handle)
+       rser = get_rserial(handle, vid, rec)
+       call cue_read_header(ierr, head, ctables(jc), ufile, rser)
+       if (ierr.eq.0) then
+          call set_if_present(krect, ctables(jc)%krect)
+       endif
+    endif
+  end subroutine cache_read_header
 !!!_  & cache_write_header
 !!!_  & cache_read_data
+!!!_  & cache_var_read
+  subroutine cache_var_read_i &
+       & (ierr, d, handle, vid, rec, start, count)
+    use TOUZA_Nio_std,only: KIOFS, WHENCE_BEGIN
+    use TOUZA_Nio_record,only: nio_read_data
+    integer,intent(out)         :: ierr
+    integer,intent(out)         :: d(*)
+    integer,intent(in)          :: handle, vid
+    integer,intent(in)          :: rec
+    integer,intent(in),optional :: start(0:*), count(0:*)
+    integer jc, vser
+    type(group_t),pointer :: g
+    type(var_t),pointer :: v
+    integer ofs(0:lcoor-1), mem(0:lcoor-1)
+    character(len=litem) :: head(nitem)
+    integer krect, ufile
+    integer n
+    integer rser
+
+    ierr = 0
+    v => NULL()
+    g => NULL()
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       ufile = extr_h2unit(handle)
+       rser = get_rserial(handle, vid, rec)
+       call cue_read_header(ierr, head, ctables(jc), ufile, rser)
+       if (ierr.eq.0) krect = ctables(jc)%krect
+    endif
+    if (ierr.eq.0) then
+       vser = get_vserial(handle, vid)
+       ierr = min(0, vser)
+    endif
+    if (ierr.eq.0) then
+       v => ctables(jc)%v(vser)
+       call cache_var_slice(ofs, mem, lcoor, v, start, count)
+       n = -1
+       call nio_read_data &
+            & (ierr, d, n, head, krect, ufile, start=ofs(0:v%neff-1), count=mem(0:v%neff-1))
+    endif
+  end subroutine cache_var_read_i
+  subroutine cache_var_read_f &
+       & (ierr, d, handle, vid, rec, start, count)
+    use TOUZA_Nio_std,only: KTGT=>KFLT, KIOFS, WHENCE_BEGIN
+    use TOUZA_Nio_record,only: nio_read_data
+    integer,        intent(out)         :: ierr
+    real(kind=KTGT),intent(out)         :: d(*)
+    integer,        intent(in)          :: handle, vid
+    integer,        intent(in)          :: rec
+    integer,        intent(in),optional :: start(0:*), count(0:*)
+    integer jc, vser
+    type(group_t),pointer :: g
+    type(var_t),pointer :: v
+    integer ofs(0:lcoor-1), mem(0:lcoor-1)
+    character(len=litem) :: head(nitem)
+    ! integer(kind=KIOFS) :: rpos
+    integer krect, ufile
+    integer n
+    integer rser
+
+    ierr = 0
+    v => NULL()
+    g => NULL()
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       ufile = extr_h2unit(handle)
+       rser = get_rserial(handle, vid, rec)
+       call cue_read_header(ierr, head, ctables(jc), ufile, rser)
+       if (ierr.eq.0) krect = ctables(jc)%krect
+    endif
+    ! if (ierr.eq.0) then
+    !    ufile = extr_h2unit(handle)
+    !    ridx = cache_gvr2rindex(handle, gid, vid, rec)
+    !    ierr = min(0, ridx)
+    !    if (ierr.eq.0) then
+    !       rpos = ctables(jc)%rpos(ridx)
+    !       call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
+    !    endif
+    ! endif
+    ! write(*, *) 'var_read/header', ierr, rec, rpos, ufile
+    if (ierr.eq.0) then
+       vser = get_vserial(handle, vid)
+       ierr = min(0, vser)
+    endif
+    if (ierr.eq.0) then
+       v => ctables(jc)%v(vser)
+       call cache_var_slice(ofs, mem, lcoor, v, start, count)
+       ! ofs(0:lcoor-1) = 0
+       ! mem(0:lcoor-1) = v%jend(0:lcoor-1) - v%jbgn(0:lcoor-1)
+       ! do jeff = 0, v%neff - 1
+       !    jco = v%ceff(jeff)
+       !    ofs(jco) = start(jeff)
+       !    mem(jco) = count(jeff)
+       !    ! write(*, *) 'ofs/mem', jco, ofs(jco), mem(jco)
+       ! enddo
+       n = -1
+       call nio_read_data &
+            & (ierr, d, n, head, krect, ufile, start=ofs(0:v%neff-1), count=mem(0:v%neff-1))
+       ! write(*, *) 'cache_var_read', ierr, n
+    endif
+    ! write(*, *) 'cache_var_read', ierr, n, handle, vid, vser, rser
+  end subroutine cache_var_read_f
+  subroutine cache_var_read_d &
+       & (ierr, d, handle, vid, rec, start, count)
+    use TOUZA_Nio_std,only: KTGT=>KDBL, KIOFS, WHENCE_BEGIN
+    use TOUZA_Nio_record,only: nio_read_data
+    integer,        intent(out)         :: ierr
+    real(kind=KTGT),intent(out)         :: d(*)
+    integer,        intent(in)          :: handle, vid
+    integer,        intent(in)          :: rec
+    integer,        intent(in),optional :: start(0:*), count(0:*)
+    integer jc, vser
+    type(group_t),pointer :: g
+    type(var_t),pointer :: v
+    integer ofs(0:lcoor-1), mem(0:lcoor-1)
+    character(len=litem) :: head(nitem)
+    integer krect, ufile
+    integer n
+    integer rser
+
+    ierr = 0
+    v => NULL()
+    g => NULL()
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       ufile = extr_h2unit(handle)
+       rser = get_rserial(handle, vid, rec)
+       call cue_read_header(ierr, head, ctables(jc), ufile, rser)
+       if (ierr.eq.0) krect = ctables(jc)%krect
+    endif
+    if (ierr.eq.0) then
+       vser = get_vserial(handle, vid)
+       ierr = min(0, vser)
+    endif
+    if (ierr.eq.0) then
+       v => ctables(jc)%v(vser)
+       call cache_var_slice(ofs, mem, lcoor, v, start, count)
+       ! ofs(0:lcoor-1) = 0
+       ! mem(0:lcoor-1) = v%jend(0:lcoor-1) - v%jbgn(0:lcoor-1)
+       ! do jeff = 0, v%neff - 1
+       !    jco = v%ceff(jeff)
+       !    ofs(jco) = start(jeff)
+       !    mem(jco) = count(jeff)
+       ! enddo
+       n = -1
+       call nio_read_data &
+            & (ierr, d, n, head, krect, ufile, start=ofs(0:v%neff-1), count=mem(0:v%neff-1))
+    endif
+  end subroutine cache_var_read_d
+
+!!!_  & cache_var_slice
+  subroutine cache_var_slice &
+       & (ofs, mem, lcoor, v, start, count)
+    implicit none
+    integer,    intent(out)         :: ofs(0:*)
+    integer,    intent(out)         :: mem(0:*)
+    integer,    intent(in)          :: lcoor
+    type(var_t),intent(in)          :: v
+    integer,    intent(in),optional :: start(0:*), count(0:*)
+    integer jeff, jco
+
+    ofs(0:lcoor-1) = 0
+    mem(0:lcoor-1) = v%jend(0:lcoor-1) - v%jbgn(0:lcoor-1)
+    if (present(start)) then
+       if (present(count)) then
+          do jeff = 0, v%neff - 1
+             jco = v%ceff(jeff)
+             ofs(jco) = start(jeff)
+             mem(jco) = count(jeff)
+          enddo
+       else
+          do jeff = 0, v%neff - 1
+             jco = v%ceff(jeff)
+             ofs(jco) = start(jeff)
+             mem(jco) = 1
+          enddo
+       endif
+    else if (present(count)) then
+       do jeff = 0, v%neff - 1
+          jco = v%ceff(jeff)
+          ofs(jco) = 0
+          mem(jco) = count(jeff)
+       enddo
+    endif
+  end subroutine cache_var_slice
+
 !!!_  & cache_write_data
 !!!_  & cache_verify_record
 !!!_  & cache_read_record
@@ -2008,6 +2675,661 @@ contains
 
   end subroutine store_cache_aset
 
+!!!_ + cache/sparse access
+!!!_  & cache_post_review
+  subroutine cache_post_review &
+       & (ierr,   &
+       &  nbase,  mcols, npack, &
+       &  refh,   refp,  refc,  &
+       &  head,   popts, colc)
+    use TOUZA_Nio_sparse,only: lopts_sparse, nio_inquire_sparse
+    use TOUZA_Nio_record,only: PROP_PTX_COLC
+    implicit none
+    integer,         intent(out)          :: ierr
+    integer,         intent(out)          :: nbase,  mcols, npack
+    character(len=*),intent(in)           :: refh(*)
+    integer,         intent(in)           :: refp(*)
+    integer,         intent(in)           :: refc
+    character(len=*),intent(out),optional :: head(*)
+    integer,         intent(out),optional :: popts(*)
+    integer,         intent(out),optional :: colc
+    ierr = 0
+    if (ierr.eq.0) then
+       if (present(colc)) then
+          ! colc = refc
+          colc = refp(PROP_PTX_COLC)  ! count from 1, oh.....
+       endif
+       if (present(popts)) then
+          popts(1:lopts_sparse) = refp(1:lopts_sparse)
+       endif
+       if (present(head)) then
+          head(1:nitem) = refh(1:nitem)
+       endif
+       call nio_inquire_sparse(refp, nbase, mcols, npack)
+    endif
+    return
+  end subroutine cache_post_review
+!!!_  & cache_sparse_review
+  subroutine cache_sparse_review_d &
+       & (ierr,   &
+       &  nbase,  mcols, npack, &
+       &  handle, vid,   rec, mold, &
+       &  head,   popts, colc,  &
+       &  cname)
+    use TOUZA_Nio_sparse,only: lopts_sparse, nio_column_coor, nio_review_sparse
+    use TOUZA_Nio_record,only: rev_pos_leave
+    implicit none
+    integer,parameter :: KARG=KDBL
+    integer,         intent(out)          :: ierr
+    integer,         intent(out)          :: nbase,  mcols, npack
+    integer,         intent(in)           :: handle, vid,   rec
+    real(kind=KARG), intent(in)           :: mold
+    character(len=*),intent(out),optional :: head(*)
+    integer,         intent(out),optional :: popts(*)
+    integer,         intent(out),optional :: colc
+    character(len=*),intent(in), optional :: cname
+
+    character(len=litem) :: xhd(nitem)
+    integer              :: xpo(lopts_sparse)
+    integer              :: xcc
+    integer              :: krect
+    integer ufile
+    integer flag
+
+    ierr = 0
+    flag = rev_pos_leave
+
+    if (ierr.eq.0) then
+       call cache_read_header &
+            & (ierr, xhd, handle, vid, rec, krect)
+    endif
+    if (ierr.eq.0) xcc = nio_column_coor(xhd, cname)
+    if (ierr.eq.0) then
+       ufile = extr_h2unit(handle)
+       ierr = min(0, ufile)
+    endif
+    if (ierr.eq.0) then
+       call nio_review_sparse &
+            & (ierr, xpo, xhd, ufile, krect, mold, xcc, flag)
+    endif
+    if (ierr.eq.0) then
+       call cache_post_review &
+            & (ierr,   &
+            &  nbase,  mcols, npack, &
+            &  xhd,    xpo,   xcc,   &
+            &  head,   popts, colc)
+    endif
+  end subroutine cache_sparse_review_d
+  subroutine cache_sparse_review_f &
+       & (ierr,   &
+       &  nbase,  mcols, npack, &
+       &  handle, vid,   rec, mold, &
+       &  head,   popts, colc,  &
+       &  cname)
+    use TOUZA_Nio_sparse,only: lopts_sparse, nio_column_coor, nio_review_sparse
+    use TOUZA_Nio_record,only: rev_pos_leave
+    implicit none
+    integer,parameter :: KARG=KFLT
+    integer,         intent(out)          :: ierr
+    integer,         intent(out)          :: nbase,  mcols, npack
+    integer,         intent(in)           :: handle, vid,   rec
+    real(kind=KARG), intent(in)           :: mold
+    character(len=*),intent(out),optional :: head(*)
+    integer,         intent(out),optional :: popts(*)
+    integer,         intent(out),optional :: colc
+    character(len=*),intent(in), optional :: cname
+
+    character(len=litem) :: xhd(nitem)
+    integer              :: xpo(lopts_sparse)
+    integer              :: xcc
+    integer              :: krect
+    integer ufile
+    integer flag
+
+    ierr = 0
+    flag = rev_pos_leave
+
+    if (ierr.eq.0) then
+       call cache_read_header &
+            & (ierr, xhd, handle, vid, rec, krect)
+    endif
+    if (ierr.eq.0) xcc = nio_column_coor(xhd, cname)
+    if (ierr.eq.0) then
+       ufile = extr_h2unit(handle)
+       ierr = min(0, ufile)
+    endif
+    if (ierr.eq.0) then
+       call nio_review_sparse &
+            & (ierr, xpo, xhd, ufile, krect, mold, xcc, flag)
+    endif
+    if (ierr.eq.0) then
+       call cache_post_review &
+            & (ierr,   &
+            &  nbase,  mcols, npack, &
+            &  xhd,    xpo,   xcc,   &
+            &  head,   popts, colc)
+    endif
+  end subroutine cache_sparse_review_f
+  subroutine cache_sparse_review_i &
+       & (ierr,   &
+       &  nbase,  mcols, npack, &
+       &  handle, vid,   rec, mold, &
+       &  head,   popts, colc,  &
+       &  cname)
+    use TOUZA_Nio_sparse,only: lopts_sparse, nio_column_coor, nio_review_sparse
+    use TOUZA_Nio_record,only: rev_pos_leave
+    implicit none
+    integer,parameter :: KARG=KDBL
+    integer,         intent(out)          :: ierr
+    integer,         intent(out)          :: nbase,  mcols, npack
+    integer,         intent(in)           :: handle, vid,   rec
+    integer,         intent(in)           :: mold
+    character(len=*),intent(out),optional :: head(*)
+    integer,         intent(out),optional :: popts(*)
+    integer,         intent(out),optional :: colc
+    character(len=*),intent(in), optional :: cname
+
+    character(len=litem) :: xhd(nitem)
+    integer              :: xpo(lopts_sparse)
+    integer              :: xcc
+    integer              :: krect
+    integer ufile
+    integer flag
+
+    ierr = 0
+    flag = rev_pos_leave
+
+    if (ierr.eq.0) then
+       call cache_read_header &
+            & (ierr, xhd, handle, vid, rec, krect)
+    endif
+    if (ierr.eq.0) xcc = nio_column_coor(xhd, cname)
+    if (ierr.eq.0) then
+       ufile = extr_h2unit(handle)
+       ierr = min(0, ufile)
+    endif
+    if (ierr.eq.0) then
+       call nio_review_sparse &
+            & (ierr, xpo, xhd, ufile, krect, mold, xcc, flag)
+    endif
+    if (ierr.eq.0) then
+       call cache_post_review &
+            & (ierr,   &
+            &  nbase,  mcols, npack, &
+            &  xhd,    xpo,   xcc,   &
+            &  head,   popts, colc)
+    endif
+  end subroutine cache_sparse_review_i
+!!!_  & cache_restore_csr
+  subroutine cache_restore_csr_d &
+       & (ierr,   dcsr, hcsr, &
+       &  handle, vid,  rec,  colc)
+    use TOUZA_Nio_sparse,only: nio_restore_csr
+    implicit none
+    integer,parameter :: KARG=KDBL
+    integer,        intent(out) :: ierr
+    real(kind=KARG),intent(out) :: dcsr(0:*)
+    integer,        intent(out) :: hcsr(0:*)
+    integer,        intent(in)  :: handle, vid,   rec
+    integer,        intent(in)  :: colc
+
+    character(len=litem) :: head(nitem)
+    integer ufile, krect
+    integer jc,    rser
+
+    ierr = 0
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       ufile = extr_h2unit(handle)
+       rser = get_rserial(handle, vid, rec)
+       call cue_read_header(ierr, head, ctables(jc), ufile, rser)
+    endif
+    if(ierr.eq.0) then
+       krect = ctables(jc)%krect
+       call nio_restore_csr &
+            & (ierr, dcsr,   hcsr,  &
+            &  head, ufile,  krect, colc)
+    endif
+  end subroutine cache_restore_csr_d
+  subroutine cache_restore_csr_f &
+       & (ierr,   dcsr, hcsr, &
+       &  handle, vid,  rec,  colc)
+    use TOUZA_Nio_sparse,only: nio_restore_csr
+    implicit none
+    integer,parameter :: KARG=KFLT
+    integer,        intent(out) :: ierr
+    real(kind=KARG),intent(out) :: dcsr(0:*)
+    integer,        intent(out) :: hcsr(0:*)
+    integer,        intent(in)  :: handle, vid,   rec
+    integer,        intent(in)  :: colc
+
+    character(len=litem) :: head(nitem)
+    integer ufile, krect
+    integer jc,    rser
+
+    ierr = 0
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       ufile = extr_h2unit(handle)
+       rser = get_rserial(handle, vid, rec)
+       call cue_read_header(ierr, head, ctables(jc), ufile, rser)
+    endif
+    if(ierr.eq.0) then
+       krect = ctables(jc)%krect
+       call nio_restore_csr &
+            & (ierr, dcsr,   hcsr,  &
+            &  head, ufile,  krect, colc)
+    endif
+  end subroutine cache_restore_csr_f
+  subroutine cache_restore_csr_i &
+       & (ierr,   dcsr, hcsr, &
+       &  handle, vid,  rec,  colc)
+    use TOUZA_Nio_sparse,only: nio_restore_csr
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(out) :: dcsr(0:*)
+    integer,intent(out) :: hcsr(0:*)
+    integer,intent(in)  :: handle, vid,   rec
+    integer,intent(in)  :: colc
+
+    character(len=litem) :: head(nitem)
+    integer ufile, krect
+    integer jc,    rser
+
+    ierr = 0
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       ufile = extr_h2unit(handle)
+       rser = get_rserial(handle, vid, rec)
+       call cue_read_header(ierr, head, ctables(jc), ufile, rser)
+    endif
+    if(ierr.eq.0) then
+       krect = ctables(jc)%krect
+       call nio_restore_csr &
+            & (ierr, dcsr,   hcsr,  &
+            &  head, ufile,  krect, colc)
+    endif
+  end subroutine cache_restore_csr_i
+
+!!!_ + i/o core
+!!!_  & cue_read_header
+  subroutine cue_read_header &
+       & (ierr, head, c, ufile, rser)
+    use TOUZA_Nio_std,only: KIOFS, WHENCE_BEGIN, sus_getpos
+    use TOUZA_Nio_record,only: nio_read_header
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(out)   :: head(*)
+    type(cache_t),   intent(inout) :: c
+    integer,         intent(in)    :: ufile
+    integer,         intent(in)    :: rser
+    integer krect
+    integer(kind=KIOFS) :: rpos
+
+    ierr = min(0, rser)
+    if (ierr.eq.0) then
+       if (rser.ge.c%lrec) ierr = _ERROR(ERR_OUT_OF_RANGE)
+    endif
+    if (ierr.eq.0) then
+       rpos = c%rpos(rser)
+       call nio_read_header(ierr, head, krect, ufile, rpos, WHENCE_BEGIN)
+    endif
+    if (ierr.eq.0) then
+       c%krect = krect
+       call sus_getpos(ierr, c%dpos(rser), ufile, WHENCE_BEGIN)
+    endif
+  end subroutine cue_read_header
+
+!!!_ + various handles and serial index
+!!!_  & register_cache()
+  integer function register_cache(u, jcache) result(e)
+    use TOUZA_Nio_std,only: reg_entry
+    implicit none
+    integer,intent(in) :: u
+    integer,intent(in) :: jcache
+    e = reg_entry(hh_cache, ikey=(/u/), status=(/jcache/))
+    e = min(0, e)
+  end function register_cache
+
+!!!_  - is_valid() - check handle and group/variable range
+  integer function is_valid (handle, vid) result(jc)
+    implicit none
+    integer,intent(in)          :: handle
+    integer,intent(in),optional :: vid
+    integer jg
+    jc = extr_h2index(handle)
+    if (jc.lt.0) return
+    jg = extr_h2group(handle)
+    if (jg.eq.grp_suite) then
+       if (.not.present(vid)) return
+       if (vid.lt.0.or.vid.ge.ctables(jc)%o(ctables(jc)%ngrp)) jc = _ERROR(ERR_INVALID_ITEM)
+    else
+       if (jg.lt.0.or.jg.ge.ctables(jc)%ngrp) jc = _ERROR(ERR_INVALID_ITEM)
+       if (.not.present(vid)) return
+       if (vid.lt.0.or.vid.ge.ctables(jc)%g(jg)%nvar) jc = _ERROR(ERR_INVALID_ITEM)
+    endif
+  end function is_valid
+
+!!!_  & extr_h2index()
+  integer function extr_h2index(handle) result(jcache)
+    use TOUZA_Nio_std,only: query_status
+    implicit none
+    integer,intent(in) :: handle
+    integer u
+    integer jerr
+    u = extr_h2unit(handle)
+    call query_status(jerr, jcache, hh_cache, ikey=(/u/))
+    if (jerr.lt.0) jcache = jerr
+  end function extr_h2index
+
+!!!_  & conv_u2handle()
+  integer function conv_u2handle(unit, gid) result(h)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,intent(in)          :: unit
+    integer,intent(in),optional :: gid
+    integer g
+    if (unit.lt.0) then
+       h = _ERROR(ERR_INVALID_ITEM)
+    else if (unit.ge.mdl_file) then
+       h = _ERROR(ERR_OUT_OF_RANGE)
+    else
+       g = choice(grp_suite, gid)
+       g = conv_g2image(g)
+       if (g.lt.0) then
+          h = _ERROR(ERR_OUT_OF_RANGE)
+       else
+          h = IOR(unit, ISHFT(g, pat_file))
+       endif
+    endif
+  end function conv_u2handle
+
+!!!_  & conv_h2handle()
+  integer function conv_h2handle(handle, gid) result(h)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,intent(in)          :: handle
+    integer,intent(in),optional :: gid
+    integer g, u
+    if (handle.lt.0) then
+       h = _ERROR(ERR_INVALID_ITEM)
+    else
+       g = choice(grp_suite, gid)
+       g = conv_g2image(g)
+       if (g.lt.0) then
+          h = _ERROR(ERR_OUT_OF_RANGE)
+       else
+          u = extr_h2unit(handle)
+          if (u.lt.0) then
+             h = _ERROR(ERR_INVALID_ITEM)
+          else
+             h = IOR(u, ISHFT(g, pat_file))
+          endif
+       endif
+    endif
+  end function conv_h2handle
+
+!!!_  - extr_h2group() - without group range check
+  integer function extr_h2group(handle) result(g)
+    implicit none
+    integer,intent(in) :: handle
+    if (handle.lt.0) then
+       g = _ERROR(ERR_INVALID_ITEM)
+    else
+       g = ISHFT(handle, - pat_file)
+       g = conv_image2g(g)
+    endif
+  end function extr_h2group
+
+!!!_  & conv_g2image()
+  integer function conv_g2image(gid) result (p)
+    implicit none
+    integer,intent(in) :: gid
+    if (gid.lt.0.or.gid.ge.lim_groups) then
+       !! valid range is 0:lim
+       p = _ERROR(ERR_OUT_OF_RANGE)
+    else
+       ! increment by 1 to store
+       p = IAND(gid + 1, msk_group)
+    endif
+  end function conv_g2image
+
+!!!_  & conv_image2g()
+  integer function conv_image2g(pattern) result (gid)
+    implicit none
+    integer,intent(in) :: pattern
+    if (pattern.lt.0.or.pattern.ge.lim_groups) then
+       !! valid range is 0:lim
+       gid = _ERROR(ERR_OUT_OF_RANGE)
+    else
+       ! decrement by 1 to store
+       gid = IAND(pattern + msk_group, msk_group)
+    endif
+  end function conv_image2g
+
+!!!_  - extr_h2unit()
+  integer function extr_h2unit(handle) result(u)
+    implicit none
+    integer,intent(in) :: handle
+    if (handle.lt.0) then
+       u = _ERROR(ERR_INVALID_ITEM)
+    else
+       u = IAND(handle, msk_file)
+    endif
+  end function extr_h2unit
+
+!!!_  & query_coor()
+  integer function query_coor(c, coor) result(xh)
+    implicit none
+    type(cache_t),   intent(in)  :: c
+    character(len=*),intent(in)  :: coor
+    integer jx
+    xh = _ERROR(ERR_NOT_FOUND)
+    do jx = 0, c%ncoor - 1
+       if (c%x(jx).eq.coor) then
+          xh = jx
+          exit
+       endif
+    enddo
+  end function query_coor
+
+!!!_  - query_gserial - name to group query
+  integer function query_gserial(grp, name, jbgn, jend) result(gser)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    type(group_t),   intent(in) :: grp(0:*)
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: jbgn, jend
+    integer jg
+
+    gser = _ERROR(ERR_INVALID_PARAMETER)
+    do jg = jbgn, jend - 1
+       if (grp(jg)%name.eq.name) then
+          gser = jg
+          exit
+       endif
+    enddo
+  end function query_gserial
+!!!_  - query_vserial - name to variable query
+  integer function query_vserial(var, name, jbgn, jend) result(vser)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    type(var_t),     intent(in) :: var(0:*)
+    character(len=*),intent(in) :: name
+    integer,         intent(in) :: jbgn, jend
+    integer jv
+
+    integer jp
+    integer lsep, lname
+
+    ! Search first occurence of variable NAME from INIT.
+    ! If strict matching is desired, set NAME as {NAME // trim (dup_sep) // index},
+    ! e.g., PRCP~2.
+
+    lsep = max(1, len_trim(dup_sep))
+    lname = len_trim(name)
+    jp = index(name(1:lname), dup_sep(1:lsep))
+    if (jp.gt.0) then
+       ! strict matching
+       do jv = jbgn, jend - 1
+          if (var(jv)%item.eq.name(1:lname)) then
+             vser = jv
+             return
+          endif
+       enddo
+    else
+       ! loose matching
+       do jv = jbgn, jend - 1
+          if (var(jv)%item(1:lname).eq.name(1:lname)) then
+             if (var(jv)%item(lname+1:).eq.' ' &
+                  & .or. var(jv)%item(lname+1:lname+lsep).eq.dup_sep(1:lsep)) then
+                vser = jv
+                return
+             endif
+          endif
+       enddo
+    endif
+    vser = _ERROR(ERR_INVALID_PARAMETER)
+  end function query_vserial
+
+!!!_  - query_rserial_time - return record id filtered by time range
+  integer function query_rserial_time_d &
+       & (handle, vid, timel, timeh, func, init) result(rser)
+    use TOUZA_Nio_std,only: KTGT=>KDBL
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,         intent(in) :: handle
+    integer,         intent(in) :: vid
+    real(kind=KTGT), intent(in) :: timel, timeh
+    integer,optional,intent(in) :: init     ! for variable duplication
+    interface
+       logical function func(dstr, tstr, timel, timeh)
+         use TOUZA_Nio_std,only: KTGT=>KDBL
+         implicit none
+         character(len=*),intent(in) :: dstr ! date string
+         character(len=*),intent(in) :: tstr ! time string
+         real(kind=KTGT), intent(in) :: timel, timeh
+       end function func
+    end interface
+
+    integer jc, gser, vser, jr
+    integer jerr
+    integer rbgn, rend, rofs
+
+    rser = -1
+    jc = is_valid(handle)
+    jerr = min(0, jc)
+    if (jerr.eq.0) then
+       gser = get_gserial(handle, vid)
+       vser = get_vserial(handle, vid)
+       jerr = min(0, gser, vser)
+    endif
+    if (jerr.eq.0) then
+       rofs = get_rserial(handle, vid, 0)
+       rbgn = choice(rofs, init) - rofs
+       rend = ctables(jc)%g(gser)%nrec
+       do jr = rbgn, rend
+          if (func(ctables(jc)%g(gser)%d(jr), ctables(jc)%g(gser)%t(jr), timel, timeh)) then
+             rser = jr
+             exit
+          endif
+       enddo
+    endif
+    if (jerr.eq.0) then
+       if (rser.ge.0) rser = rser + rofs
+    endif
+  end function query_rserial_time_d
+
+!!!_  - get_gserial() - return /suite/ group index (serial)
+  integer function get_gserial(handle, vid) result(gser)
+    implicit none
+    integer,intent(in)          :: handle
+    integer,intent(in),optional :: vid
+    integer jc, j
+    integer jerr
+    jc = is_valid(handle, vid)
+    jerr = min(0, jc)
+    if (jerr.eq.0) then
+       gser = extr_h2group(handle)
+       if (gser.eq.grp_suite) then
+          if (.not.present(vid)) then
+             gser = _ERROR(ERR_FEW_ARGUMENTS)
+             return
+          endif
+          do j = 0, ctables(jc)%ngrp - 1
+             if (ctables(jc)%o(j+1).gt.vid) then
+                gser = j
+                return
+             endif
+          enddo
+          gser = _ERROR(ERR_PANIC)
+       endif
+    else
+       gser = jerr
+    endif
+  end function get_gserial
+
+!!!_  - get_vserial() - return /suite/ variable index (serial)
+  integer function get_vserial(handle, vid) result(vser)
+    implicit none
+    integer,intent(in) :: handle
+    integer,intent(in) :: vid
+    integer gid
+    integer jc
+    integer jerr
+    jc = is_valid(handle, vid)
+    jerr = min(0, jc)
+    if (jerr.eq.0) then
+       gid = extr_h2group(handle)
+       if (gid.eq.grp_suite) then
+          vser = vid
+       else
+          vser = ctables(jc)%o(gid) + vid
+       endif
+    else
+       vser = jerr
+    endif
+  end function get_vserial
+
+!!!_  - get_rserial() - return /suite/ record index (serial)
+  integer function get_rserial(handle, vid, rec) result(rser)
+    implicit none
+    integer,intent(in) :: handle
+    integer,intent(in) :: vid
+    integer,intent(in) :: rec
+    integer jerr
+    integer jc, gser, vser
+    jc = is_valid(handle, vid)
+    jerr = min(0, jc)
+    if (jerr.eq.0) then
+       if (vid.eq.var_suite) then
+          if (rec.ge.0.and.rec.lt.ctables(jc)%lrec) then
+             rser = rec
+          else
+             jerr = -1
+          endif
+       else
+          gser = get_gserial(handle, vid)
+          vser = get_vserial(handle, vid)
+          jerr = min(0, gser, vser)
+          ! write(*, *) 'get_rserial', gser, vser
+          if (jerr.eq.0) then
+             if (rec.ge.0.and.rec.lt.ctables(jc)%g(gser)%nrec) then
+                rser = rec + ctables(jc)%v(vser)%rofs
+             else
+                jerr = -1
+             endif
+          endif
+       endif
+    endif
+    if (jerr.ne.0) then
+       rser = _ERROR(ERR_INVALID_PARAMETER)
+    endif
+  end function get_rserial
+
 !!!_ + end module
 end module TOUZA_Nio_cache
 
@@ -2027,12 +3349,14 @@ program test_nio_cache
 
   integer uh
   integer flag
+  integer ngrp
 
   ierr = 0
   jarg = 0
   flag = 0
 
 101 format(A,' = ', I0)
+  ! call init(ierr, levv=+9, stdv=+9)
   call init(ierr, stdv=+9)
   if (ierr.eq.0) call arg_init(ierr, levv=-9)
   if (ierr.eq.0) call parse(ierr)
@@ -2049,9 +3373,15 @@ program test_nio_cache
         endif
         if (ierr.eq.0) call cache_open_read(ierr, uh, file, flag)
         if (ierr.eq.0) call show_cache(ierr, uh, levv=+2)
+        if (ierr.eq.0) then
+           ngrp = cache_group_size(uh)
+111        format('groups: ', I0)
+           write(*, 111) ngrp
+        endif
+        if (ierr.eq.0) call cache_close(ierr, uh, file)
      enddo
   endif
-  if (ierr.eq.0) call diag(ierr, levv=+9, mode=MODE_DEEPEST)
+  if (ierr.eq.0) call diag(ierr, levv=+9, mode=MODE_DEEP)
   if (ierr.eq.0) call finalize(ierr)
   write(*, 101) 'FINAL', ierr
   stop
