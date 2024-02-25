@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 10:00:00 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/25 22:21:26 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020,2021,2022,2023
@@ -79,8 +79,9 @@ contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, ubgn, uend, cdef, icomm)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_init=>init, choice
-    use TOUZA_Std_log,only: log_init=>init
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_utl,only: utl_init=>init ! included by TOUZA_Std_log
+    ! use TOUZA_Std_log,only: log_init=>init ! included by TOUZA_Std_mwe
     use TOUZA_Std_mwe,only: mwe_init=>init
     implicit none
     integer,intent(out)         :: ierr
@@ -106,8 +107,8 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call mwe_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
        endif
        if (is_first_force(init_counts, mode)) then
@@ -127,8 +128,10 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_diag=>diag, choice
-    use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_log,only: msg_mdl
+    ! use TOUZA_Std_utl,only: utl_diag=>diag
+    ! use TOUZA_Std_log,only: log_diag=>diag
     use TOUZA_Std_mwe,only: mwe_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
@@ -157,8 +160,8 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call mwe_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -169,8 +172,9 @@ contains
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
-    use TOUZA_Std_log,only: log_finalize=>finalize
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_utl,only: utl_finalize=>finalize
+    ! use TOUZA_Std_log,only: log_finalize=>finalize
     use TOUZA_Std_log,only: mwe_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -192,8 +196,8 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call log_finalize(ierr, utmp, levv, mode=lmd)
-          if (ierr.eq.0) call utl_finalize(ierr, utmp, levv, mode=lmd)
+          ! if (ierr.eq.0) call utl_finalize(ierr, utmp, levv, mode=lmd)
+          ! if (ierr.eq.0) call log_finalize(ierr, utmp, levv, mode=lmd)
           if (ierr.eq.0) call mwe_finalize(ierr, utmp, levv, mode=lmd)
        endif
     endif

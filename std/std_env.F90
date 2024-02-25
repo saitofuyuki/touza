@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2024/01/31 14:15:45 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/25 22:23:02 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2024
@@ -292,11 +292,12 @@ contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, levtry, icomm)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_init=>init, choice
-    use TOUZA_Std_log,only: log_init=>init
-    use TOUZA_Std_prc,only: prc_init=>init
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_prc,only: prc_init=>init ! included by TOUZA_Std_utl
+    ! use TOUZA_Std_utl,only: utl_init=>init ! included by TOUZA_Std_log
+    ! use TOUZA_Std_log,only: log_init=>init ! included by TOUZA_Std_mwe
+    ! use TOUZA_Std_mwe,only: mwe_init=>init ! included by TOUZA_Std_fun
     use TOUZA_Std_fun,only: fun_init=>init
-    use TOUZA_Std_mwe,only: mwe_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u      ! log unit
@@ -321,10 +322,10 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call mwe_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
+          ! if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call mwe_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call fun_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
        endif
        if (is_first_force(init_counts, mode)) then
@@ -343,11 +344,13 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_diag=>diag, choice
-    use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
-    use TOUZA_Std_prc,only: prc_diag=>diag
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_log,only: msg_mdl
+    ! use TOUZA_Std_prc,only: prc_diag=>diag
+    ! use TOUZA_Std_utl,only: utl_diag=>diag
+    ! use TOUZA_Std_log,only: log_diag=>diag
+    ! use TOUZA_Std_mwe,only: mwe_diag=>diag
     use TOUZA_Std_fun,only: fun_diag=>diag
-    use TOUZA_Std_mwe,only: mwe_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -384,10 +387,10 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call mwe_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call mwe_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call fun_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -398,11 +401,12 @@ contains
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
-    use TOUZA_Std_log,only: log_finalize=>finalize
-    use TOUZA_Std_prc,only: prc_finalize=>finalize
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_prc,only: prc_finalize=>finalize
+    ! use TOUZA_Std_utl,only: utl_finalize=>finalize
+    ! use TOUZA_Std_log,only: log_finalize=>finalize
+    ! use TOUZA_Std_mwe,only: mwe_finalize=>finalize
     use TOUZA_Std_fun,only: fun_finalize=>finalize
-    use TOUZA_Std_mwe,only: mwe_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -424,10 +428,10 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call mwe_finalize(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call mwe_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call fun_finalize(ierr, utmp, lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
