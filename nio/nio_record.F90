@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2024/02/09 15:37:49 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/25 21:50:01 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023, 2024
@@ -502,7 +502,7 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
-          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
        endif
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call trp_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
@@ -588,7 +588,7 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
        endif
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call trp_diag(ierr, utmp, levv=lv, mode=lmd)
@@ -624,7 +624,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
        endif
        if (md.ge.MODE_DEEP) then

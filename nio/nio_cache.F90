@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2023/11/12 10:33:46 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/25 21:48:41 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -174,8 +174,8 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
-          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nr_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call nr_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
        endif
        if (present(sep)) then
           dup_sep = sep
@@ -219,8 +219,8 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nr_diag(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call nr_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -253,9 +253,9 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nr_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call nr_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
        endif
        fine_counts = fine_counts + 1
     endif

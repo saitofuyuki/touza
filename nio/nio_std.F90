@@ -1,7 +1,7 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2023/10/19 16:16:37 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/25 22:34:47 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -116,7 +116,8 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
-    use TOUZA_Std,only: env_init, sus_init, bld_init, htb_init
+    ! use TOUZA_Std,only: env_init
+    use TOUZA_Std,only: sus_init, bld_init, htb_init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -139,8 +140,8 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           lev_stdv = choice(lev_stdv, stdv)
+          ! if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm) ! included by TOUZA_Std_sus
           if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
-          if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call sus_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call htb_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
        endif
@@ -152,7 +153,8 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std,only: env_diag, sus_diag, bld_diag, htb_diag
+    ! use TOUZA_Std,only: env_diag
+    use TOUZA_Std,only: sus_diag, bld_diag, htb_diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -176,8 +178,8 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
+          ! if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call bld_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
-          if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call sus_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call htb_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
        endif
@@ -188,7 +190,8 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std,only: env_finalize, sus_finalize, bld_finalize, htb_finalize
+    ! use TOUZA_Std,only: env_finalize
+    use TOUZA_Std,only: sus_finalize, bld_finalize, htb_finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -209,8 +212,8 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
+          ! if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call bld_finalize(ierr, utmp, lev_stdv, mode=lmd)
-          if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call sus_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call htb_finalize(ierr, utmp, lev_stdv, mode=lmd)
        endif
