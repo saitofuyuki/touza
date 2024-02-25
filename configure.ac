@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/02/02 21:24:15 fuyuki configure.ac>
+# Time-stamp: <2024/02/25 22:42:39 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -11,7 +11,7 @@ MT_INIT()
 AC_INIT([touza],MT_VERSION,[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
-Copyright (C) 2020-2023 Japan Agency for Marine-Earth Science and Technology
+Copyright (C) 2020-2024 Japan Agency for Marine-Earth Science and Technology
 
 This is TOUZA, a collection of MIROC base infrastructure.
 
