@@ -1,10 +1,10 @@
 !!!_! nio_control.F90 - TOUZA/Nio control center
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 12 2022
-#define TIME_STAMP 'Time-stamp: <2024/02/02 09:44:17 fuyuki nio_control.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/26 15:31:41 fuyuki nio_control.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023
+! Copyright (C) 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -40,7 +40,7 @@ module TOUZA_Nio_control
   integer,parameter,public :: flag_default = enable_cache
   !     embedded cache    no embedded cache
   ! 01    cache                cache
-  ! 10    seqeuntial           sequential
+  ! 10    sequential           sequential
   ! 11    cache                sequential
 !!!_  - private parameter
 !!!_  - control tables
@@ -424,10 +424,10 @@ contains
 !!!_  - nio_search
   subroutine nio_search_d &
        & (ierr,   status, &
-       &  handle, item,   timel, timeh, func, iniv, inir, group)
+       &  handle, item,   timel, timeh, func, iniv, inir)
     use TOUZA_Nio_std,only: KTGT=>KDBL
     use TOUZA_Nio_std,only: choice
-    use TOUZA_Nio_cache,only: cache_var_id, cache_rec_id, gid_suite
+    use TOUZA_Nio_cache,only: cache_var_id, cache_time_rec, grp_suite
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: status        ! current status
@@ -435,7 +435,6 @@ contains
     character(len=*),intent(in)  :: item
     real(kind=KTGT), intent(in)  :: timel, timeh
     integer,optional,intent(in)  :: iniv,  inir   ! search initialization flag
-    integer,optional,intent(in)  :: group
     interface
        logical function func(dstr, tstr, timel, timeh)
          use TOUZA_Nio_std,only: KTGT=>KDBL
@@ -447,7 +446,7 @@ contains
     end interface
 
     real(kind=KTGT) :: tl, th
-    integer b, ch, gid, vid, rid
+    integer b, ch, vid, rid
 
     ierr = 0
     tl = nio_time_repl(timel, -HUGE(timel))
@@ -458,9 +457,8 @@ contains
     if (ierr.eq.0) then
        ch = is_cache_bind(b)
        if (ch.ge.0) then
-          gid = choice(gid_suite, group)
-          vid = cache_var_id(item, ch, gid, iniv)
-          rid = cache_rec_id(ch, gid, vid, tl, th, func, inir)
+          vid = cache_var_id(item, ch, iniv)
+          rid = cache_time_rec(ch, vid, tl, th, func, inir)
           status = rid
        else
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
