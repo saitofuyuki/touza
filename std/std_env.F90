@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2024/02/25 22:23:02 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/27 08:45:49 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2024
@@ -293,10 +293,6 @@ contains
   subroutine init(ierr, u, levv, mode, levtry, icomm)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: choice
-    ! use TOUZA_Std_prc,only: prc_init=>init ! included by TOUZA_Std_utl
-    ! use TOUZA_Std_utl,only: utl_init=>init ! included by TOUZA_Std_log
-    ! use TOUZA_Std_log,only: log_init=>init ! included by TOUZA_Std_mwe
-    ! use TOUZA_Std_mwe,only: mwe_init=>init ! included by TOUZA_Std_fun
     use TOUZA_Std_fun,only: fun_init=>init
     implicit none
     integer,intent(out)         :: ierr
@@ -322,10 +318,6 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          ! if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
-          ! if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
-          ! if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
-          ! if (ierr.eq.0) call mwe_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call fun_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
        endif
        if (is_first_force(init_counts, mode)) then
@@ -346,10 +338,6 @@ contains
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
-    ! use TOUZA_Std_prc,only: prc_diag=>diag
-    ! use TOUZA_Std_utl,only: utl_diag=>diag
-    ! use TOUZA_Std_log,only: log_diag=>diag
-    ! use TOUZA_Std_mwe,only: mwe_diag=>diag
     use TOUZA_Std_fun,only: fun_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
@@ -387,10 +375,6 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          ! if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
-          ! if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
-          ! if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
-          ! if (ierr.eq.0) call mwe_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call fun_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -402,10 +386,6 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: choice
-    ! use TOUZA_Std_prc,only: prc_finalize=>finalize
-    ! use TOUZA_Std_utl,only: utl_finalize=>finalize
-    ! use TOUZA_Std_log,only: log_finalize=>finalize
-    ! use TOUZA_Std_mwe,only: mwe_finalize=>finalize
     use TOUZA_Std_fun,only: fun_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -428,10 +408,6 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          ! if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
-          ! if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
-          ! if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)
-          ! if (ierr.eq.0) call mwe_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call fun_finalize(ierr, utmp, lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
@@ -678,6 +654,7 @@ contains
     ! otherwise -1.
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
+    use TOUZA_Std_fun,only: is_unit_opened
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: ustdi, ustdo, ustde
@@ -703,8 +680,9 @@ contains
     ue  = choice(-1, uend)
     if (ue.lt.0) ue = ub + 10
     do jchk = ub, ue
-       if (ierr.eq.0) inquire(UNIT=jchk, IOSTAT=ierr, OPENED=opnd)
-       if (ierr.eq.0.and.OPND) then
+       ! if (ierr.eq.0) inquire(UNIT=jchk, IOSTAT=ierr, OPENED=opnd)
+       if (ierr.eq.0) opnd = is_unit_opened(jchk, ierr)
+       if (ierr.eq.0.and.opnd) then
           inquire(unit=jchk, IOSTAT=ierr, ACTION=TA)
           if (ierr.eq.0) then
              if (TA.eq.'READ') then
@@ -1734,7 +1712,7 @@ contains
        & (ierr, KENDI, u, levv, ubgn, uend, ustp)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
-    use TOUZA_Std_fun,only: new_unit
+    use TOUZA_Std_fun,only: new_unit, is_unit_opened
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: kendi
@@ -1771,7 +1749,8 @@ contains
        us = max(1, choice(-1, ustp))
     endif
     do ju = ub, ue, us
-       if (ierr.eq.0) inquire(UNIT=ju, IOSTAT=ierr, OPENED=OPND)
+       ! if (ierr.eq.0) inquire(UNIT=ju, IOSTAT=ierr, OPENED=OPND)
+       if (ierr.eq.0) opnd = is_unit_opened(ju, ierr)
        if (ierr.eq.0) then
           if (OPND) cycle
           lrec = 32
@@ -1907,6 +1886,7 @@ contains
        & (ierr, KENDI, utest, force, u, levv)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
+    use TOUZA_Std_fun,only: is_unit_opened
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: kendi
@@ -1937,7 +1917,8 @@ contains
 
     if (ierr.eq.0) call set_endian_tester(ierr)
 
-    if (ierr.eq.0) inquire(UNIT=utest, IOSTAT=ierr, OPENED=OPND)
+    ! if (ierr.eq.0) inquire(UNIT=utest, IOSTAT=ierr, OPENED=OPND)
+    if (ierr.eq.0) opnd = is_unit_opened(utest, ierr)
     if (ierr.eq.0) then
        if (OPND) then
           ierr = ERR_PANIC

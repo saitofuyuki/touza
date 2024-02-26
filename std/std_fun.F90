@@ -1,10 +1,10 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2024/02/25 22:21:26 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/27 08:46:35 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020,2021,2022,2023
+! Copyright (C) 2020,2021,2022,2023,2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -74,14 +74,13 @@ module TOUZA_Std_fun
   public new_unit
   public new_unit_tmp, set_tempfile
   public set_tmptmpl
+  public is_file_exist, is_unit_opened
 !!!_ + common interfaces
 contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, ubgn, uend, cdef, icomm)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: choice
-    ! use TOUZA_Std_utl,only: utl_init=>init ! included by TOUZA_Std_log
-    ! use TOUZA_Std_log,only: log_init=>init ! included by TOUZA_Std_mwe
     use TOUZA_Std_mwe,only: mwe_init=>init
     implicit none
     integer,intent(out)         :: ierr
@@ -107,8 +106,6 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          ! if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
-          ! if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call mwe_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
        endif
        if (is_first_force(init_counts, mode)) then
@@ -130,8 +127,6 @@ contains
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
-    ! use TOUZA_Std_utl,only: utl_diag=>diag
-    ! use TOUZA_Std_log,only: log_diag=>diag
     use TOUZA_Std_mwe,only: mwe_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
@@ -160,8 +155,6 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          ! if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
-          ! if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call mwe_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -173,8 +166,6 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: choice
-    ! use TOUZA_Std_utl,only: utl_finalize=>finalize
-    ! use TOUZA_Std_log,only: log_finalize=>finalize
     use TOUZA_Std_log,only: mwe_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -196,8 +187,6 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          ! if (ierr.eq.0) call utl_finalize(ierr, utmp, levv, mode=lmd)
-          ! if (ierr.eq.0) call log_finalize(ierr, utmp, levv, mode=lmd)
           if (ierr.eq.0) call mwe_finalize(ierr, utmp, levv, mode=lmd)
        endif
     endif
@@ -328,7 +317,8 @@ contains
     endif
 
     do ui = uoff, ue - 1
-       inquire(UNIT=ui, IOSTAT=jerr, OPENED=opnd)
+       opnd = is_unit_opened(ui, jerr)
+       ! inquire(UNIT=ui, IOSTAT=jerr, OPENED=opnd)
        if (jerr.eq.0 .and. .not.opnd) then
           un = ui
           ulast(kc) = un
@@ -336,7 +326,8 @@ contains
        endif
     enddo
     do ui = ub, uoff - 1
-       inquire(UNIT=ui, IOSTAT=jerr, OPENED=opnd)
+       opnd = is_unit_opened(ui, jerr)
+       ! inquire(UNIT=ui, IOSTAT=jerr, OPENED=opnd)
        if (jerr.eq.0 .and. .not.opnd) then
           un = ui
           ulast(kc) = un
@@ -408,7 +399,8 @@ contains
     else
        stt(:) = 0
        do jchk = ubgn, lchk
-          inquire(UNIT=jchk, IOSTAT=ierr, OPENED=opnd)
+          ! inquire(UNIT=jchk, IOSTAT=ierr, OPENED=opnd)
+          opnd = is_unit_opened(jchk, jerr)
           tmsg = ' '
           if (ierr.eq.0) then
              if (OPND) then
@@ -470,6 +462,66 @@ contains
 #   undef __PROC__
   end subroutine open_scratch
 
+!!!_ + inquire wrappers
+!!!_  & is_unit_opened() - return a defined value (.false.) even at error
+  logical function is_unit_opened &
+       & (unit, iostat, iomsg) &
+       & result(b)
+    implicit none
+    integer,         intent(in)           :: unit
+    integer,         intent(out),optional :: iostat
+    character(len=*),intent(out),optional :: iomsg
+    integer jerr
+#if HAVE_FORTRAN_OPEN_IOMSG
+    inquire(UNIT=unit, OPENED=b, IOSTAT=jerr, IOMSG=iomsg)
+    if (jerr.ne.0) b = .FALSE.
+    if (present(iostat)) then
+       iostat = jerr
+    endif
+#else  /* not HAVE_FORTRAN_OPEN_IOMSG */
+    inquire(UNIT=unit, OPENED=b, IOSTAT=jerr)
+    if (jerr.ne.0) b = .FALSE.
+    if (present(iostat)) then
+       iostat = jerr
+    endif
+    if (jerr.ne.0) then
+       if (present(iomsg)) then
+101       format('error at open check: ', I0)
+          write(iomsg, 101, IOSTAT=jerr) unit
+       endif
+    endif
+#endif /* not HAVE_FORTRAN_OPEN_IOMSG */
+  end function is_unit_opened
+
+!!!_  & is_file_exist() - return a defined value (.false.) even at error
+  logical function is_file_exist &
+       & (file, iostat, iomsg) &
+       & result(b)
+    implicit none
+    character(len=*),intent(in)           :: file
+    integer,         intent(out),optional :: iostat
+    character(len=*),intent(out),optional :: iomsg
+    integer jerr
+#if HAVE_FORTRAN_OPEN_IOMSG
+    inquire(FILE=file, EXIST=b, IOSTAT=jerr, IOMSG=iomsg)
+    if (jerr.ne.0) b = .FALSE.
+    if (present(iostat)) then
+       iostat = jerr
+    endif
+#else  /* not HAVE_FORTRAN_OPEN_IOMSG */
+    inquire(FILE=file, EXIST=b, IOSTAT=jerr)
+    if (jerr.ne.0) b = .FALSE.
+    if (present(iostat)) then
+       iostat = jerr
+    endif
+    if (jerr.ne.0) then
+       if (present(iomsg)) then
+101       format('error at existence check: ', A)
+          write(iomsg, 101, IOSTAT=jerr) trim(file)
+       endif
+    endif
+#endif /* not HAVE_FORTRAN_OPEN_IOMSG */
+  end function is_file_exist
 end module TOUZA_Std_fun
 
 !!!_@ test_std_fun - test program
