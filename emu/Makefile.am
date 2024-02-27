@@ -1,14 +1,15 @@
 # touza/emu Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 15 2020
-# Time-stamp: <2023/01/12 14:20:32 fuyuki Makefile.am>
+# Time-stamp: <2024/02/27 17:14:46 fuyuki Makefile.am>
 
-# Copyright (C) 2020-2023
+# Copyright (C) 2020-2024
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 EXTRA_DIST = README-emu.org
+EXTRA_DIST += ggf agmp
 SUBDIRS = .
 
 include $(top_srcdir)/aminclude_static.am
