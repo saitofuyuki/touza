@@ -1,10 +1,10 @@
 !!!_! nio.F90 - TOUZA/Nio manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 11 2021
-#define TIME_STAMP 'Time-stamp: <2023/10/10 13:55:54 fuyuki nio.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/04/04 08:31:37 fuyuki nio.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022,2023
+! Copyright (C) 2021,2022,2023,2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -21,6 +21,7 @@ module TOUZA_Nio
   use TOUZA_Nio_std,     ns_init=>init, ns_diag=>diag, ns_finalize=>finalize
   use TOUZA_Nio_header,  nh_init=>init, nh_diag=>diag, nh_finalize=>finalize
   use TOUZA_Nio_record,  nr_init=>init, nr_diag=>diag, nr_finalize=>finalize
+  use TOUZA_Nio_axis,    na_init=>init, na_diag=>diag, na_finalize=>finalize
   use TOUZA_Nio_sparse,  np_init=>init, np_diag=>diag, np_finalize=>finalize
   use TOUZA_Nio_cache,   nc_init=>init, nc_diag=>diag, nc_finalize=>finalize
   use TOUZA_Nio_control, nx_init=>init, nx_diag=>diag, nx_finalize=>finalize
@@ -67,6 +68,7 @@ contains
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
           if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call nr_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call na_init(ierr, u=ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call nc_init(ierr, u=ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call np_init(ierr, u=ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call nx_init(ierr, u=ulog, levv=lv, mode=lmd)
@@ -109,6 +111,7 @@ contains
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nr_diag(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call na_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nc_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call np_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nx_diag(ierr, utmp, levv=lv, mode=lmd)
@@ -147,6 +150,7 @@ contains
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nr_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call na_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nc_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call np_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nx_finalize(ierr, utmp, levv=lv, mode=lmd)
