@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2024/05/01 09:09:19 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/06 11:09:32 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024
@@ -274,6 +274,9 @@ module TOUZA_Emu_ugg
   interface psgp_cachelo
      module procedure psgp_cachelo_d, psgp_cachelo_tr_d
   end interface psgp_cachelo
+  interface psgp_cachelo_px
+     module procedure psgp_cachelo_px_d
+  end interface psgp_cachelo_px
   interface psgp_bwd_geod
      module procedure psgp_bwd_geod_d
   end interface psgp_bwd_geod
@@ -624,6 +627,7 @@ module TOUZA_Emu_ugg
   public flatten_to_ecc
 
   public psgp_set_byf, psgp_set, psgp_cachela, psgp_cachelo
+  public psgp_cachelo_px
   public psgp_set_step
   public psgp_inquire
   public psgp_fwd,    psgp_fwd_isf, psgp_fwd_cis
@@ -1181,9 +1185,15 @@ contains
           longi(j) = longi(j - 1) + (sp / width)
        enddo
     else
-       do j = 0, n - 1
-          longi(j) = ((real(j, kind=KTGT) + o) / width) * sp
-       enddo
+       if (MOD(sp, width).eq.ZERO) then
+          do j = 0, n - 1
+             longi(j) = (real(j, kind=KTGT) + o) * (sp / width)
+          enddo
+       else
+          do j = 0, n - 1
+             longi(j) = ((real(j, kind=KTGT) + o) / width) * sp
+          enddo
+       endif
     endif
     weight(0:n - 1) = wf / width
 
@@ -1751,29 +1761,30 @@ contains
   ! See Karney(2011).
 !!!_  & psgp_set_byf - psgp_set wrapper (using flattening and projection center)
   subroutine psgp_set_byf_d &
-       & (ierr, cco, f, a, latts, cproj, xs, ys, tol, lodeg)
+       & (ierr, cco, f, a, latts, lonorg, pole, xs, ys, tol, lodeg)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(out)         :: cco(*)
     real(kind=KTGT),intent(in)          :: f, a
-    real(kind=KTGT),intent(in)          :: latts
-    real(kind=KTGT),intent(in)          :: cproj(*)
+    real(kind=KTGT),intent(in)          :: latts   ! radian
+    real(kind=KTGT),intent(in)          :: lonorg  ! unit is controlled by LODEG
+    integer,        intent(in)          :: pole    ! north pole == +1, south pole == -1
     real(kind=KTGT),intent(in),optional :: xs, ys  ! scale for x,y (default == 1)
     real(kind=KTGT),intent(in),optional :: tol
     logical,        intent(in),optional :: lodeg   ! true if unit degree in longitude (default: FALSE)
 
-    real(kind=KTGT) :: sp, e
+    real(kind=KTGT) :: e
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
-    integer pole
+    integer p
 
     ierr = 0
-    sp = sin_canonical(_LATI(cproj))
+    p = pole
 
-    if (sp.eq.+ONE) then
-       pole = +1
-    else if (sp.eq.-ONE) then
-       pole = -1
+    if (p.gt.0) then
+       p = +1
+    else if (p.lt.0) then
+       p = -1
     else
        ierr = _ERROR(ERR_INVALID_PARAMETER)
     endif
@@ -1781,7 +1792,7 @@ contains
     if (ierr.eq.0) then
        e = flatten_to_ecc(f)
        call psgp_set &
-            & (cco, e, a, latts, _LONGI(cproj), pole, xs, ys, tol, f, lodeg)
+            & (cco, e, a, latts, lonorg, p, xs, ys, tol, f, lodeg)
     endif
 
   end subroutine psgp_set_byf_d
@@ -1907,7 +1918,7 @@ contains
 
 !!!_  & psgp_inquire
   subroutine psgp_inquire_d &
-       & (ierr, cco, tslat, olat, olon, lospan, psign, e, f)
+       & (ierr, cco, tslat, olat, olon, pxlon, lospan, psign, e, f)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out)          :: ierr
@@ -1915,15 +1926,29 @@ contains
     real(kind=KTGT),intent(out),optional :: tslat
     real(kind=KTGT),intent(out),optional :: olat
     real(kind=KTGT),intent(out),optional :: olon
+    real(kind=KTGT),intent(out),optional :: pxlon       ! +x longitude
     real(kind=KTGT),intent(out),optional :: lospan
     real(kind=KTGT),intent(out),optional :: psign
     real(kind=KTGT),intent(out),optional :: e, f
+
+    real(kind=KTGT) :: quad
+
     ierr = 0
     if (present(tslat)) then
        tslat = cco(icache_psgp_tslat)
     endif
     if (present(olon)) then
        olon = cco(icache_psgp_olon)
+    endif
+    if (present(pxlon)) then
+       quad = cco(icache_psgp_lospan)
+       if (quad.eq.0.0_KTGT) then
+          quad = pi_(0.0_KTGT) / 2.0_KTGT
+       else
+          quad = quad / 4.0_KTGT
+       endif
+       ! pxlon = cco(icache_psgp_olon) + quad * cco(icache_psgp_sign)
+       pxlon = cco(icache_psgp_olon) + quad
     endif
     if (present(lospan)) then
        lospan = cco(icache_psgp_lospan)
@@ -2016,7 +2041,38 @@ contains
     dlo = (lon - lonorg) * cco(icache_psgp_sign)
     clo(icache_psgp_sindlo) = sin_canonical(dlo, lospan)
     clo(icache_psgp_cosdlo) = cos_canonical(dlo, lospan)
+    ! write(*, *) 'cachelo:', ang2deg(dlo, lospan), sin_canonical(dlo, lospan), cos_canonical(dlo, lospan), lospan
   end subroutine psgp_cachelo_d
+
+!!!_  & psgp_cachelo_px - lon cache for stereographic projection (longitude relative to +x lon)
+  subroutine psgp_cachelo_px_d &
+       & (clo, rlon, cco)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: clo(*)
+    real(kind=KTGT),intent(in)  :: rlon    ! relative longitude from +x longitude
+    real(kind=KTGT),intent(in)  :: cco(*)
+
+    real(kind=KTGT) :: lospan, rl
+
+    !  sin(a [+-] pi/2) = [+-] cos a
+    !  cos(a [+-] pi/2) = [-+] sin a
+
+    lospan = cco(icache_psgp_lospan)
+
+    ! NP: dlo = + (rlon + pi/2) = +rlon + pi/2
+    ! SP: dlo = - (pi/2 - rlon) = +rlon - pi/2
+    ! rl = rlon
+    ! clo(icache_psgp_sindlo) = + cos_canonical(rl, lospan) * cco(icache_psgp_sign)
+    ! clo(icache_psgp_cosdlo) = - sin_canonical(rl, lospan) * cco(icache_psgp_sign)
+
+    ! NP: dlo = + (rlon + pi/2) = + rlon + pi/2
+    ! SP: dlo = - (rlon + pi/2) = - rlon - pi/2
+    rl = rlon * cco(icache_psgp_sign)
+    clo(icache_psgp_sindlo) = + cos_canonical(rl, lospan) * cco(icache_psgp_sign)
+    clo(icache_psgp_cosdlo) = - sin_canonical(rl, lospan) * cco(icache_psgp_sign)
+
+  end subroutine psgp_cachelo_px_d
 
 !!!_  & psgp_cachelo_tr - lon cache for stereographic projection (pole)
   subroutine psgp_cachelo_tr_d &
@@ -2112,7 +2168,6 @@ contains
     real(kind=KTGT),intent(in) :: clo(*)
     real(kind=KTGT),intent(in) :: cla(*)
 
-    ! write(*, *) 'psgp:x', cla(icache_psgp_xrho), clo(icache_psgp_sindlo)
     xy(1) = + cla(icache_psgp_xrho) * clo(icache_psgp_sindlo)
     xy(2) = - cla(icache_psgp_yrho) * clo(icache_psgp_cosdlo)
   end function psgp_fwd_core_d
@@ -2142,6 +2197,8 @@ contains
     real(kind=KTGT),intent(in) :: clo(*)
     real(kind=KTGT),intent(in) :: cla(*)
 
+    ! write(*, *) 'psgp:x', cla(icache_psgp_xrho), clo(icache_psgp_sindlo)
+    ! write(*, *) 'psgp:y', cla(icache_psgp_yrho), clo(icache_psgp_cosdlo)
     xyf(1) = + cla(icache_psgp_xrho) * clo(icache_psgp_sindlo)
     xyf(2) = - cla(icache_psgp_yrho) * clo(icache_psgp_cosdlo)
     xyf(3) = psgp_fwd_isf(cla)
@@ -6424,19 +6481,28 @@ contains
     call test_stereog_single(ierr, a, e, latts, lon0, (/90.0_KTGT, 0.0_KTGT/))
     call test_stereog_single(ierr, a, e, latts, lon0, (/89.9_KTGT, 0.0_KTGT/))
 
-    ! on axis
+    ! octant
+    call banner(ierr, 'octant')
     latts = +71.0_KTGT
     lon0  = 0.0_KTGT
     zla = 80.0_KTGT
     call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+45.0_KTGT/))
     call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+90.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+135.0_KTGT/))
     call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+180.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+225.0_KTGT/))
     call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+270.0_KTGT/))
+    call test_stereog_single(ierr, a, e, latts, lon0, (/zla, lon0+315.0_KTGT/))
 
     call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0/))
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+45.0_KTGT/))
     call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+90.0_KTGT/))
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+135.0_KTGT/))
     call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+180.0_KTGT/))
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+225.0_KTGT/))
     call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+270.0_KTGT/))
+    call test_stereog_single(ierr, a, e, -latts, lon0, (/-zla, lon0+315.0_KTGT/))
 
     ! on pole and axis
     zla = 90.0_KTGT
@@ -6479,14 +6545,17 @@ contains
     real(kind=KTGT),intent(in),optional :: xref, yref
     real(kind=KTGT) :: sf
     real(kind=KTGT) :: rr(2), rts, llorg(2)
-    real(kind=KTGT) :: xxo(3), xxc(3), lli(2), zref(2)
+    real(kind=KTGT) :: xxo(3), xxc(3), xxr(3), lli(2), zref(2)
+    real(kind=KTGT) :: xxp(3)
     real(kind=KTGT) :: cco2(ncache_psgp_co), clo2(ncache_psgp_lo), cla2(ncache_psgp_la)
     real(kind=KTGT) :: cco3(ncache_psgp_co), clo3(ncache_psgp_lo), cla3(ncache_psgp_la)
+    real(kind=KTGT) :: clor(ncache_psgp_lo)
     real(kind=KTGT) :: gla(2), dlo(2)
     real(kind=KTGT) :: laref(2), loref(2)
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
     real(kind=KTGT) :: xt, yt
     real(kind=KTGT),parameter :: ztol = 1.0_KTGT
+    real(kind=KTGT) :: pxlon, rxlon
     integer pole
     logical bref
     logical undet
@@ -6519,6 +6588,7 @@ contains
 115 format('  psgp[', A, ']:', 2L1,  1x, ' >> (', 2ES16.8, ')', 1x, ES16.8)
 113 format('  backward:', 2L1,  1x, 2ES16.8, 1x, 2ES16.8, 1x, F16.13)
 114 format('  backward:', '--', 1x, 2ES16.8, 1x, 2ES16.8, 1x, F16.13)
+116 format('  rlon:', 1x, 2ES16.8)
 
     call psgp_set(cco2, e, a, rts, _LONGI(llorg), pole)
 
@@ -6536,6 +6606,18 @@ contains
     else
        write(*, 112) 'cache', xxc(1:2), ONE / xxc(3)
     endif
+
+    call psgp_inquire(ierr, cco2, pxlon=pxlon)
+    rxlon = _LONGI(rr) - pxlon
+    call psgp_cachelo_px(clor, rxlon, cco2)
+    xxr = psgp_fwd_cis(clor, cla2)
+    if (bref) then
+       write(*, 115) 'xlon', ABS(xxr(1:2)-zref(1:2)).lt.ztol, xxr(1:2), ONE / xxr(3)
+    else
+       write(*, 112) 'xlon', xxr(1:2), ONE / xxc(3)
+    endif
+    write(*, 116) rad2deg(rxlon), rad2deg(pxlon)
+
 
     lli = psgp_bwd_ll(xxc(1), xxc(2), cco2)
     sf = psgp_bwd_sf(xxc(1), xxc(2), cco2)
@@ -6630,6 +6712,12 @@ contains
     write(*, 132) is_same_coor(xt, xxc(1)), is_same_angle(gla(1:2), laref(1:2)), xt, gla
     call psgp_yla_tr(yt, gla, xxc(1), clo3, cco3)
     write(*, 133) is_same_coor(yt, xxc(2)), is_same_angle(gla(1:2), laref(1:2)), yt, gla
+
+152 format(2x, '+xlon:', A, ': ', ES10.2)
+    call psgp_inquire(ierr, cco2, pxlon=pxlon)
+    write(*, 152) '2', rad2deg(pxlon)
+    call psgp_inquire(ierr, cco3, pxlon=pxlon)
+    write(*, 152) '3', rad2deg(pxlon)
 
   end subroutine test_stereog_single
 
