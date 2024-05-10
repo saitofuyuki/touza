@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2024/02/15 09:45:58 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/05/15 16:34:42 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2024
@@ -79,6 +79,10 @@ module TOUZA_Std_utl
      module procedure compact_format_i
   end interface compact_format
 
+  interface compact_string
+     module procedure compact_string_f, compact_string_d
+  end interface compact_string
+
   interface parse_number
      module procedure parse_number_i, parse_number_f, parse_number_d
   end interface parse_number
@@ -86,13 +90,20 @@ module TOUZA_Std_utl
   interface join_list
      module procedure join_list_i, join_list_f, join_list_d, join_list_a
   end interface join_list
+  interface join_item
+     module procedure join_format_item_i, join_format_item_f, join_format_item_d
+     module procedure join_mask_item_i, join_mask_item_f, join_mask_item_d
+  end interface join_item
+  interface join_format_item
+     module procedure join_format_item_i, join_format_item_f, join_format_item_d
+  end interface join_format_item
 
   interface split_list
      module procedure split_list_i, split_list_f, split_list_d
   end interface split_list
 
   interface find_first
-     module procedure find_first_i, find_first_a
+     module procedure find_first_i, find_first_f, find_first_d, find_first_a
   end interface find_first
 
   interface find_first_range
@@ -118,7 +129,7 @@ module TOUZA_Std_utl
   public control_lev
   public set_defu
   public parse_number
-  public compact_format
+  public compact_format, compact_string
   public join_list,  split_list, split_heads
   public find_first, find_first_range
   public jot
@@ -893,6 +904,165 @@ contains
     endif
   end subroutine compact_format_item_i
 
+!!!_  & compact_string
+  subroutine compact_string_f &
+       & (ierr, str, v, fmt, ldelim, rdelim, append, mag, tol, decp)
+    implicit none
+    integer,parameter :: KTGT=KFLT
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(inout)       :: str
+    real(kind=KTGT), intent(in)          :: v
+    character(len=*),intent(in),optional :: fmt
+    character(len=*),intent(in),optional :: ldelim, rdelim
+    logical,         intent(in),optional :: append
+    logical,         intent(in),optional :: decp    ! leave decimal point (.FALSE.)
+    integer,         intent(in),optional :: mag
+    real(kind=KTGT), intent(in),optional :: tol
+    character(len=128) :: buf, bfmt
+    integer nd, nr, m
+    integer lt
+    integer jpp, jpx, jpe, jpt
+
+    ierr = 0
+    if (present(fmt)) then
+       if (fmt.eq.'*') then
+          write(buf, *) v
+       else
+          write(buf, fmt) v
+       endif
+    else
+       nd = PRECISION(v) + 1
+       m = choice(nd, mag)
+       ! if (AINT(v).eq.v.and.abs(v).lt.10.0_KTGT**m) then
+       if (abs(v).lt.10.0_KTGT**m.and.abs(v).ge.1.0_KTGT) then
+102       format('(F0.', I0, ')')
+          write(bfmt, 102) nd
+       else
+          nr = ndigits(RANGE(v) / 2)
+101       format('(ES', I0, '.', I0, 'E', I0, ')')
+          write(bfmt, 101) nd + nr + 5, nd, nr
+       endif
+       write(buf, trim(bfmt)) v
+    endif
+    buf = adjustl(buf)
+    lt = LEN_TRIM(buf)
+    jpe = SCAN(buf(1:lt), 'Ee')
+    ! write(*, *) '0:', jpe, trim(buf)
+    if (jpe.gt.0) then
+       jpx = jpe + 1
+       if (VERIFY(buf(jpx:jpx), '+-').gt.0) jpx = jpx + 1
+       jpt = VERIFY(buf(jpx+1:lt), '0')
+       ! write(*, *) jpt, buf(jpx+1:lt)
+       if (jpt.eq.0) then
+          buf(jpe:lt) = ' '
+       elseif (jpt.gt.0) then
+          buf(jpx+1:lt) = buf(jpx+jpt:lt)
+       endif
+    else
+       jpe = lt + 1
+    endif
+    jpp = INDEX(buf(1:lt), '.')
+    ! write(*, *) '1:', jpp, trim(buf)
+    ! write(*, *) '2:', jpe, buf(:jpe-1)
+    if (jpp.gt.0) then
+       jpt = VERIFY(buf(:jpe-1), '0', BACK=.TRUE.)
+       if (jpt.ge.jpp) buf(jpt+1:lt) = buf(jpe:lt)
+       if (choice(.FALSE., decp)) then
+       else
+          if (SCAN(buf(jpp+1:jpp+1), ' Ee').gt.0) buf(jpp:lt) = buf(jpp+1:lt)
+       endif
+    endif
+    if (present(ldelim)) then
+       buf = ldelim // trim(buf)
+    endif
+    if (present(rdelim)) then
+       buf = trim(buf) // rdelim
+    endif
+    if (choice(.FALSE., append)) then
+       str = trim(str) // trim(buf)
+    else
+       str = trim(buf)
+    endif
+  end subroutine compact_string_f
+  subroutine compact_string_d &
+       & (ierr, str, v, fmt, ldelim, rdelim, append, mag, tol, decp)
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(inout)       :: str
+    real(kind=KTGT), intent(in)          :: v
+    character(len=*),intent(in),optional :: fmt
+    character(len=*),intent(in),optional :: ldelim, rdelim
+    logical,         intent(in),optional :: append
+    logical,         intent(in),optional :: decp    ! leave decimal point (.FALSE.)
+    integer,         intent(in),optional :: mag
+    real(kind=KTGT), intent(in),optional :: tol
+    character(len=128) :: buf, bfmt
+    integer nd, nr, m
+    integer lt
+    integer jpp, jpx, jpe, jpt
+
+    ierr = 0
+    if (present(fmt)) then
+       if (fmt.eq.'*') then
+          write(buf, *) v
+       else
+          write(buf, fmt) v
+       endif
+    else
+       nd = PRECISION(v) + 1
+       m = choice(nd, mag)
+       ! if (AINT(v).eq.v.and.abs(v).lt.10.0_KTGT**m) then
+       if (abs(v).lt.10.0_KTGT**m.and.abs(v).ge.1.0_KTGT) then
+102       format('(F0.', I0, ')')
+          write(bfmt, 102) nd
+       else
+          nr = ndigits(RANGE(v) / 2)
+101       format('(ES', I0, '.', I0, 'E', I0, ')')
+          write(bfmt, 101) nd + nr + 5, nd, nr
+       endif
+       write(buf, trim(bfmt)) v
+    endif
+    buf = adjustl(buf)
+    lt = LEN_TRIM(buf)
+    jpe = SCAN(buf(1:lt), 'Ee')
+    ! write(*, *) '0:', jpe, trim(buf)
+    if (jpe.gt.0) then
+       jpx = jpe + 1
+       if (VERIFY(buf(jpx:jpx), '+-').gt.0) jpx = jpx + 1
+       jpt = VERIFY(buf(jpx+1:lt), '0')
+       ! write(*, *) jpt, buf(jpx+1:lt)
+       if (jpt.eq.0) then
+          buf(jpe:lt) = ' '
+       elseif (jpt.gt.0) then
+          buf(jpx+1:lt) = buf(jpx+jpt:lt)
+       endif
+    else
+       jpe = lt + 1
+    endif
+    jpp = INDEX(buf(1:lt), '.')
+    ! write(*, *) '1:', jpp, trim(buf)
+    ! write(*, *) '2:', jpe, buf(:jpe-1)
+    if (jpp.gt.0) then
+       jpt = VERIFY(buf(:jpe-1), '0', BACK=.TRUE.)
+       if (jpt.ge.jpp) buf(jpt+1:lt) = buf(jpe:lt)
+       if (choice(.FALSE., decp)) then
+       else
+          if (SCAN(buf(jpp+1:jpp+1), ' Ee').gt.0) buf(jpp:lt) = buf(jpp+1:lt)
+       endif
+    endif
+    if (present(ldelim)) then
+       buf = ldelim // trim(buf)
+    endif
+    if (present(rdelim)) then
+       buf = trim(buf) // rdelim
+    endif
+    if (choice(.FALSE., append)) then
+       str = trim(str) // trim(buf)
+    else
+       str = trim(buf)
+    endif
+  end subroutine compact_string_d
 !!!_  & parse_number - safely parse number from string
 !!!_   . Note
   !!     It seems surprizing that read statement with fmt=* is actually
@@ -1006,7 +1176,7 @@ contains
 
     integer lstr, jstr
     integer jv, nv
-    integer nb, ns
+    integer nb
     character(len=64) :: buf
     character(len=64) :: xfmt
     character(len=64) :: xsep
@@ -1019,12 +1189,7 @@ contains
     nv = size(v)
     if (nv.le.0) return
 
-    call choice_a(xsep, ' ', sep)
-    if (xsep(1:1).eq.char(0)) then
-       lsep = 0
-    else
-       lsep = max(1, len_trim(xsep))
-    endif
+    call join_init_sep(xsep, lsep, sep)
     call choice_a(xfmt, '(I0)', fmt)
 
     jstr = 0
@@ -1033,25 +1198,16 @@ contains
     if (present(mask)) then
        call choice_a(cskp, '_', skip)
        jv = 0
-       if (mask(jv)) then
-          buf = cskp
-       else
-          write(buf, xfmt, IOSTAT=ierr) v(jv)
-       endif
-       nb = len_trim(buf)
-       jstr = jstr + nb
-       str = buf(1:nb)
+       call join_item(nb, buf, v(jv), xfmt, mask(jv), cskp)
+       ierr = min(0, nb)
        if (ierr.eq.0) then
+          jstr = jstr + nb
+          str = buf(1:nb)
           do jv = 1, nv - 1
-             if (mask(jv)) then
-                buf = cskp
-             else
-                write(buf, xfmt, IOSTAT=ierr) v(jv)
-                if (ierr.ne.0) ierr = _ERROR(ERR_PANIC)
-             endif
-             nb = len_trim(buf)
-             jstr = jstr + nb + lsep
+             call join_item(nb, buf, v(jv), xfmt, mask(jv), cskp)
+             ierr = min(0, nb)
              if (ierr.eq.0) then
+                jstr = jstr + nb + lsep
                 if (jstr.gt.lstr) then
                    ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
                 else
@@ -1063,18 +1219,16 @@ contains
        endif
     else
        jv = 0
-       write(buf, xfmt, IOSTAT=ierr) v(jv)
-       nb = len_trim(buf)
-       jstr = jstr + nb
-       str = buf(1:nb)
-
+       call join_item(nb, buf, v(jv), xfmt)
+       ierr = min(0, nb)
        if (ierr.eq.0) then
+          jstr = jstr + nb
+          str = buf(1:nb)
           do jv = 1, nv - 1
-             write(buf, xfmt, IOSTAT=ierr) v(jv)
-             if (ierr.ne.0) ierr = _ERROR(ERR_PANIC)
-             nb = len_trim(buf)
-             jstr = jstr + nb + lsep
+             call join_item(nb, buf, v(jv), xfmt)
+             ierr = min(0, nb)
              if (ierr.eq.0) then
+                jstr = jstr + nb + lsep
                 if (jstr.gt.lstr) then
                    ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
                 else
@@ -1085,30 +1239,10 @@ contains
           enddo
        endif
     endif
-    if (present(ldelim)) then
-       if (ierr.eq.0) then
-          ns = max(1, len_trim(ldelim))
-          jstr = jstr + ns
-          if (jstr.gt.lstr) then
-             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-          else
-             str = ldelim(1:ns) // trim(str)
-          endif
-       endif
-    endif
-    if (present(rdelim)) then
-       if (ierr.eq.0) then
-          ns = max(1, len_trim(rdelim))
-          jstr = jstr + ns
-          if (jstr.gt.lstr) then
-             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-          else
-             str = trim(str) // rdelim(1:ns)
-          endif
-       endif
-    endif
-
+    if (ierr.eq.0) call add_ldelim(ierr, jstr, str, ldelim)
+    if (ierr.eq.0) call add_rdelim(ierr, jstr, str, rdelim)
   end subroutine join_list_i
+
   subroutine join_list_f &
        & (ierr, str, v, fmt, sep, ldelim, rdelim, mask, skip)
     use TOUZA_Std_prc,only: KTGT=>KFLT
@@ -1123,7 +1257,7 @@ contains
 
     integer lstr, jstr
     integer jv, nv
-    integer nb, ns
+    integer nb
     character(len=64) :: buf
     character(len=64) :: xfmt
     character(len=64) :: xsep
@@ -1136,13 +1270,8 @@ contains
     nv = size(v)
     if (nv.le.0) return
 
-    call choice_a(xsep, ' ', sep)
-    if (xsep(1:1).eq.char(0)) then
-       lsep = 0
-    else
-       lsep = max(1, len_trim(xsep))
-    endif
-    call choice_a(xfmt, ' ', fmt)
+    call join_init_sep(xsep, lsep, sep)
+    call choice_a(xfmt, '*', fmt)
 
     jstr = 0
     lstr = len(str)
@@ -1150,31 +1279,16 @@ contains
     if (present(mask)) then
        call choice_a(cskp, '_', skip)
        jv = 0
-       if (mask(jv)) then
-          buf = cskp
-       else if (xfmt.eq.' ') then
-          write(buf, *, IOSTAT=ierr) v(jv)
-       else
-          write(buf, xfmt, IOSTAT=ierr) v(jv)
-       endif
-       buf = adjustl(buf)
-       nb = len_trim(buf)
-       jstr = jstr + nb
-       str = buf(1:nb)
+       call join_item(nb, buf, v(jv), xfmt, mask(jv), cskp)
+       ierr = min(0, nb)
        if (ierr.eq.0) then
+          jstr = jstr + nb
+          str = buf(1:nb)
           do jv = 1, nv - 1
-             if (mask(jv)) then
-                buf = cskp
-             else if (xfmt.eq.' ') then
-                write(buf, *, IOSTAT=ierr) v(jv)
-             else
-                write(buf, xfmt, IOSTAT=ierr) v(jv)
-                if (ierr.ne.0) ierr = _ERROR(ERR_PANIC)
-             endif
-             buf = adjustl(buf)
-             nb = len_trim(buf)
-             jstr = jstr + nb + lsep
+             call join_item(nb, buf, v(jv), xfmt, mask(jv), cskp)
+             ierr = min(0, nb)
              if (ierr.eq.0) then
+                jstr = jstr + nb + lsep
                 if (jstr.gt.lstr) then
                    ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
                 else
@@ -1186,28 +1300,16 @@ contains
        endif
     else
        jv = 0
-       if (xfmt.eq.' ') then
-          write(buf, *, IOSTAT=ierr) v(jv)
-       else
-          write(buf, xfmt, IOSTAT=ierr) v(jv)
-       endif
-       buf = adjustl(buf)
-       nb = len_trim(buf)
-       jstr = jstr + nb
-       str = buf(1:nb)
-
+       call join_item(nb, buf, v(jv), xfmt)
+       ierr = min(0, nb)
        if (ierr.eq.0) then
+          jstr = jstr + nb
+          str = buf(1:nb)
           do jv = 1, nv - 1
-             if (xfmt.eq.' ') then
-                write(buf, *, IOSTAT=ierr) v(jv)
-             else
-                write(buf, xfmt, IOSTAT=ierr) v(jv)
-             endif
-             if (ierr.ne.0) ierr = _ERROR(ERR_PANIC)
-             buf = adjustl(buf)
-             nb = len_trim(buf)
-             jstr = jstr + nb + lsep
+             call join_item(nb, buf, v(jv), xfmt)
+             ierr = min(0, nb)
              if (ierr.eq.0) then
+                jstr = jstr + nb + lsep
                 if (jstr.gt.lstr) then
                    ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
                 else
@@ -1218,30 +1320,10 @@ contains
           enddo
        endif
     endif
-    if (present(ldelim)) then
-       if (ierr.eq.0) then
-          ns = max(1, len_trim(ldelim))
-          jstr = jstr + ns
-          if (jstr.gt.lstr) then
-             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-          else
-             str = ldelim(1:ns) // trim(str)
-          endif
-       endif
-    endif
-    if (present(rdelim)) then
-       if (ierr.eq.0) then
-          ns = max(1, len_trim(rdelim))
-          jstr = jstr + ns
-          if (jstr.gt.lstr) then
-             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-          else
-             str = trim(str) // rdelim(1:ns)
-          endif
-       endif
-    endif
-
+    if (ierr.eq.0) call add_ldelim(ierr, jstr, str, ldelim)
+    if (ierr.eq.0) call add_rdelim(ierr, jstr, str, rdelim)
   end subroutine join_list_f
+
   subroutine join_list_d &
        & (ierr, str, v, fmt, sep, ldelim, rdelim, mask, skip)
     use TOUZA_Std_prc,only: KTGT=>KDBL
@@ -1256,7 +1338,7 @@ contains
 
     integer lstr, jstr
     integer jv, nv
-    integer nb, ns
+    integer nb
     character(len=64) :: buf
     character(len=64) :: xfmt
     character(len=64) :: xsep
@@ -1269,13 +1351,8 @@ contains
     nv = size(v)
     if (nv.le.0) return
 
-    call choice_a(xsep, ' ', sep)
-    if (xsep(1:1).eq.char(0)) then
-       lsep = 0
-    else
-       lsep = max(1, len_trim(xsep))
-    endif
-    call choice_a(xfmt, ' ', fmt)
+    call join_init_sep(xsep, lsep, sep)
+    call choice_a(xfmt, '*', fmt)
 
     jstr = 0
     lstr = len(str)
@@ -1283,31 +1360,16 @@ contains
     if (present(mask)) then
        call choice_a(cskp, '_', skip)
        jv = 0
-       if (mask(jv)) then
-          buf = cskp
-       else if (xfmt.eq.' ') then
-          write(buf, *, IOSTAT=ierr) v(jv)
-       else
-          write(buf, xfmt, IOSTAT=ierr) v(jv)
-       endif
-       buf = adjustl(buf)
-       nb = len_trim(buf)
-       jstr = jstr + nb
-       str = buf(1:nb)
+       call join_item(nb, buf, v(jv), xfmt, mask(jv), cskp)
+       ierr = min(0, nb)
        if (ierr.eq.0) then
+          jstr = jstr + nb
+          str = buf(1:nb)
           do jv = 1, nv - 1
-             if (mask(jv)) then
-                buf = cskp
-             else if (xfmt.eq.' ') then
-                write(buf, *, IOSTAT=ierr) v(jv)
-             else
-                write(buf, xfmt, IOSTAT=ierr) v(jv)
-                if (ierr.ne.0) ierr = _ERROR(ERR_PANIC)
-             endif
-             buf = adjustl(buf)
-             nb = len_trim(buf)
-             jstr = jstr + nb + lsep
+             call join_item(nb, buf, v(jv), xfmt, mask(jv), cskp)
+             ierr = min(0, nb)
              if (ierr.eq.0) then
+                jstr = jstr + nb + lsep
                 if (jstr.gt.lstr) then
                    ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
                 else
@@ -1319,28 +1381,16 @@ contains
        endif
     else
        jv = 0
-       if (xfmt.eq.' ') then
-          write(buf, *, IOSTAT=ierr) v(jv)
-       else
-          write(buf, xfmt, IOSTAT=ierr) v(jv)
-       endif
-       buf = adjustl(buf)
-       nb = len_trim(buf)
-       jstr = jstr + nb
-       str = buf(1:nb)
-
+       call join_item(nb, buf, v(jv), xfmt)
+       ierr = min(0, nb)
        if (ierr.eq.0) then
+          jstr = jstr + nb
+          str = buf(1:nb)
           do jv = 1, nv - 1
-             if (xfmt.eq.' ') then
-                write(buf, *, IOSTAT=ierr) v(jv)
-             else
-                write(buf, xfmt, IOSTAT=ierr) v(jv)
-             endif
-             if (ierr.ne.0) ierr = _ERROR(ERR_PANIC)
-             buf = adjustl(buf)
-             nb = len_trim(buf)
-             jstr = jstr + nb + lsep
+             call join_item(nb, buf, v(jv), xfmt)
+             ierr = min(0, nb)
              if (ierr.eq.0) then
+                jstr = jstr + nb + lsep
                 if (jstr.gt.lstr) then
                    ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
                 else
@@ -1351,28 +1401,8 @@ contains
           enddo
        endif
     endif
-    if (present(ldelim)) then
-       if (ierr.eq.0) then
-          ns = max(1, len_trim(ldelim))
-          jstr = jstr + ns
-          if (jstr.gt.lstr) then
-             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-          else
-             str = ldelim(1:ns) // trim(str)
-          endif
-       endif
-    endif
-    if (present(rdelim)) then
-       if (ierr.eq.0) then
-          ns = max(1, len_trim(rdelim))
-          jstr = jstr + ns
-          if (jstr.gt.lstr) then
-             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-          else
-             str = trim(str) // rdelim(1:ns)
-          endif
-       endif
-    endif
+    if (ierr.eq.0) call add_ldelim(ierr, jstr, str, ldelim)
+    if (ierr.eq.0) call add_rdelim(ierr, jstr, str, rdelim)
   end subroutine join_list_d
 
   subroutine join_list_a &
@@ -1386,7 +1416,7 @@ contains
 
     integer lstr, jstr
     integer jv, nv
-    integer nb, ns
+    integer nb
     character(len=64) :: buf
     character(len=64) :: xfmt
     character(len=64) :: xsep
@@ -1398,13 +1428,7 @@ contains
     nv = size(v)
     if (nv.le.0) return
 
-    call choice_a(xsep, ' ', sep)
-    lsep = max(1, len_trim(xsep))
-    if (xsep(1:1).eq.char(0)) then
-       lsep = 0
-    else
-       lsep = max(1, len_trim(xsep))
-    endif
+    call join_init_sep(xsep, lsep, sep)
     call choice_a(xfmt, '(A)', fmt)
 
     jstr = 0
@@ -1428,30 +1452,201 @@ contains
           endif
        endif
     enddo
-    if (present(ldelim)) then
-       if (ierr.eq.0) then
-          ns = max(1, len_trim(ldelim))
-          jstr = jstr + ns
-          if (jstr.gt.lstr) then
-             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-          else
-             str = ldelim(1:ns) // trim(str)
-          endif
-       endif
-    endif
-    if (present(rdelim)) then
-       if (ierr.eq.0) then
-          ns = max(1, len_trim(rdelim))
-          jstr = jstr + ns
-          if (jstr.gt.lstr) then
-             ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-          else
-             str = trim(str) // rdelim(1:ns)
-          endif
-       endif
-    endif
-
+    if (ierr.eq.0) call add_ldelim(ierr, jstr, str, ldelim)
+    if (ierr.eq.0) call add_rdelim(ierr, jstr, str, rdelim)
   end subroutine join_list_a
+
+!!!_   . init_join
+  subroutine join_init_sep(sep, lsep, arg)
+    implicit none
+    character(len=*),intent(out)         :: sep
+    integer,         intent(out)         :: lsep
+    character(len=*),intent(in),optional :: arg
+    call choice_a(sep, ' ', arg)
+    if (sep(1:1).eq.CHAR(0)) then
+       lsep = 0
+    else
+       lsep = max(1, len_trim(sep))
+    endif
+  end subroutine join_init_sep
+!!!_   . join_mask_item
+  subroutine join_mask_item_d &
+       & (n, str, v, fmt, mask, skip)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    integer,         intent(out) :: n
+    character(len=*),intent(out) :: str
+    real(kind=KTGT), intent(in)  :: v
+    character(len=*),intent(in)  :: fmt
+    logical,         intent(in)  :: mask
+    character(len=*),intent(in)  :: skip
+
+    if (mask) then
+       str = skip
+       n = len_trim(skip)
+    else
+       call join_format_item(n, str, v, fmt)
+    endif
+    return
+  end subroutine join_mask_item_d
+  subroutine join_mask_item_f &
+       & (n, str, v, fmt, mask, skip)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    integer,         intent(out) :: n
+    character(len=*),intent(out) :: str
+    real(kind=KTGT), intent(in)  :: v
+    character(len=*),intent(in)  :: fmt
+    logical,         intent(in)  :: mask
+    character(len=*),intent(in)  :: skip
+
+    if (mask) then
+       str = skip
+       n = len_trim(skip)
+    else
+       call join_format_item(n, str, v, fmt)
+    endif
+    return
+  end subroutine join_mask_item_f
+  subroutine join_mask_item_i &
+       & (n, str, v, fmt, mask, skip)
+    implicit none
+    integer,         intent(out) :: n
+    character(len=*),intent(out) :: str
+    integer,         intent(in)  :: v
+    character(len=*),intent(in)  :: fmt
+    logical,         intent(in)  :: mask
+    character(len=*),intent(in)  :: skip
+
+    if (mask) then
+       str = skip
+       n = len_trim(skip)
+    else
+       call join_format_item(n, str, v, fmt)
+    endif
+    return
+  end subroutine join_mask_item_i
+
+!!!_   . join_format_item
+  subroutine join_format_item_d &
+       & (n, str, v, fmt)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    integer,         intent(out) :: n
+    character(len=*),intent(out) :: str
+    real(kind=KTGT), intent(in)  :: v
+    character(len=*),intent(in)  :: fmt
+    integer jerr
+
+    if (fmt.eq.'*') then
+       write(str, *, IOSTAT=jerr) v
+    else if (fmt.eq.' ') then
+       call compact_string(jerr, str, v)
+    else
+       write(str, fmt, IOSTAT=jerr) v
+    endif
+    if (jerr.eq.0) then
+       str = adjustl(str)
+       n = len_trim(str)
+    else
+       n = _ERROR(ERR_PANIC)
+    endif
+    return
+  end subroutine join_format_item_d
+  subroutine join_format_item_f &
+       & (n, str, v, fmt)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    integer,         intent(out) :: n
+    character(len=*),intent(out) :: str
+    real(kind=KTGT), intent(in)  :: v
+    character(len=*),intent(in)  :: fmt
+    integer jerr
+
+    if (fmt.eq.'*') then
+       write(str, *, IOSTAT=jerr) v
+    else if (fmt.eq.' ') then
+       call compact_string(jerr, str, v)
+    else
+       write(str, fmt, IOSTAT=jerr) v
+    endif
+    if (jerr.eq.0) then
+       str = adjustl(str)
+       n = len_trim(str)
+    else
+       n = _ERROR(ERR_PANIC)
+    endif
+    return
+  end subroutine join_format_item_f
+  subroutine join_format_item_i &
+       & (n, str, v, fmt)
+    implicit none
+    integer,         intent(out) :: n
+    character(len=*),intent(out) :: str
+    integer,         intent(in)  :: v
+    character(len=*),intent(in)  :: fmt
+    integer jerr
+
+    if (fmt.eq.'*') then
+       write(str, *, IOSTAT=jerr) v
+    else if (fmt.eq.' ') then
+       write(str, '(I0)', IOSTAT=jerr) v
+    else
+       write(str, fmt, IOSTAT=jerr) v
+    endif
+    if (jerr.eq.0) then
+       str = adjustl(str)
+       n = len_trim(str)
+    else
+       n = _ERROR(ERR_PANIC)
+    endif
+    return
+  end subroutine join_format_item_i
+
+!!!_   . add_ldelim
+  subroutine add_ldelim(ierr, jpos, str, delim)
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(inout)       :: jpos
+    character(len=*),intent(inout)       :: str
+    character(len=*),intent(in),optional :: delim
+    integer lstr
+    integer ns
+
+    ierr = 0
+    if (present(delim)) then
+       lstr = len(str)
+       ns = max(1, len_trim(delim))
+       jpos = jpos + ns
+       if (jpos.gt.lstr) then
+          ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+       else
+          str = delim(1:ns) // trim(str)
+       endif
+    endif
+  end subroutine add_ldelim
+!!!_   . add_rdelim
+  subroutine add_rdelim(ierr, jpos, str, delim)
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(inout)       :: jpos
+    character(len=*),intent(inout)       :: str
+    character(len=*),intent(in),optional :: delim
+    integer lstr
+    integer ns
+
+    ierr = 0
+    if (present(delim)) then
+       lstr = len(str)
+       ns = max(1, len_trim(delim))
+       jpos = jpos + ns
+       if (jpos.gt.lstr) then
+          ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+       else
+          str = trim(str) // delim(1:ns)
+       endif
+    endif
+  end subroutine add_rdelim
 
 !!!_  & split_heads - split string and return head-array
   subroutine split_heads &
@@ -1813,6 +2008,93 @@ contains
        n = min(-1, ofs - 1)
     endif
   end function find_first_i
+
+  integer function find_first_f &
+       & (list, val, start, back, offset, no, tol) &
+       & result(n)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    real(kind=KTGT),intent(in)          :: list(0:)
+    real(kind=KTGT),intent(in)          :: val
+    integer,        intent(in),optional :: start
+    logical,        intent(in),optional :: back
+    integer,        intent(in),optional :: offset
+    integer,        intent(in),optional :: no
+    real(kind=KTGT),intent(in),optional :: tol
+
+    real(kind=KTGT) :: r
+    integer j, jb, ll, ofs
+    ofs = choice(find_offset, offset)
+    jb  = choice(ofs, start) - ofs
+    r   = choice(0.0_KTGT, tol)
+    ll  = size(list)
+    n = -1
+    if (choice(.false., back)) then
+       do j = ll - 1, jb, -1
+          if (ABS(list(j)-val).le.r) then
+             n = j
+             exit
+          endif
+       enddo
+    else
+       do j = jb, ll - 1
+          if (ABS(list(j)-val).le.r) then
+             n = j
+             exit
+          endif
+       enddo
+    endif
+    if (n.ge.0) then
+       n = n + ofs
+    else if (present(no)) then
+       n = no
+    else
+       n = min(-1, ofs - 1)
+    endif
+  end function find_first_f
+  integer function find_first_d &
+       & (list, val, start, back, offset, no, tol) &
+       & result(n)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in)          :: list(0:)
+    real(kind=KTGT),intent(in)          :: val
+    integer,        intent(in),optional :: start
+    logical,        intent(in),optional :: back
+    integer,        intent(in),optional :: offset
+    integer,        intent(in),optional :: no
+    real(kind=KTGT),intent(in),optional :: tol
+
+    real(kind=KTGT) :: r
+    integer j, jb, ll, ofs
+    ofs = choice(find_offset, offset)
+    jb  = choice(ofs, start) - ofs
+    r   = choice(0.0_KTGT, tol)
+    ll  = size(list)
+    n = -1
+    if (choice(.false., back)) then
+       do j = ll - 1, jb, -1
+          if (ABS(list(j)-val).le.r) then
+             n = j
+             exit
+          endif
+       enddo
+    else
+       do j = jb, ll - 1
+          if (ABS(list(j)-val).le.r) then
+             n = j
+             exit
+          endif
+       enddo
+    endif
+    if (n.ge.0) then
+       n = n + ofs
+    else if (present(no)) then
+       n = no
+    else
+       n = min(-1, ofs - 1)
+    endif
+  end function find_first_d
 
   integer function find_first_a &
        & (list, val, start, back, offset, no) &
@@ -2201,11 +2483,14 @@ end module TOUZA_Std_utl
 #if TEST_STD_UTL
 program test_std_utl
   use TOUZA_Std_utl
+  use TOUZA_Std_prc,only: KDBL
   implicit none
+  integer,parameter :: KTGT=KDBL
   integer ierr
   character(len=128) :: T0, T1
   integer a(4), b(2)
   integer i
+  real(kind=KTGT) :: v
 
   call init(ierr, levv=+8)
   call diag(ierr)
@@ -2239,6 +2524,26 @@ program test_std_utl
   call test_compact((/(i*i, i=0, 30)/))
   call test_compact((/((-1)**i * (i*i), i=0, 30)/))
 
+  call test_compact_str(0.0_KTGT)
+  call test_compact_str(+HUGE(0.0_KTGT))
+  call test_compact_str(-HUGE(0.0_KTGT))
+  call test_compact_str(1.e3_KTGT)
+  v = 1.0_KTGT
+  do i = 0, PRECISION(0.0_KTGT) + 1
+     call test_compact_str(v)
+     v = v * 10.0_KTGT + mod(i + 2, 10) * 1.0_KTGT
+  enddo
+  v = 1.0_KTGT
+  do i = 0, PRECISION(0.0_KTGT) + 1
+     call test_compact_str(v)
+     v = v * 10.0_KTGT
+  enddo
+  v = 1.0_KTGT
+  do i = 0, PRECISION(0.0_KTGT) + 1
+     call test_compact_str(v)
+     v = v / 2.0_KTGT
+  enddo
+
   call test_nparser('123')
   call test_nparser('12,3')
   call test_nparser('12/3')
@@ -2259,6 +2564,10 @@ program test_std_utl
 
   call test_join((/0/))
   call test_join((/0,1,2/))
+
+  call test_join_r((/0.0_KTGT/))
+  call test_join_r((/0.0_KTGT,1.0_KTGT,2.0_KTGT/))
+  call test_join_r((/1.0_KTGT,0.5_KTGT,0.25_KTGT/))
 
   call test_split(':')
 
@@ -2394,6 +2703,23 @@ contains
     return
   end subroutine test_compact
 
+  subroutine test_compact_str(v)
+    implicit none
+    real(kind=KTGT),intent(in) :: v
+    character(len=128) :: text
+    integer ierr
+
+101 format('compact2: ', A)
+102 format('compact2:def: ', A)
+103 format('compact2:mag: ', A)
+    write(text, *) v
+    write(*, 101) trim(adjustl(text))
+    call compact_string(ierr, text, v)
+    write(*, 102) trim(text)
+    call compact_string(ierr, text, v, mag=5)
+    write(*, 103) trim(text)
+  end subroutine test_compact_str
+
   subroutine test_join(v)
     implicit none
     integer,intent(in) :: v(:)
@@ -2429,6 +2755,46 @@ contains
     call join_list(jerr, strshort, v, sep=sep, ldelim=ld, rdelim=rd)
     write(*, 109) 'short:', jerr, trim(strshort)
   end subroutine test_join_sub
+
+  subroutine test_join_r(v)
+    implicit none
+    real(kind=KTGT),intent(in) :: v(:)
+    call test_join_rsub(v)
+    call test_join_rsub(v, ' ')
+    call test_join_rsub(v, ',')
+    call test_join_rsub(v, ',', '[', ']')
+    call test_join_rsub(v, fmt=' ')
+  end subroutine test_join_r
+
+  subroutine test_join_rsub(v, sep, ld, rd, fmt)
+    implicit none
+    real(kind=KTGT),intent(in) :: v(:)
+    character(len=*),intent(in),optional :: sep, ld, rd, fmt
+    character(len=128) :: msg
+    character(len=32) :: strlong
+    character(len=4)  :: strshort
+    integer jerr
+    msg = ' '
+    if (present(sep)) then
+       msg = trim(msg) // ' sep[' // sep // ']'
+    endif
+    if (present(ld)) then
+       msg = trim(msg) // ' left:' // trim(ld)
+    endif
+    if (present(rd)) then
+       msg = trim(msg) // ' right:' // trim(rd)
+    endif
+    if (present(fmt)) then
+       msg = trim(msg) // ' fmt:' // trim(fmt)
+    endif
+101 format('join:', A)
+    write(*, 101) trim(msg)
+    call join_list(jerr, strlong, v, sep=sep, ldelim=ld, rdelim=rd, fmt=fmt)
+109 format('join:', A, ':', I0, ' >> ', A, ' //')
+    write(*, 109) 'long:', jerr, trim(strlong)
+    call join_list(jerr, strshort, v, sep=sep, ldelim=ld, rdelim=rd, fmt=fmt)
+    write(*, 109) 'short:', jerr, trim(strshort)
+  end subroutine test_join_rsub
 
   subroutine test_split(str)
     implicit none
