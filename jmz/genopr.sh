@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/03/28 16:17:59 fuyuki genopr.sh>
+# Time-stamp: <2023/04/06 14:20:44 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -115,6 +115,7 @@ register_all ()
   register -g stack +n m,'2m'      REPEAT   'repeat from last non-adjacent anchor'
   register -g stack +n m,0         FLUSH    'flush-out from last anchor'
   register -g stack +n m,0         DFLUSH   'flush-out from last anchor (defined only)'
+  register -g stack +n m,0 -o COLS CFLUSH   'flush-out from last anchor (columnized)'
 
   # queue manipulation
   register -g queue ITER   'iterate last queue operator for each set from last anchor'
