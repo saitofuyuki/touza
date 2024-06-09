@@ -115,7 +115,7 @@ dnl MT_SUB_PACKAGE([div], [[$]enable_sub_div_default],     [std])
 AM_CONDITIONAL([BUILD_div], [false])
 dnl MT_SUB_PACKAGE([nio], [],     [std emu trp div])
 MT_SUB_PACKAGE([nio], [],     [std emu trp])
-MT_SUB_PACKAGE([ami], [],     [std])
+MT_SUB_PACKAGE([ami], [],     [std nio])
 
 AC_ARG_ENABLE([nctcdf],
 [AS_HELP_STRING([--enable-nctcdf], [enable nio/n*c*tcdf features@<:@default=no@:>@])],
@@ -187,6 +187,7 @@ AM_CONDITIONAL([autorevision],
 
 AC_PATH_PROGS([AUTOREVISION], [autorevision], [:])
 AC_PATH_PROGS([REALPATH], [realpath], [false])
+AC_PATH_PROGS([ZSH], [zsh], [:])
 
 dnl dependency hack
 dnl _AM_DEPENDENCIES(FC)
