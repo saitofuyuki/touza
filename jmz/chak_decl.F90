@@ -1,6 +1,6 @@
 !!!_! jmz/chak_decl.F90 - TOUZA/Jmz CH(swiss) army knife operator symbol declaration
 ! Maintainer: SAITO Fuyuki
-! Created by genopr.sh at 2023-04-06T14:21:43+09:00
+! Created by genopr.sh at 2023-04-17T15:57:12+09:00
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -167,6 +167,8 @@
   character(len=*),parameter :: str_DUR = 'DUR'
   !! group: buffer
   character(len=*),parameter :: str_TAG = 'TAG'
+  character(len=*),parameter :: str_DESC = 'DESC'
+  character(len=*),parameter :: str_FUNC = 'FUNC'
   character(len=*),parameter :: str_PERM = 'PERM'
   character(len=*),parameter :: str_SHAPE = 'SHAPE'
   character(len=*),parameter :: str_SIZE = 'SIZE'
@@ -370,16 +372,18 @@
   !! group: buffer
   integer,parameter :: grp_buffer_bgn = 130
   integer,parameter :: opr_TAG = 130
-  integer,parameter :: opr_PERM = 131
+  integer,parameter :: opr_DESC = 131
+  integer,parameter :: opr_FUNC = 132
+  integer,parameter :: opr_PERM = 133
   integer,parameter :: opr_SHAPE = opr_PERM
-  integer,parameter :: opr_SIZE = 132
-  integer,parameter :: opr_CSHIFT = 133
-  integer,parameter :: opr_EOSHIFT = 134
-  integer,parameter :: opr_C0 = 135
-  integer,parameter :: opr_C1 = 136
-  integer,parameter :: opr_C2 = 137
-  integer,parameter :: opr_C3 = 138
-  integer,parameter :: opr_X = 139
-  integer,parameter :: opr_Y = 140
-  integer,parameter :: opr_Z = 141
-  integer,parameter :: grp_buffer_end = 142
+  integer,parameter :: opr_SIZE = 134
+  integer,parameter :: opr_CSHIFT = 135
+  integer,parameter :: opr_EOSHIFT = 136
+  integer,parameter :: opr_C0 = 137
+  integer,parameter :: opr_C1 = 138
+  integer,parameter :: opr_C2 = 139
+  integer,parameter :: opr_C3 = 140
+  integer,parameter :: opr_X = 141
+  integer,parameter :: opr_Y = 142
+  integer,parameter :: opr_Z = 143
+  integer,parameter :: grp_buffer_end = 144

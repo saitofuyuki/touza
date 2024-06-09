@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/04/07 10:31:02 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/17 14:31:02 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -75,6 +75,7 @@ program chak
   character(len=lfmt),save :: afmt_int = '(I0)'
   character(len=lfmt),save :: afmt_flt = '(es16.12)'
   character(len=lfmt),save :: afmt_dbl = '(es16.12)'
+
 !!!_  - misc
   integer irecw
 
@@ -85,6 +86,10 @@ program chak
   integer,parameter :: levq_stack = levq_rec - 1
   integer,parameter :: levq_column = levq_stack - 1
   integer,parameter :: levq_coordinate = levq_column - 1
+
+  character(len=*),parameter :: bfmt_write_buf   = '(''W'', I0)'
+  character(len=*),parameter :: bfmt_read_buf    = '(''F'', I0)'
+  character(len=*),parameter :: bfmt_read_filter = '(''F'', I0, ''.'', I0)'
 
 !!!_ + Body
   ierr = 0
@@ -106,17 +111,17 @@ program chak
   if (ierr.eq.0) call finalize(ierr)
 #if HAVE_FORTRAN_EXIT
   if (ierr.ne.0) then
-     write(*, *) 'exit = ', ierr
+     call trace_err(ierr)
      call exit(1)
   endif
 #elif HAVE_FORTRAN_ERROR_STOP
   if (ierr.ne.0) then
-     write(*, *) 'exit = ', ierr
+     call trace_err(ierr)
      error stop 1
   endif
 #else /* not HAVE_FORTRAN_ERROR_STOP */
   if (ierr.ne.0) then
-     write(*, *) 'exit = ', ierr
+     call trace_err(ierr)
   endif
 #endif /* not HAVE_FORTRAN_ERROR_STOP */
   stop
@@ -539,6 +544,11 @@ contains
                 ierr = min(0, ierr)
              endif
              if (ierr.eq.0) then
+                call parse_arg_buffer(ierr, arg)
+                if (ierr.eq.0) exit
+                ierr = min(0, ierr)
+             endif
+             if (ierr.eq.0) then
                 call parse_arg_literal(ierr, arg)
                 if (ierr.eq.0) exit
                 ierr = min(0, ierr)
@@ -877,7 +887,7 @@ contains
     integer lasth
     integer jf
     integer nbufs
-    character(len=lname) :: bname
+    character(len=lname) :: bname, fname
     integer jerr
 
     ierr = 0
@@ -902,12 +912,15 @@ contains
              jb = buf_h2item(hbuf)
              obuffer(jb)%stt = stt_locked
              ! ofile(jf)%bh = hbuf
-1011         format('W', I0)
-             write(bname, 1011, IOSTAT=jerr) user_index_bgn(wcount)
-             obuffer(jb)%name = bname
-             wcount = wcount + 1
+             ! fake operator for file handle
+             write(bname, bfmt_write_buf, IOSTAT=jerr) user_index_bgn(wcount)
+             if (ierr.eq.0) then
+                ! obuffer(jb)%name = bname
+                ! call reg_fake_opr(ierr, hbuf, bname)
+                call reg_fake_opr(ierr, hfile, bname)
+             endif
           endif
-          if (ierr.eq.0) call reg_fake_opr(ierr, hbuf, bname)
+          if (ierr.eq.0) wcount = wcount + 1
        else
           if (.not.associated(ofile(def_read)%rgrp)) then
              call add_default_records(ierr, ofile(def_read))
@@ -940,14 +953,12 @@ contains
     integer jerr
 
     ierr = 0
-101 format('F', I0)
-102 format('F', I0, '.', I0)
     do jj = 0, nbufs - 1
        if (ierr.eq.0) then
           if (nbufs.le.1.and.jsub.lt.1) then
-             write(tag, 101, IOSTAT=jerr) user_index_bgn(jtag)
+             write(tag, bfmt_read_buf, IOSTAT=jerr) user_index_bgn(jtag)
           else
-             write(tag, 102, IOSTAT=jerr) user_index_bgn(jtag), user_index_bgn(jsub + jj)
+             write(tag, bfmt_read_filter, IOSTAT=jerr) user_index_bgn(jtag), user_index_bgn(jsub + jj)
           endif
        endif
        if (ierr.eq.0) call new_buffer(ierr, hbuf, tag)
@@ -1010,6 +1021,53 @@ contains
     endif
   end subroutine parse_arg_literal
 
+!!!_   . parse_arg_buffer
+  subroutine parse_arg_buffer &
+       & (ierr, arg)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: arg
+    integer hopr,  lasth
+    integer jfile
+    logical cond
+
+    ierr = 0
+    hopr = parse_term_operator(arg)
+    jfile = file_h2item(hopr)
+
+    cond = hopr.ge.0
+    if (cond) cond = .not. is_operator(hopr)
+
+    if (cond) then
+       if (jfile.lt.0) then
+          ! fake operator (== tagged buffer)
+          if (ierr.eq.0) call append_queue(ierr, hopr, 0, 1, (/hopr/))
+          if (ierr.eq.0) call push_stack(ierr, hopr)
+       else
+          if (is_read_mode(ofile(jfile)%mode)) then
+             ierr = ERR_PANIC
+          else
+             ! OUTPUT WRITE-TAG
+             if (ierr.eq.0) call last_queue(ierr, lasth)
+             if (ierr.eq.0) then
+                if (lasth.eq.opr_OUTPUT) then
+                   call pop_queue(ierr)
+                   if (ierr.eq.0) call append_queue(ierr, hopr, pop=1, push=0)
+                   if (ierr.eq.0) call pop_stack(ierr)
+                else
+                   ierr = ERR_PANIC
+                endif
+             endif
+          endif
+       endif
+       if (ierr.ne.0) then
+          call message(ierr, 'panic: ' // trim(arg) // ' cannot be parsed (forget = ?)')
+       endif
+    else
+       ierr = ERR_NO_CANDIDATE   ! not error
+    endif
+  end subroutine parse_arg_buffer
+
 !!!_   . parse_arg_operator
   subroutine parse_arg_operator &
        & (ierr, arg)
@@ -1029,7 +1087,7 @@ contains
 
     hbufo = -1
     hopr = parse_term_operator(arg)
-
+    ! write(*, *) hopr, is_operator(hopr), trim(arg)
     if (is_msglev_info(lev_verbose)) then
        if (hopr.ge.0) then
           inquire(FILE=arg, EXIST=isx, IOSTAT=ierr)
@@ -1103,8 +1161,9 @@ contains
           if (ierr.eq.0) call stack_normal_opr(ierr, 0, 0, hopr, 0)
        else
           ! fake operator
-          if (ierr.eq.0) call append_queue(ierr, hopr, 0, 1, (/hopr/))
-          if (ierr.eq.0) call push_stack(ierr, hopr)
+          ierr = ERR_NO_CANDIDATE   ! not error
+          ! if (ierr.eq.0) call append_queue(ierr, hopr, 0, 1, (/hopr/))
+          ! if (ierr.eq.0) call push_stack(ierr, hopr)
        endif
     else
        ierr = ERR_NO_CANDIDATE   ! not error
@@ -1146,7 +1205,7 @@ contains
 
 !!!_   . parse_flat_shape
   subroutine parse_flat_shape (ierr, arg, hopr)
-    use TOUZA_Std,only: split_list
+    use TOUZA_Std,only: split_list, condop
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: arg
@@ -1161,6 +1220,7 @@ contains
     integer jq
     integer jsbgn, jsend
     integer jrep
+    integer flag
 
     ierr = 0
     pop = 0
@@ -1185,7 +1245,8 @@ contains
           ierr = ERR_INSUFFICIENT_BUFFER
           call message(ierr, 'too many ranks to SHAPE:' // trim(arg))
        else
-          call decompose_coordinate_mod(ierr, jrep, arg=arg(jpb+1:jpe-1), hopr=hopr)
+          flag = condop((hopr.eq.opr_SIZE), shape_size, shape_element)
+          call decompose_coordinate_mod(ierr, jrep, arg=arg(jpb+1:jpe-1), flag=flag)
           if (ierr.eq.0) then
              aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
              aqueue(jq)%lefts(:)%lcp(jc)%bgn  = null_range
@@ -1267,7 +1328,7 @@ contains
 
 !!!_   . parse_buffer_shape
   subroutine parse_buffer_shape (ierr, arg, hopr)
-    use TOUZA_Std,only: split_list
+    use TOUZA_Std,only: split_list, condop
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: arg
@@ -1282,6 +1343,7 @@ contains
     integer jq
     integer jsbgn, jsend
     integer b, e, s, jrep
+    integer flag
 
     ierr = 0
 
@@ -1319,7 +1381,8 @@ contains
           ierr = ERR_INSUFFICIENT_BUFFER
           call message(ierr, 'too many ranks to SHAPE:' // trim(arg))
        else
-          call decompose_coordinate_mod(ierr, jrep, b, e, s, arg(jpb+1:jpe-1), hopr)
+          flag = condop((hopr.eq.opr_SIZE), shape_size, shape_element)
+          call decompose_coordinate_mod(ierr, jrep, b, e, s, arg(jpb+1:jpe-1), flag)
           if (ierr.eq.0) then
              aqueue(jq)%lefts(:)%lcp(jc)%name = adjustl(arg(jpb+1:jpb+jrep))
              aqueue(jq)%lefts(:)%lcp(jc)%bgn  = b
@@ -1341,7 +1404,7 @@ contains
 
 !!!_   . parse_coordinate_opr
   subroutine parse_coordinate_opr (ierr, cidx, arg, hopr)
-    use TOUZA_Std,only: split_list
+    use TOUZA_Std,only: split_list, condop
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: cidx
@@ -1351,6 +1414,7 @@ contains
     integer jq
     integer pop, push
     integer b, e, s, jrep
+    integer flag
 
     ierr = 0
 
@@ -1372,7 +1436,8 @@ contains
        endif
     endif
     if (ierr.eq.0) then
-       call decompose_coordinate_mod(ierr, jrep, b, e, s, arg, hopr)
+       flag = condop((hopr.eq.opr_SIZE), shape_size, shape_element)
+       call decompose_coordinate_mod(ierr, jrep, b, e, s, arg, flag)
        ! write(*, *) ierr, b, e, s, arg(1:jrep)
     endif
     if (ierr.eq.0) then
@@ -1388,114 +1453,6 @@ contains
        bstack(mstack-pop:mstack-1)%lcp(cidx)%stp = s
     endif
   end subroutine parse_coordinate_opr
-
-!!!_   . decompose_coordinate_mod
-  subroutine decompose_coordinate_mod &
-       & (ierr, jrep, b, e, s, arg, hopr)
-    use TOUZA_Std,only: split_list, condop
-    implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: jrep     ! name/rename as (1:jrep)
-    integer,optional,intent(out) :: b, e, s  ! either all or none specified
-    character(len=*),intent(in)  :: arg
-    integer,         intent(in)  :: hopr
-    integer larg, lsep
-    integer js0, js1
-    integer rpos(2)
-    integer,parameter :: rdef(2) = (/null_range, null_range/)
-    integer nc
-    integer jran
-    logical no_range
-
-    ! NAME/REPL//RANGE   == NAME/REPL/  RANGE      / before RANGE is absorbed
-    ! NAME/REPL/RANGE    == NAME/REPL   RANGE
-    ! NAME//RANGE        == NAME/       RANGE
-    ! NAME/RANGE         == NAME        RANGE
-    ! NAME/REPL/                                   no / absorption
-    ! NAME/REPL
-    !  NAME REPL  alpha+alnum
-    !  RANGE      [num][:[num]]
-
-    ierr = 0
-    lsep = len(rename_sep)
-    larg = len_trim(arg)
-
-    if ((present(b).eqv.present(e)) &
-         & .and. (present(b).eqv.present(s))) then
-       no_range = .not.present(b)
-    else
-       ierr = ERR_FEW_ARGUMENTS
-       return
-    endif
-
-    js0 = index(arg, rename_sep)
-    jran = -1
-    if (js0.gt.0) then
-       ! first /
-       js0 = js0 + lsep
-       js1 = index(arg(js0:), rename_sep)
-       if (js1.gt.0) then
-          ! second /
-          jran = js0 - 1 + js1 + lsep
-          jrep = jran - lsep
-          if (jran.le.larg) then
-             if (arg(jran:jran+lsep-1).eq.rename_sep) then
-                jran = jran + lsep
-             else
-                jrep = jrep - lsep
-             endif
-          endif
-       endif
-    else
-       js0 = 1
-    endif
-    if (no_range) then
-       if (jran.lt.0) jrep = larg
-       return
-    endif
-
-    if (jran.lt.0) then
-       if (index(('0123456789' // range_sep), arg(js0:js0)).eq.0) then
-          jran = larg + 1
-          jrep = larg
-       else
-          jran = js0
-          jrep = jran - lsep - lsep
-       endif
-    endif
-
-    rpos(1) = system_index_bgn(null_range)
-    rpos(2) = system_index_end(null_range)
-    s = -1
-    call split_list(nc, rpos, arg(jran:larg), range_sep, 2, rdef(:))
-    if (nc.lt.0) then
-       ierr = nc
-       call message(ierr, 'cannot parse range: ' // trim(arg(jran:larg)))
-    else if (nc.eq.0) then
-       b = system_index_bgn(rpos(1))
-       e = system_index_end(rpos(2))
-    else if (nc.eq.1) then
-       if (hopr.eq.opr_SIZE) then
-          ! force null coordinate if size==0
-          b = 0
-          e = rpos(1)
-          s = condop(rpos(1).eq.0, 0, 1)
-       else
-          b = system_index_bgn(rpos(1))
-          e = b + 1
-          s = 1
-       endif
-    else if (nc.eq.2) then
-       b = system_index_bgn(rpos(1))
-       e = system_index_end(rpos(2))
-       s = 1
-       if (e.ne.null_range .and. e.le.b) s = 0
-    else if (nc.gt.2) then
-       ierr = ERR_INVALID_PARAMETER
-       call message(ierr, 'fail to extract range ' // trim(arg(jran:larg)))
-    endif
-    ! write(*, *) jrep, jran, '{' // arg(1:jrep) // '}{' // arg(jran:larg) // '} ', b, e, s
-  end subroutine decompose_coordinate_mod
 
 !!!_   . stack_buffer_opr
   subroutine stack_buffer_opr (ierr, hopr)
@@ -3700,7 +3657,7 @@ contains
     else
        tsfx = ' '
     endif
-101 format('  write:', A, 1x, A, A)
+101 format('    write:', A, 1x, A, A)
     write(txt, 101, IOSTAT=jerr) trim(obuffer(jb)%name), trim(obuffer(jb)%desc), trim(tsfx)
     call message(ierr, txt, levm=msglev_normal, u=uerr)
 
@@ -5888,9 +5845,9 @@ contains
     endif
 
     if (is_msglev_DEBUG(lev_verbose)) then
-       if (ierr.eq.0) call show_domain(ierr, domL, 'compromise/L')
+       if (ierr.eq.0) call show_domain(ierr, domL, 'compromise/L', indent=4)
        do j = 0, nbuf - 1
-          if (ierr.eq.0) call show_domain(ierr, domR(j), 'compromise/R')
+          if (ierr.eq.0) call show_domain(ierr, domR(j), 'compromise/R', indent=4)
        enddo
     endif
   end subroutine get_compromise_domain

@@ -1,7 +1,7 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:57:17 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/17 09:47:01 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2023
@@ -101,7 +101,7 @@ module TOUZA_Std_log
   public is_msglev_warning, is_msglev_normal,   is_msglev_info
   public is_msglev_detail,  is_msglev_debug
   public banner
-  public trace_control,     trace_fine
+  public trace_control,     trace_fine,         trace_err
   public is_error_match
 contains
 !!!_ + common interfaces
@@ -210,6 +210,40 @@ contains
   end subroutine finalize
 
 !!!_ + trace
+!!!_  - trace_err
+  subroutine trace_err &
+       & (ierr, pkg, grp, mdl, fun, asfx, isfx, u, levv)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,         intent(in)          :: ierr
+    character(len=*),intent(in),optional :: pkg, grp, mdl, fun
+    character(len=*),intent(in),optional :: asfx
+    integer,         intent(in),optional :: isfx
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv
+    integer c
+    integer lv
+    integer mgrp, mmdl
+    character(len=128) :: estr, tag
+
+    lv = choice(msglev_normal, levv)
+    if (ierr.ne.0.or.is_msglev_DEBUG(lv)) then
+       if (ierr.lt.0) then
+          c = - ierr
+          mgrp = c / ERR_MASK_GROUP
+          mmdl = mod(c, ERR_MASK_GROUP) / ERR_MASK_MODULE
+          c = mod(c, ERR_MASK_MODULE)
+101       format('trace_err:', I0, '=', I0, ',', I0, ',', I0)
+          write(estr, 101) ierr, mgrp, mmdl, c
+       else
+102       format('trace_err:', I0)
+          write(estr, 102) ierr
+       endif
+       call gen_tag(tag, pkg, grp, mdl, fun, asfx, isfx)
+       call msg(estr, tag, u)
+    endif
+
+  end subroutine trace_err
 !!!_  - trace_fine ()
   subroutine trace_fine &
        & (ierr, mode, icount, dcount, fcount, &
@@ -629,10 +663,18 @@ contains
 101 format(_TOUZA_FORMAT_TAG(A), A)
 102 format(A)
     if (present(tag)) then
-       if      (ut.eq.unit_star) then
-          write(*,   101) trim(tag), trim(txt)
-       else if (ut.ge.0)  then
-          write(ut,  101) trim(tag), trim(txt)
+       if (tag.eq.' ') then
+          if      (ut.eq.unit_star) then
+             write(*,   102) trim(txt)
+          else if (ut.ge.0)  then
+             write(ut,  102) trim(txt)
+          endif
+       else
+          if      (ut.eq.unit_star) then
+             write(*,   101) trim(tag), trim(txt)
+          else if (ut.ge.0)  then
+             write(ut,  101) trim(tag), trim(txt)
+          endif
        endif
     else
        if      (ut.eq.unit_star) then
@@ -885,6 +927,9 @@ program test_std_log
      call test_error(-je - ERR_MASK_NIO, ERR_EOF, ERR_MASK_CAL)
   enddo
 
+  call test_error_code(ERR_MASK_NIO,      ERR_EOF)
+  call test_error_code(ERR_MASK_NIO_CTRL, ERR_EOF)
+
   call finalize(ierr, levv=+10)
 
   stop
@@ -922,6 +967,19 @@ contains
     endif
 
   end subroutine test_error
+
+  subroutine test_error_code &
+       & (egrp, ecode)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,intent(in) :: egrp, ecode
+    integer ierr
+    ierr = - egrp + ecode
+101 format('error code: ', I0, 1x, ' = ', I0, ',', I0)
+    write(*, 101) ierr, egrp, ecode
+    call trace_err(ierr)
+    call trace_err(ierr, asfx=__FILE__, isfx=__LINE__)
+  end subroutine test_error_code
 
 end program test_std_log
 #endif /* TEST_STD_LOG */

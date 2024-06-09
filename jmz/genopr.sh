@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/04/06 14:20:44 fuyuki genopr.sh>
+# Time-stamp: <2023/04/17 15:53:43 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -272,6 +272,8 @@ register_all ()
 
   # property manipulation
   register -g buffer -p NAME              TAG
+  register -g buffer -p NAME              DESC           'description'
+  register -g buffer -o NAME              FUNC           'function declaration'
   register -g buffer -p NAME/REPL/RANGE,.. -n 1,1 PERM   'array shape permutatation'
   register -a PERM SHAPE
   register -g buffer -p NAME/REPL/SIZE,..  -n 1,1 SIZE    'array size(shape) permutatation'

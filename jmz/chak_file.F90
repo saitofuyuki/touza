@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz CH(swiss) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/27 09:05:18 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/09 20:02:49 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -308,7 +308,7 @@ contains
 !!!_   . set_file_format
   subroutine set_file_format &
        & (ierr, file, arg)
-    use TOUZA_Std,only: upcase
+    use TOUZA_Std,only: upcase, find_next_sep
     use TOUZA_Nio,only: parse_record_fmt
     implicit none
     integer,         intent(out)   :: ierr
@@ -323,7 +323,9 @@ contains
     ierr = 0
 
     abuf = ' '
-    call upcase(abuf, arg)
+    jp = find_next_sep(arg, asep)
+    call upcase(abuf, arg(1:jp))
+    abuf = abuf(1:jp) // arg(jp+1:)
     call parse_record_fmt(ierr, file%kfmt, abuf)
     if (ierr.eq.0) then
        file%fmt = trim(abuf)
@@ -1215,66 +1217,6 @@ end subroutine cue_read_file
     b = mode.le.mode_read
   end function is_read_mode
 
-!!!_   . parse_format_shape
-  subroutine parse_format_shape &
-       & (nco, irange, mco, fmt)
-    use TOUZA_Std,only: parse_number
-    implicit none
-    integer,         intent(out) :: nco
-    integer,         intent(out) :: irange(2, 0:*)
-    integer,         intent(in)  :: mco
-    character(len=*),intent(in)  :: fmt
-    character(len=*),parameter :: csep = item_sep
-    character(len=*),parameter :: rsep = range_sep
-    integer jp, je, jr
-    integer k
-    integer lf
-    integer jerr
-
-    lf = len_trim(fmt)
-    ! write(*, *) 'parse_format_shape: ', fmt(1:lf)
-    nco = 0
-    jp = 0
-    do
-       if (jp.ge.lf) exit
-       if (nco.gt.mco) exit
-       je = index(fmt(jp+1:lf), csep)
-       if (je.eq.0) je = lf - jp + 1
-       if (je.le.1) then
-          irange(1:2, nco) = (/0, 0/)
-       else
-          jr = index(fmt(jp+1:jp+je), rsep)
-          if (jr.le.0) then
-             irange(1, nco) = 0
-             call parse_number(jerr, k, fmt(jp+1:jp+je-1))
-             if (jerr.eq.0) irange(2, nco) = system_index_end(k)
-          else
-             if (jr.gt.1) then
-                call parse_number(jerr, k, fmt(jp+1:jp+jr-1))
-                if (jerr.eq.0) irange(1, nco) = system_index_bgn(k)
-             else
-                irange(1, nco) = 0
-             endif
-             if (jr.lt.je-1) then
-                if (jerr.eq.0) call parse_number(jerr, k, fmt(jp+jr+len(rsep):jp+je-1))
-                if (jerr.eq.0) irange(2, nco) = system_index_end(k)
-             else
-                irange(2, nco) = 0
-             endif
-          endif
-          if (jerr.ne.0) exit
-          if (irange(2,nco).gt.0) irange(1,nco) = irange(1,nco) + 1
-       endif
-       nco = nco + 1
-       jp = jp + je + len(csep) - 1
-    enddo
-    ! write(*, *) irange(:, 0:mco-1)
-    if (nco.gt.mco) then
-       nco = ERR_INVALID_PARAMETER
-       call message(nco, 'too many coordinates')
-    endif
-  end subroutine parse_format_shape
-
 !!!_  - gtool/nio
 !!!_   . cue_read_nio
   subroutine cue_read_nio &
@@ -1584,6 +1526,7 @@ end subroutine cue_read_file
     integer,     intent(out)   :: ierr
     type(file_t),intent(inout) :: file
 
+    character(len=lname) :: cname(lcoor)
     integer irange(2, lcoor)
     integer nco, jc
     integer n
@@ -1591,8 +1534,9 @@ end subroutine cue_read_file
 
     ierr = 0
     file%h(:) = ' '
+    cname(1:lcoor) = ' '
 
-    if (ierr.eq.0) call parse_format_shape(nco, irange, lcoor, file%fmt)
+    if (ierr.eq.0) call parse_format_shape(nco, cname, irange, lcoor, file%fmt)
     if (nco.eq.0) then
        n = 0
        do
@@ -1614,7 +1558,7 @@ end subroutine cue_read_file
     if (ierr.eq.0) call put_item(ierr, file%h, 'UR8',  hi_DFMT)
     if (ierr.eq.0) then
        do jc = 1, nco
-          call put_header_cprop(ierr, file%h, ' ', irange(1:2, jc), jc)
+          call put_header_cprop(ierr, file%h, cname(jc), irange(1:2, jc), jc)
        enddo
        ! call show_header(ierr, file%h)
     endif
@@ -1842,6 +1786,7 @@ end subroutine cue_read_file
     integer,     intent(out)   :: ierr
     type(file_t),intent(inout) :: file
     integer(kind=KIOFS) :: fpos
+    character(len=lname) :: cname(lcoor)
     integer irange(2, lcoor)
     integer nco, jc
     integer n
@@ -1849,11 +1794,12 @@ end subroutine cue_read_file
 
     ierr = 0
     file%h(:) = ' '
+    cname(1:lcoor) = ' '
 
     inquire(unit=file%u, size=fpos, IOSTAT=ierr)
     usize = usize_binary(file%kfmt)
 
-    if (ierr.eq.0) call parse_format_shape(nco, irange, lcoor, file%fmt)
+    if (ierr.eq.0) call parse_format_shape(nco, cname, irange, lcoor, file%fmt)
     if (ierr.eq.0) then
        if (nco.eq.0) then
           n = int((fpos - 1) / usize + 1, kind=kind(n))
@@ -1865,7 +1811,7 @@ end subroutine cue_read_file
     if (ierr.eq.0) call put_item(ierr, file%h, 'UR8',  hi_DFMT)
     if (ierr.eq.0) then
        do jc = 1, nco
-          call put_header_cprop(ierr, file%h, ' ', irange(1:2, jc), jc)
+          call put_header_cprop(ierr, file%h, cname(jc), irange(1:2, jc), jc)
        enddo
        ! call show_header(ierr, file%h)
     endif

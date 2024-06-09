@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2023/04/07 10:27:02 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/04/17 14:30:06 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -36,6 +36,7 @@ module chak_lib
   use TOUZA_Std,only: msglev_NORMAL, msglev_INFO, msglev_DEBUG
   use TOUZA_Std,only: msglev_WARNING, msglev_DETAIL
   use TOUZA_Std,only: is_msglev_DETAIL, is_msglev_NORMAL, is_msglev_INFO, is_msglev_DEBUG
+  use TOUZA_Std,only: trace_err
   use TOUZA_Nio,only: litem, nitem, GFMT_END
   implicit none
   public
@@ -150,6 +151,10 @@ module chak_lib
 
   integer,parameter :: cmode_xundef     = 4  ! exclude undefined at flushing
   integer,parameter :: cmode_column     = 8  ! columned
+
+!!!_  - shape parser flag
+  integer,parameter :: shape_element = 0  ! interprete single integer as element
+  integer,parameter :: shape_size    = 1  ! interprete single integer as size
 
 !!!_  - global flags
   integer,save :: lev_verbose = 0
@@ -283,7 +288,7 @@ contains
 
 !!!_   . show_domain
   subroutine show_domain &
-       & (ierr, dom, tag, u, levv)
+       & (ierr, dom, tag, u, levv, indent)
     use TOUZA_Std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
@@ -291,30 +296,33 @@ contains
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv
+    integer,         intent(in),optional :: indent
     integer utmp
     integer lv
+    integer tab
     character(len=64) :: pfx, cran
     integer jc
     ierr = 0
     lv = choice(lev_verbose, levv)
     utmp = choice(ulog, u)
+    tab = choice(0, indent)
     if (present(tag)) then
        pfx = '[' // trim(tag) // ']'
     else
        pfx = ' '
     endif
-102 format('domain', A, ' total = ', I0)
-103 format('domain', A, ': ', I0, ' / = ', 6(1x, I0))
-    write(utmp, 102) trim(pfx), dom%n
-    write(utmp, 103) trim(pfx), dom%mco, dom%cidx(0:dom%mco - 1)
+102 format(A, 'domain', A, ' total = ', I0)
+103 format(A, 'domain', A, ': ', I0, ' / = ', 6(1x, I0))
+    write(utmp, 102) repeat(' ', tab), trim(pfx), dom%n
+    write(utmp, 103) repeat(' ', tab), trim(pfx), dom%mco, dom%cidx(0:dom%mco - 1)
     do jc = 0, dom%mco - 1
-111    format('domain', A, ': ', I0, 1x, A, ' +', I0, '+', I0, ' (', I0, ')')
-112    format('domain', A, ': ', I0, 1x, A, ' +', I0, '+', I0)
+111    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '+', I0, ' (', I0, ')')
+112    format(A, 'domain', A, ': ', I0, 1x, A, ' +', I0, '+', I0)
        call get_range_string(ierr, cran, dom%bgn(jc), dom%end(jc), 1)
        if (dom%ofs(jc).eq.null_range) then
-          write(utmp, 112) trim(pfx), jc, trim(cran), dom%iter(jc), dom%strd(jc)
+          write(utmp, 112) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%iter(jc), dom%strd(jc)
        else
-          write(utmp, 111) trim(pfx), jc, trim(cran), dom%iter(jc), dom%strd(jc), dom%ofs(jc)
+          write(utmp, 111) repeat(' ', tab), trim(pfx), jc, trim(cran), dom%iter(jc), dom%strd(jc), dom%ofs(jc)
        endif
     enddo
   end subroutine show_domain
@@ -914,6 +922,159 @@ contains
   end subroutine settle_domain_stride
 
 !!!_  - coordinate manipulation
+!!!_   . decompose_coordinate_mod
+  subroutine decompose_coordinate_mod &
+       & (ierr, jrep, b, e, s, arg, flag)
+    use TOUZA_Std,only: split_list, condop
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: jrep     ! name/rename as (1:jrep)
+    integer,optional,intent(out) :: b, e, s  ! either all or none specified
+    character(len=*),intent(in)  :: arg
+    integer,         intent(in)  :: flag     ! prefered style
+    integer larg, lsep
+    integer js0, js1
+    integer rpos(2)
+    integer,parameter :: rdef(2) = (/null_range, null_range/)
+    integer nc
+    integer jran
+    logical no_range
+
+    ! NAME/REPL//RANGE   == NAME/REPL/  RANGE      / before RANGE is absorbed
+    ! NAME/REPL/RANGE    == NAME/REPL   RANGE
+    ! NAME//RANGE        == NAME/       RANGE
+    ! NAME/RANGE         == NAME        RANGE
+    ! NAME/REPL/                                   no / absorption
+    ! NAME/REPL
+    !  NAME REPL  alpha+alnum
+    !  RANGE      [num][:[num]]
+
+    ierr = 0
+    lsep = len(rename_sep)
+    larg = len_trim(arg)
+
+    if ((present(b).eqv.present(e)) &
+         & .and. (present(b).eqv.present(s))) then
+       no_range = .not.present(b)
+    else
+       ierr = ERR_FEW_ARGUMENTS
+       return
+    endif
+
+    js0 = index(arg, rename_sep)
+    jran = -1
+    if (js0.gt.0) then
+       ! first /
+       js0 = js0 + lsep
+       js1 = index(arg(js0:), rename_sep)
+       if (js1.gt.0) then
+          ! second /
+          jran = js0 - 1 + js1 + lsep
+          jrep = jran - lsep
+          if (jran.le.larg) then
+             if (arg(jran:jran+lsep-1).eq.rename_sep) then
+                jran = jran + lsep
+             else
+                jrep = jrep - lsep
+             endif
+          endif
+       endif
+    else
+       js0 = 1
+    endif
+    if (no_range) then
+       if (jran.lt.0) jrep = larg
+       return
+    endif
+
+    if (jran.lt.0) then
+       if (index(('0123456789' // range_sep), arg(js0:js0)).eq.0) then
+          jran = larg + 1
+          jrep = larg
+       else
+          jran = js0
+          jrep = jran - lsep - lsep
+       endif
+    endif
+
+    rpos(1) = system_index_bgn(null_range)
+    rpos(2) = system_index_end(null_range)
+    s = -1
+    call split_list(nc, rpos, arg(jran:larg), range_sep, 2, rdef(:))
+    if (nc.lt.0) then
+       ierr = nc
+       call message(ierr, 'cannot parse range: ' // trim(arg(jran:larg)))
+    else if (nc.eq.0) then
+       b = system_index_bgn(rpos(1))
+       e = system_index_end(rpos(2))
+    else if (nc.eq.1) then
+       if (flag.eq.shape_size) then
+          ! force null coordinate if size==0
+          b = 0
+          e = rpos(1)
+          s = condop(rpos(1).eq.0, 0, 1)
+       else
+          b = system_index_bgn(rpos(1))
+          e = b + 1
+          s = 1
+       endif
+    else if (nc.eq.2) then
+       b = system_index_bgn(rpos(1))
+       e = system_index_end(rpos(2))
+       s = 1
+       if (e.ne.null_range .and. e.le.b) s = 0
+    else if (nc.gt.2) then
+       ierr = ERR_INVALID_PARAMETER
+       call message(ierr, 'fail to extract range ' // trim(arg(jran:larg)))
+    endif
+    ! write(*, *) jrep, jran, '{' // arg(1:jrep) // '}{' // arg(jran:larg) // '} ', b, e, s
+  end subroutine decompose_coordinate_mod
+
+!!!_   . parse_format_shape
+  subroutine parse_format_shape &
+       & (nco, cname, irange, mco, fmt)
+    use TOUZA_Std,only: parse_number, find_next_sep
+    implicit none
+    integer,         intent(out) :: nco
+    character(len=*),intent(out) :: cname(0:*)
+    integer,         intent(out) :: irange(2, 0:*)
+    integer,         intent(in)  :: mco
+    character(len=*),intent(in)  :: fmt
+    character(len=*),parameter :: csep = item_sep
+    character(len=*),parameter :: rsep = range_sep
+    integer jp, je, jr
+    integer lf
+    integer jerr
+    integer b, e, s
+
+    jerr = 0
+    lf = len_trim(fmt)
+    nco = 0
+    jp = 0
+    do
+       if (jp.ge.lf) exit
+       je = find_next_sep(fmt, csep, jp)
+       if (jerr.eq.0) call decompose_coordinate_mod(jerr, jr, b, e, s, fmt(jp+1:je), shape_size)
+       if (jerr.eq.0) then
+          if (s.le.0) then
+             irange(1:2, nco) = (/0, 0/)
+          else
+             irange(1:2, nco) = (/b, e/)
+          endif
+          cname(nco) = fmt(jp+1:jp+jr)
+       endif
+       if (irange(2,nco).gt.0) irange(1,nco) = irange(1,nco) + 1
+       nco = nco + 1
+       jp = je + len(csep)
+    enddo
+    if (jerr.eq.0) then
+       if (nco.gt.mco) then
+          nco = ERR_INVALID_PARAMETER
+          call message(nco, 'too many coordinates')
+       endif
+    endif
+  end subroutine parse_format_shape
+
 !!!_   . get_logical_shape
   subroutine get_logical_shape &
        & (ierr, cname, ctype, cpidx, lcp, pcp, mco)
