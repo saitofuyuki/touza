@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz CH(swiss) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/04/09 20:02:49 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/06/19 15:48:51 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -22,7 +22,7 @@
 module chak_file
 !!!_ + Declaration
 !!!_  - modules
-  use chak_lib,lib_init=>init
+  use chak_lib,lib_init=>init,lib_finalize=>finalize
   implicit none
   public
 !!!_  - parameters
@@ -115,14 +115,17 @@ module chak_file
      integer                :: hflag = hflag_unset ! header parser flag
      type(rgroup_t),pointer :: rgrp(:) => NULL()
      integer                :: bigg
+     integer                :: opr       ! fake entry as operator
   end type file_t
 !!!_ + Procedures
 contains
 !!!_  - init
   subroutine init(ierr)
+    use TOUZA_Std_env,only: init_file_bodr
     implicit none
     integer,intent(out) :: ierr
     ierr = 0
+    call init_file_bodr(ierr)
   end subroutine init
 
 !!!_  - reset_file
@@ -149,6 +152,7 @@ contains
     file%mode  = choice(mode_unset, mode)
     file%hflag = choice(hflag_unset, flag)
     file%bigg  = choice(bigg_on, bigg)
+    file%opr = -1
     ! file%bh = -1
 
     if (present(name)) then
@@ -316,7 +320,7 @@ contains
     character(len=*),intent(in)    :: arg
     character(len=litem*4) :: abuf
 
-    character(len=*),parameter :: asep = ','
+    character(len=*),parameter :: asep = item_sep
     character(len=*),parameter :: bsep = ':'
     integer jp
 
@@ -1385,24 +1389,32 @@ end subroutine cue_read_file
        if (irange(2, jc).le.0) then
           lpp(jc)%bgn = irange(1, jc)
           lpp(jc)%end = irange(2, jc)
-          lpp(jc)%stp = 0
+          lpp(jc)%flg = loop_null
        else
           lpp(jc)%bgn = irange(1, jc) - 1
           lpp(jc)%end = irange(2, jc)
-          lpp(jc)%stp = 1
+          lpp(jc)%flg = loop_normal
        endif
        if (IAND(hf, hflag_nulld).eq.0) then
           if (lpp(jc)%name.eq.' ' &
                .and. (lpp(jc)%end - lpp(jc)%bgn).eq.1) then
-             lpp(jc)%stp = 0
+             lpp(jc)%flg = loop_null
           endif
+       endif
+       lpp(jc)%ofs = 0
+       if (lpp(jc)%name.eq.' ' .and. lpp(jc)%flg.le.loop_null) then
+          lpp(jc)%cyc = -1
+       else
+          lpp(jc)%cyc = 0
        endif
     enddo
     do jc = mcoor, lcoor - 1
        lpp(jc)%name = ' '
        lpp(jc)%bgn = 0
        lpp(jc)%end = 0
-       lpp(jc)%stp = -1
+       lpp(jc)%flg = loop_unset
+       lpp(jc)%ofs = 0
+       lpp(jc)%cyc = -1
     enddo
   end subroutine get_header_lprops
 
@@ -1440,7 +1452,7 @@ end subroutine cue_read_file
              if (irange(1).le.0) irange(1) = 1
              irange(2) = irange(1)
           endif
-       else if (lpp(jc)%stp.eq.0) then
+       else if (lpp(jc)%flg.eq.loop_null .or. lpp(jc)%flg.eq.loop_reduce) then
           ! if null coordinate enabled
           if (irange(1).eq.irange(2) .or. irange(1).eq.irange(2) - 1) then
              irange(:) = 0
@@ -1449,7 +1461,7 @@ end subroutine cue_read_file
        if (ierr.eq.0) call put_header_cprop(ierr, head, lpp(jc)%name, irange, 1+jc)
     enddo
     do jc = mcoor, lcoor - 1
-       if (lpp(jc)%stp.ge.0) then
+       if (lpp(jc)%flg.ge.loop_null) then
           ierr = ERR_PANIC
           call message(ierr, 'reach coordinate limits')
        endif

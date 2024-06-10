@@ -1,7 +1,7 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2023/04/17 09:47:01 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/13 22:03:43 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2023
@@ -44,6 +44,8 @@ module TOUZA_Std_log
   integer,save :: lev_verbose = STD_MSG_LEVEL
   integer,save :: err_default = ERR_NO_INIT - ERR_MASK_STD_LOG
   integer,save :: default_unit = unit_star
+
+  logical,save :: to_flush = .TRUE.
 !!!_  - interfaces
   interface msg
      module procedure msg_is
@@ -106,7 +108,7 @@ module TOUZA_Std_log
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, u, levv, mode)
+  subroutine init(ierr, u, levv, mode, bflush)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_init=>init, choice
     use TOUZA_Std_prc,only: prc_init=>init
@@ -114,6 +116,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u             ! global log unit (untouch if unit_global)
     integer,intent(in),optional :: levv, mode
+    logical,intent(in),optional :: bflush        ! flush (default: T)
     integer md, lv, lmd
     integer utmp
 
@@ -135,6 +138,7 @@ contains
           if (ierr.eq.0) call prc_init(ierr, default_unit, levv=lv, mode=lmd)
           if (ierr.eq.0) call utl_init(ierr, default_unit, levv=lv, mode=lmd)
        endif
+       to_flush = choice(to_flush, bflush)
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
@@ -657,6 +661,7 @@ contains
     character(len=*),intent(in)          :: txt
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
+    integer jerr
     integer ut
     ut = choice(unit_global, u)
     if (ut.eq.unit_global) ut = default_unit
@@ -665,22 +670,29 @@ contains
     if (present(tag)) then
        if (tag.eq.' ') then
           if      (ut.eq.unit_star) then
-             write(*,   102) trim(txt)
+             write(*,   102, IOSTAT=jerr) trim(txt)
           else if (ut.ge.0)  then
-             write(ut,  102) trim(txt)
+             write(ut,  102, IOSTAT=jerr) trim(txt)
           endif
        else
           if      (ut.eq.unit_star) then
-             write(*,   101) trim(tag), trim(txt)
+             write(*,   101, IOSTAT=jerr) trim(tag), trim(txt)
           else if (ut.ge.0)  then
-             write(ut,  101) trim(tag), trim(txt)
+             write(ut,  101, IOSTAT=jerr) trim(tag), trim(txt)
           endif
        endif
     else
        if      (ut.eq.unit_star) then
-          write(*,   102) trim(txt)
+          write(*,   102, IOSTAT=jerr) trim(txt)
        else if (ut.ge.0)  then
-          write(ut,  102) trim(txt)
+          write(ut,  102, IOSTAT=jerr) trim(txt)
+       endif
+    endif
+    if (ut.ge.0) then
+       if (to_flush) then
+#if HAVE_FORTRAN_FLUSH_UNIT
+          flush(unit=ut, IOSTAT=jerr)
+#endif
        endif
     endif
     return
@@ -899,6 +911,12 @@ program test_std_log
   call diag(ierr)
   call msg('discarded',  'SKIP', -999)
   call msg('to unit 10', '10',   10)
+  call msg('(''with format (s) '', A)')
+  call msg('(''with format (s) '', A)',                           'tag')
+  call msg('(''with format (s) '', A)',     'abc',                'tag')
+  call msg('(''with format (a) '', 3A3)',   (/'a ', 'b ', 'cd'/), 'tag')
+  call msg('(''with format (s) '', I0)',    354, 'tag')
+  call msg('(''with format (a) '', 3I3.2)', (/4, 9, 16/), ' ')
 
   call test_gen_tag()
   call test_gen_tag('P')

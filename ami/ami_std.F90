@@ -1,7 +1,7 @@
 !!!_! ami_std.F90 - TOUZA/Ami bridge to Std
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2023/04/12 10:03:45 fuyuki ami_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/23 08:27:55 fuyuki ami_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -18,10 +18,10 @@
 module TOUZA_Ami_std
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Std_prc,only: KDBL
+  use TOUZA_Std_prc,only: KDBL,         KFLT
   use TOUZA_Std_utl,only: choice,       choice_a,     set_if_present
   use TOUZA_Std_utl,only: control_deep, control_mode, is_first_force
-  use TOUZA_Std_utl,only: find_first
+  use TOUZA_Std_utl,only: find_first,   inrange
   use TOUZA_Std_log,only: is_msglev
   use TOUZA_Std_log,only: is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
   use TOUZA_Std_log,only: is_msglev_severe, is_msglev_fatal
@@ -60,10 +60,10 @@ module TOUZA_Ami_std
   public init, diag, finalize
   public msg
 !!!_   . TOUZA_Std
-  public KDBL
+  public KDBL,         KFLT
   public choice,       choice_a,     set_if_present
   public control_mode, control_deep, is_first_force
-  public find_first
+  public find_first,   inrange
   public is_msglev
   public is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
   public is_msglev_severe, is_msglev_fatal
