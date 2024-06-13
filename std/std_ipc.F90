@@ -1,7 +1,7 @@
 !!!_! std_ipc.F90 - touza/std intrinsic procedures compatible gallery
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 25 2023
-#define TIME_STAMP 'Time-stamp: <2023/03/25 10:02:26 fuyuki std_ipc.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/05/08 21:50:14 fuyuki std_ipc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -15,6 +15,9 @@
 #  include "touza_config.h"
 #endif
 #include "touza_std.h"
+#ifndef    OPT_IPC_HYPOT_ITER
+#  define  OPT_IPC_HYPOT_ITER 3
+#endif
 !!!_ + debug
 #ifndef   TEST_STD_IPC
 #  define TEST_STD_IPC 0
@@ -30,6 +33,7 @@ module TOUZA_Std_ipc
 # define __MDL__ 'ipc'
 # define _ERROR(E) (E - ERR_MASK_STD_IPC)
 !!!_  - parameters
+  integer,parameter :: iter_hypot = OPT_IPC_HYPOT_ITER
 !!!_  - public constants
 !!!_  - static
   integer,save :: init_mode = 0
@@ -47,9 +51,15 @@ module TOUZA_Std_ipc
   interface exam_IBITS
      module procedure exam_IBITS_i, exam_IBITS_l
   end interface exam_IBITS
+
+  interface ipc_HYPOT
+     module procedure ipc_HYPOT_d, ipc_HYPOT_f
+  end interface ipc_HYPOT
+
 !!!_  - public
   public init, diag, finalize
   public ipc_IBITS,  exam_IBITS
+  public ipc_HYPOT
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -308,23 +318,90 @@ contains
     endif
     if (score.gt.0) ierr = _ERROR(ERR_PANIC)
   end subroutine exam_IBITS_l
+!!!_ + HYPOT - Euclidean distance
+!!!_  - notes about HYPOT
+  ! Moler and Morrison algorithm
+!!!_  - ipc_HYPOT
+  ELEMENTAL &
+  real(kind=KTGT) function ipc_HYPOT_f(X, Y) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    real(kind=KTGT),intent(in) :: X, Y
+    real(kind=KTGT) :: a, b
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
+    integer j
+    if (x.eq.ZERO) then
+       r = abs(y)
+       return
+    endif
+    if (y.eq.ZERO) then
+       r = abs(x)
+       return
+    endif
+    a = max(abs(x), abs(y))
+    b = min(abs(x), abs(y))
+    do j = 1, iter_hypot
+       r = (b / a) ** 2
+       r = r / (4.0_KTGT + r)
+       a = a + 2.0_KTGT * (a * r)
+       b = b * r
+    enddo
+    r = a
+    return
+  end function ipc_HYPOT_f
+  ELEMENTAL &
+  real(kind=KTGT) function ipc_HYPOT_d(X, Y) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: X, Y
+    real(kind=KTGT) :: a, b
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
+    integer j
+    if (x.eq.ZERO) then
+       r = abs(y)
+       return
+    endif
+    if (y.eq.ZERO) then
+       r = abs(x)
+       return
+    endif
+    a = max(abs(x), abs(y))
+    b = min(abs(x), abs(y))
+    do j = 1, iter_hypot
+       r = (b / a) ** 2
+       r = r / (4.0_KTGT + r)
+       a = a + 2.0_KTGT * (a * r)
+       b = b * r
+    enddo
+    r = a
+    return
+  end function ipc_HYPOT_d
 !!!_ + end TOUZA_Std_ipc
 end module TOUZA_Std_ipc
 
 !!!_@ test_std_ipc - test program
 #if TEST_STD_IPC
 #  if TEST_STD_IPC == 1
-#    define TEST_IPC_KIND KI32
+#    define TEST_IPC_IKIND KI32
+#    define TEST_IPC_RKIND KFLT
 #  else
-#    define TEST_IPC_KIND KI64
+#    define TEST_IPC_IKIND KI64
+#    define TEST_IPC_RKIND KDBL
 #  endif
 program test_std_ipc
   use TOUZA_Std_prc,only: KI32, KI64
+  use TOUZA_Std_prc,only: KFLT, KDBL
   use TOUZA_Std_bld,only: bld_init=>init, bld_diag=>diag, bld_finalize=>finalize
   use TOUZA_Std_ipc
   implicit none
-  integer,parameter :: KTGT = TEST_IPC_KIND
+  integer,parameter :: KITGT = TEST_IPC_IKIND
+  integer,parameter :: KRTGT = TEST_IPC_RKIND
+
+  real(kind=KRTGT),parameter :: H = HUGE(0.0_KRTGT)
+  real(kind=KRTGT) :: F
+
   integer ierr
+
   ierr = 0
   call init(ierr)
   if (ierr.eq.0) call diag(ierr)
@@ -332,10 +409,37 @@ program test_std_ipc
   if (ierr.eq.0) call bld_init(ierr)
   if (ierr.eq.0) call bld_diag(ierr, levv=+9)
   if (ierr.eq.0) call bld_finalize(ierr)
-  if (ierr.eq.0) call exam_IBITS(ierr, 0_KTGT, levv=0)
+
+  if (ierr.eq.0) call exam_IBITS(ierr, 0_KITGT, levv=0)
+
 101 format('FINAL = ', I0)
   write(*, 101) ierr
+
+  ierr = 0
+  call test_hypot(ierr, 3.0_KRTGT, 4.0_KRTGT)
+  F = (H / 8.0_KRTGT)
+  call test_hypot(ierr, 3.0_KRTGT * F, 4.0_KRTGT * F)
+
+  write(*, 101) ierr
   stop
+contains
+  subroutine test_hypot(ierr, x, y)
+    integer,intent(out) :: ierr
+    real(kind=KRTGT),intent(in) :: x, y
+
+    real(kind=KRTGT) :: zt, zr, zi
+
+    ierr = 0
+    zt = ipc_HYPOT(x, y)
+    zi = HYPOT(x, y)
+    zr = sqrt(x**2 + y**2)
+
+101 format('hypot:', A, 1x, 2E16.8, 1x E24.16)
+    write(*, 101) 'ipc',       x, y, zt
+    write(*, 101) 'intrinsic', x, y, zi
+    write(*, 101) 'raw',       x, y, zr
+
+  end subroutine test_hypot
 end program test_std_ipc
 
 #endif /* TEST_STD_IPC */

@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/30 10:39:40 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/03/30 22:40:04 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -55,6 +55,7 @@ module TOUZA_Nio_record
   integer,parameter,public :: GFMT_ERR  = -1
   integer,parameter,public :: GFMT_MASK = 2048  /* mask bit */
   integer,parameter,public :: GFMT_LPAD = 4096  /* list-padding bit */
+  integer,parameter,public :: GFMT_SUBV = GFMT_LPAD + 1024  /* list-padding subscript vector */
 
   integer,parameter,public :: GFMT_UR8  = 1
   integer,parameter,public :: GFMT_UR4  = 2
@@ -85,14 +86,15 @@ module TOUZA_Nio_record
   integer,parameter,public :: GFMT_MI4  = GFMT_UI4 + GFMT_MASK
   integer,parameter,public :: GFMT_MI8  = GFMT_UI8 + GFMT_MASK
 
-  integer,parameter,public :: GFMT_PI1  = GFMT_UI1 + GFMT_LPAD
-  integer,parameter,public :: GFMT_PI4  = GFMT_UI4 + GFMT_LPAD
-  integer,parameter,public :: GFMT_PI8  = GFMT_UI8 + GFMT_LPAD
+  integer,parameter,public :: GFMT_PI1   = GFMT_UI1 + GFMT_LPAD
+  integer,parameter,public :: GFMT_PI4   = GFMT_UI4 + GFMT_LPAD
+  integer,parameter,public :: GFMT_PI8   = GFMT_UI8 + GFMT_LPAD
+  integer,parameter,public :: GFMT_PI4SV = GFMT_UI4 + GFMT_SUBV
 
-  integer,parameter,public :: GFMT_URT     = 256
-  integer,parameter,public :: GFMT_MRT     = GFMT_URT    + GFMT_MASK
+  integer,parameter,public :: GFMT_URT  = 256
+  integer,parameter,public :: GFMT_MRT  = GFMT_URT + GFMT_MASK
 
-  integer,parameter,public :: GFMT_END     = GFMT_LPAD * 2
+  integer,parameter,public :: GFMT_END  = GFMT_LPAD * 2
 !!!_    * URT details
   integer,parameter,public :: PROP_DEFAULT = (- HUGE(0)) - 1
 
@@ -187,7 +189,7 @@ module TOUZA_Nio_record
   integer,           allocatable,save :: wdsubv(:)  ! subscript vector (destination)
   integer,           allocatable,save :: wssubv(:)  ! subscript vector (source)
 
-  integer,parameter :: lwtag = 16
+  integer,parameter :: lwtag = 32
   character(len=lwtag),save :: wtag_i = ' ', wtag_f  = ' ', wtag_d = ' '
   character(len=lwtag),save :: wtag_p = ' ', wtag_m  = ' ', wtag_s = ' '
 !!!_  - interfaces
@@ -374,6 +376,10 @@ module TOUZA_Nio_record
   interface restore_pi4_packed
      module procedure restore_pi4_packed_d, restore_pi4_packed_f, restore_pi4_packed_i
   end interface restore_pi4_packed
+
+  interface restore_ptn_plain_subv
+     module procedure restore_ptn_plain_subv_i, restore_ptn_plain_subv_f, restore_ptn_plain_subv_d
+  end interface restore_ptn_plain_subv
 
   interface normalize_xry
      module procedure normalize_xry_d
@@ -1394,6 +1400,9 @@ contains
        case (GFMT_MRT)
           call get_data_mrt &
                & (ierr, d, nd, u, krect, vmiss, kopts)
+       case (GFMT_PI4SV)
+          call restore_ptn_plain_subv &
+               & (ierr, d, ld, u, krect, vmiss, kfmt, kaxs)
        case (GFMT_PR8)
           mk = max(1, kaxs(3))
           call get_data_pr8 &
@@ -1467,6 +1476,9 @@ contains
        case (GFMT_MRT)
           call get_data_mrt &
                & (ierr, d, nd, u, krect, vmiss, kopts)
+       case (GFMT_PI4SV)
+          call restore_ptn_plain_subv &
+               & (ierr, d, ld, u, krect, vmiss, kfmt, kaxs)
        case (GFMT_PR8)
           mk = max(1, kaxs(3))
           call get_data_pr8 &
@@ -1542,6 +1554,9 @@ contains
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
           ! call get_data_mrt &
           !      & (ierr, d, nd, u, krect, vmiss, kopts)
+       case (GFMT_PI4SV)
+          call restore_ptn_plain_subv &
+               & (ierr, d, ld, u, krect, vmiss, kfmt, kaxs)
        case (GFMT_PR8)
           mk = max(1, kaxs(3))
           call get_data_pr8 &
@@ -1795,7 +1810,7 @@ contains
     mw = product(max(1, kaxs(1:nr)))
     call bes_triplet(ierr, bes, kaxs, start, count)
     if (ierr.eq.0) then
-       nd = product(bes(2, 1:nr) - bes(1, 1:nr))
+       nd = count_bes(bes, nr)
        if (IAND(kfmt, GFMT_LPAD).eq.0) then
           if (ld.ge.0.and.nd.gt.ld) then
              ierr = _ERROR(ERR_SIZE_MISMATCH)
@@ -1878,27 +1893,22 @@ contains
        case (GFMT_MRT)
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
           mk = max(1, kaxs(3))
-       case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
-          if (is_packed_subv(head)) then
-             call restore_ptn_packed_subv &
-                     & (ierr, &
-                     &  subv, ldata, ends, u, krect, kfmt, kaxs, citer)
-          else
-             select case(kfmt)
-             case (GFMT_PR8)
-                call restore_pr8_packed &
-                     & (ierr, &
-                     &  d,    ldata, ends, u, krect, kaxs, citer, check)
-             case (GFMT_PR4)
-                call restore_pr4_packed &
-                     & (ierr, &
-                     &  d,    ldata, ends, u, krect, kaxs, citer, check)
-             case (GFMT_PI4)
-                call restore_pi4_packed &
-                     & (ierr, &
-                     &  d,    ldata, ends, u, krect, kaxs, citer, check)
-             end select
-          endif
+       case (GFMT_PI4SV)
+          call restore_ptn_packed_subv &
+               & (ierr, &
+               &  subv, ldata, ends, u, krect, kfmt, kaxs, citer)
+       case (GFMT_PR8)
+          call restore_pr8_packed &
+               & (ierr, &
+               &  d,    ldata, ends, u, krect, kaxs, citer, check)
+       case (GFMT_PR4)
+          call restore_pr4_packed &
+               & (ierr, &
+               &  d,    ldata, ends, u, krect, kaxs, citer, check)
+       case (GFMT_PI4)
+          call restore_pi4_packed &
+               & (ierr, &
+               &  d,    ldata, ends, u, krect, kaxs, citer, check)
        case default
           ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
@@ -1973,27 +1983,22 @@ contains
        case (GFMT_MRT)
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
           mk = max(1, kaxs(3))
-       case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
-          if (is_packed_subv(head)) then
-             call restore_ptn_packed_subv &
-                     & (ierr, &
-                     &  subv, ldata, ends, u, krect, kfmt, kaxs, citer)
-          else
-             select case(kfmt)
-             case (GFMT_PR8)
-                call restore_pr8_packed &
-                     & (ierr, &
-                     &  d,    ldata, ends, u, krect, kaxs, citer, check)
-             case (GFMT_PR4)
-                call restore_pr4_packed &
-                     & (ierr, &
-                     &  d,    ldata, ends, u, krect, kaxs, citer, check)
-             case (GFMT_PI4)
-                call restore_pi4_packed &
-                     & (ierr, &
-                     &  d,    ldata, ends, u, krect, kaxs, citer, check)
-             end select
-          endif
+       case (GFMT_PI4SV)
+          call restore_ptn_packed_subv &
+               & (ierr, &
+               &  subv, ldata, ends, u, krect, kfmt, kaxs, citer)
+       case (GFMT_PR8)
+          call restore_pr8_packed &
+               & (ierr, &
+               &  d,    ldata, ends, u, krect, kaxs, citer, check)
+       case (GFMT_PR4)
+          call restore_pr4_packed &
+               & (ierr, &
+               &  d,    ldata, ends, u, krect, kaxs, citer, check)
+       case (GFMT_PI4)
+          call restore_pi4_packed &
+               & (ierr, &
+               &  d,    ldata, ends, u, krect, kaxs, citer, check)
        case default
           ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
@@ -2068,27 +2073,22 @@ contains
        case (GFMT_MRT)
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
           mk = max(1, kaxs(3))
-       case (GFMT_PR8,GFMT_PR4,GFMT_PI4)
-          if (is_packed_subv(head)) then
-             call restore_ptn_packed_subv &
-                     & (ierr, &
-                     &  subv, ldata, ends, u, krect, kfmt, kaxs, citer)
-          else
-             select case(kfmt)
-             case (GFMT_PR8)
-                call restore_pr8_packed &
-                     & (ierr, &
-                     &  d,    ldata, ends, u, krect, kaxs, citer, check)
-             case (GFMT_PR4)
-                call restore_pr4_packed &
-                     & (ierr, &
-                     &  d,    ldata, ends, u, krect, kaxs, citer, check)
-             case (GFMT_PI4)
-                call restore_pi4_packed &
-                     & (ierr, &
-                     &  d,    ldata, ends, u, krect, kaxs, citer, check)
-             end select
-          endif
+       case (GFMT_PI4SV)
+          call restore_ptn_packed_subv &
+               & (ierr, &
+               &  subv, ldata, ends, u, krect, kfmt, kaxs, citer)
+       case (GFMT_PR8)
+          call restore_pr8_packed &
+               & (ierr, &
+               &  d,    ldata, ends, u, krect, kaxs, citer, check)
+       case (GFMT_PR4)
+          call restore_pr4_packed &
+               & (ierr, &
+               &  d,    ldata, ends, u, krect, kaxs, citer, check)
+       case (GFMT_PI4)
+          call restore_pi4_packed &
+               & (ierr, &
+               &  d,    ldata, ends, u, krect, kaxs, citer, check)
        case default
           ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
@@ -2165,7 +2165,7 @@ contains
        nk = max(1, kaxs(3))
        call put_data_pr8 &
             & (ierr, d, n, u, krect, nk, kopts)
-    case (GFMT_PI4)
+    case (GFMT_PI4, GFMT_PI4SV)
        nk = max(1, kaxs(3))
        call put_data_pi4 &
             & (ierr, d, n, u, krect, nk, kopts)
@@ -2243,7 +2243,7 @@ contains
        nk = max(1, kaxs(3))
        call put_data_pr8 &
             & (ierr, d, n, u, krect, nk, kopts)
-    case (GFMT_PI4)
+    case (GFMT_PI4, GFMT_PI4SV)
        nk = max(1, kaxs(3))
        call put_data_pi4 &
             & (ierr, d, n, u, krect, nk, kopts)
@@ -2315,7 +2315,7 @@ contains
        nk = max(1, kaxs(3))
        call put_data_pr8 &
             & (ierr, d, n, u, krect, nk, kopts)
-    case (GFMT_PI4)
+    case (GFMT_PI4, GFMT_PI4SV)
        nk = max(1, kaxs(3))
        call put_data_pi4 &
             & (ierr, d, n, u, krect, nk, kopts)
@@ -2511,7 +2511,7 @@ contains
        !! to do: dummy separator
        nrec = 1
        call nio_skip_prec(ierr, u, nrec, krect)
-    case (GFMT_PI4, GFMT_PR4, GFMT_PR8)
+    case (GFMT_PI4, GFMT_PR4, GFMT_PR8, GFMT_PI4SV)
        !! to do: dummy separator
        nrec = 1
        call nio_skip_prec(ierr, u, nrec, krect)
@@ -2543,7 +2543,7 @@ contains
           n = 1
        case (GFMT_MR4, GFMT_MR8, GFMT_MI4)
           n = 3
-       case (GFMT_PR4, GFMT_PR8, GFMT_PI4)
+       case (GFMT_PI4, GFMT_PR4, GFMT_PR8, GFMT_PI4SV)
           n = 1
        case (GFMT_URC, GFMT_URC2)
           n = parse_header_size(head, 3)
@@ -4079,7 +4079,7 @@ contains
        nh = 0
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4177,7 +4177,7 @@ contains
        nh = 0
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4275,7 +4275,7 @@ contains
        nh = 0
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4656,7 +4656,7 @@ contains
     if (present(bes)) then
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4690,7 +4690,7 @@ contains
              call pack_restore_dunp(ierr, idec, icom, nmd, nbits, kpackb, dunp, nunp)
           endif
           if (ierr.eq.0) then
-             nh = product(bes(2, 1:2) - bes(1, 1:2))
+             nh = count_bes(bes, 2)
              jdb = nh * (jk - bes(1, cz))
              jprv = 0
              do jc = 0, nidx - 1
@@ -4799,7 +4799,7 @@ contains
     if (present(bes)) then
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4833,7 +4833,7 @@ contains
              call pack_restore_dunp(ierr, idec, icom, nmd, nbits, kpackb, dunp, nunp)
           endif
           if (ierr.eq.0) then
-             nh = product(bes(2, 1:2) - bes(1, 1:2))
+             nh = count_bes(bes, 2)
              jdb = nh * (jk - bes(1, cz))
              jprv = 0
              do jc = 0, nidx - 1
@@ -4942,7 +4942,7 @@ contains
     if (present(bes)) then
        if (.not.present(nr)) ierr = _ERROR(ERR_INVALID_ITEM)
        if (ierr.eq.0) then
-          if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:nr)))) then
+          if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
           endif
@@ -4976,7 +4976,7 @@ contains
              call pack_restore_dunp(ierr, idec, icom, nmd, nbits, kpackb, dunp, nunp)
           endif
           if (ierr.eq.0) then
-             nh = product(bes(2, 1:2) - bes(1, 1:2))
+             nh = count_bes(bes, 2)
              jdb = nh * (jk - bes(1, cz))
              jprv = 0
              do jc = 0, nidx - 1
@@ -5228,7 +5228,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5299,7 +5299,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5370,7 +5370,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5443,7 +5443,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5514,7 +5514,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5585,7 +5585,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5658,7 +5658,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5729,7 +5729,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -5800,7 +5800,7 @@ contains
        if (.not.present(nr)) ierr = _ERROR(ERR_FEW_ARGUMENTS)
        if (ierr.eq.0) then
           ! ndata: maximum possible
-          ndata = product(max(1, bes(2, 1:nr) - bes(1, 1:nr)))
+          ndata = count_bes(bes, nr)
           if (ldata.ge.0.and.ldata.lt.ndata) then
              ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
              return
@@ -7930,7 +7930,7 @@ contains
     if (mfk.eq.mo) then
        if (ierr.eq.0) then
           select case (kfmt)
-          case (GFMT_PI4)
+          case (GFMT_PI4, GFMT_PI4SV)
              call restore_pi4_packed &
                   & (ierr, subv, ldata, ends, u, krect, kaxs, citer, packed_read)
           case (GFMT_PR4)
@@ -7948,7 +7948,7 @@ contains
        !! [CAUTION] wssubv confliction never occurs when packed_read
        if (ierr.eq.0) then
           select case (kfmt)
-          case (GFMT_PI4)
+          case (GFMT_PI4, GFMT_PI4SV)
              call restore_pi4_packed &
                   & (ierr, subv, ldata, wssubv, u, krect, kaxs, citer, packed_read)
           case (GFMT_PR4)
@@ -7967,6 +7967,154 @@ contains
        if (ierr.eq.0) call alloc_wsubv(ierr, -1, 'res:ptn-subv')
     endif
   end subroutine restore_ptn_packed_subv
+
+!!!_  - restore_ptn_plain_subv_i - restore P[IR]n subscript vector to plain
+  subroutine restore_ptn_plain_subv_i &
+       & (ierr, &
+       &  d, ldata, u, krect, vmiss, kfmt, kaxs)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: d(0:*)
+    integer,         intent(in)  :: ldata
+    integer,         intent(in)  :: u
+    integer,         intent(in)  :: krect
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: kaxs(*)
+    integer vmt
+    integer ci
+    integer jfi, jfk
+    integer nd
+    integer mfh, mfk
+    integer jvb, jve, jv
+    integer jd
+#define __PROC__ 'restore_ptn_plain_subv_i'
+
+    ierr = 0
+    vmt = int(vmiss)
+    ci = packed_ends_coordinate
+    mfk = max(1, product(max(1, kaxs(packed_ends_coordinate:laxs))))
+    mfh = max(1, product(max(1, kaxs(1:packed_ends_coordinate-1))))
+    if (ierr.eq.0) call alloc_wsubv(ierr, mfk, __PROC__)
+    if (ierr.eq.0) then
+       call review_ptn_core(ierr, nd, mfk, u, krect, ends=wssubv(0:mfk-1), flag=rev_pos_leave)
+    endif
+    if (ierr.eq.0) call alloc_worki(ierr, nd,  __PROC__)
+    if (ierr.eq.0) call get_data_irecord(ierr, worki(0:nd-1), nd, u, krect)
+    if (ierr.eq.0) then
+       d(0:ldata-1) = vmt
+       do jfk = 0, mfk - 1
+          jvb = wssubv(jfk)
+          jve = wssubv(jfk+1)
+          do jv = jvb, jve - 1
+             jd = mfh * jfk + worki(jv)
+             d(jd) = jv
+          enddo
+       enddo
+    endif
+    if (ierr.eq.0) call alloc_worki(ierr, -1,  __PROC__)
+    if (ierr.eq.0) call alloc_wsubv(ierr, -1,  __PROC__)
+#undef __PROC__
+  end subroutine restore_ptn_plain_subv_i
+  subroutine restore_ptn_plain_subv_d &
+       & (ierr, &
+       &  d, ldata, u, krect, vmiss, kfmt, kaxs)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KDBL
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(out) :: d(*)
+    integer,         intent(in)  :: ldata
+    integer,         intent(in)  :: u
+    integer,         intent(in)  :: krect
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: kaxs(*)
+    integer vmt
+    integer ci
+    integer jfi, jfk
+    integer nd
+    integer mfh, mfk
+    integer jvb, jve, jv
+    integer jd
+#define __PROC__ 'restore_ptn_plain_subv_d'
+
+    ierr = 0
+    vmt = int(vmiss)
+    ci = packed_ends_coordinate
+    mfk = max(1, product(max(1, kaxs(packed_ends_coordinate:laxs))))
+    mfh = max(1, product(max(1, kaxs(1:packed_ends_coordinate-1))))
+    if (ierr.eq.0) call alloc_wsubv(ierr, mfk, __PROC__)
+    if (ierr.eq.0) then
+       call review_ptn_core(ierr, nd, mfk, u, krect, ends=wssubv(0:mfk-1), flag=rev_pos_leave)
+    endif
+    if (ierr.eq.0) call alloc_worki(ierr, nd,  __PROC__)
+    if (ierr.eq.0) call get_data_irecord(ierr, worki(0:nd-1), nd, u, krect)
+    if (ierr.eq.0) then
+       d(0:ldata-1) = vmt
+       do jfk = 0, mfk - 1
+          jvb = wssubv(jfk)
+          jve = wssubv(jfk+1)
+          do jv = jvb, jve - 1
+             jd = mfh * jfk + worki(jv)
+             d(jd) = real(jv, kind=KARG)
+          enddo
+       enddo
+    endif
+    if (ierr.eq.0) call alloc_worki(ierr, -1,  __PROC__)
+    if (ierr.eq.0) call alloc_wsubv(ierr, -1,  __PROC__)
+#undef __PROC__
+  end subroutine restore_ptn_plain_subv_d
+  subroutine restore_ptn_plain_subv_f &
+       & (ierr, &
+       &  d, ldata, u, krect, vmiss, kfmt, kaxs)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,parameter :: KARG=KFLT
+    integer,         intent(out) :: ierr
+    real(kind=KARG), intent(out) :: d(*)
+    integer,         intent(in)  :: ldata
+    integer,         intent(in)  :: u
+    integer,         intent(in)  :: krect
+    real(kind=KRMIS),intent(in)  :: vmiss
+    integer,         intent(in)  :: kfmt
+    integer,         intent(in)  :: kaxs(*)
+    integer vmt
+    integer ci
+    integer jfi, jfk
+    integer nd
+    integer mfh, mfk
+    integer jvb, jve, jv
+    integer jd
+#define __PROC__ 'restore_ptn_plain_subv_d'
+
+    ierr = 0
+    vmt = int(vmiss)
+    ci = packed_ends_coordinate
+    mfk = max(1, product(max(1, kaxs(packed_ends_coordinate:laxs))))
+    mfh = max(1, product(max(1, kaxs(1:packed_ends_coordinate-1))))
+    if (ierr.eq.0) call alloc_wsubv(ierr, mfk, __PROC__)
+    if (ierr.eq.0) then
+       call review_ptn_core(ierr, nd, mfk, u, krect, ends=wssubv(0:mfk-1), flag=rev_pos_leave)
+    endif
+    if (ierr.eq.0) call alloc_worki(ierr, nd,  __PROC__)
+    if (ierr.eq.0) call get_data_irecord(ierr, worki(0:nd-1), nd, u, krect)
+    if (ierr.eq.0) then
+       d(0:ldata-1) = vmt
+       do jfk = 0, mfk - 1
+          jvb = wssubv(jfk)
+          jve = wssubv(jfk+1)
+          do jv = jvb, jve - 1
+             jd = mfh * jfk + worki(jv)
+             d(jd) = real(jv, kind=KARG)
+          enddo
+       enddo
+    endif
+    if (ierr.eq.0) call alloc_worki(ierr, -1,  __PROC__)
+    if (ierr.eq.0) call alloc_wsubv(ierr, -1,  __PROC__)
+#undef __PROC__
+  end subroutine restore_ptn_plain_subv_f
 
 !!!_  - restore_pr8_packed_d - restore PR8 data to packed array
   subroutine restore_pr8_packed_d &
@@ -9258,7 +9406,7 @@ contains
 !!!_  & get_data_record_slice - read data block (slice)
   subroutine get_data_record_slice_i &
        & (ierr, &
-       &  d,  nd, u, krect, md, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, nr, sub)
     use TOUZA_Nio_std,only: sus_slice_read_irec
     implicit none
     integer,parameter :: KARG=KI32
@@ -9269,14 +9417,14 @@ contains
     integer,           intent(in)             :: krect
     integer,           intent(in)             :: md        ! size of data record
     integer,           intent(in)             :: bes(3, *)
-    integer,           intent(in)             :: r
+    integer,           intent(in)             :: nr
     logical,           intent(inout),optional :: sub
 
     logical swap, lrec
     integer div
 
     ierr = 0
-    if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:r)))) then
+    if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
        ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
        return
     endif
@@ -9287,13 +9435,13 @@ contains
        ierr = _ERROR(ERR_NOT_IMPLEMENTED)
     else
        div = read_sep_flag(krect)
-       call sus_slice_read_irec(ierr, u, d, bes, r, swap, sub, div, md)
+       call sus_slice_read_irec(ierr, u, d, bes, nr, swap, sub, div, md)
     endif
     return
   end subroutine get_data_record_slice_i
   subroutine get_data_record_slice_f &
        & (ierr, &
-       &  d,  nd, u, krect, md, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, nr, sub)
     use TOUZA_Nio_std,only: sus_slice_read_irec
     implicit none
     integer,parameter :: KARG=KFLT
@@ -9304,14 +9452,14 @@ contains
     integer,        intent(in)             :: krect
     integer,        intent(in)             :: md        ! size of data record
     integer,        intent(in)             :: bes(3, *)
-    integer,        intent(in)             :: r
+    integer,        intent(in)             :: nr
     logical,        intent(inout),optional :: sub
 
     logical swap, lrec
     integer div
 
     ierr = 0
-    if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:r)))) then
+    if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
        ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
        return
     endif
@@ -9322,13 +9470,13 @@ contains
        ierr = _ERROR(ERR_NOT_IMPLEMENTED)
     else
        div = read_sep_flag(krect)
-       call sus_slice_read_irec(ierr, u, d, bes, r, swap, sub, div, md)
+       call sus_slice_read_irec(ierr, u, d, bes, nr, swap, sub, div, md)
     endif
     return
   end subroutine get_data_record_slice_f
   subroutine get_data_record_slice_d &
        & (ierr, &
-       &  d,  nd, u, krect, md, bes, r, sub)
+       &  d,  nd, u, krect, md, bes, nr, sub)
     use TOUZA_Nio_std,only: sus_slice_read_irec
     implicit none
     integer,parameter :: KARG=KDBL
@@ -9339,14 +9487,14 @@ contains
     integer,        intent(in)             :: krect
     integer,        intent(in)             :: md        ! size of data record
     integer,        intent(in)             :: bes(3, *)
-    integer,        intent(in)             :: r
+    integer,        intent(in)             :: nr
     logical,        intent(inout),optional :: sub
 
     logical swap, lrec
     integer div
 
     ierr = 0
-    if (nd.ge.0.and.nd.lt.product(max(1, bes(3,1:r)))) then
+    if (nd.ge.0.and.nd.lt.count_bes(bes, nr)) then
        ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
        return
     endif
@@ -9357,7 +9505,7 @@ contains
        ierr = _ERROR(ERR_NOT_IMPLEMENTED)
     else
        div = read_sep_flag(krect)
-       call sus_slice_read_irec(ierr, u, d, bes, r, swap, sub, div, md)
+       call sus_slice_read_irec(ierr, u, d, bes, nr, swap, sub, div, md)
     endif
     return
   end subroutine get_data_record_slice_d
@@ -10411,7 +10559,11 @@ contains
     case ('M')
        kfmt = GFMT_MASK
     case ('P')
-       kfmt = GFMT_LPAD
+       if (je.gt.len_trim(str)) then
+          kfmt = GFMT_SUBV
+       else
+          kfmt = GFMT_LPAD
+       endif
     case default
        ierr = _ERROR(ERR_UNKNOWN_FORMAT)
     end select
@@ -11589,6 +11741,19 @@ contains
     endif
     return
   end function check_id_format
+
+!!!_  & count_bes()
+  PURE &
+  integer function count_bes(bes, nc) result(n)
+    implicit none
+    integer,intent(in)          :: bes(3, *)
+    integer,intent(in),optional :: nc
+    if (present(nc)) then
+       n = max(1, product(max(1, bes(2, 1:nc) - bes(1, 1:nc))))
+    else
+       n = max(1, product(max(1, bes(2, 1:laxs) - bes(1, 1:laxs))))
+    endif
+  end function count_bes
 
 !!!_  & bes_triplet
   subroutine bes_triplet(ierr, bes, kaxs, start, count)

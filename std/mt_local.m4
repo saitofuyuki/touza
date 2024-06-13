@@ -13,6 +13,8 @@ MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_command_argument], [1], [])
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getarg], [1, T], [
      character T*30])
 MT_FORTRAN_BATCH_CHECK_FUNCTION([command_argument_count], [])
+
+MT_FORTRAN_BATCH_CHECK_FUNCTION([hypot], [0.0, 0.0])
 dnl SX
 MT_FORTRAN_BATCH_CHECK_FUNCTION([iargc], [])
 MT_FORTRAN_BATCH_CHECK_FUNCTION([fseek],  [0,0,0])

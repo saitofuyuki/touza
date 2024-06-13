@@ -14,11 +14,130 @@
   (expected to be in the parent directory) for general instruction of
   *TOUZA* collection.
 
-* Build and installation
-
 * Brief description of *TOUZA/emu* modules
-
+** =TOUZA_Emu_usi= - ~usysio~ emulation
+*** public constants
+*** module procedures
+**** ~init~
+#+begin_src f90
+  subroutine init(ierr, u, levv, mode, stdv, icomm, pos, stdi, stdo)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+    integer,intent(in),optional :: stdv
+    integer,intent(in),optional :: icomm
+    integer,intent(in),optional :: pos
+    logical,intent(in),optional :: stdi, stdo
+#+end_src
+**** ~diag~
+#+begin_src f90
+  subroutine diag(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+#+end_src
+**** ~finalize~
+#+begin_src f90
+  subroutine finalize(ierr, u, levv, mode)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+#+end_src
+**** ~update_color~ - set (MPI-)color index for SYSIN filename generation
+#+begin_src f90
+  subroutine update_color(icol, ncol, icomm)
+    integer,intent(in)          :: icol
+    integer,intent(in),optional :: ncol
+    integer,intent(in),optional :: icomm
+#+end_src
+**** ~update_ranks~ - set (MPI-)rank for SYSOUT filename generation
+#+begin_src f90
+  subroutine update_ranks(ir, nr)
+    integer,intent(in),optional :: ir
+    integer,intent(in),optional :: nr
+#+end_src
+**** ~open_sysin~
+#+begin_src f90
+  subroutine open_sysin(ierr)
+    integer,intent(out) :: ierr
+#+end_src
+**** ~open_sysout~
+#+begin_src f90
+  subroutine open_sysout(ierr)
+    integer,intent(out) :: ierr
+#+end_src
+**** ~get_sysu~
+#+begin_src f90
+  subroutine get_sysu(sysi, syso)
+    integer,intent(out),optional :: sysi
+    integer,intent(out),optional :: syso
+#+end_src
+**** ~is_locked_rewind()~
+#+begin_src f90
+  logical function is_locked_rewind()
+#+end_src
+**** ~rewind_lock~
+#+begin_src f90
+  subroutine rewind_lock(tag, u)
+    character(len=*),intent(in),optional :: tag
+    integer,         intent(in),optional :: u
+#+end_src
+**** ~rewind_unlock~
+#+begin_src f90
+  subroutine rewind_unlock(tag, u)
+    character(len=*),intent(in),optional :: tag
+    integer,         intent(in),optional :: u
+#+end_src
+**** ~show_lock_status~
+#+begin_src f90
+  subroutine show_lock_status(u)
+    integer,intent(in),optional :: u
+#+end_src
+*** legacy compatible interfaces
+**** ~SETCLR~ - =update_color= alternate
+#+begin_src f90
+subroutine SETCLR(MYCOLR)
+  integer,intent(in) :: MYCOLR
+#+end_src
+**** ~SETRNK~ - =update_ranks= alternate
+#+begin_src f90
+subroutine SETRNK(MYRANK)
+  integer,intent(in) :: MYRANK
+#+end_src
+**** ~SETSIZ~ - =update_ranks= alternate
+#+begin_src f90
+subroutine SETSIZ(MYSIZE)
+  integer,intent(in) :: MYSIZE
+#+end_src
+**** ~OPNNML~ - batch call of =open_sysin=, =open_sysout=
+#+begin_src f90
+subroutine OPNNML(IOS)
+  integer,intent(out) :: IOS   !! io status
+#+end_src
+**** ~SETNML~ - set sysin/sysout io-units
+#+begin_src f90
+subroutine SETNML(IFILE, JFILE)
+  integer,intent(in) :: IFILE, JFILE
+#+end_src
+**** ~REWNML~ - get sysin/sysout io-units, rewinding sysin as a side-effects
+#+begin_src f90
+subroutine REWNML(IFPAR, JFPAR)
+  integer,intent(out) :: IFPAR, JFPAR
+#+end_src
+**** ~GETIFP~ - get sysin io-unit
+#+begin_src f90
+subroutine GETIFP(IFPAR)
+  integer,intent(out) :: IFPAR
+#+end_src
+**** ~GETJFP~ - get sysout io-unit
+#+begin_src f90
+subroutine GETJFP(JFPAR)
+  integer,intent(out) :: JFPAR
+#+end_src
+** =TOUZA_Emu_rpx= - ~parallel/~ emulation
+** =TOUZA_Emu_msg= - ~usubs::msgs~ emulation
+** =TOUZA_Emu_ugg= - geography and geometry
 * Copyright and license
-Copyright 2020, 2021 Japan Agency for Marine-Earth Science and Technology
+Copyright 2020-2023 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)

@@ -1,7 +1,7 @@
 /* touza.h - touza definitions */
 /*    Maintainer: SAITO Fuyuki */
 /*    Created: Jun 5 2020 */
-/*     Time-stamp: <2023/03/20 21:29:29 fuyuki touza.h> */
+/*     Time-stamp: <2023/04/11 21:48:33 fuyuki touza.h> */
 
 /* Copyright (C) 2020-2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
@@ -134,6 +134,7 @@
 #define ERR_MASK_AMI_STD      (ERR_MASK_AMI + ERR_MASK_MODULE * 1)
 #define ERR_MASK_AMI_LEGACY   (ERR_MASK_AMI + ERR_MASK_MODULE * 2)
 #define ERR_MASK_AMI_NIO      (ERR_MASK_AMI + ERR_MASK_MODULE * 3)
+#define ERR_MASK_AMI_TABLE    (ERR_MASK_AMI + ERR_MASK_MODULE * 4)
 
 #define ERR_MASK_CAL     (ERR_MASK_GROUP * 2)
 #define ERR_MASK_EMU     (ERR_MASK_GROUP * 3)
