@@ -1,7 +1,7 @@
 !!!_! std_ipc.F90 - touza/std intrinsic procedures compatible gallery
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 25 2023
-#define TIME_STAMP 'Time-stamp: <2023/05/08 21:50:14 fuyuki std_ipc.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/25 22:15:58 fuyuki std_ipc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -56,18 +56,30 @@ module TOUZA_Std_ipc
      module procedure ipc_HYPOT_d, ipc_HYPOT_f
   end interface ipc_HYPOT
 
+  interface ipc_ASINH
+     module procedure ipc_ASINH_d, ipc_ASINH_f
+  end interface ipc_ASINH
+  interface ipc_ACOSH
+     module procedure ipc_ACOSH_d, ipc_ACOSH_f
+  end interface ipc_ACOSH
+  interface ipc_ATANH
+     module procedure ipc_ATANH_d, ipc_ATANH_f
+  end interface ipc_ATANH
+
 !!!_  - public
   public init, diag, finalize
   public ipc_IBITS,  exam_IBITS
   public ipc_HYPOT
+  public ipc_ASINH,  ipc_ACOSH, ipc_ATANH
 contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_init=>init, choice
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_prc,only: prc_init=>init  ! included by TOUZA_Std_utl
+    ! use TOUZA_Std_utl,only: utl_init=>init  ! included by TOUZA_Std_log
     use TOUZA_Std_log,only: log_init=>init
-    use TOUZA_Std_prc,only: prc_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u      ! log unit
@@ -90,8 +102,8 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
        endif
        if (is_first_force(init_counts, mode)) then
@@ -106,9 +118,10 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_prc,only: prc_diag=>diag
+    ! use TOUZA_Std_utl,only: utl_diag=>diag
     use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
-    use TOUZA_Std_prc,only: prc_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -137,8 +150,8 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -149,9 +162,10 @@ contains
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_prc,only: prc_finalize=>finalize
+    ! use TOUZA_Std_utl,only: utl_finalize=>finalize
     use TOUZA_Std_log,only: log_finalize=>finalize
-    use TOUZA_Std_prc,only: prc_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -173,8 +187,8 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
@@ -376,6 +390,72 @@ contains
     r = a
     return
   end function ipc_HYPOT_d
+!!!_ + Inverse hyperbolic functions (Fortran 2008)
+!!!_  - ipc_ASINH
+  ELEMENTAL &
+  real(kind=KTGT) function ipc_ASINH_f(X) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    real(kind=KTGT),intent(in) :: X
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+
+    r = LOG(X + ipc_HYPOT(ONE, X))
+    return
+  end function ipc_ASINH_f
+  real(kind=KTGT) function ipc_ASINH_d(X) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: X
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+
+    r = LOG(X + ipc_HYPOT(ONE, X))
+    return
+  end function ipc_ASINH_d
+
+!!!_  - ipc_ACOSH
+  ELEMENTAL &
+  real(kind=KTGT) function ipc_ACOSH_f(X) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    real(kind=KTGT),intent(in) :: X
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+
+    r = LOG(X + SQRT((X - ONE) * (X + ONE)))
+    return
+  end function ipc_ACOSH_f
+  real(kind=KTGT) function ipc_ACOSH_d(X) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: X
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+
+    r = LOG(X + SQRT((X - ONE) * (X + ONE)))
+    return
+  end function ipc_ACOSH_d
+
+!!!_  - ipc_ATANH
+  ELEMENTAL &
+  real(kind=KTGT) function ipc_ATANH_f(X) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    real(kind=KTGT),intent(in) :: X
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT),parameter :: TWO = 2.0_KTGT
+
+    r = LOG((ONE + X) / (ONE - X)) / TWO
+    return
+  end function ipc_ATANH_f
+  real(kind=KTGT) function ipc_ATANH_d(X) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: X
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT),parameter :: TWO = 2.0_KTGT
+
+    r = LOG((ONE + X) / (ONE - X)) / TWO
+    return
+  end function ipc_ATANH_d
+
 !!!_ + end TOUZA_Std_ipc
 end module TOUZA_Std_ipc
 
@@ -420,6 +500,11 @@ program test_std_ipc
   F = (H / 8.0_KRTGT)
   call test_hypot(ierr, 3.0_KRTGT * F, 4.0_KRTGT * F)
 
+  call test_invht(ierr, 2.0_KRTGT)
+  call test_invht(ierr, 1.0_KRTGT)
+  call test_invht(ierr, 0.5_KRTGT)
+  call test_invht(ierr, 0.0_KRTGT)
+
   write(*, 101) ierr
   stop
 contains
@@ -440,6 +525,40 @@ contains
     write(*, 101) 'raw',       x, y, zr
 
   end subroutine test_hypot
+
+  subroutine test_invht(ierr, x)
+    integer,intent(out) :: ierr
+    real(kind=KRTGT),intent(in) :: x
+
+    real(kind=KRTGT) :: zs, zc, zt
+    real(kind=KRTGT) :: ys, yc, yt
+
+    ierr = 0
+    zt = ipc_ATANH(x)
+    zc = ipc_ACOSH(x)
+    zs = ipc_ASINH(x)
+#if HAVE_FORTRAN_ACOSH
+    yc = ACOSH(x)
+#else
+    yc = - HUGE(0.0_KRTGT)
+#endif
+#if HAVE_FORTRAN_ASINH
+    ys = ASINH(x)
+#else
+    ys = - HUGE(0.0_KRTGT)
+#endif
+#if HAVE_FORTRAN_ATANH
+    yt = ATANH(x)
+#else
+    yt = - HUGE(0.0_KRTGT)
+#endif
+
+101 format('invht:', A, 1x, 2ES24.16, 1x, ES24.16)
+    write(*, 101) 'asinh', zs, ys, zs-ys
+    write(*, 101) 'acosh', zc, yc, zc-yc
+    write(*, 101) 'atanh', zt, yt, zt-yt
+  end subroutine test_invht
+
 end program test_std_ipc
 
 #endif /* TEST_STD_IPC */

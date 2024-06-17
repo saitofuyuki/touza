@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:35:22 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/02 09:41:03 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023
@@ -1454,7 +1454,6 @@ contains
 
     real(kind=KRFLD) :: vmskh, vh, vsign
     logical bzerom, bzerop, bneg, bpos
-    integer mhalf
 
     ierr = 0
 
@@ -1805,7 +1804,6 @@ contains
 
     real(kind=KRFLD) :: vmskh, vh, vsign
     logical bzerom, bzerop, bneg, bpos
-    integer mhalf
 
     ierr = 0
 
@@ -1919,7 +1917,6 @@ contains
 
     real(kind=KRFLD) :: vmskh, vh, vsign
     logical bzerom, bzerop, bneg, bpos
-    integer mhalf
 
     ierr = 0
 
@@ -4307,10 +4304,7 @@ contains
 
     integer nt
     character(len=128) :: ti, tt
-    character(len=128) :: BA, BB, BC
-    real(kind=KRTGT) :: ea, er
     integer j
-    integer ja, jb, jc, jx, jo, lb
     integer utmp
 
     ierr = 0

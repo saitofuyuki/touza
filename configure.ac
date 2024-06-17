@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2023/03/24 17:22:02 fuyuki configure.ac>
+# Time-stamp: <2023/10/27 15:13:06 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -156,8 +156,7 @@ AX_SUBDIRS_CONFIGURE([jmz],
      [TOUZA_NAME="${PACKAGE_NAME}"],
      [TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}],
      [TOUZA_LIBRARY=${ac_top_build_prefix}lib${with_touza_name}.la],
-     [TOUZA_LIBS=${NETCDF4_FLIBS} ${NETCDF4_LIBS}],
-     [TOUZA_LDFLAGS=${NETCDF4_LDFLAGS}]],
+     [TOUZA_LIBS=${NETCDF4_FLIBS} ${NETCDF4_LIBS}]],
     [[--enable-nctcdf="[$]jmz_nctcdf"]],
     [--with-build-jmz])])
 

@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:42:25 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/02 09:44:56 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -990,7 +990,7 @@ contains
     integer,         intent(in),optional :: switch
 
     integer jas,   jau
-    integer icsrc, icunit, icroot
+    integer icsrc, icunit
     integer irank, nrank
     integer sw
 
@@ -1038,7 +1038,7 @@ contains
     ! integer,optional,intent(in)  :: opr   ! operation on unit agents
     ! integer,optional,intent(in)  :: keys(:)   !
 
-    integer icsrc, icroot
+    integer icsrc
     integer igsrc
     integer jas,   jau
     ! integer jt
@@ -1662,8 +1662,6 @@ contains
     integer,         intent(in)  :: iaref
     integer,         intent(in)  :: src
     integer,         intent(in)  :: flag
-
-    integer icsrc, icnew
 
     ierr = 0
     call add_agent(ierr, iagent, (/name/), src)

@@ -1,0 +1,188 @@
+#!/usr/bin/zsh -f
+# Maintainer: SAITO Fuyuki
+# Time-stamp: <2023/07/29 21:56:57 fuyuki wtest_gt.sh.in>
+
+# Copyright (C) 2023
+#           Japan Agency for Marine-Earth Science and Technology
+# Licensed under the Apache License, Version 2.0
+#   (https://www.apache.org/licenses/LICENSE-2.0)
+
+set -u
+
+this=$0
+base=$this:t
+PACKAGE_STRING='@PACKAGE_STRING@'
+TOUZA_VERSION='@TOUZA_VERSION@'
+JMZ_VERSION='@VERSION@'
+CHAK='@CHAK@'
+GTOOL_PATH=
+builddir='@builddir@'
+
+main ()
+{
+  local testdir=test_gt srcdir= outdir=
+  local gtooldir=
+  while [[ $# -gt 0 ]]
+  do
+    case $1 in
+    (-s) srcdir=$2; shift;;
+    (-o) outdir=$2; shift;;
+    (-t) testdir=$2; shift;;
+    (-g) gtooldir=$2; shift;;
+    (-*) print -u2 - "($base) error: invalid argument $1"
+         return 1;;
+    (*)  break;;
+    esac
+    shift || return $?
+  done
+  [[ -z $srcdir ]] && srcdir=$testdir/src
+  [[ -z $outdir ]] && outdir=$testdir/out
+  mkdir -p $srcdir $outdir || return $?
+
+  if [[ -z $gtooldir ]]; then
+    local g=
+    for g in ${(s/:/)GTOOL_PATH} ${(s/:/)PATH}
+    do
+      [[ -x $g/gtadd ]] && gtooldir=$g && break
+    done
+  fi
+  [[ -z $gtooldir ]] \
+      && print -u2 - "($base) error: invalid gtooldir" && return 1
+
+  local BINARY=(add amp arg div mask mlt mod pwr sub)
+  local UNARY=(sqrt sqr inv abs log log10 exp sin cos tan asin acos atan sinh cosh tanh d2r r2d)
+
+  local opr= o=
+  for opr in $@
+  do
+    if [[ $opr == unary ]]; then
+      for o in $UNARY
+      do
+        test_gt_unary gt$o || return $?
+      done
+    elif [[ $opr == binary ]]; then
+      for o in $BINARY
+      do
+        test_gt_binary gt$o || return $?
+      done
+    else
+      o=${opr#gt}
+      if [[ ${UNARY[(I)$o]} -gt 0 ]]; then
+        test_gt_unary gt$o || return $?
+      elif [[ ${BINARY[(I)$o]} -gt 0 ]]; then
+        test_gt_binary gt$o || return $?
+      else
+        print -u2 - "($base) error: invalid operation ($o)"
+        return 1
+      fi
+    fi
+  done
+  return 0
+}
+
+test_gt_unary ()
+{
+  local opr=$1; shift
+  local args=()
+  run_gt_unary $opr _raw $args || return $?
+  run_gt_unary $opr _of  $args ofs=2.0 fact=3.0 || return $?
+  return 0
+}
+
+test_gt_binary ()
+{
+  local opr=$1; shift
+  local args=()
+  run_gt_binary $opr _raw $args || return $?
+  run_gt_binary $opr _of1 $args ofs=-2.0      fact=-3.0  || return $?
+  run_gt_binary $opr _of2 $args ofs=,+2.0     fact=,+3.0 || return $?
+  run_gt_binary $opr _ofi $args ofs=-2.0,+2.0 fact=-3.0,+3.0 || return $?
+  run_gt_binary $opr _ofo $args ofs2=4.0      fact2=5.0  || return $?
+  return 0
+}
+
+run_gt_unary ()
+{
+  local opr=$1; shift
+  local sfx=$1; shift
+  local args=("$@")
+
+  local obase=$opr:t
+
+  local inf=$srcdir/input_0
+  local outg=$outdir/${obase}${sfx}-g  outt=$outdir/${obase}${sfx}-t
+
+  if [[ ! -e $inf ]]; then
+    input_gt_unary $inf || return $?
+  fi
+
+  args=($inf "${(@)args}")
+  local gcmd=$gtooldir/$opr
+  local ref=gtfna
+
+  print - "#### $opr"
+  if [[ -x $gcmd ]]; then
+    $gcmd                    "${(@)args}" out:$outg || return $?
+  else
+    print -u2 - "($base) not found $gcmd, use workaround."
+    gcmd=$gtooldir/$ref
+    $gcmd ${opr#gt}=T        "${(@)args}" out:$outg || return $?
+  fi
+  $builddir/$ref $opr -q -f "${(@)args}" out:$outt || return $?
+  $CHAK -qqqq $outg $outt REPEAT NEF COUNT INSERT SUB DUP LMAX== EXCH LMIN== FLUSH -i
+  return 0
+}
+
+run_gt_binary ()
+{
+  local opr=$1; shift
+  local sfx=$1; shift
+  local args=("$@")
+
+  local obase=$opr:t
+
+  local in1=$srcdir/input_1
+  local in2=$srcdir/input_2
+  local outg=$outdir/${obase}${sfx}-g  outt=$outdir/${obase}${sfx}-t
+
+  if [[ ! -e $in1 || ! -e $in2 ]]; then
+    input_gt_binary $in1 $in2 || return $?
+  fi
+
+  args=($in1 $in2 "${(@)args}")
+  local gcmd=$gtooldir/$opr
+  local ref=gtfnb
+
+  print - "#### $opr"
+  if [[ -x $gcmd ]]; then
+    $gcmd                    "${(@)args}" out:$outg || return $?
+  else
+    print -u2 - "($base) not found $gcmd, use workaround."
+    gcmd=$gtooldir/$ref
+    $gcmd ${opr#gt}=T        "${(@)args}" out:$outg || return $?
+  fi
+  $builddir/$ref $opr -q -f "${(@)args}" out:$outt || return $?
+  $CHAK -qqqq $outg $outt REPEAT NEF COUNT INSERT SUB DUP LMAX== EXCH LMIN== FLUSH -i
+  return 0
+}
+
+input_gt_unary ()
+{
+  local file=$1
+
+  $CHAK -f 0 SIZE=lon/7,lat/11,lev/5 FLAT 2 15 POW DIV ADD = $file ITEM=in-0
+  return $?
+}
+
+input_gt_binary ()
+{
+  local file1=$1 file2=$2
+  local size=lon/7,lat/11,lev/5
+
+  $CHAK -f 0 SIZE=$size FLAT 2 13 POW DIV ADD = $file1 ITEM=in-1
+  $CHAK -f 0 SIZE=$size FLAT 1 ADD 2 14 POW DIV ADD = $file2 ITEM=in-2
+  return $?
+}
+
+main "$@"; err=$?
+exit $err

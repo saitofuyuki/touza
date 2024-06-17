@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz CH(swiss) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/19 15:48:51 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/10/05 22:19:32 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -1690,6 +1690,7 @@ end subroutine cue_read_file
   subroutine emulate_header_ascii &
        & (ierr, head, file, rec, crec)
     use TOUZA_Nio,only: fill_header, get_default_header, parse_header_size
+    use TOUZA_Nio,only: put_item, hi_TIME
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(out)   :: head(*)
@@ -1700,6 +1701,8 @@ end subroutine cue_read_file
     ierr = 0
     if (ierr.eq.0) call get_default_header(head)
     if (ierr.eq.0) call fill_header(ierr, head, file%h, 1)
+
+    if (ierr.eq.0) call put_item(ierr, head, rec, hi_TIME)
 
     if (ierr.eq.0) then
        m = parse_header_size(file%h, 0, lazy=1)
@@ -1902,6 +1905,7 @@ end subroutine cue_read_file
        & (ierr, head, file, rec, crec)
     use TOUZA_Nio,only: fill_header, get_default_header, parse_header_size
     use TOUZA_Std,only: sus_rseek, WHENCE_ABS
+    use TOUZA_Nio,only: put_item, hi_TIME
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(out)   :: head(*)
@@ -1912,6 +1916,9 @@ end subroutine cue_read_file
     ierr = 0
     if (ierr.eq.0) call get_default_header(head)
     if (ierr.eq.0) call fill_header(ierr, head, file%h, 1)
+
+    if (ierr.eq.0) call put_item(ierr, head, rec, hi_TIME)
+
     if (ierr.eq.0) then
        m = parse_header_size(file%h, 0, lazy=1)
        jpos = cue_binary_pos(file%kfmt, m, rec)

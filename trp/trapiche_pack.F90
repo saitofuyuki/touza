@@ -1,7 +1,7 @@
 !!!_! trapiche_pack.F90 - TOUZA/Trapiche integer packing/unpacking
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:36:25 fuyuki trapiche_pack.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/02 09:48:30 fuyuki trapiche_pack.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023
@@ -319,7 +319,7 @@ contains
     integer(kind=KICNZ) :: kofs
     integer(kind=KICNZ) :: nw, nb, mc
     integer,parameter   :: lbits = BIT_SIZE(mold)
-    integer(kind=KICNZ) :: lpos = + HUGE(mold)
+    ! integer(kind=KICNZ) :: lpos = + HUGE(mold)
     integer(kind=KICNZ) :: lneg = (- HUGE(mold)) - 1
 
     ierr = err_default
@@ -2770,7 +2770,7 @@ contains
     integer,parameter :: mold = 0_KIBGZ
     integer,parameter :: nbits = 1
     integer,parameter :: lbits = bit_size(mold)
-    integer jcbgn, jcend, jcnxt, jc
+    integer jcbgn, jcend, jcnxt
     integer jbbgn, jbend, rbbgn, rbend, jb, rb     ! j: element  r: mod
     integer mr_c,  cspan_c,  dspan_c
     integer mr_b,  cspan_b,  dspan_b
@@ -3401,7 +3401,7 @@ contains
     integer jo, mo, jobgn, joend
     integer jbbgn, jbend
     integer jcbgn, jcend, jcorg
-    integer idx(0:nr-1), next(0:nr), span(0:nr-1)
+    integer next(0:nr), span(0:nr-1)
     integer gstep(0:nr)
 
     ierr = 0

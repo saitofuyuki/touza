@@ -2,10 +2,10 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2023/06/08 13:01:59 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/25 22:09:13 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022,2023
+! Copyright (C) 2021,2022,2023,2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -265,27 +265,28 @@ module TOUZA_Std_sus
   public sus_write_lsep, sus_read_lsep, sus_write
 
   public sus_rseek, sus_getpos
-  public sus_pos_a2rel, sus_pos_r2abs
+  public sus_pos_a2rel, sus_pos_r2abs, sus_rel_pos
   public sus_eswap
   public sus_pad
   public sus_record_mems_irec
   public max_members, is_irec_overflow, is_irec_overflow_mix
   public sus_size_irec
   public sus_is_stream_unit
-
-#if TEST_STD_SUS
+  public debug_status
   public set_slice_loop, init_offset, next_offset
-#endif
+  public set_runl_loop
 contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, icomm)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_prc,only: prc_init=>init
-    use TOUZA_Std_utl,only: utl_init=>init, choice
-    use TOUZA_Std_fun,only: fun_init=>init
-    use TOUZA_Std_log,only: log_init=>init
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_prc,only: prc_init=>init   ! included by TOUZA_Std_utl
+    ! use TOUZA_Std_utl,only: utl_init=>init   ! included by TOUZA_Std_env
+    ! use TOUZA_Std_fun,only: fun_init=>init   ! included by TOUZA_Std_env
+    ! use TOUZA_Std_log,only: log_init=>init   ! included by TOUZA_Std_env
     use TOUZA_Std_env,only: env_init=>init, get_unit_strm, get_size_bytes, conv_b2strm
+    ! env depends on fun
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -307,10 +308,10 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call fun_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
+          ! if (ierr.eq.0) call prc_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call fun_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
+          ! if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call env_init(ierr, ulog, levv=lv, mode=lmd, icomm=icomm)
        endif
        if (is_first_force(init_counts, mode)) then
@@ -349,10 +350,12 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_prc,only: prc_diag=>diag
-    use TOUZA_Std_utl,only: utl_diag=>diag, choice
-    use TOUZA_Std_fun,only: fun_diag=>diag
-    use TOUZA_Std_log,only: log_diag=>diag, msg_mdl, is_msglev_normal
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_log,only: msg_mdl, is_msglev_normal
+    ! use TOUZA_Std_prc,only: prc_diag=>diag
+    ! use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    ! use TOUZA_Std_fun,only: fun_diag=>diag
+    ! use TOUZA_Std_log,only: log_diag=>diag
     use TOUZA_Std_env,only: env_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
@@ -380,10 +383,10 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call utl_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call log_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call fun_diag(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call prc_diag(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_diag(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call fun_diag(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call log_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call env_diag(ierr, utmp, levv=lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -394,10 +397,12 @@ contains
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_prc,only: prc_finalize=>finalize
-    use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
-    use TOUZA_Std_fun,only: fun_finalize=>finalize
-    use TOUZA_Std_log,only: log_finalize=>finalize, msg, is_msglev_info
+    use TOUZA_Std_utl,only: choice
+    use TOUZA_Std_log,only: msg_mdl, is_msglev_info
+    ! use TOUZA_Std_prc,only: prc_finalize=>finalize
+    ! use TOUZA_Std_utl,only: utl_finalize=>finalize
+    ! use TOUZA_Std_fun,only: fun_finalize=>finalize
+    ! use TOUZA_Std_log,only: log_finalize=>finalize
     use TOUZA_Std_env,only: env_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -417,17 +422,17 @@ contains
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
+       if (is_msglev_info(lv)) then
+          call msg_mdl('(''final iostat saved = '', I0, 1x, I0)', &
+               &   (/last_iostat, last_line/), __MDL__, u)
+       endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call utl_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call log_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call fun_finalize(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call prc_finalize(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_finalize(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call fun_finalize(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call log_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call env_finalize(ierr, utmp, levv=lv, mode=lmd)
-       endif
-       if (is_msglev_info(lv)) then
-          call msg('(''final iostat saved = '', I0, 1x, I0)', &
-               &   (/last_iostat, last_line/), __MDL__, u)
        endif
        fine_counts = fine_counts + 1
     endif
@@ -555,7 +560,10 @@ contains
     character(len=*),intent(inout),optional :: iomsg
 
     character(len=16) :: STT, ACT, FRM, POS, ACC
+#if HAVE_FORTRAN_OPEN_IOMSG
+#else
     integer jerr
+#endif
 
     ierr = ERR_SUCCESS
 
@@ -2729,6 +2737,7 @@ contains
     logical,intent(in),optional :: swap        ! byte-order switch
     integer(KIND=KISEP) :: isep
     integer(KIND=KIOFS) :: apos
+    logical cont
     ! check and reset suspend_wu suspend_wsub suspend_wposh
     ierr = 0
     if (sw.lt.0) then
@@ -2736,9 +2745,17 @@ contains
           call sus_write_isep(ierr, u, sep=dsep, swap=swap)
        else
           isep = abs(suspend_wsub)
+          cont = (suspend_wsub.lt.0)
           if (ierr.eq.0) call sus_getpos(ierr, apos, u)
-          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.FAlSE., pos=suspend_wposh)
-          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=(suspend_wsub.lt.0), pos=apos)
+          if (ierr.eq.0) then
+             ! final null subrecord special.  Not fully tested.
+             if (isep.eq.0) then
+                isep = 1
+                apos = apos + 1
+             endif
+          endif
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=.FALSE., pos=suspend_wposh)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, sep=isep, swap=swap, sub=cont, pos=apos)
        endif
        if (ierr.eq.0) then
           suspend_wposh = -1
@@ -5283,9 +5300,13 @@ contains
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-    if (ierr.eq.0) call sus_write(ierr, u, V, n, swap)
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    if (isep.eq.0) then
+       if (ierr.eq.0) call sus_write_null_iset(ierr, u, pre, post, swap, jpos, whence)
+    else
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_write(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    endif
   end subroutine sus_write_iset_i
   subroutine sus_write_iset_l &
        & (ierr, u, v, n, isep, pre, post, swap, jpos, whence)
@@ -5301,9 +5322,13 @@ contains
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-    if (ierr.eq.0) call sus_write(ierr, u, V, n, swap)
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    if (isep.eq.0) then
+       if (ierr.eq.0) call sus_write_null_iset(ierr, u, pre, post, swap, jpos, whence)
+    else
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_write(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    endif
   end subroutine sus_write_iset_l
   subroutine sus_write_iset_f &
        & (ierr, u, v, n, isep, pre, post, swap, jpos, whence)
@@ -5319,9 +5344,13 @@ contains
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-    if (ierr.eq.0) call sus_write(ierr, u, V, n, swap)
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    if (isep.eq.0) then
+       if (ierr.eq.0) call sus_write_null_iset(ierr, u, pre, post, swap, jpos, whence)
+    else
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_write(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    endif
   end subroutine sus_write_iset_f
   subroutine sus_write_iset_d &
        & (ierr, u, v, n, isep, pre, post, swap, jpos, whence)
@@ -5337,9 +5366,13 @@ contains
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-    if (ierr.eq.0) call sus_write(ierr, u, V, n, swap)
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    if (isep.eq.0) then
+       if (ierr.eq.0) call sus_write_null_iset(ierr, u, pre, post, swap, jpos, whence)
+    else
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_write(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    endif
   end subroutine sus_write_iset_d
   subroutine sus_write_iset_a &
        & (ierr, u, v, n, isep, pre, post, swap, jpos, whence)
@@ -5355,9 +5388,14 @@ contains
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-    if (ierr.eq.0) call sus_write(ierr, u, V, n, swap)
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    ierr = 0
+    if (isep.eq.0) then
+       if (ierr.eq.0) call sus_write_null_iset(ierr, u, pre, post, swap, jpos, whence)
+    else
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_write(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    endif
   end subroutine sus_write_iset_a
 !!!_  & sus_pad_iset
   subroutine sus_pad_iset_i &
@@ -5374,9 +5412,13 @@ contains
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-    if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    if (isep.eq.0) then
+       if (ierr.eq.0) call sus_write_null_iset(ierr, u, pre, post, swap, jpos, whence)
+    else
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    endif
   end subroutine sus_pad_iset_i
   subroutine sus_pad_iset_l &
        & (ierr, u, v, n, isep, pre, post, swap, jpos, whence)
@@ -5392,9 +5434,13 @@ contains
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-    if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    if (isep.eq.0) then
+       if (ierr.eq.0) call sus_write_null_iset(ierr, u, pre, post, swap, jpos, whence)
+    else
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    endif
   end subroutine sus_pad_iset_l
   subroutine sus_pad_iset_f &
        & (ierr, u, v, n, isep, pre, post, swap, jpos, whence)
@@ -5410,9 +5456,13 @@ contains
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-    if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    if (isep.eq.0) then
+       if (ierr.eq.0) call sus_write_null_iset(ierr, u, pre, post, swap, jpos, whence)
+    else
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    endif
   end subroutine sus_pad_iset_f
   subroutine sus_pad_iset_d &
        & (ierr, u, v, n, isep, pre, post, swap, jpos, whence)
@@ -5428,9 +5478,13 @@ contains
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-    if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    if (isep.eq.0) then
+       if (ierr.eq.0) call sus_write_null_iset(ierr, u, pre, post, swap, jpos, whence)
+    else
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    endif
   end subroutine sus_pad_iset_d
   subroutine sus_pad_iset_a &
        & (ierr, u, v, n, isep, pre, post, swap, jpos, whence)
@@ -5446,9 +5500,13 @@ contains
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-    if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    if (isep.eq.0) then
+       if (ierr.eq.0) call sus_write_null_iset(ierr, u, pre, post, swap, jpos, whence)
+    else
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_pad(ierr, u, V, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+    endif
   end subroutine sus_pad_iset_a
 !!!_  & sus_blank_iset
   subroutine sus_blank_iset &
@@ -5465,10 +5523,56 @@ contains
     integer,            intent(in),optional :: whence
     integer(kind=KIOFS) :: jposf
     ierr = 0
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-    if (ierr.eq.0) call sus_getpos(ierr, jposf, u)
-    if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre,  swap, jposf + skip)
+    if (isep.eq.0) then
+       if (ierr.eq.0) call sus_write_null_iset(ierr, u, pre, post, swap, jpos, whence)
+    else
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_getpos(ierr, jposf, u)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre,  swap, jposf + skip)
+    endif
   end subroutine sus_blank_iset
+!!!_  & sus_write_null_iset
+  subroutine sus_write_null_iset &
+       & (ierr, u, pre, post, swap, jpos, whence)
+    use TOUZA_Std_log,only: msg_mdl
+    implicit none
+    integer,parameter :: KISEP=KI32, KARG=KI32
+    integer,            intent(out)         :: ierr
+    integer,            intent(in)          :: u         ! file unit
+    logical,            intent(in)          :: pre, post ! continuation flag
+    logical,            intent(in)          :: swap      ! byte-order switch
+    integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
+    integer,            intent(in),optional :: whence
+    integer(kind=KISEP) :: isep
+    integer,parameter :: n = 1
+    character(len=1),parameter :: cnull(n) = CHAR(0)
+    ierr = 0
+    if (pre.eqv.post) then
+       if (pre) then
+          ! medium null subrecord
+          continue
+       else
+          ! independent null (sub)record
+          isep = 0
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+       endif
+       return
+    endif
+    if (pre) then
+       ! final null subrecord.  Dummy single-byte sub-record is written.
+       isep = n
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_write(ierr, u, cnull, n, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+       return
+    endif
+
+    ! Initial null subrecord must be avoided
+    ierr = _ERROR(ERR_INITIAL_NULL_SUBRECORD)
+    call msg_mdl('(''Initial null sub-record is detected: '', I0)', u, __MDL__, ulog)
+
+  end subroutine sus_write_null_iset
 !!!_ + separator
 !!!_  & sus_write_isep - write 32-bit separator
   subroutine sus_write_isep_i (ierr, u, sep, sub, swap, pos, whence)
@@ -6229,6 +6333,25 @@ contains
          &          ISHFT(IBITS(V, LBU*7, LBU), LBU*0))))
     return
   end function sus_swap_l
+!!!_  & sus_rel_pos() - get relative position of current
+  integer(kind=KIOFS) function sus_rel_pos &
+       & (u, whence) &
+       & result(rpos)
+    implicit none
+    integer,         intent(in) :: u
+    integer,optional,intent(in) :: whence
+    integer(kind=KIOFS),parameter :: errp = - HUGE(0_KIOFS)
+    integer(kind=KIOFS) :: apos
+    integer jerr
+
+    inquire(UNIT=u, POS=apos, IOSTAT=jerr)
+    if (jerr.eq.0) then
+       rpos = sus_pos_a2rel(apos, u, whence)
+    else
+       rpos = errp
+    endif
+  end function sus_rel_pos
+
 !!!_  & sus_pos_a2rel() - convert absolute (system) position to various
   integer(kind=KIOFS) function sus_pos_a2rel &
        & (apos, u, whence) &
@@ -6766,6 +6889,41 @@ contains
     end select
 
   end subroutine check_dummy_irec_l
+!!!_  & set_runl_loop
+  subroutine set_runl_loop(runl, nrl, bes, r)
+    implicit none
+    integer,intent(out) :: runl(0:*)
+    integer,intent(out) :: nrl
+    integer,intent(in)  :: bes(3, 0:*)
+    integer,intent(in)  :: r
+
+    integer jsrc, jprv
+    integer rr, m
+    integer stp(0:r-1), itr(0:r-1), idx(0:r-1)
+
+    call set_slice_loop(rr, stp, itr, bes, r)
+    ! write(*, *) 'bes', bes(:, 0:r-1)
+
+    ! write(*, *) 'stp', stp(0:rr-1)
+    ! write(*, *) 'itr', itr(0:rr-1)
+
+    idx(0:rr-1) = 0
+    jsrc = init_offset(bes, r)
+    nrl = 0
+    jprv = 0
+    m = itr(0)
+    do
+       if (jsrc.lt.0) exit
+       runl(nrl)   = jsrc - jprv
+       runl(nrl+1) = m
+       jprv = jsrc + m
+       nrl = nrl + 2
+       call next_offset(jsrc, idx, stp, itr, rr, m)
+    enddo
+    runl(nrl) = product(bes(3, 0:r-1)) - jprv
+    runl(nrl+1) = 0
+    nrl = nrl + 1
+  end subroutine set_runl_loop
 !!!_  & set_slice_loop
   subroutine set_slice_loop(rr, stp, itr, bes, r)
     implicit none
@@ -6844,6 +7002,40 @@ contains
        rj = rj + 1
     enddo
   end subroutine next_offset
+!!!_  - debug_status
+  subroutine debug_status(ierr, ufile, u, tag)
+    use TOUZA_Std_utl,only: choice, choice_a
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(in)          :: ufile
+    integer,         intent(in),optional :: u
+    character(len=*),intent(in),optional :: tag
+    integer utmp
+    integer(kind=KIOFS) :: pos
+    character(len=128)  :: pfx
+    ierr = 0
+
+    call choice_a(pfx, 'status', tag)
+    utmp = choice(ulog, u)
+
+    call sus_getpos(ierr, pos, ufile, WHENCE_BEGIN)
+
+101 format(A, '(', I0, '): ', I0, 1x, Z8.8)
+111 format(A, '(', I0, '): error=', I0)
+    if (ierr.eq.0) then
+       if (utmp.ge.0) then
+          write(utmp, 101) trim(pfx), ufile, pos, pos
+       else
+          write(*, 101) trim(pfx), ufile, pos, pos
+       endif
+    else
+       if (utmp.ge.0) then
+          write(utmp, 111) trim(pfx), ufile, ierr
+       else
+          write(*, 111) trim(pfx), ufile, ierr
+       endif
+    endif
+  end subroutine debug_status
 !!!_ + end module TOUZA_Std_sus
 end module TOUZA_Std_sus
 
@@ -6888,6 +7080,10 @@ program test_std_sus
      endif
   endif
   if (ierr.eq.0) call batch_overflow_mix(ierr)
+
+  if (ierr.eq.0) then
+     call test_slice_loop(ierr)
+  endif
 
   if (ierr.eq.0) call finalize(ierr)
   write(*, 101) 'FINAL', ierr
@@ -7223,6 +7419,7 @@ program test_std_sus
   character(len=512) :: file2 = 'out.sus2'
   character(len=512) :: file3 = 'out.sus3'
   character(len=512) :: file4 = 'out.sus4'
+  character(len=512) :: file_ni = 'out.sus_null-iset'
 
   integer dims(4)
 
@@ -7351,6 +7548,8 @@ program test_std_sus
   if (ierr.eq.0) call test_list_read(ierr, u, jb, je, nm)
 
   if (ierr.eq.0) call sus_close(ierr, u, file4)
+
+  if (ierr.eq.0) call test_null_iset(ierr, u, file_ni)
 
   if (ierr.eq.0) call finalize(ierr)
   write(*, 101) 'FINAL', ierr
@@ -7482,122 +7681,6 @@ contains
 
     return
   end subroutine batch_seqread_check
-
-  subroutine test_slice_loop(ierr)
-    implicit none
-    integer,intent(out) :: ierr
-    ierr = 0
-
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 1, (/0,8,8/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 1, (/1,5,8/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 1, (/0,1,1/))
-
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,8,8,  0,6,6/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/1,5,8,  0,6,6/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,1,1,  0,6,6/))
-
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,8,8,  2,4,6/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/1,5,8,  2,4,6/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,1,1,  2,4,6/))
-
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,8,8,  0,1,1/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/1,5,8,  0,1,1/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,1,1,  0,1,1/))
-
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,6,6,  0,4,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,6,6,  0,4,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,6,6,  0,4,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  2,4,6,  0,4,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  2,4,6,  0,4,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  2,4,6,  0,4,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,1,1,  0,4,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,1,1,  0,4,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,1,1,  0,4,4/))
-
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,6,6,  1,3,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,6,6,  1,3,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,6,6,  1,3,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  2,4,6,  1,3,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  2,4,6,  1,3,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  2,4,6,  1,3,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,1,1,  1,3,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,1,1,  1,3,4/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,1,1,  1,3,4/))
-
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,6,6,  0,1,1/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,6,6,  0,1,1/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,6,6,  0,1,1/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  2,4,6,  0,1,1/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  2,4,6,  0,1,1/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  2,4,6,  0,1,1/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,1,1,  0,1,1/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,1,1,  0,1,1/))
-    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,1,1,  0,1,1/))
-
-  end subroutine test_slice_loop
-
-  subroutine test_slice_loop_sub(ierr, r, bes)
-    use TOUZA_Std_utl,only: join_list
-    implicit none
-    integer,intent(out) :: ierr
-    integer,intent(in)  :: r
-    integer,intent(in)  :: bes(3, 0:*)
-
-    integer jt
-    integer j
-    integer rr
-    integer stp(0:r-1), itr(0:r-1)
-    integer lidx(0:r-1), pidx(0:r-1)
-    character(len=32)  :: str(0:r-1)
-    character(len=256) :: txti, txto
-    integer jerr
-
-    integer jsrc
-    integer m, mm, k
-
-    call set_slice_loop(rr, stp, itr, bes, r)
-111 format('slice: ', A, ' > ', A)
-
-101 format(I0, ':', I0, '/', I0)
-102 format(I0, '+', I0)
-    do j = 0, r - 1
-       write(str(j), 101) bes(1:3, j)
-    enddo
-    call join_list(jerr, txti, str(0:r-1))
-    do j = 0, rr - 1
-       write(str(j), 102) itr(j), stp(j)
-    enddo
-    call join_list(jerr, txto, str(0:rr-1))
-
-    write(*, 111) trim(txti), trim(txto)
-
-    do jt = 0, 1
-       if (jt.eq.0) then
-          m = itr(0)
-       else if (itr(0).eq.1) then
-          cycle
-       else
-          m = max(1, itr(0) / 2)
-       endif
-       jsrc = init_offset(bes, r)
-       lidx(0:rr-1) = 0
-       do
-          if (jsrc.lt.0) exit
-          k = jsrc
-          do j = 0, r - 1
-             pidx(j) = mod(k, bes(3, j))
-             k = k / bes(3, j)
-          enddo
-          call join_list(jerr, txti, lidx(0:rr-1))
-          call join_list(jerr, txto, pidx(0:r-1))
-121       format('slice/seq+', I0, ': ', I0, ' / ', A, ' > ', A)
-          write(*, 121) m, jsrc, trim(txti), trim(txto)
-          mm = min(m, itr(0) - lidx(0))
-          call next_offset(jsrc, lidx, stp, itr, rr, mm)
-       enddo
-    enddo
-
-  end subroutine test_slice_loop_sub
 
   subroutine test_blank_create  &
        & (ierr, u, nm)
@@ -8098,8 +8181,228 @@ contains
     enddo
   end subroutine test_slice_ref
 
-end program test_std_sus
+  subroutine test_null_iset (ierr, u, file)
+    use TOUZA_Std_log,only: trace_err, is_error_match
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: u
+    character(len=*),intent(in) :: file
+    integer,parameter :: la = 4
+    integer vtbl(-1:la), vchk(0:la-1)
+    integer j, jj
+    logical swap, pre, post
+    integer n, k, b
+    character(len=*),parameter :: delim = '='
+    character(len=1) :: dmy(1)
+    character(len=4) :: str(0:la-1)
 
+    ierr = 0
+    b = 2**8
+    do j = -1, la
+       k = IACHAR('a') + j
+       vtbl(j) = ((k * b + k) * b + k) * b + k
+    enddo
+
+    swap = .FALSE.
+
+    if (ierr.eq.0) call sus_open(ierr, u, file, ACTION='RW', STATUS='R')
+    ! single record
+    if (ierr.eq.0) call sus_write_irec(ierr, u, vtbl(0:la-1), la, swap, pre=.FALSE., post=.FALSE.)
+
+    if (ierr.eq.0) call sus_pad_irec(ierr, u, delim, 16, swap, pre=.FALSE., post=.FALSE.)
+    ! cont record
+    do j = 0, la - 1
+       pre  = j.gt.0
+       post = j.lt.la-1
+       if (ierr.eq.0) call sus_write_irec(ierr, u, vtbl(j:j), 1, swap, pre=pre, post=post)
+    enddo
+    if (ierr.eq.0) call sus_pad_irec(ierr, u, delim, 8, swap, pre=.FALSE., post=.FALSE.)
+
+    ! initial null record
+    do j = -1, la - 1
+       pre  = j.gt.0
+       post = j.lt.la-1
+       n = 0
+       if (j.ge.0) n = 1
+       if (ierr.eq.0) call sus_write_irec(ierr, u, vtbl(j:j), n, swap, pre=pre, post=post)
+       if (ierr.ne.0) then
+          if (is_error_match(ierr,ERR_INITIAL_NULL_SUBRECORD)) then
+             if (j.lt.0) then
+                write(*, *) 'null/i: catch initial null subrecord error.'
+                ierr = 0
+             endif
+          endif
+       endif
+    enddo
+    if (ierr.eq.0) call sus_pad_irec(ierr, u, delim, 15, swap, pre=.FALSE., post=.FALSE.)
+    ! intermediate null record
+    jj = 0
+    do j = 0, la
+       pre  = j.gt.0
+       post = j.lt.la
+       n = 0
+       if (j.ne.la/2) n = 1
+       if (ierr.eq.0) call sus_write_irec(ierr, u, vtbl(jj:jj), n, swap, pre=pre, post=post)
+       write(*, *) 'null/m', j, jj, n, pre, post
+       jj = jj + n
+    enddo
+    if (ierr.eq.0) call sus_pad_irec(ierr, u, delim, 8, swap, pre=.FALSE., post=.FALSE.)
+    ! final null record
+    do j = 0, la
+       pre  = j.gt.0
+       post = j.lt.la
+       n = 0
+       if (post) n = 1
+       if (ierr.eq.0) call sus_write_irec(ierr, u, vtbl(j:j), n, swap, pre=pre, post=post)
+    enddo
+    if (ierr.eq.0) call sus_pad_irec(ierr, u, delim, 15, swap, pre=.FALSE., post=.FALSE.)
+    ! single null record
+    if (ierr.eq.0) call sus_pad_irec(ierr, u, '_', 4*la, swap, pre=.FALSE., post=.FALSE.)
+    if (ierr.eq.0) call sus_write_irec(ierr, u, vtbl(0:0), 0, swap, pre=.FALSE., post=.FALSE.)
+    if (ierr.eq.0) call sus_pad_irec(ierr, u, '^', 4*la, swap, pre=.FALSE., post=.FALSE.)
+
+    if (ierr.eq.0) then
+       n = la
+       rewind(u)
+       do
+          if (ierr.ne.0) exit
+          vchk(0:n-1) = 0
+          call sus_read_irec(ierr, u, vchk, n, swap)
+          str(0:n-1) = transfer(vchk(0:n-1), str(0), n)
+          write(*, *) 'null/read:', ALL(vchk(0:n-1).eq.vtbl(0:n-1)), str(0:n-1)
+          if (ierr.eq.0) call sus_read_irec(ierr, u, dmy, 0, swap)
+       enddo
+    endif
+    if (is_error_match(ierr, ERR_EOF)) ierr = 0
+    call trace_err(ierr)
+  end subroutine test_null_iset
+
+end program test_std_sus
+#endif /* TEST_STD_SUS */
+#if TEST_STD_SUS
+  subroutine test_slice_loop(ierr)
+    implicit none
+    integer,intent(out) :: ierr
+    ierr = 0
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 1, (/0,8,8/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 1, (/1,5,8/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 1, (/0,1,1/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,8,8,  0,6,6/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/1,5,8,  0,6,6/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,1,1,  0,6,6/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,8,8,  2,4,6/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/1,5,8,  2,4,6/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,1,1,  2,4,6/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,8,8,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/1,5,8,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 2, (/0,1,1,  0,1,1/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,6,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,6,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,6,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  2,4,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  2,4,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  2,4,6,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,1,1,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,1,1,  0,4,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,1,1,  0,4,4/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,6,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,6,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,6,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  2,4,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  2,4,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  2,4,6,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,1,1,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,1,1,  1,3,4/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,1,1,  1,3,4/))
+
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,6,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,6,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,6,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  2,4,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  2,4,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  2,4,6,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,8,8,  0,1,1,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/1,5,8,  0,1,1,  0,1,1/))
+    if (ierr.eq.0) call test_slice_loop_sub(ierr, 3, (/0,1,1,  0,1,1,  0,1,1/))
+
+  end subroutine test_slice_loop
+
+  subroutine test_slice_loop_sub(ierr, r, bes)
+    use TOUZA_Std_sus
+    use TOUZA_Std_utl,only: join_list
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: r
+    integer,intent(in)  :: bes(3, 0:*)
+
+    integer jt
+    integer j
+    integer rr
+    integer,parameter :: lmax = 1024
+    integer nrl
+    integer runl(0:lmax)
+    integer stp(0:r-1), itr(0:r-1)
+    integer lidx(0:r-1), pidx(0:r-1)
+    character(len=32)  :: str(0:r-1)
+    character(len=256) :: txti, txto
+    integer jerr
+
+    integer jsrc
+    integer m, mm, k
+
+    call set_slice_loop(rr, stp, itr, bes, r)
+111 format('slice: ', A, ' > ', A)
+
+101 format(I0, ':', I0, '/', I0)
+102 format(I0, '+', I0)
+    do j = 0, r - 1
+       write(str(j), 101) bes(1:3, j)
+    enddo
+    call join_list(jerr, txti, str(0:r-1))
+    do j = 0, rr - 1
+       write(str(j), 102) itr(j), stp(j)
+    enddo
+    call join_list(jerr, txto, str(0:rr-1))
+
+    write(*, 111) trim(txti), trim(txto)
+
+    do jt = 0, 1
+       if (jt.eq.0) then
+          m = itr(0)
+       else if (itr(0).eq.1) then
+          cycle
+       else
+          m = max(1, itr(0) / 2)
+       endif
+       jsrc = init_offset(bes, r)
+       lidx(0:rr-1) = 0
+       do
+          if (jsrc.lt.0) exit
+          k = jsrc
+          do j = 0, r - 1
+             pidx(j) = mod(k, bes(3, j))
+             k = k / bes(3, j)
+          enddo
+          call join_list(jerr, txti, lidx(0:rr-1))
+          call join_list(jerr, txto, pidx(0:r-1))
+121       format('slice/seq+', I0, ': ', I0, ' / ', A, ' > ', A)
+          write(*, 121) m, jsrc, trim(txti), trim(txto)
+          mm = min(m, itr(0) - lidx(0))
+          call next_offset(jsrc, lidx, stp, itr, rr, mm)
+       enddo
+    enddo
+
+    call set_runl_loop(runl, nrl, bes, r)
+    call join_list(jerr, txti, runl(0:nrl))
+131 format('runl:', I0, ': ', A)
+    write(*, 131) nrl, trim(txti)
+  end subroutine test_slice_loop_sub
 #endif /* TEST_STD_SUS */
 !!!_! FOOTER
 !!!_ + Local variables

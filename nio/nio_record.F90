@@ -1,10 +1,10 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/30 22:40:04 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/25 21:50:01 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022, 2023
+! Copyright (C) 2021, 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -431,6 +431,7 @@ module TOUZA_Nio_record
   public init, diag, finalize
   public set_default_switch
   public set_default_header, get_default_header
+  public nio_record_std, nio_record_def
   public nio_check_magic_file
   public nio_read_header,    nio_write_header
   public nio_read_data,      nio_write_data
@@ -501,7 +502,7 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
-          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
        endif
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call trp_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
@@ -587,7 +588,7 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
        endif
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call trp_diag(ierr, utmp, levv=lv, mode=lmd)
@@ -623,7 +624,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
        endif
        if (md.ge.MODE_DEEP) then
@@ -851,6 +852,18 @@ contains
   end subroutine finalize_destroy
 
 !!!_ + user interfaces
+!!!_  & nio_record_std() - get standard record type == (REC_BIG)
+  integer function nio_record_std() result(k)
+    implicit none
+    k = REC_BIG
+  end function nio_record_std
+
+!!!_  & nio_record_def() - get default record type == (REC_DEFAULT)
+  integer function nio_record_def() result(k)
+    implicit none
+    k = REC_DEFAULT
+  end function nio_record_def
+
 !!!_  - get_default_header - get default header
   subroutine get_default_header &
        & (head,  &
@@ -5164,7 +5177,6 @@ contains
 
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer(kind=KIOFS) :: apini
-    integer f
     integer mfull  ! logical full-size
 
     ierr = 0

@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 10:03:03 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/25 22:16:42 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020,2021,2022,2023
@@ -83,8 +83,9 @@ contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, icomm)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_utl,only: utl_init=>init ! included by TOUZA_Std_log
     use TOUZA_Std_log,only: log_init=>init
-    use TOUZA_Std_utl,only: utl_init=>init, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -107,7 +108,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
        endif
        if (is_first_force(init_counts, mode)) then
@@ -121,7 +122,8 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode, icomm)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_utl,only: utl_diag=>diag, choice
     use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
     implicit none
     integer,intent(out)         :: ierr
@@ -166,7 +168,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -177,7 +179,8 @@ contains
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_utl,only: utl_finalize=>finalize
     use TOUZA_Std_log,only: log_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -209,7 +212,7 @@ contains
 #endif /* OPT_USE_MPI */
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
