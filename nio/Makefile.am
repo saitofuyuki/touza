@@ -1,7 +1,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2023/03/26 11:50:59 fuyuki Makefile.am>
+# Time-stamp: <2023/10/20 13:57:41 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022, 2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -18,6 +18,9 @@ include_HEADERS = touza_nio.h touza_nio_interface.h
 noinst_LTLIBRARIES = libtouza_local.la
 libtouza_local_la_SOURCES = nio_std.F90 nio_header.F90
 libtouza_local_la_SOURCES += nio_record.F90 nio_cache.F90
+
+libtouza_local_la_SOURCES += nio_sparse.F90
+
 if BUILD_div
 if with_mpi
 # libtouza_local_la_SOURCES += nio_division.F90
@@ -68,6 +71,7 @@ endif
 TEST_COMMON_LIBS += $(FC_LDADD_touza_trp) $(FC_LDADD_touza_std)
 
 check_PROGRAMS = test_nio_header test_nio_record test_nio_cache
+check_PROGRAMS += test_nio_sparse
 if BUILD_div
 check_PROGRAMS += test_nio_division
 endif
@@ -91,6 +95,11 @@ test_nio_record_SOURCES = $(TEST_COMMON_SOURCES) nio_record.F90
 test_nio_record_LDADD = $(TEST_COMMON_LIBS)
 test_nio_record_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_RECORD=1
 EXTRA_test_nio_record_DEPENDENCIES = $(test_nio_record_LDADD)
+
+test_nio_sparse_SOURCES = $(TEST_COMMON_SOURCES) nio_sparse.F90
+test_nio_sparse_LDADD = $(TEST_COMMON_LIBS)
+test_nio_sparse_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_SPARSE=1
+EXTRA_test_nio_sparse_DEPENDENCIES = $(test_nio_sparse_LDADD)
 
 WTEST_LOGDIR = log
 WTEST = wtest.sh
