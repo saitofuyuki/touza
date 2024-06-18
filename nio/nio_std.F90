@@ -50,6 +50,7 @@ module TOUZA_Nio_std
   use TOUZA_Std,only: max_members,      is_irec_overflow, sus_record_mems_irec
   use TOUZA_Std,only: def_block,        ignore_small,     ignore_bigger,  ignore_always
   use TOUZA_Std,only: sus_is_status_new
+  use TOUZA_Std,only: set_slice_loop,   init_offset,      next_offset
   use TOUZA_Std,only: debug_status
   use TOUZA_Std,only: new_htable,       reg_entry,        query_status
 !!!_  - default
@@ -110,6 +111,7 @@ module TOUZA_Nio_std
   public :: max_members,      is_irec_overflow, sus_record_mems_irec
   public :: def_block,        ignore_small,     ignore_bigger,  ignore_always
   public :: sus_is_status_new
+  public :: set_slice_loop,   init_offset,      next_offset
   public :: debug_status
   public :: new_htable,       reg_entry,        query_status
 contains
