@@ -844,6 +844,10 @@ family which performs permutation and/or insertion of coordinates.
 **** Record format flag
 - =-X[<flags>]=, =+X[<flags>]= :: set record format options.
 
+**** File-buffer naming flag
+- =-I= :: default (ITEM only)
+- =-Id= :: insert DSET as a prefix of ITEM (DSET/ITEM)
+
 **** Compromise domain policy
 - =-i= :: Inclusive domain mode for operation (default)
 - =-x= :: Intersect domain mode for operation

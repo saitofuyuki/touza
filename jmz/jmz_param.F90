@@ -1,10 +1,10 @@
 !!!_! jmz_param.F90 - TOUZA/Jmz parameters placeholder
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 6 2023
-#define TIME_STAMP 'Time-stamp: <2023/11/01 12:47:18 fuyuki jmz_param.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/15 10:54:34 fuyuki jmz_param.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2023
+! Copyright (C) 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -14,28 +14,42 @@
 #  include "jmz_config.h"
 #endif
 #include "jmz.h"
+!!!_* macros
+#ifndef   OPT_PATH_LEN
+#  define OPT_PATH_LEN 1024
+#endif
 !!!_@ TOUZA/Jmz/param - jmz parameters
 module Jmz_param
-  use TOUZA_Std,only: KFLT, KDBL, KIOFS
-  use TOUZA_Nio_record, only: laxs
+  use TOUZA_Std,only: KFLT, KDBL, KQPL, KIOFS
+  use TOUZA_Nio,only: litem, nitem, laxs, GFMT_END
 !!!_ + Declaration
 !!!_  - default
   implicit none
   public
+!!!_  - strings
+  integer,parameter,public :: lpath = OPT_PATH_LEN
+!!!_  - flag constants
+  integer,parameter,public :: fmode_default    = 0     ! default
+  integer,parameter,public :: fmode_new        = 1     ! error if exist
+  integer,parameter,public :: fmode_write      = 2     ! force overwrite
+  integer,parameter,public :: fmode_append     = 3     ! append
 !!!_  - float parameters
-  integer,parameter :: KBUF = __KBUF
+  integer,parameter :: KRSTD = __KBUF
+  integer,parameter :: KBUF  = KRSTD      ! for compatibility
 
-  real(kind=KBUF),parameter :: ZERO  = 0.0_KBUF
-  real(kind=KBUF),parameter :: ONE   = 1.0_KBUF
+!!!_  - literal
+  real(kind=KRSTD),parameter :: ZERO  = 0.0_KRSTD
+  real(kind=KRSTD),parameter :: ONE   = 1.0_KRSTD
+  real(kind=KRSTD),parameter :: TWO   = 2.0_KRSTD
 
-  real(kind=KBUF),parameter :: TRUE  = ONE
-  real(kind=KBUF),parameter :: FALSE = ZERO
+  real(kind=KRSTD),parameter :: TRUE  = ONE
+  real(kind=KRSTD),parameter :: FALSE = ZERO
 
-  real(kind=KBUF),parameter :: ULIMIT = + HUGE(ZERO)
-  real(kind=KBUF),parameter :: LLIMIT = - HUGE(ZERO)
+  real(kind=KRSTD),parameter :: ULIMIT = + HUGE(ZERO)
+  real(kind=KRSTD),parameter :: LLIMIT = - HUGE(ZERO)
 
-  real(kind=KBUF),parameter :: UNDEF  = -999.0_KBUF
-  ! real(kind=KBUF),parameter :: UNDEF  = LLIMIT
+  real(kind=KRSTD),parameter :: UNDEF  = -999.0_KRSTD
+  ! real(kind=KRSTD),parameter :: UNDEF  = LLIMIT
 
 !!!_  - coordinates
   integer,parameter :: lcoor = 6
@@ -102,19 +116,6 @@ module Jmz_param
 
 !!!_ + Procedures
 contains
-!!!_  - init
-  subroutine init(ierr)
-    implicit none
-    integer,intent(out) :: ierr
-    ierr = 0
-  end subroutine init
-!!!_  - finalize
-  subroutine finalize(ierr, u)
-    implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: u
-    ierr = 0
-  end subroutine finalize
 !!!_  - set_user_offsets - control offset for users
   subroutine set_user_offsets &
        & (ierr, off_bgn, off_end)

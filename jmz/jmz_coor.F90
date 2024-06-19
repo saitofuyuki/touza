@@ -1,10 +1,10 @@
 !!!_! jmz_coor.F90 - TOUZA/Jmz coordinate (loop) manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 6 2023
-#define TIME_STAMP 'Time-stamp: <2023/11/01 12:50:00 fuyuki jmz_coor.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/04/05 20:55:50 fuyuki jmz_coor.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2023
+! Copyright (C) 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -27,26 +27,11 @@
 module Jmz_coor
 !!!_ + Declaration
 !!!_  - modules
-  use TOUZA_Std,only: KFLT, KDBL, KIOFS
-  use TOUZA_Std,only: is_msglev
-  use TOUZA_Std,only: msglev_DETAIL,    msglev_NORMAL,    msglev_INFO,    msglev_DEBUG
-  use TOUZA_Std,only: msglev_WARNING
-  use TOUZA_Std,only: is_msglev_DETAIL, is_msglev_NORMAL, is_msglev_INFO, is_msglev_DEBUG
-  use TOUZA_Std,only: is_msglev_WARNING
-  use TOUZA_Std,only: trace_err
-
-  use TOUZA_Nio,only: litem
+  use Jmz_param
+  use Jmz_base
 !!!_  - default
   implicit none
   private
-!!!_  - i/o units
-  integer,save :: ulog = -1
-  integer,save :: uerr = -1
-!!!_  - global flags
-  integer,save :: lev_verbose = 0
-  integer,save :: dbgv = -1
-  integer,save :: stdv = -1
-
 !!!_  - coordinate kind
   integer,parameter,public :: KCO = OPT_JMZ_COORDINATE_KIND
 !!!_  - string
@@ -68,23 +53,24 @@ module Jmz_coor
   integer,parameter,public :: loop_normal = 2
 
 !!!_  - misc
-  integer(kind=KCO),parameter :: ZERO = 0_KCO
-  integer(kind=KCO),parameter :: ONE  = 1_KCO
+  integer(kind=KCO),parameter :: C0 = 0_KCO
+  integer(kind=KCO),parameter :: C1 = 1_KCO
+
 !!!_  - range special
-  integer(kind=KCO),parameter,public :: full_range = + HUGE(ZERO)              ! case low:
-  integer(kind=KCO),parameter,public :: null_range = (- HUGE(ZERO)) - ONE      ! case low (MUST BE NEGATIVE)
+  integer(kind=KCO),parameter,public :: full_range = + HUGE(C0)             ! case low:
+  integer(kind=KCO),parameter,public :: null_range = (- HUGE(C0)) - C1      ! case low (MUST BE NEGATIVE)
 
 !!!_  - loop property
   type loop_t
      integer           :: flg = loop_unset
-     integer(kind=KCO) :: bgn = - ONE
-     integer(kind=KCO) :: end = - ONE
-     integer(kind=KCO) :: ofs = ZERO
-     integer(kind=KCO) :: cyc = - ONE        ! 0 if still effective empty
+     integer(kind=KCO) :: bgn = - C1
+     integer(kind=KCO) :: end = - C1
+     integer(kind=KCO) :: ofs = C0
+     integer(kind=KCO) :: cyc = - C1        ! 0 if still effective empty
      character(len=lname) :: name
   end type loop_t
 
-  type(loop_t),save,public :: def_loop  = loop_t(loop_unset, null_range, null_range, ZERO, -ONE, ' ')
+  type(loop_t),save,public :: def_loop  = loop_t(loop_unset, null_range, null_range, C0, -C1, ' ')
 
   public :: loop_t
 
@@ -92,29 +78,24 @@ module Jmz_coor
   interface get_range_string
      module procedure get_range_string_t, get_range_string_c
   end interface get_range_string
+
+  interface flat_index_l2p
+     module procedure flat_index_l2p_be, flat_index_l2p_mem
+  end interface flat_index_l2p
+  interface logical_index_array
+     module procedure logical_index_array_be, logical_index_array_mem
+  end interface logical_index_array
+  interface physical_index_flat
+     module procedure physical_index_flat_be, physical_index_flat_mem
+  end interface physical_index_flat
 !!!_  - public
-  public :: init, finalize
   public :: get_range_string
   public :: is_null_coor, count_effective, coordinate_type
   public :: show_lpp
+  public :: pack_mems, gen_stride, flat_index_l2p
+  public :: logical_index_array, physical_index_flat
 !!!_ + Procedures
 contains
-!!!_  - init
-  subroutine init(ierr)
-    implicit none
-    integer,intent(out) :: ierr
-
-    ierr = 0
-  end subroutine init
-!!!_  - finalize
-  subroutine finalize(ierr, u)
-    implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: u
-
-    ierr = 0
-  end subroutine finalize
-
 !!!_  - show_lpp
   subroutine show_lpp &
        & (ierr, lpp, tag, u, levv, indent)
@@ -341,7 +322,6 @@ contains
     call join_list(ierr, str, cstr(0:nc), ldelim='[', rdelim=']')
   end subroutine get_domain_string
 
-
 !!!_  - get_range_string
   subroutine get_range_string_t &
        & (ierr, str, lpp)
@@ -495,7 +475,197 @@ contains
 
   end function coordinate_type
 
-!!!_ + End jmzlib
+!!!_ + primitives
+!!!_  & pack_mems
+  subroutine pack_mems(dest, n, src, xtbl)
+    implicit none
+    integer,intent(out) :: dest(0:*)
+    integer,intent(in)  :: n
+    integer,intent(in)  :: src(0:*)
+    integer,intent(in)  :: xtbl(0:*)
+    integer j, jj
+    jj = 0
+    do j = 0, n - 1
+       if (xtbl(j).ge.0) then
+          dest(jj) = src(j)
+          jj = jj + 1
+       endif
+    enddo
+  end subroutine pack_mems
+!!!_  & gen_stride
+  subroutine gen_stride(strd, n, mem, xtbl)
+    implicit none
+    integer,intent(out)         :: strd(0:*)
+    integer,intent(in)          :: n
+    integer,intent(in)          :: mem(0:*)
+    integer,intent(in),optional :: xtbl(0:*)   ! logical-physical exchanger
+    integer :: j, jj
+    integer :: t(0:n)
+    if (n.le.0) return
+    if (present(xtbl)) then
+       t(0) = 1
+       jj = 0
+       do j = 0, n - 1
+          if (xtbl(j).ge.0) then
+             t(j+1) = mem(j) * t(j)
+             jj = jj + 1
+          else
+             t(j+1) = t(j)
+          endif
+       enddo
+       strd(jj:n-1) = 0
+       do j = 0, n - 1
+          jj = xtbl(j)
+          if (jj.ge.0) then
+             strd(jj) = t(j)
+          endif
+       enddo
+    else
+       j = 0
+       strd(j) = 1
+       do j = 0, n - 2
+          strd(j+1) = strd(j) * max(1, mem(j))
+       enddo
+    endif
+  end subroutine gen_stride
+!!!_  & flat_index_l2p()
+  PURE &
+  integer function flat_index_l2p_be &
+       & (lflat, lbgn, lend, n, pstr, pofs, pcyc) &
+       &  result(pflat)
+    implicit none
+    integer,intent(in)          :: lflat
+    integer,intent(in)          :: lbgn(0:*), lend(0:*)  ! logical range
+    integer,intent(in)          :: n
+    integer,intent(in)          :: pstr(0:*)
+    integer,intent(in),optional :: pofs(0:*), pcyc(0:*)
+    integer :: lidx(0:n-1)
+    call logical_index_array(lidx, lflat, lbgn, lend, n)
+    pflat = physical_index_flat(lidx, lbgn, lend, n, pstr, pofs, pcyc)
+  end function flat_index_l2p_be
+  PURE &
+  integer function flat_index_l2p_mem &
+       & (lflat, lmem, n, pstr, pofs, pcyc) &
+       &  result(pflat)
+    implicit none
+    integer,intent(in)          :: lflat
+    integer,intent(in)          :: lmem(0:*)
+    integer,intent(in)          :: n
+    integer,intent(in)          :: pstr(0:*)
+    integer,intent(in),optional :: pofs(0:*), pcyc(0:*)
+    integer :: lidx(0:n-1)
+    call logical_index_array(lidx, lflat, lmem, n)
+    ! write(*, *) 'lidx', lflat, lidx(0:n-1)
+    pflat = physical_index_flat(lidx, lmem, n, pstr, pofs, pcyc)
+  end function flat_index_l2p_mem
+
+!!!_  & logical_index_array()
+  PURE &
+  subroutine logical_index_array_be(idx, flat, lbgn, lend, n)
+    implicit none
+    integer,intent(out) :: idx(0:*)
+    integer,intent(in)  :: flat
+    integer,intent(in)  :: lbgn(0:*), lend(0:*)
+    integer,intent(in)  :: n
+    integer :: lmem(0:n-1)
+
+    lmem(0:n-1) = lend(0:n-1) - lbgn(0:n-1)
+    call logical_index_array_mem(idx, flat, lmem, n)
+  end subroutine logical_index_array_be
+  PURE &
+  subroutine logical_index_array_mem(idx, flat, lmem, n)
+    implicit none
+    integer,intent(out) :: idx(0:*)
+    integer,intent(in)  :: flat
+    integer,intent(in)  :: lmem(0:*)
+    integer,intent(in)  :: n
+    integer jf, j
+
+    if (n.le.0) return
+
+    jf = flat
+    j = 0
+    idx(j) = mod(jf, lmem(j))
+    do j = 1, n - 1
+       jf = jf / lmem(j-1)
+       idx(j) = mod(jf, lmem(j))
+    enddo
+  end subroutine logical_index_array_mem
+!!!_  & physical_index_flat()
+  PURE &
+  integer function physical_index_flat_mem &
+       & (lidx, lmem, n, pstr, pofs, pcyc) &
+       &  result(flat)
+    implicit none
+    integer,intent(in)          :: lidx(0:*)             ! logical indices
+    integer,intent(in)          :: lmem(0:*)
+    integer,intent(in)          :: n
+    integer,intent(in)          :: pstr(0:*)
+    integer,intent(in),optional :: pofs(0:*), pcyc(0:*)
+    integer :: lbgn(0:n-1)
+    lbgn(0:n-1) = 0
+    flat = physical_index_flat_be(lidx, lbgn, lmem, n, pstr, pofs, pcyc)
+  end function physical_index_flat_mem
+
+  PURE &
+  integer function physical_index_flat_be &
+       & (lidx, lbgn, lend, n, pstr, pofs, pcyc) &
+       &  result(flat)
+    implicit none
+    integer,intent(in)          :: lidx(0:*)             ! logical indices
+    integer,intent(in)          :: lbgn(0:*), lend(0:*)  ! logical range
+    integer,intent(in)          :: n
+    integer,intent(in)          :: pstr(0:*)
+    integer,intent(in),optional :: pofs(0:*), pcyc(0:*)
+    integer po(0:n-1), pc(0:n-1)
+    if (present(pofs)) then
+       if (present(pcyc)) then
+          flat = physical_index_flat_core(lidx, lbgn, lend, n, pstr, pofs, pcyc)
+       else
+          pc(0:n-1) = 0
+          flat = physical_index_flat_core(lidx, lbgn, lend, n, pstr, pofs, pc)
+       endif
+    else if (present(pcyc)) then
+       po(0:n-1) = 0
+       flat = physical_index_flat_core(lidx, lbgn, lend, n, pstr, po, pcyc)
+    else
+       po(0:n-1) = 0
+       pc(0:n-1) = 0
+       flat = physical_index_flat_core(lidx, lbgn, lend, n, pstr, po, pc)
+    endif
+  end function physical_index_flat_be
+
+!!!_  & physical_index_flat_core()
+  PURE &
+  integer function physical_index_flat_core &
+       & (lidx, lbgn, lend, n, pstr, pofs, pcyc) &
+       &  result(flat)
+    implicit none
+    integer,intent(in) :: lidx(0:*)                        ! logical indices
+    integer,intent(in) :: lbgn(0:*), lend(0:*)             ! logical range
+    integer,intent(in) :: n
+    integer,intent(in) :: pofs(0:*), pstr(0:*), pcyc(0:*)  ! physical offsets, strides, cyclic flags
+
+    integer j, jj
+
+    flat = 0
+    !NEC$ novector
+    do j = 0, n - 1
+       if (lbgn(j).le.lidx(j) .and. lidx(j).lt.lend(j)) then
+          jj = pofs(j) + lidx(j)
+          if (pcyc(j).gt.0) then
+             flat = flat + modulo(jj, pcyc(j)) * pstr(j)
+          else
+             flat = flat + jj * pstr(j)
+          endif
+       else
+          flat = -1
+          exit
+       endif
+    enddo
+  end function physical_index_flat_core
+
+!!!_ + End Jmz_coor
 end module Jmz_coor
 !!!_! FOOTER
 !!!_ + Local variables

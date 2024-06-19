@@ -1,0 +1,666 @@
+/* agmp helper */
+/* Maintainer: SAITO Fuyuki */
+/* Time-stamp: <2024/01/18 17:20:06 fuyuki intersects_agmp.max> */
+
+load("f90")$
+stardisp: true$
+fpprec: 33$
+linel: 192$
+llim: linel-20$
+ratprint: false$
+
+/* arguments */
+if not constantp(ORDER) then ORDER:7$
+DEBUG: is(equal(DEBUG, 1))$
+
+/* area of quadraliteral (geodesic-meridian-equator-meridan) */
+gmem(lat1, lat2, lon1, lon2) := \
+   block([R, S, C, T, dlath, alat, dlonh],
+          dlath: (lat2 - lat1) / 2, 
+          alat:  (lat2 + lat1) / 2,
+          dlonh: (lon2 - lon1) / 2, 
+          S: sin(alat), 
+          C: cos(dlath),
+          T: tan(dlonh),
+          R: 2 * atan((S / C) * T),
+          if DEBUG then print("gmem:", R, dlath, S, C, T),
+          R)$
+/* area of quadraliteral (parallel-meridian-equator-meridan) */
+pmem(lat, lon1, lon2) := \
+   block([R, S, dlon],
+          dlon: lon2 - lon1,
+          S: sin(lat), 
+          R: S * dlon,
+          if DEBUG then print("pmem:", R, dlon, S),
+          R)$
+
+/* area of triangle (geodesic-meridian-parallel) */
+gmp(lat1, lat2, lon1, lon2) := \
+   block([G, P, R],
+          G: gmem(lat1, lat2, lon1, lon2),
+          P: pmem(lat1, lon1, lon2),
+          R: G - P,
+          if DEBUG then print("gmp:", R, G, P),
+          R)$
+
+/* gmem(lat1, lat2, lon1, lon2); */
+/* pmem(lat, lon1, lon2); */
+/* gmp(lat1, lat2, lon1, lon2); */
+
+/* assume(cos(dlath) > 0)$ */
+
+/* base expression for taylor expansion */
+GMEM(lat1, dlath, lon1, dlonh) := \
+    trigreduce(expand(trigexpand(lratsubst([lat2 = lat1 + 2 * dlath, lon2 = lon1 + 2 * dlonh],
+                                           gmem(lat1, lat2, lon1, lon2)))))$
+/* GMEM(lat1, dlath, lon1, dlonh); */
+
+/* Draft design [c], taylor expansion around tan(dlat/2) and dlon/2 */
+
+GMEM_c: taylor(lratsubst([tan(dlath) = e * tdlath, dlonh = e * dlonh],
+                          GMEM(lat1, dlath, lon1, dlonh)), 
+               e, 0, ORDER)$
+
+/* Cc:n  ORDER NUM-EXPR    -  base expression to expand (numerator) */
+/* Cc:d  ORDER DENOM DENOM -  denominator */
+/* Cc:c  ORDER POWER       -  power of cosine-term, -1 if unexpected formulation */
+/* Cc:l  ORDER DP CP EXPR - coefficients */
+
+/* sum(Cc[o,k] * (cos(lat) ** cp) * (tan(dlat/2) ** o) * ((dlon/2) ** k)) */
+
+for o:0 thru ORDER do
+  block([C, j, k, p, D, N, X, Xs, Y, Ys, cp, s],
+         /* local C[0,1] is preserved for health check, but removed from Cc[0,1] */
+         C: 0,
+         for j:0 thru ORDER do C: C + coeff(coeff(GMEM_c, e, j), tdlath, o),
+         Cc[o]: C,
+         C: ratsimp(subst([tdlath = tan(dlath), sin(lat1) = s, cos(lat1) = c], C)),
+         if C # 0
+         then (N: expand(num(C)), D: denom(C),
+               s: string(N),
+               if slength(s) > llim then s: sconcat(substring(s, 1, llim), "..."),
+               print("Cc:n ", o, s),
+               print("Cc:d ", o, string(D), string(denom(ratsimp(Cc[o])))),
+               cp: lopow(N, c),
+               if hipow(N, c) # cp
+                 then print("Cc:c ", o, -1)
+                 else print("Cc:c ", o, cp),
+               for k: 0 thru hipow(N, dlonh) do
+                 (Y: coeff(N, dlonh, k),
+                  cp: lopow(Y, c),
+                  if hipow(Y, c) # cp then print("Cc: not multiple of c"),
+                  if mod(k, 2) # 0 or Y # 0 then
+                  (Ys: coeff(Y, c, cp),
+                   print("Cc:l ", o, k, cp, string(horner(Ys))))))
+         )$
+
+/* health check and pmem adjustment */
+if coeff(Cc[0], dlonh, 0) # 0 then error("Panic in Cc[0] = ", Cc[0])$
+
+block([C0, P],
+      C0: coeff(Cc[0], dlonh, 1),
+      P: pmem(lat1, lon1, lon1 + 2 * dlonh) / dlonh,
+      if C0#P then error("Panic in Cc[0, 1] = ", C0, P))$
+
+Cc[0]: Cc[0] - pmem(lat1, lon1, lon1 + 2 * dlonh)$
+
+/* implementation check */
+GMP_c(dlonh, lat1, dlath, o) := \
+block([j, I],
+  R: 0,
+  for j:o thru 0 step -1
+    do (I: float(ev(Cc[j])) * (float(tan(dlath))**j),
+        R: R + I),
+  return(R))$
+
+/* Draft design [d], taylor expansion around dlon/2 only */
+GMEM_d: taylor(lratsubst([tan(dlath) = tdlath, dlonh = e * dlonh],
+                          GMEM(lat1, dlath, lon1, dlonh)), 
+               e, 0, ORDER)$
+
+/* sum(Cd[o,k] * (cos(lat) ** cp) * (tan(dlat/2) ** o) * ((dlon/2) ** k)) */
+
+for o:0 thru ORDER do
+  block([C, j, k, p, D, N, X, Xs, Y, Ys, cp, s],
+         /* declare(s, mainvar), */
+         /* declare(s2, mainvar), */
+         /* powerdisp:true, */
+         /* local C[0,1] is preserved for health check, but removed from Cc[0,1] */
+         C: 0,
+         for j:0 thru ORDER do C: C + coeff(coeff(GMEM_d, e, j), tdlath, o),
+         Cd[o]: C,
+         C: ratsimp(subst([tdlath = tan(dlath), sin(lat1) = s, cos(lat1) = c], C)),
+         if C # 0
+         then (N: expand(num(C)), D: denom(C),
+               s: string(N),
+               if slength(s) > llim then s: sconcat(substring(s, 1, llim), "..."),
+               print("Cd:n ", o, s),
+               print("Cd:d ", o, string(D), string(denom(ratsimp(Cd[o])))),
+               cp: lopow(N, c),
+               if hipow(N, c) # cp
+                 then print("Cd:c ", o, -1)
+                 else print("Cd:c ", o, cp),
+               tn:lratsubst([dlonh=x, c=1], N / D),
+               td: denom(tn), tn: num(tn),
+               block([powerdisp], powerdisp:true,
+                      print("Cd:t ", o, string(tn), string(td), string(c^cp))),
+               for k: 0 thru hipow(N, dlonh) do
+                 (Y: coeff(N, dlonh, k),
+                  cp: lopow(Y, c),
+                  if hipow(Y, c) # cp then print("Cd: not multiple of c"),
+                  if mod(k, 2) # 0 or Y # 0 then
+                  (Ys: coeff(Y, c, cp),
+                   print("Cd:l ", o, k, cp, string(horner(Ys)))
+                   
+))))$
+
+/* health check and pmem adjustment */
+if coeff(Cd[0], dlonh, 0) # 0 then error("Panic in Cd[0] = ", Cd[0])$
+
+block([C0, P],
+      C0: coeff(Cd[0], dlonh, 1),
+      P: pmem(lat1, lon1, lon1 + 2 * dlonh) / dlonh,
+      if C0#P then error("Panic in Cd[0, 1] = ", C0, P))$
+
+Cd[0]: Cd[0] - pmem(lat1, lon1, lon1 + 2 * dlonh)$
+
+/* implementation check */
+GMP_d(dlonh, lat1, dlath, o) := \
+block([j, I],
+  R: 0,
+  for j:o thru 0 step -1
+    do (I: float(ev(Cd[j])) * (float(tan(dlath))**j),
+        R: R + I),
+  return(R))$
+
+/* Draft design [e], taylor expansion around dlon/2, in terms of sin cos (n phi) */
+
+ORDERe: ORDER * 2$
+
+GMEM_e: expand(trigreduce(taylor(GMEM(lat1, dlath, lon1, dlonh), dlonh, 0, ORDERe)))$
+
+/* sum(Ce[o,even]  * sin((2o+1)*lat1))
+   + sum(Ce[o,odd] * cos((2o+1)*lat1) * tan(dlath)) */
+
+for o:0 thru ORDER do
+  block([C, S, T, k, Y, N, D],
+        S: ratsimp(coeff(GMEM_e, sin((2 * o + 1) * lat1))),
+        C: ratsimp(coeff(GMEM_e, cos((2 * o + 1) * lat1)) / tan(dlath)),
+        /* print(["S", o, string(S)]), */
+        /* print(["C", o, string(C)]), */
+        Ce[2 * o]: S,
+        Ce[2 * o + 1]: C)$
+
+for o:0 thru 2 * ORDER + 1 do
+  block([C, N, D, k, Y, YT, s, td, tn],
+         C: Ce[o],
+         if C # 0 then
+         (N: expand(num(C)),
+          D: denom(C),
+          s: string(N),
+          if slength(s) > llim then s: sconcat(substring(s, 1, llim), "..."),
+          /* print("Ce:t ", o, string(subst([dlonh=x,tan(dlath)=y], N)), "/", D), */
+          print("Ce:n ", o, s),
+          print("Ce:d ", o, string(D)),
+          for k: 0 thru hipow(N, dlonh) do
+          (Y: coeff(N, dlonh, k),
+           YT: Y,
+           /* if mod(o, 2) # 0 then YT: YT * tan(dlath), */
+           if Y#0 then (print("Ce:l ", o, k,
+                             string(horner(ratsubst(tdhsq, tan(dlath)^2, Y)))),
+                        tn:ratsubst(y, tan(dlath), YT / D),
+                        td: denom(tn), tn: num(tn),
+                        print("Ce:t ", o, string(tn), string(td), string(x^k)))
+)))$
+ 
+/* health check and pmem adjustment */
+
+block([C0, P],
+      C0: coeff(expand(Ce[0]), dlonh, 1),
+      P: pmem(lat1, lon1, lon1 + 2 * dlonh) / dlonh / sin(lat1),
+      if C0 # P then error("Panic in Ce[0, 1] = ", C0, P))$
+Ce[0]: expand(Ce[0] - pmem(lat1, lon1, lon1 + 2 * dlonh) / sin(lat1))$
+
+GMP_e(dlonh, lat1, dlath, o) := \
+block([j, je, jo, Se, So, Ie, Io],
+  R: 0, Se: 0, So: 0,
+  for j: (o * 2 - 1) thru 0 step -2
+    do (je: j - 1,
+        jo: j,
+        Ie: float(ev(Ce[je])) * float(sin(jo * lat1)),
+        Io: float(ev(Ce[jo])) * float(cos(jo * lat1)) * float(tan(dlath)),
+        Se: Se + Ie, So: So + Io,
+        if DEBUG then print(jo, Io, So),
+        if DEBUG then print(je, Ie, Se),
+        R: R + (Io + Ie)),
+ return(R))$
+
+/* demonstrations */
+
+if not constantp(REFL) then REFL: 70$
+if not constantp(DLAT) then DLAT: 0.0001$
+if not constantp(DLON) then DLON: DLAT$
+
+dlath: %pi*DLAT/180/2$
+dlonh: %pi*DLON/180/2$
+dlat:  %pi*DLAT/180$
+dlon:  %pi*DLON/180$
+
+lat1:  %pi*REFL/180$
+lat2:  lat1 + dlath * 2$
+lon1:  0$
+lon2:  %pi*DLON/180$
+
+bdlath: bfloat(%pi) * bfloat(DLAT) / 180.b0 / 2.b0$
+bdlonh: bfloat(%pi) * bfloat(DLON) / 180.b0 / 2.b0$
+
+blat1:  bfloat(%pi) * bfloat(REFL) / 180.b0$
+blat2:  blat1 + bdlath * 2.b0$
+blon1:  bfloat(0)$
+blon2:  bfloat(%pi) * bfloat(DLON) / 180.b0$
+
+print("## Demo", REFL, DLAT, DLON)$
+
+S0: bfloat(gmp(blat1, blat2, blon1, blon2))$
+S1: float(gmp(lat1, lat2, lon1, lon2))$
+
+err(ref, x) := if is(equal(ref, 0)) then (x - ref) else ((x - ref) / ref)$
+Chk(ref, sol, tag, o) := print(tag, o,
+                               string(sol),
+                               string(float(sol - ref)),
+                               string(float(err(ref, sol))))$
+print("S0:", 0, string(S0))$
+Chk(S0, S1, "S1:", 1)$
+
+/* print("dlon", float(dlonh), float(lat1), float(dlath), float(tan(dlath)), float(tan(dlath))**2); */
+
+for o:ORDER thru ORDER do
+  block([Sc, Sd, Se],
+    Sc: GMP_c(dlonh, lat1, dlath, o),
+    Sd: GMP_d(dlonh, lat1, dlath, o),
+    Se: GMP_e(dlonh, lat1, dlath, o),
+    Chk(S0, Sc, "Sc:", o),
+    Chk(S0, Sd, "Sd:", o),
+    Chk(S0, Se, "Se:", o))$
+
+quit();
+
+/* Obsolete */
+
+/* GMME - PMME */
+/* kill(all)$ */
+load("f90")$
+if not constantp(ORDER) then ORDER:7$
+stardisp:true$
+fpprec: 33$
+linel: 192$
+llim: linel-20$
+DEBUG: is(equal(DEBUG, 1))$
+
+assume(cos(phi) > 0, sin(phi) > 0, tan(l2) > 0)$
+
+/* phi:    reference latitude */
+/* phi+2d: target latitude */
+/* tlon2:  tan(longitude difference / 2) */
+
+gmem(phi, d, tlon2)  := block([S, C, T, R],
+                              S: sin(phi + d), C: cos(d), T:tlon2, R: 2 * atan((S / C) * T),
+                              R)$
+                              /* 2 * atan((sin(phi + d) / cos(d)) * tlon2))$ */
+/* gmemb(phi, d, tlon2) := 2 * atan(((sin(phi) * cos(d) + cos(phi) * sin(d)) / cos(d)) * tlon2)$ */
+gmemb(phi, d, tlon2) := block([S, C, D, T, R],
+                               S: sin(phi), C: cos(phi), D: tan(d), T: tlon2,
+                               R: 2 * atan((S + C * D) * T),
+                               if DEBUG then print("gmemb", string([S, C, D, T, R])),
+                               R)$
+/* 2 * atan(((sin(phi) + cos(phi) * tan(d))) * tlon2)$ */
+
+pmem(phi, tlon2) := block([S, T, R],
+                           S: sin(phi), T: atan(tlon2) * 2, R: S * T,
+                           if DEBUG then print("pmem", string([phi, S, T, R])),
+                           R)$
+                           
+  /* sin(phi) * atan(tlon2) * 2$ */
+
+gmpm2(phi, d, tlon2) := block([G, P, R],
+                        G:gmemb(phi, d, tlon2), P: pmem(phi, tlon2), R: (G - P) / 2,
+                        if DEBUG then print("GP", string([phi, G, P, R*2])),
+                        R)$
+gmpm2q(phi, d, tlon2) := bfloat(float(gmem(phi, d, tlon2)) - float(pmem(phi, tlon2))) / 2$
+
+/* expansion relative to d */
+GMEM2: taylor(subst([d = e * dd, tlon2 = tan(e * l2)],
+                    gmem(phi, d, tlon2) / 2), e, 0, ORDER)$
+
+/* expansion relative to sin(d) */
+/* trigexpand(sin(phi+d)): cos(d)*sin(phi) + sin(d)*cos(phi) */
+
+GMEM2b: taylor(subst([tan(d) = e * td, tlon2 = tan(e * l2)],
+                           gmemb(phi, d, tlon2) / 2), e, 0, ORDER)$
+
+/* design [a] */
+for o:0 thru ORDER do
+  Ca[o]: expand(subst([dd = d], coeff(GMEM2, e, o)))$
+
+if Ca[0] # 0 then error("Panic in Ca[0] = ", Ca[0])$
+
+if Ca[1] - trigreduce(subst([tlon2 = tan(l2)], pmem(phi, tlon2) / 2)) # 0 \
+   then error("Panic in Ca[1] = ", Ca[1])$
+
+for o:2 thru ORDER do
+  block([C, j, k, p, D, N, X],
+         C: expand(subst([dd = d], coeff(GMEM2, e, o))),
+         C: ratsimp(subst([sin(phi) = s, cos(phi) = c], C)),
+         N: expand(num(C)), D: denom(C),
+         print("Ca:", o, ": ", string(N)),
+         print("Ca:", o, ": ", string(D)),
+         p:hipow(N, l2),
+         for j from 0 thru p
+         do (k: o - j,
+             X: factor(coeff(coeff(N, l2, j), d, k)),
+             print("Ca:", o,j,k, ": ",
+                   string(horner(X, s)), " : ",
+                   string(horner(X, c)))))$
+
+/* design [b] */
+for o:0 thru ORDER do
+  Cb[o]: expand(subst([td = tan(d)], coeff(GMEM2b, e, o)))$
+
+if Cb[0] # 0 then error("Panic in Cb[0] = ", Cb[0])$
+
+if Cb[1] - trigreduce(subst([tlon2 = tan(l2)], pmem(phi, tlon2) / 2)) # 0 \
+   then error("Panic in Cb[1] = ", Cb[1])$
+
+/* output */
+/* Cb:n order : numerator */
+/* Cb:d order : denominator */
+/* Cb:t order l2-power tan(d)-power : cosine power : coeff(horner) : coeff-full */
+
+for o:2 thru ORDER do
+  block([C, j, k, p, D, N, X, Xs, cp],
+         C: expand(subst([td = tan(d)], coeff(GMEM2b, e, o))),
+         C: ratsimp(subst([sin(phi) = s, cos(phi) = c], C)),
+         N: expand(num(C)), D: denom(C),
+         print("Cb:n ", o, ": ", string(N)),
+         print("Cb:d ", o, ": ", string(D)),
+         /* p:hipow(N, l2), */
+         for j from 0 thru o
+         do (k: o - j,
+             X: factor(coeff(coeff(N, l2, j), tan(d), k)),
+             cp: lopow(X,c),
+             if hipow(X,c) # cp then print("Cb: not multiple of c"),
+             Xs: coeff(X, c, cp),
+             print("Cb:t ", o,j,k, ": ",
+                   string(cp), ": ",
+                   string(horner(Xs, s)), ": ",
+                   string(factor(X))
+                   )))$
+
+/* design [c] */
+for o:0 thru ORDER do
+  block([C, j, k, p, D, N, X, Xs, Y, Ys, cp, s],
+         C:0,
+         /* for j:0 thru ORDER do */
+         /*    (if o#0 or j#1 then C: C + coeff(coeff(GMEM2b, e, j), td, o)), */
+         for j:0 thru ORDER do C: C + coeff(coeff(GMEM2b, e, j), td, o),
+         /* C[0,1] is preserved for health check, but removed from Cc[0,1] */
+         Cc[o]: C,
+         if equal(o,0) then Cc[o]: Cc[o] - pmem(phi, tan(l2)) / 2,
+         Cc[o]: Cc[o] * (tan(d) ** o),
+         /* print(o, string(Cc[o])), */
+         C: ratsimp(subst([td = tan(d), sin(phi) = s, cos(phi) = c], C)),
+         if C # 0
+         then (N: expand(num(C)), D: denom(C),
+               s:string(N),
+               if slength(s) > llim then s: sconcat(substring(s, 1, llim), "..."),
+               print("Cc:n ", o, s),
+               print("Cc:d ", o, string(D), string(denom(ratsimp(Cc[o])))),
+               cp: lopow(N,c),
+               if hipow(N,c) # cp
+                 then print("Cc:c ", o, 0)
+                 else print("Cc:c ", o, cp),
+               for k:0 thru hipow(N, l2) do
+                 (Y: coeff(N, l2, k),
+                  cp: lopow(Y,c),
+                  if hipow(Y,c) # cp then print("Cc: not multiple of c"),
+                  if equal(k%2, 0) or Y#0 then
+                     (Ys: coeff(Y, c, cp),
+                      print("Cc:l ", o, k, cp, string(horner(Ys)))))))$
+
+/* design [d], discard */
+/* rGMEM2b: expand(trigreduce(GMEM2b))$ */
+/* /\*rGMEM2b; *\/ */
+/* for o:0 thru ORDER do */
+/*   block([C, S, j, k, p, D, N, X, Xs, Y, Ys, cp, s], */
+/*         S: coeff(subst([e=1], rGMEM2b), sin((2 * o + 1) * phi)), */
+/*         S: ratsimp(S), */
+/*         C: coeff(subst([e=1], rGMEM2b), cos((2 * o + 1) * phi)), */
+/*         C: ratsimp(C), */
+/*         D: denom(S), */
+/*         print(["D", o, denom(S), denom(C)]), */
+/*         print(["S", o, string(S)]), */
+/*         for j:0 thru ORDER do */
+/*         (Cds[o,j]: coeff(num(S), td, j), */
+/*         print([o, j, string(Cds[o,j])])), */
+/*         print(["C", o, string(C)]), */
+/*         for j:0 thru ORDER do */
+/*         (Cdc[o,j]: coeff(num(C), td, j), */
+/*         print([o, j, string(Cdc[o,j])])) */
+/*         )$ */
+
+/* design [e] */
+
+/* trigreduce(taylor(subst([tlon2 = tan(l2)], gmemb(phi, d, tlon2) / 2), l2, 0, 6)); */
+/* trigreduce(subst([tlon2 = tan(l2)], pmem(phi, tlon2) / 2)); */
+/* trigreduce(taylor(subst([tlon2 = tan(l2)], gmemb(phi, d, tlon2) / 2), l2, 0, 6)) - trigreduce(subst([tlon2 = tan(l2)], pmem(phi, tlon2) / 2))n; */
+
+rGMEM2e: expand(trigreduce(taylor(subst([tlon2 = tan(l2)], gmemb(phi, d, tlon2) / 2), l2, 0, ORDER)))$
+for o:0 thru ORDER do
+  block([C, S, j, k, p, D, N, X, Xs, Y, Ys, cp, s],
+        S: ratsimp(coeff(rGMEM2e, sin((2 * o + 1) * phi))),
+        C: ratsimp(coeff(rGMEM2e, cos((2 * o + 1) * phi)) / tan(d)),
+        /* print(["S", o, string(S)]), */
+        /* print(["C", o, string(C)]), */
+        Ce[2*o]: S, Ce[2*o+1]: C,
+        if S # 0
+        then (N: expand(num(S)), D: denom(S),
+              s:string(N),
+              if slength(s) > llim then s: sconcat(substring(s, 1, llim), "..."),
+              print("Ce:ns ", o, s),
+              print("Ce:ds ", o, string(D)),
+              for k:0 thru hipow(N, l2) do
+                (Ys:coeff(N, l2, k),
+                 if Ys#0 then print("Ce:ls ", o, k, string(horner(ratsubst(tdhsq, tan(d)^2, Ys), tdhsq))))),
+        if C # 0
+        then (N: expand(num(C)), D: denom(C),
+              s:string(N),
+              if slength(s) > llim then s: sconcat(substring(s, 1, llim), "..."),
+              print("Ce:nc ", o, s),
+              print("Ce:dc ", o, string(D)),
+              for k:0 thru hipow(N, l2) do
+                (Ys:coeff(N, l2, k),
+                 if Ys#0 then print("Ce:lc ", o, k, string(horner(ratsubst(tdhsq, tan(d)^2, Ys), tdhsq))))))$
+
+Ce[0]: ratsimp(Ce[0] - l2)$
+
+/* ---------------------------------------------------------------------- */
+if not constantp(REFL) then REFL:70$
+if not constantp(DLAT) then DLAT:0.0001$
+if not constantp(DLON) then DLON:DLAT$
+
+refl: %pi*REFL/180$
+dlath: %pi*DLAT/180/2$
+dlon:  %pi*DLON/180$
+dlonh: %pi*DLON/180/2$
+
+brefl:  bfloat(%pi) * bfloat(REFL) / 180.b0$
+bdlath: bfloat(%pi) * bfloat(DLAT) / 180.b0 / 2.b0$
+bdlonh: bfloat(%pi) * bfloat(DLON) / 180.b0 / 2.b0$
+
+print("## Demo", REFL, DLAT, DLON)$
+/* print(sin(bfloat(refl)), cos(bfloat(%pi/2-refl)))$ */
+/* print(sin(bfloat(float(%pi))*REFL/180), bfloat(float(%pi))*REFL/180)$ */
+/* print(bfloat(REFL), bfloat(refl))$ */
+
+/* print("DLON", bfloat(DLON), bfloat(%pi))$ */
+/* print("dlon:   ", string(dlon))$ */
+/* print("dlon:B  ", bdlonh*2)$ */
+/* print("dlon:fb-", bfloat(bfloat(%pi)*bfloat(DLON/180)))$  /\* THIS ONE *\/ */
+/* print("dlon:f  ", float(%pi)*float(DLON)/float(180))$ */
+/* print("dlon:fbb", bfloat(float(%pi)*bfloat(DLON)/bfloat(180)))$ */
+/* print("dlon:fff", bfloat(float(%pi)*float(DLON)/float(180)))$ */
+/* print("dlon:fbf", bfloat(float(%pi)*bfloat(DLON)/float(180)))$ */
+/* print("dlon:ffb", bfloat(float(%pi)*float(DLON)/bfloat(180)))$ */
+/* print("dlon:bff", bfloat(bfloat(%pi)*float(DLON)/float(180)))$ */
+/* print("dlon:bbf", bfloat(bfloat(%pi)*bfloat(DLON)/float(180)))$ */
+/* print("dlon:bbb", bfloat(bfloat(%pi)*bfloat(DLON)/bfloat(180)))$ */
+/* print("dlon:bfb", bfloat(bfloat(%pi)*float(DLON)/bfloat(180)))$ */
+
+/* S0: bfloat(2*gmpm2(bfloat(refl), bfloat(dlath), tan(bfloat(dlonh))))$ */
+/* S0: bfloat(2*gmpm2(bfloat(refl), bfloat(dlath), bfloat(tan(bdlonh))))$ */
+S0: bfloat(2*gmpm2(bfloat(brefl), bfloat(bdlath), bfloat(tan(bdlonh))))$
+S1: float(2*gmpm2(refl, dlath, tan(dlonh)))$
+S1q: 2*gmpm2q(refl, dlath, tan(dlonh))$
+
+/* print(bfloat(gmem(bfloat(refl), bfloat(dlath), tan(bfloat(dlonh))))); */
+/* print(bfloat(pmem(bfloat(refl), tan(bfloat(dlonh))))); */
+
+GMPM2e(dlon, refl, dlat, o) := \
+block([j, I0, I1],
+  Se: 0,
+  for j:2*o thru 0 step -2
+    do (I0: float(subst([l2=dlon, phi=refl, d=dlat], Ce[j])   * sin((j+1)*refl)),
+        I1: float(subst([l2=dlon, phi=refl, d=dlat], Ce[j+1]) * cos((j+1)*refl) * tan(dlat)),
+        /* print("c:", string(I)), */
+        Se: Se + float(I0 + I1)),return(Se))$
+
+GMPM2c(dlon, refl, dlat, o) := \
+block([j, I],
+  Sc: 0,
+  for j:o thru 0 step -1
+    do (I: float(subst([l2=dlon, phi=refl, d=dlat], Cc[j])),
+        /* print("c:", string(I)), */
+        Sc: Sc + I),return(Sc))$
+/* GMPM2c(dlon, refl, dlat, o) := \ */
+/* block([j, I], */
+/*   Sc: 0, */
+/*   for j:o thru 2 step -1 */
+/*     do (I: float(subst([l2=dlon, phi=refl, d=dlat], Cc[j])), */
+/*         Sc: Sc + I), */
+/*   for j:0 thru 1 */
+/*     do (I: float(subst([l2=dlon, phi=refl, d=dlat], Cc[j])), */
+/*         Sc: Sc + I),return(Sc))$ */
+
+GMPM2a(dlon, refl, dlat, o) := \
+block([j, I],
+  Sa:0,
+    for j:o thru 2 step -1
+    do (Sa: Sa + float(subst([l2=dlon, phi=refl, d=dlat], Ca[j]))),
+    return(Sa))$
+
+GMPM2b(dlon, refl, dlat, o) := \
+block([j, I],
+  Sb:0,
+    for j:o thru 2 step -1
+    do ((I: float(subst([l2=dlon, phi=refl, d=dlat], Cb[j])),
+        /* print("b:", string(I)),         */
+        Sb: Sb + I)),
+    return(Sb))$
+
+err(ref,x) := if is(equal(ref,0)) then x-ref else (x-ref)/ref$
+
+print("S0:", 0, string(S0), string(S1), string(float(err(S0, S1))))$
+
+for o:ORDER thru ORDER do
+  block([Sa, Sb, Sc],
+    /* Sa: 0, Sb:0, Sc:0,  */
+    /* for j:o thru 2 step -1 */
+    /* do (Sa: Sa + float(subst([l2=dlon, phi=refl, d=dlat], C[j])), */
+    /*     Sb: Sb + float(subst([l2=dlon, phi=refl, d=dlat], Cb[j]))), */
+    /* for j:o thru 0 step -1 */
+    /* do (Sc: Sc + float(subst([l2=dlon, phi=refl, d=dlat], Cc[j]))), */
+    Sa: 2*GMPM2a(dlonh, refl, dlath, o),
+    Sb: 2*GMPM2b(dlonh, refl, dlath, o),
+    Sc: 2*GMPM2c(dlonh, refl, dlath, o),
+    Se: 2*GMPM2e(dlonh, refl, dlath, o),
+    print("Sa:", o, string(Sa), string(float(Sa-S0)), string(float(err(S0,Sa)))),
+    print("Sb:", o, string(Sb), string(float(Sb-S0)), string(float(err(S0,Sb)))),
+    print("Sc:", o, string(Sc), string(float(Sc-S0)), string(float(err(S0,Sc)))),
+    print("Se:", o, string(Se), string(float(Se-S0)), string(float(err(S0,Se)))))$
+
+quit()$
+
+assume(cos(p1)>0)$
+assume(sin(p1)>0)$
+A12ht: (sin(p1 + d) / cos(d)) * tlh$
+A23h:  sin(p1) * atan(tlh)$
+A12h: atan(A12ht)$
+refl:89$
+dt:0.001$
+dt:0.00001$
+dl:dt$
+order: 4$ /* d \sim 0.0001 */
+order: 5$ /* d \sim 0.001 */
+order: 6$ /* d \sim 0.1 */
+order: 8$ /* d \sim 1 */
+
+/* order: 4$ */
+/* refl:60$ */
+/* dt:0.01$ */
+/* order: 5$ */
+/* dl:dt; */
+
+AA: taylor(subst([d = e * dd, tlh = tan(e * lh)], A12h), e, 0, order)$
+for o:0 thru order do D[o]: expand(subst([dd=d], coeff(AA, e, o)))$
+
+D[0];
+D[1];
+D[2];
+coeff(D[2], lh, 0);
+coeff(D[2], lh, 1);
+coeff(D[2], lh, 2);
+
+D[3];
+coeff(D[3], lh, 2);
+f90(factor(coeff(D[3], lh, 3)))$
+
+D[4]$
+f90(factor(coeff(D[4], lh, 0)))$
+f90(factor(coeff(D[4], lh, 1)))$
+f90(factor(coeff(D[4], lh, 2)))$
+f90(factor(coeff(D[4], lh, 3)))$
+f90(factor(coeff(D[4], lh, 4)))$
+
+D[5]$
+f90(factor(coeff(D[5], lh, 0)))$
+f90(factor(coeff(D[5], lh, 1)))$
+f90(factor(coeff(D[5], lh, 2)))$
+f90(factor(coeff(D[5], lh, 3)))$
+f90(factor(coeff(D[5], lh, 4)))$
+f90(factor(coeff(D[5], lh, 5)))$
+
+D[6];
+f90(factor(coeff(D[6], lh, 0)))$
+f90(factor(coeff(D[6], lh, 1)))$
+f90(factor(coeff(D[6], lh, 2)))$
+f90(factor(coeff(D[6], lh, 3)))$
+f90(factor(coeff(D[6], lh, 4)))$
+f90(factor(coeff(D[6], lh, 5)))$
+f90(factor(coeff(D[6], lh, 6)))$
+horner(expand(coeff(D[6], lh, 3)), cos(p1));
+
+xlh: %pi*dl/180$
+xp1: %pi*refl/180$
+xd: -%pi*dt/180$
+
+T1:0$
+for o:order thru 2 step -1 do
+    T1: T1 + float(subst([lh=xlh, p1=xp1, d=xd], D[o]))$
+T1;
+float(subst([tlh=tan(xlh), p1=xp1, d=xd], A12h));
+float(subst([tlh=tan(xlh), p1=xp1, d=xd], A23h));
+T2: float(subst([tlh=tan(xlh), p1=xp1, d=xd], A12h-A23h));
+T3: bfloat(subst([tlh=tan(bfloat(xlh)), p1=bfloat(xp1), d=bfloat(xd)], A12h-A23h));
+
+[T1-T3, T2-T3];
+[(T1-T3)/T3, (T2-T3)/T3];

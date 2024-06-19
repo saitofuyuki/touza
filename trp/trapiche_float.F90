@@ -1,10 +1,10 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2024/02/02 09:41:03 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/21 23:00:49 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022, 2023
+! Copyright (C) 2021, 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -46,6 +46,13 @@
 #define OPT_TRAPICHE_IEEE 0
 #ifndef   OPT_TRAPICHE_IEEE
 #  define OPT_TRAPICHE_IEEE HAVE_FORTRAN_IEEE_ARITMETIC
+#endif
+!!!_ + special schemes
+#ifndef   OPT_TRAPICHE_SCHEME_OVERFLOW
+#  define OPT_TRAPICHE_SCHEME_OVERFLOW KS_HUGE
+#endif
+#ifndef   OPT_TRAPICHE_SCHEME_UNDERFLOW
+#  define OPT_TRAPICHE_SCHEME_UNDERFLOW KS_TINY
 #endif
 !!!_@ TOUZA_Trp_float - trapiche floating-point manager
 module TOUZA_Trp_float
@@ -157,8 +164,8 @@ module TOUZA_Trp_float
   integer,save :: KSCHM_DNM  = KS_ZERO
   integer,save :: KSCHM_NAN  = KS_MISS
   integer,save :: KSCHM_INF  = KS_MISS
-  integer,save :: KSCHM_OVFL = KS_ROOF
-  integer,save :: KSCHM_UNFL = KS_UNDER
+  integer,save :: KSCHM_OVFL = OPT_TRAPICHE_SCHEME_OVERFLOW
+  integer,save :: KSCHM_UNFL = OPT_TRAPICHE_SCHEME_UNDERFLOW
 
 !!!_   . sign flag alias
   integer,save :: ksign_table(0:15) = &                                        !  -+np 0123
@@ -2892,7 +2899,6 @@ contains
        if (ksign.eq.KF_NEG_PZERO.or.ksign.eq.KF_POS_MZERO) kzsign = -one
 
        vmsk = _SET_EXPONENT(one, mbits + ixone)
-       vrst = _SET_EXPONENT(one, ixdnm + 1)
        if (_PREFER_DOIF) then
           do j = 0, ncnz - 1
              if (ictlg(j).ge.kxspc) then
@@ -2915,6 +2921,7 @@ contains
                 if     (abs(vdst(j)).eq.zz) then
                    vdst(j) = sign(zero, sign(one, vdst(j)) * kzsign)
                 else
+                   vrst = _SET_EXPONENT(one, ixdnm + 1)
                    vdst(j) = &
                         & sign(_SET_EXPONENT(abs(vdst(j)), ixdnm + 1) - vrst, &
                         &      vdst(j))
@@ -2945,7 +2952,7 @@ contains
                 vdst(0:ncnz-1) = sign(zero, sign(one, vdst(0:ncnz-1)) * kzsign)
              elsewhere
                 vdst(0:ncnz-1) = &
-                     & sign(_SET_EXPONENT(abs(vdst(0:ncnz-1)), ixdnm + 1) - vrst, &
+                     & sign(_SET_EXPONENT(abs(vdst(0:ncnz-1)), ixdnm + 1) - _SET_EXPONENT(one, ixdnm + 1), &
                      &      vdst(0:ncnz-1))
              end where
           elsewhere
@@ -2980,6 +2987,7 @@ contains
 
     integer,parameter :: lbgz = BIT_SIZE(kstkh)
     integer,parameter :: lfrc = DIGITS(zero) - 1
+    integer,parameter :: ladj = lbgz - lfrc
 
     integer ebitsx, kpackx
     integer nbitsh, ebitsh, kpackh, ksign, kzsign
@@ -3088,6 +3096,9 @@ contains
        if (ksign.eq.0) then
           iwork(0:ncnz-1) = IOR(ISHFT(IBITS(iwork(0:ncnz-1), ebitsh, 1), nbitsh), &
                &               IOR(_IBITS(_IBITS(iwork(0:ncnz-1), 0, ebitsh) + moffsh, 0, nbitsh), mmskh))
+          do j = 0, ncnz - 1
+             if (ictlg(j).ge.kxspc) iwork(j) = ISHFT(iwork(j), ladj)
+          enddo
           vdst(0:ncnz-1) = &
                & _SET_EXPONENT(vmsk + real(_IBITS(iwork(0:ncnz-1), 0, nbitsh), kind=KRFLD), &
                &              mbits + ixone)
@@ -3124,12 +3135,18 @@ contains
                 end where
              endif
           endif
+          do j = 0, ncnz - 1
+             if (ictlg(j).ge.kxspc) iwork(j) = ISHFT(iwork(j), ladj)
+          enddo
           vdst(0:ncnz-1) = &
                & _SET_EXPONENT(vmsk + xureal(iwork(0:ncnz-1), one), &
                &               mbits + ixone)
           vdst(0:ncnz-1) = sign(vdst(0:ncnz-1), vsign)
        else
           iwork(0:ncnz-1) = IOR(_IBITS(iwork(0:ncnz-1) + moffsh, 0, nbitsh), mmskh)
+          do j = 0, ncnz - 1
+             if (ictlg(j).ge.kxspc) iwork(j) = ISHFT(iwork(j), ladj)
+          enddo
           vsign = real(ksign, kind=KRFLD)
           vdst(0:ncnz-1) = &
                & _SET_EXPONENT(vmsk + real(iwork(0:ncnz-1), kind=KRFLD), &
@@ -3164,8 +3181,8 @@ contains
        if (ksign.eq.KF_NEG_PZERO.or.ksign.eq.KF_POS_MZERO) kzsign = -one
 
        vmsk = _SET_EXPONENT(one, mbits + ixone)
-       vrst = _SET_EXPONENT(one, ixdnm + 1)
-       if (_PREFER_DOIF) then
+       ! if (_PREFER_DOIF) then
+       if (.true.) then
           do j = 0, ncnz - 1
              if (ictlg(j).ge.kxspc) then
                 if     (abs(vdst(j)).eq.zz) then
@@ -3188,7 +3205,7 @@ contains
                    vdst(j) = sign(zero, sign(one, vdst(j)) * kzsign)
                 else
                    vdst(j) = &
-                        & sign(_SET_EXPONENT(abs(vdst(j)), ixdnm + 1) - vrst, &
+                        & sign(_SET_EXPONENT(abs(vdst(j)), ixdnm + 1) - _SET_EXPONENT(one, ixdnm + 1), &
                         &      vdst(j))
                 endif
              else
@@ -3217,7 +3234,7 @@ contains
                 vdst(0:ncnz-1) = sign(zero, sign(one, vdst(0:ncnz-1)) * kzsign)
              elsewhere
                 vdst(0:ncnz-1) = &
-                     & sign(_SET_EXPONENT(abs(vdst(0:ncnz-1)), ixdnm + 1) - vrst, &
+                     & sign(_SET_EXPONENT(abs(vdst(0:ncnz-1)), ixdnm + 1) - _SET_EXPONENT(one, ixdnm + 1), &
                      &      vdst(0:ncnz-1))
              end where
           elsewhere
@@ -3537,6 +3554,7 @@ contains
        jl = _IBITS(IOR(jl, ml), 0, nl)
        v  = v + real(jl, kind=KRTGT)
     endif
+    ! write(*, *) i, nh, kh, mh, nl, kl, ml, one, ixone, v
     return
   end function zspecial_d
   ELEMENTAL &
@@ -3574,6 +3592,7 @@ contains
        jl = _IBITS(IOR(jl, ml), 0, nl)
        v  = v + real(jl, kind=KRTGT)
     endif
+    ! write(*, *) i, nh, kh, mh, nl, kl, ml, one, ixone, v
     return
   end function zspecial_f
 

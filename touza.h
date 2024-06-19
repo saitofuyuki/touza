@@ -1,7 +1,7 @@
 /* touza.h - touza definitions */
 /*    Maintainer: SAITO Fuyuki */
 /*    Created: Jun 5 2020 */
-/*     Time-stamp: <2024/02/02 08:11:28 fuyuki touza.h> */
+/*     Time-stamp: <2024/04/04 07:47:09 fuyuki touza.h> */
 
 /* Copyright (C) 2020-2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
@@ -126,6 +126,7 @@
 #define ERR_MASK_NIO_CACHE    (ERR_MASK_NIO + ERR_MASK_MODULE * 7)
 #define ERR_MASK_NIO_CTRL     (ERR_MASK_NIO + ERR_MASK_MODULE * 8)
 #define ERR_MASK_NIO_SPARSE   (ERR_MASK_NIO + ERR_MASK_MODULE * 9)
+#define ERR_MASK_NIO_AXIS     (ERR_MASK_NIO + ERR_MASK_MODULE * 10)
 
 #define ERR_MASK_TRP          (ERR_MASK_GROUP * 5)
 #define ERR_MASK_TRP_STD      (ERR_MASK_TRP + ERR_MASK_MODULE * 1)
@@ -140,7 +141,9 @@
 #define ERR_MASK_AMI_XFORM    (ERR_MASK_AMI + ERR_MASK_MODULE * 5)
 
 #define ERR_MASK_CAL     (ERR_MASK_GROUP * 2)
-#define ERR_MASK_EMU     (ERR_MASK_GROUP * 3)
+
+#define ERR_MASK_EMU          (ERR_MASK_GROUP * 3)
+#define ERR_MASK_EMU_UGG      (ERR_MASK_EMU + ERR_MASK_MODULE * 1)
 
 #define DEBUG_TRACE(E,T) call trace_debug(E, T, __FILE__, __LINE__)
 

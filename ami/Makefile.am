@@ -1,9 +1,9 @@
 # touza/ami Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 2 2022
-# Time-stamp: <2023/10/27 11:58:53 c0210 Makefile.am>
+# Time-stamp: <2024/02/02 21:27:00 fuyuki Makefile.am>
 
-# Copyright (C) 2022,2023
+# Copyright (C) 2022,2023,2024
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -22,6 +22,7 @@ libtouza_local_la_SOURCES += ami_utils.F90
 libtouza_local_la_SOURCES += ami_legacy.F90
 libtouza_local_la_SOURCES += ami_nio.F90
 libtouza_local_la_SOURCES += ami_xform.F90
+libtouza_local_la_SOURCES += ami.F90
 libtouza_local_la_SOURCES += $(include_HEADERS)
 
 libtouza_local_la_SOURCES += $(libtouza_APPENDS)

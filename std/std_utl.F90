@@ -99,7 +99,7 @@ module TOUZA_Std_utl
   end interface join_format_item
 
   interface split_list
-     module procedure split_list_i, split_list_f, split_list_d
+     module procedure split_list_i, split_list_f, split_list_d, split_list_a
   end interface split_list
 
   interface find_first
@@ -114,16 +114,24 @@ module TOUZA_Std_utl
      module procedure inrange_i, inrange_f, inrange_d
   end interface inrange
 
+  interface swap_items
+     module procedure swap_items_i, swap_items_f, swap_items_d
+  end interface swap_items
+
   interface bisection_find
      module procedure bisection_find_i, bisection_find_f, bisection_find_d
   end interface bisection_find
+
+  interface is_symbol
+     module procedure is_symbol_set, is_symbol_def
+  end interface is_symbol
 !!!_  - public
   public init, diag, finalize
   public choice, choice_a
   public set_if_present
   public condop, condrep
   public chcount
-  public upcase, downcase
+  public upcase, downcase, is_symbol
   public ndigits
   public control_mode, control_deep, is_first_force
   public control_lev
@@ -135,6 +143,7 @@ module TOUZA_Std_utl
   public jot
   public inrange
   public begin_with, find_next_sep
+  public swap_items
   public bisection_find
 !!!_  - static
   integer,save :: init_mode = 0
@@ -622,6 +631,51 @@ contains
        if (index(chs, str(i:i)).gt.0) n = n + 1
     enddo
   end function chcount
+
+!!!_  & is_symbol()
+  logical function is_symbol_def (str) result(b)
+    implicit none
+    character(len=*),intent(in)          :: str
+    integer,parameter :: la = IACHAR('a'), lz = IACHAR('z')
+    integer,parameter :: ua = IACHAR('A'), uz = IACHAR('Z')
+    integer,parameter :: d0 = IACHAR('0'), d9 = IACHAR('9')
+    character(len=*),parameter :: nw = '_'
+    character c
+    integer j, jc
+    do j = 1, len_trim(str)
+       c = str(j:j)
+       jc = IACHAR(c)
+       if (la.le.jc.and.jc.le.lz) cycle
+       if (ua.le.jc.and.jc.le.uz) cycle
+       if (d0.le.jc.and.jc.le.d9) cycle
+       if (INDEX(nw, c).gt.0) cycle
+       b = .FALSE.
+       return
+    enddo
+    b = .TRUE.
+  end function is_symbol_def
+
+  logical function is_symbol_set (str, set) result(b)
+    implicit none
+    character(len=*),intent(in) :: str
+    character(len=*),intent(in) :: set
+    integer,parameter :: la = IACHAR('a'), lz = IACHAR('z')
+    integer,parameter :: ua = IACHAR('A'), uz = IACHAR('Z')
+    integer,parameter :: d0 = IACHAR('0'), d9 = IACHAR('9')
+    character c
+    integer j, jc
+    do j = 1, len_trim(str)
+       c = str(j:j)
+       jc = IACHAR(c)
+       if (la.le.jc.and.jc.le.lz) cycle
+       if (ua.le.jc.and.jc.le.uz) cycle
+       if (d0.le.jc.and.jc.le.d9) cycle
+       if (INDEX(set, c).gt.0) cycle
+       b = .FALSE.
+       return
+    enddo
+    b = .TRUE.
+  end function is_symbol_set
 
 !!!_  & upcase() - upper case conversion
   subroutine upcase_m(S)
@@ -1924,6 +1978,72 @@ contains
     return
   end subroutine split_list_d
 
+  subroutine split_list_a &
+       & (n, v, str, sep, lim, def, empty)
+    implicit none
+    integer,         intent(out)         :: n         ! number of elements or error code
+    character(len=*),intent(inout)       :: v(0:)
+    character(len=*),intent(in)          :: str
+    character(len=*),intent(in)          :: sep
+    integer,         intent(in),optional :: lim       ! negative to count only; 0 to infinite
+    character(len=*),intent(in),optional :: def(0:*)  ! no bound check
+    logical,         intent(in),optional :: empty     ! allow empty element (ignored if def present)
+
+    integer jpos, lstr, lsep
+    integer js,   jh
+    integer nlim
+    integer jerr
+    logical eallow
+
+    jerr = 0
+    nlim = choice(0, lim)
+    if (nlim.eq.0) nlim = +HUGE(0)
+    eallow = choice(.TRUE., empty)
+
+    n = 0
+    jpos = 0
+    lstr = len_trim(str)
+    if (lstr.eq.0) return
+    lsep = max(1, len_trim(sep))   ! allow single blank only
+    js = 0
+    do
+       js = index(str(jpos+1:lstr), sep(1:lsep))
+       if (js.eq.0) then
+          jh = lstr
+       else
+          jh = jpos + js - 1
+       endif
+       ! write(*, *) '  split', n, js, jpos, jh, str(jpos+1:lstr)
+       if (jpos.lt.jh) then
+          if (nlim.ge.0) then
+             if (n.ge.nlim) then
+                jerr = _ERROR(ERR_OUT_OF_RANGE)
+             else
+                v(n) = str(jpos+1:jh)
+             endif
+          endif
+          n = n + 1
+       else if (present(def)) then
+          if (nlim.ge.0) then
+             if (n.ge.nlim) then
+                jerr = _ERROR(ERR_OUT_OF_RANGE)
+             else
+                v(n) = def(n)
+             endif
+          endif
+          n = n + 1
+       else if (eallow) then
+          if (nlim.ge.0.and.n.ge.nlim) jerr = _ERROR(ERR_OUT_OF_RANGE)
+          n = n + 1
+       endif
+       jpos = jh + lsep
+       if (js.eq.0) exit
+       if (jerr.ne.0) exit
+    enddo
+    if (jerr.lt.0) n = jerr
+    return
+  end subroutine split_list_a
+
 !!!_  & find_first_range() - find first occurence of array within range (inclusive)
   integer function find_first_range_i &
        & (list, low, high, start, back, offset, no) &
@@ -2262,6 +2382,38 @@ contains
        n = len(str) + o
     endif
   end function find_next_sep
+
+!!!_  & swap_items - swap two items
+  subroutine swap_items_i (a, b)
+    implicit none
+    integer,intent(inout) :: a
+    integer,intent(inout) :: b
+    integer t
+    t = a
+    a = b
+    b = t
+  end subroutine swap_items_i
+  subroutine swap_items_f (a, b)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    real(kind=KTGT),intent(inout) :: a
+    real(kind=KTGT),intent(inout) :: b
+    real(kind=KTGT) t
+    t = a
+    a = b
+    b = t
+  end subroutine swap_items_f
+  subroutine swap_items_d (a, b)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(inout) :: a
+    real(kind=KTGT),intent(inout) :: b
+    real(kind=KTGT) t
+    t = a
+    a = b
+    b = t
+  end subroutine swap_items_d
+
 !!!_  - find insertion position in sorted array by bisection
   integer function bisection_find_i &
        & (val, list, n, dir, offset) &
@@ -2424,6 +2576,7 @@ contains
        endif
     endif
   end function bisection_find_d
+
 !!!_ + (system) control procedures
 !!!_  & is_first_force () - check if first time or force
   logical function is_first_force(n, mode) result(b)

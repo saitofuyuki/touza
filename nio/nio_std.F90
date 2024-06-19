@@ -4,7 +4,7 @@
 #define TIME_STAMP 'Time-stamp: <2024/02/25 22:34:47 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022, 2023
+! Copyright (C) 2021, 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -22,11 +22,12 @@ module TOUZA_Nio_std
   use TOUZA_Std,only: choice,           choice_a,       condop,           upcase
   use TOUZA_Std,only: set_if_present
   use TOUZA_Std,only: control_deep,     control_mode,   is_first_force,   parse_number
-  use TOUZA_Std,only: split_list,       join_list
+  use TOUZA_Std,only: split_list,       join_list,      find_first
   use TOUZA_Std,only: is_msglev
   use TOUZA_Std,only: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
   use TOUZA_Std,only: is_msglev_severe, is_msglev_fatal
   use TOUZA_Std,only: get_logu,         unit_global,    trace_fine,       trace_control
+  use TOUZA_Std,only: trace_err
   use TOUZA_Std,only: is_error_match
   use TOUZA_Std,only: KIOFS
   use TOUZA_Std,only: nc_strm,          nbits_byte
@@ -50,7 +51,7 @@ module TOUZA_Nio_std
   use TOUZA_Std,only: max_members,      is_irec_overflow, sus_record_mems_irec
   use TOUZA_Std,only: def_block,        ignore_small,     ignore_bigger,  ignore_always
   use TOUZA_Std,only: sus_is_status_new
-  use TOUZA_Std,only: set_slice_loop,   init_offset,      next_offset
+  use TOUZA_Std,only: set_slice_loop,   init_offset,      next_offset,    set_runl_loop
   use TOUZA_Std,only: debug_status
   use TOUZA_Std,only: new_htable,       reg_entry,        query_status
 !!!_  - default
@@ -83,11 +84,12 @@ module TOUZA_Nio_std
   public :: choice,           choice_a,       condop,           upcase
   public :: set_if_present
   public :: control_deep,     control_mode,   is_first_force,   parse_number
-  public :: split_list,       join_list
+  public :: split_list,       join_list,      find_first
   public :: is_msglev
   public :: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
   public :: is_msglev_severe, is_msglev_fatal
   public :: get_logu,         unit_global,    trace_fine,       trace_control
+  public :: trace_err
   public :: is_error_match
   public :: KIOFS
   public :: nc_strm,          nbits_byte
@@ -111,7 +113,7 @@ module TOUZA_Nio_std
   public :: max_members,      is_irec_overflow, sus_record_mems_irec
   public :: def_block,        ignore_small,     ignore_bigger,  ignore_always
   public :: sus_is_status_new
-  public :: set_slice_loop,   init_offset,      next_offset
+  public :: set_slice_loop,   init_offset,      next_offset,    set_runl_loop
   public :: debug_status
   public :: new_htable,       reg_entry,        query_status
 contains

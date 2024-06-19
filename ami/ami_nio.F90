@@ -1,7 +1,7 @@
 !!!_! ami_nio.F90 - TOUZA/Ami/nio-format interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 19 2023
-#define TIME_STAMP 'Time-stamp: <2023/10/26 16:03:47 fuyuki ami_nio.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/16 22:16:13 fuyuki ami_nio.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -630,14 +630,14 @@ contains
   end subroutine check_remove_wings_i
 !!!_  - set_raheader
   subroutine set_raheader(ierr, hd, axocn, ayocn, nxygdm, mxo, myo)
-    use TOUZA_Nio,only: get_default_header, put_header_cprop
+    use TOUZA_Nio,only: put_header_cprop
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: hd(*)
     character(len=*),intent(in)  :: axocn,  ayocn
     integer,         intent(in)  :: nxygdm, mxo, myo
     ierr = 0
-    call get_default_header(hd)
+    ! call get_default_header(hd)
     if (mxo * myo.eq.0) then
        if (ierr.eq.0) call put_header_cprop(ierr, hd, 'ocplane', (/1, nxygdm/), 1)
        if (ierr.eq.0) call put_header_cprop(ierr, hd, ' ',       (/1, 1/), 2)
@@ -650,14 +650,14 @@ contains
 
 !!!_  - set_roheader
   subroutine set_roheader(ierr, hd, axatm, ayatm, ijdim, mxa, mya)
-    use TOUZA_Nio,only: get_default_header, put_header_cprop
+    use TOUZA_Nio,only: put_header_cprop
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: hd(*)
     character(len=*),intent(in)  :: axatm, ayatm
     integer,         intent(in)  :: ijdim, mxa, mya
     ierr = 0
-    call get_default_header(hd)
+    ! call get_default_header(hd)
     if (mxa * mya.eq.0) then
        if (ierr.eq.0) call put_header_cprop(ierr, hd, 'aplane', (/1, ijdim/), 1)
        if (ierr.eq.0) call put_header_cprop(ierr, hd, ' ',      (/1, 1/), 2)

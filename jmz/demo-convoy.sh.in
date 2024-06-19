@@ -1,0 +1,484 @@
+#!@ZSH@ -f
+# Time-stamp: <2024/04/16 21:08:16 fuyuki demo-convoy.sh.in>
+
+srcdir=@srcdir@
+
+main ()
+{
+  set -u
+  local demod=demo/convoy
+  local chak=./chak
+  local units=units
+  local qoxi=./qoxi
+  local convoy=./qoxi
+
+  local DRY= FORCE= VERBOSE=
+  local dest= src=
+  local ellip=
+  local res=
+  local proj=
+  local lev_ps2g=
+
+  while [[ $# -gt 0 ]]
+  do
+    case $1 in
+    (-n) DRY=$1;;
+    (-f) FORCE=$1;;
+    (-v) VERBOSE=$1;;
+    (-S) src=$2; shift;;
+    (-D) dest=$2; shift;;
+    (-E) ellip=$2; shift;;
+    (-d) res=$2; shift;;
+    (-P) proj=$2; shift;;
+    (-LX) lev_ps2g=$2; shift;;
+    (-*) print -u2 - "Unknown argument $1"; return 1;;
+    (--) shift; break;;
+    (*)  break;;
+    esac
+    shift
+  done
+
+  # local DEMO=()
+  # set_demo_filter DEMO "$@" || return $?
+
+  local ps= ps2g=
+  gen_ps   ps   $demod/ps   -E$ellip -D$dest -d$res -P$proj || return $?
+  gen_ps2g ps2g $demod/ps2g -E$ellip -D$dest -d$res -P$proj -S$src -L$lev_ps2g || return $?
+
+  local test=
+  local FFWD=() FOUT=()
+  local FBWD=()
+  for test in "$@"
+  do
+    # algebraic base and derivatives
+    gen_field FFWD $demod/ref -S$src $ps2g jfwd $test || return $?
+    transform_once FOUT $demod/out $ps2g f $test $FFWD || return $?
+
+    gen_field FBWD $demod/ref -S$ps:r:t $ps lat,lon $test || return $?
+
+    transform_once FOUT $demod/out $ps2g b $test $FBWD || return $?
+  done
+  
+  return 0
+}
+
+transform_once ()
+{
+  local __var=$1;  shift || return $?
+  [[ $__var == FOUT ]] || local FOUT=()
+  FOUT=()
+  local outd=$1; shift || return $?
+  mkdir -p $outd || return $?
+
+  local ps2g=$1 sfx=$2 test=$3; shift 3 || return $?
+
+  local base=$1 dlat=$2 dlon=$3
+
+  local opfx=$outd/${test}${sfx}_${ps2g:r:t}
+
+  local oid=
+  case $sfx in
+  (f) oid=1;;
+  (b) oid=0;;
+  esac
+
+  run transform ${opfx}-2.dat   $qoxi -f $ps2g/$oid $base $dlat $dlon = @OUTPUT@ || return $?
+  run transform ${opfx}-0.dat   $qoxi -f $ps2g/$oid $base -     -     = @OUTPUT@ || return $?
+  run transform ${opfx}-1la.dat $qoxi -f $ps2g/$oid $base $dlat -     = @OUTPUT@ || return $?
+  run transform ${opfx}-1lo.dat $qoxi -f $ps2g/$oid $base -     $dlon = @OUTPUT@ || return $?
+  # print -u2 - $qoxi -f $ps2g/$oid $base -     $dlon = ${opfx}-1lo.dat
+
+  FOUT=(${opfx}-{0,1la,1lo,2}.dat)
+
+  [[ $__var != FOUT ]] && set -A $__var "${(@)FOUT}"
+  return 0
+}
+
+
+gen_field ()
+{
+  local __var=$1;  shift || return $?
+  [[ $__var == FIN ]] || local FIN=()
+  FIN=()
+  local outd=$1; shift || return $?
+  mkdir -p $outd || return $?
+
+  local src=
+  while [[ $# -gt 0 ]]
+  do
+    case $1 in
+    (-S*) src=${1: 2};;
+    (*)  break;;
+    esac
+    shift
+  done
+  local gf=$1 gv=$2; shift 2 || return $?
+  [[ ! -e $gf ]] && print -u2 - "Not found $gf" && return 1
+
+  case $gv in
+  (jfwd)
+    def_src src $src || return $?
+
+    local rr=()
+    rr=($($chak +q $gf PROP | sed -ne  "/\<$gv\>/p")) || return $?
+    local coor=(${(s:,:)rr[4]})
+    local lat= lon=
+    parse_coor lon $coor[1] $gf || return $?
+    parse_coor lat $coor[2] $gf || return $?
+    #     LON LAT
+    local opll=($gf T=$lon[1]/$lat[1] POP=LO,LA LO SHAPE=$lon[2] D2R LA SHAPE=+,$lat[2])
+    ;;
+  (*)
+    gv=(${(s:,:)gv})
+    local lat= lon=
+    parse_record lat $gv[1] $gf || return $?
+    parse_record lon $gv[2] $gf || return $?
+    local opll=($gf T=$lon/$lat POP=LO,LA LO LA)
+    ;;
+  esac
+
+  # test  "PHASE" LAT-FUNC FACTOR POWER  "PHASE" LON-FUNC FACTOR POWER  CONST
+  local test=("$@"); shift
+  local cfg=()
+  case $test in
+  (t2) cfg=(0 COS 1 2   0 COS 2 1   2);;
+  (t3) cfg=(0 SIN 2 16  0 COS 16 1  2);;
+  (x3) cfg=(0 COS 8 1   0 SIN 6  6  2);;
+  (*)  print -u2 - "Unknown test $test"; return 1;;
+  esac
+
+  gen_comp_field FIN $outd $src $test "$opll" base $cfg || return $?
+  gen_comp_field FIN $outd $src $test "$opll" dlat $cfg || return $?
+  gen_comp_field FIN $outd $src $test "$opll" dlon $cfg || return $?
+
+  [[ $__var != FIN ]] && set -A $__var "${(@)FIN}"
+  return 0
+}
+
+#  gen_comp_field FIN $outd $src $test "$opll" base $cfg || return $?
+gen_comp_field ()
+{
+  local __var=$1; shift || return $?
+  local outd=$1 src=$2 test=$3; shift 3 || return $?
+  local opll="$1"; shift || return $?
+  local t=$1; shift || return $?
+  local opr=()
+  gen_opr_field opr $t "$@" || return $?
+
+  local of=
+  of=$outd/${test}_${src}_${t}.dat
+  local cmd=($chak -f $=opll $opr = $of ITEM="$test")
+  run source $of $chak -f $=opll $opr = @OUTPUT@ ITEM="$test" || return $?
+  set -A $__var "${(@P)__var}" $of
+  return 0
+}
+
+gen_opr_field ()
+{
+  local __var=$1; shift || return $?
+  [[ $__var = opr ]] ||  local opr=()
+
+  local t=$1; shift
+  local cfg=("$@")
+
+  local -A DF=(COS "SIN NEG"
+               SIN COS)
+  opr=()
+  local df=
+  local ph=
+  # FUNC FACTOR POW
+  # POW * (FUNC(FACTOR (X+P)) ** (POW - 1)) * DFUNC(FACTOR (X+P)) * FACTOR
+  ph=($=cfg[1]); shift cfg
+  if [[ $t == dlat ]]; then
+    df=${DF[$cfg[1]]}
+    opr+=($ph ADD $cfg[2] MUL DUP $cfg[1] $cfg[3] 1 SUB POW $cfg[3] MUL)
+    opr+=(EXCH $=df MUL $cfg[2] MUL)
+  else
+    opr+=($cfg[2] MUL $cfg[1] $cfg[3] POW)
+  fi
+  shift 3 cfg
+
+  opr+=(EXCH)
+  ph=($=cfg[1]); shift cfg
+  if [[ $t == dlon ]]; then
+    df=${DF[$cfg[1]]}
+    opr+=($ph ADD $cfg[2] MUL DUP $cfg[1] $cfg[3] 1 SUB POW $cfg[3] MUL)
+    opr+=(EXCH $=df MUL $cfg[2] MUL)
+  else
+    opr+=($cfg[2] MUL $cfg[1] $cfg[3] POW)
+  fi
+  shift 3 cfg
+  opr+=(MUL)
+  if [[ $t == base ]]; then
+    opr+=($cfg[1] ADD)
+  fi
+
+  [[ $__var == opr ]] || set -A $__var "${(@)opr}"
+  return 0
+}
+
+
+parse_coor ()
+{
+  local __var=$1; shift
+  local coor=$1; shift
+  local gf=$1
+  coor=(${(s:/:)coor})
+  local rr=()
+  rr=($($chak -Id +q $gf PROP | sed -ne  "\\@AXLOC/\<$coor[1]\>@p")) || return $?
+  local t=$rr[1] r=$coor[2]
+  set -A $__var $t $r
+  return 0
+}
+
+parse_record ()
+{
+  local __var=$1; shift
+  local gv=$1; shift
+  local gf=$1
+  local rr=()
+  rr=($($chak +q $gf PROP | sed -ne  "/\<$gv\>/p")) || return $?
+  local t=$rr[1]
+  : ${(P)__var::=$t}
+  return 0
+}
+
+gen_ps2g ()
+{
+  local __var=$1;  shift || return $?
+  [[ $__var == ps2g ]] || local ps2g=
+
+  local outd=$1; shift || return $?
+  mkdir -p $outd || return $?
+
+  local ellip= res= proj= dest= lev= src=
+  while [[ $# -gt 0 ]]
+  do
+    case $1 in
+    (-E*) ellip=${1: 2};;
+    (-d*) res=${1: 2};;
+    (-P*) proj=${1: 2};;
+    (-D*) dest=${1: 2};;
+    (-S*) src=${1: 2};;
+    (-L*) lev=${1: 2};;
+    (*)  break;;
+    esac
+    shift
+  done
+
+  def_ellip ellip $ellip || return $?
+  def_dest dest $dest || return $?
+  def_src src $src || return $?
+
+  [[ -z $lev ]] && lev=8
+
+  local P=
+  set_proj P "$proj" "$dest" || return $?
+
+  local C=
+  local cc=()
+  set_dest cc "$res" "$dest" || return $?
+  C=$cc[1]
+
+  local comp=()
+  comp+=($src)
+  comp+=($cc[2]${proj:+-$proj})
+  comp+=(${(L)ellip})
+  comp+=(l$lev)
+
+  ps2g="${(j:_:)comp}"
+  ps2g=$outd/$ps2g.dat
+
+  local L=
+  case $lev in
+  (*i) L=${lev%i}:::--;;
+  (*)  L=$lev;;
+  esac
+
+  run ps2g $ps2g $qoxi +q -f E=$ellip LEV=$L C=$C P=$P G=$src PS2G @OUTPUT@ ALL || return $?
+  return 0
+}
+
+gen_ps ()
+{
+  local __var=$1;  shift || return $?
+  [[ $__var == ps ]] || local ps=
+
+  local outd=$1; shift || return $?
+  mkdir -p $outd || return $?
+
+  local ellip= res= proj= dest= lev=
+  while [[ $# -gt 0 ]]
+  do
+    case $1 in
+    (-E*) ellip=${1: 2};;
+    (-d*) res=${1: 2};;
+    (-P*) proj=${1: 2};;
+    (-D*) dest=${1: 2};;
+    (-L*) lev=${1: 2};;
+    (*)  break;;
+    esac
+    shift
+  done
+
+  def_ellip ellip $ellip || return $?
+  def_dest  dest $dest || return $?
+
+  [[ -z $lev ]] && lev=3
+
+  local P=
+  set_proj P "$proj" "$dest" || return $?
+
+  local C=
+  local cc=()
+  set_dest cc "$res" "$dest" || return $?
+  C=$cc[1]
+
+  local comp=()
+  comp+=($cc[2]${proj:+-$proj})
+  comp+=(${(L)ellip})
+  comp+=(l$lev)
+
+  ps="${(j:_:)comp}"
+  ps=$outd/$ps.dat
+
+  run ps $ps $qoxi +q -f E=$ellip LEV=$lev C=$C P=$P PS @OUTPUT@ ALL || return $?
+  return 0
+}
+
+set_proj ()
+{
+  local __var=$1; shift || return $?
+  local proj=${1-} dest=${2-}
+
+  if [[ -z $proj ]]; then
+    case ${(L)dest} in
+    (sp*) proj=aa;;
+    (np*) proj=al;;
+    (*)   proj=$dest;;
+    esac
+  else
+    case ${(L)dest} in
+    (g*) proj=90:$proj;;
+    (a*) proj=-90:$proj;;
+    (sp*) proj=-90:$proj;;
+    (np*) proj=90:$proj;;
+    (*) print -u2 - "Unknown destination $proj $dest"; return 1;;
+    esac
+  fi
+  : ${(P)__var::=$proj}
+  return 0
+}
+
+set_dest ()
+{
+  local __var=$1; shift || return $?
+  local res=${1-} dest=${2-}
+  [[ -z $res ]] && res=48km
+
+  local cm= ck=
+  if $units -t $res km >& /dev/null; then
+    cm=$($units -t $res m) || return $?
+    ck=$($units -t $res km) || return $?
+  else
+    cm=$($units -t ${res}km m) || return $?
+    ck=$($units -t ${res}km km) || return $?
+  fi
+  set -A $__var "${dest}:$cm" "$dest$ck"
+  return 0
+}
+
+set_src ()
+{
+  :
+}
+
+
+def_ellip ()
+{
+  local __var=$1; shift || return $?
+  [[ $__var == ellip ]] || local ellip=
+
+  ellip=${1-}
+  [[ -z $ellip ]] && ellip=wgs84
+  
+  [[ $__var == ellip ]] || ${(P)__var::=$ellip}
+  return 0
+}
+
+def_dest ()
+{
+  local __var=$1; shift || return $?
+  [[ $__var == dest ]] || local dest=
+
+  dest=${1-}
+  [[ -z $dest ]] && dest=gl
+  
+  [[ $__var == dest ]] || ${(P)__var::=$dest}
+  return 0
+}
+
+def_src ()
+{
+  local __var=$1; shift || return $?
+  [[ $__var == src ]] || local src=
+
+  src=${1-}
+  [[ -z $src ]] && src=t42
+  
+  [[ $__var == src ]] || ${(P)__var::=$src}
+  return 0
+}
+
+set_demo_filter ()
+{
+  local _var=$1; shift
+  local _r=()
+  local d= dd=
+  for d in "$@"
+  do
+    dd=()
+    for d in "${(@s/:/)d}"
+    do
+      if [[ -z $d ]]; then
+        dd+=("*")
+      else
+        dd+=("$d")
+      fi
+    done
+    _r+=("${(j/:/)dd}")
+  done
+  set -A "$_var" "${(@)_r}"
+  return $?
+}
+
+run ()
+{
+  local tag=$1; shift || return $?
+  local of=$1; shift || return $?
+
+  local cmd=("$@")
+  cmd=("${(@)cmd:/@OUTPUT@/$of}")
+  if [[ -n $DRY ]]; then
+    print -u2 - "dry-run[$tag]: ${(@q-)cmd}"
+  else
+    [[ -n $FORCE && -e $of ]] && print -u2 - "remove[$tag]: $of" && rm -f $of
+    [[ -n $VERBOSE ]] && print -u2 - "run[$tag]: ${(@q-)cmd}"
+    if [[ ! -e $of ]]; then
+      $cmd; local err=$?
+      if [[ $err -ne 0 ]]; then
+        print -u2 - "failed[$tag]: $cmd"
+        return $err
+      else
+        print -u2 - "create[$tag]: $of"
+      fi
+    else
+      print -u2 - "keep[$tag]: $of"
+    fi
+  fi
+  return 0
+}
+
+
+main "$@"; err=$?
+exit $err
