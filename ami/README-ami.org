@@ -1,17 +1,17 @@
-#+title: TOUZA/ami guide
+#+title: TOUZA/Ami guide
 #+author: SAITO Fuyuki
 #+date: <2022-01-26 Wed>
 
 * Introduction
-*TOUZA/ami* (or ami-da) is a collection of Fortran subroutines for
-`coupling'.  `ami-da' stands for ami(friend) drvies associates.
+*TOUZA/Ami* (or ami-da) is a collection of Fortran subroutines for
+`coupling'.  `ami-da' stands for ami(friend) drives associates.
 
 The original motivation to develop this package is to replace
-legacy =pgcpl.F= in MIROC, with improving the interfaces and
-the algorithms to control the domain decomposition and parallel
-communication.
+legacy =pgcpl.F= and its relatives in MIROC, with improving the
+interfaces and the algorithms to control the domain decomposition and
+parallel communication.
 
-*TOUZA/ami* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
+*TOUZA/Ami* is maintained by SAITO Fuyuki <saitofuyuki AT jamstec
 DOT go DOT jp>.
 
 *TOUZA (楊座)*, MIROC base infrastructure, is a collection of
@@ -21,7 +21,113 @@ Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
 
 * Build and installation
 
+* Brief document about MIROC legacy formats (aka rafile, rofile)
+** rafile legacy formats
+*** Record structure (miroc5 and after)
+| record | type     | size      | name        | pattern                     |
+|--------+----------+-----------+-------------+-----------------------------+
+|      0 | int 32   | 1         | ij_amax     |                             |
+|      1 | int 32   | ij_amax+1 | ij_ahead    |                             |
+|      2 | int 32   | 1         | len_a2m     |                             |
+|      3 | int 32   | len_a2m   | ijrecov_a2m |                             |
+|      4 | int 32   | len_a2m   | ijc2o       |                             |
+|      5 | float 64 | len_a2m   | satm        |                             |
+|      6 | float 64 | nxygdm*2  | ru rv       | {ru(1:nxygdm) rv(1:nxygdm)} |
+|      7 | float 64 | nxygdm    | rocn        |                             |
+
+Mapping matrix: rows nxygdm by columns ijdim
+
+Row is flat-index of ~nxygdm~-size array, where ~nxygdm~ equals ~nxgdim~
+times ~nygdim~.  Both sizes correspond to the full span plus wings
+in both sides (2 * 2 = 4) along x and y direction.
+
+Column is flat index of ~ijdim~-size array, where ~ijdim~ equals
+~imax + 1~ times ~jmax~.
+
+For a historical reason, both flat-index contain those corresponding
+dummy elements.  In TOUZA/Ami, they are normalized into sequentail
+index without dummy elements.  In ther words, ~nxyg~ is used instead
+of ~nxygdm~, and ~imax~ ~jmax~ are used instead of ~ijdim~.
+
+ij_amax: maximum number of non-zero columns per row
+len_a2m: total non-zelo elements
+ijrecov_a2m: raw index of non-zero elements
+ijc2o: column index of non-zero elements
+
+The original matrix is stored using a variation of the COO storage,
+which stores the value of non-zero elements
+and their row and column index through the matrix.
+The ordering of storage partially follows an idea of Jagged Diagnoal
+Storage (JDS).
+
+First, all elements are shifted left from the original matrix.
+: original (7 by 6)     shifted     (7 by 4)
+: (a b 0 0 0 0)         (a b    )
+: (c d e 0 f 0)         (c d e f)
+: (0 g 0 0 0 h)         (g h    )
+: (0 0 0 0 0 0)         (       )
+: (0 0 i j 0 k)         (i j k  )
+: (0 0 0 l m n)         (l m n  )
+: (0 0 0 0 o 0)         (o      )
+Then the corresponding row and column index are stored sequentially
+for each shifted columns.
+
+:          <------------ len_a2m ----------->
+: value:   a c g i l o   b d h j m   e k n  f      == satm
+: row:     0 1 2 4 5 6   0 1 2 4 5   1 4 5  1      == ijrecov_a2m
+: column:  0 0 1 2 3 4   1 1 5 3 4   2 5 5  4      == ijc2o
+: heads:   0 . . . . .   6 . . . .   11. .  14 15  == ij_ahead
+
+*** Record structure (miroc4 and before)
+| record | type     | size      | name        | pattern                     |
+|--------+----------+-----------+-------------+-----------------------------+
+|      0 | int 32   | 1         | ij_amax     |                             |
+|      1 | int 32   | ij_amax+1 | ij_ahead    |                             |
+|      2 | int 32   | 1         | len_a2m     |                             |
+|      3 | int 32   | len_a2m   | ijrecov_a2m |                             |
+|      4 | int 32   | len_a2m   | ijc2o       |                             |
+|      5 | float 64 | len_a2m   | satm        |                             |
+|      6 | float 64 | nxygdm*2  | ru rv       | {ru(1:nxygdm) rv(1:nxygdm)} |
+
+** rofile legacy formats
+*** Record structure (miroc5 and after)
+| record     | type     | size    | name       | pattern                          |
+|------------+----------+---------+------------+----------------------------------|
+| 0          | int 32   | ijdim   | ij_o       |                                  |
+| 1..ijdim   | mixed    |         | ijo2c,socn | {int(:ij_o(j)) double(:ij_o(j))} |
+| ijdim+1    | float 64 | ijdim   | flandg     |                                  |
+| ijdim+2    | float 64 | ijdim*2 | ruo rvo    | {ruo(1:ijdim) rvo(1:ijdim)}      |
+
+Mapping matrix: rows ijdim by columns nxygdm
+
+The original matrix is stored using a minor variation of the
+Compressed Row Storage (CRS).  Number of non-zero columns is stored in
+ij_o through the row, and their value and column index are stored in
+socn and ijo2c, respectively.
+
+: original (6 by 7)
+: (a c 0 0 0 0 0)
+: (b d g 0 0 0 0)
+: (0 e 0 0 i 0 0)
+: (0 0 0 0 j l 0)
+: (0 f 0 0 0 m o)
+: (0 0 h 0 k n 0)
+
+: value    a c   b d g   e i    j l    f m o  h k n  == socn(row, col.shift)
+: index    0 1   0 1 2   1 4    4 5    1 5 6  2 4 5  == ijo2c(row,col.shift)
+: columns  2     3       2      2      3      3      == ij_o
+: row      0     1       2      3      4      5
+
+*** Record structure (miroc4 and before)
+| record             | type   | size  | name        | pattern                            |
+|--------------------+--------+-------+-------------+------------------------------------|
+| 0                  | int 32 | ijdim | ij_o        |                                    |
+| 1..ijdim           | mixed  |       | ijo2c,socn  | {int(:ij_o(j)) double(:ij_o(j))}   |
+| ijdim+1            | int 32 | ijdim | ij_ol       |                                    |
+| ijdim+2..2*ijdim+1 | mixed  |       | ijo2cl,slnd | {int(:ij_ol(j)) double(:ij_ol(j))} |
+
+* Sparse matrix storage used in TOUZA/Ami
 * Copyright and license
-Copyright 2022 Japan Agency for Marine-Earth Science and Technology
+Copyright 2022,2023 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)

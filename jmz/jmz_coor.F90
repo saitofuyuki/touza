@@ -1,7 +1,7 @@
 !!!_! jmz_coor.F90 - TOUZA/Jmz coordinate (loop) manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 6 2023
-#define TIME_STAMP 'Time-stamp: <2023/10/06 15:02:26 fuyuki jmz_coor.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/11/01 12:50:00 fuyuki jmz_coor.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -88,17 +88,12 @@ module Jmz_coor
 
   public :: loop_t
 
-!!!_  - convention parameters
-  integer,save,public :: user_offset_bgn = 0     ! begin-index offset (user-friendly)
-  integer,save,public :: user_offset_end = 0     ! end-index offset (user-friendly)
-
 !!!_  - interfaces
   interface get_range_string
      module procedure get_range_string_t, get_range_string_c
   end interface get_range_string
 !!!_  - public
   public :: init, finalize
-  public :: set_user_offsets
   public :: get_range_string
   public :: is_null_coor, count_effective, coordinate_type
   public :: show_lpp
@@ -119,19 +114,6 @@ contains
 
     ierr = 0
   end subroutine finalize
-
-!!!_  - set_user_offsets - control offset for users
-  subroutine set_user_offsets &
-       & (ierr, off_bgn, off_end)
-    use TOUZA_Std,only: choice
-    implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: off_bgn
-    integer,intent(in),optional :: off_end
-    ierr = 0
-    user_offset_bgn = choice(user_offset_bgn, int(off_bgn, kind=KCO))
-    user_offset_end = choice(user_offset_end, int(off_end, kind=KCO))
-  end subroutine set_user_offsets
 
 !!!_  - show_lpp
   subroutine show_lpp &
@@ -184,6 +166,7 @@ contains
 
 !!!_  - user_index_bgn()
   ELEMENTAL integer function user_index_bgn(j, n) result(k)
+    use Jmz_param,only: user_offset_bgn
     implicit none
     integer,intent(in)          :: j
     integer,intent(in),optional :: n
@@ -195,6 +178,7 @@ contains
   end function user_index_bgn
 !!!_  - user_index_end()
   ELEMENTAL integer function user_index_end(j, n) result(k)
+    use Jmz_param,only: user_offset_end
     implicit none
     integer,intent(in)          :: j
     integer,intent(in),optional :: n
@@ -206,6 +190,7 @@ contains
   end function user_index_end
 !!!_  - system_index_bgn()
   ELEMENTAL integer function system_index_bgn(j, n) result(k)
+    use Jmz_param,only: user_offset_bgn
     implicit none
     integer,intent(in)          :: j
     integer,intent(in),optional :: n
@@ -217,6 +202,7 @@ contains
   end function system_index_bgn
 !!!_  - system_index_end()
   ELEMENTAL integer function system_index_end(j, n) result(k)
+    use Jmz_param,only: user_offset_end
     implicit none
     integer,intent(in)          :: j
     integer,intent(in),optional :: n

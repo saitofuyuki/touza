@@ -1,7 +1,7 @@
 # touza/ami Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 2 2022
-# Time-stamp: <2023/04/11 22:12:20 fuyuki Makefile.am>
+# Time-stamp: <2023/10/27 11:58:53 c0210 Makefile.am>
 
 # Copyright (C) 2022,2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -21,6 +21,7 @@ libtouza_local_la_SOURCES += ami_table.F90
 libtouza_local_la_SOURCES += ami_utils.F90
 libtouza_local_la_SOURCES += ami_legacy.F90
 libtouza_local_la_SOURCES += ami_nio.F90
+libtouza_local_la_SOURCES += ami_xform.F90
 libtouza_local_la_SOURCES += $(include_HEADERS)
 
 libtouza_local_la_SOURCES += $(libtouza_APPENDS)
@@ -34,10 +35,14 @@ TEST_COMMON_LIBS += $(FC_LDADD_touza_nio) $(FC_LDADD_touza_trp)
 TEST_COMMON_LIBS += $(FC_LDADD_touza_emu)
 TEST_COMMON_LIBS += $(FC_LDADD_touza_std)
 
+lib-nio:
+	cd ../nio; $(MAKE)
+
 if with_nctcdf
 TEST_COMMON_LIBS += $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 endif
 
+AM_FCFLAGS_MODULE += $(FC_MODULE_touza_trp)
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_nio)
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_emu)
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_std)
@@ -71,6 +76,12 @@ test_ami_miroc_SOURCES = $(TEST_COMMON_SOURCES) ami_miroc.F90
 test_ami_miroc_LDADD = $(TEST_COMMON_LIBS)
 test_ami_miroc_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_AMI_MIROC=1
 EXTRA_test_ami_miroc_DEPENDENCIES    = $(test_ami_miroc_LDADD)
+
+check_PROGRAMS += test_ami_xform
+test_ami_xform_SOURCES = $(TEST_COMMON_SOURCES) ami_xform.F90
+test_ami_xform_LDADD = $(TEST_COMMON_LIBS)
+test_ami_xform_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_AMI_XFORM=1
+EXTRA_test_ami_xform_DEPENDENCIES    = $(test_ami_xform_LDADD)
 
 include Makedep.inc
 

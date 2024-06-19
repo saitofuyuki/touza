@@ -41,6 +41,11 @@ noinst_SCRIPTS += demo-chak.sh
 noinst_SCRIPTS += ocheck.sh
 EXTRA_DIST += ocheck.sh.in
 
+EXTRA_PROGRAMS = convoy
+convoy_SOURCES = convoy.F90 jmz.h
+convoy_to_include =
+EXTRA_convoy_DEPENDENCIES = $(TOUZA_LIBRARY)
+
 noinst_PYTHON = jmznml.py
 
 TEST_COMMON_LIBS = $(noinst_LTLIBRARIES)
