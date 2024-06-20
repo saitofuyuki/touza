@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2024/04/16 22:12:42 fuyuki Makefile.am>
+# Time-stamp: <2024/06/20 22:29:16 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023,2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -48,6 +48,7 @@ qoxi_SOURCES += qoxi.F90 jmz.h
 EXTRA_qoxi_DEPENDENCIES = $(TOUZA_LIBRARY)
 
 noinst_SCRIPTS += demo-chak.sh demo-convoy.sh
+EXTRA_DIST += demo-chak.sh.in demo-convoy.sh.in
 noinst_SCRIPTS += ocheck.sh
 EXTRA_DIST += ocheck.sh.in
 
@@ -139,7 +140,7 @@ genx2.sh: genx2.sh.in
 		chmod +x $@; \
 	fi
 
-EXTRA_DIST += jmzdepf90.sh.in demo-chak.sh.in $(chak_to_include)
+EXTRA_DIST += jmzdepf90.sh.in $(chak_to_include)
 EXTRA_DIST += README-jmz.org
 
 MOSTLYCLEANFILES =
