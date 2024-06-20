@@ -1,7 +1,7 @@
 !!!_! ami_table.F90 - TOUZA/Ami/table amida-coupler table procedures
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2024/06/07 10:35:51 fuyuki ami_table.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/06 21:26:18 fuyuki ami_table.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024
@@ -196,27 +196,16 @@ module TOUZA_Ami_table
   ! logical,save :: debug_side_d = .FALSE.
 !!!_ + type
 !!!_ + interfaces
-  interface ps2g_wedge_longitude
-     module procedure ps2g_wedge_longitude_d
-  end interface ps2g_wedge_longitude
   interface symm_ps2g_map
      module procedure symm_ps2g_map_d
   end interface symm_ps2g_map
+
   interface div_ps2g_map
      module procedure div_ps2g_map_d
   end interface div_ps2g_map
-  interface wedge_ps2g_map
-     module procedure wedge_ps2g_map_d
-  end interface wedge_ps2g_map
-  interface ps2g_store_table
-     module procedure ps2g_store_table_d
-  end interface ps2g_store_table
   interface ps2g_store_fwd
      module procedure ps2g_store_fwd_d
   end interface ps2g_store_fwd
-  interface ps2g_bwd_settle
-     module procedure ps2g_bwd_settle_d
-  end interface ps2g_bwd_settle
   interface div_ps2g_cell
      module procedure div_ps2g_cell_d
   end interface div_ps2g_cell
@@ -268,18 +257,12 @@ module TOUZA_Ami_table
   interface set_grlon_node
      module procedure set_grlon_node_d
   end interface set_grlon_node
-  interface set_glon_node
-     module procedure set_glon_node_d
-  end interface set_glon_node
   interface is_seg_intersect
      module procedure is_seg_intersect_d
   end interface is_seg_intersect
   interface set_seg_lat_cache
      module procedure set_seg_lat_cache_d
   end interface set_seg_lat_cache
-  interface set_seg_lon_cache
-     module procedure set_seg_lon_cache_d
-  end interface set_seg_lon_cache
   interface set_seg_rlon_cache
      module procedure set_seg_rlon_cache_d
   end interface set_seg_rlon_cache
@@ -375,10 +358,8 @@ module TOUZA_Ami_table
   public init, diag, finalize
   public cyclic_interp_table
   public geo_interp_table
-  public symm_ps2g_map,  div_ps2g_map
-  public wedge_ps2g_map, ps2g_wedge_longitude
+  public symm_ps2g_map
   public ps2g_invert_table
-  public shift_by_wedge
   public is_symmetric_plane, set_symmetric_zone
 
 !!!_ + function-like macros
@@ -635,164 +616,8 @@ contains
     return
   end subroutine cyclic_interp_table
 
-!!!_  - ps2g_wedge_longitude
-  subroutine ps2g_wedge_longitude_d &
-       & (ierr,  &
-       &  wdlon, wglon, wpos,  nwedge, iniskip, &
-       &  dlon,  glon,  mlon,  clon,   deg)
-    use TOUZA_Ami_std,only: KTGT=>KDBL
-    use TOUZA_Ami_std,only: choice, trace_err
-    use TOUZA_Emu_ugg,only: check_monotonic, deg2rad
-    implicit none
-    integer,         intent(out) :: ierr
-    real(kind=KTGT), intent(out) :: wdlon(0:*)   ! wedged delta longitude
-    real(kind=KTGT), intent(out) :: wglon(0:*)   ! wedged longitude
-    integer,         intent(out) :: wpos(0:*)    ! wedged positions
-    integer,         intent(out) :: nwedge
-    integer,         intent(out) :: iniskip
-    real(kind=KTGT), intent(in)  :: dlon(0:*)
-    real(kind=KTGT), intent(in)  :: glon(0:*)
-    integer,         intent(in)  :: mlon
-    real(kind=KTGT), intent(in)  :: clon         ! longitude center for projection
-    logical,optional,intent(in)  :: deg          ! degree unit (default .false.)
-
-    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
-    real(kind=KTGT),parameter :: TWO = 2.0_KTGT
-    real(kind=KTGT),parameter :: quad = 90.0_KTGT
-    real(kind=KTGT),parameter :: oct  = quad / TWO
-    real(kind=KTGT),parameter :: semi = quad * TWO
-
-    real(kind=KTGT) :: rq, ro, rs
-    real(kind=KTGT) :: cmdl, cnml
-    real(kind=KTGT) :: bl, bh, bo
-    integer j, jq, jcb, jce, jpb, jpe
-    integer dir
-    logical bdeg
-
-    ierr = 0
-
-    iniskip = 0
-    dir = check_monotonic(glon, mlon + 1)
-    if (dir.eq.0) ierr = _ERROR(ERR_INVALID_PARAMETER)
-
-    nwedge = 0
-    wpos(nwedge) = 0
-    if (ierr.eq.0) then
-       bdeg = choice(.FALSE., deg)
-       if (bdeg) then
-          rq = quad
-          rs = semi
-          ro = oct
-       else
-          rq = deg2rad(quad)
-          rs = deg2rad(semi)
-          ro = deg2rad(oct)
-       endif
-       if (ANY(ABS(glon(1:mlon)-glon(0:mlon-1)).gt.rq)) then
-          ierr = _ERROR(ERR_INVALID_PARAMETER)
-       endif
-    endif
-    if (ierr.eq.0) then
-       cnml = modulo(clon + rq, rs) - rq
-       cmdl = clon - ro
-       if (dir.gt.0) then
-          ! ascending
-          bl = modulo(glon(0) - cmdl, rq) - ro
-          do j = 0, mlon - 1
-             bh = modulo(glon(j+1) - cmdl, rq) - ro
-             ! write(*, *) j, glon(j), glon(j+1), bl, bh
-             if (bl.eq.ZERO) then
-                continue
-             else if (bl.lt.ZERO.and.bh.gt.ZERO) then
-                bo = (bl + bh) / TWO
-                if (bo.eq.ZERO) then
-                   iniskip = max(iniskip, 1)
-                else
-                   nwedge = nwedge + 1
-                   wpos(nwedge) = 1 + j
-                endif
-             endif
-             bl = bh
-          enddo
-       else
-          ! descending
-          bh = modulo(glon(0) - cmdl, rq) - ro
-          do j = 0, mlon - 1
-             bl = modulo(glon(j+1) - cmdl, rq) - ro
-             if (bl.eq.ZERO) then
-                continue
-             else if (bl.lt.ZERO.and.bh.gt.ZERO) then
-                bo = (bl + bh) / TWO
-                if (bo.eq.ZERO) then
-                   iniskip = max(iniskip, 1)
-                else
-                   nwedge = nwedge + 1
-                   wpos(nwedge) = 1 + j
-                endif
-             endif
-             bh = bl
-          enddo
-       endif
-    endif
-    if (ierr.eq.0) then
-       wpos(nwedge+1) = mlon
-       jcb = 0
-       jpb = wpos(0)
-       do jq = 0, nwedge - 1
-          jpe = wpos(jq+1)
-          bo = max(glon(jpe), glon(jpe-1))
-          bo = aint((bo - cnml) / rq) * rq + cnml
-          jce = jcb + (jpe - jpb)
-
-          wglon(jcb:jce-1) = glon(jpb:jpe-1)
-          wglon(jce)       = bo
-
-          wdlon(jcb:jce-2) = dlon(jpb:jpe-2)
-          wdlon(jce-1)     = bo - glon(jpe-1)
-          wdlon(jce)       = glon(jpe) - bo
-
-          jcb = jce + 1
-          jpb = jpe
-          wpos(jq+1) = jce
-       enddo
-       jpe = mlon
-       jce = jcb + (jpe - jpb)
-       wglon(jcb:jce)   = glon(jpb:jpe)
-       wdlon(jcb:jce-1) = dlon(jpb:jpe-1)
-       wpos(nwedge+1) = jce + 1
-       wpos(0) = -1
-    endif
-    if (ierr.eq.0) then
-       dir = check_monotonic(wglon, mlon + 1 + nwedge)
-       if (dir.eq.0) then
-          ierr = _ERROR(ERR_PANIC)
-          write(*, *) 'FATAL, non monotonic.'
-       endif
-    endif
-    ! write(*, *) wpos(0:nwedge+1)
-    call trace_err(ierr, fun='ps2g_wedge_longitude')
-    return
-  end subroutine ps2g_wedge_longitude_d
-
-!!!_  & shift_by_wedge()
-  integer function shift_by_wedge(idx, nw, wp) result(k)
-    implicit none
-    integer,intent(in) :: idx
-    integer,intent(in) :: nw
-    integer,intent(in) :: wp(0:*)
-    integer j
-    k = idx
-    if (nw.gt.0) then
-       do j = nw, 1, -1
-          if (idx.gt.wp(j) - j) then
-             k = idx + j
-             exit
-          endif
-       enddo
-    endif
-  end function shift_by_wedge
-
-!!!_  - symm_ps2g_map - axi-symmetric ps2g mapping
+!!!_  - [ps2g]
+!!!_   & symm_ps2g_map - axi-symmetric ps2g mapping
   subroutine symm_ps2g_map_d &
        & (ierr,   iofs,    iprj,    wprj,  &
        &  nmem,   lmem,    &
@@ -1164,7 +989,7 @@ contains
     call trace_err(ierr, fun='symm_ps2g_map')
   end subroutine symm_ps2g_map_d
 
-!!!_  . octant_dist_table - distribute normalized octant table
+!!!_   & octant_dist_table - distribute normalized octant table
   subroutine octant_dist_table_d &
        & (ierr,     iofs,     iprj,     wprj,  &
        &  nmem,     lmem,     &
@@ -1297,7 +1122,7 @@ contains
     return
   end subroutine octant_dist_table_d
 
-!!!_  - octant_settle_table
+!!!_   & octant_settle_table
   subroutine octant_settle_table_d &
        & (ierr, iprj, wprj, iofs, jlatb, jlate, jlonb, jlone, mdest)
     implicit none
@@ -1322,7 +1147,7 @@ contains
     mgg = (jlate - jlatb) * (jlone - jlonb)
     do jp = 0, iofs(mgg) - 1
        jx = iprj(jp)
-       if (jx.gt.mdest) then
+       if (jx.lt.0.or.jx.gt.mdest) then
           write(*, *) 'settle:fail:', jp, jx, mdest
        else
           sac(jx) = sac(jx) + wprj(ps2g_w0, jp)
@@ -1332,7 +1157,8 @@ contains
     enddo
     do jp = 0, iofs(mgg) - 1
        jx = iprj(jp)
-       if (jx.le.mdest) then
+       ! if (jx.le.mdest) then
+       if (jx.ge.0.and.jx.ge.mdest) then
           wprj(ps2g_w1fla, jp) = wprj(ps2g_w1fla, jp) - cla(jx) * sac(jx)
           wprj(ps2g_w1flo, jp) = wprj(ps2g_w1flo, jp) - clo(jx) * sac(jx)
        endif
@@ -1360,7 +1186,7 @@ contains
     return
   end subroutine octant_settle_table_d
 
-!!!_   , octant_gen_table - tabulate octant-arrangement
+!!!_    * octant_gen_table - tabulate octant-arrangement
   subroutine octant_gen_table_d &
        & (ierr,     &
        &  dectbl,   doct_dec, lonn_dec, adjl_dec, &
@@ -1484,7 +1310,7 @@ contains
     ! enddo
   end subroutine octant_gen_table_d
 
-!!!_   . octant_wedge_lonseq
+!!!_    * octant_wedge_lonseq
   subroutine octant_wedge_lonseq_d &
        & (ierr,   nditbl, ofs,    mo,  &
        &  dectbl, ndiseq, lonseq, dloseq, adjseq, lseq, &
@@ -1628,7 +1454,7 @@ contains
     endif
   end function octant_normalize_lon_d
 
-!!!_   . octant_fill_table
+!!!_    * octant_fill_table
   subroutine octant_fill_table_d &
        & (ierr,  &
        &  ooffs, lonn_ser, dlon_ser)
@@ -1660,7 +1486,7 @@ contains
 
   end subroutine octant_fill_table_d
 
-!!!_   . octant_gen_group
+!!!_    * octant_gen_group
   subroutine octant_gen_group_d &
        & (ierr,     &
        &  symmz,    &
@@ -1792,7 +1618,7 @@ contains
     endif
   end subroutine octant_gen_group_d
 
-!!!_   . set_octant_ends
+!!!_    * set_octant_ends
   subroutine set_octant_ends_d &
        & (ierr, nocts, opropi, &
        &  lonn, jlonb, jlone,  cco)
@@ -1847,7 +1673,7 @@ contains
 
   end subroutine set_octant_ends_d
 
-!!!_   . set_zone_props
+!!!_    * set_zone_props
   subroutine set_zone_props_d &
        & (ierr,  zpropi, zpropr, &
        &  kasp,  symmz,  xl, dx, mx, yl, dy, my)
@@ -1925,7 +1751,7 @@ contains
 
   end subroutine set_zone_props_d
 
-!!!_   . set_zone_range
+!!!_    * set_zone_range
   subroutine set_zone_range_d &
        & (ierr,  zpropi, zpropr, &
        &  jzset, xl, xh, dx, yl, yh, dy)
@@ -1993,7 +1819,7 @@ contains
     endif
 
   end subroutine set_zone_range_d
-!!!_   . set_zone_range_core
+!!!_    * set_zone_range_core
   subroutine set_zone_range_core_d &
        & (ierr,  zpropi, zpropr, &
        &  jzset, xl, xh, dx, jco)
@@ -2032,7 +1858,7 @@ contains
 !          & zpropr(:, jzset, jco), zpropi(:, jzset, jco)
   end subroutine set_zone_range_core_d
 
-!!!_   . adjust_zone_range
+!!!_    * adjust_zone_range
   subroutine adjust_zone_range_d &
        & (ierr,  zpropi, zpropr, symmz, jco)
     implicit none
@@ -2107,7 +1933,7 @@ contains
 !     enddo
   end subroutine adjust_zone_range_d
 
-!!!_   . set_zone_coeffs
+!!!_    * set_zone_coeffs
   subroutine set_zone_coeffs_d &
        & (ierr,  zpropi, zpropr, &
        &  jzset, xl, xh, dx, yl, yh, dy)
@@ -2143,7 +1969,7 @@ contains
 
   end subroutine set_zone_coeffs_d
 
-!!!_   . octant_zone_d ()
+!!!_    * octant_zone_d ()
   integer function octant_zone_d(lon, cco, ofs) result(k)
     use TOUZA_Emu_ugg,only: deg2rad, psgp_inquire
     implicit none
@@ -2173,7 +1999,7 @@ contains
     endif
   end function octant_zone_d
 
-!!!_   . get_octant_ndi () - return normalized doubled octant id
+!!!_    * get_octant_ndi () - return normalized doubled octant id
   integer function get_octant_ndi_d(lon, cco, ref) result(k)
     use TOUZA_Emu_ugg,only: deg2rad, psgp_inquire
     implicit none
@@ -2205,7 +2031,7 @@ contains
     endif
   end function get_octant_ndi_d
 
-!!!_   . octant_lon_d ()
+!!!_    * octant_lon_d ()
   real(kind=KTGT) function octant_lon_d(zone, cco, zofs, lorg) result(v)
     use TOUZA_Emu_ugg,only: deg2rad, psgp_inquire
     use TOUZA_Ami_std,only: KTGT=>KDBL
@@ -2234,7 +2060,7 @@ contains
     endif
   end function octant_lon_d
 
-!!!_   . octant_dec_table - tabulate longitude-decomposition
+!!!_    * octant_dec_table - tabulate longitude-decomposition
   subroutine octant_dec_table_d &
        & (ierr,     &
        &  jwgt_dec, oref_dec, lwgt,     wtbl_dec, &
@@ -2301,7 +2127,7 @@ contains
   end subroutine octant_dec_table_d
 
 
-!!!_  - is_symmetric_plane
+!!!_   & is_symmetric_plane
   integer function is_symmetric_plane_d &
        & (xl, dx, mx, yl, dy, my, xo, yo) &
        & result(k)
@@ -2331,7 +2157,7 @@ contains
 
   end function is_symmetric_plane_d
 
-!!!_   . symmetric_coor
+!!!_    * symmetric_coor
   integer function symmetric_coor_d (o, d, m, a) result(k)
     use TOUZA_Ami_std,only: choice
     implicit none
@@ -2377,7 +2203,7 @@ contains
     endif
   end function symmetric_coor_d
 
-!!!_  - set_symmetric_zone
+!!!_   & set_symmetric_zone
   subroutine set_symmetric_zone(ierr, symmz, ksymm, kasp)
     implicit none
     integer,intent(out) :: ierr
@@ -2408,7 +2234,7 @@ contains
 
   end subroutine set_symmetric_zone
 
-!!!_  - symmetric_zone
+!!!_   & symmetric_zone
   integer function symmetric_zone &
        & (ksymm, ph, ff) &
        & result(k)
@@ -2426,7 +2252,7 @@ contains
     enddo
   end function symmetric_zone
 
-!!!_  - div_ps2g_map
+!!!_   & div_ps2g_map
   subroutine div_ps2g_map_d &
        & (ierr,   iofs,    iprj,    wprj,  &
        &  nmem,   lmem,    &
@@ -2820,7 +2646,7 @@ contains
     return
   end subroutine div_ps2g_map_d
 
-!!!_  - ps2g_store_fwd
+!!!_   & ps2g_store_fwd
   subroutine ps2g_store_fwd_d &
        & (iprj,   wprj,   nmem, &
        &  ntiles, ptiles, lmem,  &
@@ -2920,415 +2746,7 @@ contains
 
   end subroutine ps2g_store_fwd_d
 
-!!!_  - wedge_ps2g_map
-  subroutine wedge_ps2g_map_d &
-       & (ierr,   iofs,    iprj,    wprj,  &
-       &  nmem,   lmem,    &
-       &  latn,   wlat,    jlatb,   jlate, mlat,   &
-       &  lonn,   dlon,    jlonb,   jlone, mlon,   &
-       &  nwedge, wpos,    iniskip, &
-       &  xl,     dx,      mx,      yl,    dy,     my,   &
-       &  cco,    &
-       &  lonlev, latlev,  inilev,  swlev, reqlev, tol,  &
-       &  deg,    u,       levv,    tag,   udump)
-    use TOUZA_Emu_ugg,only: ncache_psgp_co
-    use TOUZA_Emu_ugg,only: psgp_set_step, psgp_bwd_isf, psgp_inquire, psgp_dlo_tr
-    use TOUZA_Emu_ugg,only: deg2rad, sind_canonical, cosd_canonical
-    use TOUZA_Emu_ugg,only: sin_canonical, cos_canonical
-    use TOUZA_Emu_ugg,only: check_monotonic, ang2deg, ang2rad
-    use TOUZA_Ami_Std,only: join_list, choice, is_msglev_WARNING
-    implicit none
-    integer,parameter :: KTGT=KDBL
-    integer,         intent(out) :: ierr
-    integer,         intent(in)  :: lmem                   ! limit size of iprj wprj  (negative to skip check)
-    integer,         intent(out) :: iofs(0:*)              ! [(lo,la)+1] to subscript-vector offset (lv)
-    integer,         intent(out) :: iprj(0:*)              ! [lv] to g(xy)-index
-    real(kind=KTGT), intent(out) :: wprj(0:ps2g_weights-1, 0:*)    ! [lv] to weights
-    integer,         intent(out) :: nmem                   ! wprj active members
-    real(kind=KTGT), intent(in)  :: lonn(0:*), latn(0:*)   ! node longitude [0:mlon] and latitude [0:mlat] (deg/rad)
-    real(kind=KTGT), intent(in)  :: dlon(0:*), wlat(0:*)   ! d lon(deg/rad); [d sin(lat)]
-    integer,         intent(in)  :: jlonb, jlatb, mlat     ! nlon: jlone - jlonb, physical size
-    integer,         intent(in)  :: jlone, jlate, mlon     ! mlon: logical size
-    real(kind=KTGT), intent(in)  :: cco(*)                 ! ps2g cache (common)
-    real(kind=KTGT), intent(in)  :: xl, dx
-    real(kind=KTGT), intent(in)  :: yl, dy
-    integer,         intent(in)  :: mx, my
-    integer,         intent(in)  :: iniskip,   nwedge
-    integer,         intent(in)  :: wpos(0:*)
-    integer,         intent(in)  :: lonlev, latlev, inilev, swlev
-    integer,         intent(out) :: reqlev                 ! required level limit
-    real(kind=KTGT), intent(in)  :: tol
-    logical,         intent(in),optional :: deg(:)         ! degree if true, radian otherwise
-    integer,         intent(in),optional :: u, levv
-    integer,         intent(in),optional :: udump
-    character(len=*),intent(in),optional :: tag
-
-    integer,parameter :: mlimit = HUGE(0)
-
-    integer :: mxd, myd
-
-    real(kind=KTGT),parameter :: ZERO=0.0_KTGT
-    real(kind=KTGT),parameter :: ONE=1.0_KTGT
-    real(kind=KTGT),parameter :: TWO=2.0_KTGT
-
-    real(kind=KTGT) :: cci(ncache_psgp_co)
-    integer nlon, nlat, jlon, jlat, jtlon, jtlat
-    integer jlonph, jlatph
-    integer jalon,  jalat, jagh
-    real(kind=KTGT) :: tolx
-    integer dir_lon, dir_lat, dir_nat
-    real(kind=KTGT) :: destl(lxy), desth(lxy), destd(lxy), destdh(lxy)
-    real(kind=KTGT) :: lonorg,   lonofs
-
-    integer,parameter :: sparelev = 2
-    integer :: symmlev, xstep
-    integer :: locache, lacache
-    integer :: lotile,  latile
-    real(kind=KTGT) :: adj_lonsub ! centroid(pivot) longitude adjustment from source representative
-    integer :: jclon_rep          ! cache index for (sub-)cell representative longitude
-    integer :: repfac             ! cache length to unit-cell factor
-
-    integer :: lstack
-    integer :: mdest
-    integer jtabr(lrange, lxy)    ! possibly active table range
-
-    real(kind=KTGT) :: utseg(0:accum_num-1)
-    real(kind=KTGT),allocatable :: gslatn(:), dslatn(:), uslatn(:), cglatn(:, :)
-    real(kind=KTGT),allocatable :: glonn(:),  dlonn(:),  ulonn(:),  cglonn(:, :)
-    real(kind=KTGT),allocatable :: lintg2(:)
-
-    integer,        allocatable :: levco(:)
-    integer,        allocatable :: pstack(:, :)
-    real(kind=KTGT),allocatable :: ntiles(:, :), ptiles(:, :)
-    real(kind=KTGT),allocatable :: clats(:, :), clons(:, :)
-    real(kind=KTGT),allocatable :: aplane(:, :, :), aglat(:, :, :), aglon(:, :, :)
-
-    integer,parameter :: lpw2 = BIT_SIZE(0)
-    integer :: cstride(0:lpw2)   ! clats clons stride cache
-    integer,parameter :: lpw4 = lpw2 + 2
-    real(kind=KTGT) :: afact(0:lpw4)   ! power-4 table
-
-    integer jwedge
-    integer latflag
-    integer swlevx, inilevx
-    logical blatc
-
-    integer lv
-    integer utmp, ud
-    character(len=128) :: txt
-    integer j
-    integer jerr
-
-    real(kind=KTGT) :: lospan
-    real(kind=KTGT) :: sref, schk, snt, spt
-    real(kind=KTGT) :: negmaxa
-    real(kind=KTGT) :: rlon(NTRIG)
-    ! real(kind=KTGT) :: lo0, lo1, la0, la1
-
-    ierr = 0
-
-    utmp = get_logu(u, ulog)
-    ud = choice(-1, udump)
-    lv = choice(lev_verbose, levv)
-
-    ! health check
-    if ((mlimit / mx) .lt. my) then
-       ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-    else if (mlimit / (mx * my) .lt. lxy) then
-       ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
-    endif
-    if (ierr.ne.0) then
-109    format('maximim size reached: ', I0, 1x, I0)
-       write(txt, 109) mx, my
-       call msg(txt)
-       return
-    endif
-
-    ! reset
-    iofs(0) = 0
-    nmem = 0
-    reqlev = 0
-    negmaxa = ZERO
-
-    nlon = jlone - jlonb
-    nlat = jlate - jlatb
-
-    tolx = set_tolerance(tol)
-
-    dir_lon = check_monotonic(lonn(jlonb:jlone), nlon+1)
-    dir_lat = check_monotonic(latn(jlatb:jlate), nlat+1)
-    dir_nat = - dir_lon * dir_lat
-    ! dir_nat is positive if (lon=0,lat=0) -- (+1,0) -- (+1,+1) -- (0,+1)
-    ! is clockwise
-    ! lon+0  +1
-    !     0--1   lat+0
-    !        |
-    !     3--2   lat+1
-    call msg('(''natural direction = '', I0)', (/dir_nat/))
-    if (dir_nat.eq.0) then
-119    format('direction: ', I0, 1x, I0)
-       write(txt, 119) dir_lon, dir_lat
-       call msg(txt)
-       ierr = _ERROR(ERR_INVALID_PARAMETER)
-       return
-    endif
-
-    ! normalize psgp parameters
-    call psgp_inquire(ierr, cco, olon=lonofs)
-
-    lonorg = ZERO
-    cci(1:ncache_psgp_co) = cco(1:ncache_psgp_co)
-    if (is_deg(deg, JLONGI)) then
-       lospan = 360.0_KTGT
-    else
-       lospan = 0.0_KTGT
-    endif
-#define LON_DEGREE 1
-! #define LON_DEGREE 0
-#if LON_DEGREE
-#else
-    lospan = 0.0_KTGT
-#endif
-    call psgp_set_step(cci, dx, dy, lonorg, lospan=lospan)
-
-    destd(1:2) = ONE
-    destdh(1:2) = destd(1:2) / TWO
-    destl(1:2) = (/xl, yl/) / (/dx, dy/)
-    desth(1:2) = destl(1:2) + real((/mx, my/), kind=KTGT)
-
-    symmlev = min(lonlev, latlev)
-    if (symmlev + sparelev.gt.lpw2) then
-129    format('panic: symmetric level: ', I0, 1x, I0, 1x, I0)
-       write(txt, 129) symmlev, sparelev, lpw2
-       call msg(txt)
-       ierr = _ERROR(ERR_PANIC)
-       return
-    endif
-
-    lotile  = 2 ** lonlev
-    latile  = 2 ** latlev
-    locache = 2 ** (lonlev + sparelev)
-    lacache = 2 ** (latlev + sparelev)
-    xstep   = 2 ** (symmlev + sparelev)
-    repfac  = 2 ** sparelev
-
-    sref = 2.0_KTGT**(lonlev + latlev)
-
-    cstride(0) = xstep
-    do j = 1, symmlev + sparelev
-       cstride(j) = cstride(j-1) / 2
-    enddo
-    do j = 0, symmlev + sparelev
-       afact(j) = 4.0_KTGT ** (symmlev - j)
-    enddo
-
-    lstack = 1 + 3 * symmlev
-    mdest  = mx * my
-    mxd    = mx * 2
-    myd    = my * 2
-
-    if (ierr.eq.0) allocate(levco(0:symmlev), STAT=ierr)
-    if (ierr.eq.0) allocate(pstack(prop_psg_size, 0:lstack), STAT=ierr)
-    if (ierr.eq.0) allocate(ntiles(0:mdest, 0:accum_num-1), ptiles(0:mdest, 0:accum_num-1), STAT=ierr)
-    if (ierr.eq.0) allocate(clats(mcla, 0:lacache), clons(mclo, 0:locache), STAT=ierr)
-    if (ierr.eq.0) allocate(aglat(NTRIG, 0:mxd, 0:myd), aglon(NTRIG, 0:mxd, 0:myd), STAT=ierr)
-    if (ierr.eq.0) allocate(aplane(lxy, 0:mxd, 0:myd), STAT=ierr)
-    if (ierr.eq.0) allocate(gslatn(0:nlat), dslatn(0:nlat-1), uslatn(0:nlat-1), STAT=ierr)
-    if (ierr.eq.0) allocate(glonn(0:nlon), dlonn(0:nlon-1), ulonn(0:nlon-1), STAT=ierr)
-    if (ierr.eq.0) allocate(lintg2(0:lacache), STAT=ierr)
-    if (ierr.eq.0) allocate(cglatn(mcla, 0:nlat), cglonn(mclo, 0:nlon), STAT=ierr)
-
-    ! clon(:, lcache+1) is for longitude origin special
-    if (ierr.ne.0) then
-       ierr = _ERROR(ERR_ALLOCATION)
-       return
-    endif
-
-    if (ierr.eq.0) then
-       call set_coor_anchor(aplane, aglat, aglon, destdh, destl, mxd, myd, cci)
-
-       call set_gslat_node &
-            & (gslatn, dslatn, uslatn, cglatn, &
-            &  latn,   wlat,   jlatb,  jlate,  latile, cci, dir_lat, deg)
-       call set_glon_node &
-            & (ierr,   &
-            &  glonn,  dlonn,  ulonn,  cglonn, &
-            &  lonn,   dlon,   jlonb,  jlone,  lotile, cci, lonofs, dir_lon, deg)
-    endif
-
-    ntiles(:,:) = ZERO
-    ptiles(:,:) = ZERO
-
-    ! divides
-
-101 format('ps2g:i: ', I0, ',', I0)
-102 format('ps2g:o: ', I0, ',', I0)
-103 format('ps2g:x: ', I0, ',', I0)
-    do jlat = 0, nlat - 1
-       blatc = .FALSE.
-       jalon = 0
-       jwedge = 1
-       do jlon = 0, nlon - 1
-          jtabr(rmax, :) = - HUGE(0)
-          jtabr(rmin, :) = + HUGE(0)
-
-          jlonph = jlon + jlonb
-
-          ! a cell = {wpos-1 wpos wpos+1}
-
-          !  case no subcell         case subcell division
-          !     |===cell==|          |========|========|      source cell
-          !     l   rep  l+1         l       rep      l+1
-          !     o----+----o          o-----o--X--------o
-          !                          | rep |    rep    |
-          !                          |--x--W-----x-----|      sub cell division at a wedge
-          !                         w-1    w          w+1
-
-          ! distance between representatives of the source cell and (sub-)cell
-          if (jlonph.eq.wpos(jwedge) - 1) then
-             adj_lonsub = - dlonn(jlon + 1) / TWO
-          else if (jlonph.eq.wpos(jwedge - 1)) then
-             adj_lonsub = + dlonn(jlon - 1) / TWO
-          else
-             adj_lonsub = ZERO
-          endif
-          jclon_rep = locache / 2
-
-          if (dlonn(jlon).eq.0.0_KTGT) then
-             if (is_msglev_DETAIL(lv)) then
-                write(txt, 103) jlat+jlatb, jlon+jlonb
-                call msg(txt, tag, utmp)
-             endif
-             utseg(accum_w1lo) = abs(lonn(jlon+1) - lonn(jlon))
-             utseg(accum_w1la) = utseg(accum_w1lo)
-             utseg(accum_w0) = abs(dslatn(jlat)) * utseg(accum_w1lo)
-             ptiles(mdest, accum_w0) = ZERO
-             ntiles(mdest, accum_w0) = ONE
-             ptiles(mdest, accum_w1la) = ZERO
-             ntiles(mdest, accum_w1la) = ZERO
-             ptiles(mdest, accum_w1lo) = ZERO
-             ntiles(mdest, accum_w1lo) = ZERO
-          else if (is_seg_intersect(cglatn, cglonn, jlat, jlat+1, jlon, jlon+1, destl, desth)) then
-             if (is_msglev_INFO(lv)) then
-                write(txt, 101) jlat+jlatb, jlon+jlonb
-                call msg(txt, tag, utmp)
-             endif
-             utseg(accum_w0) = abs(uslatn(jlat) * ulonn(jlon))
-             utseg(accum_w1lo) = abs(ulonn(jlon))
-             utseg(accum_w1la) = abs(ulonn(jlon))
-
-             if (.not.blatc) then
-                jlatph = jlat + jlatb
-                call set_seg_lat_cache(clats, lintg2, gslatn(jlat), gslatn(jlat+1), dslatn(jlat), cci, lacache)
-                blatc = .TRUE.
-             endif
-             call set_seg_lon_cache(clons, glonn(jlon), glonn(jlon+1), dlonn(jlon), cci, locache)
-
-             levco(0:symmlev) = 0
-             ! center longitude division may affect switching and initial levels
-             inilevx = min(max(0, inilev), symmlev)
-             swlevx =  swlev
-             if (swlevx.lt.0) swlevx = (symmlev + 1 + swlevx)
-
-             do jtlat = 0, lacache - 1, xstep
-                latflag = latcell_normal
-                if (jtlat.eq.0) latflag = latflag + latcell_upb
-                if (jtlat+xstep.eq.lacache) latflag = latflag + latcell_lowb
-                do jtlon = 0, locache - 1, xstep
-                   call div_ps2g_cell &
-                        & (ntiles,  ptiles,  levco,   jtabr,   pstack,  negmaxa, &
-                        &  reqlev,  symmlev, inilevx, swlevx,  &
-                        &  clats,   jtlat,   clons,   jtlon,   &
-                        &  afact,   cstride, lintg2,  &
-                        &  uslatn(jlat), ulonn(jlon), lospan, dir_nat, latflag, jclon_rep, repfac, &
-                        &  aplane, mx,  my, mdest, destl,   &
-                        &  cci, tolx, lv, tag, ud, jlatph, jlonph)
-                enddo
-             enddo
-#define _FMT_ 1x, F0.3
-201          format('ps2g:sum:F: ', I0, 1x, I0, 1x, E10.3, 4(1x, E12.3))
-202          format('ps2g:sum:S: ', I0, 1x, I0, 1x, E10.3, 4(_FMT_))
-#undef _FMT_
-             if (is_msglev_INFO(lv)) then
-                snt = SUM(ntiles(0:mdest, accum_w0))
-                spt = SUM(ptiles(0:mdest, accum_w0))
-                schk = snt + spt
-                if (schk.ne.sref) then
-                   write(txt, 201) jlatph, jlonph, schk - sref, sref, schk, snt, spt
-                   call msg(txt, tag, utmp)
-                else if (is_msglev_DETAIL(lv)) then
-                   write(txt, 202) jlatph, jlonph, schk - sref, sref, schk, snt, spt
-                   call msg(txt, tag, utmp)
-                endif
-             endif
-             if (is_msglev_DETAIL(lv)) then
-                call join_list(jerr, txt, levco(0:symmlev))
-                call msg(txt, tag, utmp)
-             endif
-          else
-             if (is_msglev_DETAIL(lv)) then
-                write(txt, 102) jlat+jlatb, jlon+jlonb
-                call msg(txt, tag, utmp)
-             endif
-             utseg(accum_w0) = abs(dslatn(jlat) * dlonn(jlon))
-             utseg(accum_w1lo) = abs(dlonn(jlon))
-             utseg(accum_w1la) = abs(dlonn(jlon))
-             ptiles(mdest, accum_w0) = ZERO
-             ntiles(mdest, accum_w0) = ONE
-             ptiles(mdest, accum_w1la) = ZERO
-             ntiles(mdest, accum_w1la) = ZERO
-             ptiles(mdest, accum_w1lo) = ZERO
-             ntiles(mdest, accum_w1lo) = ZERO
-          endif
-
-          call psgp_dlo_tr(rlon(1:NTRIG), clons(:, jclon_rep), cco)
-          ! store result (clear ntiles ptiles)
-          ! write(*, *) 'utseg:', jlat, jlon, deg2rad(utseg(:))
-          utseg(:) = ang2rad(utseg(:), lospan)
-          ! write(*, *) 'utseg:', jlat, jlon, utseg(:)
-          call ps2g_store_table &
-               & (iprj,   wprj,   nmem,  &
-               &  ntiles, ptiles, lmem,  mx,   my, mdest, &
-               &  aglat,  aglon,  &
-               &  jtabr,  utseg,  adj_lonsub, rlon)
-
-          jalat = jlat
-          jagh = jalat * mlon + jalon
-          ! write(*, *) jagh, jalat, jalon, mlon, jlonph, wpos(jwedge)
-          ! a cell = {wpos-1 wpos wpos+1}
-          if (jlonph+1.ge.wpos(jwedge)) then
-             iofs(jagh+1) = nmem
-             jwedge = jwedge + 1
-          else
-             iofs(jagh+1) = nmem
-             jalon = jalon + 1
-          endif
-       enddo
-    enddo
-    if (ierr.eq.0) then
-       if (lmem.gt.0.or.nmem.lt.lmem) then
-          call ps2g_bwd_settle &
-               & (ierr, iprj, wprj, lmem, iofs, mlat, mlon)
-       endif
-    endif
-    if (ierr.eq.0) then
-       if (negmaxa.lt.ZERO) then
-          if (is_msglev_WARNING(lv)) then
-141          format('negative area piece detected: ', ES13.3)
-             write(txt, 141) negmaxa
-             call msg(txt)
-          endif
-       endif
-    endif
-    if (ierr.eq.0) deallocate(levco, pstack, ntiles, ptiles, STAT=ierr)
-    if (ierr.eq.0) deallocate(clats, clons, STAT=ierr)
-    if (ierr.eq.0) deallocate(aglat, aglon, aplane, STAT=ierr)
-    if (ierr.eq.0) deallocate(gslatn, dslatn, uslatn, glonn, dlonn, ulonn, lintg2, STAT=ierr)
-    if (ierr.eq.0) deallocate(cglatn, cglonn, STAT=ierr)
-    return
-  end subroutine wedge_ps2g_map_d
-
-!!!_  & coeff2_line_integ
+!!!_   & coeff2_line_integ
   real(kind=KTGT) function coeff2_line_integ_d(s) result(v)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
@@ -3341,7 +2759,7 @@ contains
     v = - c - la * s
   end function coeff2_line_integ_d
 
-!!!_  & coeff3_line_integ
+!!!_   & coeff3_line_integ
   real(kind=KTGT) function coeff3_line_integ_d(s) result(v)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
@@ -3354,183 +2772,7 @@ contains
     v = - (c * s + la) / 2.0_KTGT
   end function coeff3_line_integ_d
 
-!!!_  - ps2g_store_table
-  subroutine ps2g_store_table_d &
-       & (iprj,   wprj,   nmem, &
-       &  ntiles, ptiles, lmem,  mx, my,  mdest, &
-       &  aglat,  aglon,  &
-       &  jtabr,  utseg,  adj_lonsub, rlon)
-    use TOUZA_Emu_ugg,only: rad2deg, set_sincos, sub_angle, add_angle, phase
-    implicit none
-    integer,parameter :: KTGT=KDBL
-    integer,        intent(in)    :: lmem
-    integer,        intent(inout) :: iprj(0:*)
-    real(kind=KTGT),intent(inout) :: wprj(0:ps2g_weights-1, 0:*)
-    integer,        intent(inout) :: nmem
-    integer,        intent(in)    :: mx, my, mdest
-    real(kind=KTGT),intent(inout) :: ntiles(0:mdest,0:*)     ! [0:mx*my]  must be reset before call  (larger)
-    real(kind=KTGT),intent(inout) :: ptiles(0:mdest,0:*)     ! [0:mx*my]  must be reset before call  (smaller)
-    real(kind=KTGT),intent(in)    :: aglat(:, 0:, 0:)
-    real(kind=KTGT),intent(in)    :: aglon(:, 0:, 0:)
-    integer,        intent(in)    :: jtabr(lrange, *)        ! possibly active destination range
-    real(kind=KTGT),intent(in)    :: utseg(0:*)
-    real(kind=KTGT),intent(in)    :: adj_lonsub
-    real(kind=KTGT),intent(in)    :: rlon(*)
-
-    real(kind=KTGT) :: centla, centlo, asum
-    real(kind=KTGT) :: t0, t1lo, t1la, cblon
-    real(kind=KTGT) :: flon(NTRIG), blon(NTRIG), dlon(NTRIG)
-    integer jdx, jdy, jdh
-    integer nmbgn, nmend, jnm
-
-    ! real(kind=KTGT) :: ap, an
-
-    centla = 0.0_KTGT
-    ! ! below accumulation (ap an for each) is rather worse....
-    ! ap =  0.0_KTGT
-    ! an =  0.0_KTGT
-    ! do jdy = jtabr(rmin, coor_y), jtabr(rmax, coor_y)
-    !    do jdx = jtabr(rmin, coor_x), jtabr(rmax, coor_x)
-    !       jdh = jdy * mx + jdx
-    !       an = an + ntiles(jdh,accum_w1lo)
-    !       ap = ap + ptiles(jdh,accum_w1lo)
-    !    enddo
-    ! enddo
-    ! jdh = mdest
-    ! an = an + ntiles(jdh,accum_w1lo)
-    ! ap = ap + ptiles(jdh,accum_w1lo)
-    ! centlo = an + ap
-    ! write(*, *) centlo, an, ap
-
-    centlo = 0.0_KTGT
-    asum = 0.0_KTGT
-    nmbgn = nmem
-    do jdy = jtabr(rmin, coor_y), jtabr(rmax, coor_y)
-       do jdx = jtabr(rmin, coor_x), jtabr(rmax, coor_x)
-          jdh = jdy * mx + jdx
-          if (ntiles(jdh,accum_w0).gt.0.0_KTGT.or.ptiles(jdh,accum_w0).gt.0.0_KTGT) then
-             t0 = ntiles(jdh,accum_w0) + ptiles(jdh,accum_w0)
-             t1la = ntiles(jdh,accum_w1la) + ptiles(jdh,accum_w1la)
-             t1lo = ntiles(jdh,accum_w1lo) + ptiles(jdh,accum_w1lo)
-             asum   = asum + t0
-             centla = centla + t1la
-             centlo = centlo + t1lo
-             if (lmem.lt.0.or.nmem.lt.lmem) then
-                iprj(nmem) = jdh
-                wprj(ps2g_w0, nmem) = t0
-                wprj(ps2g_w1fla, nmem) = t1la
-                wprj(ps2g_w1flo, nmem) = t1lo
-             endif
-             nmem = nmem + 1
-             ntiles(jdh,0:accum_num-1) = 0.0_KTGT
-             ptiles(jdh,0:accum_num-1) = 0.0_KTGT
-          endif
-       enddo
-    enddo
-
-    jdh = mdest
-    if (ntiles(jdh,accum_w0).gt.0.0_KTGT.or.ptiles(jdh,accum_w0).gt.0.0_KTGT) then
-       t0 = ntiles(jdh,accum_w0) + ptiles(jdh,accum_w0)
-       t1la = ntiles(jdh,accum_w1la) + ptiles(jdh,accum_w1la)
-       t1lo = ntiles(jdh,accum_w1lo) + ptiles(jdh,accum_w1lo)
-       asum   = asum + t0
-       centla = centla + t1la
-       centlo = centlo + t1lo
-       if (lmem.lt.0.or.nmem.lt.lmem) then
-          iprj(nmem) = jdh
-          wprj(ps2g_w0, nmem) = t0
-          wprj(ps2g_w1fla, nmem) = t1la
-          wprj(ps2g_w1flo, nmem) = t1lo
-       endif
-       nmem = nmem + 1
-       ntiles(jdh,0:accum_num-1) = 0.0_KTGT
-       ptiles(jdh,0:accum_num-1) = 0.0_KTGT
-    endif
-
-    centla = centla * (utseg(accum_w1la) / asum) / utseg(accum_w0)
-    centlo = centlo * (utseg(accum_w1lo) / asum) + adj_lonsub
-    ! [note about centroid longitude]
-    !    Indeed, the centroid longitude of a RLL grid cell matches to
-    !    the central longtitude of the source cell, thus it can be safely
-    !    skip this computation with just set centlo = 0.
-    !    However, this part is left for future extension to treat non-RLL
-    !    source cells.
-
-    write(*, *) centlo, asum
-    nmend = min(nmem, lmem)
-
-    wprj(ps2g_w0, nmbgn:nmend-1) = &
-         & wprj(ps2g_w0, nmbgn:nmend-1) * utseg(accum_w0)
-
-    wprj(ps2g_w1bla, nmbgn:nmend-1) = &
-         & wprj(ps2g_w1fla, nmbgn:nmend-1) * utseg(accum_w1la)
-    wprj(ps2g_w1blo, nmbgn:nmend-1) = &
-         & wprj(ps2g_w1flo, nmbgn:nmend-1) * utseg(accum_w1lo) * utseg(accum_w0)
-
-    wprj(ps2g_w1fla, nmbgn:nmend-1) = &
-         & wprj(ps2g_w1bla, nmbgn:nmend-1) - centla * wprj(ps2g_w0, nmbgn:nmend-1)
-    ! plus sign (+ centlo) is intentional
-    wprj(ps2g_w1flo, nmbgn:nmend-1) = &
-         & wprj(ps2g_w1blo, nmbgn:nmend-1) + centlo * wprj(ps2g_w0, nmbgn:nmend-1)
-
-    flon(:) = set_sincos(adj_lonsub)
-    flon(:) = add_angle(flon, rlon)
-    do jnm = nmbgn, nmend - 1
-       jdh = iprj(jnm)
-       if (jdh.lt.mdest) then
-          jdy = jdh / mx
-          jdx = mod(jdh, mx)
-          blon(:) = aglon(:, jdx * 2 + 1, jdy * 2 + 1)
-          dlon(:) = sub_angle(flon, blon)
-          cblon = ATAN2(dlon(JSIN), dlon(JCOS))
-          wprj(ps2g_w1blo, jnm) = &
-               & wprj(ps2g_w1blo, jnm) + cblon * wprj(ps2g_w0, jnm)
-       else
-          wprj(ps2g_w1blo, jnm) = 0.0_KTGT
-       endif
-    enddo
-  end subroutine ps2g_store_table_d
-
-!!!_  - ps2g_bwd_settle
-  subroutine ps2g_bwd_settle_d &
-       & (ierr, iprj, wprj, lmem, iofs, mlat, mlon)
-    implicit none
-    integer,parameter :: KTGT=KDBL
-    integer,        intent(out)   :: ierr
-    integer,        intent(in)    :: lmem
-    integer,        intent(inout) :: iprj(0:*)
-    real(kind=KTGT),intent(inout) :: wprj(0:ps2g_weights-1, 0:*)
-    integer,        intent(in)    :: iofs(0:*)
-    integer,        intent(in)    :: mlat, mlon
-    integer j
-    integer jp, jpbgn, jpend
-    real(kind=KTGT) :: centla, centlo, asum
-    ierr = 0
-    do j = 0, mlat * mlon - 1
-       jpbgn = iofs(j)
-       jpend = iofs(j+1)
-       centla = 0.0_KTGT
-       centlo = 0.0_KTGT
-       asum = 0.0_KTGT
-       do jp = jpbgn, jpend - 1
-          centla = centla + wprj(ps2g_w1bla, jp)
-          centlo = centlo + wprj(ps2g_w1blo, jp)
-          asum = asum + wprj(ps2g_w0, jp)
-       enddo
-       ! centla = SUM(wprj(ps2g_w1bla, jbgn:jend-1))
-       ! centlo = SUM(wprj(ps2g_w1blo, jbgn:jend-1))
-       ! asum = SUM(wprj(ps2g_w0, jbgn:jend-1))
-       ! write(*, *) j, asum, jbgn, jend, wprj(ps2g_w0, jbgn:jend-1)
-       wprj(ps2g_w1bla, jpbgn:jpend-1) = &
-            & wprj(ps2g_w1bla, jpbgn:jpend-1) - (centla / asum) * wprj(ps2g_w0, jpbgn:jpend-1)
-       wprj(ps2g_w1blo, jpbgn:jpend-1) = &
-            & wprj(ps2g_w1blo, jpbgn:jpend-1) - (centlo / asum) * wprj(ps2g_w0, jpbgn:jpend-1)
-    enddo
-
-    return
-  end subroutine ps2g_bwd_settle_d
-
-!!!_  - div_ps2g_cell
+!!!_   & div_ps2g_cell
   subroutine div_ps2g_cell_d &
        & (ntiles,  ptiles,  levco,   jtabr,   pstack,  negmaxa, &
        &  reqlev,  symmlev, inilev,  swlev,   &
@@ -3770,7 +3012,7 @@ contains
     enddo
   end subroutine div_ps2g_cell_d
 
-!!!_  - div_ps2g_neighbor
+!!!_   & div_ps2g_neighbor
   subroutine div_ps2g_neighbor_d &
        & (ntiles,    ptiles,  jtabr,   negmaxa, &
        &  gmax,      gmin,    &
@@ -4117,7 +3359,7 @@ contains
 
   end subroutine div_ps2g_neighbor_d
 
-!!!_  & segment_rel_sinlat() - set relative latitude within tiny rll segment
+!!!_   & segment_rel_sinlat() - set relative latitude within tiny rll segment
   PURE &
     real(kind=KTGT) function segment_rel_sinlat_d &
       & (slat, slat0, slat1, slat2, p1, p2, u) &
@@ -4139,7 +3381,7 @@ contains
     endif
   end function segment_rel_sinlat_d
 
-!!!_  & segment_rel_lon() - set relative longitude within tiny rll segment
+!!!_   & segment_rel_lon() - set relative longitude within tiny rll segment
   real(kind=KTGT) function segment_rel_lon_d &
       & (lon, lon0, lon1, lon2, p1, p2, u) &
       &  result(r)
@@ -4166,7 +3408,7 @@ contains
 
   end function segment_rel_lon_d
 
-!!!_  - ps2g_meridian_intersection
+!!!_   & ps2g_meridian_intersection
   subroutine ps2g_meridian_intersection_d &
        & (aside,  ngraph,  jseq,   &
        &  gsegco, nprops,  glat,   glon,  jxsec, jysec, &
@@ -4309,7 +3551,7 @@ contains
     endif
 
   end subroutine ps2g_meridian_intersection_d
-!!!_  - ps2g_parallel_intersection
+!!!_   & ps2g_parallel_intersection
   subroutine ps2g_parallel_intersection_d &
        & (aside,   ngraph, jseq,   &
        &  gsegco,  nprops, glat,   glon,  jxsec, jysec, &
@@ -4638,7 +3880,7 @@ contains
 
   end subroutine ps2g_parallel_intersection_d
 
-!!!_  - ps2g_graph_connection
+!!!_   & ps2g_graph_connection
   subroutine ps2g_graph_connection &
        & (cflag, ngraph, nprops, nseq, jt)
     implicit none
@@ -4687,7 +3929,7 @@ contains
     ! endif
   end subroutine ps2g_graph_connection
 
-!!!_  - ps2g_area_bent
+!!!_   & ps2g_area_bent
 #if OPT_AMI_AGMP_METHOD == 1
 #  define _AGMP_TABLE agmpd_gen_table
 #  define _AGMP_COMP  agmpd_area_core
@@ -4784,7 +4026,7 @@ contains
     endif
   end subroutine ps2g_area_bent_d
 
-!!!_  - ps2g_area_straight
+!!!_   & ps2g_area_straight
   subroutine ps2g_area_straight_d &
        & (asec, glat, glon, gsegco, jf, jt, &
        &  ngraph, nprops, uaseg, korder, rlona, uslat, ulon)
@@ -4880,7 +4122,7 @@ contains
 
 #undef _AGMP_TABLE
 #undef _AGMP_COMP
-!!!_  - ps2g_neighbor_collect
+!!!_   & ps2g_neighbor_collect
   subroutine ps2g_neighbor_collect_d &
          & (adiv, negmaxa, &
          &  asec, aside,   ngraph, nprops, relpos, nseq, uslat, &
@@ -5023,7 +4265,7 @@ contains
   end subroutine ps2g_neighbor_collect_d
 
 
-!!!_  - div_ps2g_advance
+!!!_   & div_ps2g_advance
   subroutine div_ps2g_advance_d &
        & (pstack,  jadd,    jpos, &
        &  cstride, cachela, jlatc, cachelo, jlonc, destl, tol)
@@ -5089,7 +4331,7 @@ contains
     jadd = 3
   end subroutine div_ps2g_advance_d
 
-!!!_  - div_ps2g_simple_fallback
+!!!_   & div_ps2g_simple_fallback
   subroutine div_ps2g_simple_fallback_d &
        & (ptiles, jtabr,   &
        &  gmax,   gmin,    &
@@ -5162,7 +4404,7 @@ contains
 
   end subroutine div_ps2g_simple_fallback_d
 
-!!!_  - ps2g_simple_fallback
+!!!_   & ps2g_simple_fallback
   subroutine ps2g_simple_fallback_d &
        & (ptiles, jx, jy, mx, my, jdext, ua, mdest)
     use TOUZA_Ami_std,only: inrange
@@ -5187,7 +4429,7 @@ contains
 
   end subroutine ps2g_simple_fallback_d
 
-!!!_  - div_ps2g_fallback
+!!!_   & div_ps2g_fallback
   subroutine div_ps2g_fallback_d &
        & (ptiles,  jtabr,   &
        &  afact,   cstride, pstack,  &
@@ -5326,7 +4568,7 @@ contains
 
   end subroutine div_ps2g_fallback_d
 
-!!!_  - set_tolerance()
+!!!_   & set_tolerance()
   PURE &
   real(kind=KTGT) function set_tolerance_d(tol) result(r)
     use TOUZA_Ami_std,only: KTGT=>KDBL
@@ -5343,7 +4585,7 @@ contains
     endif
   end function set_tolerance_d
 
-!!!_  - set_coor_anchor - set geographic and plane coordinate of anchors(plane gridline intersections)
+!!!_   & set_coor_anchor - set geographic and plane coordinate of anchors(plane gridline intersections)
   subroutine set_coor_anchor_d &
        & (aplane, aglat, aglon, destd, destl, mx, my, cco)
     use TOUZA_Emu,only: psgp_bwd_tr, phase, rad2deg
@@ -5377,7 +4619,7 @@ contains
     enddo
   end subroutine set_coor_anchor_d
 
-!!!_  - set_gslat_node
+!!!_   & set_gslat_node
   subroutine set_gslat_node_d &
        & (gslatn, dslatn, uslatn, cglatn, &
        &  latn,   wlat,   &
@@ -5426,7 +4668,7 @@ contains
     endif
   end subroutine set_gslat_node_d
 
-!!!_  - set_grlon_node
+!!!_   & set_grlon_node
   subroutine set_grlon_node_d &
        & (ierr,  &
        &  glonn, dlonn, ulonn,  cglonn, &
@@ -5497,92 +4739,7 @@ contains
     endif
   end subroutine set_grlon_node_d
 
-!!!_  - set_glon_node
-  subroutine set_glon_node_d &
-       & (ierr,  &
-       &  glonn, dlonn, ulonn,  cglonn, &
-       &  lonn,  dlon,  &
-       &  jlonb, jlone, lotile, cco,    lonofs, dir, &
-       &  deg)
-    use TOUZA_Ami_std,only: choice
-    use TOUZA_Emu_ugg,only: deg2rad, sind_canonical, sin_canonical
-    use TOUZA_Emu_ugg,only: psgp_cachelo, psgp_inquire
-    implicit none
-    integer,parameter :: KTGT=KDBL
-    integer,         intent(out) :: ierr
-    real(kind=KTGT), intent(out) :: glonn(0:*)
-    real(kind=KTGT), intent(out) :: dlonn(0:*)
-    real(kind=KTGT), intent(out) :: ulonn(0:*)
-    real(kind=KTGT), intent(out) :: cglonn(mclo, 0:*)
-    real(kind=KTGT), intent(in)  :: lonn(0:*)
-    real(kind=KTGT), intent(in)  :: dlon(0:*)
-    integer,         intent(in)  :: jlonb, jlone
-    real(kind=KTGT), intent(in)  :: cco(*)
-    real(kind=KTGT), intent(in)  :: lonofs
-    integer,         intent(in)  :: lotile
-    integer,         intent(in)  :: dir
-    logical,optional,intent(in)  :: deg(:)
-
-    integer nlon, jlo
-    real(kind=KTGT) :: olon
-    character(len=256) :: txt
-
-    ierr = 0
-    !! cco::olon must be ZERO
-    !! lonofs is used instead
-    call psgp_inquire(ierr, cco, olon=olon)
-    if (ierr.eq.0) then
-       if (olon.ne.0.0_KTGT) then
-          ierr = _ERROR(ERR_PANIC)
-109       format('assertion: olon = ', E16.9)
-          write(txt, 109) olon
-          call msg(txt)
-          call trace_err(ierr, fun='set_glon_node')
-       endif
-    endif
-
-    if (ierr.eq.0) then
-       nlon = jlone - jlonb
-       if (is_deg(deg, JLONGI)) then
-#if LON_DEGREE
-          glonn(0:nlon) = lonn(jlonb:jlone) - lonofs
-#if DEBUG_AMI_SYMM
-          write(*, *) 'lonn', lonn(jlonb:jlone)
-          write(*, *) 'glonn', glonn(0:nlon)
-#endif /* DEBUG_AMI_SYMM */
-          if (dir.lt.0) then
-             dlonn(0:nlon-1) = - dlon(jlonb:jlone-1)
-          else
-             dlonn(0:nlon-1) = + dlon(jlonb:jlone-1)
-          endif
-          ulonn(0:nlon-1) = ABS(dlon(jlonb:jlone-1) / real(lotile, kind=KTGT))
-#else
-          glonn(0:nlon) = deg2rad(lonn(jlonb:jlone)) - lonofs
-          if (dir.lt.0) then
-             dlonn(0:nlon-1) = - ABS(deg2rad(dlon(jlonb:jlone-1)))
-          else
-             dlonn(0:nlon-1) = + ABS(deg2rad(dlon(jlonb:jlone-1)))
-          endif
-          ulonn(0:nlon-1) = ABS(deg2rad(dlon(jlonb:jlone-1) / real(lotile, kind=KTGT)))
-#endif
-       else
-          glonn(0:nlon) = lonn(jlonb:jlone) - lonofs
-          if (dir.lt.0) then
-             dlonn(0:nlon-1) = - ABS(dlon(jlonb:jlone-1))
-          else
-             dlonn(0:nlon-1) = + ABS(dlon(jlonb:jlone-1))
-          endif
-          ulonn(0:nlon-1) = ABS(dlon(jlonb:jlone-1) / real(lotile, kind=KTGT))
-       endif
-
-       do jlo = 0, nlon
-          call psgp_cachelo(cglonn(:, jlo), glonn(jlo), cco)
-          ! write(*, *) 'cglonn:', jlo, lonn(jlo), sind_canonical(lonn(jlo)), glonn(jlo), cglonn(:, jlo)
-       enddo
-    endif
-  end subroutine set_glon_node_d
-
-!!!_  - is_deg
+!!!_   & is_deg
   logical function is_deg(deg, dir) result(b)
     implicit none
     logical,intent(in),optional :: deg(*)
@@ -5594,7 +4751,7 @@ contains
     endif
   end function is_deg
 
-!!!_  - is_seg_intersect()
+!!!_   & is_seg_intersect()
   logical function is_seg_intersect_d &
        & (clat, clon, jla1, jla2, jlo1, jlo2, destl, desth) &
        & result(b)
@@ -5642,7 +4799,7 @@ contains
     b = .not. b
   end function is_seg_intersect_d
 
-!!!_  - set_seg_lat_cache
+!!!_   & set_seg_lat_cache
   subroutine set_seg_lat_cache_d &
        & (cache, lintg2, slat0, slat1, dslat, cco, lcache)
     use TOUZA_Emu_ugg,only: psgp_cachela
@@ -5683,7 +4840,7 @@ contains
     lintg2(jc) = coeff2_line_integ(slat)
   end subroutine set_seg_lat_cache_d
 
-!!!_  - set_seg_rlon_cache
+!!!_   & set_seg_rlon_cache
   subroutine set_seg_rlon_cache_d &
        & (cache, lon0, lon1, dlon, cco, lcache)
     use TOUZA_Emu_ugg,only: psgp_cachelo_px, deg2rad
@@ -5717,41 +4874,7 @@ contains
 
   end subroutine set_seg_rlon_cache_d
 
-!!!_  - set_seg_lon_cache
-  subroutine set_seg_lon_cache_d &
-       & (cache, lon0, lon1, dlon, cco, lcache)
-    use TOUZA_Emu_ugg,only: psgp_cachelo, deg2rad
-    implicit none
-    integer,parameter :: KTGT=KDBL
-    real(kind=KTGT),intent(out) :: cache(:, 0:)
-    real(kind=KTGT),intent(in)  :: lon0,   lon1
-    real(kind=KTGT),intent(in)  :: dlon
-    real(kind=KTGT),intent(in)  :: cco(*)
-    integer,        intent(in)  :: lcache
-    real(kind=KTGT) :: ulon
-    real(kind=KTGT) :: lon
-
-    integer jj, jc
-
-    ulon = dlon / real(lcache, kind=KTGT)
-    do jj = 0, lcache / 2 - 1
-       jc = jj
-       lon = lon0 + ulon * real(jj, kind=KTGT)
-       call psgp_cachelo(cache(:, jc), lon, cco)
-       ! write(*, *) 'cache/lo/1', jc, cache(:, jc), lon0, lonofs
-    enddo
-    do jj = 0, lcache / 2 - 1
-       jc = lcache - jj
-       lon = lon1 - ulon * real(jj, kind=KTGT)
-       call psgp_cachelo(cache(:, jc), lon, cco)
-    enddo
-    jc = lcache / 2
-    lon = (lon0 + lon1) * 0.5_KTGT
-    call psgp_cachelo(cache(:, jc), lon, cco)
-
-  end subroutine set_seg_lon_cache_d
-
-!!!_  - is_adjacent_cells()
+!!!_   & is_adjacent_cells()
   integer function is_adjacent_cells (pos1, pos2) result (k)
     implicit none
     integer,intent(in) :: pos1(*), pos2(*)
@@ -5771,7 +4894,7 @@ contains
     endif
   end function is_adjacent_cells
 
-!!!_  - is_neighbor() - 0 if same, 1 if neighbor, 2 otherwise
+!!!_   & is_neighbor() - 0 if same, 1 if neighbor, 2 otherwise
   ELEMENTAL &
   integer function is_neighbor (pos1, pos2) result (k)
     implicit none
@@ -5790,7 +4913,7 @@ contains
     k = max(0, ((h + 3) / 2) - ((l + 4) / 2))
   end function is_neighbor
 
-!!!_  - anchor_pos()
+!!!_   & anchor_pos()
   ELEMENTAL &
   integer function anchor_pos(pos1, pos2) result (k)
     implicit none
@@ -5813,7 +4936,7 @@ contains
     ! v = real(k, kind=kind(MOLD)) / 2.0_KTGT
   end function anchor_pos
 
-!!!_  - parallel_dlongi ()
+!!!_   & parallel_dlongi ()
   real(kind=KTGT) function parallel_dlongi_d &
        & (dlon1, dlon2) &
        & result(v)
@@ -5829,7 +4952,7 @@ contains
     ! dla = ATAN2(dlon2(1), dlon2(2)) - ATAN2(dlon1(1), dlon1(2))
   end function parallel_dlongi_d
 
-!!!_  & nsort4 - sort 4-element array by /network/ method
+!!!_   & nsort4 - sort 4-element array by /network/ method
   PURE &
   subroutine nsort4_d(seq, xy, idx)
     implicit none
@@ -5868,7 +4991,7 @@ contains
     enddo
   end subroutine nsort4_d
 
-!!!_  & ps2g_invert_table
+!!!_   & ps2g_invert_table
   subroutine ps2g_invert_table_d &
        & (ierr,   &
        &  ipofs,  ipprj,  wpprj, mph, lpmem, &
@@ -5962,7 +5085,7 @@ contains
     if (ierr.eq.0) deallocate(nc, STAT=ierr)
   end subroutine ps2g_invert_table_d
 
-!!!_  - debug_dump_cell
+!!!_   & debug_dump_cell
   subroutine debug_dump_cell_d &
        & (pcache, pstack, cachelo, cachela, destl, jdest, klev, jpos, udump)
     use TOUZA_Emu_ugg,only: psgp_fwd
@@ -6181,13 +5304,14 @@ contains
     real(kind=KDBL),intent(in):: xl, dx, yl, dy
     integer,intent(in) :: mx, my
     character(len=4) :: s
+    integer kasp
     integer symmz(0:7)
 
     integer k
     ierr = 0
     k = is_symmetric_plane(xl, dx, mx, yl, dy, my)
 101 format('symm:', I0, ':', A, 1x, 2(1x, F9.1, 1x, F9.1, 1x, I0))
-102 format('   zone:', 8(1x, I3))
+102 format('   zone:', I0, 1x, 8(1x, I3))
     s = ' '
     if (IBITS(k, 0, 1).eq.1) then
        s(1:1) = 'x'
@@ -6212,8 +5336,13 @@ contains
 
     write(*, 101) k, s, xl, dx, mx, yl, dy, my
 
-    call set_symmetric_zone(ierr, symmz, k)
-    write(*, 102) symmz
+    kasp = +1
+    call set_symmetric_zone(ierr, symmz, k, kasp)
+    write(*, 102) kasp, symmz
+
+    kasp = -1
+    call set_symmetric_zone(ierr, symmz, k, kasp)
+    write(*, 102) kasp, symmz
 
   end subroutine test_symm
 
