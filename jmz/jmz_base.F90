@@ -1,7 +1,7 @@
 !!!_! jmz_base.F90 - TOUZA/Jmz base utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 14 2024
-#define TIME_STAMP 'Time-stamp: <2024/02/27 12:34:44 fuyuki jmz_base.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/21 21:54:22 fuyuki jmz_base.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2024
@@ -41,6 +41,7 @@ module Jmz_base
   public
 !!!_  - constant
   character(len=*),parameter,private :: sep_base = '/'
+
 !!!_  - global options
   integer,save,public :: lev_verbose = 0
   integer,save,public :: lev_debug = -1
@@ -570,6 +571,94 @@ contains
     integer,intent(in) :: cfmt
     b = (cfmt_gtool_seq.le.cfmt) .and. (cfmt.lt.cfmt_gtool)
   end function is_cfmt_nio
+
+!!!_  - set_header_plane
+  subroutine set_header_plane &
+       & (ierr, head, dfmt, mx, xname, my, yname, mz, zname)
+    use TOUZA_Nio,only: put_header_cprop, put_item
+    use TOUZA_Nio,only: hi_DFMT
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(inout) :: head(*)
+    character(len=*),intent(in)    :: dfmt
+    integer,         intent(in)    :: mx, my
+    character(len=*),intent(in)    :: xname, yname
+    integer,         intent(in),optional :: mz
+    character(len=*),intent(in),optional :: zname
+
+    ierr = 0
+    if (ierr.eq.0) call put_item(ierr, head, dfmt,  hi_DFMT)
+    if (ierr.eq.0) call put_header_cprop(ierr, head, xname, (/1, mx/), 1)
+    if (ierr.eq.0) call put_header_cprop(ierr, head, yname, (/1, my/), 2)
+    if (present(mz).and.present(zname)) then
+       if (ierr.eq.0) call put_header_cprop(ierr, head, zname,   (/1, mz/),  3)
+    else if (present(mz).or.present(zname)) then
+       ierr = ERR_INVALID_ITEM
+    else
+       if (ierr.eq.0) call put_header_cprop(ierr, head, ' ',   (/1, 1/),  3)
+    endif
+
+  end subroutine set_header_plane
+
+!!!_  & parse_output_var
+  subroutine parse_output_var &
+       & (ierr,  jitem, kbatch, kitem, jpos,  npos, &
+       &  bname, bmask, mb,     vname, vmask, nv)
+    implicit none
+    integer,         intent(out)   :: ierr
+    integer,         intent(out)   :: jitem
+    integer,         intent(inout) :: kbatch, kitem
+    integer,         intent(inout) :: jpos
+    integer,         intent(in)    :: npos
+    character(len=*),intent(in)    :: bname(0:*), vname(0:*)
+    integer,         intent(in)    :: bmask(0:*), vmask(0:*)
+    integer,         intent(in)    :: mb, nv
+
+    integer,parameter :: larg = 256
+    character(len=larg) :: atxt, utxt
+
+    ierr = 0
+    jitem = special_end_param
+
+    loop_parse: do
+       if (kbatch.eq.batch_null) then
+          if (jpos.gt.npos) exit loop_parse
+          if (ierr.eq.0) call get_param(ierr, atxt, jpos, ' ')
+          if (ierr.eq.0) call upcase(utxt, atxt)
+          if (ierr.eq.0) then
+             jitem = find_first(vname(0:nv-1), utxt)
+             if (jitem.lt.0) then
+                kbatch = find_first(bname(1:mb), utxt, offset=1, no=-1)
+                if (kbatch.gt.0) then
+                   kitem = 0
+                else
+                   ierr = ERR_INVALID_PARAMETER
+                   write(*, *) 'unknown variable/set: ', trim(atxt)
+                   exit loop_parse
+                endif
+             endif
+          endif
+          jpos = jpos + 1
+       endif
+       if (kbatch.gt.batch_null) then
+          jitem = -1
+          do
+             if (kitem.ge.nv) exit
+             if (IAND(vmask(kitem), bmask(kbatch)).eq.bmask(kbatch)) then
+                jitem = kitem
+                exit
+             endif
+             kitem = kitem + 1
+          enddo
+          if (jitem.lt.0) then
+             kbatch = batch_null
+             cycle
+          endif
+          kitem = jitem + 1
+       endif
+       exit loop_parse
+    end do loop_parse
+  end subroutine parse_output_var
 
 !!!_ + End Jmz_base
 end module Jmz_base

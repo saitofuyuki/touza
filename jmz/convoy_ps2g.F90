@@ -1,7 +1,7 @@
 !!!_! convoy_ps2g.F90 - TOUZA/Jmz/convoy polar sterographic/geographic transform
 ! Maintainer: SAITO Fuyuki
 ! Created: Apr 10 2024
-#define TIME_STAMP 'Time-stamp: <2024/06/05 16:42:27 fuyuki convoy_ps2g.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/15 19:08:49 fuyuki convoy_ps2g.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2024
@@ -22,8 +22,8 @@ module convoy_ps2g
 !!!_  - modules
   use Jmz_param
   use Jmz_base
+  use Jmz_geogr
   use convoy_util
-  use TOUZA_Nio,only: nio_record_std
   implicit none
   public
 !!!_  - ps2g conversion properties
@@ -32,28 +32,17 @@ module convoy_ps2g
   integer,parameter :: pxlev_ini = 3
   integer,parameter :: pxlev_switch = 4
   integer,parameter :: lpx = 4
-
-!!!_  - geographic spherical domain properties
-  character(len=*),parameter :: geo_gauss = 'G'   ! gaussian
-  character(len=*),parameter :: geo_eqdis = 'E'   ! equidistant
-  character(len=*),parameter :: geo_divsl = 'S'   ! divide with equal sine-latitude
-  character(len=*),parameter :: geo_divll = 'L'   ! divide with equal latitude/longitude
-  character(len=*),parameter :: geo_desco = 'D'   ! descending order
-
-  character(len=*),parameter :: geo_all = geo_gauss // geo_eqdis // geo_divsl // geo_divll // geo_desco
-
-  integer,parameter :: lpad = 1
-  integer,parameter :: rpad = 2
 !!!_  - other options
   integer,parameter :: ps2g_opt_sort = 0
   integer,parameter :: ps2g_nopts = 1
 !!!_ + Body
 contains
-!!!_  & qoxi_ps2g
-  subroutine qoxi_ps2g &
+!!!_  & main_ps2g
+  subroutine main_ps2g &
        & (ierr, jpos, npos)
+    use Jmz_psprop
     use TOUZA_Emu,only: ncache_psgp_co
-    use convoy_psprop,only: parse_ellipsoid, parse_psgp, parse_psplane
+    use TOUZA_Nio,only: nio_record_std
     implicit none
     integer,intent(out)   :: ierr
     integer,intent(inout) :: jpos
@@ -86,7 +75,7 @@ contains
     character(len=litem) :: head(nitem)
     integer :: krect
     integer :: kopts(0:ps2g_nopts-1)
-    character(len=*),parameter :: proc='qoxi_ps2g'
+    character(len=*),parameter :: proc='ps2g'
 
     ierr = 0
     if (ierr.eq.0) call push_basename(ierr, 'ps2g')
@@ -115,12 +104,22 @@ contains
     if (ierr.eq.0) call parse_psgp(ierr, cco, flatten, major, clon=clond)
 
     if (ierr.eq.0) then
-       ! Cell boundaries are specified in PS2G
-       call parse_psplane &
-            & (ierr, mx, my, xprop, yprop, xname, yname, cco, kflag=cflag_boundary)
+       call reset_coor_props(xprop, xname)
+       call reset_coor_props(yprop, yname)
     endif
+
+    if (ierr.eq.0) call parse_coor_org(ierr, xprop, yprop, cco, def=' ')
+    if (ierr.eq.0) call parse_coor_ps(ierr, xprop, yprop, xname, yname, def=' ')
+    if (ierr.eq.0) call parse_coordinate(ierr, mx, xprop, xname, 'X', def=' ')
+    if (ierr.eq.0) call parse_coordinate(ierr, my, yprop, yname, 'Y', def=' ')
     if (ierr.eq.0) then
-       call parse_atmos_geogr_base &
+       ! transformed into the number of cells, not boundaries
+       mx = mx - 1
+       my = my - 1
+    endif
+
+    if (ierr.eq.0) then
+       call parse_geogr_atmos_base &
             & (ierr, &
             &  mlat, latdiv, latpad, latofs, latname, lattype, &
             &  mlon, londiv, lonpad, lonofs, lonname, lontype)
@@ -151,7 +150,7 @@ contains
     endif
     call trace_err(ierr, fun=proc)
     if (ierr.eq.0) call pop_basename(ierr, 'ps2g')
-  end subroutine qoxi_ps2g
+  end subroutine main_ps2g
 !!!_  & batch_ps2g
   subroutine batch_ps2g &
        & (ierr,  jpos,   npos,    &
@@ -163,9 +162,9 @@ contains
        &  ufile, head,   krect)
     use TOUZA_Ami,only: at_init, at_diag, at_finalize
     use TOUZA_Ami,only: symm_ps2g_map
-    use TOUZA_Ami,only: wedge_ps2g_map, ps2g_wedge_longitude, shift_by_wedge
     use TOUZA_Ami,only: ps2g_no_switch, ps2g_fast_fallback
     use TOUZA_Ami,only: ps2g_weights, ps2g_w0, ps2g_w1flo, ps2g_w1fla
+    use TOUZA_Emu,only: round_degree, round_2pi
     implicit none
     integer,intent(out)   :: ierr
     integer,intent(inout) :: jpos
@@ -203,39 +202,34 @@ contains
     integer jglatb, jglate, nglat, mglat
     integer jglonb, jglone, nglon, mglon
 
-    ! /wedged/ coordinate (geographic) (adjusted by the projection center)
-    integer jwlonb, jwlone, mwlon, lwlon
-    integer nwedge
-    integer,parameter :: lwedge = 8
-    integer :: wpos(0:lwedge+1)
-    real(kind=KTGT),allocatable :: wwlon(:), wglon(:)
-    integer iniskip
-
     real(kind=KTGT) :: xl, dx, yl, dy
     integer lonlev, latlev, inilev, swlev, reqlev
 
     integer ngg
     integer nmem, lmem
 
-    integer jq, j, jb, je
-    logical deg(NGEOG)
+    ! integer jq, j, jb, je
+    real(kind=KTGT) :: loround, laround
+    ! logical deg(NGEOG)
     character(len=lmsg) :: txt
 
     ierr = 0
     call at_init(ierr, levv=lev_debug)
 
-    deg(JLATI)  = .FALSE.
-    deg(JLONGI) = .TRUE.
+    laround = real(round_2pi, kind=KTGT)
+    loround = real(round_degree, kind=KTGT)
+    ! deg(JLATI)  = .FALSE.
+    ! deg(JLONGI) = .TRUE.
 
     if (ierr.eq.0) then
        mglat = mlat * latdiv
        mglon = mlon * londiv
-       lwlon = mglon + lwedge
+       ! lwlon = mglon + lwedge
        allocate (gwlat(0:mglat-1), glatm(0:mglat),   glat(0:mglat-1),  &
             &    gwlon(0:mglon),   glonm(0:mglon+1), glon(0:mglon),  &
-            &    wwlon(0:lwlon-1), wglon(0:lwlon), &
             &    STAT=ierr)
     endif
+            ! &    wwlon(0:lwlon-1), wglon(0:lwlon), &
     if (ierr.eq.0) then
        call geog_latitude &
             & (ierr, glat,   gwlat,  glatm,  mlat, latdiv, latofs, lattype)
@@ -245,48 +239,10 @@ contains
             & (ierr, glon,   gwlon,  glonm,  mlon, londiv, lonofs, lontype)
     endif
     if (ierr.eq.0) then
-       call ps2g_wedge_longitude &
-            & (ierr, &
-            &  wwlon, wglon, wpos,  nwedge, iniskip, &
-            &  gwlon, glonm, mglon, clond,  deg(JLONGI))
-    endif
-    if (ierr.eq.0) mwlon = mglon + nwedge
-    if (ierr.eq.0) then
-       if (iniskip.gt.0) then
-          if (is_verbose(msglev_WARNING)) then
-101          format('initial level adjustment ', SP, I0)
-             write(txt, 101) iniskip
-             call message(ierr, txt, levm=+999)
-          endif
-       endif
-       if (nwedge.gt.0) then
-          if (is_verbose(msglev_WARNING)) then
-102          format('geographic domain decomposition [', I0, '] ', &
-                  & I0, 3(1x, F11.5), 2(1x, F11.5))
-             do jq = 0, nwedge - 1
-                j = wpos(jq + 1)
-                write(txt, 102) jq, j, wglon(j-1), wglon(j), wglon(j+1), wwlon(j-1), wwlon(j)
-                call message(ierr, txt)
-             enddo
-          endif
-       else if (is_verbose(msglev_NORMAL)) then
-103       format('geographic domain ', I0, 1x, I0, 1x, 2(1x, F11.5))
-          do jq = 1, max(1, nwedge) - 1
-             jb = wpos(jq)
-             je = wpos(jq+1)
-             write(txt, 103) jb, je, wglon(jb), wglon(je)
-             call message(ierr, txt)
-          enddo
-       endif
-    endif
-    if (ierr.eq.0) then
        call adjust_range(jglatb, jglate, jlatb, jlate, mglat)
        call adjust_range(jglonb, jglone, jlonb, jlone, mglon)
        nglat = jglate - jglatb
        nglon = jglone - jglonb
-
-       jwlonb = shift_by_wedge(jglonb, nwedge, wpos)
-       jwlone = shift_by_wedge(jglone, nwedge, wpos)
     endif
     if (ierr.eq.0) then
        xl = xprop(cp_low)
@@ -303,29 +259,12 @@ contains
        ngg = nglat * nglon
        allocate (iofs(0:ngg), STAT=ierr)
     endif
-    ! write(*, *) 'glonm = ', glonm(:)
-    ! write(*, *) 'wglon = ', wglon(:)
-    ! if (ierr.eq.0) then
-    !    allocate (iprj(0:1), wprj(0:ps2g_weights-1, 0:1), STAT=ierr)
-    !    call symm_ps2g_map &
-    !         & (ierr,   iofs,   iprj,   wprj,   &
-    !         &  nmem,   0,      &
-    !         &  glatm,  gwlat,  jglatb, jglate, nglat,  &
-    !         &  glonm,  gwlon,  jglonb, jglone, mglon,  &
-    !         &  xl,     dx,     mx,     yl,     dy,     my,   &
-    !         &  cco,    &
-    !         &  lonlev, latlev, inilev, ps2g_fast_fallback,  reqlev, tol,   &
-    !         &  deg,    levv=lev_verbose)
-    !    deallocate(iprj, wprj, STAT=ierr)
-    ! endif
-#define PS2G_SYMM 1
     if (ierr.eq.0) then
        lmem = lbuf
        if (lmem.le.0) then
           ! dry-run, to estimate lmem
           allocate (iprj(0:1), wprj(0:ps2g_weights-1, 0:1), STAT=ierr)
           if (ierr.eq.0) then
-#if PS2G_SYMM
              call symm_ps2g_map &
                   & (ierr,   iofs,   iprj,   wprj,   &
                   &  nmem,   0,      &
@@ -334,20 +273,7 @@ contains
                   &  xl,     dx,     mx,     yl,     dy,     my,   &
                   &  cco,    &
                   &  lonlev, latlev, inilev, ps2g_fast_fallback, reqlev, tol,   &
-                  &  deg,    levv=lev_verbose)
-#else /* not PS2G_SYMM */
-             call wedge_ps2g_map &
-                  & (ierr,   iofs,   iprj,    wprj,   &
-                  &  nmem,   0,  &
-                  &  glatm,  gwlat,  jglatb,  jglate, nglat, &
-                  &  wglon,  wwlon,  jwlonb,  jwlone, nglon, &
-                  &  nwedge, wpos,   iniskip, &
-                  &  xl,     dx,     mx,      yl,     dy,    my, &
-                  &  cco,    &
-                  &  lonlev, latlev, inilev,  ps2g_fast_fallback, reqlev, tol, &
-                  &  deg,    levv=lev_verbose)
-                  ! levv=-9
-#endif /* not PS2G_SYMM */
+                  &  loround,laround,levv=lev_verbose)
           endif
           if (ierr.eq.0) then
              lmem = nmem + mglat * mglon ! for safety
@@ -376,7 +302,6 @@ contains
        allocate (iprj(0:lmem-1), wprj(0:ps2g_weights-1, 0:lmem-1), &
             &    STAT=ierr)
     endif
-#if PS2G_SYMM
     if (ierr.eq.0) then
        call symm_ps2g_map &
             & (ierr,   iofs,   iprj,   wprj,   &
@@ -386,22 +311,8 @@ contains
             &  xl,     dx,     mx,     yl,     dy,     my,   &
             &  cco,    &
             &  lonlev, latlev, inilev, swlev,  reqlev, tol,   &
-            &  deg,    levv=lev_verbose)
+            &  loround,laround,levv=lev_verbose)
     endif
-#else /* not PS2G_SYMM */
-    if (ierr.eq.0) then
-       call wedge_ps2g_map &
-            & (ierr,   iofs,   iprj,   wprj,   &
-            &  nmem,   lmem,   &
-            &  glatm,  gwlat,  jglatb, jglate, nglat,  &
-            &  wglon,  wwlon,  jwlonb, jwlone, nglon,  &
-            &  nwedge, wpos,   iniskip, &
-            &  xl,     dx,     mx,     yl,     dy,     my,   &
-            &  cco,    &
-            &  lonlev, latlev, inilev, swlev,  reqlev, tol,   &
-            &  deg,    levv=lev_verbose)
-    endif
-#endif /* not PS2G_SYMM */
     if (ierr.eq.0) then
        if (nmem.gt.lmem) ierr = ERR_INSUFFICIENT_BUFFER
     endif
@@ -410,15 +321,13 @@ contains
        call ps2g_output &
             & (ierr,   jpos,  npos,  &
             &  iofs,   iprj,  wprj,  nmem,   lmem,   &
-            &  glat,   glatm, gwlat, jglatb, jglate, mglat, latname, &
-            &  glon,   glonm, gwlon, jglonb, jglone, mglon, lonname, &
-            &  nwedge, wpos,  &
-            &  mx,     my,    xname, yname,  cco,    deg,   kopts,   &
+            &  glat,   glatm, gwlat, jglatb, jglate, mglat, latname, laround, &
+            &  glon,   glonm, gwlon, jglonb, jglone, mglon, lonname, loround, &
+            &  mx,     my,    xname, yname,  cco,    kopts,   &
             &  ufile,  head,  krect)
     endif
 
     if (ierr.eq.0) deallocate(glat,  gwlat, glatm, glon, gwlon, glonm, STAT=ierr)
-    if (ierr.eq.0) deallocate(wwlon, wglon, STAT=ierr)
 
     if (ierr.eq.0) call at_diag(ierr)
     if (ierr.eq.0) call at_finalize(ierr)
@@ -429,17 +338,16 @@ contains
   subroutine ps2g_output &
        & (ierr,   jpos,   npos,  &
        &  iofs,   iprj,   wprj,  nmem,   lmem,  &
-       &  glat,   glatm,  gwlat, jglatb, jglate, mglat, latname, &
-       &  glon,   glonm,  gwlon, jglonb, jglone, mglon, lonname, &
-       &  nwedge, wpos,  &
-       &  mx,     my,    xname,  yname,  cco,    deg,   kopts,   &
-       &  ufile,  head,  krect)
+       &  glat,   glatm,  gwlat, jglatb, jglate, mglat, latname, laround, &
+       &  glon,   glonm,  gwlon, jglonb, jglone, mglon, lonname, loround, &
+       &  mx,     my,     xname, yname,  cco,    kopts, &
+       &  ufile,  head,   krect)
     use TOUZA_Ami,only: ps2g_invert_table
     use TOUZA_Ami,only: ps2g_weights, ps2g_w0, ps2g_w1flo, ps2g_w1fla
     use TOUZA_Ami,only: ps2g_w1blo, ps2g_w1bla
     use TOUZA_Nio,only: axis_set_header, axis_loc, axis_wgt, axis_cyclic
     use TOUZA_Nio,only: show_header
-    use TOUZA_Emu,only: deg2rad
+    use TOUZA_Emu,only: deg2rad, ang2deg, ang2rad
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(inout) :: jpos
@@ -455,11 +363,11 @@ contains
     integer,         intent(in)    :: jglatb, jglate, mglat
     integer,         intent(in)    :: jglonb, jglone, mglon
     character(len=*),intent(in)    :: latname,lonname
-    integer,         intent(in)    :: nwedge, wpos(0:)
+    real(kind=KTGT), intent(in)    :: laround,loround
     integer,         intent(in)    :: mx,     my
     character(len=*),intent(in)    :: xname,  yname
     real(kind=KTGT), intent(in)    :: cco(*)
-    logical,         intent(in)    :: deg(*)
+    ! logical,         intent(in)    :: deg(*)
     integer,         intent(in)    :: kopts(0:*)
     integer,         intent(in)    :: ufile
     character(len=*),intent(inout) :: head(*)
@@ -513,9 +421,12 @@ contains
     real(kind=KTGT),allocatable :: wbwd(:, :)
     integer,        allocatable :: jbwd(:), bofs(:)
     character(len=lmsg) :: txt
+    character(len=litem) :: ugeog
+    real(kind=KTGT),allocatable :: gbuf(:)
 
     ierr = 0
     ksort = kopts(ps2g_opt_sort)
+    ugeog = 'degree'
 
     if (bmask(0).lt.0) then
        bmask(batch_null)  = 0
@@ -747,13 +658,25 @@ contains
           ! if (ierr.eq.0) call put_item(ierr, head, 'lat', hi_ITEM)
           call axis_set_header(ierr, head, latname, mglat, axis_loc)
           if (ierr.eq.0) call put_item(ierr, head, 'UR8', hi_DFMT)
-          if (deg(JLATI)) then
-             if (ierr.eq.0) call put_item(ierr, head, 'degree', hi_UNIT)
-          else
-             if (ierr.eq.0) call put_item(ierr, head, 'radian', hi_UNIT)
+          if (ierr.eq.0) call put_item(ierr, head, ugeog, hi_UNIT)
+          if (ierr.eq.0) call alloc_buffer(ierr, mglat)
+          if (ierr.eq.0) then
+             select case (ugeog)
+             case('degree')
+                gbuf(0:mglat-1) = ang2deg(glat(0:mglat-1), laround)
+             case('radian')
+                gbuf(0:mglat-1) = ang2rad(glat(0:mglat-1), laround)
+             case default
+                gbuf(0:mglat-1) = glat(0:mglat-1)
+             end select
           endif
+          ! if (deg(JLATI)) then
+          !    if (ierr.eq.0) call put_item(ierr, head, 'degree', hi_UNIT)
+          ! else
+          !    if (ierr.eq.0) call put_item(ierr, head, 'radian', hi_UNIT)
+          ! endif
           if (ierr.eq.0) call nio_write_header(ierr, head, krect, ufile)
-          if (ierr.eq.0) call nio_write_data(ierr, glat, mglat, head, krect, ufile)
+          if (ierr.eq.0) call nio_write_data(ierr, gbuf, mglat, head, krect, ufile)
        case(var_gcoor_lon)
           ! mv = jglone - jglonb
           ! call set_header_geogr &
@@ -761,13 +684,25 @@ contains
           ! if (ierr.eq.0) call put_item(ierr, head, 'lon', hi_ITEM)
           call axis_set_header(ierr, head, lonname, mglon, axis_loc + axis_cyclic)
           if (ierr.eq.0) call put_item(ierr, head, 'UR8', hi_DFMT)
-          if (deg(JLONGI)) then
-             if (ierr.eq.0) call put_item(ierr, head, 'degree', hi_UNIT)
-          else
-             if (ierr.eq.0) call put_item(ierr, head, 'radian', hi_UNIT)
+          if (ierr.eq.0) call put_item(ierr, head, ugeog, hi_UNIT)
+          if (ierr.eq.0) call alloc_buffer(ierr, mglon+1)
+          if (ierr.eq.0) then
+             select case (ugeog)
+             case('degree')
+                gbuf(0:mglon) = ang2deg(glon(0:mglon), laround)
+             case('radian')
+                gbuf(0:mglon) = ang2rad(glon(0:mglon), laround)
+             case default
+                gbuf(0:mglon) = glon(0:mglon)
+             end select
           endif
+          ! if (deg(JLONGI)) then
+          !    if (ierr.eq.0) call put_item(ierr, head, 'degree', hi_UNIT)
+          ! else
+          !    if (ierr.eq.0) call put_item(ierr, head, 'radian', hi_UNIT)
+          ! endif
           if (ierr.eq.0) call nio_write_header(ierr, head, krect, ufile)
-          if (ierr.eq.0) call nio_write_data(ierr, glon, mglon+1, head, krect, ufile)
+          if (ierr.eq.0) call nio_write_data(ierr, gbuf, mglon+1, head, krect, ufile)
        case(var_gcoor_wlat)
           ! call set_header_geogr &
           !      & (ierr, head, jglatb, jglate, latname, 0, 0, ' ', 'UR8')
@@ -798,6 +733,26 @@ contains
     if (ierr.eq.0) then
        if (allocated(bofs)) deallocate(bofs, jbwd, wbwd, STAT=ierr)
     endif
+    if (ierr.eq.0) then
+       if (allocated(gbuf)) deallocate(gbuf, STAT=ierr)
+    endif
+    return
+  contains
+    subroutine alloc_buffer(ierr, mem)
+      implicit none
+      integer,intent(out) :: ierr
+      integer,intent(in)  :: mem
+      integer n
+      if (allocated(gbuf)) then
+         n = size(gbuf)
+         if (n.lt.mem) then
+            deallocate(gbuf, STAT=ierr)
+            if (ierr.eq.0) allocate(gbuf(0:mem-1), STAT=ierr)
+         endif
+      else
+         allocate(gbuf(0:mem-1), STAT=ierr)
+      endif
+    end subroutine alloc_buffer
   end subroutine ps2g_output
 !!!_  & ps2g_write_csr_wprj
   subroutine ps2g_write_csr_wprj &
@@ -846,289 +801,7 @@ contains
        endif
     enddo
   end subroutine ps2g_wsum
-!!!_  & parse_atmos_geogr_base - agcm geographic domain parser
-  subroutine parse_atmos_geogr_base &
-       & (ierr, &
-       &  mlat, latdiv, latpad, latofs, latname, lattype, &
-       &  mlon, londiv, lonpad, lonofs, lonname, lontype, &
-       &  atag)
-    use TOUZA_Std,only: find_next_sep
-    implicit none
-    integer,         intent(out)         :: ierr
-    integer,         intent(out)         :: mlat,      mlon
-    integer,         intent(out)         :: latdiv,    londiv
-    integer,         intent(out)         :: latpad(*), lonpad(*)
-    real(kind=KTGT), intent(out)         :: latofs,    lonofs
-    character(len=*),intent(out)         :: latname,   lonname
-    character(len=*),intent(out)         :: lattype,   lontype
-    character(len=*),intent(in),optional :: atag
 
-    character(len=*),parameter :: gtag = 'GEOGR'
-
-    integer,parameter   :: larg = 256
-    character(len=larg) :: aval, uval
-    character(len=*),parameter :: proc='parse_atmos_geogr_base'
-
-    integer jsep, js, ls
-
-    ! GEOGR|GEO|G=SPECIAL[[,:][LATPROP][,[LONPROP]]]
-
-    ierr = 0
-    mlat = -1
-    mlon = -1
-
-    call reset_gprop(mlat, latdiv, latpad, latofs, latname, lattype)
-    call reset_gprop(mlon, londiv, lonpad, lonofs, lonname, lontype)
-
-    if (ierr.eq.0) then
-       if (present(atag)) then
-          call get_last_option &
-               & (ierr, aval, &
-               &  atag, atag(1:1), gtag, gtag(1:3), gtag(1:1), def=' ')
-       else
-          call get_last_option &
-               & (ierr, aval, gtag, gtag(1:3), gtag(1:1), def=' ')
-       endif
-    endif
-    if (ierr.eq.0) then
-       ls = max(1, len_trim(aval))
-       jsep = SCAN(aval, sep_item // sep_coor)
-       if (jsep.eq.0) jsep = ls + 1
-       call upcase(uval, aval(1:jsep-1))
-       call upcase(uval)
-       if (uval(1:1).eq.'T') then
-          select case (uval)
-          case('T2')
-             mlat = 4
-             mlon = 8
-          case('T5')
-             mlat = 8
-             mlon = 16
-          case('T10')
-             mlat = 16
-             mlon = 32
-          case('T21')
-             mlat = 32
-             mlon = 64
-          case('T42')
-             mlat = 64
-             mlon = 128
-          case('T85')
-             mlat = 128
-             mlon = 256
-          case('T106')
-             mlat = 180
-             mlon = 360
-          case('T213')
-             mlat = 320
-             mlon = 640
-          case default
-             ierr = ERR_INVALID_PARAMETER
-          end select
-       else if (uval.ne.' ') then
-          ierr = ERR_INVALID_PARAMETER
-       endif
-       if (ierr.ne.0) then
-          write(*, *) 'cannot parse geo-coordinate argument ', &
-               & trim(gtag), '=', trim(aval)
-       endif
-    endif
-    if (ierr.eq.0) then
-       js = jsep
-       jsep = find_next_sep(aval(1:ls), sep_coor, js)
-       if (js.lt.jsep) then
-          if (mlat.ge.0) then
-             call parse_geogr_coor &
-                  & (ierr, latdiv, latpad, latofs, latname, lattype, aval(js+1:jsep))
-          else
-             call parse_geogr_coor &
-                  & (ierr, latdiv, latpad, latofs, latname, lattype, aval(js+1:jsep), mlat)
-          endif
-       endif
-    endif
-    if (ierr.eq.0) then
-       js = jsep + 1
-       jsep = find_next_sep(aval(1:ls), sep_coor, js)
-       if (js.lt.jsep) then
-          if (mlon.ge.0) then
-             call parse_geogr_coor &
-                  & (ierr, londiv, lonpad, lonofs, lonname, lontype, aval(js+1:jsep))
-          else
-             call parse_geogr_coor &
-                  & (ierr, londiv, lonpad, lonofs, lonname, lontype, aval(js+1:jsep), mlon)
-          endif
-       endif
-    endif
-    call trace_err(ierr, fun=proc)
-  end subroutine parse_atmos_geogr_base
-!!!_  & parse_ocean_geogr_base - ogcm geographic domain parser
-  subroutine parse_ocean_geogr_base &
-       & (ierr, &
-       &  mlat, latdiv, latpad, latofs, latname, lattype, &
-       &  mlon, londiv, lonpad, lonofs, lonname, lontype, &
-       &  atag)
-    use TOUZA_Std,only: find_next_sep
-    implicit none
-    integer,         intent(out)         :: ierr
-    integer,         intent(out)         :: mlat,      mlon
-    integer,         intent(out)         :: latdiv,    londiv
-    integer,         intent(out)         :: latpad(*), lonpad(*)
-    real(kind=KTGT), intent(out)         :: latofs,    lonofs
-    character(len=*),intent(out)         :: latname,   lonname
-    character(len=*),intent(out)         :: lattype,   lontype
-    character(len=*),intent(in),optional :: atag
-
-
-    integer,parameter   :: larg = 256
-    character(len=larg) :: gtag
-    character(len=larg) :: aval
-
-    integer jsep, js, ls
-
-    ! OCN|O=[LATPROP][,[LONPROP]]
-
-    ierr = 0
-    call choice_a(gtag, ' ', atag)
-    if (gtag.eq.' ') gtag = 'OCN'
-
-    call reset_gprop(mlat, latdiv, latpad, latofs, latname, lattype)
-    call reset_gprop(mlon, londiv, lonpad, lonofs, lonname, lontype)
-
-    if (ierr.eq.0) then
-       call get_last_option &
-            & (ierr, aval, gtag, gtag(1:3), gtag(1:1), def=' ')
-    endif
-    if (ierr.eq.0) then
-       ls = max(1, len_trim(aval))
-       jsep = 0
-       ! no special, at the moment
-    endif
-    if (ierr.eq.0) then
-       js = jsep
-       jsep = find_next_sep(aval(1:ls), sep_coor, js)
-       if (js.lt.jsep) then
-          call parse_geogr_coor &
-               & (ierr, latdiv, latpad, latofs, latname, lattype, aval(js+1:jsep), mlat)
-       endif
-       js = jsep + 1
-       jsep = find_next_sep(aval(1:ls), sep_coor, js)
-       if (js.lt.jsep) then
-          call parse_geogr_coor &
-               & (ierr, londiv, lonpad, lonofs, lonname, lontype, aval(js+1:jsep), mlon)
-       endif
-    endif
-  end subroutine parse_ocean_geogr_base
-!!!_  & parse_geogr_coor
-  subroutine parse_geogr_coor &
-       & (ierr, &
-       &  div,  pad, o, name, t, &
-       &  str,  m)
-    use TOUZA_Std,only: inrange
-    implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: div
-    integer,         intent(out) :: pad(*)
-    real(kind=KTGT), intent(out) :: o
-    character(len=*),intent(out) :: name
-    character(len=*),intent(out) :: t
-    character(len=*),intent(in)  :: str
-    integer,optional,intent(out) :: m
-
-    integer c
-    integer lstr, jn, js1, js2, ls
-    integer lsep
-
-    integer ji, ni
-    integer,parameter :: li = 4
-    integer,parameter   :: larg = 256
-    character(len=larg) :: aitems(li)
-    character(len=*),parameter :: proc='parse_geogr_coor'
-
-    !      0   1                        2     3
-    ! NAME/NUM:DIV[+PADDING][-PADDING][:FLAG[:OFFSET]]    if m present
-    ! NAME/DIV[+PADDING][-PADDING][:FLAG[:OFFSET]]
-    ierr = 0
-    lsep = len(sep_name)
-    lstr = len_trim(str)
-    jn = index(str, sep_name)
-    if (jn.eq.0) then
-       c = IACHAR(str(1:1))
-       if (inrange(c, iachar('0'), iachar('9'))) then
-          jn = 1 - lsep
-       else
-          jn = lstr + lsep
-       endif
-    endif
-    ! write(*, *) 'name:', str(1:jn-1)
-    ! write(*, *) 'prop:', str(jn+lsep:lstr)
-    name = str(1:jn-1)
-    jn = jn + lsep
-    if (jn.le.lstr) then
-       aitems(:) = ' '   ! need to reset to allow empty
-       call split_list(ni, aitems, str(jn:lstr), sep_item, li)
-       ierr = min(0, ni)
-       ji = 1
-       if (present(m)) then
-          if (ierr.eq.0) call parse_number(ierr, m, aitems(ji), 0)
-          ji = ji + 1
-       endif
-       if (ni.ge.ji) then
-          ! DIV[+PADDING][-PADDING]
-          ls = len_trim(aitems(ji))
-          js1 = SCAN(aitems(ji)(1:),     sep_lpad // sep_rpad)
-          js2 = SCAN(aitems(ji)(js1+1:), sep_lpad // sep_rpad)
-          if (js2.gt.0) then
-             js2 = js1 + js2
-             if (ierr.eq.0) call parse_padding(ierr, pad, aitems(ji)(js2:))
-          else
-             js2 = ls + 1
-          endif
-          if (js1.gt.0) then
-             if (ierr.eq.0) call parse_padding(ierr, pad, aitems(ji)(js1:js2-1))
-          else
-             js1 = ls + 1
-          endif
-          if (js1.gt.1) then
-             if (ierr.eq.0) call parse_number(ierr, div, aitems(ji)(1:js1-1))
-          endif
-       endif
-       ji = ji + 1
-       if (ni.ge.ji) then
-          ! FLAG
-          if (ierr.eq.0) then
-             t = aitems(ji)
-             call upcase(t)
-             if (verify(trim(t), geo_all).ne.0) ierr = ERR_INVALID_PARAMETER
-          endif
-       endif
-       ji = ji + 1
-       if (ni.ge.ji) then
-          ! OFFSET
-          if (ierr.eq.0) call parse_number(ierr, o, aitems(ji), 0.0_KTGT)
-       endif
-    endif
-    call trace_err(ierr, fun=proc)
-  end subroutine parse_geogr_coor
-!!!_  & parse_padding
-  subroutine parse_padding(ierr, pad, str)
-    implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: pad(*)
-    character(len=*),intent(in)  :: str
-    integer v
-    ! write(*, *) 'pad:', trim(str)
-    call parse_number(ierr, v, str(2:))
-    if (ierr.eq.0) then
-       select case(str(1:1))
-       case(sep_lpad)
-          pad(lpad) = v
-       case(sep_rpad)
-          pad(rpad) = v
-       case default
-          ierr = ERR_PANIC
-       end select
-    endif
-  end subroutine parse_padding
 !!!_  & parse_ps2g_params
   subroutine parse_ps2g_params &
        & (ierr, levp, tol, lbuf, jlatb, jlate, jlonb, jlone)
@@ -1158,7 +831,7 @@ contains
     if (ierr.eq.0) call get_last_option(ierr, aval, ptag, def=' ')
     if (ierr.eq.0) then
        aitems(:) = ' '
-       call split_list(ni, aitems, aval, sep_item, lpx)
+       call split_list(ni, aitems, aval, sep_attr, lpx)
        ierr = min(0, ni)
     endif
     if (ierr.eq.0) call parse_number(ierr, levp(pxlev_lat), aitems(pxlev_lat), 0)
@@ -1181,7 +854,7 @@ contains
     if (ierr.eq.0) call get_last_option(ierr, aval, rtag, def=' ')
     if (ierr.eq.0) then
        aco(:) = ' '
-       call split_list(nco, aco, aval, sep_coor, lco)
+       call split_list(nco, aco, aval, sep_attr, lco)
        ierr = min(0, nco)
     endif
     if (ierr.eq.0) call parse_range(ierr, jlatb, jlate, aco(1))
@@ -1217,7 +890,7 @@ contains
 
     def(:) = (/0, -1/)
     aitem(:) = def(:)
-    call split_list(ni, aitem, str, sep_item, litem, def=def)
+    call split_list(ni, aitem, str, sep_range, litem, def=def)
     ierr = min(0, ni)
     if (ierr.eq.0) then
        jbgn = aitem(1)
@@ -1227,99 +900,7 @@ contains
        jend = -1
     endif
   end subroutine parse_range
-!!!_  & geog_latitude
-  subroutine geog_latitude &
-       & (ierr,  glat, gwlat,  glatm, &
-       &  nbase, ndiv, ofs,    tp)
-    use TOUZA_Emu,only: gauss_latitude, mid_latitude
-    implicit none
-    integer,         intent(out) :: ierr
-    real(kind=KTGT), intent(out) :: glat(0:*)
-    real(kind=KTGT), intent(out) :: gwlat(0:*)
-    real(kind=KTGT), intent(out) :: glatm(0:*)
-    integer,         intent(in)  :: nbase, ndiv
-    real(kind=KTGT), intent(in)  :: ofs
-    character(len=*),intent(in)  :: tp
 
-    real(kind=KTGT) :: blat(0:nbase-1)
-    real(kind=KTGT) :: wlat(0:nbase-1)
-    real(kind=KTGT) :: blatm(0:nbase)
-
-    real(kind=KTGT) :: span = ZERO
-    real(kind=KTGT) :: wnml = ONE
-    real(kind=KTGT) :: prec = -ONE
-
-    ierr = 0
-
-    if (ndiv.gt.1) then
-       write(*, *) 'Not implemented: lat div = ', ndiv
-       ierr = ERR_NOT_IMPLEMENTED
-    endif
-
-    ! todo:  tp ofs check
-
-    if (ierr.eq.0) call gauss_latitude(ierr, blat, wlat, nbase, span, wnml, prec=prec)
-    if (ierr.eq.0) blat(0:nbase-1) = asin(blat(0:nbase-1))
-    if (ierr.eq.0) call mid_latitude(ierr, blatm, wlat, nbase)
-
-    ! todo:  division
-
-    if (ierr.eq.0) then
-       glat(0:nbase-1)  = blat(0:nbase-1)
-       glatm(0:nbase)   = blatm(0:nbase)
-       ! wlat from gauss_latitude() is [d sin(lat)] / 2 for historical reason
-       gwlat(0:nbase-1) = wlat(0:nbase-1) * TWO
-    endif
-
-    return
-  end subroutine geog_latitude
-!!!_  & geog_longitude
-  subroutine geog_longitude &
-       & (ierr,  glon, gwlon,  glonm, &
-       &  nbase, ndiv, ofs,    tp)
-    use TOUZA_Emu,only: get_longitude, mid_longitude
-    implicit none
-    integer,         intent(out) :: ierr
-    real(kind=KTGT), intent(out) :: glon(0:*)
-    real(kind=KTGT), intent(out) :: gwlon(0:*)
-    real(kind=KTGT), intent(out) :: glonm(0:*)
-    integer,         intent(in)  :: nbase, ndiv
-    real(kind=KTGT), intent(in)  :: ofs
-    character(len=*),intent(in)  :: tp
-
-    real(kind=KTGT) :: blon(0:nbase)
-    real(kind=KTGT) :: wlon(0:nbase)
-    real(kind=KTGT) :: blonm(0:nbase+1)
-
-    real(kind=KTGT) :: span = 360.0_KTGT
-    real(kind=KTGT) :: wnml = ZERO
-
-    ierr = 0
-
-    if (ndiv.gt.1) then
-       write(*, *) 'Not implemented: lon div = ', ndiv
-       ierr = ERR_NOT_IMPLEMENTED
-    endif
-
-    ! todo:  tp ofs check
-
-    if (ierr.eq.0) call get_longitude(ierr, blon,  wlon, nbase, span=span, wnml=wnml, org=ofs)
-    if (ierr.eq.0) call mid_longitude(ierr, blonm, blon, wlon, nbase)
-    ! ! todo:  division
-
-    if (ierr.eq.0) then
-       if (INDEX(tp, geo_desco).gt.0) then
-          glon(0:nbase)    = blon(nbase:0:-1)
-          glonm(0:nbase+1) = blonm(nbase+1:0:-1)
-          gwlon(0:nbase)   = wlon(nbase:0:-1)
-       else
-          glon(0:nbase)    = blon(0:nbase)
-          glonm(0:nbase+1) = blonm(0:nbase+1)
-          gwlon(0:nbase)   = wlon(0:nbase)
-       endif
-    endif
-    return
-  end subroutine geog_longitude
 !!!_  & reset_gprop
   subroutine reset_gprop (m, div, pad, o, name, t)
     implicit none
@@ -1336,186 +917,6 @@ contains
     name = ' '
     t = ' '
   end subroutine reset_gprop
-!!!_  & adjust_range
-  subroutine adjust_range(jbgnx, jendx, jbgni, jendi, mi)
-    implicit none
-    integer,intent(out) :: jbgnx, jendx
-    integer,intent(in)  :: jbgni, jendi, mi
-
-    jbgnx = jbgni
-    jendx = jendi
-
-    if (jbgnx.lt.0) jbgnx = mi + 1 + jbgnx
-    if (jbgnx.lt.0) jbgnx = 0
-
-    if (jendx.lt.0) jendx = mi + 1 + jendx
-    if (jendx.le.0) jendx = jbgnx + 1
-  end subroutine adjust_range
-!!!_  & set_check_atmos
-  subroutine set_check_atmos &
-       & (ierr, &
-       &  mlat, latdiv, latpad, latofs, latname, lattype, &
-       &  mlon, londiv, lonpad, lonofs, lonname, lontype, &
-       &  ijdim)
-    implicit none
-    integer,         intent(out)   :: ierr
-    integer,         intent(inout) :: mlat,      mlon
-    integer,         intent(inout) :: latdiv,    londiv
-    integer,         intent(inout) :: latpad(*), lonpad(*)
-    real(kind=KTGT), intent(inout) :: latofs,    lonofs
-    character(len=*),intent(inout) :: latname,   lonname
-    character(len=*),intent(inout) :: lattype,   lontype
-    integer,optional,intent(in)    :: ijdim
-
-    integer dim
-    integer m, nlo, nla, k
-    character(len=lmsg) :: txt
-
-    ierr = 0
-    dim = choice(0, ijdim)
-    if (ierr.eq.0) then
-       if (mlat.le.0.or.mlon.le.0) ierr = ERR_FEW_ARGUMENTS
-    endif
-    if (ierr.eq.0) then
-       latdiv = max(1, latdiv)
-       londiv = max(1, londiv)
-       latpad(1:2) = max(0, latpad(1:2))
-       lonpad(1:2) = max(0, lonpad(1:2))
-       if (dim.gt.0) then
-          do k = 0, 1
-             nla = mlat + latpad(lpad) + latpad(rpad)
-             nlo = mlon + lonpad(lpad) + lonpad(rpad) + k
-             m = (nlo * londiv) * (nla * latdiv)
-             if (m.eq.dim) then
-                lonpad(rpad) = lonpad(rpad) + k
-                exit
-             endif
-          enddo
-          if (m.ne.dim) then
-             ierr = ERR_FEW_ARGUMENTS
-109          format('atmos size mismatch: ijdim seems ', I0)
-             write(txt, 109) dim
-             call message(ierr, txt, trace=.FALSE.)
-          endif
-       endif
-    endif
-    if (ierr.eq.0) then
-201    format('GLON', I0)
-202    format('GGLA', I0)
-211    format('GLON', I0, 'x', I0)
-212    format('GGLA', I0, 'x', I0)
-       if (lonname.eq.' ') then
-          if (londiv.gt.1) then
-             write(lonname, 211) mlon, londiv
-          else
-             write(lonname, 201) mlon
-          endif
-       endif
-       if (latname.eq.' ') then
-          if (latdiv.gt.1) then
-             write(latname, 212) mlat, latdiv
-          else
-             write(latname, 202) mlat
-          endif
-       endif
-    endif
-    if (ierr.eq.0) then
-       if (latpad(lpad).ne.0 .or. latpad(rpad).ne.0 &
-            & .or. lonpad(lpad).ne.0) then
-          ierr = ERR_PANIC
-119       format('cannot handle atmos padding ', 4(1x, I0))
-          write(txt, 119) latpad(lpad:rpad), lonpad(lpad:rpad)
-          call message(ierr, txt, trace=.FALSE.)
-       endif
-    endif
-    if (ierr.ne.0) then
-       call message(ierr, 'Need sufficient ATM domain configuration', trace=.FALSE.)
-    endif
-107 format('atmos coordinate ', A, ' = ', &
-         & '[', A, '] (', I0, '+', I0, '+', I0, ')*', I0, 1x, A, 1x, F12.3)
-    if (is_verbose(msglev_NORMAL).or.ierr.lt.0) then
-       write(txt, 107) 'lat', trim(latname), mlat, latpad(1:2), latdiv, trim(lattype), latofs
-       call message(ierr, txt, trace=.FALSE.)
-       write(txt, 107) 'lon', trim(lonname), mlon, lonpad(1:2), londiv, trim(lontype), lonofs
-       call message(ierr, txt, trace=.FALSE.)
-    endif
-  end subroutine set_check_atmos
-!!!_  & set_check_ocean
-  subroutine set_check_ocean &
-       & (ierr, &
-       &  mlat, latdiv, latpad, latofs, latname, lattype, &
-       &  mlon, londiv, lonpad, lonofs, lonname, lontype, &
-       &  nxydim)
-    implicit none
-    integer,         intent(out)   :: ierr
-    integer,         intent(inout) :: mlat,      mlon
-    integer,         intent(inout) :: latdiv,    londiv
-    integer,         intent(inout) :: latpad(*), lonpad(*)
-    real(kind=KTGT), intent(inout) :: latofs,    lonofs
-    character(len=*),intent(inout) :: latname,   lonname
-    character(len=*),intent(inout) :: lattype,   lontype
-    integer,optional,intent(in)    :: nxydim
-
-    integer dim
-    integer m, nlo, nla, k
-    character(len=lmsg) :: txt
-
-    ierr = 0
-    dim = choice(0, nxydim)
-    if (ierr.eq.0) then
-       if (mlat.le.0.or.mlon.le.0) ierr = ERR_FEW_ARGUMENTS
-    endif
-    if (ierr.eq.0) then
-       latdiv = max(1, latdiv)
-       londiv = max(1, londiv)
-       latpad(1:2) = max(0, latpad(1:2))
-       lonpad(1:2) = max(0, lonpad(1:2))
-       if (dim.gt.0) then
-          do k = 0, 2
-             nla = mlat + latpad(lpad) + latpad(rpad) + k * 2
-             nlo = mlon + lonpad(lpad) + lonpad(rpad) + k * 2
-             m = (nlo * londiv) * (nla * latdiv)
-             if (m.eq.dim) then
-                lonpad(1:2) = lonpad(1:2) + k
-                latpad(1:2) = latpad(1:2) + k
-                exit
-             endif
-          enddo
-          if (m.ne.dim) then
-             ierr = ERR_FEW_ARGUMENTS
-109          format('ocean size mismatch: nxydim seems ', I0)
-             write(txt, 109) dim
-             call message(ierr, txt, trace=.FALSE.)
-          endif
-       endif
-    endif
-    if (ierr.eq.0) then
-201    format('OCLONTPT', I0)
-202    format('OCLATTPT', I0)
-       if (lonname.eq.' ') write(lonname, 201) mlon
-       if (latname.eq.' ') write(latname, 202) mlat
-    endif
-    if (ierr.eq.0) then
-       if (latpad(lpad).ne.latpad(rpad) &
-            & .or. lonpad(lpad).ne.lonpad(rpad)) then
-          ierr = ERR_PANIC
-119       format('cannot handle ocean wings ', 4(1x, I0))
-          write(txt, 119) latpad(lpad:rpad), lonpad(lpad:rpad)
-          call message(ierr, txt, trace=.FALSE.)
-       endif
-    endif
-    if (ierr.ne.0) then
-       call message(ierr, 'Need sufficient OCN domain configuration', trace=.FALSE.)
-    endif
-107 format('ocean coordinate ', A, ' = ', &
-         & '[', A, '] (', I0, '+', I0, '+', I0, ')*', I0, 1x, A, 1x, F12.3)
-    if (is_verbose(msglev_NORMAL).or.ierr.lt.0) then
-       write(txt, 107) 'lat', trim(latname), mlat, latpad(1:2), latdiv, trim(lattype), latofs
-       call message(ierr, txt, trace=.FALSE.)
-       write(txt, 107) 'lon', trim(lonname), mlon, lonpad(1:2), londiv, trim(lontype), lonofs
-       call message(ierr, txt, trace=.FALSE.)
-    endif
-  end subroutine set_check_ocean
 !!!_  - parse_ps2g_opts
   subroutine parse_ps2g_opts &
        & (ierr, kopts)
@@ -1549,6 +950,29 @@ contains
        endif
     endif
   end subroutine parse_ps2g_opts
+
+!!!_  & parse_convoy_ps2g
+  subroutine parse_convoy_ps2g &
+       & (ierr, prime, jpos, npos, handle)
+    implicit none
+    integer,         intent(out)   :: ierr
+    type(convoy_t),  intent(inout) :: prime
+    integer,         intent(inout) :: jpos
+    integer,         intent(in)    :: npos
+    integer,         intent(in)    :: handle
+    character(len=*),parameter :: proc = 'parse_convoy_ps2g'
+
+    ierr = 0
+    if (ierr.eq.0) then
+       call parse_oprfile &
+            & (ierr, prime, jpos, npos, handle, xcmd_csr, 'jfwd', 'wfwd', 'w2fwd', 'w3fwd')
+    endif
+    if (ierr.eq.0) then
+       call parse_oprfile &
+            & (ierr, prime, jpos, npos, handle, xcmd_csr, 'jbwd', 'wbwd', 'w2bwd', 'w3bwd')
+    endif
+    call trace_err(ierr, fun=proc)
+  end subroutine parse_convoy_ps2g
 
 !!!_ + end module convoy_ps2g
 end module convoy_ps2g

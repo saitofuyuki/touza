@@ -1,7 +1,7 @@
 !!!_! convoy_util.F90 - TOUZA/Jmz/convoy utilities and parameters
 ! Maintainer: SAITO Fuyuki
 ! Created: Apr 10 2024
-#define TIME_STAMP 'Time-stamp: <2024/04/17 06:59:07 fuyuki convoy_util.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/28 07:16:04 fuyuki convoy_util.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2024
@@ -24,31 +24,19 @@ module convoy_util
   use TOUZA_Nio,only: hi_DFMT, hi_ITEM, hi_DSET, hi_UNIT
   use TOUZA_Nio,only: put_header_cprop, put_item, get_default_header
   use TOUZA_Nio,only: nio_write_header, nio_write_data, nio_store_csr
+  use TOUZA_Nio,only: lopts_sparse
 !!!_  - default
   implicit none
   public
 !!!_  - base parameters
   integer,parameter :: KTGT=KDBL
   integer,parameter :: lname=16
-  integer,parameter :: lmsg=256
-!!!_  - cartesian plane properties
-  real(kind=KTGT),parameter :: cp_undef = -HUGE(0.0_KTGT)
-  integer,parameter :: cp_spacing = 1
-  integer,parameter :: cp_low     = 2
-  integer,parameter :: cp_high    = 3
-  integer,parameter :: cp_anchor  = 4
-  integer,parameter :: cp_shift   = 5
-  integer,parameter :: cp_ofs     = 6
-  integer,parameter :: mem_cp = 6
-
-  integer,parameter :: cflag_center   = 0
-  integer,parameter :: cflag_boundary = 1
 
 !!!_  - dset entries
-  character(len=*),parameter :: DSET_PFX    = 'QX'
-  character(len=*),parameter :: DSET_R2G    = DSET_PFX // 'RFILE'
-  character(len=*),parameter :: DSET_PS2G   = DSET_PFX // 'PS2G'
-  character(len=*),parameter :: DSET_PSPROP = DSET_PFX // 'PSPROP'
+  ! character(len=*),parameter :: DSET_PFX    = 'QX'
+  ! character(len=*),parameter :: DSET_R2G    = DSET_PFX // 'RFILE'
+  ! character(len=*),parameter :: DSET_PS2G   = DSET_PFX // 'PS2G'
+  ! character(len=*),parameter :: DSET_PSPROP = DSET_PFX // 'PSPROP'
 
   integer,parameter :: xcmd_none = 0
   integer,parameter :: xcmd_noperm = 16384    ! permutation mask
@@ -67,11 +55,11 @@ module convoy_util
   character(len=*),parameter :: DSET_CWGT = 'C' // DSET_WGT
 
 !!!_  - configurations
-  character(len=*),parameter :: sep_item = ':'
-  character(len=*),parameter :: sep_name = '/'
-  character(len=*),parameter :: sep_coor = ','
-  character(len=*),parameter :: sep_lpad = '-'
-  character(len=*),parameter :: sep_rpad = '+'
+  ! character(len=*),parameter :: sep_item = ':'
+  ! character(len=*),parameter :: sep_name = '/'
+  ! character(len=*),parameter :: sep_coor = ','
+  ! character(len=*),parameter :: sep_lpad = '-'
+  ! character(len=*),parameter :: sep_rpad = '+'
 
   character(len=*),parameter :: opr_assign = '='
   character(len=*),parameter :: param_skip = '-'
@@ -83,101 +71,59 @@ module convoy_util
   integer,parameter :: span_negative = -1
   integer,parameter :: span_both = 0
 
-  integer,parameter :: special_end_param = -1
-  integer,parameter :: batch_null = 0
-
   integer,parameter :: cset_err = -1
   integer,parameter :: cset_ordered = 0
   integer,parameter :: cset_shuffled = 1
 
+!!!_  - type
+  ! transformation
+  integer,parameter :: lcvax = 3
+  integer,parameter :: lweights = 3
+  integer,parameter :: lcaux = 3
+  type transf_t
+     integer k
+     integer nxs, nxd     ! number of coordinates
+     character(len=litem) :: srcx(0:lcvax-1)      ! source,destination coordinates
+     character(len=litem) :: dstx(0:lcvax-1)
+     integer msrc(0:lcvax-1)
+     integer mdst(0:lcvax-1)
+     integer auxsrc(0:lcaux-1, 0:lcvax-1)
+     integer auxdst(0:lcaux-1, 0:lcvax-1)
+     integer namin, namax
+     integer nw
+     integer h             ! cache handle (suite or group)
+     integer idjv,  idwv(0:lweights-1)   ! index, weight variable id
+     integer recj,  recw(0:lweights-1)   ! record index
+     integer nbase, mcols, npack
+     integer colc
+     integer popts(lopts_sparse)
+     real(kind=KTGT),allocatable :: wcsr(:, :)
+     integer,        allocatable :: icsr(:)
+     integer,        allocatable :: hcsr(:)
+     character(len=litem) :: opr      ! operator name
+  end type transf_t
+  ! convoy
+  type convoy_t
+     integer :: nt = -1
+     type(transf_t),pointer :: tr(:) => NULL()
+     type(auxil_t), pointer :: aux(:) => NULL()
+  end type convoy_t
+  ! auxiliary data
+  type auxil_t
+     integer k
+     integer nx
+     character(len=litem) :: xname(0:lcvax-1)
+     integer mem(0:lcvax-1)
+     integer h   ! cache handle (suite or group)
+     integer idv
+     integer rec
+     integer reftr  ! reference transform
+     real(kind=KTGT),allocatable :: vd(:)
+     integer,        allocatable :: vi(:)
+  end type auxil_t
+
 !!!_ + Procedures
   contains
-!!!_  & parse_output_var
-  subroutine parse_output_var &
-       & (ierr,  jitem, kbatch, kitem, jpos,  npos, &
-       &  bname, bmask, mb,     vname, vmask, nv)
-    implicit none
-    integer,         intent(out)   :: ierr
-    integer,         intent(out)   :: jitem
-    integer,         intent(inout) :: kbatch, kitem
-    integer,         intent(inout) :: jpos
-    integer,         intent(in)    :: npos
-    character(len=*),intent(in)    :: bname(0:*), vname(0:*)
-    integer,         intent(in)    :: bmask(0:*), vmask(0:*)
-    integer,         intent(in)    :: mb, nv
-
-    integer,parameter :: larg = 256
-    character(len=larg) :: atxt, utxt
-
-    ierr = 0
-    jitem = special_end_param
-
-    loop_parse: do
-       if (kbatch.eq.batch_null) then
-          if (jpos.gt.npos) exit loop_parse
-          if (ierr.eq.0) call get_param(ierr, atxt, jpos, ' ')
-          if (ierr.eq.0) call upcase(utxt, atxt)
-          if (ierr.eq.0) then
-             jitem = find_first(vname(0:nv-1), utxt)
-             if (jitem.lt.0) then
-                kbatch = find_first(bname(1:mb), utxt, offset=1, no=-1)
-                if (kbatch.gt.0) then
-                   kitem = 0
-                else
-                   ierr = ERR_INVALID_PARAMETER
-                   write(*, *) 'unknown variable/set: ', trim(atxt)
-                   exit loop_parse
-                endif
-             endif
-          endif
-          jpos = jpos + 1
-       endif
-       if (kbatch.gt.batch_null) then
-          jitem = -1
-          do
-             if (kitem.ge.nv) exit
-             if (IAND(vmask(kitem), bmask(kbatch)).eq.bmask(kbatch)) then
-                jitem = kitem
-                exit
-             endif
-             kitem = kitem + 1
-          enddo
-          if (jitem.lt.0) then
-             kbatch = batch_null
-             cycle
-          endif
-          kitem = jitem + 1
-       endif
-       exit loop_parse
-    end do loop_parse
-  end subroutine parse_output_var
-
-!!!_   . set_header_plane
-  subroutine set_header_plane &
-       & (ierr, head, dfmt, mx, xname, my, yname, mz, zname)
-    implicit none
-    integer,         intent(out)   :: ierr
-    character(len=*),intent(inout) :: head(*)
-    character(len=*),intent(in)    :: dfmt
-    integer,         intent(in)    :: mx, my
-    character(len=*),intent(in)    :: xname, yname
-    integer,         intent(in),optional :: mz
-    character(len=*),intent(in),optional :: zname
-
-    ierr = 0
-    if (ierr.eq.0) call put_item(ierr, head, dfmt,  hi_DFMT)
-    if (ierr.eq.0) call put_header_cprop(ierr, head, xname, (/1, mx/), 1)
-    if (ierr.eq.0) call put_header_cprop(ierr, head, yname, (/1, my/), 2)
-    if (present(mz).and.present(zname)) then
-       if (ierr.eq.0) call put_header_cprop(ierr, head, zname,   (/1, mz/),  3)
-    else if (present(mz).or.present(zname)) then
-       ierr = ERR_INVALID_ITEM
-    else
-       if (ierr.eq.0) call put_header_cprop(ierr, head, ' ',   (/1, 1/),  3)
-    endif
-
-  end subroutine set_header_plane
-
 !!!_   . set_header_geogr
   subroutine set_header_geogr &
        & (ierr, head, &
@@ -212,6 +158,209 @@ module convoy_util
     if (ierr.eq.0) call put_item(ierr, head, dfmt,  hi_DFMT)
 
   end subroutine set_header_geogr
+
+!!!_  & parse_oprfile
+  subroutine parse_oprfile &
+       & (ierr, pr, jpos, npos, handle, xsw, vidx, vwgt, vw2, vw3)
+    use TOUZA_Nio,only: grp_suite, cache_var_id, cache_read_header
+    use TOUZA_Nio,only: cache_unit, cache_co_name, cache_co_len
+    use TOUZA_Nio,only: cache_group_recs, cache_sparse_review
+    use TOUZA_Nio,only: nio_column_coor, nio_review_sparse
+    use TOUZA_Nio,only: lopts_sparse, PROP_PTX_COLC
+    use TOUZA_Nio,only: hi_MEMO1, get_item, restore_item
+    implicit none
+    integer,         intent(out)   :: ierr
+    type(convoy_t),  intent(inout) :: pr
+    integer,         intent(inout) :: jpos
+    integer,         intent(in)    :: npos
+    integer,         intent(in)    :: handle
+    integer,         intent(in)    :: xsw
+    character(len=*),intent(in)    :: vidx, vwgt
+    character(len=*),intent(in),optional :: vw2, vw3
+
+    character(len=*),parameter :: proc = 'parse_oprfile'
+
+    integer id_jini, id_wini
+    integer id_j
+    integer nrec_j
+    integer jt,      jrec
+    integer utab
+    real(kind=KTGT) :: mold = 0.0_KTGT
+    character(len=litem) :: head(nitem)
+    integer popts(lopts_sparse)
+    integer nbase, mcols, npack, colc
+    integer jx, ji
+    integer jw, nw, jtbgn
+
+    ierr = 0
+    id_wini = 0
+
+    utab = cache_unit(handle)
+    colc = -1
+    nw = 1
+    if (present(vw2)) nw = nw + 1
+    if (present(vw3)) nw = nw + 1
+
+    id_jini = 0
+    jtbgn = pr%nt
+    do
+       id_j = cache_var_id(vidx, handle, id_jini)
+       if (id_j.lt.0) exit
+       nrec_j = cache_group_recs(handle, id_j)
+       if (nrec_j.lt.0) then
+          ierr = ERR_PANIC
+          exit
+       endif
+       do jrec = 0, nrec_j - 1
+          call add_transf(ierr, jt, pr)
+          if (ierr.eq.0) then
+             pr%tr(jt)%idwv(:) = -1
+             pr%tr(jt)%recw(:) = -1
+             pr%tr(jt)%k        = xsw
+             pr%tr(jt)%h        = handle
+             pr%tr(jt)%idjv     = id_j
+             pr%tr(jt)%recj     = jrec
+             pr%tr(jt)%namin    = 1
+             pr%tr(jt)%namax    = nw
+             pr%tr(jt)%nw       = nw
+          endif
+          if (ierr.eq.0) then
+             call cache_sparse_review &
+                  & (ierr,   &
+                  &  nbase,  mcols, npack, &
+                  &  handle, id_j,  jrec,  mold, &
+                  &  head,   popts, colc)
+          endif
+          if (ierr.eq.0) then
+             pr%tr(jt)%nbase = nbase
+             pr%tr(jt)%mcols = mcols
+             pr%tr(jt)%npack = npack
+             pr%tr(jt)%colc = colc
+             if (colc.le.0) ierr = ERR_PANIC
+          endif
+          if (ierr.eq.0) then
+             pr%tr(jt)%auxdst(:,:) = -1
+             pr%tr(jt)%auxsrc(:,:) = -1
+             pr%tr(jt)%nxd = colc - 1
+             do jx = 0, colc - 2
+                if (ierr.eq.0) then
+                   call cache_co_name(ierr, pr%tr(jt)%dstx(jx), handle, id_j, jx)
+                endif
+                if (ierr.eq.0) then
+                   pr%tr(jt)%mdst(jx) = cache_co_len(handle, id_j, jx)
+                endif
+             enddo
+             pr%tr(jt)%nxs = 0
+             do jx = 0, lcvax - 1
+                ji = hi_MEMO1 + jx * 2
+                if (ierr.eq.0) call get_item(ierr, head, pr%tr(jt)%srcx(jx),  ji)
+                if (ierr.eq.0) then
+                   if (pr%tr(jt)%srcx(jx).eq.' ') exit
+                   pr%tr(jt)%nxs = pr%tr(jt)%nxs + 1
+                   call restore_item(ierr, head, pr%tr(jt)%msrc(jx),  ji+1, def=-1)
+                endif
+             enddo
+          endif
+       enddo
+       if (ierr.ne.0) exit
+       id_jini = id_j + 1
+    enddo
+    jw = 0
+    if (ierr.eq.0) then
+       call add_opr_weight(ierr, pr, jtbgn, handle, jw, vwgt, vidx)
+    endif
+    jw = jw + 1
+    if (present(vw2)) then
+       if (ierr.eq.0) then
+          call add_opr_weight(ierr, pr, jtbgn, handle, jw, vw2, vidx)
+       endif
+    endif
+    jw = jw + 1
+    if (present(vw3)) then
+       if (ierr.eq.0) then
+          call add_opr_weight(ierr, pr, jtbgn, handle, jw, vw3, vidx)
+       endif
+    endif
+
+    call trace_err(ierr, fun=proc)
+    return
+  end subroutine parse_oprfile
+
+!!!_  & add_transf
+  subroutine add_transf(ierr, jt, pr)
+    implicit none
+    integer,       intent(out)   :: ierr
+    integer,       intent(out)   :: jt
+    type(convoy_t),intent(inout) :: pr
+
+    type(transf_t),pointer :: tt(:)
+    integer,parameter :: mt = 2
+
+    ierr = 0
+    jt = pr%nt
+    if (jt.ge.size(pr%tr)) then
+       allocate(tt(0:pr%nt+mt-1), STAT=ierr)
+       if (ierr.eq.0) then
+          tt(0:pr%nt-1) = pr%tr(0:pr%nt-1)
+          deallocate(pr%tr, STAT=ierr)
+       endif
+       if (ierr.eq.0) pr%tr => tt
+    endif
+    if (ierr.eq.0) pr%nt = pr%nt + 1
+    if (ierr.ne.0) ierr = ERR_ALLOCATION
+  end subroutine add_transf
+
+!!!_  - add_opr_weight
+  subroutine add_opr_weight &
+       & (ierr, pr, jtbgn, handle, jw, vwgt, vidx)
+    use TOUZA_Nio,only: cache_var_id, cache_group_recs
+    implicit none
+    integer,         intent(out)   :: ierr
+    type(convoy_t),  intent(inout) :: pr
+    integer,         intent(in)    :: jtbgn
+    integer,         intent(in)    :: handle
+    integer,         intent(in)    :: jw
+    character(len=*),intent(in)    :: vwgt
+    character(len=*),intent(in)    :: vidx
+    integer jt
+    integer id_j, id_jprv, jreci, nreci
+    integer id_w, id_wini, nrecw
+    character(len=lmsg) :: txt
+
+    ierr = 0
+    id_wini = 0
+    id_jprv = -1
+    nrecw = -1
+
+119 format('No pair record of index and weight: ', A, 1x, A)
+    do jt = jtbgn, pr%nt - 1
+       id_j  = pr%tr(jt)%idjv
+       if (id_jprv.ne.id_j) then
+          id_w = cache_var_id(vwgt, handle, id_wini)
+          if (id_w.lt.0) exit
+          nrecw = cache_group_recs(handle, id_w)
+          nreci = cache_group_recs(handle, id_j)
+          if (nrecw.ne.nreci) then
+             ierr = ERR_PANIC
+             write(txt, 119) trim(vidx), trim(vwgt)
+             call message(ierr, txt, levm=msglev_CRITICAL)
+             exit
+          endif
+          id_wini = id_w + 1
+          id_jprv = id_j
+       endif
+       jreci = pr%tr(jt)%recj
+       if (jreci.lt.nrecw) then
+          pr%tr(jt)%idwv(jw) = id_w
+          pr%tr(jt)%recw(jw) = jreci
+       else
+          ierr = ERR_PANIC
+          write(txt, 119) trim(vidx), trim(vwgt)
+          call message(ierr, txt, levm=msglev_CRITICAL)
+          exit
+       endif
+    enddo
+  end subroutine add_opr_weight
 
 !!!_ + end module
 end module convoy_util

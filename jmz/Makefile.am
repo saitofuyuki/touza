@@ -1,7 +1,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2024/06/20 22:29:16 fuyuki Makefile.am>
+# Time-stamp: <2024/06/28 07:32:08 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023,2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -26,6 +26,8 @@ libjmz_local_la_SOURCES =
 libjmz_local_la_SOURCES += jmz_param.F90 jmz_base.F90
 libjmz_local_la_SOURCES += jmz_coor.F90
 libjmz_local_la_SOURCES += jmz_file.F90 jmz_buf.F90 jmzlib.F90
+libjmz_local_la_SOURCES += jmz_psprop.F90
+libjmz_local_la_SOURCES += jmz_geogr.F90
 libjmz_local_la_SOURCES += chak_lib.F90
 libjmz_local_la_SOURCES += chak_opr.F90 chak_file.F90
 # libjmz_local_la_SOURCES += chak_handles.F90
@@ -41,21 +43,24 @@ chak_SOURCES = chak.F90 jmz.h
 chak_to_include = chak_decl.F90 chak_reg.F90
 EXTRA_chak_DEPENDENCIES = $(TOUZA_LIBRARY)
 
+CONVOY = convoy
+bin_PROGRAMS += $(CONVOY)
+convoy_SOURCES =  convoy_util.F90 convoy_ps2g.F90 convoy_r2g.F90
+convoy_SOURCES += $(CONVOY).F90 jmz.h
+convoy_to_include =
+EXTRA_convoy_DEPENDENCIES = $(TOUZA_LIBRARY)
+
 QOXI = qoxi
 bin_PROGRAMS += $(QOXI)
-qoxi_SOURCES =  convoy_util.F90 convoy_psprop.F90 convoy_ps2g.F90
-qoxi_SOURCES += qoxi.F90 jmz.h
+qoxi_SOURCES =
+qoxi_SOURCES += $(QOXI).F90 jmz.h
+qoxi_to_include =
 EXTRA_qoxi_DEPENDENCIES = $(TOUZA_LIBRARY)
 
 noinst_SCRIPTS += demo-chak.sh demo-convoy.sh
 EXTRA_DIST += demo-chak.sh.in demo-convoy.sh.in
 noinst_SCRIPTS += ocheck.sh
 EXTRA_DIST += ocheck.sh.in
-
-EXTRA_PROGRAMS += convoy
-convoy_SOURCES = convoy.F90 jmz.h
-convoy_to_include =
-EXTRA_convoy_DEPENDENCIES = $(TOUZA_LIBRARY)
 
 noinst_PYTHON = jmznml.py
 

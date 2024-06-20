@@ -1,7 +1,7 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2024/04/15 09:24:26 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/21 17:25:16 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024
@@ -1491,7 +1491,7 @@ contains
     ierr = 0
     nrep = tuple_default
 
-    jpar = index(arg, param_sep) + 1
+    jpar = index(arg, sep_param) + 1
     jend = len_trim(arg) + 1
     if (jpar.eq.1) jpar = jend + 1
     if (jpar.lt.jend) then
@@ -1509,7 +1509,7 @@ contains
              hnxt = parse_term_operator(abuf)
              if (hnxt.ne.hopr) exit
 
-             jpar = index(abuf, param_sep) + 1
+             jpar = index(abuf, sep_param) + 1
              jend = len_trim(abuf) + 1
              if (jpar.eq.1) jpar = jend + 1
              inxt = 0
@@ -1548,7 +1548,7 @@ contains
     if (ierr.eq.0) jb = buf_h2item(hbuf)
     if (ierr.eq.0) ierr = min(0, jb)
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
        select case(hopr)
@@ -1595,7 +1595,7 @@ contains
 
     integer jc
     integer jpb, jpe, larg
-    character,parameter :: csep = item_sep       ! coordinate separaor
+    character,parameter :: csep = sep_item       ! coordinate separaor
 
     integer jq
     integer jsbgn, jsend
@@ -1659,7 +1659,7 @@ contains
     if (ierr.eq.0) jb = buf_index(hobj)
     if (ierr.eq.0) ierr = min(0, jb)
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
        select case(hopr)
@@ -1746,7 +1746,7 @@ contains
     if (ierr.eq.0) jb = buf_index(hobj)
     if (ierr.eq.0) ierr = min(0, jb)
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
        select case(hopr)
@@ -1877,7 +1877,7 @@ contains
     integer,         intent(in)    :: hopr
     integer,optional,intent(in)    :: lflag
 
-    character,parameter :: csep = item_sep       ! coordinate separaor
+    character,parameter :: csep = sep_item       ! coordinate separaor
     integer jc
     integer larg
     integer jpb, jpe, jrep
@@ -1951,7 +1951,7 @@ contains
     ! need special care for POP[=TAG]
     if (hopr.eq.opr_POP) then
        jerr = 0  ! non-zero reserved for tagged POP
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
        if (jpar.lt.jend) call parse_number(jerr, k, arg(jpar:jend-1))
@@ -1959,7 +1959,7 @@ contains
           if (jerr.eq.0) then
              call parse_prefetch_tuples(ierr, niter, hiter, ntup, hopr, arg(1:jend-1), japos)
           else
-             call split_heads(ntup, ldmy, arg(jpar:jend-1), item_sep, -1, empty=.TRUE.)
+             call split_heads(ntup, ldmy, arg(jpar:jend-1), sep_item, -1, empty=.TRUE.)
              call parse_pop_list(ierr, niter, hiter, ntup, arg(jpar:jend-1))
              ! write(*, *) niter
              ! call parse_buffer_opr(ierr, opr_TAG, arg)
@@ -2044,8 +2044,8 @@ contains
        ierr = ERR_INVALID_PARAMETER
        return
     endif
-    lsp = len(item_sep)
-    call split_heads(m, jhead, arg, item_sep, ntup, empty=.TRUE.)
+    lsp = len(sep_item)
+    call split_heads(m, jhead, arg, sep_item, ntup, empty=.TRUE.)
     ierr = min(0, m)
     if (ierr.eq.0) call mpop_stack(ierr, hobjs, ntup, .TRUE.)
     ! write(*, *) jhead(0:niter)
@@ -2093,7 +2093,7 @@ contains
        jfw = jfr
     endif
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend
        select case(hopr)
@@ -2186,7 +2186,7 @@ contains
 
     ierr = 0
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
 
@@ -2230,7 +2230,7 @@ contains
     integer nfetch, ntgt
     integer jb,     jx
 
-    character,parameter :: csep = item_sep       ! coordinate separaor
+    character,parameter :: csep = sep_item       ! coordinate separaor
     integer   jq
     integer   jsbgn, jsend
 
@@ -2274,7 +2274,7 @@ contains
     if (ierr.eq.0) call mset_stack_queue(ierr, pop=(npop - ntgt))
 
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend
        if (arg(jpar:jend-1).eq.shape_sweep_reduce) jpar = jend
@@ -3244,7 +3244,7 @@ contains
     implicit none
     character(len=*),intent(in) :: arg
     integer jpar, jend
-    jpar = index(arg, param_sep) + 1
+    jpar = index(arg, sep_param) + 1
     jend = len_trim(arg) + 1
     if (jpar.eq.1) jpar = jend + 1
     if (arg(jpar:jend-1).eq.shape_sweep_stack) then
