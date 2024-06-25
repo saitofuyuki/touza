@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2024/02/25 22:06:46 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/25 14:06:06 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2024
@@ -64,6 +64,8 @@ module TOUZA_Std_arg
   integer,parameter :: nch_mdl = 4
   integer,parameter :: ngt_mdl = 128
   integer,parameter :: nap_mdl = 4
+
+  character(len=*),parameter :: sep_path = '/'
 !!!_ + static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
@@ -184,6 +186,7 @@ module TOUZA_Std_arg
   public :: init, diag, finalize
   public :: decl_pos_arg
   public :: parse
+  public :: get_cmd
   public :: get_nparam, get_nargs
   public :: get_param, get_array, get_option
   public :: get_arg,   get_key,   get_value,  get_entry
@@ -1120,6 +1123,26 @@ contains
   end subroutine append_aitem
 
 !!!_ + inquiries
+!!!_  & get_cmd - get program name (0th argument)
+  subroutine get_cmd &
+       & (ierr, cmd, base)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(out)         :: cmd
+    logical,         intent(in),optional :: base   ! True for basename only
+    integer jp
+    ierr = 0
+    call cmdline_arg_wrap(0, cmd, s=ierr)
+    if (ierr.eq.0) then
+       if (choice(.FALSE., base)) then
+          jp = index(cmd, sep_path, BACK=.TRUE.)
+          if (jp.gt.0) cmd = trim(cmd(jp+1:))
+       endif
+    else
+       ierr = _ERROR(ERR_INSUFFICIENT_BUFFER)
+    endif
+  end subroutine get_cmd
 !!!_  & get_nparam() - get number of positional parameters
   integer function get_nparam () result (n)
     implicit none
@@ -2957,11 +2980,16 @@ contains
     logical,intent(in)  :: dup
     integer jp, np
     integer ja, na
-    character(len=128) :: tag, arg
+    character(len=128) :: tag, arg, cmd
     integer,parameter :: nv = 3
     integer :: ivals(nv)
 
     ierr = 0
+    if (ierr.eq.0) call get_cmd(ierr, cmd)
+    if (ierr.eq.0) write(*, *) 'command:', trim(cmd)
+    if (ierr.eq.0) call get_cmd(ierr, cmd, base=.TRUE.)
+    if (ierr.eq.0) write(*, *) 'command/base:', trim(cmd)
+
     if (ierr.eq.0) call decl_pos_arg(ierr)
     if (ierr.eq.0) call decl_pos_arg(ierr, 'X')
     if (ierr.eq.0) call decl_pos_arg(ierr, 'Z', 4)
