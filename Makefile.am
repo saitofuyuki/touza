@@ -1,9 +1,9 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2023/03/24 17:28:42 fuyuki Makefile.am>
+# Time-stamp: <2024/06/25 10:46:03 fuyuki Makefile.am>
 
-# Copyright (C) 2020-2023
+# Copyright (C) 2020-2024
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
@@ -74,6 +74,7 @@ SUBDIRS	+=	. $(subdirs_extra)
 include_HEADERS		= touza.h $(CONFIG_HEADER)
 lib_LTLIBRARIES 	= lib@TOUZA_NAME@.la
 lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
+lib@TOUZA_NAME@_la_LDFLAGS = $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 
 local_name			= libtouza_local.la
 
