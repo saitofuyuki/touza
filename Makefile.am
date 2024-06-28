@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/06/25 10:46:03 fuyuki Makefile.am>
+# Time-stamp: <2024/06/28 09:34:18 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -12,6 +12,12 @@
 ACLOCAL_AMFLAGS	=	-I m4c
 EXTRA_DIST	=	autogen.sh README-touza.org LICENSE NOTICE
 include $(top_srcdir)/aminclude_static.am
+
+include_HEADERS		= touza.h $(CONFIG_HEADER)
+lib_LTLIBRARIES 	= lib@TOUZA_NAME@.la
+lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
+lib@TOUZA_NAME@_la_LDFLAGS =
+lib@TOUZA_NAME@_la_LDFLAGS += $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 
 noinst_SCRIPTS 	= makeshift
 CLEANFILES += $(noinst_bin_SCRIPTS)
@@ -65,16 +71,11 @@ AM_FCFLAGS_MODULE         += $(FC_MODULE_touza_ami)
 endif
 
 pkgconfigdir	=	$(libdir)/pkgconfig
-pkgconfig_DATA	=	touza.pc
+pkgconfig_DATA	=	@TOUZA_NAME@.pc
 
 SUBDIRS	+=	m4c
 
 SUBDIRS	+=	. $(subdirs_extra)
-
-include_HEADERS		= touza.h $(CONFIG_HEADER)
-lib_LTLIBRARIES 	= lib@TOUZA_NAME@.la
-lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
-lib@TOUZA_NAME@_la_LDFLAGS = $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 
 local_name			= libtouza_local.la
 
