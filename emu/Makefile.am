@@ -1,7 +1,7 @@
 # touza/emu Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 15 2020
-# Time-stamp: <2024/02/27 17:14:46 fuyuki Makefile.am>
+# Time-stamp: <2024/07/04 17:25:51 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -24,7 +24,7 @@ EXTRA_libtouza_local_la_SOURCES = emu_msg.F90
 
 noinst_SCRIPTS =
 if MAINTAINER_MODE
-noinst_SCRIPTS += wrap-ugg.sh
+noinst_SCRIPTS += wrap-ugg.sh demo_stp.sh.in
 endif
 
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_std)
@@ -51,6 +51,10 @@ test_emu_ugg_LDADD    = $(TEST_COMMON_LIBS)
 CLEANFILES += $(noinst_SCRIPTS)
 
 wrap-ugg.sh: wrap-ugg.sh.in
+	sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@
+	chmod +x $@
+
+demo_stp.sh: demo_stp.sh.in
 	sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@
 	chmod +x $@
 

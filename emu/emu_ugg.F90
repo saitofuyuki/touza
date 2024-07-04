@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2024/06/06 11:09:32 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/25 15:52:19 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024
@@ -18,7 +18,7 @@
 #include "touza_std.h"
 #ifndef TEST_EMU_UGG
 #define TEST_EMU_UGG 0
-#endif  TEST_EMU_UGG 0
+#endif
 !!!_ + hypot
 #ifndef   OPT_UGG_HYPOT_INTRINSIC
 #  define OPT_UGG_HYPOT_INTRINSIC 1
@@ -82,6 +82,12 @@ module TOUZA_Emu_ugg
   integer,parameter,public :: NGEOG = 2
   integer,parameter,public :: JLATI = _LAIDX, JLONGI = _LOIDX
 
+  integer,parameter,public :: NATRI = 3
+  integer,parameter,public :: JAMP = NATRI   ! != JSIN, JCOS
+
+  integer,parameter,public :: round_2pi    = 0
+  integer,parameter,public :: round_degree = 360
+
   ! symmetric properties
   integer,parameter,public :: symm_error = -1
   integer,parameter,public :: symm_asymm = 0
@@ -94,7 +100,7 @@ module TOUZA_Emu_ugg
   integer,parameter,public :: equidistant_strict = 1   ! sign denotes ascending/descending
   integer,parameter,public :: equidistant_enough = 2
   integer,parameter,public :: non_equidistant = 4
-!!!_ + cache size and index
+!!!_ + polar steregraphic projection: cache size and index
   integer,parameter,public :: ncache_psgp_lo = 2
   integer,parameter,public :: ncache_psgp_la = 5
   integer,parameter,public :: ncache_psgp_co = 15
@@ -122,11 +128,25 @@ module TOUZA_Emu_ugg
   integer,parameter :: icache_psgp_e2c  = 12 ! (1 - e^2)
   integer,parameter :: icache_psgp_aco  = 13 ! 1 + e2c (atanh(e) / e)
   integer,parameter :: icache_psgp_tslat= 14 ! true latitude
-  integer,parameter :: icache_psgp_lospan = 15   ! one cycle in longitude
+  integer,parameter :: icache_psgp_loround = 15   ! one cycle in longitude
 
   integer,parameter :: lim_psginv = OPT_PSGINV_ITER_LIMIT
-!!!_  - static
-!!!_  - private static
+!!!_ + symmetric tripolar
+  integer,parameter :: icache_stp_plon = 1       ! longitude of w-sphere np
+  integer,parameter :: icache_stp_plat = 2       !   (sp: lat-np, 180+lon-np)
+  integer,parameter :: icache_stp_olat = 3       ! pole latitude of the other side of w-sphere
+  integer,parameter :: icache_stp_splat= 4       ! sine(plat)
+  integer,parameter :: icache_stp_solat= 5       ! sine(olat). either +1 or -1 (used as sign)
+  integer,parameter :: icache_stp_wnpr = 6       ! real-part of w-sphere np projection
+  integer,parameter :: icache_stp_loround = 7    ! round angle for longitude
+  integer,parameter :: icache_stp_laround = 8    ! round angle for latitude
+  integer,parameter,public :: ncache_stp_co = 8
+
+  integer,parameter :: icache_stp_zamp = 1
+  integer,parameter :: icache_stp_zclo = 1
+  integer,parameter :: icache_stp_zslo = 2
+
+!!!_ + private static
   integer,save :: init_mode = 0
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
@@ -138,6 +158,29 @@ module TOUZA_Emu_ugg
 #define _ERROR(E) (E - ERR_MASK_EMU_UGG)
 # define __MDL__ 'ugg'
 !!!_ + interfaces
+!!!_  - stp
+  interface stp_geogr_zproj
+     module procedure stp_geogr_zproj_tr_d
+  end interface stp_geogr_zproj
+  interface stp_z2wproj_atr
+     module procedure stp_z2wproj_atr_d
+  end interface stp_z2wproj_atr
+  interface stp_wsphere_lat_tr
+     module procedure stp_wsphere_lat_tr_d
+  end interface stp_wsphere_lat_tr
+  interface stp_wsphere_lon_tr
+     module procedure stp_wsphere_lon_tr_d
+  end interface stp_wsphere_lon_tr
+  interface is_stp_wsphere_tr
+     module procedure is_stp_wsphere_tr_d
+  end interface is_stp_wsphere_tr
+  interface stp_fwd_tr
+     module procedure stp_fwd_tr_d
+  end interface stp_fwd_tr
+  interface stp_set
+     module procedure stp_set_d
+  end interface stp_set
+!!!_  - to clean
   interface get_longitude
      module procedure get_longitude_d
   end interface get_longitude
@@ -174,6 +217,15 @@ module TOUZA_Emu_ugg
   interface check_precision
      module procedure check_precision_d, check_precision_f
   end interface check_precision
+
+  interface round_choice
+     module procedure round_choice_d, round_choice_id
+  end interface round_choice
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  interface round_choice
+     module procedure round_choice_q, round_choice_iq
+  end interface round_choice
+#endif
 
   interface span_longitude
      module procedure span_longitude_d
@@ -341,6 +393,9 @@ module TOUZA_Emu_ugg
   interface ang2deg
      module procedure ang2deg_d
   end interface ang2deg
+  interface deg2ang
+     module procedure deg2ang_d
+  end interface deg2ang
   interface rad2ang
      module procedure rad2ang_d
   end interface rad2ang
@@ -360,6 +415,9 @@ module TOUZA_Emu_ugg
   interface ang2deg
      module procedure ang2deg_q
   end interface ang2deg
+  interface deg2ang
+     module procedure deg2ang_q
+  end interface deg2ang
   interface deg2rad
      module procedure deg2rad_q
   end interface deg2rad
@@ -622,7 +680,13 @@ module TOUZA_Emu_ugg
   public get_latitude,  gauss_latitude, mid_latitude, div_latitude
   public check_symmetric, check_monotonic
   public check_precision, is_equidistant
-  public deg2rad, rad2deg, ang2rad, rad2ang, ang2deg
+  public deg2rad, rad2deg, ang2rad, rad2ang, ang2deg, deg2ang
+  public round_choice, span_longitude,   span_latitude
+
+  public :: stp_set
+  public :: stp_fwd_tr
+  public :: stp_geogr_zproj, stp_z2wproj_atr, stp_wsphere_lon_tr, stp_wsphere_lat_tr
+  public :: is_stp_wsphere_tr
 
   public flatten_to_ecc
 
@@ -940,110 +1004,156 @@ contains
   end function wtan_d
 !!!_   . ang2rad
   ELEMENTAL &
-  real(kind=KTGT) function ang2rad_d(angl, span) result(r)
+  real(kind=KTGT) function ang2rad_d(angl, round) result(r)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(in) :: angl
-    real(kind=KTGT),intent(in) :: span
+    real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT) :: s
-    if (span.eq.0.0_KTGT) then
+    if (round.eq.real(round_2pi, kind=KTGT)) then
        r = angl
        return
     endif
     s = sign(ONE, angl)
-    r = s * (modulo(abs(angl), span) * (pi_(angl) / (span / 2.0_KTGT)))
+    r = s * (modulo(abs(angl), round) * (pi_(angl) / (round / 2.0_KTGT)))
   end function ang2rad_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   ELEMENTAL &
-  real(kind=KTGT) function ang2rad_q(angl, span) result(r)
+  real(kind=KTGT) function ang2rad_q(angl, round) result(r)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
     real(kind=KTGT),intent(in) :: angl
-    real(kind=KTGT),intent(in) :: span
+    real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT) :: s
-    if (span.eq.0.0_KTGT) then
+    if (round.eq.real(round_2pi, kind=KTGT)) then
        r = angl
        return
     endif
     s = sign(ONE, angl)
-    r = s * (modulo(abs(angl), span) * (pi_(angl) / (span / 2.0_KTGT)))
+    r = s * (modulo(abs(angl), round) * (pi_(angl) / (round / 2.0_KTGT)))
   end function ang2rad_q
 #endif
 !!!_   . rad2ang
   ELEMENTAL &
-  real(kind=KTGT) function rad2ang_d(rad, span) result(a)
+  real(kind=KTGT) function rad2ang_d(rad, round) result(a)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(in) :: rad
-    real(kind=KTGT),intent(in) :: span
+    real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT) :: p2, s
-    if (span.eq.0.0_KTGT) then
+    if (round.eq.real(round_2pi, kind=KTGT)) then
        a = rad
        return
     endif
-    p2 = 2.0_KTGT * pi_(rad)
+    p2 = round_choice(round_2pi, p2)
+    ! p2 = 2.0_KTGT * pi_(rad)
     s = sign(ONE, rad)
-    a = s * ((modulo(abs(rad), p2)) / p2) * span
+    a = s * ((modulo(abs(rad), p2)) / p2) * round
   end function rad2ang_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   ELEMENTAL &
-  real(kind=KTGT) function rad2ang_q(rad, span) result(a)
+  real(kind=KTGT) function rad2ang_q(rad, round) result(a)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
     real(kind=KTGT),intent(in) :: rad
-    real(kind=KTGT),intent(in) :: span
+    real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT) :: p2, s
-    if (span.eq.0.0_KTGT) then
+    if (round.eq.real(round_2pi, kind=KTGT)) then
        a = rad
        return
     endif
-    p2 = 2.0_KTGT * pi_(rad)
+    p2 = round_choice(round_2pi, p2)
+    ! p2 = 2.0_KTGT * pi_(rad)
     s = sign(ONE, rad)
-    a = s * ((modulo(abs(rad), p2)) / p2) * span
+    a = s * ((modulo(abs(rad), p2)) / p2) * round
   end function rad2ang_q
 #endif
 !!!_   . ang2deg
   ELEMENTAL &
-  real(kind=KTGT) function ang2deg_d(angl, span) result(d)
+  real(kind=KTGT) function ang2deg_d(angl, round) result(d)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(in) :: angl
-    real(kind=KTGT),intent(in) :: span
-    real(kind=KTGT),parameter :: w = 360.0_KTGT
+    real(kind=KTGT),intent(in) :: round
+    real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT) :: s, sp
-    if (span.eq.w) then
+    if (round.eq.w) then
        d = angl
        return
     endif
-    sp = span
-    if (sp.eq.0.0_KTGT) sp = pi_(angl) * 2.0_KTGT
+    sp = round_choice(round, angl)
+    ! sp = round
+    ! if (sp.eq.0.0_KTGT) sp = pi_(angl) * 2.0_KTGT
     s = sign(ONE, angl)
     d = s * (modulo(abs(angl), sp) / sp) * w
   end function ang2deg_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   ELEMENTAL &
-  real(kind=KTGT) function ang2deg_q(angl, span) result(d)
+  real(kind=KTGT) function ang2deg_q(angl, round) result(d)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
     real(kind=KTGT),intent(in) :: angl
-    real(kind=KTGT),intent(in) :: span
-    real(kind=KTGT),parameter :: w = 360.0_KTGT
+    real(kind=KTGT),intent(in) :: round
+    real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT) :: s, sp
-    if (span.eq.w) then
+    if (round.eq.w) then
        d = angl
        return
     endif
-    sp = span
-    if (sp.eq.0.0_KTGT) sp = pi_(angl) * 2.0_KTGT
+    sp = round_choice(round, angl)
+    ! sp = round
+    ! if (sp.eq.0.0_KTGT) sp = pi_(angl) * 2.0_KTGT
     s = sign(ONE, angl)
     d = s * (modulo(abs(angl), sp) / sp) * w
   end function ang2deg_q
+#endif
+
+!!!_   . deg2ang
+  ELEMENTAL &
+  real(kind=KTGT) function deg2ang_d(deg, round) result(a)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: deg
+    real(kind=KTGT),intent(in) :: round
+    real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT) :: s, sp
+    if (round.eq.w) then
+       a = deg
+       return
+    endif
+    sp = round_choice(round, deg)
+    ! sp = round
+    ! if (sp.eq.0.0_KTGT) sp = pi_(deg) * 2.0_KTGT
+    s = sign(ONE, deg)
+    a = s * (modulo(abs(deg), w) / w) * sp
+  end function deg2ang_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  ELEMENTAL &
+  real(kind=KTGT) function deg2ang_q(deg, round) result(a)
+    use TOUZA_Std,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in) :: deg
+    real(kind=KTGT),intent(in) :: round
+    real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT) :: s, sp
+    if (round.eq.w) then
+       a = deg
+       return
+    endif
+    sp = round_choice(round, deg)
+    ! sp = round
+    ! if (sp.eq.0.0_KTGT) sp = pi_(deg) * 2.0_KTGT
+    s = sign(ONE, deg)
+    a = s * (modulo(abs(deg), w) / w) * sp
+  end function deg2ang_q
 #endif
 
 !!!_   . deg2rad
@@ -1054,7 +1164,7 @@ contains
     implicit none
     real(kind=KTGT),intent(in) :: deg
     logical,optional,intent(in) :: nml
-    real(kind=KTGT),parameter :: w = 360.0_KTGT
+    real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT) :: s
     s = sign(ONE, deg)
@@ -1071,7 +1181,7 @@ contains
     implicit none
     real(kind=KTGT),intent(in) :: deg
     logical,optional,intent(in) :: nml
-    real(kind=KTGT),parameter :: w = 360.0_KTGT
+    real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT) :: s
     s = sign(ONE, deg)
@@ -1089,7 +1199,7 @@ contains
     implicit none
     real(kind=KTGT),intent(in) :: rad
     logical,optional,intent(in) :: nml
-    real(kind=KTGT),parameter :: w = 360.0_KTGT
+    real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT) :: p2, s
     p2 = 2.0_KTGT * pi_(rad)
@@ -1107,7 +1217,7 @@ contains
     implicit none
     real(kind=KTGT),intent(in) :: rad
     logical,optional,intent(in) :: nml
-    real(kind=KTGT),parameter :: w = 360.0_KTGT
+    real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT) :: p2, s
     p2 = 2.0_KTGT * pi_(rad)
@@ -1138,7 +1248,7 @@ contains
 !!!_  & get_longitude
   subroutine get_longitude_d &
        & (ierr,  longi, weight, &
-       &  n,     div,   span,   wnml, org, acc, plain)
+       &  n,     div,   round, wnml, org, acc, plain)
 !!!_   . note for MIROC compatibility
     !  Need set wnml = 1.0
     !  Need set div  = n * MINT
@@ -1151,8 +1261,8 @@ contains
     real(kind=KTGT),intent(out)         :: weight(0:*)
     integer,        intent(in)          :: n          ! domain size
     integer,        intent(in),optional :: div        ! logical domain width (default n)
-    real(kind=KTGT),intent(in),optional :: span       ! physical domain width (default: 2 pi)
-    real(kind=KTGT),intent(in),optional :: wnml       ! normalization factor on weights, i.e, wnml == sum(weight) (default: span)
+    real(kind=KTGT),intent(in),optional :: round      ! round angle (default: 2 pi)
+    real(kind=KTGT),intent(in),optional :: wnml       ! normalization factor on weights, i.e, wnml == sum(weight) (default: round)
     real(kind=KTGT),intent(in),optional :: org        ! origin (in dx unit default, direct value if acc)
     logical,        intent(in),optional :: acc        ! accumulate switch (legacy)
     logical,        intent(in),optional :: plain      ! non-cyclic (default .FALSE.)
@@ -1169,7 +1279,7 @@ contains
 
     pi = pi_(ONE)
     o = choice(ZERO, org)
-    sp = span_longitude(span)
+    sp = span_longitude(round)
     wf = choice(ZERO, wnml)
     lw = choice(0, div)
     bp = choice(.FALSE., plain)
@@ -1247,7 +1357,8 @@ contains
   end subroutine mid_longitude_d
 !!!_  & div_longitude
   subroutine div_longitude_d &
-       & (ierr, longi, div, boundary, longi_c, longi_b, base, method, span, plain)
+       & (ierr,   longi, div, boundary, longi_c, longi_b, base, &
+       &  method, round, plain)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
     integer,        intent(out)         :: ierr
@@ -1258,7 +1369,7 @@ contains
     real(kind=KTGT),intent(in)          :: longi_b(0:*)  ! source coordinate (boundary)  x x x
     integer,        intent(in)          :: base          ! source array size
     integer,        intent(in),optional :: method
-    real(kind=KTGT),intent(in),optional :: span          ! domain width
+    real(kind=KTGT),intent(in),optional :: round         ! round-angle
     logical,        intent(in),optional :: plain         ! non-cyclic (default .FALSE.)
     real(kind=KTGT) :: sp
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
@@ -1266,17 +1377,18 @@ contains
 
     bp = choice(.FALSE., plain)
 
-    if (present(span)) then
-       sp = span_longitude(span)
-    else
-       sp = ZERO
-    endif
+    sp = span_longitude(round)
+    ! if (present(span)) then
+    !    sp = span_longitude(span)
+    ! else
+    !    sp = ZERO
+    ! endif
     call div_coordinate &
          & (ierr, longi, div, boundary, longi_c, longi_b, base, sp, method, bp)
   end subroutine div_longitude_d
 !!!_  & check_longitude
   subroutine check_longitude_d &
-       & (ierr, longi, n, div, span, tag, u, tol)
+       & (ierr, longi, n, div, round, tag, u, tol)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     use TOUZA_Std,only: msg_grp
     implicit none
@@ -1284,7 +1396,7 @@ contains
     real(kind=KTGT), intent(out)         :: longi(0:*)
     integer,         intent(in)          :: n          ! array size
     integer,         intent(in),optional :: div        ! logical domain width (default n)
-    real(kind=KTGT), intent(in),optional :: span       ! physical domain width (default: 2 pi)
+    real(kind=KTGT), intent(in),optional :: round      ! round angle (default: 2 pi)
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
     real(kind=KTGT), intent(in),optional :: tol
@@ -1303,8 +1415,9 @@ contains
 
 101 format('check/longitude:', A, ': ', E10.3, ' / ', E10.3, 1x, L1)
 102 format('check/longitude:', A, ': ', E10.3, 1x, L1)
-    if (present(span)) then
-       sp = span_longitude(span)
+
+    if (present(round)) then
+       sp = span_longitude(round)
        refd = sp / real(choice(n, div), kind=KTGT)
        b = is_equidistant(longi, n, tol, e, r=refd)
        write(txt, 101) trim(ti), e, refd, b
@@ -1316,8 +1429,8 @@ contains
   end subroutine check_longitude_d
 !!!_  & check_div_longitude
   subroutine check_div_longitude_d &
-       & (ierr, longi, div, boundary, longi_c, longi_b, base, span, &
-       &  tag,  u,     tol)
+       & (ierr,  longi, div, boundary, longi_c, longi_b, base, &
+       &  round, tag,   u,   tol)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     use TOUZA_Std,only: msg_grp
     implicit none
@@ -1328,7 +1441,7 @@ contains
     real(kind=KTGT), intent(in)          :: longi_c(0:*)  ! source coordinate (center)     o o
     real(kind=KTGT), intent(in)          :: longi_b(0:*)  ! source coordinate (boundary)  x x x
     integer,         intent(in)          :: base          ! source array size
-    real(kind=KTGT), intent(in),optional :: span          ! domain width
+    real(kind=KTGT), intent(in),optional :: round         ! round-angle
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
     real(kind=KTGT), intent(in),optional :: tol
@@ -1349,7 +1462,7 @@ contains
     endif
     if (ti.eq.' ') write(ti, '(I0, ''*'', I0)') base, div
     if (ierr.eq.0) then
-       call check_longitude(ierr, longi, mem, mwid, span, ti, utmp, tol)
+       call check_longitude(ierr, longi, mem, mwid, round, ti, utmp, tol)
     endif
     if (ierr.eq.0) then
 101    format('check/longitude/b:', A, ': ', E10.3)
@@ -1379,7 +1492,7 @@ contains
 !!!_  & get_latitude - latitude computation with poles as boundaries
   subroutine get_latitude_d &
        & (ierr, lati,  weight, &
-       &  n,    span,  wnml,   method)
+       &  n,    round, wnml,   method)
     use TOUZA_Std,only: KTGT=>KDBL
     use TOUZA_Std,only: choice
     implicit none
@@ -1387,8 +1500,8 @@ contains
     real(kind=KTGT),intent(out)         :: lati(*)
     real(kind=KTGT),intent(out)         :: weight(*)
     integer,        intent(in)          :: n
-    real(kind=KTGT),intent(in),optional :: span       ! physical domain width (default: pi)
-    real(kind=KTGT),intent(in),optional :: wnml       ! normalization factor on weights, i.e, wnml == sum(weight) (default: span)
+    real(kind=KTGT),intent(in),optional :: round      ! round-angle (default 2 pi)
+    real(kind=KTGT),intent(in),optional :: wnml       ! normalization factor on weights, i.e, wnml == sum(weight) (default: round/2)
     integer,        intent(in),optional :: method
 
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
@@ -1404,7 +1517,7 @@ contains
 
     ierr = ERR_PANIC
     m = choice(LAT_GAUSS_LEGACY, method)
-    sp = span_latitude(span)
+    sp = span_latitude(round)
     wf = choice(ZERO, wnml)
     if (wf.eq.ZERO) wf = sp
 
@@ -1442,7 +1555,7 @@ contains
   end subroutine get_latitude_d
 !!!_  & gauss_latitude - compute gauss latitudes (inherit gauss())
   subroutine gauss_latitude_d &
-       & (ierr, CTHETA,  GW, NLATS, span, wnml, method, &
+       & (ierr, CTHETA,  GW, NLATS, round, wnml, method, &
        &  prec, max_iter)
     use TOUZA_Std,only: KTGT=>KDBL
     use TOUZA_Std,only: choice
@@ -1452,8 +1565,8 @@ contains
     real(kind=KTGT),intent(out)         :: CTHETA(*)
     real(kind=KTGT),intent(out)         :: GW(*)
     integer,        intent(in)          :: NLATS
-    real(kind=KTGT),intent(in),optional :: span       ! physical domain width (default: pi)
-    real(kind=KTGT),intent(in),optional :: wnml       ! normalization factor on weights, i.e, wnml == sum(weight) (default: span)
+    real(kind=KTGT),intent(in),optional :: round      ! round angle
+    real(kind=KTGT),intent(in),optional :: wnml       ! normalization factor on weights, i.e, wnml == sum(weight) (default: round/2)
     integer,        intent(in),optional :: method     ! reserved
     real(kind=KTGT),intent(in),optional :: PREC
     integer,        intent(in),optional :: max_iter
@@ -1474,7 +1587,7 @@ contains
     ierr = 0
 
     m = choice(LAT_GAUSS_LEGACY, method)
-    sp = span_latitude(span)
+    sp = span_latitude(round)
     wf = choice(ZERO, wnml)
     if (wf.eq.ZERO) wf = sp
 
@@ -1599,7 +1712,7 @@ contains
   end subroutine mid_latitude_d
 !!!_  & div_latitude
   subroutine div_latitude_d &
-       & (ierr, lati, div, boundary, lati_c, lati_b, base, method, span)
+       & (ierr, lati, div, boundary, lati_c, lati_b, base, method, round)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
     integer,        intent(out)         :: ierr
@@ -1610,16 +1723,17 @@ contains
     real(kind=KTGT),intent(in)          :: lati_b(0:*)   ! source coordinate (boundary)  x x x
     integer,        intent(in)          :: base          ! source array size
     integer,        intent(in),optional :: method
-    real(kind=KTGT),intent(in),optional :: span          ! domain width
+    real(kind=KTGT),intent(in),optional :: round          ! domain width
 
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
     real(kind=KTGT) :: sp
 
-    if (present(span)) then
-       sp = span_latitude(span)
-    else
-       sp = ZERO
-    endif
+    sp = span_latitude(round)
+    ! if (present(span)) then
+    !    sp = span_latitude(span)
+    ! else
+    !    sp = ZERO
+    ! endif
     call div_coordinate &
          & (ierr, lati, div, boundary, lati_c, lati_b, base, sp, method)
 
@@ -1821,7 +1935,7 @@ contains
     real(kind=KTGT) :: tcf, lt
     real(kind=KTGT) :: tglat, tclat, cc, e2c
     real(kind=KTGT) :: fc, c
-    logical bdeg
+    real(kind=KTGT) :: loro
 
     if (pole.lt.0) then
        cco(icache_psgp_sign) = - ONE
@@ -1868,12 +1982,11 @@ contains
     endif
 
     cco(icache_psgp_tol) = choice(ONE, tol)
-    bdeg = choice(.FALSE., lodeg)
-    if (bdeg) then
-       call psgp_set_step(cco, xs, ys, lonorg, 360.0_KTGT)
-    else
-       call psgp_set_step(cco, xs, ys, lonorg, 0.0_KTGT)
-    endif
+
+    loro = round_choice(round_2pi, loro)
+    if (choice(.FALSE., lodeg)) loro = real(round_degree, KIND=KTGT)
+
+    call psgp_set_step(cco, xs, ys, lonorg, loround=loro)
     ! s = choice(ONE, xs)
     ! if (s.eq.ZERO) s = ONE
     ! cco(icache_psgp_xco)  = a / s
@@ -1884,7 +1997,7 @@ contains
   end subroutine psgp_set_d
 !!!_  & psgp_set_step
   subroutine psgp_set_step_d &
-       & (cco, xs, ys, lonorg, lospan)
+       & (cco, xs, ys, lonorg, loround)
     ! [caution]
     ! xs ys != 1 are special configuration for amida,
     ! which are not fully tested on consistency.
@@ -1893,7 +2006,7 @@ contains
     real(kind=KTGT),intent(inout)       :: cco(*)
     real(kind=KTGT),intent(in),optional :: xs, ys  ! scale for x,y (default == 1)
     real(kind=KTGT),intent(in),optional :: lonorg
-    real(kind=KTGT),intent(in),optional :: lospan
+    real(kind=KTGT),intent(in),optional :: loround
 
     real(kind=KTGT),parameter :: ONE=1.0_KTGT, ZERO=0.0_KTGT
     real(kind=KTGT) :: s, a
@@ -1911,14 +2024,15 @@ contains
     if (present(lonorg)) then
        cco(icache_psgp_olon) = lonorg
     endif
-    if (present(lospan)) then
-       cco(icache_psgp_lospan) = lospan
+    if (present(loround)) then
+       cco(icache_psgp_loround) = round_choice(loround, ZERO)
     endif
   end subroutine psgp_set_step_d
 
 !!!_  & psgp_inquire
   subroutine psgp_inquire_d &
-       & (ierr, cco, tslat, olat, olon, pxlon, lospan, psign, e, f)
+       & (ierr, cco, tslat, olat, olon, pxlon, &
+       &  loround, psign, e, f)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out)          :: ierr
@@ -1927,7 +2041,7 @@ contains
     real(kind=KTGT),intent(out),optional :: olat
     real(kind=KTGT),intent(out),optional :: olon
     real(kind=KTGT),intent(out),optional :: pxlon       ! +x longitude
-    real(kind=KTGT),intent(out),optional :: lospan
+    real(kind=KTGT),intent(out),optional :: loround
     real(kind=KTGT),intent(out),optional :: psign
     real(kind=KTGT),intent(out),optional :: e, f
 
@@ -1941,19 +2055,25 @@ contains
        olon = cco(icache_psgp_olon)
     endif
     if (present(pxlon)) then
-       quad = cco(icache_psgp_lospan)
-       if (quad.eq.0.0_KTGT) then
-          quad = pi_(0.0_KTGT) / 2.0_KTGT
-       else
-          quad = quad / 4.0_KTGT
-       endif
+       quad = round_choice(cco(icache_psgp_loround), mold=quad) / 4.0_KTGT
+       ! if (quad.eq.0.0_KTGT) then
+       !    quad = pi_(0.0_KTGT) / 2.0_KTGT
+       ! else
+       !    quad = quad / 4.0_KTGT
+       ! endif
        ! pxlon = cco(icache_psgp_olon) + quad * cco(icache_psgp_sign)
        pxlon = cco(icache_psgp_olon) + quad
     endif
-    if (present(lospan)) then
-       lospan = cco(icache_psgp_lospan)
-       if (lospan.eq.0.0_KTGT) lospan = pi_(0.0_KTGT) * 2.0_KTGT
+    if (present(loround)) then
+       loround = round_choice(cco(icache_psgp_loround), mold=loround)
+       ! lospan = cco(icache_psgp_lospan)
+       ! if (lospan.eq.0.0_KTGT) lospan = pi_(0.0_KTGT) * 2.0_KTGT
     endif
+    ! if (present(laround)) then
+    !    laround = round_choice(cco(icache_psgp_laround))
+    !    ! lospan = cco(icache_psgp_lospan)
+    !    ! if (lospan.eq.0.0_KTGT) lospan = pi_(0.0_KTGT) * 2.0_KTGT
+    ! endif
     if (present(olat)) then
        olat = cco(icache_psgp_sign)
        olat = olat * (pi_(0.0_KTGT)) / 2.0_KTGT
@@ -2034,13 +2154,13 @@ contains
     real(kind=KTGT),intent(in)  :: lon
     real(kind=KTGT),intent(in)  :: cco(*)
 
-    real(kind=KTGT) :: lonorg, lospan
+    real(kind=KTGT) :: lonorg, loro
     real(kind=KTGT) :: dlo
     lonorg = cco(icache_psgp_olon)
-    lospan = cco(icache_psgp_lospan)
+    loro = cco(icache_psgp_loround)
     dlo = (lon - lonorg) * cco(icache_psgp_sign)
-    clo(icache_psgp_sindlo) = sin_canonical(dlo, lospan)
-    clo(icache_psgp_cosdlo) = cos_canonical(dlo, lospan)
+    clo(icache_psgp_sindlo) = sin_canonical(dlo, loro)
+    clo(icache_psgp_cosdlo) = cos_canonical(dlo, loro)
     ! write(*, *) 'cachelo:', ang2deg(dlo, lospan), sin_canonical(dlo, lospan), cos_canonical(dlo, lospan), lospan
   end subroutine psgp_cachelo_d
 
@@ -2053,12 +2173,12 @@ contains
     real(kind=KTGT),intent(in)  :: rlon    ! relative longitude from +x longitude
     real(kind=KTGT),intent(in)  :: cco(*)
 
-    real(kind=KTGT) :: lospan, rl
+    real(kind=KTGT) :: loro, rl
 
     !  sin(a [+-] pi/2) = [+-] cos a
     !  cos(a [+-] pi/2) = [-+] sin a
 
-    lospan = cco(icache_psgp_lospan)
+    loro = cco(icache_psgp_loround)
 
     ! NP: dlo = + (rlon + pi/2) = +rlon + pi/2
     ! SP: dlo = - (pi/2 - rlon) = +rlon - pi/2
@@ -2069,8 +2189,8 @@ contains
     ! NP: dlo = + (rlon + pi/2) = + rlon + pi/2
     ! SP: dlo = - (rlon + pi/2) = - rlon - pi/2
     rl = rlon * cco(icache_psgp_sign)
-    clo(icache_psgp_sindlo) = + cos_canonical(rl, lospan) * cco(icache_psgp_sign)
-    clo(icache_psgp_cosdlo) = - sin_canonical(rl, lospan) * cco(icache_psgp_sign)
+    clo(icache_psgp_sindlo) = + cos_canonical(rl, loro) * cco(icache_psgp_sign)
+    clo(icache_psgp_cosdlo) = - sin_canonical(rl, loro) * cco(icache_psgp_sign)
 
   end subroutine psgp_cachelo_px_d
 
@@ -2083,11 +2203,11 @@ contains
     real(kind=KTGT),intent(in)  :: slon, clon
     real(kind=KTGT),intent(in)  :: cco(*)
 
-    real(kind=KTGT) :: lonorg, lospan
+    real(kind=KTGT) :: lonorg, loro
     real(kind=KTGT) :: lo0(NTRIG), lo1(NTRIG), dlo(NTRIG)
     lonorg = cco(icache_psgp_olon)
-    lospan = cco(icache_psgp_lospan)
-    _TRIG(lo0) = set_sincos(lonorg, lospan)
+    loro = cco(icache_psgp_loround)
+    _TRIG(lo0) = set_sincos(lonorg, loro)
     _SIN(lo1) = slon
     _COS(lo1) = clon
     _TRIG(dlo) = sub_angle(lo1, lo0)
@@ -2263,13 +2383,13 @@ contains
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
 
-    real(kind=KTGT) :: s, lo, lospan
+    real(kind=KTGT) :: s, lo, loro
     real(kind=KTGT) :: rhonml
     real(kind=KTGT) :: tglat
     real(kind=KTGT),parameter :: ZERO=0.0_KTGT
     real(kind=KTGT) :: xx, yy
 
-    lospan = cco(icache_psgp_lospan)
+    loro = cco(icache_psgp_loround)
     s   = cco(icache_psgp_sign)
     xx = x / cco(icache_psgp_xco)
     yy = y / cco(icache_psgp_yco)
@@ -2286,7 +2406,7 @@ contains
 
        ! lo = s * cco(icache_psgp_olon) + ATAN2(xx * s, - yy * s)
        ! _LONGI(ll) = lo * s
-       lo = rad2ang(s * ATAN2(xx * s, - yy * s), lospan)
+       lo = rad2ang(s * ATAN2(xx * s, - yy * s), loro)
        lo = cco(icache_psgp_olon) + lo
        _LONGI(ll) = lo
     endif
@@ -4702,6 +4822,199 @@ contains
     C2a(0) = C2a(0) * (1.0_KTGT - eps) - eps
   end subroutine gen_ctable_I2a_d
 
+!!!_ + symmetric tripolar coordinate
+!!!_  & stp_set
+  subroutine stp_set_d &
+       & (ierr, csco, latp, lonp, pole, loround, laround)
+    ! [caution]
+    ! xs ys != 1 are special configuration for amida,
+    ! which are not fully tested on consistency.
+    use TOUZA_Std,only: KTGT=>KDBL, choice
+    implicit none
+    integer,        intent(out)         :: ierr
+    real(kind=KTGT),intent(out)         :: csco(*)
+    real(kind=KTGT),intent(in)          :: latp, lonp
+    integer,        intent(in)          :: pole    ! either +1 or -1, target sphere
+    real(kind=KTGT),intent(in),optional :: loround
+    real(kind=KTGT),intent(in),optional :: laround
+
+    real(kind=KTGT),parameter :: ONE=1.0_KTGT, ZERO=0.0_KTGT
+    real(kind=KTGT),parameter :: TWO=2.0_KTGT
+    real(kind=KTGT) :: loro, laro
+
+    real(kind=KTGT) :: ca(NATRI), plo(NTRIG), pla(NTRIG)
+
+    ierr = 0
+
+    loro = round_choice(loround, ZERO)
+    laro = round_choice(laround, ZERO)
+
+    if (abs(pole).ne.1) then
+       ierr = _ERROR(ERR_INVALID_PARAMETER)
+    else
+       csco(icache_stp_solat) = - real(pole, kind=KTGT)  ! negate
+       csco(icache_stp_olat) = - deg2ang(90.0_KTGT, laro) * real(pole, kind=KTGT)
+    endif
+
+    if (ierr.eq.0) then
+       csco(icache_stp_loround) = loro
+       csco(icache_stp_laround) = laro
+       csco(icache_stp_plon) = lonp
+       csco(icache_stp_plat) = latp
+
+       csco(icache_stp_splat) = sin_canonical(latp, laro)
+    endif
+    if (ierr.eq.0) then
+
+       plo(:) = set_sincos(ZERO, loro)
+       pla(:) = set_sincos(latp, laro)
+
+       ca = stp_geogr_zproj(plo, pla, csco)
+
+       csco(icache_stp_wnpr) = ca(JAMP) * ca(JCOS)
+    endif
+
+  end subroutine stp_set_d
+
+!!!_  & stp_fwd() - transform from geographic to w-sphere coordinate
+  PURE &
+  function stp_fwd_tr_d &
+       & (lon, lat, csco) &
+       & result (wg)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lon(NTRIG)   ! geological coordinates
+    real(kind=KTGT),intent(in) :: lat(NTRIG)
+    real(kind=KTGT),intent(in) :: csco(*)
+    real(kind=KTGT) :: wg(NGEOG)
+
+    real(kind=KTGT) :: zacs(NATRI), wacs(NATRI)
+    real(kind=KTGT) :: wlo(NTRIG), wla(NTRIG)
+
+    real(kind=KTGT) :: loro, laro
+
+    zacs = stp_geogr_zproj(lon, lat, csco)
+    wacs = stp_z2wproj_atr(zacs, csco)
+    wlo = stp_wsphere_lon_tr(wacs)
+    wla = stp_wsphere_lat_tr(wacs)
+
+    loro = csco(icache_stp_loround)
+    laro = csco(icache_stp_laround)
+    wg(JLONGI) = rad2ang(phase(wlo), loro)
+    wg(JLATI) = rad2ang(phase(wla), laro)
+  end function stp_fwd_tr_d
+
+!!!_  & is_stp_wsphere() - check if on the w-sphere
+  PURE &
+  logical function is_stp_wsphere_tr_d &
+       & (lat, csco) &
+       & result(b)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lat(NTRIG)  ! geological latitude
+    real(kind=KTGT),intent(in) :: csco(*)
+
+    b = (csco(icache_stp_solat).le.lat(JSIN) .and. lat(JSIN).lt.csco(icache_stp_splat)) &
+         & .or. &
+         & (csco(icache_stp_solat).ge.lat(JSIN) .and. lat(JSIN).gt.csco(icache_stp_splat))
+    b = .not. b
+  end function is_stp_wsphere_tr_d
+
+!!!_  & stp_geogr_zproj() - transform from geographic to z-plane projection
+  PURE &
+  function stp_geogr_zproj_tr_d &
+       & (lon, lat, csco) &
+       & result (zacs)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lon(NTRIG)   ! geological coordinates
+    real(kind=KTGT),intent(in) :: lat(NTRIG)
+    real(kind=KTGT),intent(in) :: csco(*)
+    real(kind=KTGT) :: zacs(NATRI)
+
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT),parameter :: ZERO = 1.0_KTGT
+    zacs(JCOS) = lon(JCOS)
+    zacs(JSIN) = lon(JSIN)
+    zacs(JAMP) = lat(JCOS) / (ONE - lat(JSIN) * csco(icache_stp_solat))
+  end function stp_geogr_zproj_tr_d
+
+!!!_  & stp_z2wproj() - transform from z-plane to w-plane projection
+  PURE &
+  function stp_z2wproj_atr_d &
+       & (zacs, csco) &
+       & result (wacs)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: zacs(NATRI)
+    real(kind=KTGT),intent(in) :: csco(*)
+    real(kind=KTGT) :: wacs(NATRI)
+
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT),parameter :: ZERO = 1.0_KTGT
+    real(kind=KTGT),parameter :: TWO = 2.0_KTGT
+
+    real(kind=KTGT) :: wp
+    real(kind=KTGT) :: wd, wr, wi, wh
+
+    ! zacs(JCOS) = lon(JCOS)
+    ! zacs(JSIN) = lon(JSIN)
+    ! zacs(JAMP) = lat(JCOS) / (ONE + lat(JSIN))
+
+    wp = csco(icache_stp_wnpr)
+
+    wd = - ((zacs(JAMP) ** 2 + wp ** 2) &
+         &  + (TWO * wp * zacs(JAMP) * zacs(JCOS)))
+
+    wr = (zacs(JAMP) + wp) * (zacs(JAMP) - wp)
+    wi = TWO * wp * zacs(JAMP) * zacs(JSIN)
+    wh = HYPOT(wr, wi)
+
+    wacs(JCOS) = wr / wp * SIGN(ONE, wd)
+    wacs(JSIN) = wi / wp * SIGN(ONE, wd)
+    wacs(JAMP) = ABS(wh / wd)
+
+  end function stp_z2wproj_atr_d
+
+!!!_  & stp_wsphere_lat() - transform w-plane projection to latitude (on w sphere)
+  PURE &
+  function stp_wsphere_lat_tr_d &
+       & (wacs) &
+       & result (lat)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: wacs(NATRI)
+    real(kind=KTGT) :: lat(NTRIG)
+
+    real(kind=KTGT),parameter :: TWO = 2.0_KTGT
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+
+    real(kind=KTGT) :: s, c
+
+    c = TWO * wacs(JAMP)
+    s = (ONE + wacs(JAMP)) * (ONE - wacs(JAMP))
+
+    lat(1:NTRIG) = nml_sincos(s, c)
+  end function stp_wsphere_lat_tr_d
+
+!!!_  & stp_wsphere_lon() - transform w-plane projection to longitude (on w sphere)
+  PURE &
+  function stp_wsphere_lon_tr_d &
+       & (wacs) &
+       & result (lon)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: wacs(NATRI)
+    real(kind=KTGT) :: lon(NTRIG)
+
+    real(kind=KTGT) :: s, c
+
+    s = wacs(JSIN)
+    c = wacs(JCOS)
+
+    lon(1:NTRIG) = nml_sincos(s, c)
+  end function stp_wsphere_lon_tr_d
+
 !!!_ + trigonometric function
 !!!_  & phase() - (atan2() wrapper)
   PURE &
@@ -4794,30 +5107,30 @@ contains
     v = modulo(angl, c)
   end function degree_modulo_d
 
-!!!_  & sets_sincos() - set sine and cosine array (span)
+!!!_  & sets_sincos() - set sine and cosine array (with round angle)
   PURE &
-  function sets_sincos_d(angl, span) &
+  function sets_sincos_d(angl, round) &
        & result(sc)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(in) :: angl
-    real(kind=KTGT),intent(in) :: span
+    real(kind=KTGT),intent(in) :: round
     real(kind=KTGT) :: sc(NTRIG)
     real(kind=KTGT) r, a, s, c, q
     integer n
 
-    if (span.eq.0.0_KTGT) then
+    if (round.eq.0.0_KTGT) then
        sc(1:NTRIG) = setr_sincos(angl)
     else
-       q = span / 4.0_KTGT
+       q = round / 4.0_KTGT
        a = ANINT(angl / q)
        r = angl - q * a
        n = modulo(int(a), 4)
-       if (ABS(r).eq.(span / 8.0_KTGT)) then
+       if (ABS(r).eq.(round / 8.0_KTGT)) then
           c = SQRT(2.0_KTGT) / 2.0_KTGT
           s = sign(c, r)
        else
-          r = pi_(angl) * (r / (span / 2.0_KTGT))
+          r = pi_(angl) * (r / (round / 2.0_KTGT))
           s = sin(r)
           c = cos(r)
        endif
@@ -4839,28 +5152,28 @@ contains
   end function sets_sincos_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   PURE &
-  function sets_sincos_q(angl, span) &
+  function sets_sincos_q(angl, round) &
        & result(sc)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
     real(kind=KTGT),intent(in) :: angl
-    real(kind=KTGT),intent(in) :: span
+    real(kind=KTGT),intent(in) :: round
     real(kind=KTGT) :: sc(NTRIG)
     real(kind=KTGT) r, a, s, c, q
     integer n
 
-    if (span.eq.0.0_KTGT) then
+    if (round.eq.0.0_KTGT) then
        sc(1:NTRIG) = setr_sincos(angl)
     else
-       q = span / 4.0_KTGT
+       q = round / 4.0_KTGT
        a = ANINT(angl / q)
        r = angl - q * a
        n = modulo(int(a), 4)
-       if (ABS(r).eq.(span / 8.0_KTGT)) then
+       if (ABS(r).eq.(round / 8.0_KTGT)) then
           c = SQRT(2.0_KTGT) / 2.0_KTGT
           s = sign(c, r)
        else
-          r = pi_(angl) * (r / (span / 2.0_KTGT))
+          r = pi_(angl) * (r / (round / 2.0_KTGT))
           s = sin(r)
           c = cos(r)
        endif
@@ -4981,25 +5294,25 @@ contains
   end function setd_sincos_q
 #endif
 
-!!!_  & sins_canonical() - canonical sine (with span)
+!!!_  & sins_canonical() - canonical sine (with round angle)
   ELEMENTAL &
-  real(kind=KTGT) function sins_canonical_d (angl, span) result(v)
+  real(kind=KTGT) function sins_canonical_d (angl, round) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(in) :: angl
-    real(kind=KTGT),intent(in) :: span
+    real(kind=KTGT),intent(in) :: round
 
     real(kind=KTGT) r, a, q
     integer n
 
-    if (span.eq.0.0_KTGT) then
+    if (round.eq.0.0_KTGT) then
        v = sinr_canonical(angl)
     else
-       q = span / 4.0_KTGT
+       q = round / 4.0_KTGT
        a = ANINT(angl / q)
        r = angl - q * a
        n = modulo(int(a), 4)
-       if (ABS(r).eq.(span / 8.0_KTGT)) then
+       if (ABS(r).eq.(round / 8.0_KTGT)) then
           v = SQRT(2.0_KTGT) / 2.0_KTGT
           select case(n)
           case(0)
@@ -5012,7 +5325,7 @@ contains
              v = - v
           end select
        else
-          r = pi_(angl) * (r / (span / 2.0_KTGT))
+          r = pi_(angl) * (r / (round / 2.0_KTGT))
           select case(n)
           case(0)
              v = + sin(r)
@@ -5026,24 +5339,24 @@ contains
        endif
     endif
   end function sins_canonical_d
-!!!_  & coss_canonical() - canonical cosine (with span)
+!!!_  & coss_canonical() - canonical cosine (with round angle)
   ELEMENTAL &
-  real(kind=KTGT) function coss_canonical_d (angl, span) result(v)
+  real(kind=KTGT) function coss_canonical_d (angl, round) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(in) :: angl
-    real(kind=KTGT),intent(in) :: span
+    real(kind=KTGT),intent(in) :: round
     real(kind=KTGT) r, a, q
     integer n
 
-    if (span.eq.0.0_KTGT) then
+    if (round.eq.0.0_KTGT) then
        v = cosr_canonical(angl)
     else
-       q = span / 4.0_KTGT
+       q = round / 4.0_KTGT
        a = ANINT(angl / q)
        r = angl - q * a
        n = modulo(int(a), 4)
-       if (ABS(r).eq.(span / 8.0_KTGT)) then
+       if (ABS(r).eq.(round / 8.0_KTGT)) then
           v = SQRT(2.0_KTGT) / 2.0_KTGT
           select case(n)
           case(0)
@@ -5056,7 +5369,7 @@ contains
              v = + sign(v, r)
           end select
        else
-          r = pi_(angl) * (r / (span / 2.0_KTGT))
+          r = pi_(angl) * (r / (round / 2.0_KTGT))
           select case(n)
           case(0)
              v = + cos(r)
@@ -5961,24 +6274,62 @@ contains
        enddo
     endif
   end function check_precision_f
-!!!_   . span_longitude() - return default span if not present or zero
-  PURE real(kind=KTGT) function span_longitude_d(span) result(x)
+!!!_   . round_choice() - return default round-angle if not present or zero
+  ELEMENTAL &
+    real(kind=KTGT) function round_choice_d(round, mold) result(x)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
-    real(kind=KTGT),intent(in),optional :: span
-    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
-    x = choice(ZERO, span)
-    if (x.eq.ZERO) x = 2.0_KTGT * pi_(ZERO)
+    real(kind=KTGT),intent(in),optional :: round
+    real(kind=KTGT),intent(in)          :: mold
+    real(kind=KTGT),parameter :: DEF = real(round_2pi, kind=KTGT)
+    x = choice(DEF, round)
+    if (x.eq.DEF) x = 2.0_KTGT * pi_(mold)
+  end function round_choice_d
+  ELEMENTAL &
+    real(kind=KTGT) function round_choice_id(round, mold) result(x)
+    use TOUZA_Std,only: KTGT=>KDBL, choice
+    implicit none
+    integer,        intent(in) :: round
+    real(kind=KTGT),intent(in) :: mold
+    x = round_choice(real(round, kind=KTGT), mold)
+  end function round_choice_id
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  ELEMENTAL &
+    real(kind=KTGT) function round_choice_q(round, mold) result(x)
+    use TOUZA_Std,only: KTGT=>KQPL, choice
+    implicit none
+    real(kind=KTGT),intent(in),optional :: round
+    real(kind=KTGT),intent(in)          :: mold
+    real(kind=KTGT),parameter :: DEF = real(round_2pi, kind=KTGT)
+    x = choice(DEF, round)
+    if (x.eq.DEF) x = 2.0_KTGT * pi_(mold)
+  end function round_choice_q
+  ELEMENTAL &
+    real(kind=KTGT) function round_choice_iq(round, mold) result(x)
+    use TOUZA_Std,only: KTGT=>KQPL, choice
+    implicit none
+    integer,        intent(in) :: round
+    real(kind=KTGT),intent(in) :: mold
+    x = round_choice(real(round, kind=KTGT), mold)
+  end function round_choice_iq
+#endif
+
+!!!_   . span_longitude() - return default span if not present or zero
+  ELEMENTAL &
+    real(kind=KTGT) function span_longitude_d(round) result(x)
+    use TOUZA_Std,only: KTGT=>KDBL, choice
+    implicit none
+    real(kind=KTGT),intent(in),optional :: round
+    x = round_choice(round, mold=0.0_KTGT)
   end function span_longitude_d
 
 !!!_   . span_latitude() - return default span if not present or zero
-  PURE real(kind=KTGT) function span_latitude_d(span) result(x)
+  ELEMENTAL &
+    real(kind=KTGT) function span_latitude_d(round) result(x)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
-    real(kind=KTGT),intent(in),optional :: span
-    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
-    x = choice(ZERO, span)
-    if (x.eq.ZERO) x = pi_(ZERO)
+    real(kind=KTGT),intent(in),optional :: round
+    x = round_choice(round, mold=0.0_KTGT) / 2.0_KTGT
   end function span_latitude_d
 
 !!!_   . pi_()
@@ -6051,9 +6402,10 @@ program test_emu_ugg
   use TOUZA_Std,only: condop, banner
   implicit none
   integer ierr
-  integer nlat(NTRIG)
-  integer nlon(NTRIG)
+  integer nlat(2)
+  integer nlon(2)
   integer stereo,  geod, prec, section, length, cell, dazim, agmp
+  integer stp
   integer hpangle
   integer cano
   integer levv
@@ -6093,6 +6445,7 @@ program test_emu_ugg
   if (ierr.eq.0) call get_option(ierr, dazim, 'dazim', 0)
   if (ierr.eq.0) call get_option(ierr, agmp, 'agmp', 0)
   if (ierr.eq.0) call get_option(ierr, hpangle, 'hpa', 0)
+  if (ierr.eq.0) call get_option(ierr, stp, 'stp', 0)
 
   if (ierr.eq.0) then
      if (prec.gt.0) call test_ugg_prec(ierr)
@@ -6146,6 +6499,10 @@ program test_emu_ugg
 
   if (ierr.eq.0) then
      if (hpangle.gt.0) call batch_test_hpangle(ierr)
+  endif
+
+  if (ierr.eq.0) then
+     if (stp.gt.0) call batch_test_stp(ierr, stp)
   endif
 
   call finalize(ierr)
@@ -6249,18 +6606,18 @@ contains
     integer,intent(out) :: ierr
     integer,intent(in)  :: nlat
     integer,intent(in)  :: mdiv
-    real(kind=KTGT) :: glat(nlat),  wlat(nlat)
-    real(kind=KTGT) :: glat2(nlat), wlat2(nlat)
-    real(kind=KTGT) :: glatm(nlat+1)
+    real(kind=KTGT) :: glat(0:nlat-1),  wlat(0:nlat-1)
+    real(kind=KTGT) :: glat2(0:nlat-1), wlat2(0:nlat-1)
+    real(kind=KTGT) :: glatm(0:nlat)
 
-    real(kind=KTGT) :: ylatc(nlat*mdiv)
-    real(kind=KTGT) :: ylatb(nlat*mdiv+1)
+    real(kind=KTGT) :: ylatc(0:nlat*mdiv-1)
+    real(kind=KTGT) :: ylatb(0:nlat*mdiv)
 
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
     real(kind=KTGT),parameter :: ONE =  1.0_KTGT
     real(kind=KTGT),parameter :: HALF = 0.5_KTGT
 
-    real(kind=KTGT) :: span = ZERO
+    real(kind=KTGT) :: round = ZERO
     real(kind=KTGT) :: wnml = ONE
     integer deq
 
@@ -6269,26 +6626,26 @@ contains
 
     ierr = 0
 
-    if (ierr.eq.0) call get_option(ierr, span,    'ly', ZERO)
+    if (ierr.eq.0) call get_option(ierr, round,   'ly', ZERO)
     if (ierr.eq.0) call get_option(ierr, wnml,    'wy', ONE)
     if (ierr.eq.0) call get_option(ierr, method,  'my', LAT_GAUSS_LEGACY)
 
-    if (ierr.eq.0) call get_latitude(ierr, glat,  wlat, nlat, span=span, wnml=wnml, method=method)
+    if (ierr.eq.0) call get_latitude(ierr, glat,  wlat, nlat, round=round, wnml=wnml, method=method)
     if (ierr.eq.0) call mid_latitude(ierr, glatm, wlat, nlat)
 
-    if (ierr.eq.0) call gauss_latitude(ierr, glat2, wlat2, nlat, span, wnml, prec=-1.0_KTGT)
+    if (ierr.eq.0) call gauss_latitude(ierr, glat2, wlat2, nlat, round, wnml, prec=-1.0_KTGT)
     if (ierr.eq.0) glat2(1:nlat) = asin(glat2(1:nlat))
 
 201 format('lat:', I0, 1x, F9.3, 1x, 2E10.3, 2x, 2E10.3, 1x, L1, 1x, E10.3, 1x, 2E10.3)
 202 format('latm:', I0, 1x, F9.3, 1x, E16.8)
     if (ierr.eq.0) then
-       do j = 1, nlat
+       do j = 0, nlat - 1
           write(*, 201) j, glat(j) * 180.0_KTGT / PI, &
                & glat(j), wlat(j), glat2(j), wlat2(j), &
                & glat(j).eq.glat2(j), glat(j)-glat2(j), &
                & sin(glat(j)), wlat(j) * 2.0_KTGT
        enddo
-       do j = 1, nlat + 1
+       do j = 0, nlat
           write(*, 202) j, glatm(j) * 180.0_KTGT / PI, glatm(j)
        enddo
     endif
@@ -6305,15 +6662,15 @@ contains
           endif
        else
           if (ierr.eq.0)then
-             call div_latitude(ierr, ylatc, mdiv, .FALSE., glat, glatm, nlat, span=span, method=method)
+             call div_latitude(ierr, ylatc, mdiv, .FALSE., glat, glatm, nlat, round=round, method=method)
           endif
           if (ierr.eq.0)then
-             call div_latitude(ierr, ylatb, mdiv, .TRUE., glat, glatm, nlat, span=span, method=method)
+             call div_latitude(ierr, ylatb, mdiv, .TRUE., glat, glatm, nlat, round=round, method=method)
           endif
        endif
        if (ierr.eq.0) then
 203 format('laty:', I0, 1x, F9.3, 1x, F9.3)
-          do j = 1, nlat * mdiv
+          do j = 0, nlat * mdiv - 1
              write(*, 203) j, rad2deg(ylatc(j)), rad2deg(ylatb(j))
           enddo
        endif
@@ -6341,25 +6698,37 @@ contains
     integer bsw
     integer :: method, deq
 
-    real(kind=KTGT) :: span = ZERO
+    real(kind=KTGT) :: round = ZERO
     real(kind=KTGT) :: wnml = ONE
+    integer j
     integer ny
 
     ierr = 0
 
-    if (ierr.eq.0) call get_option(ierr, span,    'lx', ZERO)
+    if (ierr.eq.0) call get_option(ierr, round,   'lx', ZERO)
     if (ierr.eq.0) call get_option(ierr, wnml,    'wx', ONE)
     if (ierr.eq.0) call get_option(ierr, bsw,     'bx', 0)    ! boundary (mid_longitude) switch
     if (ierr.eq.0) call get_option(ierr, method,  'mx', DIV_EACH_EDGE)
     if (ierr.eq.0) call get_option(ierr, deq,     'ex', 0)
 
-    if (ierr.eq.0) call get_longitude(ierr, glonc, wlonc, nlon,             span=span, wnml=wnml)
+    if (ierr.eq.0) call get_longitude(ierr, glonc, wlonc, nlon, round=round, wnml=wnml)
     if (ierr.eq.0) then
        if (bsw.eq.0) then
-          if (ierr.eq.0) call get_longitude(ierr, glonb, wlonb, nlon+1, div=nlon, span=span, wnml=wnml, org=-HALF)
+          if (ierr.eq.0) call get_longitude(ierr, glonb, wlonb, nlon+1, div=nlon, round=round, wnml=wnml, org=-HALF)
        else
-          if (ierr.eq.0) call mid_longitude(ierr, glonb, glonc, wlonc, nlon, span / wnml)
+          if (ierr.eq.0) call mid_longitude(ierr, glonb, glonc, wlonc, nlon, round / wnml)
        endif
+    endif
+
+101 format('lon:',  I0, 1x, F9.3, 1x, 2E10.3)
+102 format('lonm:', I0, 1x, F9.3, 1x, E16.8)
+    if (ierr.eq.0) then
+       do j = 0, nlon - 1
+          write(*, 101) j, ang2deg(glonc(j), round),  glonc(j), wlonc(j)
+       enddo
+       do j = 0, nlon
+          write(*, 102) j, ang2deg(glonb(j), round), glonb(j)
+       enddo
     endif
 
     if (ierr.eq.0) then
@@ -6377,10 +6746,10 @@ contains
           endif
        else
           if (ierr.eq.0)then
-             call div_longitude(ierr, ylonc, mdiv, .FALSE., glonc, glonb, nlon, span=span, method=method)
+             call div_longitude(ierr, ylonc, mdiv, .FALSE., glonc, glonb, nlon, round=round, method=method)
           endif
           if (ierr.eq.0)then
-             call div_longitude(ierr, ylonb, mdiv, .TRUE.,  glonc, glonb, nlon, span=span, method=method)
+             call div_longitude(ierr, ylonb, mdiv, .TRUE.,  glonc, glonb, nlon, round=round, method=method)
           endif
        endif
        ny = nlon * mdiv
@@ -6401,14 +6770,14 @@ contains
        endif
        write(*, 201) 'c', maxval(x(0:nlon-1)) - minval(x(0:nlon-1))
     endif
-    if (ierr.eq.0) call check_longitude(ierr, glonc, nlon,             span=span, tag='lonc')
-    if (ierr.eq.0) call check_longitude(ierr, glonb, nlon+1, div=nlon, span=span, tag='lonb')
+    if (ierr.eq.0) call check_longitude(ierr, glonc, nlon,             round=round, tag='lonc')
+    if (ierr.eq.0) call check_longitude(ierr, glonb, nlon+1, div=nlon, round=round, tag='lonb')
     if (mdiv.gt.0) then
        if (ierr.eq.0) then
-          call check_div_longitude(ierr, ylonc, mdiv, .FALSE., glonc, glonb, nlon, span=span, tag='ylonc')
+          call check_div_longitude(ierr, ylonc, mdiv, .FALSE., glonc, glonb, nlon, round=round, tag='ylonc')
        endif
        if (ierr.eq.0) then
-          call check_div_longitude(ierr, ylonb, mdiv, .TRUE.,  glonc, glonb, nlon, span=span, tag='ylonb')
+          call check_div_longitude(ierr, ylonb, mdiv, .TRUE.,  glonc, glonb, nlon, round=round, tag='ylonb')
        endif
     endif
 
@@ -8169,6 +8538,82 @@ contains
     write(*, 102) 'nhp', scdnh, (scdnh-scd)/scd, (scdnh-scd)
 
   end subroutine test_hpangle
+
+  subroutine batch_test_stp(ierr, stp)
+    use TOUZA_Std,only: get_nparam, get_param
+    implicit none
+    integer,parameter :: KTGT=KDBL
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: stp
+    real(kind=KTGT) :: plon, plat, olat
+    real(kind=KTGT) :: dlo,  dla
+    real(kind=KTGT) :: targ(NGEOG)
+    real(kind=KTGT),parameter :: CSPAN = 360.0_KTGT
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
+    real(kind=KTGT),parameter :: def = -HUGE(ZERO)
+
+    real(kind=KTGT) :: lonp
+    real(kind=KTGT) :: latd, lond
+    real(kind=KTGT) :: lattr(NTRIG), lontr(NTRIG)
+
+    real(kind=KTGT) :: csco(ncache_stp_co)
+    real(kind=KTGT) :: wg(NGEOG)
+
+    integer pole
+    integer narg, jarg
+    integer j
+    integer nla, nlo, jla, jlo
+
+    ierr = 0
+    narg = get_nparam()
+    if (ierr.eq.0) call get_option(ierr, olat, 'op', def)
+    if (ierr.eq.0) then
+       if (olat.eq.def) olat = -90.0_KTGT
+    endif
+    if (ierr.eq.0) call get_option(ierr, targ(1:NGEOG), 'wp', def)
+    if (ierr.eq.0) then
+       plat = targ(JLATI)
+       plon = targ(JLONGI)
+       if (plat.eq.def) plat = 62.7328244743782_KTGT
+       if (plon.eq.def) plon = 60.0_KTGT
+       plat = - SIGN(plat, olat)
+    endif
+    if (ierr.eq.0) call get_option(ierr, dlo, 'dlo', ZERO)
+    if (ierr.eq.0) call get_option(ierr, dla, 'dla', ZERO)
+    if (ierr.eq.0) then
+       if (dlo.eq.ZERO) dlo = 5.0_KTGT
+       if (dla.eq.ZERO) dla = 5.0_KTGT
+       dla = SIGN(dla, olat)
+    endif
+    write(*, *) olat, plon, plat, dlo, dla
+    if (ierr.eq.0) then
+       if (olat.le.0) then
+          pole = +1
+       else
+          pole = -1
+       endif
+       call stp_set(ierr, csco, plat, plon, pole, loround=CSPAN, laround=CSPAN)
+       write(*, *) 'CSCO = ', csco
+    endif
+
+    if (ierr.eq.0) then
+       nla = FLOOR(ABS((-olat - plat) / dla))
+       nlo = FLOOR(CSPAN / dlo)
+       do jla = 0, nla
+          latd = - olat + DLA * real(jla, kind=KTGT)
+          lattr(:) = setd_sincos(latd)
+          do jlo = 0, nlo
+             lond = DLO * real(jlo, kind=KTGT)
+             lonp = modulo(lond + plon, CSPAN)
+             lontr(:) = setd_sincos(lond)
+             wg(:) = stp_fwd_tr(lontr, lattr, csco)
+             write(*, *) 'ZW:', lonp, latd, wg(JLONGI), wg(JLATI)
+          enddo
+       enddo
+    endif
+
+    return
+  end subroutine batch_test_stp
 
 end program test_emu_ugg
 

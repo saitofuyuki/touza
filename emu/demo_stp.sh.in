@@ -1,0 +1,76 @@
+#!/usr/bin/zsh -f
+# Time-stamp: <2024/07/04 17:33:36 fuyuki demo_stp.sh.in>
+
+exe=./test_emu_ugg
+
+main ()
+{
+  local dlo= dla=
+  local pp= ola=
+  local J= R=
+
+  while [[ $# -gt 0 ]]
+  do
+    case $1 in
+    (-dlo) dlo=$2; shift;;
+    (-dla) dla=$2; shift;;
+    (-ola) ola=$2; shift;;
+    (-p)   pp=$2; shift;;
+    (-J*)  J=$1;;
+    (-R*)  R=$1;;
+    (*) break;;
+    esac
+    shift
+  done
+
+  ops=$1
+  [[ -z $ops ]] && ops=demo_stp.pdf
+
+  local opts=()
+  [[ -z $dlo ]] && dlo=5
+  [[ -z $dla ]] && dla=5
+
+  [[ -n $dlo ]] && opts+=(dlo=$dlo)
+  [[ -n $dla ]] && opts+=(dla=$dla)
+  [[ -n $ola ]] && opts+=(op=$ola)
+  [[ -n $pp  ]] && opts+=(wp=$pp)
+
+  [[ ! -x $exe ]] && print -u2 - "cannot execute $exe" && return 1
+
+  local tmpd=$(mktemp -d)
+
+  local log=$tmpd/log
+
+  $exe stp=1 $opts > $log || return $?
+
+  local wlon=$tmpd/wlon
+  local wlat=$tmpd/wlat
+
+  sed -ne '/^ *ZW: */s///p' $log | gmt xyz2grd -G$wlat -Rd -I$dlo/$dla -i0,1,3
+  sed -ne '/^ *ZW: */s///p' $log | gmt xyz2grd -G$wlon -Rd -I$dlo/$dla -i0,1,2
+
+  # local JR=(-R0/360/$PLAT/90 -JS$PLON/90/20c)
+  # local JR=(-Rg -JA$PLON/50/20c)
+  [[ -z $J ]] && J=-JG0/50/20c
+  if [[ -z $R ]]; then
+    case $J in
+    (-JG*) R=-Rg;;
+    (-JS*) R=-R0/360/50/90;;
+    (*) R=-Rg;;
+    esac
+  fi
+  local JR=($R $J)
+
+  gmt begin $ops:r
+    gmt basemap $JR -Bafg -BWSne
+    gmt coast -Ggray
+    gmt grdcontour $wlat -C5 -A10+f15p+d -Wa2p,red  -Wc1p,red
+    gmt grdcontour $wlon -C5 -A20+f15p+d -Wa2p,blue -Wc1p,blue
+  gmt end
+
+  rm -rf $tmpd
+}
+
+
+main "$@"; err=$?
+exit $err
