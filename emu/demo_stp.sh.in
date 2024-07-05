@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2024/07/04 17:33:36 fuyuki demo_stp.sh.in>
+# Time-stamp: <2024/07/13 15:16:14 fuyuki demo_stp.sh.in>
 
 exe=./test_emu_ugg
 
@@ -7,7 +7,7 @@ main ()
 {
   local dlo= dla=
   local pp= ola=
-  local J= R=
+  local J= R= C=
 
   while [[ $# -gt 0 ]]
   do
@@ -18,6 +18,7 @@ main ()
     (-p)   pp=$2; shift;;
     (-J*)  J=$1;;
     (-R*)  R=$1;;
+    (-C*)  C=$1;;
     (*) break;;
     esac
     shift
@@ -27,8 +28,8 @@ main ()
   [[ -z $ops ]] && ops=demo_stp.pdf
 
   local opts=()
-  [[ -z $dlo ]] && dlo=5
-  [[ -z $dla ]] && dla=5
+  [[ -z $dlo ]] && dlo=2
+  [[ -z $dla ]] && dla=2
 
   [[ -n $dlo ]] && opts+=(dlo=$dlo)
   [[ -n $dla ]] && opts+=(dla=$dla)
@@ -60,12 +61,13 @@ main ()
     esac
   fi
   local JR=($R $J)
+  [[ -z $C ]] && C=-C5
 
   gmt begin $ops:r
-    gmt basemap $JR -Bafg -BWSne
+    gmt basemap $JR -Bafg -BWSNE
     gmt coast -Ggray
-    gmt grdcontour $wlat -C5 -A10+f15p+d -Wa2p,red  -Wc1p,red
-    gmt grdcontour $wlon -C5 -A20+f15p+d -Wa2p,blue -Wc1p,blue
+    gmt grdcontour $wlat $C -A10+f15p+d -Wa2p,red  -Wc1p,red
+    gmt grdcontour $wlon $C -A20+f15p+d -Wa2p,blue -Wc1p,blue
   gmt end
 
   rm -rf $tmpd
