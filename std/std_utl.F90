@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2024/05/15 16:34:42 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/14 21:22:04 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2024
@@ -30,7 +30,7 @@
 #define _CONDREP_DECL _ELEMENTAL
 !!!_@ TOUZA_Std_utl - small utilities
 module TOUZA_Std_utl
-  use TOUZA_Std_prc, only: KFLT, KDBL, KI64
+  use TOUZA_Std_prc, only: KFLT, KDBL, KI64, KQPL
 # define __MDL__ 'utl'
 # define __TAG__ STD_FORMAT_MDL('utl')
 # define _ERROR(E) (E - ERR_MASK_STD_UTL)
@@ -49,6 +49,11 @@ module TOUZA_Std_utl
      module procedure choice_i,  choice_l,  choice_b,  choice_f,  choice_d
      module procedure choice_ia, choice_la, choice_ba, choice_fa, choice_da
   end interface choice
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  interface choice
+     module procedure choice_q,  choice_qa
+  end interface choice
+#endif
 
   interface set_if_present
      module procedure set_if_present_i, set_if_present_l
@@ -380,6 +385,20 @@ contains
     endif
     return
   end function choice_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  _CHOICE_DECL real(kind=KTGT) function choice_q(d, a) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in)          :: d
+    real(kind=KTGT),intent(in),optional :: a
+    if (present(a)) then
+       r = a
+    else
+       r = d
+    endif
+    return
+  end function choice_q
+#endif
 
   function choice_ia(d, a) result(r)
     implicit none
@@ -458,6 +477,23 @@ contains
     endif
     return
   end function choice_da
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  function choice_qa(d, a) result(r)
+    use TOUZA_Std_prc,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(in)           :: d(:)
+    real(kind=KTGT),intent(in),optional  :: a(:)
+    real(kind=KTGT),dimension(size(d,1)) :: r
+    integer n
+    if (present(a)) then
+       n = min(size(d,1), size(a, 1))
+       r(:n) = a(:n)
+    else
+       r(:) = d(:)
+    endif
+    return
+  end function choice_qa
+#endif
 
 !!!_  & choice_a - work around for choice() string
   subroutine choice_a &
