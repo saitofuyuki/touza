@@ -1,31 +1,34 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2024/06/20 15:47:25 fuyuki NEWS>
+# Time-stamp: <2024/07/24 16:02:44 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
+* Changes in 1.12.3.1 from 1.12.3
+** TOUZA/Zbt temporal fragile release
+
 * Changes in 1.12.3 from 1.12.1
-*** Alpha release of remapping procedures
-    - Emu/ugg, procedures related geodesics
-    - Emu/ugg, procedures related polar stereographic projections
-    - Ami, friendly coupler framework
-      - MIROC legacy R[AO]file
-      - geographic/polar-stereographic remapping
-    - A new NIO-format PTx.
-    - Cached-Nio interface improvement for Jmz.
-    - Jmz/ConvOy implemented (to be renamed from qoxi later)
-*** Bug fixes
-    - [SEVERE] Fix POP/GO/STOP processing.
-    - [SEVERE] successive tagged POP enabled.
-    - [SEVERE] trim long fmt string to store in header.
-    - [SEVERE] hungry-mode failed occasionally.
-    - [CRITICAL] header is not updated during group reading.
-    - [FATAL] wrong operation with lazy min max.
-    - [FATAL] zero-size final suspending special.
-    - [FATAL] initial zero-size subrecord raise an error.
-    - many bug fixes.
+** Alpha release of remapping procedures
+   - Emu/ugg, procedures related geodesics
+   - Emu/ugg, procedures related polar stereographic projections
+   - Ami, friendly coupler framework
+     - MIROC legacy R[AO]file
+     - geographic/polar-stereographic remapping
+   - A new NIO-format PTx.
+   - Cached-Nio interface improvement for Jmz.
+   - Jmz/ConvOy implemented (to be renamed from qoxi later)
+** Bug fixes
+   - [SEVERE] Fix POP/GO/STOP processing.
+   - [SEVERE] successive tagged POP enabled.
+   - [SEVERE] trim long fmt string to store in header.
+   - [SEVERE] hungry-mode failed occasionally.
+   - [CRITICAL] header is not updated during group reading.
+   - [FATAL] wrong operation with lazy min max.
+   - [FATAL] zero-size final suspending special.
+   - [FATAL] initial zero-size subrecord raise an error.
+   - many bug fixes.
 
 * Changes in 1.12.1 from 1.12
 ** Bug fixes

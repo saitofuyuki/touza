@@ -1,0 +1,11 @@
+#+title: TOUZA/Zbt guide
+#+author: SAITO Fuyuki
+#+date: <2024-07-249>
+#+email: saitofuyuki AT jamstec DOT go DOT jp
+
+* Introduction
+* Installation
+* Copyright and license
+Copyright 2024 Japan Agency for Marine-Earth Science and Technology
+Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)

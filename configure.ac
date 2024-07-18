@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/02/25 22:42:39 fuyuki configure.ac>
+# Time-stamp: <2024/07/24 15:42:03 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -128,7 +128,8 @@ dnl MT_SUB_PACKAGE([div], [[$]enable_sub_div_default],     [std])
 AM_CONDITIONAL([BUILD_div], [false])
 dnl MT_SUB_PACKAGE([nio], [],     [std emu trp div])
 MT_SUB_PACKAGE([nio], [],     [std emu trp])
-MT_SUB_PACKAGE([ami], [],     [std nio trp])
+MT_SUB_PACKAGE([ami], [],     [std emu nio trp])
+MT_SUB_PACKAGE([zbt], [],     [std nio])
 
 AC_ARG_ENABLE([nctcdf],
 [AS_HELP_STRING([--enable-nctcdf], [enable nio/n*c*tcdf features@<:@default=no@:>@])],
