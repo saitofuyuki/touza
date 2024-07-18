@@ -5,6 +5,7 @@
 .deps
 .libs
 .modfiles
+__pycache__
 Makedep.inc.old
 Makefile
 Makefile.in
@@ -111,3 +112,7 @@ stamp-h1
 /trp/test_trapiche_pack_uip
 /log.agmp-*
 /log.ggf-*
+/zbt/TOUZA_Zbt.egg-info/
+/zbt/build/
+/zbt/dist/
+/zbt/zbt/param.py
