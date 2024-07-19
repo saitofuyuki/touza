@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2024/04/05 18:02:46 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/23 16:30:09 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023,2024
@@ -74,8 +74,6 @@ module TOUZA_Nio_cache
      character(len=litem) :: item = ' '
      character(len=litem) :: unit = ' '
      character(len=litem) :: dfmt = ' '
-     integer              :: jbgn(0:lcoor-1) = 0
-     integer              :: jend(0:lcoor-1) = 0
      integer              :: neff
      integer              :: xh(0:lcoor-1)   = -1  ! coordinate handle
      integer              :: ceff(0:lcoor-1) = -1  ! effective coordinate index
@@ -92,9 +90,12 @@ module TOUZA_Nio_cache
      character(len=litem) :: h(nitem)       ! header
      character(len=litem),pointer :: d(:) => NULL()    ! date [rec]
      character(len=litem),pointer :: t(:) => NULL()    ! time [rec]
+     integer,             pointer :: xh(:) => NULL()   ! coordinate handle
      ! temporal properties, to integrated into cache_t
      type(var_t),pointer :: v(:) => NULL()
      character(len=litem),pointer :: x(:) => NULL()    ! coordinates
+     integer,             pointer :: jbgn(:) => NULL() ! coordinate ranges
+     integer,             pointer :: jend(:) => NULL()
      integer(kind=KIOFS),pointer  :: rpos(:, :) => NULL() ! record offset [rec, var]
      integer(kind=KIOFS),pointer  :: rlen(:, :) => NULL() ! record size   [rec, var]
   end type group_t
@@ -106,6 +107,8 @@ module TOUZA_Nio_cache
      type(var_t),pointer   :: v(:)
      integer,pointer       :: o(:)   ! group-variable offset
      character(len=litem),pointer :: x(:) => NULL()    ! coordinates
+     integer,             pointer :: jbgn(:) => NULL() ! coordinate ranges
+     integer,             pointer :: jend(:) => NULL()
      integer(kind=KIOFS),pointer  :: rpos(:) => NULL() ! record offset [var+rec]
      integer(kind=KIOFS),pointer  :: dpos(:) => NULL() ! data-part offset [var+rec]
      integer(kind=KIOFS),pointer  :: rlen(:) => NULL() ! record size   [var+rec]
@@ -145,6 +148,13 @@ module TOUZA_Nio_cache
      module procedure cache_geti_attr_d, cache_getn_attr_d
   end interface cache_get_attr
 
+  interface cache_rec_time
+     module procedure cache_rec_time_a
+  end interface cache_rec_time
+  interface cache_rec_date
+     module procedure cache_rec_date_a
+  end interface cache_rec_date
+
   interface cache_var_read
      module procedure cache_var_read_i, cache_var_read_f, cache_var_read_d
   end interface cache_var_read
@@ -178,10 +188,13 @@ module TOUZA_Nio_cache
   public cache_open_read,  cache_close
   public cache_unit
   public cache_group_size, cache_group,  cache_group_name, cache_group_recs
+  public cache_group_cserial
+  public cache_group_coors,cache_group_coor_name, cache_group_coor_range
   public cache_var_size,   cache_var_id, cache_var_name,   cache_co_size
+  public cache_co_serial
   public cache_co_all,     cache_co_idx, cache_co_name,    cache_co_len
   public cache_co_range,   cache_var_len
-  public cache_time_rec
+  public cache_time_rec,   cache_rec_date, cache_rec_time
 
   public cache_store_v0
   public cache_var_read
@@ -533,6 +546,92 @@ contains
     endif
   end function cache_group_recs
 
+!!!_  & cache_group_coors() - return number of coordinates in a group or total
+  integer function cache_group_coors(handle) result(n)
+    use TOUZA_Nio_std,only: choice
+    implicit none
+    integer,intent(in) :: handle
+    integer jc
+    integer gid
+
+    jc = is_valid(handle)
+    n = min(0, jc)
+    if (n.lt.0) return
+
+    gid = extr_h2group(handle)
+    if (gid.eq.grp_suite) then
+       n = ctables(jc)%ncoor
+    else
+       n = ctables(jc)%g(gid)%ncoor
+    endif
+  end function cache_group_coors
+
+!!!_  & cache_group_cserial()
+  integer function cache_group_cserial(handle, cid) result(xh)
+    implicit none
+    integer,intent(in) :: handle
+    integer,intent(in) :: cid
+    integer jc, gid
+    jc = is_valid(handle)
+    xh = min(0, jc)
+    if (xh.eq.0) then
+       gid = extr_h2group(handle)
+       if (gid.eq.grp_suite) then
+          xh = cid
+       else
+          if (cid.lt.0.or.cid.ge.ctables(jc)%g(gid)%ncoor) then
+             xh = _ERROR(ERR_OUT_OF_RANGE)
+          else
+             xh = ctables(jc)%g(gid)%xh(cid)
+          endif
+       endif
+       if (xh.lt.0.or.xh.ge.ctables(jc)%ncoor) then
+          xh = _ERROR(ERR_OUT_OF_RANGE)
+       endif
+    endif
+  end function cache_group_cserial
+
+!!!_  - cache_group_coor_name - return coordinate name
+  subroutine cache_group_coor_name(ierr, name, handle, cid)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: name
+    integer,         intent(in)  :: handle
+    integer,         intent(in)  :: cid
+    integer jc, xh
+    ierr = 0
+    xh = cache_group_cserial(handle, cid)
+    ierr = min(0, xh)
+    if (ierr.eq.0) then
+       jc = is_valid(handle)
+       name = ctables(jc)%x(xh)
+    else
+       name = ' '
+    endif
+  end subroutine cache_group_coor_name
+
+!!!_  - cache_group_coor_range - return coordinate range
+  subroutine cache_group_coor_range(ierr, jbgn, jend, handle, cid)
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: jbgn, jend
+    integer,         intent(in)  :: handle
+    integer,         intent(in)  :: cid
+    integer jc, xh
+
+    ierr = 0
+    xh = cache_group_cserial(handle, cid)
+    ierr = min(0, xh)
+    if (ierr.eq.0) then
+       jc = is_valid(handle)
+       jbgn = ctables(jc)%jbgn(xh)
+       jend = ctables(jc)%jend(xh)
+    else
+       jbgn = -1
+       jend = -2
+    endif
+  end subroutine cache_group_coor_range
+
 !!!_  & cache_var_size() - return number of variables in a group or total
   integer function cache_var_size(handle) result(n)
     use TOUZA_Nio_std,only: choice
@@ -618,7 +717,7 @@ contains
     implicit none
     integer,intent(in) :: handle
     integer,intent(in) :: vid
-    integer jc, vser, jx
+    integer jc, vser, jx, xh
     integer jerr
 
     vser = get_vserial(handle, vid)
@@ -627,12 +726,69 @@ contains
        jc = extr_h2index(handle)
        n = 1
        do jx = 0, ctables(jc)%v(vser)%neff - 1
-          n = n * (ctables(jc)%v(vser)%jend(jx) - ctables(jc)%v(vser)%jbgn(jx))
+          xh = ctables(jc)%v(vser)%xh(jx)
+          n = n * (ctables(jc)%jend(xh) - ctables(jc)%jbgn(xh))
        enddo
     else
        n = jerr
     endif
   end function cache_var_len
+
+!!!_  - cache_rec_time - return time string
+  subroutine cache_rec_time_a &
+       & (ierr, val, handle, vid, rec)
+    use TOUZA_Nio_std,only: choice
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: val
+    integer,         intent(in)  :: handle
+    integer,optional,intent(in)  :: vid
+    integer,         intent(in)  :: rec
+
+    integer jc, rser, gser
+
+    gser = -1
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       gser = get_gserial(handle, vid)
+       ierr = min(0, gser)
+    endif
+    if (ierr.eq.0) then
+       if (rec.ge.0.and.rec.lt.ctables(jc)%g(gser)%nrec) then
+          val = ctables(jc)%g(gser)%t(rec)
+       else
+          ierr = _ERROR(ERR_OUT_OF_RANGE)
+       endif
+    endif
+  end subroutine cache_rec_time_a
+
+!!!_  - cache_rec_date - return date string
+  subroutine cache_rec_date_a &
+       & (ierr, val, handle, vid, rec)
+    use TOUZA_Nio_std,only: choice
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: val
+    integer,         intent(in)  :: handle
+    integer,optional,intent(in)  :: vid
+    integer,         intent(in)  :: rec
+
+    integer jc, rser, gser
+
+    gser = -1
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (ierr.eq.0) then
+       gser = get_gserial(handle, vid)
+       ierr = min(0, gser)
+    endif
+    if (ierr.eq.0) then
+       if (rec.ge.0.and.rec.lt.ctables(jc)%g(gser)%nrec) then
+          val = ctables(jc)%g(gser)%d(rec)
+       else
+          ierr = _ERROR(ERR_OUT_OF_RANGE)
+       endif
+    endif
+  end subroutine cache_rec_date_a
 
 !!!_  - cache_time_rec - return record id filtered by time range
   integer function cache_time_rec_d &
@@ -696,8 +852,8 @@ contains
     endif
   end function cache_co_size
 
-!!!_  - cache_co_len - return coordinate length
-  integer function cache_co_len(handle, vid, cid) result(nerr)
+!!!_  - cache_co_serial - return coordinate serial id
+  integer function cache_co_serial(handle, vid, cid) result(xh)
     implicit none
     integer,intent(in)  :: handle
     integer,intent(in)  :: vid
@@ -706,19 +862,34 @@ contains
     type(var_t),pointer :: v
 
     vser = get_vserial(handle, vid)
-    nerr = min(0, vser)
+    xh = min(0, vser)
     v => NULL()
-    if (nerr.eq.0) then
+    if (xh.eq.0) then
        jc = extr_h2index(handle)
        v => ctables(jc)%v(vser)
-       if (cid.lt.0.or.cid.ge.v%neff) nerr = _ERROR(ERR_INVALID_ITEM)
+       if (cid.lt.0.or.cid.ge.v%neff) xh = _ERROR(ERR_INVALID_ITEM)
     endif
-    if (nerr.eq.0) then
+    if (xh.eq.0) then
        jeff = v%ceff(cid)
-       if (jeff.lt.0) nerr = _ERROR(ERR_PANIC)
+       if (jeff.lt.0) xh = _ERROR(ERR_PANIC)
     endif
+    if (xh.eq.0) xh = v%xh(jeff)
+
+  end function cache_co_serial
+
+!!!_  - cache_co_len - return coordinate length
+  integer function cache_co_len(handle, vid, cid) result(nerr)
+    implicit none
+    integer,intent(in)  :: handle
+    integer,intent(in)  :: vid
+    integer,intent(in)  :: cid
+    integer jc, xh
+
+    xh = cache_co_serial(handle, vid, cid)
+    nerr = min(0, xh)
     if (nerr.eq.0) then
-       nerr = max(0, v%jend(jeff) - v%jbgn(jeff))
+       jc = extr_h2index(handle)
+       nerr = max(0, ctables(jc)%jend(xh) - ctables(jc)%jbgn(xh))
     endif
   end function cache_co_len
 
@@ -730,24 +901,14 @@ contains
     integer,intent(in)  :: handle
     integer,intent(in)  :: vid
     integer,intent(in)  :: cid
-    integer jc, jeff, vser
-    type(var_t),pointer :: v
+    integer jc, xh
 
-    vser = get_vserial(handle, vid)
-    ierr = min(0, vser)
-    v => NULL()
+    xh = cache_co_serial(handle, vid, cid)
+    ierr = min(0, xh)
     if (ierr.eq.0) then
        jc = extr_h2index(handle)
-       v => ctables(jc)%v(vser)
-       if (cid.lt.0.or.cid.ge.v%neff) ierr = _ERROR(ERR_INVALID_ITEM)
-    endif
-    if (ierr.eq.0) then
-       jeff = v%ceff(cid)
-       if (jeff.lt.0) ierr = _ERROR(ERR_PANIC)
-    endif
-    if (ierr.eq.0) then
-       jbgn = v%jbgn(jeff)
-       jend = v%jend(jeff)
+       jbgn = ctables(jc)%jbgn(xh)
+       jend = ctables(jc)%jend(xh)
     endif
   end subroutine cache_co_range
 
@@ -775,29 +936,13 @@ contains
     integer,         intent(in)  :: handle
     integer,         intent(in)  :: vid
     integer,         intent(in)  :: cid
-    integer jc, jeff, vser
-    integer xh
-    type(var_t),pointer :: v
+    integer jc, xh
 
-    vser = get_vserial(handle, vid)
-    jc = extr_h2index(handle)
-    ierr = min(0, vser, jc)
-    v => NULL()
+    xh = cache_co_serial(handle, vid, cid)
+    ierr = min(0, xh)
     if (ierr.eq.0) then
-       v => ctables(jc)%v(vser)
-       if (cid.lt.0.or.cid.ge.v%neff) ierr = _ERROR(ERR_INVALID_ITEM)
-    endif
-    if (ierr.eq.0) then
-       jeff = v%ceff(cid)
-       if (jeff.lt.0) ierr = _ERROR(ERR_PANIC)
-    endif
-    if (ierr.eq.0) then
-       xh = v%xh(cid)
-       if (xh.lt.0.or.xh.ge.ctables(jc)%ncoor) then
-          ierr = _ERROR(ERR_PANIC)
-       else
-          name = ctables(jc)%x(xh)
-       endif
+       jc = extr_h2index(handle)
+       name = ctables(jc)%x(xh)
     else
        name = ' '
     endif
@@ -863,10 +1008,13 @@ contains
           ufile = extr_h2unit(handle)
           rser = get_rserial(handle, vid, choice(0, rec))
           ierr = min(0, rser)
+          ! write(*, *) 'geti', ierr, ufile, rser, item
           if (ierr.eq.0) then
              rpos = ctables(jc)%rpos(rser)
              call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
+             ! write(*, *) 'rpos', ierr, rpos
              if (ierr.eq.0) call get_item(ierr, h, attr, item)
+             ! write(*, *) 'item', ierr
           endif
        endif
     else
@@ -1198,7 +1346,7 @@ contains
     lc = choice(lcoor, coors) ! hard-coded
     allocate(grp%v(0:lv-1), &
          &   grp%d(0:lr-1),           grp%t(0:lr-1), &
-         &   grp%x(0:lc-1), &
+         &   grp%x(0:lc-1), grp%jbgn(0:lc-1), grp%jend(0:lc-1), &
          &   grp%rpos(0:lr-1,0:lv-1), grp%rlen(0:lr-1,0:lv-1), &
          &   STAT=ierr)
     ! if (ierr.eq.0) then
@@ -1317,7 +1465,7 @@ contains
     utmp = get_logu(u, ulog)
     lv = choice(lev_verbose, levv)
 
-132 format(A, 3x, '{', I0, '}', 1x, A)
+132 format(A, 3x, '{', I0, '}', 1x, A, 2x, I0, ':', I0)
     if (present(tag)) then
        ttmp = tag
     else
@@ -1328,9 +1476,9 @@ contains
 
     do jx = 0, c%ncoor - 1
        if (utmp.ge.0) then
-          write(utmp, 132) trim(ttmp), jx, trim(c%x(jx))
+          write(utmp, 132) trim(ttmp), jx, trim(c%x(jx)), c%jbgn(jx), c%jend(jx)
        else if (utmp.eq.-1) then
-          write(*,    132) trim(ttmp), jx, trim(c%x(jx))
+          write(*,    132) trim(ttmp), jx, trim(c%x(jx)), c%jbgn(jx), c%jend(jx)
        endif
     enddo
 
@@ -1444,10 +1592,11 @@ contains
     integer,parameter :: mv = 4
     integer,parameter :: lline = lcol * (mv + 4)
     character(len=128) :: ttmp
+    integer             :: xbufs(0:lcoor-1)
     character(len=lcol) :: cbufs(0:mv-1)
     character(len=lline) :: line
     character(len=litem*2+1) :: dt
-    integer jr, jc, xh, nx
+    integer jr, jc, nx
     integer rofs
 
     ierr = 0
@@ -1457,14 +1606,10 @@ contains
 102 format(A, 3x, 'F', 1x, A)
 211 format(A, 3x, I0, ' [', A, '] ', A)
 202 format(A, 3x, A)
-121 format(A, 3x, I0, 1x, A)
+122 format(A, 3x, 'C', 1x, A)
 131 format(A, 1x, '<', A, '>', 1x, I0, 1x, I0)
-! 132 format(A, 3x, '{', I0, '}', 1x, A)
 201 format(Z8.8, '+', Z0)
-! 111 format(A, '/', I0, ':', I0)
-112 format('{', I0, '}', I0, ':', I0)
-113 format('-')
-    ! write(*, *) grp%nvar, grp%nrec
+
     if (present(tag)) then
        ttmp = tag
     else
@@ -1508,30 +1653,29 @@ contains
              write(*,    102) trim(ttmp), trim(line)
           endif
        endif
-       do jc = 0, lcoor - 1
+       do jvi = 0, nv - 1
           if (ierr.eq.0) then
+             xbufs(0:lcoor-1) = var(jvb+jvi)%xh(0:lcoor-1)
              nx = 0
-             do jvi = 0, nv - 1
-                xh = var(jvb+jvi)%xh(jc)
-                if (xh.ge.0) then
-                   write(cbufs(jvi), 112) xh, var(jvb+jvi)%jbgn(jc), var(jvb+jvi)%jend(jc)
-                   nx = nx + 1
-                else
-                   write(cbufs(jvi), 113)
+             do jc = lcoor - 1, 0, -1
+                if (xbufs(jc).ge.0) then
+                   nx = 1 + jc
+                   exit
                 endif
              enddo
-             call join_list(ierr, line, cbufs(0:nv-1))
-          endif
-          if (ierr.eq.0) then
-             if (nx.gt.0) then
-                if (utmp.ge.0) then
-                   write(utmp, 121) trim(ttmp), jc, trim(line)
-                else if (utmp.eq.-1) then
-                   write(*, 121) trim(ttmp), jc, trim(line)
-                endif
-             endif
+             call join_list &
+                  & (ierr, cbufs(jvi), xbufs(0:nx-1), &
+                  &  ldelim='{', rdelim='}', sep=',')
           endif
        enddo
+       if (ierr.eq.0) then
+          call join_list(ierr, line, cbufs(0:nv-1))
+          if (utmp.ge.0) then
+             write(utmp, 122) trim(ttmp), trim(line)
+          else if (utmp.eq.-1) then
+             write(*, 122) trim(ttmp), trim(line)
+          endif
+       endif
        if (is_msglev_DETAIL(lv)) then
           if (ierr.eq.0) then
              do jr = 0, grp%nrec - 1
@@ -1627,6 +1771,8 @@ contains
                       gtmp(j)%h(:) = grp(j)%h(:)
                       gtmp(j)%v => grp(j)%v
                       gtmp(j)%x => grp(j)%x
+                      gtmp(j)%jbgn => grp(j)%jbgn
+                      gtmp(j)%jend => grp(j)%jend
                       gtmp(j)%d => grp(j)%d
                       gtmp(j)%t => grp(j)%t
                       gtmp(j)%rpos => grp(j)%rpos
@@ -1712,9 +1858,6 @@ contains
        dist(j)%item    = src(j)%item
        dist(j)%unit    = src(j)%unit
        dist(j)%dfmt    = src(j)%dfmt
-       ! dist(j)%co(:)   = src(j)%co(:)
-       dist(j)%jbgn(:) = src(j)%jbgn(:)
-       dist(j)%jend(:) = src(j)%jend(:)
        dist(j)%neff    = src(j)%neff
        dist(j)%xh(:)   = src(j)%xh(:)
        dist(j)%ceff(:) = src(j)%ceff(:)
@@ -1784,7 +1927,8 @@ contains
     ! release temporal variable properties
     do jg = 0, c%ngrp - 1
        if (ierr.eq.0) then
-          deallocate(c%g(jg)%v, c%g(jg)%x, c%g(jg)%rpos, c%g(jg)%rlen, STAT=ierr)
+          deallocate(c%g(jg)%v, c%g(jg)%x, c%g(jg)%jbgn, c%g(jg)%jend, &
+               &     c%g(jg)%rpos, c%g(jg)%rlen, STAT=ierr)
        endif
        !! ! Following works, but need to adjust index (starting from 1).
        ! if (ierr.eq.0) c%g(jg)%v => c%v(c%o(jg):)
@@ -1792,6 +1936,8 @@ contains
        ! if (ierr.eq.0) c%g(jg)%v(0:) => c%v(c%o(jg):)
        c%g(jg)%v => NULL()
        c%g(jg)%x => NULL()
+       c%g(jg)%jbgn => NULL()
+       c%g(jg)%jend => NULL()
        c%g(jg)%rpos => NULL()
        c%g(jg)%rlen => NULL()
     enddo
@@ -1810,40 +1956,60 @@ contains
     integer jx, jt, jv
     integer ntmp
     character(len=litem),allocatable :: xtmp(:)
-    integer,             allocatable :: ktmp(:)
+    integer,             allocatable :: xbgn(:), xend(:)
 
     ierr = 0
     ntmp = 0
     do jg = 0, c%ngrp - 1
        ntmp = ntmp + c%g(jg)%ncoor
     enddo
-    allocate(xtmp(0:ntmp-1), ktmp(0:ntmp-1), STAT=ierr)
+    allocate(xtmp(0:ntmp-1), &
+         &   xbgn(0:ntmp-1), xend(0:ntmp-1), STAT=ierr)
+    do jg = 0, c%ngrp - 1
+       if (ierr.eq.0) then
+          ntmp = c%g(jg)%ncoor
+          allocate(c%g(jg)%xh(0:ntmp-1), STAT=ierr)
+       endif
+    enddo
     if (ierr.eq.0) then
        ntmp = 0
        do jg = 0, c%ngrp - 1
           do jx = 0, c%g(jg)%ncoor - 1
-             jt = find_first(xtmp(0:ntmp-1), c%g(jg)%x(jx))
+             jt = -1
+             do
+                jt = find_first(xtmp(0:ntmp-1), c%g(jg)%x(jx), start=jt+1)
+                if (jt.lt.0) exit
+                if (xbgn(jt).ne.c%g(jg)%jbgn(jx)) cycle
+                if (xend(jt).ne.c%g(jg)%jend(jx)) cycle
+                exit
+             enddo
              if (jt.lt.0) then
                 jt = ntmp
                 xtmp(jt) = c%g(jg)%x(jx)
+                xbgn(jt) = c%g(jg)%jbgn(jx)
+                xend(jt) = c%g(jg)%jend(jx)
                 ntmp = ntmp + 1
              endif
-             ktmp(jx) = jt
+             c%g(jg)%xh(jx) = jt
+             ! ktmp(jx) = jt
           enddo
           do jv = 0, c%g(jg)%nvar - 1
              do jx = 0, lcoor - 1
                 jt = c%g(jg)%v(jv)%xh(jx)
-                if (jt.ge.0) c%g(jg)%v(jv)%xh(jx) = ktmp(jt)
+                ! if (jt.ge.0) c%g(jg)%v(jv)%xh(jx) = ktmp(jt)
+                if (jt.ge.0) c%g(jg)%v(jv)%xh(jx) = c%g(jg)%xh(jt)
              enddo
           enddo
        enddo
     endif
-    if (ierr.eq.0) allocate(c%x(0:ntmp-1), STAT=ierr)
+    if (ierr.eq.0) allocate(c%x(0:ntmp-1), c%jbgn(0:ntmp-1), c%jend(0:ntmp-1), STAT=ierr)
     if (ierr.eq.0) then
        c%x(0:ntmp-1) = xtmp(0:ntmp-1)
+       c%jbgn(0:ntmp-1) = xbgn(0:ntmp-1)
+       c%jend(0:ntmp-1) = xend(0:ntmp-1)
        c%ncoor = ntmp
     endif
-    if (ierr.eq.0) deallocate(xtmp, ktmp, STAT=ierr)
+    if (ierr.eq.0) deallocate(xtmp, xbgn, xend, STAT=ierr)
 
     if (ierr.ne.0) ierr = _ERROR(ERR_ALLOCATION)
   end subroutine collect_coor
@@ -2032,7 +2198,7 @@ contains
     integer jc
     integer xh
     character(len=litem) :: name
-    integer irange(2)
+    integer irange(2), jbgn, jend
     integer neff
 
     ierr = 0
@@ -2046,12 +2212,11 @@ contains
        do jc = 0, lcoor - 1
           if (ierr.eq.0) then
              call get_header_cprop(name, irange, head, 1+jc)
-             ! grp%v(jvar)%co(jc) = trim(name)
-             grp%v(jvar)%jbgn(jc) = irange(1) - 1
-             grp%v(jvar)%jend(jc) = irange(2)
+             jbgn = irange(1) - 1
+             jend = irange(2)
              if (name.ne.' '.or.irange(2)-irange(1).gt.1) then
-                xh = group_search_coor(grp, name)
-                if (xh.lt.0) xh = group_add_coor(grp, name)
+                xh = group_search_coor(grp, name, jbgn, jend)
+                if (xh.lt.0) xh = group_add_coor(grp, name, jbgn, jend)
                 ierr = min(0, xh)
                 if (ierr.eq.0) then
                    grp%v(jvar)%ceff(neff) = jc
@@ -2080,12 +2245,14 @@ contains
   end subroutine new_rec
 
 !!!_  & group_add_coor()
-  integer function group_add_coor(grp, coor) result(xh)
+  integer function group_add_coor(grp, coor, jbgn, jend) result(xh)
     implicit none
-    type(group_t),   intent(inout)  :: grp
-    character(len=*),intent(in)     :: coor
+    type(group_t),   intent(inout) :: grp
+    character(len=*),intent(in)    :: coor
+    integer,         intent(in)    :: jbgn, jend
 
     character(len=litem),pointer :: tmpx(:)
+    integer,             pointer :: tmpb(:), tmpe(:)
     integer m, n
     integer jerr
 
@@ -2094,16 +2261,22 @@ contains
     m = size(grp%x)
     if (xh.ge.m) then
        n = max(m + cmdl, xh + 1)
-       allocate(tmpx(0:n-1), STAT=jerr)
+       allocate(tmpx(0:n-1), tmpb(0:n-1), tmpe(0:n-1), STAT=jerr)
        if (jerr.eq.0) then
           tmpx(0:m-1) = grp%x(0:m-1)
-          deallocate(grp%x, STAT=jerr)
+          tmpb(0:m-1) = grp%jbgn(0:m-1)
+          tmpe(0:m-1) = grp%jend(0:m-1)
+          deallocate(grp%x, grp%jbgn, grp%jend, STAT=jerr)
        endif
        if (jerr.eq.0) grp%x => tmpx
+       if (jerr.eq.0) grp%jbgn => tmpb
+       if (jerr.eq.0) grp%jend => tmpe
        if (jerr.ne.0) jerr = _ERROR(ERR_ALLOCATION)
     endif
     if (jerr.eq.0) then
        grp%x(xh) = trim(coor)
+       grp%jbgn(xh) = jbgn
+       grp%jend(xh) = jend
        grp%ncoor = grp%ncoor + 1
     else
        xh = jerr
@@ -2111,16 +2284,19 @@ contains
   end function group_add_coor
 
 !!!_  & group_search_coor()
-  integer function group_search_coor(grp, coor) result(xh)
+  integer function group_search_coor(grp, coor, jbgn, jend) result(xh)
     implicit none
-    type(group_t),   intent(in)  :: grp
-    character(len=*),intent(in)  :: coor
+    type(group_t),   intent(in) :: grp
+    character(len=*),intent(in) :: coor
+    integer,         intent(in) :: jbgn, jend
     integer jx
     xh = _ERROR(ERR_NOT_FOUND)
     do jx = 0, grp%ncoor - 1
        if (grp%x(jx).eq.coor) then
-          xh = jx
-          exit
+          if (grp%jbgn(jx).eq.jbgn.and.grp%jend(jx).eq.jend) then
+             xh = jx
+             exit
+          endif
        endif
     enddo
   end function group_search_coor
@@ -2134,7 +2310,7 @@ contains
     character(len=*),intent(in)  :: head(*)
     integer j, jc
     character(len=litem) :: name
-    integer irange(2)
+    integer irange(2), jbgn, jend
     integer xh, nx
     integer xhsrc(0:lcoor-1)
 
@@ -2142,8 +2318,10 @@ contains
 
     nx = 0
     do jc = 0, lcoor - 1
-       call get_header_cname(name, head, 1+jc)
-       xh = group_search_coor(grp, name)
+       call get_header_cprop(name, irange, head, 1+jc)
+       jbgn = irange(1) - 1
+       jend = irange(2)
+       xh = group_search_coor(grp, name, jbgn, jend)
        if (xh.ge.0) then
           xhsrc(nx) = xh
           nx = nx + 1
@@ -2151,21 +2329,11 @@ contains
     enddo
 
     loop_var: do j = 0, grp%nvar - 1
-       ! write(*, *) 'search_var', j, trim(grp%v(j)%item)
        if (grp%v(j)%neff.ne.nx) cycle loop_var
        if (ANY(grp%v(j)%xh(0:nx-1).ne.xhsrc(0:nx-1))) cycle loop_var
        if (grp%v(j)%item.ne.head(hi_ITEM)) cycle loop_var
        if (grp%v(j)%unit.ne.head(hi_UNIT)) cycle loop_var
 
-       do jc = 0, lcoor - 1
-          call get_header_cprop(name, irange, head, 1+jc)
-          irange(1) = irange(1) - 1
-          ! xh = group_search_coor(grp, name)
-          ! if (xh.lt.0) exit loop_var
-          ! if (grp%v(j)%co(jc).ne.name) cycle loop_var
-          if (grp%v(j)%jbgn(jc).ne.irange(1)) cycle loop_var
-          if (grp%v(j)%jend(jc).ne.irange(2)) cycle loop_var
-       enddo
        v = j
        return
     enddo loop_var
@@ -2240,6 +2408,9 @@ contains
        if (associated(grp%d)) deallocate(grp%d, STAT=ierr)
     endif
     if (ierr.eq.0) then
+       if (associated(grp%xh)) deallocate(grp%xh, STAT=ierr)
+    endif
+    if (ierr.eq.0) then
        if (associated(grp%t)) deallocate(grp%t, STAT=ierr)
     endif
     if (ierr.eq.0) then
@@ -2253,6 +2424,7 @@ contains
        grp%v => NULL()
        grp%d => NULL()
        grp%t => NULL()
+       grp%xh => NULL()
        grp%rpos => NULL()
        grp%rlen => NULL()
        grp%nvar = -1
@@ -2390,7 +2562,7 @@ contains
     endif
     if (ierr.eq.0) then
        v => ctables(jc)%v(vser)
-       call cache_var_slice(ofs, mem, lcoor, v, start, count)
+       call cache_var_slice(ofs, mem, lcoor, v, ctables(jc), start, count)
        n = -1
        call nio_read_data &
             & (ierr, d, n, head, krect, ufile, start=ofs(0:v%neff-1), count=mem(0:v%neff-1))
@@ -2410,7 +2582,6 @@ contains
     type(var_t),pointer :: v
     integer ofs(0:lcoor-1), mem(0:lcoor-1)
     character(len=litem) :: head(nitem)
-    ! integer(kind=KIOFS) :: rpos
     integer krect, ufile
     integer n
     integer rser
@@ -2426,35 +2597,16 @@ contains
        call cue_read_header(ierr, head, ctables(jc), ufile, rser)
        if (ierr.eq.0) krect = ctables(jc)%krect
     endif
-    ! if (ierr.eq.0) then
-    !    ufile = extr_h2unit(handle)
-    !    ridx = cache_gvr2rindex(handle, gid, vid, rec)
-    !    ierr = min(0, ridx)
-    !    if (ierr.eq.0) then
-    !       rpos = ctables(jc)%rpos(ridx)
-    !       call nio_read_header(ierr, h, krect, ufile, rpos, WHENCE_BEGIN)
-    !    endif
-    ! endif
-    ! write(*, *) 'var_read/header', ierr, rec, rpos, ufile
     if (ierr.eq.0) then
        vser = get_vserial(handle, vid)
        ierr = min(0, vser)
     endif
     if (ierr.eq.0) then
        v => ctables(jc)%v(vser)
-       call cache_var_slice(ofs, mem, lcoor, v, start, count)
-       ! ofs(0:lcoor-1) = 0
-       ! mem(0:lcoor-1) = v%jend(0:lcoor-1) - v%jbgn(0:lcoor-1)
-       ! do jeff = 0, v%neff - 1
-       !    jco = v%ceff(jeff)
-       !    ofs(jco) = start(jeff)
-       !    mem(jco) = count(jeff)
-       !    ! write(*, *) 'ofs/mem', jco, ofs(jco), mem(jco)
-       ! enddo
+       call cache_var_slice(ofs, mem, lcoor, v, ctables(jc), start, count)
        n = -1
        call nio_read_data &
             & (ierr, d, n, head, krect, ufile, start=ofs(0:v%neff-1), count=mem(0:v%neff-1))
-       ! write(*, *) 'cache_var_read', ierr, n
     endif
     ! write(*, *) 'cache_var_read', ierr, n, handle, vid, vser, rser
   end subroutine cache_var_read_f
@@ -2493,14 +2645,7 @@ contains
     endif
     if (ierr.eq.0) then
        v => ctables(jc)%v(vser)
-       call cache_var_slice(ofs, mem, lcoor, v, start, count)
-       ! ofs(0:lcoor-1) = 0
-       ! mem(0:lcoor-1) = v%jend(0:lcoor-1) - v%jbgn(0:lcoor-1)
-       ! do jeff = 0, v%neff - 1
-       !    jco = v%ceff(jeff)
-       !    ofs(jco) = start(jeff)
-       !    mem(jco) = count(jeff)
-       ! enddo
+       call cache_var_slice(ofs, mem, lcoor, v, ctables(jc), start, count)
        n = -1
        call nio_read_data &
             & (ierr, d, n, head, krect, ufile, start=ofs(0:v%neff-1), count=mem(0:v%neff-1))
@@ -2509,17 +2654,26 @@ contains
 
 !!!_  & cache_var_slice
   subroutine cache_var_slice &
-       & (ofs, mem, lcoor, v, start, count)
+       & (ofs, mem, lcoor, v, c, start, count)
     implicit none
-    integer,    intent(out)         :: ofs(0:*)
-    integer,    intent(out)         :: mem(0:*)
-    integer,    intent(in)          :: lcoor
-    type(var_t),intent(in)          :: v
-    integer,    intent(in),optional :: start(0:*), count(0:*)
-    integer jeff, jco
+    integer,      intent(out)         :: ofs(0:*)
+    integer,      intent(out)         :: mem(0:*)
+    integer,      intent(in)          :: lcoor
+    type(var_t),  intent(in)          :: v
+    type(cache_t),intent(in)          :: c
+    integer,      intent(in),optional :: start(0:*), count(0:*)
+    integer jeff, jco, xh
 
     ofs(0:lcoor-1) = 0
-    mem(0:lcoor-1) = v%jend(0:lcoor-1) - v%jbgn(0:lcoor-1)
+    ! mem(0:lcoor-1) = v%jend(0:lcoor-1) - v%jbgn(0:lcoor-1)
+    do jco = 0, lcoor - 1
+       xh = v%xh(jco)
+       if (xh.ge.0) then
+          mem(jco) = c%jend(xh) - c%jend(xh)
+       else
+          mem(jco) = 0
+       endif
+    enddo
     if (present(start)) then
        if (present(count)) then
           do jeff = 0, v%neff - 1
