@@ -1,7 +1,7 @@
 !!!_! nio_bindc.F90 - TOUZA/Nio bind(c) interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2023
-#define TIME_STAMP 'Time-stamp: <2024/02/25 21:09:11 fuyuki nio_bindc.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/23 18:09:40 fuyuki nio_bindc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023, 2024
@@ -22,11 +22,15 @@ module TOUZA_Nio_bindc
   use TOUZA_Nio_std,only: KI32, KI64, KDBL, KFLT
   use TOUZA_Nio_std,only: get_logu,      unit_global,  trace_fine,    trace_control
   use TOUZA_Nio_std,only: ignore_bigger, ignore_small, ignore_always, def_block
+  use TOUZA_Nio_header,only: litem
   implicit none
   private
 !!!_  - public parameters
   integer,parameter :: lpath = OPT_PATH_LEN
   integer,parameter :: lvar  = 64
+  ! integer(kind=C_INT),parameter,public :: len_path = OPT_PATH_LEN
+  ! integer(kind=C_INT),parameter,public :: len_var  = 64
+  ! integer(kind=C_INT),parameter,public :: len_item = litem
 !!!_  - private parameter
   integer,parameter :: lax = 6   !  3 is enough
 !!!_  - static
@@ -45,10 +49,13 @@ module TOUZA_Nio_bindc
   public :: tnb_init,          tnb_diag,       tnb_finalize
   public :: tnb_file_is_nio,   tnb_file_open,  tnb_file_diag,  tnb_file_close
   public :: tnb_file_groups,   tnb_group,      tnb_search_group
-  public :: tnb_group_name,    tnb_group_recs
+  public :: tnb_group_name,    tnb_group_recs, tnb_group_coors
+  public :: tnb_group_co_name, tnb_group_co_range, tnb_group_co_idx
   public :: tnb_group_vars,    tnb_search_var, tnb_var_name,   tnb_co_size
   public :: tnb_var_recs
-  public :: tnb_co_name,       tnb_co_len,     tnb_co_idx
+  public :: tnb_co_name,       tnb_co_len,     tnb_co_idx,     tnb_co_serial
+  public :: tnb_rec_date,      tnb_rec_time
+  public :: tnb_attr_size,     tnb_attr_len
   public :: tnb_get_attr
   public :: tnb_get_attr_byid, tnb_get_attr_name
   public :: tnb_get_attr_int,  tnb_get_attr_float, tnb_get_attr_double
@@ -210,6 +217,68 @@ contains
     endif
   end function tnb_group_name
 
+!!!_  & tnb_group_coors()
+  integer(kind=C_INT) function tnb_group_coors &
+       & (handle) BIND(C) result(n)
+    use TOUZA_Nio_cache,only: cache_group_coors
+    implicit none
+    integer(kind=C_INT),intent(in),value :: handle
+    n = cache_group_coors(int(handle))
+  end function tnb_group_coors
+
+!!!_  - tnb_group_co_idx()
+  integer(kind=C_INT) function tnb_group_co_idx &
+       & (handle, cid) BIND(C) result(serial)
+    use TOUZA_Nio_cache,only: cache_group_cserial
+    use TOUZA_Nio_header,only: litem
+    implicit none
+    integer(kind=C_INT),intent(in),value :: handle
+    integer(kind=C_INT),intent(in),value :: cid
+    integer j
+    j = cache_group_cserial(int(handle), int(cid))
+    serial = j
+  end function tnb_group_co_idx
+
+!!!_  & tnb_group_co_name()
+  integer(kind=C_INT) function tnb_group_co_name &
+       & (name, handle, cid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_group_coor_name
+    use TOUZA_Nio_header,only: litem
+    implicit none
+    character(len=1,kind=C_CHAR),intent(out)      :: name(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: cid
+    integer jerr
+    character(len=litem) :: buf
+
+    call cache_group_coor_name(jerr, buf, int(handle), int(cid))
+    if (jerr.eq.0) then
+       call f2c_string(name, buf)
+    else
+       call f2c_string(name)
+    endif
+    ierr = jerr
+  end function tnb_group_co_name
+
+!!!_  & tnb_group_co_range()
+  integer(kind=C_INT) function tnb_group_co_range &
+       & (jbgn, jend, handle, cid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_group_coor_range
+    use TOUZA_Nio_header,only: litem
+    implicit none
+    integer(kind=C_INT),intent(out)      :: jbgn
+    integer(kind=C_INT),intent(out)      :: jend
+    integer(kind=C_INT),intent(in),value :: handle
+    integer(kind=C_INT),intent(in),value :: cid
+    integer jerr
+    integer jb, je
+
+    call cache_group_coor_range(jerr, jb, je, int(handle), int(cid))
+    jbgn = jb
+    jend = je
+    ierr = jerr
+  end function tnb_group_co_range
+
 !!!_  & tnb_group_vars()
   integer(kind=C_INT) function tnb_group_vars &
        & (handle) BIND(C) result(n)
@@ -284,6 +353,24 @@ contains
     n = cache_group_recs(int(handle), int(vid))
     nrecs = n
   end function tnb_var_recs
+
+!!!_  - tnb_co_serial()
+  integer(kind=C_INT) function tnb_co_serial &
+       & (handle, vid, cid) BIND(C) result(ser)
+    use TOUZA_Nio_cache,only: cache_co_serial, cache_co_size
+    implicit none
+    integer(kind=C_INT),intent(in),value :: handle
+    integer(kind=C_INT),intent(in),value :: vid
+    integer(kind=C_INT),intent(in),value :: cid
+    integer nco, jco, xh
+    nco = cache_co_size(int(handle), int(vid))
+    ser = min(0, nco)
+    if (ser.eq.0) then
+       jco = nco - 1 - int(cid)
+       xh = cache_co_serial(int(handle), int(vid), int(jco))
+       ser = xh
+    endif
+  end function tnb_co_serial
 
 !!!_  - tnb_co_name()
   integer(kind=C_INT) function tnb_co_name &
@@ -374,6 +461,81 @@ contains
 !        dims(n-1:0:-1) = d(0:n-1)
 !     endif
 !   end function tnb_var_dims
+
+!!!_  - tnb_rec_time()
+  integer(kind=C_INT) function tnb_rec_time &
+       & (time, handle, vid, rec) BIND(C) result(ierr)
+    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_cache,only: cache_rec_time
+    implicit none
+    character(len=1,kind=C_CHAR),intent(out)      :: time(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
+    character(len=litem) :: buf
+    integer jerr
+    ierr = 0
+    if (vid.lt.0) then
+       call cache_rec_time(jerr, buf, int(handle), rec=int(rec))
+    else
+       call cache_rec_time(jerr, buf, int(handle), int(vid), int(rec))
+    endif
+    if (jerr.eq.0) then
+       call f2c_string(time, buf)
+    else
+       call f2c_string(time)
+    endif
+    ierr = jerr
+  end function tnb_rec_time
+
+!!!_  - tnb_rec_date()
+  integer(kind=C_INT) function tnb_rec_date &
+       & (time, handle, vid, rec) BIND(C) result(ierr)
+    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_cache,only: cache_rec_date
+    implicit none
+    character(len=1,kind=C_CHAR),intent(out)      :: time(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
+    character(len=litem) :: buf
+    integer jerr
+    ierr = 0
+    if (vid.lt.0) then
+       call cache_rec_date(jerr, buf, int(handle), rec=int(rec))
+    else
+       call cache_rec_date(jerr, buf, int(handle), int(vid), int(rec))
+    endif
+    if (jerr.eq.0) then
+       call f2c_string(time, buf)
+    else
+       call f2c_string(time)
+    endif
+    ierr = jerr
+  end function tnb_rec_date
+
+!!!_  & tnb_attr_size() - (hard-coded) number of attributes
+  integer(kind=C_INT) function tnb_attr_size &
+       & (handle, vid, rec) BIND(C) result(n)
+    use TOUZA_Nio_header,only: nitem
+    implicit none
+    integer(kind=C_INT),intent(in),value :: handle
+    integer(kind=C_INT),intent(in),value :: vid
+    integer(kind=C_INT),intent(in),value :: rec
+    n = nitem
+  end function tnb_attr_size
+
+!!!_  & tnb_attr_len() - (hard-coded) length of attribute string
+  integer(kind=C_INT) function tnb_attr_len &
+       & (item, handle, vid, rec) BIND(C) result(n)
+    use TOUZA_Nio_header,only: litem
+    implicit none
+    character(len=1,kind=C_CHAR),intent(in)       :: item(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
+    n = litem
+  end function tnb_attr_len
 
 !!!_  - tnb_get_attr()
   integer(kind=C_INT) function tnb_get_attr &
