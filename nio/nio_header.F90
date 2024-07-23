@@ -1,10 +1,10 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:36:26 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/23 16:32:48 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022, 2023
+! Copyright (C) 2021, 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -439,7 +439,7 @@ contains
     return
   end subroutine put_item_jdate
 
-!!!_  - get_item - get entry (with type check)
+!!!_  - get_item - get entry (with type check if number)
   subroutine get_item_a &
        & (ierr, head, v, item, iteme, fmt)
     implicit none
@@ -460,8 +460,9 @@ contains
           ierr = _ERROR(ERR_HITEM_INVALID_RANGE)
        endif
     else
-       ierr = check_hitem_type(item, ht_str)
-       if (ierr.eq.0) call restore_item(ierr, head, v, item, iteme, fmt)
+       ! ierr = check_hitem_type(item, ht_str)
+       ! if (ierr.eq.0) call restore_item(ierr, head, v, item, iteme, fmt)
+       call restore_item(ierr, head, v, item, iteme, fmt)
     endif
     return
   end subroutine get_item_a
