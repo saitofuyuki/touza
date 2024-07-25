@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/07/24 15:42:03 fuyuki configure.ac>
+# Time-stamp: <2024/07/25 16:47:59 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -219,6 +219,15 @@ AC_ARG_ENABLE([mod-dependencies],
 AM_CONDITIONAL([enable_module_dependencies], [
   test "x$use_mod_dependencies" != xno \
   && test x"$ax_f90_modext" != xunknown])
+
+AS_IF([test "x$enable_sub_zbt" != xno],
+      [AM_PATH_PYTHON([3.9], , [:])
+AC_CONFIG_FILES([zbt/zbt/Makefile])
+AC_CONFIG_FILES([zbt/tests/Makefile])
+AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
+AX_PYTHON()
+AX_PYTHON_MODULE([ctypes], , [python3])
+AX_PYTHON_MODULE([numpy], , [python3])])
 
 dnl AM_CONDITIONAL([am__fastdepFC], [false])
 

@@ -1,7 +1,7 @@
-# touza/zbt Makefile.am
+# touza/zbt/tests Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/07/25 17:04:03 fuyuki Makefile.am>
+# Time-stamp: <2024/07/25 16:50:51 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -9,11 +9,10 @@
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
-SUBDIRS = zbt tests
+EXTRA_DIST = gen_demo.sh 
 
-EXTRA_DIST =
-EXTRA_DIST += README-zbt.org pyproject.toml
-EXTRA_DIST += param.sh
+noinst_PYTHON = 
+noinst_PYTHON += test_libtouza.py test_plot.py test_xrnio.py
 
 # dummy
 all:
@@ -22,6 +21,3 @@ install-mod:
 
 uninstall-mod:
 
-### Local Variables:
-### mode: makefile-automake
-### end:

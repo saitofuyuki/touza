@@ -3,16 +3,19 @@
 
 __doc__ = \
     """
-zbt.helper
-~~~~~~~~~~
+zbt.util
+~~~~~~~~
 Common helper utilities for TOUZA/tupy
 
-:Source:     tupy/helper.py
+:Source:     zbt/util.py
 :Maintainer: SAITO Fuyuki <saitofuyuki@jamstec.go.jp>
 :Created:    Jul 16 2024
 """
 
 import ctypes as CT
+import sys
+# import pynput.keyboard as PK
+# import termios
 
 
 class WrapCDLL(CT.CDLL):
@@ -62,3 +65,27 @@ def tostr(s):
         except:
             ss = s
     return ss
+
+
+
+# def on_press(key):
+#     try:
+#         print('alphanumeric key {0} pressed'.format(
+#             key.char))
+#     except AttributeError:
+#         print('special key {0} pressed'.format(
+#             key))
+
+# def on_release(key):
+#     print('{0} released'.format(
+#         key))
+#     if key == keyboard.Key.esc:
+#         # Stop listener
+#         return False
+
+
+# def wait_press():
+#     # Collect events until released
+#     with PK.Listener(on_press=on_press) as listener:
+#         listener.join()
+#     termios.tcflush(sys.stdin, termios.TCIOFLUSH)

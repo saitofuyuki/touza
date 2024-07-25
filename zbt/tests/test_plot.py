@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/07/24 15:25:14 fuyuki test_plot.py>
+# Time-stamp: <2024/07/25 12:50:13 fuyuki test_plot.py>
 
 import sys
 import itertools
 import matplotlib.pyplot as plt
 
-from zbt.xrnio import *
+from zbt.dsnio import *
 
 
 def main(argv):
