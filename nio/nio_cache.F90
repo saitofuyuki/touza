@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2024/07/23 16:30:09 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/25 15:57:18 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023,2024
@@ -14,6 +14,7 @@
 #  include "touza_config.h"
 #endif
 #include "touza_nio.h"
+#include "touza_nio_param.h"
 !!!_* macros
 #if HAVE_F2003_ALLOCATABLE_MEMBER
 #  define _POINTER allocatable
@@ -40,15 +41,24 @@ module TOUZA_Nio_cache
   implicit none
   private
 !!!_  - public parameters
-  integer,parameter,public :: coll_default = 0
-  integer,parameter,public :: coll_strict    = -1
-  integer,parameter,public :: coll_std       = 1    ! ignore DFMT ITEM DATE TIME TDUR TIME2 UTIM2 SIZE MISS AITMn ASTRn AENDn
-  integer,parameter,public :: coll_basic     = 2    ! plus ignore TITL UNIT EDIT ETTL MEMO DMIN DMAX DIVS DIVL STYP [CIR]OPTN
-  integer,parameter,public :: coll_nosign    = 3    ! plus ignore [CM]DATE [CM]SIGN
-  integer,parameter,public :: coll_nonum     = 4    ! plus ignore DSET FNUM DNUM
-  integer,parameter,public :: coll_nospecial = 8    ! disable DSET special
+  integer,parameter,public :: coll_default = NIO_CACHE_COLL_DEFAULT
 
-  integer,parameter,public :: var_suite = -99  ! special variable id to set all the records in single suite
+  integer,parameter,public :: coll_strict    = NIO_CACHE_COLL_STRICT
+  ! std: ignore DFMT ITEM DATE TIME TDUR TIME2 UTIM2 SIZE MISS AITMn ASTRn AENDn
+  integer,parameter,public :: coll_std       = NIO_CACHE_COLL_STD
+  ! basic: std + ignore TITL UNIT EDIT ETTL MEMO DMIN DMAX DIVS DIVL STYP [CIR]OPTN
+  integer,parameter,public :: coll_basic     = NIO_CACHE_COLL_BASIC
+  ! nosign: basic + ignore [CM]DATE [CM]SIGN
+  integer,parameter,public :: coll_nosign    = NIO_CACHE_COLL_NOSIGN
+  ! nonum: nosign + ignore DSET FNUM DNUM
+  integer,parameter,public :: coll_nonum     = NIO_CACHE_COLL_NONUM
+  ! disable DSET special (bitwise)
+  integer,parameter,public :: coll_nospecial = NIO_CACHE_COLL_NOSPECIAL
+  ! allow variable name conflicts (bitwise)
+  integer,parameter,public :: allow_var_dup = NIO_CACHE_ALLOW_VAR_DUP
+
+  ! special variable id to set all the records in single suite
+  integer,parameter,public :: var_suite = NIO_CACHE_VAR_SUITE
 
   character(len=*),parameter,public :: group_suite = ' '
 !!!_  - private parameter

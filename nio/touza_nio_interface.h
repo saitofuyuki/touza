@@ -1,7 +1,7 @@
 /* touza_nio_interface.h - TOUZA/Nio c interfaces */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Feb 16 2023 */
-/* Time-stamp: <2024/07/23 18:10:44 fuyuki touza_nio_interface.h> */
+/* Time-stamp: <2024/07/25 15:46:46 fuyuki touza_nio_interface.h> */
 /* Copyright (C) 2023, 2024 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -12,7 +12,9 @@
 
 #  include "touza.h"
 
-#  define TNB_HEADER_ITEMS 40
+#  include "touza_nio_param.h"
+
+#  define TNB_HEADER_ITEMS NIO_HEADER_ITEMS   /* for backword compatibility */
 
 extern int tnb_init(const int levv, const int mode);
 extern int tnb_diag(const int levv, const int mode);

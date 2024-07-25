@@ -1,7 +1,7 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2024/07/23 16:32:48 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/25 15:59:08 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023, 2024
@@ -14,6 +14,7 @@
 #  include "touza_config.h"
 #endif
 #include "touza_nio.h"
+#include "touza_nio_param.h"
 !!!_@ TOUZA_Nio_header - Nio header-record interfaces
 module TOUZA_Nio_header
 !!!_ = declaration
@@ -23,8 +24,8 @@ module TOUZA_Nio_header
   private
 !!!_  - public parameters
 !!!_   . items
-  integer,parameter,public :: nitem = 64
-  integer,parameter,public :: litem = 16
+  integer,parameter,public :: nitem = NIO_HEADER_ITEMS
+  integer,parameter,public :: litem = NIO_HEADER_LEN_ITEM
 
   integer,parameter,public :: lhead = litem * nitem
 
