@@ -1,7 +1,7 @@
 !!!_! nio_control.F90 - TOUZA/Nio control center
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 12 2022
-#define TIME_STAMP 'Time-stamp: <2024/02/26 15:31:41 fuyuki nio_control.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/26 16:50:18 fuyuki nio_control.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024
@@ -14,6 +14,7 @@
 #  include "touza_config.h"
 #endif
 #include "touza_nio.h"
+#include "touza_nio_param.h"
 #ifndef   OPT_NIO_CTRL_SIZE
 #  define OPT_NIO_CTRL_SIZE 512
 #endif
@@ -30,9 +31,12 @@ module TOUZA_Nio_control
   integer,parameter,public :: nio_format_std   = 1   ! standard Nio format, MIROC/gtool-3.5 compatible
   integer,parameter,public :: nio_format_ext   = 2   ! extended Nio format
 
-  integer,parameter,public :: enable_cache      = 1    ! enable cache-mode
-  integer,parameter,public :: enable_sequential = 2    ! enable sequential-mode
-  integer,parameter,public :: enable_auto       = 4    ! enable auto detection
+  ! integer,parameter,public :: enable_cache      = 1    ! enable cache-mode
+  ! integer,parameter,public :: enable_sequential = 2    ! enable sequential-mode
+  ! integer,parameter,public :: enable_auto       = 4    ! enable auto detection
+  integer,parameter,public :: enable_cache      = NIO_CONTROL_ENABLE_CACHE      ! enable cache-mode
+  integer,parameter,public :: enable_sequential = NIO_CONTROL_ENABLE_SEQUENTIAL ! enable sequential-mode
+  integer,parameter,public :: enable_auto       = NIO_CONTROL_ENABLE_AUTO       ! enable auto detection
 
   character(len=*),parameter,public :: seps_file_item = '/?'   ! separators between file and item
 
