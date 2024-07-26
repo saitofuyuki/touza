@@ -1,7 +1,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2024/07/25 16:01:05 fuyuki Makefile.am>
+# Time-stamp: <2024/07/29 17:32:19 fuyuki Makefile.am>
 
 # Copyright (C) 2021, 2022, 2023, 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -138,7 +138,7 @@ $(WTEST): $(srcdir)/$(WTESTin)
 test_nio_cache_SOURCES = $(TEST_COMMON_SOURCES) nio_cache.F90
 test_nio_cache_LDADD = $(TEST_COMMON_LIBS)
 test_nio_cache_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_CACHE=1
-EXTRA_test_nio_cache_CPPDEPENDENCIES = $(test_nio_cache_LDADD)
+EXTRA_test_nio_cache_DEPENDENCIES = $(test_nio_cache_LDADD)
 
 test_nio_control_SOURCES = $(TEST_COMMON_SOURCES) nio_control.F90
 test_nio_control_LDADD = $(TEST_COMMON_LIBS)
