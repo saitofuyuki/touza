@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/07/25 10:34:01 fuyuki test_dsnio.py>
+# Time-stamp: <2024/07/29 17:59:42 fuyuki test_dsnio.py>
 
 import sys
 
@@ -27,9 +27,9 @@ def main(argv):
                 print(f"# dim:{dn}")
                 print(dd)
             for vn, vv in g.variables.items():
-                print(f"# var:{vn} {vv.shape}")
+                print(f"# var:{vn} {vv.shape} {vv.dimensions_suite}")
                 print(vv)
-                print(vv[:])
+                # print(vv[0,1])
 
 
 if __name__ == '__main__':

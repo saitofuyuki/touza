@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/07/25 12:50:13 fuyuki test_plot.py>
+# Time-stamp: <2024/07/29 18:01:10 fuyuki test_plot.py>
 
 import sys
 import itertools
@@ -26,9 +26,11 @@ def main(argv):
                     fig, ax = plt.subplots()
                     sel = var[x]
                     # print(sel[0])
-                    CS = ax.contour(sel, levels=16)
+                    CS = ax.contourf(sel, levels=16)
                     ax.clabel(CS, inline=True, fontsize=10)
+                    # plt.show(block=False)
                     plt.show()
+                    plt.close()
 
 if __name__ == '__main__':
     main(sys.argv[1:])
