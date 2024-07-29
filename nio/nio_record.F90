@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2024/02/25 21:50:01 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/30 07:35:30 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023, 2024
@@ -21,6 +21,7 @@ module TOUZA_Nio_record
   use TOUZA_Nio_std,only: get_logu,      unit_global,  trace_fine,    trace_control
   use TOUZA_Nio_std,only: ignore_bigger, ignore_small, ignore_always, def_block
   use TOUZA_Nio_std,only: search_from_last
+  use TOUZA_Nio_std,only: trace_err
   use TOUZA_Nio_header,only: litem, nitem
   use TOUZA_Trp,only: KCODE_CLIPPING,  KCODE_ROUND
   use TOUZA_Trp,only: KCODE_TRANSPOSE, KCODE_SEQUENTIAL, KCODE_INCREMENTAL
@@ -1649,6 +1650,7 @@ contains
           ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
     endif
+    call trace_err(ierr, 'nio_read_data_slice')
     return
   end subroutine nio_read_data_slice_d
   subroutine nio_read_data_slice_f &
@@ -1710,6 +1712,7 @@ contains
           ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
     endif
+    call trace_err(ierr, 'nio_read_data_slice')
     return
   end subroutine nio_read_data_slice_f
   subroutine nio_read_data_slice_i &
@@ -1769,6 +1772,7 @@ contains
           ierr = _ERROR(ERR_INVALID_SWITCH)
        end select
     endif
+    call trace_err(ierr, 'nio_read_data_slice')
     return
   end subroutine nio_read_data_slice_i
 
@@ -8549,6 +8553,7 @@ contains
        div = read_sep_flag(krect)
        call sus_slice_read_irec(ierr, u, d, bes, nr, swap, sub, div, md)
     endif
+    call trace_err(ierr, 'get_data_record_slice')
     return
   end subroutine get_data_record_slice_i
   subroutine get_data_record_slice_f &
@@ -8584,6 +8589,7 @@ contains
        div = read_sep_flag(krect)
        call sus_slice_read_irec(ierr, u, d, bes, nr, swap, sub, div, md)
     endif
+    call trace_err(ierr, 'get_data_record_slice')
     return
   end subroutine get_data_record_slice_f
   subroutine get_data_record_slice_d &
@@ -8619,6 +8625,7 @@ contains
        div = read_sep_flag(krect)
        call sus_slice_read_irec(ierr, u, d, bes, nr, swap, sub, div, md)
     endif
+    call trace_err(ierr, 'get_data_record_slice')
     return
   end subroutine get_data_record_slice_d
 !!!_  & get_data_record_runl - read data block (runlength)
