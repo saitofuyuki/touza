@@ -5,6 +5,13 @@
 
 * Introduction
 * Installation
+* Description of TOUZA/Zbt commands
+* Description of TOUZA/Zbt library
+** ~zbt.libtouza~ - lower-level interface on touza library
+** ~zbt.dsnio~ - medium-level layer of TOUZA/Nio array interfaces
+** ~zbt.xrnio~ - ~xarray~ backends for TOUZA/Nio array
+
+* Acknowledgements
 * Copyright and license
 Copyright 2024 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
