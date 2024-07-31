@@ -1,7 +1,7 @@
 !!!_! chak_file.F90 - TOUZA/Jmz CH(swiss) army knife file interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 26 2022
-#define TIME_STAMP 'Time-stamp: <2024/04/15 09:20:57 fuyuki chak_file.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/21 17:25:00 fuyuki chak_file.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -209,7 +209,7 @@ contains
        if (ierr.ne.0) exit
        ! rec(0:nrg-1) = file%rgrp(0:nrg-1)%rec
     enddo
-    if (ierr.eq.0) call join_list(ierr, str, rec(0:nrg-1), sep=item_sep)
+    if (ierr.eq.0) call join_list(ierr, str, rec(0:nrg-1), sep=sep_item)
   end subroutine get_recs_str
 !!!_   . show_file
   subroutine show_file &
@@ -314,12 +314,12 @@ contains
        do jb = 0, ms - 1, nb
           je = min(ms, jb + nb)
           if (ierr.eq.0) r(0:je-jb-1) = user_index_bgn(filter%seq(jb:je-1))
-          if (ierr.eq.0) call join_list(ierr, buf, r(0:je-jb-1), sep=rec_append_sep)
+          if (ierr.eq.0) call join_list(ierr, buf, r(0:je-jb-1), sep=sep_rec_append)
           if (ierr.eq.0) then
              if (jb.eq.0) then
                 write(utmp, 101) ms, trim(buf)
              else
-                write(utmp, 102) ms, rec_append_sep, trim(buf)
+                write(utmp, 102) ms, sep_rec_append, trim(buf)
              endif
           endif
        enddo
@@ -337,7 +337,7 @@ contains
     character(len=*),intent(in)    :: arg
     character(len=litem*4) :: abuf
 
-    character(len=*),parameter :: asep = item_sep
+    character(len=*),parameter :: asep = sep_item
     character(len=*),parameter :: bsep = ':'
     integer jp
     integer kfmt
@@ -543,7 +543,7 @@ contains
 !!!_   . parse_rec_argument
   subroutine parse_rec_argument &
        & (ierr, rgrp, arg)
-    use chak_lib,lsep=>item_sep, rsep=>range_sep
+    use chak_lib,lsep=>sep_item, rsep=>sep_range
     use TOUZA_Std,only: split_list
     implicit none
     integer,         intent(out)   :: ierr
@@ -554,8 +554,8 @@ contains
     integer dummy(0:0)
     ierr = 0
     larg = len_trim(arg)
-    ls = len(item_sep)
-    call split_list(nc, dummy, arg(1:larg), item_sep, -1, empty=.FALSE.)
+    ls = len(sep_item)
+    call split_list(nc, dummy, arg(1:larg), sep_item, -1, empty=.FALSE.)
     ierr = min(0, nc)
     if (ierr.eq.0) allocate(rgrp%filter(0:nc-1), STAT=ierr)
     if (ierr.eq.0) then
@@ -563,7 +563,7 @@ contains
        jc = 0
        do
           if (jb.ge.larg) exit
-          je = index(arg(jb+1:larg), item_sep) + jb
+          je = index(arg(jb+1:larg), sep_item) + jb
           if (je.eq.jb) je = larg + 1
           ! write(*, *) jc, jb, je, '[' // arg(jb+1:je-1) // ']'
           if (jb+1.lt.je) then
@@ -582,7 +582,7 @@ contains
 !!!_   . parse_rec_element - parse record-argument element
   subroutine parse_rec_element &
        & (ierr, relem, arg)
-    use chak_lib,lsep=>item_sep, rsep=>range_sep
+    use chak_lib,lsep=>sep_item, rsep=>sep_range
     use TOUZA_Std,only: split_list, parse_number
     implicit none
     integer,         intent(out)   :: ierr
@@ -603,14 +603,14 @@ contains
     ! [begin][:[end][:[step][:[num]]]]
 
     larg = len_trim(arg)
-    lsa = len(rec_append_sep)
+    lsa = len(sep_rec_append)
     jp = 0
-    ja = index(arg(jp+1:larg), rec_append_sep)
+    ja = index(arg(jp+1:larg), sep_rec_append)
     nr = 0
     if (ja.gt.0) then
        ! mutliple stack mode
        ! count element
-       call split_list(nr, relem%seq, arg(jp+1:larg), rec_append_sep, -1, empty=.FALSE.)
+       call split_list(nr, relem%seq, arg(jp+1:larg), sep_rec_append, -1, empty=.FALSE.)
        ierr = min(0, nr)
     else
        call parse_number(jerr, r, arg(jp+1:larg))
@@ -620,7 +620,7 @@ contains
        else
           ! range complex mode
           call split_list &
-               & (nr, rf, arg(jp+1:larg), range_sep, nfield, def)
+               & (nr, rf, arg(jp+1:larg), sep_range, nfield, def)
           if (nr.eq.1) then
              rf(1:3) = (/null_range, 0, 1/)
           else if (nr.eq.2) then
@@ -675,7 +675,7 @@ contains
        ! direct stack mode
        allocate(relem%seq(0:nr-1), STAT=ierr)
        if (ierr.eq.0) then
-          call split_list(jerr, relem%seq, arg(jp+1:larg), rec_append_sep, nr, empty=.FALSE.)
+          call split_list(jerr, relem%seq, arg(jp+1:larg), sep_rec_append, nr, empty=.FALSE.)
           if (jerr.ge.0) then
              relem%num = -nr
              relem%seq(0:nr-1) = system_index_bgn(relem%seq(0:nr-1))

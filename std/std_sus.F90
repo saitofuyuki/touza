@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2024/02/25 22:09:13 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/25 14:07:20 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023,2024
@@ -8355,6 +8355,8 @@ end program test_std_sus
 
     integer jsrc
     integer m, mm, k
+
+    ierr = 0
 
     call set_slice_loop(rr, stp, itr, bes, r)
 111 format('slice: ', A, ' > ', A)

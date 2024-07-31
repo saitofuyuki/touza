@@ -1,7 +1,7 @@
 !!!_! jmz_coor.F90 - TOUZA/Jmz coordinate (loop) manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 6 2023
-#define TIME_STAMP 'Time-stamp: <2024/04/05 20:55:50 fuyuki jmz_coor.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/21 17:22:29 fuyuki jmz_coor.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023, 2024
@@ -283,7 +283,7 @@ contains
 !!!_  - get_domain_string
   subroutine get_domain_string(ierr, str, lpp, mco)
     use TOUZA_Std,only: join_list, choice
-    use Jmz_param,only: rename_sep
+    use Jmz_param,only: sep_rename
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: str
@@ -309,9 +309,9 @@ contains
           cstr(jc) = trim(cran)
        else
           ls = len_trim(lpp(jc)%name)
-          jp = index(lpp(jc)%name(1:ls), rename_sep, back=.TRUE.)
-          if (jp.lt.ls-len(rename_sep)+1) then
-             write(cstr(jc), 102, IOSTAT=jerr) trim(lpp(jc)%name), rename_sep, trim(cran)
+          jp = index(lpp(jc)%name(1:ls), sep_rename, back=.TRUE.)
+          if (jp.lt.ls-len(sep_rename)+1) then
+             write(cstr(jc), 102, IOSTAT=jerr) trim(lpp(jc)%name), sep_rename, trim(cran)
           else
              write(cstr(jc), 103, IOSTAT=jerr) trim(lpp(jc)%name), trim(cran)
           endif

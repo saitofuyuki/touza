@@ -1,7 +1,7 @@
 !!!_! jmz_param.F90 - TOUZA/Jmz parameters placeholder
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 6 2023
-#define TIME_STAMP 'Time-stamp: <2024/02/15 10:54:34 fuyuki jmz_param.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/26 17:08:25 fuyuki jmz_param.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2024
@@ -28,11 +28,16 @@ module Jmz_param
   public
 !!!_  - strings
   integer,parameter,public :: lpath = OPT_PATH_LEN
+  integer,parameter,public :: lmsg = 256
 !!!_  - flag constants
   integer,parameter,public :: fmode_default    = 0     ! default
   integer,parameter,public :: fmode_new        = 1     ! error if exist
   integer,parameter,public :: fmode_write      = 2     ! force overwrite
   integer,parameter,public :: fmode_append     = 3     ! append
+
+  integer,parameter :: batch_null = 0
+  integer,parameter :: special_end_param = -1
+
 !!!_  - float parameters
   integer,parameter :: KRSTD = __KBUF
   integer,parameter :: KBUF  = KRSTD      ! for compatibility
@@ -84,13 +89,31 @@ module Jmz_param
   integer,parameter :: kv_flt  = 2
   integer,parameter :: kv_dbl  = 3
 
+!!!_  - cartesian plane properties
+  real(kind=KRSTD),parameter :: cp_undef = -HUGE(0.0_KRSTD)
+  integer,parameter :: cp_low     = 1      ! coordinate span lower boundary
+  integer,parameter :: cp_high    = 2      ! coordinate span higher boundary
+  integer,parameter :: cp_spacing = 3      ! cell spacing
+  integer,parameter :: cp_shift   = 4      ! cell orientation
+  integer,parameter :: cp_anchor  = 5      ! anchor coordinate
+  integer,parameter :: cp_ofs     = 6      ! coordinate offset (absolute origin)
+  integer,parameter :: mem_cp = 6
+
+  integer,parameter :: cflag_center   = 0
+  integer,parameter :: cflag_boundary = 1
+
 !!!_  - character (symbols) for command-line
-  character(len=*),parameter :: param_sep = '='
-  character(len=*),parameter :: rename_sep = '/'
-  character(len=*),parameter :: range_sep = ':'
-  character(len=*),parameter :: item_sep = ','
-  character(len=*),parameter :: rec_append_sep = '/'
-  character(len=*),parameter :: rec_num_sep = '+'
+  character(len=*),parameter :: sep_param = '='
+  character(len=*),parameter :: sep_rename = '/'
+  character(len=*),parameter :: sep_range = ':'
+  character(len=*),parameter :: sep_item = ','
+  character(len=*),parameter :: sep_set = sep_item  ! alias
+  character(len=*),parameter :: sep_attr = ':'
+  character(len=*),parameter :: sep_rec_append = '/'
+  character(len=*),parameter :: sep_rec_num = '+'
+
+  character(len=*),parameter :: sep_lpad = '-'
+  character(len=*),parameter :: sep_rpad = '+'
 
   character(len=*),parameter :: insert_coor = '+'
   character(len=*),parameter :: delete_coor = '-'
@@ -108,6 +131,12 @@ module Jmz_param
 !!!_  - character (symbols) for ascii output
   character(len=*),parameter :: amiss = '_'  ! character for missing value
   character(len=*),parameter :: aext  = '.'  ! character for external
+
+!!!_  - dset entries
+  character(len=*),parameter :: DSET_PFX    = 'QX'
+  character(len=*),parameter :: DSET_R2G    = DSET_PFX // 'RFILE'
+  character(len=*),parameter :: DSET_PS2G   = DSET_PFX // 'PS2G'
+  character(len=*),parameter :: DSET_PSPROP = DSET_PFX // 'PSPROP'
 
 !!!_ + common variables
 !!!_  - convention parameters

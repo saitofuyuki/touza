@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2024/02/08 15:12:05 fuyuki mt_local.m4>
+dnl Time-stamp: <2024/07/11 21:34:52 fuyuki mt_local.m4>
 
 dnl Copyright: 2020-2023 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -31,6 +31,7 @@ MT_FORTRAN_BATCH_CHECK_FUNCTION([ftelli8], [0])
 MT_FORTRAN_BATCH_CHECK_MODULE([mpi_f08])
 MT_FORTRAN_BATCH_CHECK_MODULE([mpi])
 MT_FORTRAN_BATCH_CHECK_MODULE([mpi], [mpi_bcast])
+MT_FORTRAN_BATCH_CHECK_MODULE([mpi], [mpi_group_translate_ranks])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT8])

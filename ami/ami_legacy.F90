@@ -1,10 +1,10 @@
 !!!_! ami_legacy.F90 - TOUZA/Ami/legacy
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 19 2023
-#define TIME_STAMP 'Time-stamp: <2023/10/26 15:52:46 fuyuki ami_legacy.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/27 10:15:45 fuyuki ami_legacy.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2023
+! Copyright (C) 2023,2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 !!!_* include
@@ -70,6 +70,16 @@ module TOUZA_Ami_legacy
      module procedure write_rofile_legacy2_d
   end interface write_rofile_legacy2
 
+  interface open_geofile_tripolar
+     module procedure open_geofile_tripolar_d
+  end interface open_geofile_tripolar
+  interface read_geofile_tripolar
+     module procedure read_geofile_tripolar_d
+  end interface read_geofile_tripolar
+  interface read_skip_geofile_tripolar
+     module procedure read_skip_geofile_tripolar_d
+  end interface read_skip_geofile_tripolar
+
 !!!_ + public procedures
   public init, diag, finalize
   public open_rafile_legacy,  open_rofile_legacy
@@ -77,6 +87,7 @@ module TOUZA_Ami_legacy
   public read_rofile_legacy1, read_rofile_legacy2, read_rofile_legacy3
   public write_rafile_legacy
   public write_rofile_legacy1, write_rofile_legacy2
+  public open_geofile_tripolar, read_geofile_tripolar
 !!!_ + function-like macros
 !!!_ + procedures
 contains
@@ -837,6 +848,226 @@ contains
     endif
   end subroutine write_rofile_legacy2_d
 
+!!!_  - open_geofile_tripolar - open GEO-file (tripolar)
+  subroutine open_geofile_tripolar_d &
+       & (ierr, &
+       &  nx,   ny1,  ny2, &
+       &  file, u,         &
+       &  nz,   kz,   nic, ibbl, &
+       &  slat, plon, plat)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: sus_open
+    implicit none
+    integer,         intent(out)          :: ierr
+    integer,         intent(out)          :: nx, ny1, ny2
+    character(len=*),intent(in)           :: file
+    integer,         intent(in)           :: u
+    integer,         intent(out),optional :: nz,   kz,   nic, ibbl
+    real(kind=KTGT), intent(out),optional :: slat, plon, plat
+
+    integer j
+    integer di(2)
+    integer nzi, kzi, nici, ibbli
+    real(kind=KTGT) :: slati, ploni, plati
+    real(kind=KTGT) :: dv
+
+    ierr = 0
+
+    nx = 0
+    ny1 = 0
+    ny2 = 0
+
+    if (ierr.eq.0) then
+       call sus_open &
+            & (ierr, u, file, &
+            &  ACTION='R', STATUS='O', ACCESS='SEQ', FORM='F')
+    endif
+
+    if (ierr.eq.0) then
+       call read_skip_geofile_tripolar &
+            & (ierr,      u,         &
+            &  nx,        ny1,       ny2,     &
+            &  nz=nz,     kz=kz,     nic=nic, ibbl=ibbl, &
+            &  slat=slat, plon=plon, plat=plat)
+    endif
+  end subroutine open_geofile_tripolar_d
+
+!!!_  - read_geofile_tripolar - read GEO-file (tripolar)
+  subroutine read_geofile_tripolar_d &
+       & (ierr, &
+       &  u,    &
+       &  dy,   dz,   hi,   ageo, bgeo)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    implicit none
+    integer,         intent(out)          :: ierr
+    integer,         intent(in)           :: u
+    real(kind=KTGT), intent(out),optional :: dy(*),   dz(*), hi(*)
+    real(kind=KTGT), intent(out),optional :: ageo(*), bgeo(*)
+
+    ierr = 0
+    if (ierr.eq.0) rewind(u, IOSTAT=ierr)
+    if (ierr.eq.0) then
+       call read_skip_geofile_tripolar &
+            & (ierr,  u,     &
+            &  dy=dy, dz=dz, hi=hi, ageo=ageo, bgeo=bgeo)
+    endif
+
+  end subroutine read_geofile_tripolar_d
+!!!_  - read_skip_geofile_tripolar - read GEO-file (tripolar) core
+  subroutine read_skip_geofile_tripolar_d &
+       & (ierr, &
+       &  u,    &
+       &  nx,   ny1,  ny2,  nz,   kz, nic, ibbl, &
+       &  slat, plon, plat, &
+       &  dy,   dz,   hi,   ageo, bgeo)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    implicit none
+    integer,         intent(out)          :: ierr
+    integer,         intent(in)           :: u
+    integer,         intent(out),optional :: nx,      ny1,   ny2
+    integer,         intent(out),optional :: nz,      kz,    nic, ibbl
+    real(kind=KTGT), intent(out),optional :: slat,    plon,  plat
+    real(kind=KTGT), intent(out),optional :: dy(*),   dz(*), hi(*)
+    real(kind=KTGT), intent(out),optional :: ageo(*), bgeo(*)
+
+    integer         :: nxi,   ny1i,  ny2i
+    integer         :: nzi,   kzi,   nici, ibbli
+    real(kind=KTGT) :: slati, ploni, plati
+
+    integer         :: di(2)
+    real(kind=KTGT) :: d
+
+    integer,parameter :: to_read_none = -1
+    integer,parameter :: to_read_nx = 0
+    integer,parameter :: to_read_ny = 1
+    integer,parameter :: to_read_nz = 2
+    integer,parameter :: to_read_kz = 3
+    integer,parameter :: to_read_ni = 4
+    integer,parameter :: to_read_ij = 5 ! dummy
+    integer,parameter :: to_read_sl = 6
+    integer,parameter :: to_read_dy = 7
+    integer,parameter :: to_read_dz = 8
+    integer,parameter :: to_read_hi = 9
+    integer,parameter :: to_read_pp = 10
+    integer,parameter :: to_read_ag = 11
+    integer,parameter :: to_read_ib = 12
+    integer,parameter :: to_read_bg = 13
+
+    integer rsw
+    integer j, ny, nh
+
+    ierr = 0
+    if (present(bgeo)) then
+       rsw = to_read_bg
+    else if (present(ibbl)) then
+       rsw = to_read_ib
+    else if (present(ageo)) then
+       rsw = to_read_ag
+    else if (present(plon).or.present(plat)) then
+       rsw = to_read_pp
+    else if (present(hi)) then
+       rsw = to_read_hi
+    else if (present(dz)) then
+       rsw = to_read_dz
+    else if (present(dy)) then
+       rsw = to_read_dy
+    else if (present(slat)) then
+       rsw = to_read_sl
+    else if (present(nic)) then
+       rsw = to_read_ni
+    else if (present(kz)) then
+       rsw = to_read_kz
+    else if (present(nz)) then
+       rsw = to_read_nz
+    else if (present(ny1).or.present(ny2)) then
+       rsw = to_read_ny
+    else if (present(nx)) then
+       rsw = to_read_nx
+    else
+       rsw = to_read_none
+    endif
+
+    if (rsw.ge.to_read_nx) then
+       if (ierr.eq.0) read(u, *, IOSTAT=ierr)  nxi
+    endif
+    if (rsw.ge.to_read_ny) then
+       if (ierr.eq.0) read(u, *, IOSTAT=ierr)  ny1i, ny2i
+       if (ierr.eq.0) then
+          ny = ny1i + ny2i
+          nh = nxi * ny
+       endif
+    endif
+    if (rsw.ge.to_read_nz) then
+       if (ierr.eq.0) read(u, *, IOSTAT=ierr)  nzi
+    endif
+    if (rsw.ge.to_read_kz) then
+       if (ierr.eq.0) read(u, *, IOSTAT=ierr)  kzi
+    endif
+    if (rsw.ge.to_read_ni) then
+       if (ierr.eq.0) read(u, *, IOSTAT=ierr)  nici
+    endif
+    if (rsw.ge.to_read_ij) then
+       if (ierr.eq.0) read(u, *, IOSTAT=ierr)  di(1:2)   ! inodes jnodes
+    endif
+    if (rsw.ge.to_read_sl) then
+       if (ierr.eq.0) read(u, *, IOSTAT=ierr)  slati
+    endif
+    if (rsw.ge.to_read_dy) then
+       if (present(dy)) then
+          if (ierr.eq.0) read(u, *, IOSTAT=ierr)  dy(1:ny)
+       else
+          if (ierr.eq.0) read(u, *, IOSTAT=ierr)  (d, j = 1, ny)
+       endif
+    endif
+    if (rsw.ge.to_read_dz) then
+       if (present(dz)) then
+          if (ierr.eq.0) read(u, *, IOSTAT=ierr)  dz(1:nzi)
+       else
+          if (ierr.eq.0) read(u, *, IOSTAT=ierr)  (d, j = 1, nzi)
+       endif
+    endif
+    if (rsw.ge.to_read_hi) then
+       if (present(hi)) then
+          if (ierr.eq.0) read(u, *, IOSTAT=ierr)  hi(1:nici)
+       else
+          if (ierr.eq.0) read(u, *, IOSTAT=ierr)  (d, j = 1, nici)
+       endif
+    endif
+    if (rsw.ge.to_read_pp) then
+       if (ierr.eq.0) read(u, *, IOSTAT=ierr)  ploni, plati
+    endif
+    if (rsw.ge.to_read_ag) then
+       if (present(ageo)) then
+          if (ierr.eq.0) read(u, *, IOSTAT=ierr)  ageo(1:nh)
+       else
+          if (ierr.eq.0) read(u, *, IOSTAT=ierr)  (d, j = 1, nh)
+       endif
+    endif
+    if (rsw.ge.to_read_ib) then
+       if (ierr.eq.0) read(u, *, IOSTAT=ierr)  ibbli
+    endif
+    if (rsw.ge.to_read_bg) then
+       if (present(bgeo)) then
+          if (ierr.eq.0) read(u, *, IOSTAT=ierr)  bgeo(1:nh)
+       else
+          if (ierr.eq.0) read(u, *, IOSTAT=ierr)  (d, j = 1, nh)
+       endif
+    endif
+
+    if (ierr.eq.0) then
+       call set_if_present(nx,   nxi)
+       call set_if_present(ny1,  ny1i)
+       call set_if_present(ny2,  ny2i)
+       call set_if_present(nz,   nzi)
+       call set_if_present(kz,   kzi)
+       call set_if_present(nic,  nici)
+       call set_if_present(ibbl, ibbli)
+       call set_if_present(slat, slati)
+       call set_if_present(plon, ploni)
+       call set_if_present(plat, plati)
+    endif
+  end subroutine read_skip_geofile_tripolar_d
+
 !!!_ + end Ami_legacy
 end module TOUZA_Ami_legacy
 !!!_@ test_ami_legacy - test program
@@ -853,6 +1084,7 @@ program test_ami_legacy
   integer,parameter :: lpath = 256
   character(len=lpath) :: rafile
   character(len=lpath) :: rofile
+  character(len=lpath) :: geofile
   character(len=lpath) :: opfx, opath
 
   integer u
@@ -872,6 +1104,9 @@ program test_ami_legacy
 
   integer mdomo, mdoma
   integer kraf,  krof
+
+  integer gnx, gny1, gny2, ibbl
+  real(kind=KMD) slat, plon, plat
 
   ierr = 0
   jarg = 0
@@ -896,6 +1131,8 @@ program test_ami_legacy
   if (ierr.eq.0) call get_option(ierr, rafile, 'RA',  ' ')
   if (ierr.eq.0) call get_option(ierr, rofile, 'RO',  ' ')
   if (ierr.eq.0) call get_option(ierr, opfx,   'OUT',  ' ')
+
+  if (ierr.eq.0) call get_option(ierr, geofile, 'GEO',  ' ')
 
   if (ierr.eq.0) call arg_diag(ierr)
 
@@ -1019,6 +1256,18 @@ program test_ami_legacy
                    &  ruo, rvo, flandg, &
                    &  ijdim,    u,     swap, krof)
            endif
+        endif
+     endif
+  endif
+
+  if (ierr.eq.0) then
+     if (geofile.ne.' ') then
+        call open_geofile_tripolar &
+             & (ierr, gnx, gny1, gny2, geofile, u, &
+             &  ibbl=ibbl, slat=slat, plon=plon, plat=plat)
+        if (ierr.eq.0) then
+           write(*, *) 'geofile:n = ', gnx,  gny1, gny2, ibbl
+           write(*, *) 'geofile:p = ', slat, plon, plat
         endif
      endif
   endif

@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2024/02/15 13:38:14 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/21 17:23:49 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -423,9 +423,9 @@ contains
           cstr(jc) = trim(cran)
        else
           ls = len_trim(lpp(jc)%name)
-          jp = index(lpp(jc)%name(1:ls), rename_sep, back=.TRUE.)
-          if (jp.lt.ls-len(rename_sep)+1) then
-             write(cstr(jc), 102, IOSTAT=jerr) trim(lpp(jc)%name), rename_sep, trim(cran)
+          jp = index(lpp(jc)%name(1:ls), sep_rename, back=.TRUE.)
+          if (jp.lt.ls-len(sep_rename)+1) then
+             write(cstr(jc), 102, IOSTAT=jerr) trim(lpp(jc)%name), sep_rename, trim(cran)
           else
              write(cstr(jc), 103, IOSTAT=jerr) trim(lpp(jc)%name), trim(cran)
           endif
@@ -1233,7 +1233,7 @@ contains
     character(len=*),parameter :: cdigits  = '0123456789'
     character(len=*),parameter :: csymbols = '+-'
 
-    ! default rename_sep = '/'
+    ! default sep_rename = '/'
 
     ! NAME/REPL/RANGE    == NAME/REPL   RANGE
     ! NAME//RANGE        == NAME//      RANGE
@@ -1244,23 +1244,23 @@ contains
     !  RANGE      [num][:[num[:[num]]]]   begin:end:shift:cycle
 
     ierr = 0
-    lsep = len(rename_sep)
+    lsep = len(sep_rename)
     larg = len_trim(arg)
 
     no_range = .not.present(lpp)
 
-    js0 = index(arg, rename_sep)
+    js0 = index(arg, sep_rename)
     jran = -1
     if (js0.gt.0) then
        ! first /
        js0 = js0 + lsep
-       js1 = index(arg(js0:), rename_sep)
+       js1 = index(arg(js0:), sep_rename)
        if (js1.gt.0) then
           ! second /
           jran = js0 - 1 + js1 + lsep
           jrep = jran - lsep
           ! if (jran.le.larg) then
-          !    if (arg(jran:jran+lsep-1).eq.rename_sep) then
+          !    if (arg(jran:jran+lsep-1).eq.sep_rename) then
           !       jran = jran + lsep
           !    else
           !       jrep = jrep - lsep
@@ -1286,7 +1286,7 @@ contains
     endif
 
     if (jran.lt.0) then
-       if (index(arg(js0:larg), range_sep).eq.0) then
+       if (index(arg(js0:larg), sep_range).eq.0) then
           call parse_number(ierr, itmp, arg(js0:larg))
           if (ierr.eq.0) then
              jran = js0
@@ -1307,7 +1307,7 @@ contains
     rpos(3) = 0
     rpos(4) = 0
     lpp = def_loop
-    call split_list(nc, rpos, arg(jran:larg), range_sep, rmem, rdef(:))
+    call split_list(nc, rpos, arg(jran:larg), sep_range, rmem, rdef(:))
     if (nc.lt.0) then
        ierr = nc
        call message(ierr, 'cannot parse range: ' // trim(arg(jran:larg)))
@@ -1354,8 +1354,8 @@ contains
     integer,         intent(out) :: irange(2, 0:*)
     integer,         intent(in)  :: mco
     character(len=*),intent(in)  :: fmt
-    character(len=*),parameter :: csep = item_sep
-    character(len=*),parameter :: rsep = range_sep
+    character(len=*),parameter :: csep = sep_item
+    character(len=*),parameter :: rsep = sep_range
     integer jp, je, jr
     integer lf
     integer jerr
@@ -1954,9 +1954,9 @@ contains
        return
     endif
 
-    lsep = len(rename_sep)
-    jsep0 = find_next_sep(str, rename_sep, offset=0)
-    jsep1 = find_next_sep(str, rename_sep, jsep0+lsep, offset=0)
+    lsep = len(sep_rename)
+    jsep0 = find_next_sep(str, sep_rename, offset=0)
+    jsep1 = find_next_sep(str, sep_rename, jsep0+lsep, offset=0)
 
     call parse_number(ierr, idmy, str(1:jsep0))
     if (ierr.eq.0) then
