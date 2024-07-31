@@ -1,13 +1,18 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2024/07/24 16:02:44 fuyuki NEWS>
+# Time-stamp: <2024/07/31 17:59:38 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
 * Changes in 1.12.3.1 from 1.12.3
-** TOUZA/Zbt temporal fragile release
+** TOUZA/Zbt + TOUZA/Jmz/ConvOy alpha releases
+*** TOUZA/zbt - python interface of TOUZA library
+*** TOUZA/Jmz/ConvOy - remapping procedures
+** Bug fixes
+   - [FATAL] std_sus: file positioning fails at a large skipping.
+   - [CRITICAL] nio_cache: Need group decomposition by records.
 
 * Changes in 1.12.3 from 1.12.1
 ** Alpha release of remapping procedures

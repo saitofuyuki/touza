@@ -1,3 +1,21 @@
+Release-1.12.3.1 / 2024-07-31
+=============================
+  * Squash import of zbt and/or convoy developments (for test release).
+    * zbt: alpha release of python interface of TOUZA library.
+    * jmz/convoy: (still) alpha release of remapping procedures.
+      Previously named as qoxi.
+  * Bug fixes
+    * std: (sus) [FATAL] file positioning fails at a large skipping.
+      - Slice reading did not work when the starting position of the
+        target slice is away than 2Gbytes.
+      - Block reading did work.
+      - Probably this bug only damage the nnview.
+    * nio: (cache) [CRITICAL] Need group decomposition by records.
+      - Null records were allowed, which is much confusing.
+        Now the number of non-empty records are identical among group
+        members.
+    * nio: (header) [severe] type check in get_item excluded when string.
+
 Release-1.12.3 / 2024-06-20
 ===========================
   * Alpha release of remapping procedures
