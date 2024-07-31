@@ -1,10 +1,10 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2023/05/13 22:03:43 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/25 21:57:57 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2011-2023
+! Copyright (C) 2011-2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -48,21 +48,19 @@ module TOUZA_Std_log
   logical,save :: to_flush = .TRUE.
 !!!_  - interfaces
   interface msg
-     module procedure msg_is
-     module procedure msg_fs
-     module procedure msg_ds
-     module procedure msg_as
-     module procedure msg_ia
-     module procedure msg_fa
-     module procedure msg_da
-     module procedure msg_aa
      module procedure msg_txt
+     module procedure msg_is, msg_ia
+     module procedure msg_fs, msg_fa
+     module procedure msg_ds, msg_da
+     module procedure msg_as, msg_aa
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+     module procedure msg_qs, msg_qa
+#endif
   end interface msg
 
   interface msg_mdl
      module procedure msg_mdl_as
-     module procedure msg_mdl_is
-     module procedure msg_mdl_ia
+     module procedure msg_mdl_is, msg_mdl_ia
      module procedure msg_mdl_txt
   end interface msg_mdl
 
@@ -82,6 +80,8 @@ module TOUZA_Std_log
   end interface banner
 
 !!!_  - message levels
+  integer,parameter,public :: msglev_anyway   = MSG_LEVEL_ANYWAY
+
   integer,parameter,public :: msglev_panic    = MSG_LEVEL_PANIC
   integer,parameter,public :: msglev_fatal    = MSG_LEVEL_FATAL
   integer,parameter,public :: msglev_critical = MSG_LEVEL_CRITICAL
@@ -98,7 +98,7 @@ module TOUZA_Std_log
   public msg,  msg_grp, msg_mdl, msg_fun
   public gen_tag
   public is_msglev
-  public is_msglev_panic
+  public is_msglev_anyway,  is_msglev_panic
   public is_msglev_fatal,   is_msglev_critical, is_msglev_severe
   public is_msglev_warning, is_msglev_normal,   is_msglev_info
   public is_msglev_detail,  is_msglev_debug
@@ -111,7 +111,7 @@ contains
   subroutine init(ierr, u, levv, mode, bflush)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_init=>init, choice
-    use TOUZA_Std_prc,only: prc_init=>init
+    ! use TOUZA_Std_prc,only: prc_init=>init   ! included by TOUZA_Std_utl
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u             ! global log unit (untouch if unit_global)
@@ -135,7 +135,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_init(ierr, default_unit, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call prc_init(ierr, default_unit, levv=lv, mode=lmd)
           if (ierr.eq.0) call utl_init(ierr, default_unit, levv=lv, mode=lmd)
        endif
        to_flush = choice(to_flush, bflush)
@@ -150,7 +150,7 @@ contains
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_diag=>diag, choice
-    use TOUZA_Std_prc,only: prc_diag=>diag
+    ! use TOUZA_Std_prc,only: prc_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -173,7 +173,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -185,7 +185,7 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
-    use TOUZA_Std_prc,only: prc_finalize=>finalize
+    ! use TOUZA_Std_prc,only: prc_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -205,7 +205,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
@@ -225,7 +225,7 @@ contains
     integer,         intent(in),optional :: isfx
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv
-    integer c
+    integer c, cs
     integer lv
     integer mgrp, mmdl
     character(len=128) :: estr, tag
@@ -237,8 +237,14 @@ contains
           mgrp = c / ERR_MASK_GROUP
           mmdl = mod(c, ERR_MASK_GROUP) / ERR_MASK_MODULE
           c = mod(c, ERR_MASK_MODULE)
-101       format('trace_err:', I0, '=', I0, ',', I0, ',', I0)
-          write(estr, 101) ierr, mgrp, mmdl, c
+          cs = c + (ERR_MASK_SPECIFIC)
+          if (cs.gt.0) then
+103          format('trace_err:', I0, '=', I0, ',', I0, ',', I0, '+', I0)
+             write(estr, 103) ierr, mgrp, mmdl, -(ERR_MASK_SPECIFIC), cs
+          else
+101          format('trace_err:', I0, '=', I0, ',', I0, ',', I0)
+             write(estr, 101) ierr, mgrp, mmdl, c
+          endif
        else
 102       format('trace_err:', I0)
           write(estr, 102) ierr
@@ -462,6 +468,12 @@ contains
     r = VCHECK(levv, cond)
   end function is_msglev
 !!!_  & is_msglev_* - check message level (specific)
+  logical function is_msglev_ANYWAY(levv) &
+       & result(r)
+    integer,intent(in) :: levv
+    r = VCHECK(levv, msglev_anyway)
+  end function is_msglev_ANYWAY
+
   logical function is_msglev_PANIC(levv) &
        & result(r)
     integer,intent(in) :: levv
@@ -564,6 +576,24 @@ contains
 
   end subroutine msg_da
 
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  subroutine msg_qa &
+       & (fmt, vv, tag, u)
+    use TOUZA_Std_prc,only: KQPL
+    implicit none
+    character(len=*),intent(in)          :: fmt
+    real(kind=KQPL), intent(in)          :: vv(:)
+    character(len=*),intent(in)          :: tag
+    integer,         intent(in),optional :: u
+    character(len=ltxt) :: txt
+    integer jerr
+
+    write(txt, fmt, IOSTAT=jerr) vv(:)
+    call msg_txt(txt, tag, u)
+
+  end subroutine msg_qa
+#endif /* OPT_REAL_QUADRUPLE_DIGITS */
+
   subroutine msg_aa &
        & (fmt, vv, tag, u)
     use TOUZA_Std_prc,only: KDBL
@@ -628,6 +658,24 @@ contains
     call msg_txt(txt, tag, u)
 
   end subroutine msg_ds
+
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  subroutine msg_qs &
+       & (fmt, v, tag, u)
+    use TOUZA_Std_prc,only: KQPL
+    implicit none
+    character(len=*),intent(in)          :: fmt
+    real(kind=KQPL), intent(in)          :: v
+    character(len=*),intent(in)          :: tag
+    integer,         intent(in),optional :: u
+    character(len=ltxt) :: txt
+    integer jerr
+
+    write(txt, fmt, IOSTAT=jerr) v
+    call msg_txt(txt, tag, u)
+
+  end subroutine msg_qs
+#endif /* OPT_REAL_QUADRUPLE_DIGITS */
 
   subroutine msg_as &
        & (fmt, v, tag, u)

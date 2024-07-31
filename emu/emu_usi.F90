@@ -1,10 +1,10 @@
 !!!_! emu_usi.F90 - touza/emu usysio emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:30:54 fuyuki emu_usi.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/01 11:12:21 fuyuki emu_usi.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2023
+! Copyright (C) 2020-2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -382,7 +382,6 @@ contains
   subroutine open_sysout(ierr)
     use TOUZA_Std,only: &
          & choice, ndigits, &
-         & parse, get_nparam, get_param, &
          & msg_grp, get_wni, uout, is_msglev_INFO, new_unit
     implicit none
     integer,intent(out)         :: ierr

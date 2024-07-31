@@ -1,10 +1,10 @@
 !!!_! chak.F90 - TOUZA/Jmz CH(swiss) Army Knife
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/07/13 13:46:27 fuyuki chak.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/21 17:25:16 fuyuki chak.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023
+! Copyright (C) 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -26,6 +26,9 @@
 program chak
 !!!_ + Declaration
 !!!_  - modules
+  use Jmz_param
+  use Jmz_base, jb_init=>init, jb_finalize=>finalize
+  use Jmz_base, dbgv=>lev_debug
   use chak_lib,lib_init=>init, lib_finalize=>finalize
   use chak_opr,opr_init=>init, opr_diag=>diag, opr_finalize=>finalize
   use chak_file,file_init=>init
@@ -48,7 +51,9 @@ program chak
   integer,parameter :: bgn_file = def_read + 1
 
   type(file_t),target :: ofile(def_write:lfile-1)
-
+!!!_  - containers
+  integer,parameter :: def_vread = 0
+  type(container_t),target :: vcont(def_vread:lcontainer-1)
 !!!_  - buffers
   integer,save      :: lcount = 0   ! literal count
   integer,save      :: consts=0     ! predefine constants
@@ -138,7 +143,8 @@ contains
     if (ierr.eq.0) call file_init(ierr)
     if (ierr.eq.0) call register_predefined(ierr)
     if (ierr.eq.0) call init_sub(ierr)
-    if (ierr.eq.0) call nio_init(ierr, levv=dbgv, stdv=stdv)
+    ! if (ierr.eq.0) call nio_init(ierr, levv=dbgv, stdv=stdv)
+    if (ierr.eq.0) call nio_init(ierr, levv=dbgv)
     if (ierr.eq.0) call set_bodr_wnative(ierr, BODR_CHECK_VERBOSE, levv=dbgv)
     if (ierr.eq.0) call nr_init(ierr, lazy=+1)
 
@@ -560,32 +566,25 @@ contains
           if (jerr.ne.0) exit
           if (stat.ne.0) exit
           do
-             if (ierr.eq.0) then
-                call parse_arg_operator(ierr, arg, japos)
-                if (ierr.eq.0) exit
-                ierr = min(0, ierr)
-             endif
-             if (ierr.eq.0) then
-                call parse_arg_buffer(ierr, arg)
-                if (ierr.eq.0) exit
-                ierr = min(0, ierr)
-             endif
-             if (ierr.eq.0) then
-                call parse_arg_literal(ierr, arg)
-                if (ierr.eq.0) exit
-                ierr = min(0, ierr)
-             endif
-             if (ierr.eq.0) then
-                call parse_option(ierr, stat, japos, arg)
-                if (ierr.eq.0) exit
-                ierr = min(0, ierr)
-             endif
-             if (ierr.eq.0) then
-                call parse_arg_file(ierr, arg, japos)
-                if (ierr.eq.0) exit
-                ierr = min(0, ierr)
-             endif
-             if (ierr.eq.0) ierr = ERR_INVALID_ITEM
+             call parse_arg_operator(ierr, arg, japos)
+             if (ierr.le.0) exit
+
+             call parse_arg_buffer(ierr, arg)
+             if (ierr.le.0) exit
+
+             call parse_arg_literal(ierr, arg)
+             if (ierr.le.0) exit
+
+             call parse_arg_option(ierr, stat, japos, arg)
+             if (ierr.le.0) exit
+
+             call parse_arg_container(ierr, arg, japos)
+             if (ierr.le.0) exit
+
+             call parse_arg_file(ierr, arg, japos)
+             if (ierr.le.0) exit
+
+             ierr = ERR_INVALID_ITEM
              exit
           enddo
           if (ierr.ne.0) exit
@@ -607,8 +606,8 @@ contains
     endif
   end subroutine parse_args
 
-!!!_   . parse_option
-  subroutine parse_option &
+!!!_   . parse_arg_option
+  subroutine parse_arg_option &
        & (ierr, stat, japos, arg)
     use TOUZA_Std,only: parse_number, get_param
     implicit none
@@ -622,8 +621,8 @@ contains
     integer md, cmd, hmd
     integer ntmp
     integer hflag, hsub
-    character(len=64) :: xopts
-    integer xsub
+    character(len=64) :: xopts, iopts
+    integer xsub, isub
 
     md = mode_unset
     cmd = mode_unset
@@ -635,6 +634,8 @@ contains
     hsub = 0
     xsub = 0
     xopts = ' '
+    isub = 0
+    iopts = ' '
 
     if (index('-+', abuf(1:1)).eq.0) then
        ierr = ERR_NO_CANDIDATE   ! not error
@@ -707,6 +708,12 @@ contains
     else if (abuf(1:2).eq.'+X') then
        xsub = +1
        xopts = trim(abuf(3:))     ! special for default write
+    else if (abuf(1:2).eq.'-I') then
+       isub = -1
+       iopts = trim(abuf(3:))
+    else if (abuf(1:2).eq.'+I') then
+       isub = +1
+       iopts = trim(abuf(3:))
     else if (abuf.eq.'-P') then
        call check_only_global(ierr, abuf)
        if (ierr.eq.0) call set_user_offsets(ierr, 0, 0)
@@ -739,10 +746,12 @@ contains
        if (ierr.eq.0) call parse_hflag_option(ierr, hflag, hsub)
     else if (xsub.ne.0) then
        if (ierr.eq.0) call parse_xflag_option(ierr, xopts, xsub)
+    else if (isub.ne.0) then
+       if (ierr.eq.0) call parse_iflag_option(ierr, iopts, isub)
     else if (cmd.ne.mode_unset) then
        if (ierr.eq.0) call parse_operator_option(ierr, cmd)
     endif
-  end subroutine parse_option
+  end subroutine parse_arg_option
 !!!_    * count_option_levels
   integer function count_option_levels(str, ch) result(n)
     use TOUZA_Std,only: parse_number
@@ -890,6 +899,40 @@ contains
     endif
   end subroutine parse_xflag_option
 
+!!!_   . parse_iflag_option
+  subroutine parse_iflag_option(ierr, opts, mode)
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: opts
+    integer,         intent(in)  :: mode
+
+    integer jfile
+
+    ierr = 0
+    if (mfile.gt.lfile) then
+       ierr = ERR_INSUFFICIENT_BUFFER
+       return
+    endif
+    jfile = mfile - 1
+    if (jfile.lt.bgn_file) then
+       if (mode.gt.0) then
+          ! to implement iflag toggles
+          jfile = def_read
+       else
+          jfile = def_read
+       endif
+    endif
+    ! enable full extension
+    if (opts.eq.' ') then
+       ofile(jfile)%iflag = iflag_default
+    endif
+    if (scan(opts, 'Dd').gt.0) then
+       ofile(jfile)%iflag = iflag_dset
+    else
+       ofile(jfile)%iflag = iflag_default
+    endif
+  end subroutine parse_iflag_option
+
 !!!_   . parse_operator_option
   subroutine parse_operator_option(ierr, mode)
     implicit none
@@ -926,6 +969,78 @@ contains
     return
   end subroutine parse_operator_option
 
+!!!_   . parse_arg_container
+  subroutine parse_arg_container &
+       & (ierr, arg, japos, cfile)
+    use TOUZA_Std,only: choice
+    use TOUZA_Nio,only: cache_var_id, grp_suite
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(in)    :: arg
+    integer,         intent(inout) :: japos
+    integer,optional,intent(in)    :: cfile
+
+    integer jfile, jfb, jfe, jft
+    integer idv
+    integer cf
+    integer hcont, jcont
+
+    cf = choice(-1, cfile)
+    if (cf.ge.0) then
+       jfb = cf
+       jfe = cf + 1
+    else
+       jfb = bgn_file
+       jfe = min(mfile, lfile)
+    endif
+    idv = -1
+    jft = -1
+    do jfile = jfb, jfe - 1
+       if (is_read_mode(ofile(jfile)%mode) &
+            & .and. ofile(jfile)%kfmt.eq.cfmt_gtool_cache) then
+          idv = cache_var_id(arg, ofile(jfile)%u, grp_suite)
+          if (idv.ge.0) then
+             jft = jfile
+             exit
+          endif
+       endif
+    enddo
+    if (idv.ge.0) then
+       call new_container(ierr, hcont)
+       if (ierr.eq.0) then
+          write(*, *) 'container', idv, jfile
+
+       endif
+    endif
+    ierr = ERR_NO_CANDIDATE
+
+    ! search through cache-type files
+
+
+    ! ierr = 0
+    ! if (ierr.eq.0) call parse_file_item(ierr, mpath, mitem, arg)
+    ! if (ierr.eq.0) then
+    !    if (mpath.eq.0) then
+    !       ierr = ERR_NO_CANDIDATE
+    !    else
+    !       call cache_open_read(ierr, ch, arg(1:mpath), flag=0)
+    !       if (ierr.eq.0) call last_queue(ierr, lasth)
+    !       if (ierr.eq.0) then
+    !          if (lasth.eq.opr_OUTPUT) then
+    !             ierr = ERR_INVALID_PARAMETER
+    !             call message(ierr, 'Cached-file item cannot work as output.')
+    !          endif
+    !       endif
+    !       if (ierr.eq.0) then
+    !          if (is_msglev_DEBUG(dbgv)) call show_cache(ierr, ch, levv=lev_verbose)
+    !       endif
+    !    endif
+    ! else
+    !    ierr = ERR_NO_CANDIDATE
+    ! endif
+    ! if (ierr.le.0) call message(ierr, 'trace:parse_arg_container', levm=-9)
+  end subroutine parse_arg_container
+
 !!!_   . parse_arg_file
   subroutine parse_arg_file &
        & (ierr, arg, japos)
@@ -933,11 +1048,43 @@ contains
     integer,         intent(out)   :: ierr
     character(len=*),intent(in)    :: arg
     integer,         intent(inout) :: japos
+    integer lasth
+    integer mpath, mitem
+
+    ierr = 0
+    if (ierr.eq.0) call parse_file_item(ierr, mpath, mitem, arg)
+    if (ierr.ne.0) then
+       ierr = ERR_NO_CANDIDATE
+       return
+    endif
+
+    if (ierr.eq.0) call last_queue(ierr, lasth)
+    if (ierr.eq.0) then
+       if (lasth.eq.opr_OUTPUT) then
+          ! if (mpath.gt.0) then
+          !    ierr = ERR_INVALID_PARAMETER
+          !    call message(ierr, 'Cached-file item cannot work as output.')
+          !    return
+          ! endif
+          call parse_arg_ofile(ierr, arg, japos)
+       else if (mpath.gt.0) then
+          call parse_arg_cfile(ierr, arg, mpath, mitem)
+       else
+          call parse_arg_ifile(ierr, arg)
+       endif
+    endif
+  end subroutine parse_arg_file
+
+!!!_   . parse_arg_ofile
+  subroutine parse_arg_ofile &
+       & (ierr, arg, japos)
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(in)    :: arg
+    integer,         intent(inout) :: japos
     integer hfile, hbuf
     integer jb
-    integer lasth
     integer jf
-    integer nbufs
     character(len=lname) :: bname
     integer oentr
     integer jerr
@@ -946,74 +1093,129 @@ contains
     integer jx
 
     ierr = 0
+
     call new_file(ierr, hfile, arg)
     if (ierr.eq.0) then
        if (hfile.lt.0) ierr = ERR_INVALID_ITEM
     endif
-    if (ierr.eq.0) call last_queue(ierr, lasth)
+    ! discard last OUTPUT operator
+    if (ierr.eq.0) call pop_queue(ierr)
     if (ierr.eq.0) then
        jf = file_h2item(hfile)
-       if (lasth.eq.opr_OUTPUT) then
-          ! file to write
-          ! call show_stack(ierr)
-          call pop_queue(ierr)
-          ofile(jf)%mode  = ofile(def_write)%mode
-          ofile(jf)%hedit = ofile(def_write)%hedit
-          ofile(jf)%hflag = ofile(def_write)%hflag
-          ofile(jf)%bigg  = ofile(def_write)%bigg
-          if (ierr.eq.0) call parse_prefetch_tuples(ierr, niter, hiter, ntup, -1, arg, japos)
-          if (ierr.eq.0) then
-             if (hiter.ge.0.and.hiter.ne.opr_ITER) then
-                ierr = ERR_INVALID_PARAMETER
-                call message(ierr, 'Modifier operator conflicts with output.')
-             endif
-          endif
-          if (ierr.eq.0) then
-             niter = adj_iterates(1, niter)
-             call check_fetch(ierr, nfetch, npop, niter, 1, hfile)
-          endif
-          if (ierr.eq.0) call append_queue(ierr, hfile, pop=npop, push=0)
-          if (ierr.eq.0) then
-             do jx = 0, nfetch - 1
-                if (ierr.eq.0) call pop_stack(ierr, hbuf)
-                if (ierr.eq.0) then
-                   ! fake operator for file handle
-                   jb = buf_h2item(hbuf)
-                   obuffer(jb)%stt = buf_locked
-                   if (nfetch.eq.1) then
-                      write(bname, bfmt_write_buf, IOSTAT=jerr) user_index_bgn(wcount)
-                   else
-                      write(bname, bfmt_write_filter, IOSTAT=jerr) &
-                           & user_index_bgn(wcount), user_index_bgn(nfetch - jx - 1)
-                   endif
-                   if (ierr.eq.0) call reg_fake_opr(oentr, hbuf, bname)
-                   if (ierr.eq.0) obuffer(jb)%name = trim(bname)
-                endif
-             enddo
-          endif
-          if (ierr.eq.0) call mset_stack_queue(ierr, pop=(npop - nfetch))
-          if (ierr.eq.0) ofile(jf)%opr = hfile
-          if (ierr.eq.0) wcount = wcount + 1
-       else
-          if (.not.associated(ofile(def_read)%rgrp)) then
-             call add_default_records(ierr, ofile(def_read))
-          endif
-          if (ierr.eq.0) then
-             rcount = rcount + 1
-             nbufs = count_file_stacks(ofile(def_read))
-             ! file to read
-             ofile(jf)%mode = mode_read
-             ofile(jf)%bigg = ofile(def_read)%bigg
-             ofile(jf)%rgrp => ofile(def_read)%rgrp
-             call alloc_file_buffers(ierr, oentr, nbufs, rcount-1, 0)
-             if (ierr.eq.0) ofile(jf)%opr = oentr
-          endif
-          if (ierr.eq.0) then
-             call append_queue_stack(ierr, hfile, 0, nbufs)
-          endif
+       ofile(jf)%mode  = ofile(def_write)%mode
+       ofile(jf)%hedit = ofile(def_write)%hedit
+       ofile(jf)%hflag = ofile(def_write)%hflag
+       ofile(jf)%iflag = ofile(def_write)%iflag
+       ofile(jf)%bigg  = ofile(def_write)%bigg
+    endif
+
+    if (ierr.eq.0) then
+       call parse_prefetch_tuples(ierr, niter, hiter, ntup, -1, arg, japos)
+    endif
+    if (ierr.eq.0) then
+       if (hiter.ge.0.and.hiter.ne.opr_ITER) then
+          ierr = ERR_INVALID_PARAMETER
+          call message(ierr, 'Modifier operator conflicts with output.')
        endif
     endif
-  end subroutine parse_arg_file
+    if (ierr.eq.0) then
+       niter = adj_iterates(1, niter)
+       call check_fetch(ierr, nfetch, npop, niter, 1, hfile)
+    endif
+    if (ierr.eq.0) call append_queue(ierr, hfile, pop=npop, push=0)
+    if (ierr.eq.0) then
+       do jx = 0, nfetch - 1
+          if (ierr.eq.0) call pop_stack(ierr, hbuf)
+          if (ierr.eq.0) then
+             ! fake operator for file handle
+             jb = buf_h2item(hbuf)
+             obuffer(jb)%stt = buf_locked
+             if (nfetch.eq.1) then
+                write(bname, bfmt_write_buf, IOSTAT=jerr) user_index_bgn(wcount)
+             else
+                write(bname, bfmt_write_filter, IOSTAT=jerr) &
+                     & user_index_bgn(wcount), user_index_bgn(nfetch - jx - 1)
+             endif
+             if (ierr.eq.0) call reg_fake_opr(oentr, hbuf, bname)
+             if (ierr.eq.0) obuffer(jb)%name = trim(bname)
+          endif
+       enddo
+    endif
+    if (ierr.eq.0) call mset_stack_queue(ierr, pop=(npop - nfetch))
+    if (ierr.eq.0) ofile(jf)%opr = hfile
+    if (ierr.eq.0) wcount = wcount + 1
+  end subroutine parse_arg_ofile
+!!!_   . parse_arg_ifile
+  subroutine parse_arg_ifile &
+       & (ierr, arg)
+    use TOUZA_Nio,only: cache_open_read, show_cache
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(in)    :: arg
+    integer hfile
+    integer jf
+    integer nbufs
+    integer oentr
+
+    ierr = 0
+    call new_file(ierr, hfile, arg)
+    if (ierr.eq.0) then
+       if (hfile.lt.0) ierr = ERR_INVALID_ITEM
+    endif
+    if (ierr.eq.0) then
+       jf = file_h2item(hfile)
+       if (.not.associated(ofile(def_read)%rgrp)) then
+          call add_default_records(ierr, ofile(def_read))
+       endif
+       if (ierr.eq.0) then
+          rcount = rcount + 1
+          nbufs = count_file_stacks(ofile(def_read))
+          ! file to read
+          ofile(jf)%mode = mode_read
+          ofile(jf)%bigg = ofile(def_read)%bigg
+          ofile(jf)%rgrp => ofile(def_read)%rgrp
+          call alloc_file_buffers(ierr, oentr, nbufs, rcount-1, 0)
+          if (ierr.eq.0) ofile(jf)%opr = oentr
+       endif
+       if (ierr.eq.0) then
+          call append_queue_stack(ierr, hfile, 0, nbufs)
+       endif
+    endif
+  end subroutine parse_arg_ifile
+
+!!!_   . parse_arg_cfile
+  subroutine parse_arg_cfile &
+       & (ierr, arg, mpath, mitem)
+    use TOUZA_Nio,only: cache_open_read, show_cache
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: arg
+    integer,         intent(in)  :: mpath, mitem
+    integer hcache, hfile
+    integer jf
+
+    ierr = 0
+    call cache_open_read(ierr, hcache, arg(1:mpath), flag=0)
+    if (ierr.ne.0) then
+       call message(ierr, 'Failed to open as cache: ' // arg(1:mpath))
+       return
+    endif
+    if (ierr.eq.0) call new_file(ierr, hfile, arg(1:mpath))
+    if (ierr.eq.0) then
+       if (hfile.lt.0) ierr = ERR_INVALID_ITEM
+    endif
+    if (ierr.eq.0) then
+       rcount = rcount + 1
+       jf = file_h2item(hfile)
+       ! file to read
+       ofile(jf)%u    = hcache
+       ofile(jf)%mode = mode_read
+       ofile(jf)%bigg = ofile(def_read)%bigg
+       ofile(jf)%kfmt = cfmt_gtool_cache
+    endif
+
+    if (is_msglev_DEBUG(dbgv)) call show_cache(ierr, hcache, levv=lev_verbose)
+  end subroutine parse_arg_cfile
 
 !!!_   . alloc_file_buffers
   subroutine alloc_file_buffers(ierr, entr, nbufs, jtag, jsub)
@@ -1223,7 +1425,7 @@ contains
 !!!_    * parse_prefetch_tuples - prefetch tuple and ITER-type operators
   subroutine parse_prefetch_tuples &
        & (ierr, niter, hiter, ntup, htup, arg, japos, contr)
-    use TOUZA_Std,only: parse_number, get_param
+    use TOUZA_Std,only: get_param
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(out)   :: niter
@@ -1246,6 +1448,8 @@ contains
     else
        ntup = tuple_null
     endif
+    ! write(*, *) 'prefetch/first', ierr, japos, ntup, htup, trim(arg)
+
     hiter = -1
     niter = tuple_null
     if (ierr.eq.0) then
@@ -1287,7 +1491,7 @@ contains
     ierr = 0
     nrep = tuple_default
 
-    jpar = index(arg, param_sep) + 1
+    jpar = index(arg, sep_param) + 1
     jend = len_trim(arg) + 1
     if (jpar.eq.1) jpar = jend + 1
     if (jpar.lt.jend) then
@@ -1305,13 +1509,16 @@ contains
              hnxt = parse_term_operator(abuf)
              if (hnxt.ne.hopr) exit
 
-             jpar = index(abuf, param_sep) + 1
+             jpar = index(abuf, sep_param) + 1
              jend = len_trim(abuf) + 1
              if (jpar.eq.1) jpar = jend + 1
              inxt = 0
              if (jpar.lt.jend) then
                 call parse_number(ierr, inxt, abuf(jpar:jend-1))
-                if (ierr.ne.0) exit
+                if (ierr.ne.0) then
+                   ierr = 0
+                   exit
+                endif
                 nadd  = nadd + max(0, inxt)
              else
                 nadd  = nadd + 1
@@ -1341,7 +1548,7 @@ contains
     if (ierr.eq.0) jb = buf_h2item(hbuf)
     if (ierr.eq.0) ierr = min(0, jb)
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
        select case(hopr)
@@ -1388,7 +1595,7 @@ contains
 
     integer jc
     integer jpb, jpe, larg
-    character,parameter :: csep = item_sep       ! coordinate separaor
+    character,parameter :: csep = sep_item       ! coordinate separaor
 
     integer jq
     integer jsbgn, jsend
@@ -1452,17 +1659,21 @@ contains
     if (ierr.eq.0) jb = buf_index(hobj)
     if (ierr.eq.0) ierr = min(0, jb)
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
        select case(hopr)
        case(opr_TAG)
           if (jpar.lt.jend) then
-             obuffer(jb)%name = arg(jpar:jend-1)
-             obuffer(jb)%stt  = buf_locked
-             hbuf = buf_handle(hobj)
-             call reg_fake_opr(oentr, hbuf, obuffer(jb)%name)
-             ierr = min(0, ierr)
+             call reg_buffer_tag(ierr, hobj, arg(jpar:jend-1))
+             ! obuffer(jb)%name = arg(jpar:jend-1)
+             ! obuffer(jb)%stt  = buf_locked
+             ! hbuf = buf_handle(hobj)
+             ! call reg_fake_opr(oentr, hbuf, obuffer(jb)%name)
+             ! ierr = min(0, oentr)
+          else
+             ierr = ERR_INVALID_PARAMETER
+             call message(ierr, 'Need parameter for ' // trim(arg))
           endif
        case(opr_MISS)
           if (jpar.lt.jend) then
@@ -1484,6 +1695,28 @@ contains
     return
   end subroutine parse_buffer_opr
 
+!!!_   . reg_buffer_tag
+  subroutine reg_buffer_tag &
+       & (ierr, hobj, name)
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: hobj
+    character(len=*),intent(in)  :: name
+    integer jbuf
+    integer oentr, hbuf
+
+    ierr = 0
+    if (ierr.eq.0) jbuf = buf_index(hobj)
+    if (ierr.eq.0) ierr = min(0, jbuf)
+    if (ierr.eq.0) then
+       obuffer(jbuf)%name = name
+       obuffer(jbuf)%stt  = buf_locked
+       hbuf = buf_handle(hobj)
+       call reg_fake_opr(oentr, hbuf, obuffer(jbuf)%name)
+       ierr = min(0, oentr)
+    endif
+  end subroutine reg_buffer_tag
+
 !!!_   . stack_buffer_opr
   subroutine stack_buffer_opr (ierr, hopr)
     implicit none
@@ -1501,7 +1734,6 @@ contains
 
 !!!_   . parse_shape_opr
   subroutine parse_shape_opr (ierr, hopr, arg)
-    use TOUZA_Std,only: parse_number
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: hopr
@@ -1514,7 +1746,7 @@ contains
     if (ierr.eq.0) jb = buf_index(hobj)
     if (ierr.eq.0) ierr = min(0, jb)
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
        select case(hopr)
@@ -1645,7 +1877,7 @@ contains
     integer,         intent(in)    :: hopr
     integer,optional,intent(in)    :: lflag
 
-    character,parameter :: csep = item_sep       ! coordinate separaor
+    character,parameter :: csep = sep_item       ! coordinate separaor
     integer jc
     integer larg
     integer jpb, jpe, jrep
@@ -1703,7 +1935,7 @@ contains
 
 !!!_   . parse_stack_opr
   subroutine parse_stack_opr (ierr, hopr, arg, japos)
-    use TOUZA_Std,only: parse_number
+    use TOUZA_Std,only: parse_number, split_heads
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(in)    :: hopr
@@ -1713,21 +1945,30 @@ contains
     integer niter, hiter
     integer jpar,  jend, jerr, k
     integer upop,  upush
+    integer ldmy(1)
 
     ierr = 0
     ! need special care for POP[=TAG]
     if (hopr.eq.opr_POP) then
-       jpar = index(arg, param_sep) + 1
+       jerr = 0  ! non-zero reserved for tagged POP
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
-       if (jpar.lt.jend) then
-          call parse_number(jerr, k, arg(jpar:jend-1))
-          if (jerr.ne.0) then
-             call parse_buffer_opr(ierr, opr_TAG, arg)
-             jend = jpar - 1
+       if (jpar.lt.jend) call parse_number(jerr, k, arg(jpar:jend-1))
+       if (ierr.eq.0) then
+          if (jerr.eq.0) then
+             call parse_prefetch_tuples(ierr, niter, hiter, ntup, hopr, arg(1:jend-1), japos)
+          else
+             call split_heads(ntup, ldmy, arg(jpar:jend-1), sep_item, -1, empty=.TRUE.)
+             call parse_pop_list(ierr, niter, hiter, ntup, arg(jpar:jend-1))
+             ! write(*, *) niter
+             ! call parse_buffer_opr(ierr, opr_TAG, arg)
+             ! niter = tuple_null
+             ! ntup = tuple_default
+             ! hiter = -1
           endif
        endif
-       if (ierr.eq.0) call parse_prefetch_tuples(ierr, niter, hiter, ntup, hopr, arg(1:jend-1), japos)
+       ! write(*, *) ierr, hiter, niter, ntup
     else if (hopr.eq.opr_ROLL) then
        ! no contraction
        if (ierr.eq.0) call parse_prefetch_tuples(ierr, niter, hiter, ntup, hopr, arg, japos, .FALSE.)
@@ -1781,11 +2022,48 @@ contains
     end select
   end subroutine parse_stack_opr
 
+!!!_   . parse_pop_list
+  subroutine parse_pop_list &
+       & (ierr, niter, hiter, ntup, arg)
+    use TOUZA_Std,only: split_heads
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: niter, hiter
+    integer,         intent(in)  :: ntup
+    character(len=*),intent(in)  :: arg
+    integer jhead(0:ntup), hobjs(0:ntup-1)
+    integer ji
+    integer m, lsp
+    integer jab, jae
+
+    ierr = 0
+    niter = tuple_null
+    hiter = -1
+
+    if (ntup.lt.0) then
+       ierr = ERR_INVALID_PARAMETER
+       return
+    endif
+    lsp = len(sep_item)
+    call split_heads(m, jhead, arg, sep_item, ntup, empty=.TRUE.)
+    ierr = min(0, m)
+    if (ierr.eq.0) call mpop_stack(ierr, hobjs, ntup, .TRUE.)
+    ! write(*, *) jhead(0:niter)
+    do ji = 0, ntup - 1
+       if (ierr.eq.0) then
+          jab = jhead(ji) + lsp
+          jae = jhead(ji + 1)
+          call reg_buffer_tag(ierr, hobjs(ji), arg(jab:jae-1))
+       endif
+    enddo
+  end subroutine parse_pop_list
+
 !!!_   . parse_header_opr
   subroutine parse_header_opr (ierr, hopr, arg)
     use TOUZA_Nio,only: hi_ITEM, hi_TITL1, hi_UNIT, hi_EDIT1, hi_DSET
-    use TOUZA_Nio,only: hi_MISS
+    use TOUZA_Nio,only: hi_MISS, hi_ETTL1
     use TOUZA_Nio,only: put_item, store_item
+    use TOUZA_Nio,only: show_header
     use TOUZA_Std,only: parse_number
     implicit none
     integer,         intent(out) :: ierr
@@ -1814,9 +2092,8 @@ contains
        endif
        jfw = jfr
     endif
-
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend
        select case(hopr)
@@ -1852,7 +2129,7 @@ contains
              ierr = ERR_INVALID_ITEM
              call message(ierr, 'no file to set record filter' // trim(arg))
           endif
-       case(opr_ITEM, opr_UNIT, opr_TITLE, opr_EDIT, opr_DSET)
+       case(opr_ITEM, opr_UNIT, opr_TITLE, opr_EDIT, opr_DSET, opr_ETITLE)
           select case(hopr)
           case(opr_ITEM)
              jitem = hi_ITEM
@@ -1860,6 +2137,8 @@ contains
              jitem = hi_UNIT
           case(opr_TITLE)
              jitem = hi_TITL1
+          case(opr_ETITLE)
+             jitem = hi_ETTL1
           case(opr_EDIT)
              jitem = hi_EDIT1
           case(opr_DSET)
@@ -1867,6 +2146,7 @@ contains
           end select
           if (jfw.ge.0) then
              call put_item(ierr, ofile(jfw)%h, arg(jpar:), jitem, 0)
+             ! call show_header(ierr, ofile(jfw)%h)
           else
              ierr = ERR_INVALID_ITEM
              call message(ierr, 'no file to set header ' // trim(arg))
@@ -1906,7 +2186,7 @@ contains
 
     ierr = 0
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend + 1
 
@@ -1935,7 +2215,6 @@ contains
 
 !!!_   . stack_reduction_opr
   subroutine stack_reduction_opr (ierr, hopr, arg, iter)
-    use TOUZA_Std,only: parse_number
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: hopr
@@ -1951,7 +2230,7 @@ contains
     integer nfetch, ntgt
     integer jb,     jx
 
-    character,parameter :: csep = item_sep       ! coordinate separaor
+    character,parameter :: csep = sep_item       ! coordinate separaor
     integer   jq
     integer   jsbgn, jsend
 
@@ -1995,7 +2274,7 @@ contains
     if (ierr.eq.0) call mset_stack_queue(ierr, pop=(npop - ntgt))
 
     if (ierr.eq.0) then
-       jpar = index(arg, param_sep) + 1
+       jpar = index(arg, sep_param) + 1
        jend = len_trim(arg) + 1
        if (jpar.eq.1) jpar = jend
        if (arg(jpar:jend-1).eq.shape_sweep_reduce) jpar = jend
@@ -2717,6 +2996,7 @@ contains
 
     integer niter, npop, npush, nopr
     integer apos,  alev
+    integer jerr
 
     ierr = 0
 
@@ -2757,6 +3037,7 @@ contains
        if (npop.gt.mstack) then
           ierr = ERR_INVALID_PARAMETER
           call message(ierr, 'POP exhausts the stacks')
+          call show_stack(jerr)
        endif
     endif
     if (ierr.eq.0) call append_queue(ierr, hopr, npop, npush)
@@ -2818,7 +3099,6 @@ contains
 
 !!!_   . parse_anchor_opr
   subroutine parse_anchor_opr (ierr, hopr, arg, japos)
-    use TOUZA_Std,only: parse_number
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(in)    :: hopr
@@ -2894,7 +3174,7 @@ contains
              if (is_anchor(bstack(jx)%bh)) then
                 continue
              else
-                if (ierr.eq.0) call queue_fetch_stack(ierr, 1, jx, ssrc=js)
+                if (ierr.eq.0) call queue_fetch_stack(ierr, 1, js, ssrc=jx)
                 js = js + 1
              endif
           enddo
@@ -2964,7 +3244,7 @@ contains
     implicit none
     character(len=*),intent(in) :: arg
     integer jpar, jend
-    jpar = index(arg, param_sep) + 1
+    jpar = index(arg, sep_param) + 1
     jend = len_trim(arg) + 1
     if (jpar.eq.1) jpar = jend + 1
     if (arg(jpar:jend-1).eq.shape_sweep_stack) then
@@ -4111,7 +4391,6 @@ contains
     integer n
     character(len=litem) :: head(nitem)
     integer xrec, crec
-    ! integer(kind=KIOFS) :: jpos
 
     ierr = 0
     nrg = size(file%rgrp)
@@ -4124,35 +4403,27 @@ contains
        ns = count_filter_records(file%rgrp(jrg)%filter(jrf))
        jse = jsb + ms
        ji  = file%rgrp(jrg)%sub
-       ! write(*, *) 'push_file', jrg, jrf, ji, file%rgrp(jrg)%pos, ns, push
        crec = get_current_rec(file%rgrp(jrg)%filter(jrf), ji)
        if (file%kfmt.eq.cfmt_ascii) then
           continue
        else
           if (ierr.eq.0) call sus_rseek(ierr, file%u, file%rgrp(jrg)%pos, WHENCE_ABS)
        endif
-       ! write(*, *) 'rseek', ierr
        do js = 0, ns - 1
           jb = buf_h2item(lefts(jsb + js)%bh)
           xrec = get_current_rec(file%rgrp(jrg)%filter(jrf), ji, js)
-          ! inquire(file%u, POS=jpos)
-          ! write(*, *) jrg, js, xrec, crec
           if (ierr.eq.0) call read_file_header(ierr, head, file, xrec, crec, ofile(def_read))
-          ! write(*, *) 'read_header', ierr
-          ! inquire(file%u, POS=jpos)
-          ! write(*, *) 'after', jpos - 1
           if (ierr.eq.0) then
-             if (jsb + js.eq.0) file%h(:) = head(:)
+             file%h(:) = head(:)
              n = parse_header_size(head, 0, lazy=1)
              obuffer(jb)%k = suggest_type(head)
              call alloc_buffer_t(ierr, obuffer(jb), n)
           endif
           if (ierr.eq.0) then
              call read_file_data(ierr, obuffer(jb)%vd, n, file)
-             ! write(*, *) 'read_push_file', jg, js, ji, xrec, n, ierr
           endif
           if (ierr.eq.0) then
-             call set_buffer_attrs(ierr, obuffer(jb), head, handle, file%hflag)
+             call set_buffer_attrs(ierr, obuffer(jb), head, handle, file%hflag, file%iflag)
           endif
           if (ierr.eq.0) then
              crec = xrec + 1
@@ -4175,32 +4446,45 @@ contains
 
 !!!_   . set_buffer_attrs
   subroutine set_buffer_attrs &
-       & (ierr, buf, head, handle, hflag)
-    use TOUZA_Std,only: upcase
+       & (ierr, buf, head, handle, hflag, iflag)
+    use TOUZA_Std,only: upcase, is_symbol
     use TOUZA_Nio,only: get_item, get_item_date, restore_item
-    use TOUZA_Nio,only: hi_MISS, hi_ITEM, hi_DATE, hi_TIME
+    use TOUZA_Nio,only: hi_MISS, hi_ITEM, hi_DATE, hi_TIME, hi_DSET
     implicit none
     integer,         intent(out)   :: ierr
     type(buffer_t),  intent(inout) :: buf
     character(len=*),intent(in)    :: head(*)
     integer,         intent(in)    :: handle
     integer,         intent(in)    :: hflag
+    integer,         intent(in)    :: iflag
 
     integer jerr
     character(len=128) :: txt, tsfx
     character(len=ldesc) :: tdesc
+    character(len=litem) :: item, dset
 
     ierr = 0
     if (ierr.eq.0) call get_item(ierr, head, buf%undef, hi_MISS, def=UNDEF)
+    if (ierr.eq.0) call get_item(ierr, head, item, hi_ITEM)
     if (ierr.eq.0) then
-       call get_item(ierr, head, buf%desc, hi_ITEM)
-       if (buf%desc.eq.' ') then
+       if (item.eq.' ') then
           buf%desc = buf%name
           buf%desc2 = buf%name
        else
-          tdesc = adjustl(buf%desc)
-          call upcase(tdesc)
-          if (verify(trim(tdesc), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789').eq.0) then
+          item = adjustl(item)
+          if (iflag.eq.iflag_dset) then
+             call get_item(jerr, head, dset, hi_DSET)
+             if (jerr.ne.0) dset = ' '
+             if (dset.ne.' ') then
+                buf%desc = trim(dset) // '/' // trim(item)
+             else
+                buf%desc = item
+             endif
+          else
+             buf%desc = item
+          endif
+          ! if (verify(trim(tdesc), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789').eq.0) then
+          if (is_symbol(item)) then
              buf%desc2 = adjustl(trim(buf%desc))
           else
              buf%desc2 = '<' // adjustl(trim(buf%desc)) // '>'
@@ -4381,7 +4665,8 @@ contains
     endif
     if (ierr.eq.0) then
        if (file%fmt.ne.' ') then
-          call put_item(ierr, head, file%fmt,  hi_DFMT)
+          call put_header_fmt(ierr, head, file%fmt)
+          ! call put_item(ierr, head, file%fmt,  hi_DFMT)
           call parse_record_fmt(jerr, kfmt, file%fmt)
        else
           call get_item(jerr, head, tstr,  hi_DFMT)
@@ -4407,7 +4692,7 @@ contains
        n = parse_header_size(head, 0, lazy=1)
     endif
 
-    if (file%kfmt.le.cfmt_org) then
+    if (file%kfmt.lt.cfmt_gtool) then
        if (ierr.eq.0) then
           ! file%t = REC_DEFAULT
           file%t = REC_BIG
@@ -4540,11 +4825,11 @@ contains
     if (jerr.eq.0) call parse_record_fmt(jerr, kfmt, vp)
     if (jerr.eq.0) then
        select case (kfmt)
-       case (GFMT_UR4, GFMT_MR4)
+       case (GFMT_UR4, GFMT_MR4, GFMT_PR4)
           k = kv_flt
-       case (GFMT_UR8, GFMT_MR8)
+       case (GFMT_UR8, GFMT_MR8, GFMT_PR8)
           k = kv_dbl
-       case (GFMT_UI4, GFMT_MI4)
+       case (GFMT_UI4, GFMT_MI4, GFMT_PI4)
           k = kv_int
        case (GFMT_URC,GFMT_URC2)
           k = kv_dbl
@@ -4648,6 +4933,45 @@ contains
     if (ierr.ne.0) write(str, 103, IOSTAT=ierr) handle
   end subroutine get_obj_string
 
+!!!_  - container manager
+!!!_   . new_container
+  subroutine new_container &
+       & (ierr, handle)
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(out) :: handle
+    integer jc
+
+    ierr = 0
+    jc = mcontainer
+    mcontainer = mcontainer + 1
+    if (jc.ge.lcontainer) then
+       ierr = -1
+       handle = -1
+    else
+       handle = container_i2handle(jc)
+    endif
+  end subroutine new_container
+
+! !!!_  - set_container
+!   subroutine set_container(ierr, ct, name, flag)
+!     use TOUZA_Std,only: choice
+!     use TOUZA_Nio,only: GFMT_ERR
+!     implicit none
+!     integer,          intent(out)         :: ierr
+!     type(container_t),intent(inout)       :: ct
+!     integer,          intent(in)          :: hfile
+!     integer,          intent(in)          :: idv
+!     character(len=*), intent(in)          :: name
+!     integer,          intent(in),optional :: flag
+
+!     ierr = 0
+
+!     ct%file = hfile
+!     ct%prop = idv
+
+!   end subroutine set_container
+
 !!!_  - operation queue dispatcher
 !!!_   . init_all_files
   subroutine init_all_files &
@@ -4688,6 +5012,11 @@ contains
     integer js
 
     ierr = 0
+
+    if (mqueue.le.0) then
+       ierr = ERR_FINISHED
+       return
+    endif
 
     neof = 0
     nterm = 0
@@ -5055,6 +5384,12 @@ contains
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_COSH)
        else if (handle.eq.opr_TANH) then
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_TANH)
+       else if (handle.eq.opr_ASINH) then
+          call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_ASINH)
+       else if (handle.eq.opr_ACOSH) then
+          call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_ACOSH)
+       else if (handle.eq.opr_ATANH) then
+          call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_ATANH)
        else if (handle.eq.opr_R2D) then
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_R2D)
        else if (handle.eq.opr_D2R) then
@@ -5073,6 +5408,10 @@ contains
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_SPACING)
        else if (handle.eq.opr_RRSP) then
           call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_RRSP)
+       else if (handle.eq.opr_SETE) then
+          call apply_opr_BINARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_BINARY_SETE)
+       else if (handle.eq.opr_FTRUNC) then
+          call apply_opr_UNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_UNARY_FTRUNC)
 !!!_    * ternary
        else if (handle.eq.opr_IFELSE) then
           call apply_opr_TERNARY(ierr, handle, lefts(1:push), righth(1:pop), cmode, apply_TERNARY_IFELSE)
@@ -5269,7 +5608,7 @@ contains
        if (ierr.eq.0) call get_obj_string(ierr, val, hb)
 
        if (ierr.eq.0) then
-          if (blank_line) write(utmp, '()')
+          ! if (blank_line) write(utmp, '()')
        endif
 
        if (is_msglev(lev_verbose, -levq_rec)) then
@@ -5298,7 +5637,7 @@ contains
        ! write(*, *) 'flush/end'
        if (ierr.eq.0) then
           if (dryrun.gt.0) then
-             write(utmp, '()')
+             ! write(utmp, '()')
           else
              mco = doml%mco
              nco = 0
@@ -5376,6 +5715,7 @@ contains
                 enddo
              end select
           endif
+          write(utmp, '()')
           if (ierr.eq.0) blank_line = .TRUE.
        endif
     enddo
@@ -5441,7 +5781,7 @@ contains
 
     ! write(*, *) def_write%kfmt, trim(def_write%fmt)
     if (ierr.eq.0) then
-       if (blank_line) write(utmp, '()')
+       ! if (blank_line) write(utmp, '()')
     endif
 
     do jbuf = 0, nbuf - 1
@@ -5628,7 +5968,7 @@ contains
     if (ierr.eq.0) call get_compromise_domain(ierr, doml, domr, htmp, pbuf, lstk, nbuf, cmode)
 
     if (ierr.eq.0) then
-       if (blank_line) write(utmp, '()')
+       ! if (blank_line) write(utmp, '()')
     endif
     if (lev_verbose.ge.levq_column) then
        do j = 0, nbuf - 1
@@ -5803,7 +6143,7 @@ contains
     endif
 
     if (ierr.eq.0) then
-       if (blank_line) write(utmp, '()')
+       ! if (blank_line) write(utmp, '()')
     endif
     if (lev_verbose.ge.levq_column) then
        do j = 0, nbuf - 1

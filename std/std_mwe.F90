@@ -1,10 +1,10 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 10:03:03 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/11 22:54:55 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020,2021,2022,2023
+! Copyright (C) 2020-2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -15,7 +15,7 @@
 #  include "touza_config.h"
 #endif
 #include "touza_std.h"
-!!!_@ TOUZA_Std_mwe - MPI wrapper/emulator
+!!!_@ TOUZA_Std_mwe - MPI wrapper/emulator/dummy interfaces
 module TOUZA_Std_mwe
 !!!_ + declaration
 !!!_  - modules
@@ -76,6 +76,10 @@ module TOUZA_Std_mwe
   public MPI_INTEGER,       MPI_CHARACTER
   public MPI_ANY_TAG,       MPI_ANY_SOURCE
   public MPI_DOUBLE_PRECISION
+  public MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  public MPI_COMM_CREATE,   MPI_COMM_SPLIT, MPI_COMM_GROUP
+  public MPI_WAIT, MPI_BARRIER
+
 !!!_  - misc
   character(len=128) tmsg
 contains
@@ -83,8 +87,9 @@ contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, icomm)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_utl,only: utl_init=>init ! included by TOUZA_Std_log
     use TOUZA_Std_log,only: log_init=>init
-    use TOUZA_Std_utl,only: utl_init=>init, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -107,7 +112,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
        endif
        if (is_first_force(init_counts, mode)) then
@@ -121,7 +126,8 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode, icomm)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_utl,only: utl_diag=>diag, choice
     use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
     implicit none
     integer,intent(out)         :: ierr
@@ -166,7 +172,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -177,7 +183,8 @@ contains
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_utl,only: utl_finalize=>finalize
     use TOUZA_Std_log,only: log_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -209,7 +216,7 @@ contains
 #endif /* OPT_USE_MPI */
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
@@ -549,7 +556,74 @@ contains
     endif
 #endif
   end subroutine show_mpi_type
+!!!_ + dummy interfaces
+#if OPT_USE_MPI
+#else
+  subroutine MPI_COMM_CREATE &
+       & (COMM, GROUP, NEWCOMM, IERROR)
+    implicit none
+    INTEGER   COMM, GROUP, NEWCOMM, IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_COMM_CREATE
 
+  subroutine MPI_COMM_SPLIT &
+       & (COMM, COLOR, KEY, NEWCOMM, IERROR)
+    implicit none
+    INTEGER   COMM, COLOR, KEY, NEWCOMM, IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_COMM_SPLIT
+
+  subroutine MPI_COMM_GROUP &
+       & (COMM, GROUP, IERROR)
+    implicit none
+    INTEGER   COMM, GROUP, IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_COMM_GROUP
+
+  subroutine MPI_GROUP_SIZE &
+       & (GROUP, SIZE, IERROR)
+    implicit none
+    INTEGER   GROUP, SIZE, IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_GROUP_SIZE
+
+  subroutine MPI_GROUP_RANK &
+       & (GROUP, RANK, IERROR)
+    implicit none
+    INTEGER   GROUP, RANK, IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_GROUP_RANK
+
+  subroutine MPI_GROUP_UNION &
+       & (GROUP1, GROUP2, NEWGROUP, IERROR)
+    implicit none
+    INTEGER   GROUP1, GROUP2, NEWGROUP, IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_GROUP_UNION
+
+  subroutine MPI_WAIT &
+       & (REQUEST, STATUS, IERROR)
+    implicit none
+    INTEGER   REQUEST, STATUS(*), IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_WAIT
+
+  subroutine MPI_BARRIER &
+       & (COMM, IERROR)
+    implicit none
+    INTEGER   COMM, IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_BARRIER
+#endif
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
+#else
+  subroutine MPI_GROUP_TRANSLATE_RANKS &
+       & (GROUP1, N, RANKS1, GROUP2, RANKS2, IERROR)
+    implicit none
+    INTEGER GROUP1, N, RANKS1(*), GROUP2, RANKS2(*), IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_GROUP_TRANSLATE_RANKS
+#endif
 end module TOUZA_Std_mwe
 !!!_@ test_std_mpi - test program
 #ifdef TEST_STD_MWE

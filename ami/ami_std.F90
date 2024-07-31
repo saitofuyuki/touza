@@ -1,7 +1,7 @@
 !!!_! ami_std.F90 - TOUZA/Ami bridge to Std
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 14:03:21 fuyuki ami_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/04/09 16:02:22 fuyuki ami_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -18,13 +18,26 @@
 module TOUZA_Ami_std
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Std_prc,only: KDBL
-  use TOUZA_Std_utl,only: choice,       choice_a,     set_if_present
+  use TOUZA_Std_prc,only: KDBL,         KFLT
+  use TOUZA_Std_utl,only: choice,       choice_a,     set_if_present, condop
   use TOUZA_Std_utl,only: control_deep, control_mode, is_first_force
+  use TOUZA_Std_utl,only: find_first,   inrange,      swap_items,    bisection_find
+  use TOUZA_Std_utl,only: join_list,    compact_string
   use TOUZA_Std_log,only: is_msglev
-  use TOUZA_Std_log,only: is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
-  use TOUZA_Std_log,only: is_msglev_severe, is_msglev_fatal
+  use TOUZA_Std_log,only: is_msglev_DEBUG,  is_msglev_INFO,   is_msglev_NORMAL, is_msglev_DETAIL
+  use TOUZA_Std_log,only: is_msglev_SEVERE, is_msglev_FATAL,  is_msglev_WARNING
   use TOUZA_Std_log,only: get_logu,         unit_global,      trace_fine,       trace_control
+  use TOUZA_Std_log,only: is_error_match,   trace_err
+  use TOUZA_Std_env,only: conv_b2strm,      KIOFS
+  use TOUZA_Std_env,only: endian_BIG,       endian_LITTLE
+  use TOUZA_Std_fun,only: new_unit
+  use TOUZA_Std_sus,only: sus_open, sus_close, sus_skip_irec
+  use TOUZA_Std_sus,only: sus_read_isep,  sus_read_irec,  sus_read,  sus_suspend_read_irec
+  use TOUZA_Std_sus,only: sus_write_isep, sus_write_irec, sus_write, sus_suspend_write_irec
+  use TOUZA_Std_sus,only: suspend_begin, suspend_end
+  use TOUZA_Std_sus,only: sus_record_mems_irec
+  use TOUZA_Std_sus,only: sus_is_stream_unit
+
 !!!_  - default
   implicit none
   private
@@ -49,19 +62,32 @@ module TOUZA_Ami_std
   public init, diag, finalize
   public msg
 !!!_   . TOUZA_Std
-  public KDBL
-  public choice,       choice_a,     set_if_present
+  public KDBL,         KFLT
+  public choice,       choice_a,     set_if_present, condop
   public control_mode, control_deep, is_first_force
+  public find_first,   inrange,      swap_items,    bisection_find
+  public join_list,    compact_string
   public is_msglev
-  public is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
-  public is_msglev_severe, is_msglev_fatal
+  public is_msglev_DEBUG,  is_msglev_INFO,   is_msglev_NORMAL, is_msglev_DETAIL
+  public is_msglev_SEVERE, is_msglev_FATAL,  is_msglev_WARNING
   public get_logu,         unit_global,      trace_fine,       trace_control
+  public is_error_match,   trace_err
+  public conv_b2strm,      KIOFS
+  public new_unit
+  public sus_open, sus_close, sus_skip_irec
+  public sus_read_isep,  sus_read_irec,  sus_read,  sus_suspend_read_irec
+  public sus_write_isep, sus_write_irec, sus_write, sus_suspend_write_irec
+  public suspend_begin, suspend_end
+  public sus_record_mems_irec
+  public sus_is_stream_unit
 contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
     use TOUZA_Std_mwe,only: mwe_init=>init
     use TOUZA_Std_env,only: env_init=>init
+    use TOUZA_Std_fun,only: fun_init=>init
+    use TOUZA_Std_sus,only: sus_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -85,7 +111,9 @@ contains
        if (md.ge.MODE_DEEP) then
           lev_stdv = choice(lev_stdv, stdv)
           if (ierr.eq.0) call mwe_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
+          if (ierr.eq.0) call fun_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
+          if (ierr.eq.0) call sus_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -97,6 +125,8 @@ contains
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std_mwe,only: mwe_diag=>diag
     use TOUZA_Std_env,only: env_diag=>diag
+    use TOUZA_Std_sus,only: sus_diag=>diag
+    use TOUZA_Std_fun,only: fun_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -121,7 +151,9 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call mwe_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
+          if (ierr.eq.0) call fun_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
+          if (ierr.eq.0) call sus_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -132,6 +164,8 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_mwe,only: mwe_finalize=>finalize
     use TOUZA_Std_env,only: env_finalize=>finalize
+    use TOUZA_Std_sus,only: sus_finalize=>finalize
+    use TOUZA_Std_fun,only: fun_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -154,6 +188,8 @@ contains
        if (md.ge.MODE_DEEP) then
           if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call mwe_finalize(ierr, utmp, lev_stdv, mode=lmd)
+          if (ierr.eq.0) call sus_finalize(ierr, utmp, lev_stdv, mode=lmd)
+          if (ierr.eq.0) call fun_finalize(ierr, utmp, lev_stdv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
     endif

@@ -1,7 +1,7 @@
 !!!_! jmzlib.F90 - TOUZA/Jmz library
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 25 2021
-#define TIME_STAMP 'Time-stamp: <2023/06/16 10:04:20 fuyuki jmzlib.F90>'
+#define TIME_STAMP 'Time-stamp: <2023/11/01 12:46:35 fuyuki jmzlib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -41,9 +41,9 @@ module jmzlib
   integer,save :: lev_verbose = 0
   integer,save :: dbgv = -1
   integer,save :: stdv = -1
-!!!_  - convention parameters
-  integer,save :: user_offset_bgn = 0     ! begin-index offset (user-friendly)
-  integer,save :: user_offset_end = 0     ! end-index offset (user-friendly)
+! !!!_  - convention parameters
+!   integer,save :: user_offset_bgn = 0     ! begin-index offset (user-friendly)
+!   integer,save :: user_offset_end = 0     ! end-index offset (user-friendly)
 !!!_ + Procedures
 contains
 !!!_  - init
@@ -75,7 +75,7 @@ contains
 
 !!!_  - message
   subroutine message(ierr, msg, iadd, fmt, levm, u, indent)
-    use TOUZA_Std,only: choice, join_list
+    use TOUZA_Std,only: choice, join_list, trace_err
     implicit none
     integer,         intent(in)          :: ierr
     character(len=*),intent(in)          :: msg     ! msg
@@ -113,23 +113,24 @@ contains
 101    format(A, A)
        if (ierr.ne.0) then
           write(utmp, 102) ierr, trim(txt)
+          call trace_err(ierr)
        else
           write(utmp, 101) repeat(' ', skp), trim(txt)
        endif
     endif
   end subroutine message
-!!!_  - set_user_offsets - control offset for users
-  subroutine set_user_offsets &
-       & (ierr, off_bgn, off_end)
-    use TOUZA_Std,only: choice
-    implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: off_bgn
-    integer,intent(in),optional :: off_end
-    ierr = 0
-    user_offset_bgn = choice(user_offset_bgn, off_bgn)
-    user_offset_end = choice(user_offset_end, off_end)
-  end subroutine set_user_offsets
+! !!!_  - set_user_offsets - control offset for users
+!   subroutine set_user_offsets &
+!        & (ierr, off_bgn, off_end)
+!     use TOUZA_Std,only: choice
+!     implicit none
+!     integer,intent(out)         :: ierr
+!     integer,intent(in),optional :: off_bgn
+!     integer,intent(in),optional :: off_end
+!     ierr = 0
+!     user_offset_bgn = choice(user_offset_bgn, off_bgn)
+!     user_offset_end = choice(user_offset_end, off_end)
+!   end subroutine set_user_offsets
 
 !!!_ + End jmzlib
 end module jmzlib

@@ -1,0 +1,18 @@
+#+title: TOUZA/Zbt guide
+#+author: SAITO Fuyuki
+#+date: <2024-07-249>
+#+email: saitofuyuki AT jamstec DOT go DOT jp
+
+* Introduction
+* Installation
+* Description of TOUZA/Zbt commands
+* Description of TOUZA/Zbt library
+** ~zbt.libtouza~ - lower-level interface on touza library
+** ~zbt.dsnio~ - medium-level layer of TOUZA/Nio array interfaces
+** ~zbt.xrnio~ - ~xarray~ backends for TOUZA/Nio array
+
+* Acknowledgements
+* Copyright and license
+Copyright 2024 Japan Agency for Marine-Earth Science and Technology
+Licensed under the Apache License, Version 2.0
+  (https://www.apache.org/licenses/LICENSE-2.0)

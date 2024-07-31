@@ -1,3 +1,77 @@
+Release-1.12.3.1 / 2024-07-31
+=============================
+  * Squash import of zbt and/or convoy developments (for test release).
+    * zbt: alpha release of python interface of TOUZA library.
+    * jmz/convoy: (still) alpha release of remapping procedures.
+      Previously named as qoxi.
+  * Bug fixes
+    * std: (sus) [FATAL] file positioning fails at a large skipping.
+      - Slice reading did not work when the starting position of the
+        target slice is away than 2Gbytes.
+      - Block reading did work.
+      - Probably this bug only damage the nnview.
+    * nio: (cache) [CRITICAL] Need group decomposition by records.
+      - Null records were allowed, which is much confusing.
+        Now the number of non-empty records are identical among group
+        members.
+    * nio: (header) [severe] type check in get_item excluded when string.
+
+Release-1.12.3 / 2024-06-20
+===========================
+  * Alpha release of remapping procedures
+    * Emu/ugg, procedures related geodesics
+    * Emu/ugg, procedures related polar stereographic projections
+    * Ami, friendly coupler framework
+    * A new NIO-format PTx.
+    * Cached-Nio interface improvement for Jmz.
+    * Jmz/ConvOy implemented (to be renamed from qoxi later)
+  * Emu/ugg
+    * Canonical trigonometric functions
+  * Ami/table
+    * Legacy R[AO]file manipulation
+    * Symmetric geographic/polar-stereographic remapping
+    * Polar stereographic procedures
+    * Geodesic computation.  Coefficient tables are generated with ggf scripts.
+    * AGMP (area of geodesic-meridian-parallel) algorithm.
+  * Nio
+    * PTx format, in particular for sparse-matrix storage (qjds csr storing)
+    * Slicing extended onto [UM]RT.
+    * Cache interface improved for Jmz/qoxi.  To be applied also by chak.
+  * Jmz
+    * restructuring of sources
+    * gtfna, gtfnb, introduced to emulate legacy gt* binary commands.
+    * TOUZA_CFLAGS updated (to export on MIROC)
+  * Jmz/chak
+    * -I option introduced to control file-buffer naming.
+    * [SEVERE] Fix POP/GO/STOP processing.
+    * [SEVERE] successive tagged POP enabled.
+    * [SEVERE] trim long fmt string to store in header.
+    * [SEVERE] hungry-mode failed occasionally.
+    * [CRITICAL] header is not updated during group reading.
+    * [FATAL] wrong operation with lazy min max.
+    * Cached gtool access is prepared (left to implemented)
+    * A new operator group, filter, introduced.
+    * update coordinate operators (PERM, SHAPE, SHIFT).
+    * disable repeat of TRANSForm operators (to raise an error).
+    * WSUM reduction implemented.
+    * ITERated output implemented.
+    * [incompatible] SIGN operator modified.
+    * ascii/binary auto TIME entry for multi-records.
+    * FTRUNC operator introduced.
+    * ETITLE operator introduced.
+    * SETE introduced, as SET_EXPONENT() intrinsic.
+  * Jmz/convoy(qoxi)
+    * subcommands: ps2g ps r2g introduced.  Still alpha.
+    * simple finite difference by axis-file.
+  * std
+    * more primitive functions.
+    * (sus) [FATAL] zero-size final suspending special.
+    * (sus) [FATAL] initial zero-size subrecord raise an error.
+    * fix and redesign of parse_number().
+    * (arg) @FILE special argument design.
+    * F2003+ new_line() workaround.
+    * (ipc) inverse hyperbolic functions introduced.
+
 Release-1.12.1 / 2023-07-19
 ===========================
 

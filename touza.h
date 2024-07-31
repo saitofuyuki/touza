@@ -1,7 +1,7 @@
 /* touza.h - touza definitions */
 /*    Maintainer: SAITO Fuyuki */
 /*    Created: Jun 5 2020 */
-/*     Time-stamp: <2023/03/20 21:29:29 fuyuki touza.h> */
+/*     Time-stamp: <2024/04/04 07:47:09 fuyuki touza.h> */
 
 /* Copyright (C) 2020-2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
@@ -78,6 +78,7 @@
 #define ERR_IO_GENERAL          -49 /* general error at io operation */
 #define ERR_FILE_EXISTS         -50 /* file exists */
 #define ERR_FILE_NOT_EXISTS     -51 /* file not exists */
+#define ERR_STRING_IO           -52 /* general error at io operation on string */
 
 /* module specific errors */
 
@@ -124,14 +125,25 @@
 #define ERR_MASK_NIO_BINDC    (ERR_MASK_NIO + ERR_MASK_MODULE * 6)
 #define ERR_MASK_NIO_CACHE    (ERR_MASK_NIO + ERR_MASK_MODULE * 7)
 #define ERR_MASK_NIO_CTRL     (ERR_MASK_NIO + ERR_MASK_MODULE * 8)
+#define ERR_MASK_NIO_SPARSE   (ERR_MASK_NIO + ERR_MASK_MODULE * 9)
+#define ERR_MASK_NIO_AXIS     (ERR_MASK_NIO + ERR_MASK_MODULE * 10)
 
 #define ERR_MASK_TRP          (ERR_MASK_GROUP * 5)
 #define ERR_MASK_TRP_STD      (ERR_MASK_TRP + ERR_MASK_MODULE * 1)
 #define ERR_MASK_TRP_PACK     (ERR_MASK_TRP + ERR_MASK_MODULE * 2)
 #define ERR_MASK_TRP_FLOAT    (ERR_MASK_TRP + ERR_MASK_MODULE * 3)
 
+#define ERR_MASK_AMI          (ERR_MASK_GROUP * 8)
+#define ERR_MASK_AMI_STD      (ERR_MASK_AMI + ERR_MASK_MODULE * 1)
+#define ERR_MASK_AMI_LEGACY   (ERR_MASK_AMI + ERR_MASK_MODULE * 2)
+#define ERR_MASK_AMI_NIO      (ERR_MASK_AMI + ERR_MASK_MODULE * 3)
+#define ERR_MASK_AMI_TABLE    (ERR_MASK_AMI + ERR_MASK_MODULE * 4)
+#define ERR_MASK_AMI_XFORM    (ERR_MASK_AMI + ERR_MASK_MODULE * 5)
+
 #define ERR_MASK_CAL     (ERR_MASK_GROUP * 2)
-#define ERR_MASK_EMU     (ERR_MASK_GROUP * 3)
+
+#define ERR_MASK_EMU          (ERR_MASK_GROUP * 3)
+#define ERR_MASK_EMU_UGG      (ERR_MASK_EMU + ERR_MASK_MODULE * 1)
 
 #define DEBUG_TRACE(E,T) call trace_debug(E, T, __FILE__, __LINE__)
 

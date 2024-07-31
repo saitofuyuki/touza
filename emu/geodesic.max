@@ -1,0 +1,303 @@
+/* Time-stamp: <2023/12/06 21:39:12 fuyuki geodesic.max> */
+
+/* order:7$ */
+
+load("f90")$
+linel: 200$
+
+F1(\epsilon) := (1-\epsilon)$
+I1i(x) := sqrt(1 + k2 * sin(x)^2)$
+I1x(\epsilon) := lratsubst([k2 = (4 * \epsilon) / (1 - \epsilon)^2, f  = (2 * n) / (1 + n)], I1i(x))$
+SI1: trigreduce(integrate(taylor(F1(\epsilon)*I1x(\epsilon), \epsilon, 0, order+1), x))$
+SD1: expand(subst(x = \sigma, SI1) - subst(x = 0, SI1))$
+A1: coeff(expand(SD1), \sigma)$
+TX1: expand(taylor(SD1 / A1, \epsilon, 0, order+1))$
+/* coeff(TX1, sin(2*\sigma)); */
+/* coeff(TX1, sin(4*\sigma)); */
+/* coeff(TX1, sin(6*\sigma)); */
+
+printf(true, "C1: -1 ")$
+f90(F1(x))$
+for o:0 thru 0 do
+block([X,D,C,s,i,L],
+  X: ratsimp(A1),
+  D: denom(X),
+  C: num(X),
+  s: "",
+  /*print(o, D),*/
+  L: [D],
+  for i from o step 2 thru hipow(C, \epsilon)
+  do (push(coeff(C,\epsilon,i), L)),
+  L: reverse(rest(apply(ezgcd, L))),
+  for i in L
+  do (s: concat(s, " ", i)),
+  /* for i from 0 step 2 thru hipow(C, \epsilon) */
+  /*   do (s: concat(s, " ", coeff(C,\epsilon,i))), */
+  print("C1: ", o, s)
+)$
+
+for o:1 thru order+1 do
+block([X,D,C,s,i,L],
+  X: ratsimp(coeff(TX1, sin(2*o*\sigma))),
+  C1[o]: X,
+  D: denom(X),
+  C: num(X),
+  s: "",
+  L: [D],
+  for i from o step 2 thru hipow(C, \epsilon)
+  do (push(coeff(C,\epsilon,i), L)),
+  L: reverse(rest(apply(ezgcd, L))),
+  /* print(o,L), */
+  for i in L
+  do (s: concat(s, " ", i)),
+  /* for i from o step 2 thru hipow(C, \epsilon) */
+  /*   do (s: concat(s, " ", coeff(C,\epsilon,i))), */
+  print("C1: ", o, s)
+)$
+
+/* for o:1 thru order+1 do */
+/*   print("C1[", o, "]:", C1[o])$ */
+
+/* Plain B1 B1p computation is too heavy. */
+B1[o] := sum((C1[j] * sin(2 * j * tau)), j, 1, o);
+
+/* B1x(o) := sum(diff(B1^n, tau, n-1) * (-1)^n / n!, n, 1, o); */
+/* taylor(ratsimp(trigreduce(B1x(3))), \epsilon, 0, 3); */
+
+BB[0]: 1$
+for o:1 thru order+1 do
+BB[o]: taylor(ratsimp(trigreduce(BB[o-1] * B1[order+2-o] * (-1) / o)), \epsilon, 0, order+1);
+
+/* for o:1 thru order+1 do */
+/*   print("BB[", o, "]:", BB[o]); */
+
+B1p: 0$
+for o:1 thru order+1 do
+  B1p: B1p + expand(diff(BB[o],tau,o-1))$
+
+for o:1 thru order+1 do
+block([X,D,C,s,i,L],
+  X: ratsimp(coeff(B1p, sin(2*o*\tau))),
+  D: denom(X),
+  C: num(X),
+  s: "",
+  L: [D],
+  for i from o step 2 thru hipow(C, \epsilon)
+  do (push(coeff(C,\epsilon,i), L)),
+  L: reverse(rest(apply(ezgcd, L))),
+  /* print(o,X), */
+  for i in L
+  do (s: concat(s, " ", i)),
+  print("C1p: ", o, s)
+)$
+
+
+/* karney 2013 */
+F2(\epsilon) := 1 / (1 - \epsilon)$
+I2i(x) := 1 / sqrt(1 + k2 * sin(x)^2)$
+I2x(\epsilon) := lratsubst([k2 = (4 * \epsilon) / (1 - \epsilon)^2, f  = (2 * n) / (1 + n)], I2i(x))$
+SI2: trigreduce(integrate(taylor(F2(\epsilon)*I2x(\epsilon), \epsilon, 0, order+1), x))$
+SD2: expand(subst(x = \sigma, SI2) - subst(x = 0, SI2))$
+A2: coeff(expand(SD2), \sigma)$
+TX2: expand(taylor(SD2 / A2, \epsilon, 0, order+1))$
+/* coeff(TX2, sin(2*\sigma)); */
+/* coeff(TX2, sin(4*\sigma)); */
+/* coeff(TX2, sin(6*\sigma)); */
+
+/* karney 2022 */
+F2y(\epsilon) := (1 + \epsilon)$
+SI2y: trigreduce(integrate(taylor(F2y(\epsilon)*I2x(\epsilon), \epsilon, 0, order+1), x))$
+SD2y: expand(subst(x = \sigma, SI2y) - subst(x = 0, SI2y))$
+A2y: coeff(expand(SD2y), \sigma)$
+TX2y: expand(taylor(SD2y / A2y, \epsilon, 0, order+1))$
+
+printf(true, "C2: -1 ")$
+f90(F2(x))$
+for o:0 thru 0 do
+block([X,D,C,s,i,L],
+  X: ratsimp(A2),
+  D: denom(X),
+  C: num(X),
+  s: "",
+  L: [D],
+  for i from o step 2 thru hipow(C, \epsilon)
+  do (push(coeff(C,\epsilon,i), L)),
+  L: reverse(rest(apply(ezgcd, L))),
+  for i in L
+  do (s: concat(s, " ", i)),
+  print("C2: ", o, s)
+)$
+
+for o:1 thru order+1 do
+block([X,D,C,s,i,L],
+  X: ratsimp(coeff(TX2, sin(2*o*\sigma))),
+  D: denom(X),
+  C: num(X),
+  s: "",
+  L: [D],
+  for i from o step 2 thru hipow(C, \epsilon)
+  do (push(coeff(C,\epsilon,i), L)),
+  L: reverse(rest(apply(ezgcd, L))),
+  for i in L
+  do (s: concat(s, " ", i)),
+  /* for i from o step 2 thru hipow(C, \epsilon) */
+  /*   do (s: concat(s, " ", coeff(C,\epsilon,i))), */
+  print("C2: ", o, s)
+)$
+
+printf(true, "C2y: -1 ")$
+f90(F2y(x))$
+for o:0 thru 0 do
+block([X,D,C,s,i,L],
+  X: ratsimp(A2y),
+  D: denom(X),
+  C: num(X),
+  s: "",
+  L: [D],
+  for i from o step 2 thru hipow(C, \epsilon)
+  do (push(coeff(C,\epsilon,i), L)),
+  L: reverse(rest(apply(ezgcd, L))),
+  for i in L
+  do (s: concat(s, " ", i)),
+  print("C2y: ", o, s)
+)$
+
+for o:1 thru order+1 do
+block([X,D,C,s,i,L],
+  X: ratsimp(coeff(TX2y, sin(2*o*\sigma))),
+  D: denom(X),
+  C: num(X),
+  s: "",
+  L: [D],
+  for i from o step 2 thru hipow(C, \epsilon)
+  do (push(coeff(C,\epsilon,i), L)),
+  L: reverse(rest(apply(ezgcd, L))),
+  for i in L
+  do (s: concat(s, " ", i)),
+  print("C2y: ", o, s)
+)$
+
+I3i(x) := (2 - f) / (1 + (1 - f) * sqrt(1 + k2 * sin(x)^2))$
+I3x(\epsilon) := lratsubst([k2 = (4 * \epsilon) / (1 - \epsilon)^2, f  = (2 * n) / (1 + n)], I3i(x))$
+SI3: trigreduce(integrate(taylor(I3x(\epsilon), \epsilon, 0, order), x))$
+SD3: expand(subst(x = \sigma, SI3) - subst(x = 0, SI3))$
+A3: coeff(expand(SD3), \sigma)$
+TX3: expand(taylor(SD3 / A3, \epsilon, 0, order))$
+/* coeff(A3, \epsilon, 1); */
+/* coeff(A3, \epsilon, 2); */
+/* coeff(A3, \epsilon, 3); */
+
+SI3o(order) := trigreduce(integrate(taylor(I3x(\epsilon), \epsilon, 0, order), x))$
+SD3o(order) := expand(subst(x = \sigma, SI3o(order)) - subst(x = 0, SI3o(order)))$
+TX3o(order) := expand(taylor(SD3o(order) / A3, \epsilon, 0, order))$
+
+
+for o:0 thru 0 do
+block([X],
+  X: A3,
+  block([Y,D,C,s,i,j,L],
+    for j:0 thru order
+      do
+      (Y: ratsimp(coeff(X, \epsilon, j)),
+       D: denom(Y),
+       C: num(Y),
+       s: "",
+       L: [D],
+       for i from 0 thru min(order-j, hipow(C, n))
+       do (push(coeff(C,n,i), L)),
+       L: reverse(rest(apply(ezgcd, L))),
+       for i in L
+       do (s: concat(s, " ", i)),
+       /* for i from 0 thru min(order-j, hipow(C, n)) */
+       /* do (s: concat(s, " ", coeff(C,n,i))), */
+       print("C3: ", o, j, s)
+)))$
+
+for o:1 thru order do
+block([X],
+  X: coeff(TX3, sin(2*o*\sigma)),
+  block([Y,D,C,s,i,j,L],
+    for j from 0 thru hipow(X, \epsilon)
+      do
+      (Y: ratsimp(coeff(X, \epsilon, j)),
+       D: denom(Y),
+       C: num(Y),
+       s: "",
+       L: [D],
+       for i from 0 thru min(order-j, hipow(C, n))
+       do (push(coeff(C,n,i), L)),
+       L: reverse(rest(apply(ezgcd, L))),
+       for i in L
+       do (s: concat(s, " ", i)),
+       /* print("L: ", L), */
+       /* for i from 0 thru min(order-j, hipow(C, n)) */
+       /* do (s: concat(s, " ", coeff(C,n,i))), */
+       print("C3: ", o, j, s)
+)))$
+
+/* coeff(coeff(TX3, sin(2*\sigma)), \epsilon); */
+/* coeff(coeff(TX3, sin(2*\sigma)), \epsilon, 2); */
+/* coeff(coeff(TX3, sin(2*\sigma)), \epsilon, 3); */
+
+/* for o:1 thru 3 do print(o)$ */
+
+/* for o:1 thru order do ( */
+/*      CA3[o]: coeff(A3, \epsilon, o) */
+/*   ); */
+/* ratsimp(CA3[2]); */
+/* hipow(num(ratsimp(CA3[2])), n); */
+
+/* karney 2013 */
+
+t(x) := x + sqrt(1/x+1) * asinh(sqrt(x))$
+I4i: -(t(ep2) - t(k2 * (sin(x))^2)) / (ep2 - k2 * (sin(x))^2) * sin(x) / 2$
+I4i: subst([abs(sin(x))=sin(x)], I4i)$
+/* I4i: subst([k2 = (4 * \epsilon) / (1 - \epsilon)^2, ep2 = 4 * n / (1 - n)^2], I4i)$ */
+/* I4i: subst([abs(\epsilon-1)=\epsilon-1, abs(1-n)=1-n], I4i)$ */
+SI4: trigreduce(integrate(taylor(taylor(I4i, k2, 0, order), ep2, 0, order), x))$
+SD4: expand(subst(x = \sigma, SI4) - subst(x = %pi/2, SI4))$
+
+/* karney 2022 */
+
+I4n: subst([k2 = (4 * \epsilon) / (1 - \epsilon)^2, ep2 = 4 * n / (1 - n)^2], I4i)$
+I4n: subst([abs(\epsilon-1)=1-\epsilon, abs(n-1)=1-n], I4n)$
+SI4n: trigreduce(integrate(subst([zz=1], ratdisrep(taylor(subst([\epsilon=zz*\epsilon, n=zz*n], I4n), zz, 0, order))), x))$
+SD4n: expand(subst(x = \sigma, SI4n) - subst(x = %pi/2, SI4n))$
+
+for o:0 thru order do
+block([X],
+  X: coeff(SD4, cos((2*o+1)*\sigma)),
+  block([Y,D,C,s,i,j,L],
+    for j from 0 thru hipow(X, k2)
+      do
+      (Y: ratsimp(coeff(X, k2, j)),
+       D: denom(Y),
+       C: num(Y),
+       s: "",
+       L: [D],
+       for i from 0 thru min(order-j, hipow(C, ep2))
+       do (push(coeff(C,ep2,i), L)),
+       L: reverse(rest(apply(ezgcd, L))),
+       for i in L
+       do (s: concat(s, " ", i)),
+       print("C4: ", o, j, s)
+)))$
+
+for o:0 thru order do
+block([X],
+  X: coeff(SD4n, cos((2*o+1)*\sigma)),
+  block([Y,D,C,s,i,j,L],
+    for j from 0 thru hipow(X, \epsilon)
+      do
+      (Y: ratsimp(coeff(X, \epsilon, j)),
+       D: denom(Y),
+       C: num(Y),
+       s: "",
+       L: [D],
+       for i from 0 thru min(order-j, hipow(C, n))
+       do (push(coeff(C,n,i), L)),
+       L: reverse(rest(apply(ezgcd, L))),
+       for i in L
+       do (s: concat(s, " ", i)),
+       print("C4n: ", o, j, s)
+)))$

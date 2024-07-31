@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/07/08 16:59:37 fuyuki genopr.sh>
+# Time-stamp: <2023/12/24 21:28:50 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -197,6 +197,9 @@ register_all ()
   register -g float -n 1,1 -i call SINH     'sinh(A)'
   register -g float -n 1,1 -i call COSH     'cosh(A)'
   register -g float -n 1,1 -i call TANH     'tanh(A)'
+  register -g float -n 1,1 -i call ASINH    'arcsinh(A)'
+  register -g float -n 1,1 -i call ACOSH    'arccosh(A)'
+  register -g float -n 1,1 -i call ATANH    'arctanh(A)'
 
   register -g float -n 1,1 -i call R2D      'Convert radian to degree'
   register -g float -n 1,1 -i call D2R      'Convert degree to radian'
@@ -218,12 +221,17 @@ register_all ()
   register -g float -n 2,1 -i call        NEAREST   'nearest(A,B)'
   register -g float -n 1,1 -i call        SPACING   'spacing(A)'
   register -g float -n 1,1 -i call        RRSP      'rrspacing(A)'
+  register -g float -n 2,1 -i call        SETE      'set_exponent(A)'
+
+  register -g float -n 1,1 -i call        FTRUNC    'float truncation'
 
   # other operation
   register         -n 2,1 -i call -P sweep=stack  MIN    'min(A,B)'
   register         -n 2,1 -i call -P sweep=stack  MAX    'max(A,B)'
+  register         -n 2,2 -i call -P sweep=stack  RANGE  'min max(A,B)'
   register -g lazy -n 2,1 -i call -P sweep=stack  LMIN   'lazy MIN'
   register -g lazy -n 2,1 -i call -P sweep=stack  LMAX   'lazy MAX'
+  register -g lazy -n 2,2 -i call -P sweep=stack  LRANGE 'lazy min max(A,B)'
 
   # conditional operation (binary)
   register -g bool -n 2,1 -f -,FALSE -i call -c int EQB       '1 if A==B, else 0'
@@ -318,6 +326,7 @@ register_all ()
   register -g header        -p STRING      ITEM    "item replacement or filter"
   register -g header        -p STRING      UNIT
   register -g header        -p STRING      TITLE
+  register -g header        -p STRING      ETITLE
   register -g header        -p STRING      EDIT
   register -g header        -p STRING      DSET
   register -g header        -p LIST   -s T TSEL    "time filter"

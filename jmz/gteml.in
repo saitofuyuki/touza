@@ -1,0 +1,59 @@
+# gttml.in: common utilities
+#
+# Maintainer: SAITO Fuyuki
+# Time-stamp: <2023/07/29 09:47:44 fuyuki gteml.in>
+
+# Copyright (C) 2022,2023
+#           Japan Agency for Marine-Earth Science and Technology
+# Licensed under the Apache License, Version 2.0
+#   (https://www.apache.org/licenses/LICENSE-2.0)
+
+set -u
+
+this=$0
+PACKAGE_STRING='@PACKAGE_STRING@'
+TOUZA_VERSION='@TOUZA_VERSION@'
+JMZ_VERSION='@VERSION@'
+TR=@TR@
+test x"${CHAK-}" = x && CHAK=@CHAK@
+test x"${GTTMPDIR-}" = x && GTTMPDIR=.
+
+upcase ()
+{
+  echo "$*" | $TR '[a-z]' '[A-Z]'
+  return $?
+}
+
+downcase ()
+{
+  echo "$*" | $TR '[A-Z]' '[a-z]'
+  return $?
+}
+
+msg ()
+{
+  echo "($base) $*"
+  return 0
+}
+
+run ()
+{
+  if test x"$dry" = x; then
+    if test $verbose -gt 0; then
+      msg "run: $*" >&2
+    fi
+    eval "$@"; err=$?
+    if test $verbose -gt 0; then
+      msg "return: $err" >&2
+    fi
+  else
+    msg "dry-run: $*" >&2
+    err=0
+  fi
+  return $err
+}
+
+# Local Variables:
+# mode: sh
+# End:
+# gttml.in:end
