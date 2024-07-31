@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/02/25 22:42:39 fuyuki configure.ac>
+# Time-stamp: <2024/07/25 16:47:59 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -128,7 +128,8 @@ dnl MT_SUB_PACKAGE([div], [[$]enable_sub_div_default],     [std])
 AM_CONDITIONAL([BUILD_div], [false])
 dnl MT_SUB_PACKAGE([nio], [],     [std emu trp div])
 MT_SUB_PACKAGE([nio], [],     [std emu trp])
-MT_SUB_PACKAGE([ami], [],     [std nio trp])
+MT_SUB_PACKAGE([ami], [],     [std emu nio trp])
+MT_SUB_PACKAGE([zbt], [],     [std nio])
 
 AC_ARG_ENABLE([nctcdf],
 [AS_HELP_STRING([--enable-nctcdf], [enable nio/n*c*tcdf features@<:@default=no@:>@])],
@@ -218,6 +219,15 @@ AC_ARG_ENABLE([mod-dependencies],
 AM_CONDITIONAL([enable_module_dependencies], [
   test "x$use_mod_dependencies" != xno \
   && test x"$ax_f90_modext" != xunknown])
+
+AS_IF([test "x$enable_sub_zbt" != xno],
+      [AM_PATH_PYTHON([3.9], , [:])
+AC_CONFIG_FILES([zbt/zbt/Makefile])
+AC_CONFIG_FILES([zbt/tests/Makefile])
+AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
+AX_PYTHON()
+AX_PYTHON_MODULE([ctypes], , [python3])
+AX_PYTHON_MODULE([numpy], , [python3])])
 
 dnl AM_CONDITIONAL([am__fastdepFC], [false])
 

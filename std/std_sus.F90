@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2024/06/25 14:07:20 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/29 17:12:26 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023,2024
@@ -3291,11 +3291,11 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = total_members(bes, r, lmem)
 
     call set_slice_loop(rr, stp, itr, bes, r)
@@ -3332,7 +3332,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), itr(0) - idx(0))
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -3378,11 +3378,11 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = total_members(bes, r, lmem)
 
     call set_slice_loop(rr, stp, itr, bes, r)
@@ -3419,7 +3419,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), itr(0) - idx(0))
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -3445,6 +3445,7 @@ contains
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_unit_strm
     use TOUZA_Std_env,only: get_size_bytes, get_size_strm
+    use TOUZA_Std_log,only: trace_err
     implicit none
     integer,parameter :: KISEP=KI32, KARG=KFLT
     integer,        intent(out)            :: ierr
@@ -3465,11 +3466,11 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = total_members(bes, r, lmem)
 
     call set_slice_loop(rr, stp, itr, bes, r)
@@ -3479,8 +3480,10 @@ contains
     jdst = 0
 
     loop_rec: do
+       ! write(*, *) 'sus', jb, jsrc, jdst
        if (ierr.eq.0) then
           call sus_read_isep(ierr, u, iseph, swap=swap)
+          ! write(*, *) 'sus/isep', ierr, iseph
           if (is_eof_ss(ierr)) then
              ierr = _ERROR(ERR_EOF)
              exit loop_rec
@@ -3489,6 +3492,7 @@ contains
        if (ierr.eq.0) call sus_getpos(ierr, aposh, u)
        if (ierr.eq.0) then
           call check_dummy_irec(bdmy, nt, max_members(V(0)), get_size_bytes(V(0)), iseph, div)
+          ! write(*, *) 'sus/dummy', bdmy, nt, div
           if (bdmy) then
              aposf = aposh + get_size_strm(V(0), int(nt, kind=KIOFS))
              je = jb + nt   ! == nt
@@ -3502,16 +3506,22 @@ contains
           endif
        endif
        if (ierr.eq.0) then
+          ! write(*, *) 'sus/apos', aposh, aposf, iseph
           do
+             ! write(*, *) 'sus/loop', ierr, jsrc, je
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), itr(0) - idx(0))
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
+             ! write(*, *) 'sus/loop/pos', &
+             !      & apos, m, jsrc, jdst, aposh, us, (jsrc - jb), us * (jsrc - jb)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
+             ! write(*, *) 'sus/loop/read', ierr
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
              call next_offset(jsrc, idx, stp, itr, rr, m)
           enddo
+          ! write(*, *) 'sus/loop/end', ierr
        endif
        if (ierr.eq.0) call sus_read_isep(ierr, u, isepf, pos=aposf, swap=swap)
        if (ierr.eq.0) then
@@ -3526,6 +3536,7 @@ contains
        jb = je
     enddo loop_rec
     if (ierr.eq.0) call sus_access_irec_foot(ierr, u, (jsrc.ge.0), iseph, sub, swap)
+    call trace_err(ierr, 'sus_slice_read_irec')
   end subroutine sus_slice_read_irec_f
   subroutine sus_slice_read_irec_d &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
@@ -3552,11 +3563,11 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = total_members(bes, r, lmem)
 
     call set_slice_loop(rr, stp, itr, bes, r)
@@ -3593,7 +3604,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), itr(0) - idx(0))
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -3639,11 +3650,11 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = total_members(bes, r, lmem)
 
     call set_slice_loop(rr, stp, itr, bes, r)
@@ -3680,7 +3691,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), itr(0) - idx(0))
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -3727,11 +3738,11 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = total_members(bes, r, lmem)
 
     call set_slice_loop(rr, stp, itr, bes, r)
@@ -3769,7 +3780,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), itr(0) - idx(0))
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_write(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -3815,11 +3826,11 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = total_members(bes, r, lmem)
 
     call set_slice_loop(rr, stp, itr, bes, r)
@@ -3857,7 +3868,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), itr(0) - idx(0))
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_write(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -3903,11 +3914,11 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = total_members(bes, r, lmem)
 
     call set_slice_loop(rr, stp, itr, bes, r)
@@ -3945,7 +3956,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), itr(0) - idx(0))
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_write(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -3991,11 +4002,11 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = total_members(bes, r, lmem)
 
     call set_slice_loop(rr, stp, itr, bes, r)
@@ -4033,7 +4044,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), itr(0) - idx(0))
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_write(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -4079,11 +4090,11 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = total_members(bes, r, lmem)
 
     call set_slice_loop(rr, stp, itr, bes, r)
@@ -4121,7 +4132,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), itr(0) - idx(0))
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_write(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -4166,12 +4177,12 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
     integer jr, rfin, nrem
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = choice(0, lmem)
 
     jsrc = 0
@@ -4215,7 +4226,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), nrem)
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -4259,12 +4270,12 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
     integer jr, rfin, nrem
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = choice(0, lmem)
 
     jsrc = 0
@@ -4308,7 +4319,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), nrem)
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -4352,12 +4363,12 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
     integer jr, rfin, nrem
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = choice(0, lmem)
 
     jsrc = 0
@@ -4401,7 +4412,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), nrem)
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -4445,12 +4456,12 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
     integer jr, rfin, nrem
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = choice(0, lmem)
 
     jsrc = 0
@@ -4494,7 +4505,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), nrem)
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -4538,12 +4549,12 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
     integer jr, rfin, nrem
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = choice(0, lmem)
 
     jsrc = 0
@@ -4587,7 +4598,7 @@ contains
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
              m = min((je - jsrc), nrem)
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -4633,12 +4644,12 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
     integer jr
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = choice(0, lmem)
 
     jb = 0
@@ -4672,7 +4683,7 @@ contains
           do
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -4717,12 +4728,12 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
     integer jr
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = choice(0, lmem)
 
     jb = 0
@@ -4756,7 +4767,7 @@ contains
           do
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -4801,12 +4812,12 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
     integer jr
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = choice(0, lmem)
 
     jb = 0
@@ -4840,7 +4851,7 @@ contains
           do
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -4885,12 +4896,12 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
     integer jr
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = choice(0, lmem)
 
     jb = 0
@@ -4924,7 +4935,7 @@ contains
           do
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
@@ -4969,12 +4980,12 @@ contains
     integer jb, je
     integer(KIND=KISEP) :: iseph, isepf
     integer(KIND=KIOFS) :: aposh, aposf, apos
-    integer us
+    integer(KIND=KIOFS) :: us
     logical bdmy
     integer jr
 
     ierr = err_default
-    us = get_unit_strm(V(0))
+    us = INT(get_unit_strm(V(0)), kind=KIOFS)
     nt = choice(0, lmem)
 
     jb = 0
@@ -5008,7 +5019,7 @@ contains
           do
              if (jsrc.lt.0) exit
              if (jsrc.ge.je) exit
-             apos = aposh + us * (jsrc - jb)
+             apos = aposh + us * INT((jsrc - jb), kind=KIOFS)
              if (ierr.eq.0) call sus_read(ierr, u, V(jdst:jdst+m-1), m, swap, apos)
              if (ierr.ne.0) exit loop_rec
              jdst = jdst + m
