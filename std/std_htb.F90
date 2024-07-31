@@ -1,7 +1,7 @@
 !!!_! std_htb.F90 - touza/std simple hash table manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2023/07/19 23:19:38 fuyuki std_htb.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/25 22:14:59 fuyuki std_htb.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -253,7 +253,8 @@ contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, numw, numk, numc)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_init=>init, choice
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_utl,only: utl_init=>init ! included by TOUZA_Std_log
     use TOUZA_Std_log,only: log_init=>init
     implicit none
     integer,intent(out)         :: ierr
@@ -280,7 +281,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_init(ierr, ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call log_init(ierr, ulog, levv=lv, mode=lmd)
        endif
        if (is_first_force(init_counts, mode)) then
@@ -296,7 +297,8 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_diag=>diag, choice
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_utl,only: utl_diag=>diag
     use TOUZA_Std_log,only: log_diag=>diag, msg_mdl
     implicit none
     integer,intent(out)         :: ierr
@@ -336,7 +338,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=lmd)
        endif
        diag_counts = diag_counts + 1
@@ -347,7 +349,8 @@ contains
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std_utl,only: utl_finalize=>finalize, choice
+    use TOUZA_Std_utl,only: choice
+    ! use TOUZA_Std_utl,only: utl_finalize=>finalize
     use TOUZA_Std_log,only: log_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -377,7 +380,7 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
+          ! if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=lmd)
           if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=lmd)
        endif
        fine_counts = fine_counts + 1
@@ -1096,12 +1099,12 @@ contains
     endif
     if (ierr.eq.0) then
        if (lk.gt.0) then
-          if (kunit.eq.0) then
-             u = 1
-          else
-             u = max(1, (lk - 1) / kunit + 1)
-             lk = kunit * u
-          endif
+#      if HAVE_F2003_DEFERRED_TYPE
+          u = 1
+#      else /* not HAVE_F2003_DEFERRED_TYPE */
+          u = max(1, (lk - 1) / kunit + 1)
+          lk = kunit * u
+#      endif /* not HAVE_F2003_DEFERRED_TYPE */
        else
           u = 0
        endif
@@ -1314,7 +1317,7 @@ contains
        & result(ee)
 !!!_   . note
     ! query_entry family returns:
-    !    non-netative if found
+    !    non-negative if found
     !    eundef(==-1) if not found
     !    else         if other errors
 !!!_   . body
@@ -1439,11 +1442,12 @@ contains
        & (ierr, status, handle, akey, ikey)
     implicit none
     integer,         intent(out)         :: ierr
-    integer,         intent(out)         :: status
+    integer,         intent(inout)       :: status
     integer,         intent(in)          :: handle
     character(len=*),intent(in),optional :: akey
     integer,         intent(in),optional :: ikey(0:)
     integer s(1)
+    s(1) = status
     call query_status_ah(ierr, s, handle, akey, ikey)
     status = s(1)
   end subroutine query_status_ih
@@ -1451,11 +1455,12 @@ contains
        & (ierr, status, ktb, akey, ikey)
     implicit none
     integer,         intent(out)         :: ierr
-    integer,         intent(out)         :: status
+    integer,         intent(inout)       :: status
     type(ktable_t),  intent(in)          :: ktb
     character(len=*),intent(in),optional :: akey
     integer,         intent(in),optional :: ikey(0:)
     integer s(1)
+    s(1) = status
     call query_status_ak(ierr, s, ktb, akey, ikey)
     status = s(1)
   end subroutine query_status_ik
@@ -2447,34 +2452,16 @@ contains
     integer,         intent(in),optional :: ikey(0:)
     integer jw
 
+    !! Return ierr=0 even when failed to search akey/ikey.
+
     jw = check_wtable(wh)
     ierr = min(0, jw)
     if (ierr.eq.0) then
-       call search_item_core(ierr, handle, wmarks(jw), akey, ikey)
+       call query_status(ierr, handle, wmarks(jw)%kh, akey, ikey)
     else
        handle = ierr
     endif
   end subroutine search_item
-!!!_  & search_item_core
-  subroutine search_item_core &
-       & (ierr, handle, wtb, akey, ikey)
-    use TOUZA_Std_utl,only: choice
-    implicit none
-    integer,         intent(out)         :: ierr
-    integer,         intent(out)         :: handle
-    type(wtable_t),  intent(in)          :: wtb
-    character(len=*),intent(in),optional :: akey
-    integer,         intent(in),optional :: ikey(0:)
-
-    ierr = 0
-    if (ierr.eq.0) then
-       call query_status(ierr, handle, wtb%kh, akey, ikey)
-    else
-       handle = ierr
-    endif
-    return
-  end subroutine search_item_core
-
 !!!_  & settle_item_core
   subroutine settle_item_core &
        & (ierr, handle, wtb, entr)

@@ -1,10 +1,10 @@
 !!!_! ppp_comm.F90 - TOUZA/ppp communication
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 2 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:43:23 fuyuki ppp_comm.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/11 22:56:06 fuyuki ppp_comm.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023
+! Copyright (C) 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 #ifdef HAVE_CONFIG_H
@@ -162,8 +162,9 @@ contains
   subroutine barrier_trace &
        & (ierr, iagent, tag, u)
 #if OPT_USE_MPI
-    use MPI,only: MPI_Barrier
+    ! use MPI,only: MPI_Barrier
 #endif /* OPT_USE_MPI */
+    use TOUZA_Ppp_std,only: MPI_BARRIER
     use TOUZA_Ppp_amng,only: inquire_agent
     implicit none
     integer,         intent(out)         :: ierr
@@ -220,8 +221,11 @@ contains
     n = size(buf)
     ik = choice(0, iroot)
     if (ierr.eq.0) call inquire_agent(ierr, icomm=icomm, iagent=iagent)
+#  if HAVE_FORTRAN_MPI_MPI_BCAST
     if (ierr.eq.0) call MPI_Bcast(buf, n, MPI_INTEGER, ik, icomm, ierr)
-
+#  else
+    ierr = ERR_NOT_IMPLEMENTED
+#  endif
     return
   end subroutine broadcast_ia
 !!!_ + gather
@@ -231,9 +235,9 @@ contains
   subroutine transfer_ia &
        & (ierr,   buf,    &
        &  irsend, irrecv, iagent, iarecv, ktag)
-    use TOUZA_Ppp_std,only: MPI_STATUS_SIZE, MPI_ANY_TAG, MPI_INTEGER
+    use TOUZA_Ppp_std,only: MPI_STATUS_SIZE, MPI_ANY_TAG, MPI_INTEGER, MPI_WAIT
 #if OPT_USE_MPI
-    use MPI,only: MPI_Wait
+    ! use MPI,only: MPI_Wait
 #endif /* OPT_USE_MPI */
 #  if HAVE_FORTRAN_MPI_MPI_ISEND
     use MPI,only: MPI_Isend
@@ -293,14 +297,22 @@ contains
     endif
     if (ierr.eq.0) then
        if (iranks.eq.irself) then
+#if HAVE_FORTRAN_MPI_MPI_ISEND
           call MPI_Isend &
                & (buf(:), n, KMTGT, irankr, tag, icomm, ireqs, ierr)
+#else
+          ierr = ERR_NOT_IMPLEMENTED
+#endif
        endif
     endif
     if (ierr.eq.0) then
        if (irankr.eq.irself) then
+#  if HAVE_FORTRAN_MPI_MPI_IRECV
           call MPI_Irecv &
                & (buf(:), n, KMTGT, iranks, tag, icomm, ireqr, ierr)
+#  else
+          ierr = ERR_NOT_IMPLEMENTED
+#  endif
        endif
     endif
     if (ierr.eq.0) then

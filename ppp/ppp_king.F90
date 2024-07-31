@@ -1,10 +1,10 @@
 !!!_! ppp_king.F90 - TOUZA/ppp king control (xmcomm/xmking replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:44:26 fuyuki ppp_king.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/11 22:19:10 fuyuki ppp_king.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022,2023
+! Copyright (C) 2022,2023,2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 #ifdef HAVE_CONFIG_H
@@ -34,6 +34,7 @@
 module TOUZA_Ppp_king
 !!!_ + modules
   use TOUZA_Ppp_std,only: get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Ppp_std,only: MPI_GROUP_TRANSLATE_RANKS
 !!!_ + default
   implicit none
   private
@@ -313,9 +314,9 @@ contains
   subroutine get_king_i &
        & (ierr, king, mdl, jaref, adef)
     use TOUZA_Ppp_std,only: MPI_UNDEFINED
-#  if HAVE_FORTRAN_MPI_MPI_BCAST
-    use MPI,only: MPI_Group_translate_ranks
-#  endif
+! #  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
+!     use MPI,only: MPI_Group_translate_ranks
+! #  endif
     use TOUZA_Ppp_amng,only: query_agent, source_agent, inquire_agent
     implicit none
     integer,                  intent(out) :: ierr
@@ -379,9 +380,6 @@ contains
 !!!_  - bind_king
   subroutine bind_king &
        & (ierr, king, pat, jasrc, jadef)
-#  if HAVE_FORTRAN_MPI_MPI_BCAST
-    use MPI,only: MPI_Group_translate_ranks
-#  endif
     use TOUZA_Ppp_amng,only: query_agent, inquire_agent
     implicit none
     integer,         intent(out) :: ierr
@@ -428,9 +426,6 @@ contains
 !!!_  - set_king
   subroutine set_king &
        & (ierr, king, pat, adef)
-#  if HAVE_FORTRAN_MPI_MPI_BCAST
-    use MPI,only: MPI_Group_translate_ranks
-#  endif
     use TOUZA_Ppp_amng,only: query_agent, source_agent, inquire_agent
     implicit none
     integer,         intent(out) :: ierr
@@ -466,9 +461,9 @@ contains
   integer function cache_register &
        & (king, iaref, iasrc, pat) &
        & result(n)
-#  if HAVE_FORTRAN_MPI_MPI_BCAST
-    use MPI,only: MPI_Group_translate_ranks
-#  endif
+! #  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
+!     use MPI,only: MPI_Group_translate_ranks
+! #  endif
     use TOUZA_Ppp_amng,only: inquire_agent
     implicit none
     integer,         intent(in)  :: king

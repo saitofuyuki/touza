@@ -1,10 +1,10 @@
 !!!_! nio_bindc.F90 - TOUZA/Nio bind(c) interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2023
-#define TIME_STAMP 'Time-stamp: <2023/04/07 14:43:38 fuyuki nio_bindc.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/23 18:09:40 fuyuki nio_bindc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2023
+! Copyright (C) 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -22,11 +22,15 @@ module TOUZA_Nio_bindc
   use TOUZA_Nio_std,only: KI32, KI64, KDBL, KFLT
   use TOUZA_Nio_std,only: get_logu,      unit_global,  trace_fine,    trace_control
   use TOUZA_Nio_std,only: ignore_bigger, ignore_small, ignore_always, def_block
+  use TOUZA_Nio_header,only: litem
   implicit none
   private
 !!!_  - public parameters
   integer,parameter :: lpath = OPT_PATH_LEN
   integer,parameter :: lvar  = 64
+  ! integer(kind=C_INT),parameter,public :: len_path = OPT_PATH_LEN
+  ! integer(kind=C_INT),parameter,public :: len_var  = 64
+  ! integer(kind=C_INT),parameter,public :: len_item = litem
 !!!_  - private parameter
   integer,parameter :: lax = 6   !  3 is enough
 !!!_  - static
@@ -43,13 +47,19 @@ module TOUZA_Nio_bindc
 !!!_  - interfaces
 !!!_  - public procedures
   public :: tnb_init,          tnb_diag,       tnb_finalize
-  public :: tnb_file_is_nio,   tnb_file_open,  tnb_file_diag, tnb_file_close
-  public :: tnb_file_groups,   tnb_group_vars, tnb_group_recs
-  public :: tnb_var_nco
-  public :: tnb_var_name,      tnb_var_id
-  public :: tnb_co_name,       tnb_co_size,    tnb_co_idx
-  public :: tnb_get_attr,      tnb_get_attr_float
+  public :: tnb_file_is_nio,   tnb_file_open,  tnb_file_diag,  tnb_file_close
+  public :: tnb_file_groups,   tnb_group,      tnb_search_group
+  public :: tnb_group_name,    tnb_group_recs, tnb_group_coors
+  public :: tnb_group_co_name, tnb_group_co_range, tnb_group_co_idx
+  public :: tnb_group_vars,    tnb_search_var, tnb_var_name,   tnb_co_size
+  public :: tnb_var_recs
+  public :: tnb_co_name,       tnb_co_len,     tnb_co_idx,     tnb_co_serial
+  public :: tnb_rec_date,      tnb_rec_time
+  public :: tnb_attr_size,     tnb_attr_len
+  public :: tnb_get_attr
   public :: tnb_get_attr_byid, tnb_get_attr_name
+  public :: tnb_get_attr_int,  tnb_get_attr_float, tnb_get_attr_double
+  public :: tnb_var_read_int,  tnb_var_read_float, tnb_var_read_double
   public :: init,              diag,           finalize
 !!!_  - public shared
 contains
@@ -162,49 +172,143 @@ contains
 !!!_  & tnb_file_groups()
   integer(kind=C_INT) function tnb_file_groups &
        & (handle) BIND(C) result(n)
-    use TOUZA_Nio_cache,only: cache_groups
+    use TOUZA_Nio_cache,only: cache_group_size
     implicit none
     integer(kind=C_INT),intent(in),value :: handle
-    n = cache_groups(int(handle))
+    n = cache_group_size(int(handle))
   end function tnb_file_groups
+
+!!!_  - tnb_group()
+  integer(kind=C_INT) function tnb_group &
+       & (handle, gidx) BIND(C) result(gh)
+    use TOUZA_Nio_cache,only: cache_group
+    implicit none
+    integer(kind=C_INT),intent(in),value :: handle
+    integer(kind=C_INT),intent(in),value :: gidx
+    gh = cache_group(int(gidx), int(handle))
+  end function tnb_group
+
+!!!_  - tnb_search_group()
+  integer(kind=C_INT) function tnb_search_group &
+       & (handle, name, refh) BIND(C) result(gh)
+    use TOUZA_Nio_cache,only: cache_group
+    implicit none
+    integer(kind=C_INT),         intent(in),value :: handle
+    character(len=1,kind=C_CHAR),intent(in)       :: name(*)
+    integer(kind=C_INT),         intent(in),value :: refh
+    character(len=lvar) :: buf
+    call c2f_string(buf, name)
+    gh = cache_group(buf, int(handle), int(refh))
+  end function tnb_search_group
+
+!!!_  - tnb_group_name()
+  integer(kind=C_INT) function tnb_group_name &
+       & (name, handle) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_group_name
+    implicit none
+    character(len=1,kind=C_CHAR),intent(out)      :: name(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    character(len=lvar) :: buf
+    call cache_group_name(ierr, buf, int(handle))
+    if (ierr.eq.0) then
+       call f2c_string(name, buf)
+    else
+       call f2c_string(name)
+    endif
+  end function tnb_group_name
+
+!!!_  & tnb_group_coors()
+  integer(kind=C_INT) function tnb_group_coors &
+       & (handle) BIND(C) result(n)
+    use TOUZA_Nio_cache,only: cache_group_coors
+    implicit none
+    integer(kind=C_INT),intent(in),value :: handle
+    n = cache_group_coors(int(handle))
+  end function tnb_group_coors
+
+!!!_  - tnb_group_co_idx()
+  integer(kind=C_INT) function tnb_group_co_idx &
+       & (handle, cid) BIND(C) result(serial)
+    use TOUZA_Nio_cache,only: cache_group_cserial
+    use TOUZA_Nio_header,only: litem
+    implicit none
+    integer(kind=C_INT),intent(in),value :: handle
+    integer(kind=C_INT),intent(in),value :: cid
+    integer j
+    j = cache_group_cserial(int(handle), int(cid))
+    serial = j
+  end function tnb_group_co_idx
+
+!!!_  & tnb_group_co_name()
+  integer(kind=C_INT) function tnb_group_co_name &
+       & (name, handle, cid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_group_coor_name
+    use TOUZA_Nio_header,only: litem
+    implicit none
+    character(len=1,kind=C_CHAR),intent(out)      :: name(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: cid
+    integer jerr
+    character(len=litem) :: buf
+
+    call cache_group_coor_name(jerr, buf, int(handle), int(cid))
+    if (jerr.eq.0) then
+       call f2c_string(name, buf)
+    else
+       call f2c_string(name)
+    endif
+    ierr = jerr
+  end function tnb_group_co_name
+
+!!!_  & tnb_group_co_range()
+  integer(kind=C_INT) function tnb_group_co_range &
+       & (jbgn, jend, handle, cid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_group_coor_range
+    use TOUZA_Nio_header,only: litem
+    implicit none
+    integer(kind=C_INT),intent(out)      :: jbgn
+    integer(kind=C_INT),intent(out)      :: jend
+    integer(kind=C_INT),intent(in),value :: handle
+    integer(kind=C_INT),intent(in),value :: cid
+    integer jerr
+    integer jb, je
+
+    call cache_group_coor_range(jerr, jb, je, int(handle), int(cid))
+    jbgn = jb
+    jend = je
+    ierr = jerr
+  end function tnb_group_co_range
 
 !!!_  & tnb_group_vars()
   integer(kind=C_INT) function tnb_group_vars &
-       & (handle, gid) BIND(C) result(n)
-    use TOUZA_Nio_cache,only: cache_vars
+       & (handle) BIND(C) result(n)
+    use TOUZA_Nio_cache,only: cache_var_size
     implicit none
     integer(kind=C_INT),intent(in),value :: handle
-    integer(kind=C_INT),intent(in),value :: gid
-    if (gid.ge.0) then
-       n = cache_vars(int(handle), int(gid))
-    else
-       n = cache_vars(int(handle))
-    endif
+    n = cache_var_size(int(handle))
   end function tnb_group_vars
 
 !!!_  - tnb_group_recs()
   integer(kind=C_INT) function tnb_group_recs &
-       & (handle, gid) BIND(C) result(nrecs)
+       & (handle) BIND(C) result(nrecs)
     use TOUZA_Nio_cache,only: cache_group_recs
     implicit none
     integer(kind=C_INT),intent(in),value :: handle
-    integer(kind=C_INT),intent(in),value :: gid
     integer n
-    n = cache_group_recs(int(handle), int(gid))
+    n = cache_group_recs(int(handle))
     nrecs = n
   end function tnb_group_recs
 
 !!!_  - tnb_var_name()
   integer(kind=C_INT) function tnb_var_name &
-       & (name, handle, gid, vid) BIND(C) result(ierr)
+       & (name, handle, vid) BIND(C) result(ierr)
     use TOUZA_Nio_cache,only: cache_var_name
     implicit none
     character(len=1,kind=C_CHAR),intent(out)      :: name(*)
     integer(kind=C_INT),         intent(in),value :: handle
-    integer(kind=C_INT),         intent(in),value :: gid
     integer(kind=C_INT),         intent(in),value :: vid
     character(len=lvar) :: buf
-    call cache_var_name(ierr, buf, int(handle), int(gid), int(vid))
+    call cache_var_name(ierr, buf, int(handle), int(vid))
     if (ierr.eq.0) then
        call f2c_string(name, buf)
     else
@@ -212,53 +316,80 @@ contains
     endif
   end function tnb_var_name
 
-!!!_  - tnb_var_id()
-  integer(kind=C_INT) function tnb_var_id &
-       & (handle, gid, name) BIND(C) result(vid)
+!!!_  - tnb_search_var()
+  integer(kind=C_INT) function tnb_search_var &
+       & (handle, name) BIND(C) result(vid)
     use TOUZA_Nio_cache,only: cache_var_id
     implicit none
     integer(kind=C_INT),         intent(in),value :: handle
-    integer(kind=C_INT),         intent(in),value :: gid
     character(len=1,kind=C_CHAR),intent(in)       :: name(*)
     character(len=lvar) :: buf
     integer jv
     call c2f_string(buf, name)
-    jv = cache_var_id(buf, int(handle), int(gid))
+    jv = cache_var_id(buf, int(handle))
     vid = jv
-  end function tnb_var_id
+  end function tnb_search_var
 
-!!!_  - tnb_var_nco()
-  integer(kind=C_INT) function tnb_var_nco &
-       & (handle, gid, vid) BIND(C) result(nco)
-    use TOUZA_Nio_cache,only: cache_var_nco
+!!!_  - tnb_co_size()
+  integer(kind=C_INT) function tnb_co_size &
+       & (handle, vid) BIND(C) result(nco)
+    use TOUZA_Nio_cache,only: cache_co_size
     implicit none
     integer(kind=C_INT),intent(in),value :: handle
-    integer(kind=C_INT),intent(in),value :: gid
     integer(kind=C_INT),intent(in),value :: vid
     integer n
-    n = cache_var_nco(int(handle), int(gid), int(vid))
+    n = cache_co_size(int(handle), int(vid))
     nco = n
-  end function tnb_var_nco
+  end function tnb_co_size
+
+!!!_  - tnb_var_recs()
+  integer(kind=C_INT) function tnb_var_recs &
+       & (handle, vid) BIND(C) result(nrecs)
+    use TOUZA_Nio_cache,only: cache_group_recs
+    implicit none
+    integer(kind=C_INT),intent(in),value :: handle
+    integer(kind=C_INT),intent(in),value :: vid
+    integer n
+    n = cache_group_recs(int(handle), int(vid))
+    nrecs = n
+  end function tnb_var_recs
+
+!!!_  - tnb_co_serial()
+  integer(kind=C_INT) function tnb_co_serial &
+       & (handle, vid, cid) BIND(C) result(ser)
+    use TOUZA_Nio_cache,only: cache_co_serial, cache_co_size
+    implicit none
+    integer(kind=C_INT),intent(in),value :: handle
+    integer(kind=C_INT),intent(in),value :: vid
+    integer(kind=C_INT),intent(in),value :: cid
+    integer nco, jco, xh
+    nco = cache_co_size(int(handle), int(vid))
+    ser = min(0, nco)
+    if (ser.eq.0) then
+       jco = nco - 1 - int(cid)
+       xh = cache_co_serial(int(handle), int(vid), int(jco))
+       ser = xh
+    endif
+  end function tnb_co_serial
 
 !!!_  - tnb_co_name()
   integer(kind=C_INT) function tnb_co_name &
-       & (name, handle, gid, vid, cid) BIND(C) result(ierr)
-    use TOUZA_Nio_cache,only: cache_co_name, cache_var_nco
+       & (name, handle, vid, cid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_co_name, cache_co_size
     use TOUZA_Nio_header,only: litem
     implicit none
     character(len=1,kind=C_CHAR),intent(out)      :: name(*)
     integer(kind=C_INT),         intent(in),value :: handle
-    integer(kind=C_INT),         intent(in),value :: gid
     integer(kind=C_INT),         intent(in),value :: vid
     integer(kind=C_INT),         intent(in),value :: cid
     integer jerr
     character(len=litem) :: buf
     integer nco, jco
-    nco = cache_var_nco(int(handle), int(gid), int(vid))
+    nco = cache_co_size(int(handle), int(vid))
     jerr = min(0, nco)
     if (jerr.eq.0) then
        jco = nco - 1 - int(cid)
-       call cache_co_name(jerr, buf, int(handle), int(gid), int(vid), jco)
+       call cache_co_name(jerr, buf, int(handle), int(vid), jco)
     endif
     if (jerr.eq.0) then
        call f2c_string(name, buf)
@@ -268,34 +399,32 @@ contains
     ierr = jerr
   end function tnb_co_name
 
-!!!_  - tnb_co_size()
-  integer(kind=C_INT) function tnb_co_size &
-       & (handle, gid, vid, cid) BIND(C) result(nsize)
-    use TOUZA_Nio_cache,only: cache_co_size, cache_var_nco
+!!!_  - tnb_co_len()
+  integer(kind=C_INT) function tnb_co_len &
+       & (handle, vid, cid) BIND(C) result(nsize)
+    use TOUZA_Nio_cache,only: cache_co_len, cache_co_size
     implicit none
     integer(kind=C_INT),intent(in),value :: handle
-    integer(kind=C_INT),intent(in),value :: gid
     integer(kind=C_INT),intent(in),value :: vid
     integer(kind=C_INT),intent(in),value :: cid
     integer ns
     integer nco, jco
-    nco = cache_var_nco(int(handle), int(gid), int(vid))
+    nco = cache_co_size(int(handle), int(vid))
     ns = min(0, nco)
     if (ns.eq.0) then
        jco = nco - 1 - int(cid)
-       ns = cache_co_size(int(handle), int(gid), int(vid), jco)
+       ns = cache_co_len(int(handle), int(vid), jco)
     endif
     nsize = ns
-  end function tnb_co_size
+  end function tnb_co_len
 
 !!!_  - tnb_co_idx()
   integer(kind=C_INT) function tnb_co_idx &
-       & (handle, gid, vid, name) BIND(C) result(cid)
-    use TOUZA_Nio_cache,only: cache_co_idx, cache_var_nco
+       & (handle, vid, name) BIND(C) result(cid)
+    use TOUZA_Nio_cache,only: cache_co_idx, cache_co_size
     use TOUZA_Nio_header,only: litem
     implicit none
     integer(kind=C_INT),         intent(in),value :: handle
-    integer(kind=C_INT),         intent(in),value :: gid
     integer(kind=C_INT),         intent(in),value :: vid
     character(len=1,kind=C_CHAR),intent(in)       :: name(*)
     integer ns
@@ -304,11 +433,11 @@ contains
 
     call c2f_string(buf, name)
     cid = -1
-    nco = cache_var_nco(int(handle), int(gid), int(vid))
+    nco = cache_co_size(int(handle), int(vid))
     ns = min(0, nco)
     if (ns.eq.0) then
        jco = nco - 1 - int(cid)
-       jco = cache_co_idx(int(handle), int(gid), int(vid), buf)
+       jco = cache_co_idx(int(handle), int(vid), buf)
        if (jco.ge.0) cid = nco - 1 - jco
     endif
   end function tnb_co_idx
@@ -333,16 +462,90 @@ contains
 !     endif
 !   end function tnb_var_dims
 
+!!!_  - tnb_rec_time()
+  integer(kind=C_INT) function tnb_rec_time &
+       & (time, handle, vid, rec) BIND(C) result(ierr)
+    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_cache,only: cache_rec_time
+    implicit none
+    character(len=1,kind=C_CHAR),intent(out)      :: time(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
+    character(len=litem) :: buf
+    integer jerr
+    ierr = 0
+    if (vid.lt.0) then
+       call cache_rec_time(jerr, buf, int(handle), rec=int(rec))
+    else
+       call cache_rec_time(jerr, buf, int(handle), int(vid), int(rec))
+    endif
+    if (jerr.eq.0) then
+       call f2c_string(time, buf)
+    else
+       call f2c_string(time)
+    endif
+    ierr = jerr
+  end function tnb_rec_time
+
+!!!_  - tnb_rec_date()
+  integer(kind=C_INT) function tnb_rec_date &
+       & (time, handle, vid, rec) BIND(C) result(ierr)
+    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_cache,only: cache_rec_date
+    implicit none
+    character(len=1,kind=C_CHAR),intent(out)      :: time(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
+    character(len=litem) :: buf
+    integer jerr
+    ierr = 0
+    if (vid.lt.0) then
+       call cache_rec_date(jerr, buf, int(handle), rec=int(rec))
+    else
+       call cache_rec_date(jerr, buf, int(handle), int(vid), int(rec))
+    endif
+    if (jerr.eq.0) then
+       call f2c_string(time, buf)
+    else
+       call f2c_string(time)
+    endif
+    ierr = jerr
+  end function tnb_rec_date
+
+!!!_  & tnb_attr_size() - (hard-coded) number of attributes
+  integer(kind=C_INT) function tnb_attr_size &
+       & (handle, vid, rec) BIND(C) result(n)
+    use TOUZA_Nio_header,only: nitem
+    implicit none
+    integer(kind=C_INT),intent(in),value :: handle
+    integer(kind=C_INT),intent(in),value :: vid
+    integer(kind=C_INT),intent(in),value :: rec
+    n = nitem
+  end function tnb_attr_size
+
+!!!_  & tnb_attr_len() - (hard-coded) length of attribute string
+  integer(kind=C_INT) function tnb_attr_len &
+       & (item, handle, vid, rec) BIND(C) result(n)
+    use TOUZA_Nio_header,only: litem
+    implicit none
+    character(len=1,kind=C_CHAR),intent(in)       :: item(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
+    n = litem
+  end function tnb_attr_len
+
 !!!_  - tnb_get_attr()
   integer(kind=C_INT) function tnb_get_attr &
-       & (attr, item, handle, gid, vid, rec) BIND(C) result(ierr)
+       & (attr, item, handle, vid, rec) BIND(C) result(ierr)
     use TOUZA_Nio_header,only: litem, nitem
     use TOUZA_Nio_cache,only: cache_get_attr
     implicit none
     character(len=1,kind=C_CHAR),intent(out)      :: attr(*)
     character(len=1,kind=C_CHAR),intent(in)       :: item(*)
     integer(kind=C_INT),         intent(in),value :: handle
-    integer(kind=C_INT),         intent(in),value :: gid
     integer(kind=C_INT),         intent(in),value :: vid
     integer(kind=C_INT),         intent(in),value :: rec
     character(len=litem*nitem) :: buf
@@ -350,14 +553,12 @@ contains
     integer jerr
     ierr = 0
     call c2f_string(ibuf, item)
-    if (gid.lt.0) then
+    if (vid.lt.0) then
        call cache_get_attr(jerr, buf, ibuf, int(handle))
-    else if (vid.lt.0) then
-       call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid))
     else if (rec.lt.0) then
-       call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid), int(vid))
+       call cache_get_attr(jerr, buf, ibuf, int(handle), int(vid))
     else
-       call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid), int(vid), int(rec))
+       call cache_get_attr(jerr, buf, ibuf, int(handle), int(vid), int(rec))
     endif
     if (jerr.eq.0) then
        call f2c_string(attr, buf)
@@ -367,44 +568,88 @@ contains
     ierr = jerr
   end function tnb_get_attr
 
-!!!_  - tnb_get_attr_float()
-  integer(kind=C_INT) function tnb_get_attr_float &
-       & (attr, item, handle, gid, vid, rec) BIND(C) result(ierr)
+!!!_  - tnb_get_attr_int()
+  integer(kind=C_INT) function tnb_get_attr_int &
+       & (attr, item, handle, vid, rec) BIND(C) result(ierr)
     use TOUZA_Nio_header,only: litem, nitem
     use TOUZA_Nio_cache,only: cache_get_attr
     implicit none
-    real(kind=C_FLOAT),          intent(out)      :: attr
+    integer(kind=C_INT),         intent(out)      :: attr
     character(len=1,kind=C_CHAR),intent(in)       :: item(*)
     integer(kind=C_INT),         intent(in),value :: handle
-    integer(kind=C_INT),         intent(in),value :: gid
     integer(kind=C_INT),         intent(in),value :: vid
     integer(kind=C_INT),         intent(in),value :: rec
     character(len=litem) :: ibuf
     integer jerr
     ierr = 0
     call c2f_string(ibuf, item)
-    if (gid.lt.0) then
+    if (vid.lt.0) then
        call cache_get_attr(jerr, attr, ibuf, int(handle))
-    else if (vid.lt.0) then
-       call cache_get_attr(jerr, attr, ibuf, int(handle), int(gid))
     else if (rec.lt.0) then
-       call cache_get_attr(jerr, attr, ibuf, int(handle), int(gid), int(vid))
+       call cache_get_attr(jerr, attr, ibuf, int(handle), int(vid))
     else
-       call cache_get_attr(jerr, attr, ibuf, int(handle), int(gid), int(vid), int(rec))
+       call cache_get_attr(jerr, attr, ibuf, int(handle), int(vid), int(rec))
+    endif
+    ierr = jerr
+  end function tnb_get_attr_int
+!!!_  - tnb_get_attr_float()
+  integer(kind=C_INT) function tnb_get_attr_float &
+       & (attr, item, handle, vid, rec) BIND(C) result(ierr)
+    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_cache,only: cache_get_attr
+    implicit none
+    real(kind=C_FLOAT),          intent(out)      :: attr
+    character(len=1,kind=C_CHAR),intent(in)       :: item(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
+    character(len=litem) :: ibuf
+    integer jerr
+    ierr = 0
+    call c2f_string(ibuf, item)
+    if (vid.lt.0) then
+       call cache_get_attr(jerr, attr, ibuf, int(handle))
+    else if (rec.lt.0) then
+       call cache_get_attr(jerr, attr, ibuf, int(handle), int(vid))
+    else
+       call cache_get_attr(jerr, attr, ibuf, int(handle), int(vid), int(rec))
     endif
     ierr = jerr
   end function tnb_get_attr_float
+!!!_  - tnb_get_attr_double()
+  integer(kind=C_INT) function tnb_get_attr_double &
+       & (attr, item, handle, vid, rec) BIND(C) result(ierr)
+    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_cache,only: cache_get_attr
+    implicit none
+    real(kind=C_DOUBLE),         intent(out)      :: attr
+    character(len=1,kind=C_CHAR),intent(in)       :: item(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
+    character(len=litem) :: ibuf
+    integer jerr
+    ierr = 0
+    call c2f_string(ibuf, item)
+    if (vid.lt.0) then
+       call cache_get_attr(jerr, attr, ibuf, int(handle))
+    else if (rec.lt.0) then
+       call cache_get_attr(jerr, attr, ibuf, int(handle), int(vid))
+    else
+       call cache_get_attr(jerr, attr, ibuf, int(handle), int(vid), int(rec))
+    endif
+    ierr = jerr
+  end function tnb_get_attr_double
 
 !!!_  - tnb_get_attr_byid()
   integer(kind=C_INT) function tnb_get_attr_byid &
-       & (attr, item, handle, gid, vid, rec) BIND(C) result(ierr)
+       & (attr, item, handle, vid, rec) BIND(C) result(ierr)
     use TOUZA_Nio_header,only: litem, nitem
     use TOUZA_Nio_cache,only: cache_get_attr
     implicit none
     character(len=1,kind=C_CHAR),intent(out)      :: attr(*)
     integer(kind=C_INT),         intent(in),value :: item
     integer(kind=C_INT),         intent(in),value :: handle
-    integer(kind=C_INT),         intent(in),value :: gid
     integer(kind=C_INT),         intent(in),value :: vid
     integer(kind=C_INT),         intent(in),value :: rec
     character(len=litem*nitem) :: buf
@@ -412,14 +657,12 @@ contains
     integer jerr
     ierr = 0
     ibuf = item
-    if (gid.lt.0) then
+    if (vid.lt.0) then
        call cache_get_attr(jerr, buf, ibuf, int(handle))
-    else if (vid.lt.0) then
-       call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid))
     else if (rec.lt.0) then
-       call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid), int(vid))
+       call cache_get_attr(jerr, buf, ibuf, int(handle), int(vid))
     else
-       call cache_get_attr(jerr, buf, ibuf, int(handle), int(gid), int(vid), int(rec))
+       call cache_get_attr(jerr, buf, ibuf, int(handle), int(vid), int(rec))
     endif
     if (jerr.eq.0) then
        call f2c_string(attr, buf)
@@ -444,22 +687,21 @@ contains
     call f2c_string(name, buf)
   end function tnb_get_attr_name
 
-!!!_  - tnb_var_read_float()
-  integer(kind=C_INT) function tnb_var_read_float &
-       & (d, rec, start, count, handle, gid, vid) BIND(C) result(ierr)
-    use TOUZA_Nio_cache,only: cache_var_read, cache_var_nco
+!!!_  - tnb_var_read_int()
+  integer(kind=C_INT) function tnb_var_read_int &
+       & (d, rec, start, count, handle, vid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_var_read, cache_co_size
     implicit none
-    real(kind=C_FLOAT),    intent(out)      :: d(*)
+    integer(kind=C_INT),   intent(out)      :: d(*)
     integer(kind=C_SIZE_T),intent(in),value :: rec
     integer(kind=C_SIZE_T),intent(in)       :: start(0:*), count(0:*)
     integer(kind=C_INT),   intent(in),value :: handle
-    integer(kind=C_INT),   intent(in),value :: gid
     integer(kind=C_INT),   intent(in),value :: vid
     integer nco, jco, jeff
     integer jerr
     integer st(0:lax-1), co(0:lax-1)
 
-    nco = cache_var_nco(int(handle), int(gid), int(vid))
+    nco = cache_co_size(int(handle), int(vid))
     jerr = min(0, nco)
     do jeff = 0, nco - 1
        jco = nco - 1 - jeff
@@ -470,11 +712,71 @@ contains
     if (jerr.eq.0) then
        call cache_var_read &
             & (jerr,        d,           &
-            &  int(handle), int(gid),    int(vid), &
+            &  int(handle), int(vid),    &
+            &  int(rec),    st(0:nco-1), co(0:nco-1))
+    endif
+    ierr = jerr
+  end function tnb_var_read_int
+!!!_  - tnb_var_read_float()
+  integer(kind=C_INT) function tnb_var_read_float &
+       & (d, rec, start, count, handle, vid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_var_read, cache_co_size
+    implicit none
+    real(kind=C_FLOAT),    intent(out)      :: d(*)
+    integer(kind=C_SIZE_T),intent(in),value :: rec
+    integer(kind=C_SIZE_T),intent(in)       :: start(0:*), count(0:*)
+    integer(kind=C_INT),   intent(in),value :: handle
+    integer(kind=C_INT),   intent(in),value :: vid
+    integer nco, jco, jeff
+    integer jerr
+    integer st(0:lax-1), co(0:lax-1)
+
+    nco = cache_co_size(int(handle), int(vid))
+    jerr = min(0, nco)
+    do jeff = 0, nco - 1
+       jco = nco - 1 - jeff
+       st(jco) = int(start(jeff))
+       co(jco) = int(count(jeff))
+    enddo
+
+    if (jerr.eq.0) then
+       call cache_var_read &
+            & (jerr,        d,           &
+            &  int(handle), int(vid),    &
             &  int(rec),    st(0:nco-1), co(0:nco-1))
     endif
     ierr = jerr
   end function tnb_var_read_float
+!!!_  - tnb_var_read_double()
+  integer(kind=C_INT) function tnb_var_read_double &
+       & (d, rec, start, count, handle, vid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_var_read, cache_co_size
+    implicit none
+    real(kind=C_DOUBLE),   intent(out)      :: d(*)
+    integer(kind=C_SIZE_T),intent(in),value :: rec
+    integer(kind=C_SIZE_T),intent(in)       :: start(0:*), count(0:*)
+    integer(kind=C_INT),   intent(in),value :: handle
+    integer(kind=C_INT),   intent(in),value :: vid
+    integer nco, jco, jeff
+    integer jerr
+    integer st(0:lax-1), co(0:lax-1)
+
+    nco = cache_co_size(int(handle), int(vid))
+    jerr = min(0, nco)
+    do jeff = 0, nco - 1
+       jco = nco - 1 - jeff
+       st(jco) = int(start(jeff))
+       co(jco) = int(count(jeff))
+    enddo
+
+    if (jerr.eq.0) then
+       call cache_var_read &
+            & (jerr,        d,           &
+            &  int(handle), int(vid),    &
+            &  int(rec),    st(0:nco-1), co(0:nco-1))
+    endif
+    ierr = jerr
+  end function tnb_var_read_double
 
 !!!_ + common interfaces
 !!!_  & init

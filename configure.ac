@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2023/03/24 17:22:02 fuyuki configure.ac>
+# Time-stamp: <2024/07/25 16:47:59 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -11,7 +11,7 @@ MT_INIT()
 AC_INIT([touza],MT_VERSION,[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
-Copyright (C) 2020-2023 Japan Agency for Marine-Earth Science and Technology
+Copyright (C) 2020-2024 Japan Agency for Marine-Earth Science and Technology
 
 This is TOUZA, a collection of MIROC base infrastructure.
 
@@ -102,6 +102,19 @@ AS_IF([test x"$enableval" = x"no"],
        AC_MSG_RESULT([enable])])
 AC_DEFINE_UNQUOTED([OPT_ENABLE_FORTRAN_ELEMENTAL], [$enable_elemental], [prefer elemental function])
 
+AC_MSG_CHECKING([if enable binary128 variation])
+AC_ARG_ENABLE([binary128],
+[AS_HELP_STRING([--enable-binary128], [disable binary128 procedures])],
+[], [enableval=no])
+AS_CASE([x"$enableval"],
+[xyes], [enable_binary128=33
+AC_MSG_RESULT([enabled with 33 digits])],
+[xno],  [enable_binary128=-1
+AC_MSG_RESULT([disabled])],
+[enable_binary128=$enableval
+AC_MSG_RESULT([enabled with $enableval digits])])
+AC_DEFINE_UNQUOTED([OPT_REAL_QUADRUPLE_DIGITS], [$enable_binary128], [binary128 precision])
+
 AS_IF([test x"$use_warn_max" = xyes], [AX_FCFLAGS_WARN_ALL([AM_FCFLAGS])])
 
 AS_IF([test x"$with_mpi" != xno], [enable_sub_div_default=yes], [enable_sub_div_default=no])
@@ -115,7 +128,8 @@ dnl MT_SUB_PACKAGE([div], [[$]enable_sub_div_default],     [std])
 AM_CONDITIONAL([BUILD_div], [false])
 dnl MT_SUB_PACKAGE([nio], [],     [std emu trp div])
 MT_SUB_PACKAGE([nio], [],     [std emu trp])
-MT_SUB_PACKAGE([ami], [],     [std])
+MT_SUB_PACKAGE([ami], [],     [std emu nio trp])
+MT_SUB_PACKAGE([zbt], [],     [std nio])
 
 AC_ARG_ENABLE([nctcdf],
 [AS_HELP_STRING([--enable-nctcdf], [enable nio/n*c*tcdf features@<:@default=no@:>@])],
@@ -154,10 +168,9 @@ AX_SUBDIRS_CONFIGURE([jmz],
     [[TOUZA_top_builddir=${ac_top_build_prefix}],
      [TOUZA_VERSION="${PACKAGE_VERSION}"],
      [TOUZA_NAME="${PACKAGE_NAME}"],
-     [TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}],
+     [TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}ami ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}emu ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}],
      [TOUZA_LIBRARY=${ac_top_build_prefix}lib${with_touza_name}.la],
-     [TOUZA_LIBS=${NETCDF4_FLIBS} ${NETCDF4_LIBS}],
-     [TOUZA_LDFLAGS=${NETCDF4_LDFLAGS}]],
+     [TOUZA_LIBS=${NETCDF4_FLIBS} ${NETCDF4_LIBS}]],
     [[--enable-nctcdf="[$]jmz_nctcdf"]],
     [--with-build-jmz])])
 
@@ -187,6 +200,7 @@ AM_CONDITIONAL([autorevision],
 
 AC_PATH_PROGS([AUTOREVISION], [autorevision], [:])
 AC_PATH_PROGS([REALPATH], [realpath], [false])
+AC_PATH_PROGS([ZSH], [zsh], [:])
 
 dnl dependency hack
 dnl _AM_DEPENDENCIES(FC)
@@ -205,6 +219,15 @@ AC_ARG_ENABLE([mod-dependencies],
 AM_CONDITIONAL([enable_module_dependencies], [
   test "x$use_mod_dependencies" != xno \
   && test x"$ax_f90_modext" != xunknown])
+
+AS_IF([test "x$enable_sub_zbt" != xno],
+      [AM_PATH_PYTHON([3.9], , [:])
+AC_CONFIG_FILES([zbt/zbt/Makefile])
+AC_CONFIG_FILES([zbt/tests/Makefile])
+AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
+AX_PYTHON()
+AX_PYTHON_MODULE([ctypes], , [python3])
+AX_PYTHON_MODULE([numpy], , [python3])])
 
 dnl AM_CONDITIONAL([am__fastdepFC], [false])
 

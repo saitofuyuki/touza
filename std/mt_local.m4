@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2023/05/12 22:20:09 fuyuki mt_local.m4>
+dnl Time-stamp: <2024/07/11 21:34:52 fuyuki mt_local.m4>
 
 dnl Copyright: 2020-2023 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -13,6 +13,15 @@ MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_command_argument], [1], [])
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getarg], [1, T], [
      character T*30])
 MT_FORTRAN_BATCH_CHECK_FUNCTION([command_argument_count], [])
+
+MT_FORTRAN_BATCH_CHECK_FUNCTION([new_line], ['a'])
+
+dnl Fortran 2008
+MT_FORTRAN_BATCH_CHECK_FUNCTION([hypot], [0.0, 0.0])
+MT_FORTRAN_BATCH_CHECK_FUNCTION([atanh], [0.0])
+MT_FORTRAN_BATCH_CHECK_FUNCTION([acosh], [1.0])
+MT_FORTRAN_BATCH_CHECK_FUNCTION([asinh], [0.0])
+
 dnl SX
 MT_FORTRAN_BATCH_CHECK_FUNCTION([iargc], [])
 MT_FORTRAN_BATCH_CHECK_FUNCTION([fseek],  [0,0,0])
@@ -22,6 +31,7 @@ MT_FORTRAN_BATCH_CHECK_FUNCTION([ftelli8], [0])
 MT_FORTRAN_BATCH_CHECK_MODULE([mpi_f08])
 MT_FORTRAN_BATCH_CHECK_MODULE([mpi])
 MT_FORTRAN_BATCH_CHECK_MODULE([mpi], [mpi_bcast])
+MT_FORTRAN_BATCH_CHECK_MODULE([mpi], [mpi_group_translate_ranks])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT8])
@@ -80,6 +90,10 @@ MT_FORTRAN_BATCH_CHECK_STATEMENT([inquire], [convert],[
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([flush], [unit],[
       flush(unit=1)])
+
+MT_FORTRAN_BATCH_CHECK_STATEMENT([format], [zero_width_real],[
+   102 format(E0.3)
+   write(*, 102) 0.0])
 
 dnl system procedures
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_environment_variable], ['A'])

@@ -1,7 +1,7 @@
 !!!_! trapiche_transfer.F90 - TOUZA/Trapiche(trapiche) communication
 ! Maintainer: SAITO Fuyuki
 ! Created: May 21 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:38:47 fuyuki trapiche_transfer.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/02 09:41:39 fuyuki trapiche_transfer.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -238,9 +238,6 @@ contains
     real(kind=KDBL),intent(in)  :: vmiss
 
     integer nw, nc
-    integer mbits
-    integer xbits, xtop, xbtm
-    integer kcode
     integer istt(MPI_STATUS_SIZE)
 
     ierr = 0

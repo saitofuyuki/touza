@@ -23,8 +23,89 @@ The design of MRT-format is incompatible from TOUZA version 1.07.
 * Nio-format, as gtool-3.5 extensions
 ** URT - arbitrary precision floating-point packing using TOUZA/Trapiche
 ** MRT - URT with mask
-** P[IR]n - list-based packed array format
+** P[IR]x - list-based packed array format
+=PTx=
+
+: [32bit separator]
+:    [int32_t] * 8       O: PTx parameters
+:    <32bit separator>
+:    [int32_t] * m       P: Number of defined for each cell (k-bit packed)
+:    <32bit separator>
+:    [type] * l          D: Defined values (packed)
+: [32bit separator]
+
+:     plain data          P    D
+:     0 1 2 3 4 5 c
+: 0   o o o o * * * *     4    oooo
+: 1   o o * o o o * *     6    oooooo
+: 2   o * * * * * * *     1    o
+: 3   * * * * * * * *     0
+: 4   o o o o * * * *     4    oooo
+: :                       :
+: n-1 o o o * * * * *     3    ooo
+
 ** XA16 - Cache record
+* Sparse-matrix formats
+** Basic
+: source matrix         compressed matrix == plain arrays
+: ijk * mcols           ijk * ncols
+: (a b 0 0 0 0)         (a b - -)    (0 1 - -)
+: (c d e 0 f 0)         (c d e f)    (0 1 2 4)
+: (0 g 0 0 0 h)         (g h - -)    (1 5 - -)
+: (0 0 0 0 0 0)         (- - - -)    (- - - -)
+: (0 0 i j 0 k)         (i j k -)    (2 3 5 -)
+: (0 0 0 l m n)         (l m n -)    (3 4 5 -)
+: (0 0 0 0 o 0)         (o - - -)    (4 - - -)
+:                       value, index components
+
+** CRS == PTn format
+: original (7 by 6)     value       index       number
+: (a b 0 0 0 0)         (a b    )   (0 1)       2
+: (c d e 0 f 0)         (c d e f)   (0 1 2 4)   4
+: (0 g 0 0 0 h)         (g h    )   (1 5)       2
+: (0 0 0 0 0 0)         (       )   ()          0
+: (0 0 i j 0 k)         (i j k  )   (2 3 5)     3
+: (0 0 0 l m n)         (l m n  )   (3 4 5)     3
+: (0 0 0 0 o 0)         (o      )   (4)         1
+
+: value:   a b   c d e f   g h  -  i j k   l m n   o       <V>    storage
+: column:  0 1   0 1 2 4   1 5  -  2 3 5   3 4 5   4       <C>    storage
+: numbers: 2     4         2    0  3       3       1       <N>    storage
+: heads:   0     2         6    8  8       11      14  15  <H>    internal
+
+Matrix-Matrix multiplication    Z(7) = M(7,6) X(6)
+
+: loop j:  0, N - 1
+:   loop k: H(j), H(j+1) - 1
+:      c = C(k)
+:      v = V(k)
+:      Z(j) += v * X(c)
+
+
+** COO + JDS
+: original (7 by 6)     value      index
+: (a b 0 0 0 0)         (a b    )   (0 1)
+: (c d e 0 f 0)         (c d e f)   (0 1 2 4)
+: (0 g 0 0 0 h)         (g h    )   (1 5)
+: (0 0 0 0 0 0)         (       )   ()
+: (0 0 i j 0 k)         (i j k  )   (2 3 5)
+: (0 0 0 l m n)         (l m n  )   (3 4 5)
+: (0 0 0 0 o 0)         (o      )   (4)
+
+: value:   a c g i l o   b d h j m   e k n  f      <V>
+: row:     0 1 2 4 5 6   0 1 2 4 5   1 4 5  1      <R>
+: column:  0 0 1 2 3 4   1 1 5 3 4   2 5 5  4      <C>
+: heads:   0 . . . . .   6 . . . .   11. .  14 15  <H>
+:          0             1           2      3  4 = L
+
+Matrix-Matrix multiplication    Z(7) = M(7,6) X(6)
+
+: loop l:    0, L - 1
+:   loop k:  H(l), H(l+1) - 1
+:     r = R(k)        # r must not be overwrapped within l
+:     c = C(k)
+:     v = V(k)
+:     Z(r) += v * X(c)
 * Brief description of *TOUZA/Nio* modules
 ** =TOUZA_Nio_header=
 *** =show_header=

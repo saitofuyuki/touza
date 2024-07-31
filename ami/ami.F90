@@ -1,0 +1,169 @@
+!!!_! ami.F90 - touza/ami interfaces
+! Maintainer: SAITO Fuyuki
+! Created: Feb 2 2024
+#define TIME_STAMP 'Time-stamp: <2024/02/02 21:34:02 fuyuki ami.F90>'
+!!!_! MANIFESTO
+!
+! Copyright (C) 2024
+!           Japan Agency for Marine-Earth Science and Technology
+!
+! Licensed under the Apache License, Version 2.0
+!   (https://www.apache.org/licenses/LICENSE-2.0)
+!
+!!!_* Includes
+#ifdef HAVE_CONFIG_H
+#  include "touza_config.h"
+#endif
+#include "touza_ami.h"
+!!!_* Macros
+!!!_@ TOUZA_Ami - touza/ami interfaces
+module TOUZA_Ami
+  use TOUZA_Ami_legacy, al_init=>init, al_diag=>diag, al_finalize=>finalize
+  use TOUZA_Ami_nio,    an_init=>init, an_diag=>diag, an_finalize=>finalize
+  use TOUZA_Ami_table,  at_init=>init, at_diag=>diag, at_finalize=>finalize
+  use TOUZA_Ami_xform,  ax_init=>init, ax_diag=>diag, ax_finalize=>finalize
+  use TOUZA_Ami_std,    as_init=>init, as_diag=>diag, as_finalize=>finalize
+  use TOUZA_Std,only: get_logu,     unit_global,  trace_fine,   trace_control
+!!!_  - default
+  implicit none
+  public
+!!!_  - private static
+  integer,save,private :: init_mode = 0
+  integer,save,private :: init_counts = 0
+  integer,save,private :: diag_counts = 0
+  integer,save,private :: fine_counts = 0
+  integer,save,private :: lev_verbose = AMI_MSG_LEVEL
+  integer,save,private :: err_default = ERR_NO_INIT
+  integer,save,private :: ulog = unit_global
+contains
+!!!_ + common interfaces
+!!!_  & init
+  subroutine init(ierr, u, levv, mode, stdv, icomm)
+    use TOUZA_Std,only: control_mode, control_deep, is_first_force
+    use TOUZA_Std,only: msg_grp, choice
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+    integer,intent(in),optional :: stdv
+    integer,intent(in),optional :: icomm
+    integer lv, md, lmd
+
+    ierr = 0
+
+    md = control_mode(mode, MODE_DEEPER)
+    init_mode = md
+
+    if (md.ge.MODE_SURFACE) then
+       err_default = ERR_SUCCESS
+       lv = choice(lev_verbose, levv)
+       if (is_first_force(init_counts, mode)) then
+          ulog = choice(ulog, u)
+          lev_verbose = lv
+       endif
+       lmd = control_deep(md, mode)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call as_init(ierr, ulog, lv, mode=lmd, stdv=stdv, icomm=icomm)
+          if (ierr.eq.0) call al_init(ierr, ulog, lv, mode=lmd, stdv=stdv)
+          if (ierr.eq.0) call an_init(ierr, ulog, lv, mode=lmd, stdv=stdv)
+          if (ierr.eq.0) call at_init(ierr, ulog, lv, mode=lmd, stdv=stdv)
+          if (ierr.eq.0) call ax_init(ierr, ulog, lv, mode=lmd, stdv=stdv)
+       endif
+       init_counts = init_counts + 1
+       if (ierr.ne.0) err_default = ERR_FAILURE_INIT
+    endif
+    return
+  end subroutine init
+!!!_  & diag
+  subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Std,only: control_mode, control_deep, is_first_force
+    use TOUZA_Std,only: choice, is_msglev_NORMAL, msg
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+    integer utmp, lv, md, lmd
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = get_logu(u, ulog)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       call trace_control &
+            & (ierr, md, pkg=PACKAGE_TAG, grp=__GRP__, fun='diag', u=utmp, levv=lv)
+       if (is_first_force(diag_counts, mode)) then
+          if (is_msglev_NORMAL(lv)) then
+             if (ierr.eq.0) call msg(TIME_STAMP, __GRP__, utmp)
+          endif
+       endif
+       lmd = control_deep(md, mode)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call as_diag(ierr, utmp, mode=lmd)
+          if (ierr.eq.0) call al_diag(ierr, utmp, mode=lmd)
+          if (ierr.eq.0) call an_diag(ierr, utmp, mode=lmd)
+          if (ierr.eq.0) call at_diag(ierr, utmp, mode=lmd)
+          if (ierr.eq.0) call ax_diag(ierr, utmp, mode=lmd)
+       endif
+       diag_counts = diag_counts + 1
+    endif
+    return
+
+    return
+  end subroutine diag
+!!!_  & finalize
+  subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Std,only: control_mode, control_deep, is_first_force
+    use TOUZA_Std,only: choice, is_msglev_NORMAL, msg_grp
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode
+    integer utmp, lv, md, lmd
+
+    ierr = err_default
+
+    md = control_mode(mode, init_mode)
+    utmp = get_logu(u, ulog)
+    lv = choice(lev_verbose, levv)
+
+    if (md.ge.MODE_SURFACE) then
+       if (is_first_force(fine_counts, mode)) then
+          call trace_fine &
+               & (ierr, md, init_counts, diag_counts, fine_counts, &
+               &  pkg=__PKG__, grp=__GRP__, fun='finalize', u=utmp, levv=lv)
+       endif
+       lmd = control_deep(md, mode)
+       if (md.ge.MODE_SHALLOW) then
+          if (ierr.eq.0) call ax_finalize(ierr, utmp, lmd)
+          if (ierr.eq.0) call at_finalize(ierr, utmp, lmd)
+          if (ierr.eq.0) call an_finalize(ierr, utmp, lmd)
+          if (ierr.eq.0) call al_finalize(ierr, utmp, lmd)
+          if (ierr.eq.0) call as_finalize(ierr, utmp, lmd)
+       endif
+       fine_counts = fine_counts + 1
+    endif
+    return
+  end subroutine finalize
+end module TOUZA_Ami
+!!!_@ test_ami - test program
+#ifdef TEST_AMI
+program test_ami
+  use TOUZA_Ami
+  implicit none
+  integer ierr
+
+  call init(ierr)
+  if (ierr.eq.0) call diag(ierr)
+  if (ierr.eq.0) call finalize(ierr)
+101 format('FINAL = ', I0)
+  write(*, 101) ierr
+  stop
+end program test_ami
+
+#endif /* TEST_AMI */
+!!!_! FOOTER
+!!!_ + Local variables
+! Local Variables:
+! End:

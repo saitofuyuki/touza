@@ -1,10 +1,10 @@
 !!!_! ppp_std.F90 - TOUZA/Ppp utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:48:06 fuyuki ppp_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/11 22:56:15 fuyuki ppp_std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023
+! Copyright (C) 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -28,6 +28,9 @@ module TOUZA_Ppp_std
   use TOUZA_Std_mwe,only: MPI_COMM_NULL, MPI_GROUP_NULL, MPI_COMM_WORLD, MPI_UNDEFINED
   use TOUZA_Std_mwe,only: MPI_STATUS_SIZE, MPI_GROUP_EMPTY, MPI_INTEGER, MPI_CHARACTER
   use TOUZA_Std_mwe,only: MPI_ANY_TAG,     MPI_ANY_SOURCE
+  use TOUZA_Std_mwe,only: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  use TOUZA_Std_mwe,only: MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
+  use TOUZA_Std_mwe,only: MPI_WAIT, MPI_BARRIER
 
   use TOUZA_Std_env,only: is_eof_ss
   use TOUZA_Std_htb,only: new_htable,  new_entry, settle_entry
@@ -70,6 +73,10 @@ module TOUZA_Ppp_std
   public MPI_STATUS_SIZE, MPI_GROUP_EMPTY
   public MPI_INTEGER, MPI_CHARACTER
   public MPI_ANY_TAG, MPI_ANY_SOURCE
+  public MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  public MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
+  public MPI_WAIT, MPI_BARRIER
+
 contains
 !!!_ + common interfaces
 !!!_  & init

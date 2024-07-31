@@ -1,7 +1,7 @@
 !!!_! chak_opr.F90 - TOUZA/Jmz CH(swiss) army knife operation primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 4 2022
-#define TIME_STAMP 'Time-stamp: <2023/07/09 10:31:38 fuyuki chak_opr.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/06/21 17:19:33 fuyuki chak_opr.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -195,7 +195,7 @@ contains
     integer jb
     ho = query_opr_handle_n(str)
     if (ho.lt.0) then
-       jb = index(str, param_sep)
+       jb = index(str, sep_param)
        if (jb.gt.1) then
           ho = query_opr_handle_n(str(1:jb-1))
        endif
@@ -725,6 +725,26 @@ contains
        endif
     enddo
   end subroutine apply_UNARY_TRUNC
+!!!_   . apply_UNARY_FTRUNC
+  subroutine apply_UNARY_FTRUNC &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_FTRUNC(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_FTRUNC
 !!!_   . apply_UNARY_EXP
   subroutine apply_UNARY_EXP &
        & (ierr, Z, domZ, X, domX, F)
@@ -965,6 +985,66 @@ contains
        endif
     enddo
   end subroutine apply_UNARY_TANH
+!!!_   . apply_UNARY_ASINH
+  subroutine apply_UNARY_ASINH &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_ASINH(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_ASINH
+!!!_   . apply_UNARY_ACOSH
+  subroutine apply_UNARY_ACOSH &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_ACOSH(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_ACOSH
+!!!_   . apply_UNARY_ATANH
+  subroutine apply_UNARY_ATANH &
+       & (ierr, Z, domZ, X, domX, F)
+    implicit none
+    integer,        intent(out) :: ierr
+    real(kind=KBUF),intent(out) :: Z(0:*)
+    real(kind=KBUF),intent(in)  :: X(0:*)
+    type(domain_t), intent(in)  :: domZ, domX
+    real(kind=KBUF),intent(in)  :: F
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_ATANH(X(jx), F)
+       else
+          Z(jz) = F
+       endif
+    enddo
+  end subroutine apply_UNARY_ATANH
 !!!_   . apply_UNARY_R2D
   subroutine apply_UNARY_R2D &
        & (ierr, Z, domZ, X, domX, F)
@@ -2152,6 +2232,26 @@ contains
        endif
     enddo
   end subroutine apply_BINARY_NEAREST
+!!!_   . apply_BINARY_SETE
+  subroutine apply_BINARY_SETE &
+       & (ierr, Z, domZ, FZ, X, domX, FX)
+    implicit none
+    integer,        intent(out)   :: ierr
+    real(kind=KBUF),intent(inout) :: Z(0:*)
+    real(kind=KBUF),intent(in)    :: X(0:*)
+    type(domain_t), intent(in)    :: domZ, domX
+    real(kind=KBUF),intent(in)    :: FZ, FX
+    integer jz, jx
+    ierr = 0
+    do jz = 0, domZ%n - 1
+       jx = conv_physical_index(jz, domZ, domX)
+       if (jx.ge.0) then
+          Z(jz) = elem_SETE(Z(jz), X(jx), FZ, FX)
+       else
+          Z(jz) = FZ
+       endif
+    enddo
+  end subroutine apply_BINARY_SETE
 
 !!!_   . apply_UNARY_BITNOT
   subroutine apply_UNARY_BITNOT &
@@ -3083,6 +3183,42 @@ contains
        Z = TANH(X)
     endif
   end function elem_TANH
+!!!_   & elem_ASINH ()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_ASINH (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = ASINH(X)
+    endif
+  end function elem_ASINH
+!!!_   & elem_ACOSH ()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_ACOSH (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = ACOSH(X)
+    endif
+  end function elem_ACOSH
+!!!_   & elem_ATANH()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_ATANH (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = ATANH(X)
+    endif
+  end function elem_ATANH
 !!!_   & elem_R2D ()
   ELEMENTAL &
   real(kind=KBUF) function elem_R2D (X, F) result(Z)
@@ -3215,6 +3351,18 @@ contains
        Z = AINT(X)
     endif
   end function elem_TRUNC
+!!!_   & elem_FTRUNC()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_FTRUNC (X, F) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X
+    real(kind=KBUF),intent(in) :: F
+    if (X.eq.F) then
+       Z = F
+    else
+       Z = REAL(REAL(X, KIND=KFLT), KIND=KBUF)
+    endif
+  end function elem_FTRUNC
 !!!_    * elem_SPACING ()
   ELEMENTAL &
   real(kind=KBUF) function elem_SPACING (X, F) result(Z)
@@ -3432,7 +3580,7 @@ contains
     real(kind=KBUF),intent(in) :: X,  Y
     real(kind=KBUF),intent(in) :: FX, FY
     if (Y.eq.FY) then
-       Z = FX
+       Z = X
     else if (X.eq.FX) then
        Z = Y
     else
@@ -3446,7 +3594,7 @@ contains
     real(kind=KBUF),intent(in) :: X,  Y
     real(kind=KBUF),intent(in) :: FX, FY
     if (Y.eq.FY) then
-       Z = FX
+       Z = X
     else if (X.eq.FX) then
        Z = Y
     else
@@ -3969,6 +4117,18 @@ contains
        Z = NEAREST(X, Y)
     endif
   end function elem_NEAREST
+!!!_    * elem_SETE()
+  ELEMENTAL &
+  real(kind=KBUF) function elem_SETE (X, Y, FX, FY) result(Z)
+    implicit none
+    real(kind=KBUF),intent(in) :: X,  Y
+    real(kind=KBUF),intent(in) :: FX, FY
+    if (X.eq.FX.or.Y.eq.FY) then
+       Z = FX
+    else
+       Z = SET_EXPONENT(X, INT(Y))
+    endif
+  end function elem_SETE
 !!!_    * elem_IFELSE()
   ELEMENTAL &
   real(kind=KBUF) function elem_IFELSE (X, Y, Z, FX, FY, FZ) result(W)
