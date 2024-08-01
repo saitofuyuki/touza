@@ -1,7 +1,7 @@
 !!!_! nio_bindc.F90 - TOUZA/Nio bind(c) interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2023
-#define TIME_STAMP 'Time-stamp: <2024/07/23 18:09:40 fuyuki nio_bindc.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/08/02 07:18:53 fuyuki nio_bindc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023, 2024
@@ -48,6 +48,7 @@ module TOUZA_Nio_bindc
 !!!_  - public procedures
   public :: tnb_init,          tnb_diag,       tnb_finalize
   public :: tnb_file_is_nio,   tnb_file_open,  tnb_file_diag,  tnb_file_close
+  public :: tnb_file_is_opened
   public :: tnb_file_groups,   tnb_group,      tnb_search_group
   public :: tnb_group_name,    tnb_group_recs, tnb_group_coors
   public :: tnb_group_co_name, tnb_group_co_range, tnb_group_co_idx
@@ -101,10 +102,12 @@ contains
     ! return non-negative if gtool-format.
     use TOUZA_Nio_record,only: nio_check_magic_file
     use TOUZA_Nio_std,only: new_unit, search_from_last, sus_close, sus_open
-    use TOUZA_Nio_std,only: is_eof_ss
+    use TOUZA_Nio_std,only: is_eof_ss, trace_err
+    use TOUZA_Nio_cache,only: cache_is_registered
     implicit none
     character(len=1,kind=C_CHAR),intent(in) :: path(*)
     character(len=lpath) :: buf
+    character(len=lpath) :: msg
     integer jerr
     integer u
     krect = 0
@@ -113,7 +116,26 @@ contains
        jerr = u
     else
        call c2f_string(buf, path)
-       call sus_open(jerr, u, buf, ACTION='R', STATUS='O')
+       call sus_open(jerr, u, buf, ACTION='R', STATUS='O', IOMSG=msg)
+       ! Note: about duplicate open for single file
+       !    As far as I checked, a new unit connection for already opened file
+       !    fails using this procedure, with GNU fortran/gcc (Debian 14.1.0-5
+       !    or 14.1.0).  On the other hand, cache_open_read() seems to accept
+       !    this feature.  Actually this feature is processor dependent.
+       !    Fortran standard mentions that:
+       !         If a file is already connected to a unit, an OPEN statement
+       !         on that file with a different unit shall not be executed.
+       !    Thus whether or not succeeds is unexpected.
+       !    Following is a workaround to bypass this feature, when a file is
+       !    already connected and registered into Nio cache table, then it
+       !    skips the file scanning and return cache handle.
+       if (jerr.ne.0) then
+          ! This returns handle, not krect, but it is enough.
+          krect = cache_is_registered(buf)
+          jerr = min(0, krect)
+          if (jerr.eq.0) return
+       endif
+       call trace_err(jerr, fun='tnb_file_is_nio', asfx=msg)
        if (jerr.eq.0) then
           jerr = nio_check_magic_file(u)
           krect = jerr
@@ -136,6 +158,7 @@ contains
     character(len=lpath) :: buf
     integer h
     integer jerr
+
     call c2f_string(buf, path)
     call cache_open_read(jerr, h, buf, int(flag))
     handle = h
@@ -168,6 +191,24 @@ contains
     call cache_close(jerr, h)
     if (jerr.lt.0) ierr = jerr
   end function tnb_file_close
+
+!!!_  & tnb_file_is_opened() - wrapper for cache_is_registered
+  integer(kind=C_INT) function tnb_file_is_opened &
+       & (path) BIND(C) result(handle)
+    ! return non-negative if gtool-format.
+    use TOUZA_Nio_record,only: nio_check_magic_file
+    use TOUZA_Nio_std,only: new_unit, search_from_last, sus_close, sus_open
+    use TOUZA_Nio_std,only: is_eof_ss, trace_err
+    use TOUZA_Nio_cache,only: cache_is_registered
+    implicit none
+    character(len=1,kind=C_CHAR),intent(in) :: path(*)
+    character(len=lpath) :: buf
+    integer h
+
+    call c2f_string(buf, path)
+    h = cache_is_registered(buf)
+    handle = h
+  end function tnb_file_is_opened
 
 !!!_  & tnb_file_groups()
   integer(kind=C_INT) function tnb_file_groups &
