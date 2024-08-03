@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/08/02 17:56:55 fuyuki test_dsnio.py>
+# Time-stamp: <2024/08/08 14:14:39 fuyuki test_dsnio.py>
 
 import sys
-# import textwrap as tw
+import itertools
+import matplotlib.pyplot as plt
 
+import netCDF4 as nc4
 from zbt.dsnio import *
-from zbt.libtouza import *
-
 
 def main(argv):
     """Sample driver."""
@@ -14,6 +14,7 @@ def main(argv):
     diag = False
     show = False
     suite = False
+    plot = False
     while argv:
         if argv[0][0] != '-':
             break
@@ -25,11 +26,17 @@ def main(argv):
             show = True
         elif argv[0] == '-s':
             suite = True
+        elif argv[0] == '-P':
+            plot = True
         argv = argv[1:]
 
     for a in argv:
         print(f'##### file: {a}')
-        ds = test_class(a)
+        if test_class.is_nio_file(a):
+            ds = test_class(a)
+        else:
+            ds = nc4.Dataset(a)
+            suite = True
         print('### dataset')
         print(ds)
         print('### dimensions')
@@ -50,11 +57,26 @@ def main(argv):
                 print(f"# dim:{dn}")
                 print(dd)
             for vn, vv in g.variables.items():
-                print(f"# var:{vn} {vv.shape} {vv.dimensions_suite}")
+                # print(f"# var:{vn} {vv.shape} {vv.dimensions_suite()} {vv.dataset.root.handle}")
+                print(f"# var:{vn} {vv.shape}")
                 print(vv)
                 if show:
                     print(vv[:])
-        ds.close()
+                if plot:
+                    print(f"# var:{vv.name} {vv.shape}")
+                    ext = vv.shape[:-2]
+                    if len(vv.shape) >= 2:
+                        for x in itertools.product(*tuple(range(n) for n in ext)):
+                            # x = x + plane
+                            s = ','.join([str(idx) for idx in x])
+                            print(f"# plot: {vv.name}[{s},:,:]")
+                            fig, ax = plt.subplots()
+                            sel = vv[x]
+                            CS = ax.contourf(sel, levels=16)
+                            ax.clabel(CS, inline=True, fontsize=10)
+                            plt.show()
+
+    ds.close()
 
     if diag:
         print()

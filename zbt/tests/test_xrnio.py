@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/08/02 20:46:47 fuyuki test_xrnio.py>
+# Time-stamp: <2024/08/07 10:27:55 fuyuki test_xrnio.py>
 
 import sys
 import xarray as xr
@@ -44,27 +44,7 @@ def main(argv):
                         except Exception as x:
                             print(x)
                         plt.show()
-                        # plt.draw()
-                        # fig.clear()
                         plt.close(fig)
-
-        # print('### dimensions')
-        # for d, dim in ds.dimensions.items():
-        #     print(f'{d}: {str(dim)}')
-        # print('### groups')
-        # print(ds.groups)
-        # for g in ds.groups.values():
-        #     print(f'### group: {g.name}')
-        #     print(g)
-        #     print('### dimensions')
-        #     print(g.dimensions)
-        #     for dn, dd in g.dimensions.items():
-        #         print(f"# dim:{dn}")
-        #         print(dd)
-        #     for vn, vv in g.variables.items():
-        #         print(f"# var:{vn} {vv.shape}")
-        #         print(vv)
-        #         print(vv[:])
 
 
 if __name__ == '__main__':
