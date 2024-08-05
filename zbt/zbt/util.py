@@ -239,6 +239,24 @@ def tostr(s):
     return ss
 
 
+
+
+def expand(array, mask, default=None):
+    """Expand array to mask length accorinding to mask boolean."""
+    r = []
+    j = 0
+    for b in mask:
+        if b:
+            if j < len(array):
+                r.append(array[j])
+                j = j + 1
+            else:
+                raise ValueError("Out of bounds.")
+        else:
+            r.append(default)
+    return type(array)(r)
+
+
 def main(argv):
     import pprint as ppr
     X = NameMap()

@@ -38,3 +38,6 @@ Issues = "https://github.com/saitofuyuki/touza/issues"
 
 [project.entry-points."xarray.backends"]
 zbt = "zbt.xrnio:xrNioBackendEntrypoint"
+
+[project.scripts]
+zbcont = "zbt.zbcont:_driver"
