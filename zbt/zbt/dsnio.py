@@ -12,7 +12,9 @@ numpy + TOUZA/Nio extension
 :Created:    Jul 16 2024
 """
 
-# import xarray as xr
+import sys
+import os
+import pathlib as plib
 import ctypes as CT
 import numpy
 
@@ -21,63 +23,32 @@ from . import util
 from . import param
 
 
+def diag_datasets():
+    """Show registered dataset table for debug."""
+    for h, ds in _DataSets.items():
+        print(f"handle: {h}")
+        print(ds)
+        print()
+
+
 class _TouzaNio(param.ParamTouzaNio):
     """Common procedures among TouzaNio classes."""
-    __slots__ = ('sub', )
+    __slots__ = ('sub', 'sep', )
 
-    def __init__(self, sub=None):
+    lib = libtouza.LibTouzaNio(name=None)
+
+    def __init__(self, sub=None, sep=None):
         """Bind TOUZA/Nio properties from file."""
         self.sub = sub or '~'
+        self.sep = sep or '/'
 
-    def _fmt_dup(self, name):
-        if isinstance(name, tuple):
-            # root = util.tostr(name[0])
-            root = name[0]
-            name = root + self.sub + ','.join(str(s) for s in name[1:])
-        return name
+    @classmethod
+    def is_nio_file(cls, path):
+        """Check if path is TOUZA/Nio format file."""
+        if isinstance(path, str):
+            return cls.lib.tnb_file_is_nio(path)
+        return False
 
-    def _fmt_dim(self, d, dn=None):
-        dn = dn or d.name
-        dn = self._fmt_dup(dn)
-        if d.handle >= 0:
-            h = f"<{d.handle}>"
-        else:
-            h = ''
-        return f"{util.tostr(dn)}{h}"
-
-    def _fmt_var(self, v, vn=None):
-        vn = vn or v.name
-        vn = self._fmt_dup(vn)
-        return str(v.dtype) \
-            + ' ' + util.tostr(vn) \
-            + '(' + ','.join(f"{self._fmt_dim(d)}"
-                             for d in v.dimensions) + ')'
-
-    def _fmt_grp(self, g, gn=None):
-        gn = gn or g.name
-        gn = self._fmt_dup(gn)
-        return util.tostr(gn)
-
-    def _add_or_dupl(self, arr, key, val):
-        key = util.tostr(key)
-        if key in arr:
-            arr[(key, 0)] = arr[key]
-            del arr[key]
-            arr[(key, 1)] = val
-        elif (key, 0) in arr:
-            j = 1
-            while (key, j) in arr:
-                j = j + 1
-            arr[(key, j)] = val
-        else:
-            arr[key] = val
-        return arr
-
-    def reverse_mapping(self, arr, val):
-        for k, v in arr.items():
-            if (v == val):
-                return k
-        return None
 
 # pylint: disable=too-many-ancestors
 # pylint: disable=too-many-instance-attributes
@@ -89,15 +60,13 @@ class TouzaNioDataset(_TouzaNio):
                  'dimensions',
                  'record', 'recdim', 'cls_var')
 
-    lib = libtouza.LibTouzaNio(name=None)
-
     def __init__(self, filename,
                  record=None,
                  flatten=True, cls_var=None, **kwds):
         """Bind TOUZA/Nio properties from file."""
 
         if not self.lib.tnb_file_is_nio(filename):
-            raise ValueError
+            raise ValueError(f"{filename} is not nio/gtool format.")
 
         flag = self.lib.NIO_CACHE_COLL_DEFAULT
         if flatten:
@@ -106,21 +75,44 @@ class TouzaNioDataset(_TouzaNio):
                     | self.lib.NIO_CACHE_ALLOW_GRP_DUP
                     | self.lib.NIO_CACHE_ALLOW_COOR_DUP)
 
-        self.handle = self.lib.tnb_file_open(filename, flag=flag)
-        self.name = filename
-        self.root = self
-        self.parent = None
-        self.cls_var = cls_var or TouzaNioVar
-
-        self.recdim = None
-        self.record = record or 'record'  # name of record dimension
-
         super().__init__(**kwds)
 
+        handle = self.lib.tnb_file_open(filename, flag=flag)
+        self.assign_nio(handle, filename, self, None, None, flatten, cls_var)
+
+    def assign_nio(self, handle, filename,
+                   root=None, parent=None, record=None, flatten=True,
+                   cls_var=None):
+        """Bind TOUZA/Nio properties from cache handle"""
+
+        _DataSets[handle] = self
+
+        self.handle = handle
+        self.name = filename
+        self.root = root
+        self.parent = parent
+        self.cls_var = cls_var or TouzaNioVar
+        self.record = record or 'record'  # name of record dimension
+
+        self.recdim = None
+
+        self.groups = util.NameMap()
+        self.dimensions = util.NameMap()
         # add dimensions first to share among groups
         self._add_dimensions()
         self._add_groups()
+        self.variables = util.NameMap()
         self._flatten_suites(flatten)
+
+    def close(self):
+        """Close file to free io unit."""
+        self.lib.tnb_file_close(self.handle)
+        self.handle = -1
+
+    def __del__(self, *args, **kwds):
+        """Destructor."""
+        if self.handle >= 0 and self.root is None:
+            self.close()
 
     # pylint: disable=invalid-name
     def createGroup(self, groupname,
@@ -142,7 +134,8 @@ class TouzaNioDataset(_TouzaNio):
                         handle=None, begin=None, end=None):
         """Construct variable instance."""
         return TouzaNioDimension(dimname, size,
-                                 handle=handle, begin=begin, end=end)
+                                 handle=handle, begin=begin, end=end,
+                                 group=self.root)
 
     def search_dim(self, ser):
         """Search parent corresponding to serial"""
@@ -170,21 +163,19 @@ class TouzaNioDataset(_TouzaNio):
 
     def _add_groups(self):
         """Bind NIO groups in NIO object"""
-        self.groups = {}
         for gh, gname in self._groups():
             grp = self.createGroup(gname, gh)
             gk = util.tostr(gname)
-            self._add_or_dupl(self.groups, gk, grp)
-            # self.groups[gk] = grp
+            self.groups[gk] = grp
         return self.groups
 
     def _add_dimensions(self):
-        self.dimensions = {}
         nr = self._recs()
         if nr:
             cname = self.record
             self.recdim = self.createDimension(cname, size=nr, handle=-1)
-            self._add_or_dupl(self.dimensions, cname, self.recdim)
+            ck = util.tostr(cname)
+            self.dimensions[ck] = self.recdim
         for ch, cname in self._dimensions():
             (begin, end) = self.lib.group_co_range(self.handle, ch)
             dim = None
@@ -194,25 +185,24 @@ class TouzaNioDataset(_TouzaNio):
             if not dim:
                 dim = self.createDimension(cname, begin=begin, end=end,
                                            handle=ch)
-            self._add_or_dupl(self.dimensions, cname, dim)
+            ck = util.tostr(cname)
+            self.dimensions[ck] = dim
         return self.dimensions
 
     def _flatten_suites(self, flatten):
-        self.variables = {}
-        # print(f"flatten {flatten}")
         if flatten:
             for g in self.groups.values():
                 for v in g.variables.values():
-                    vk = v.name
-                    self._add_or_dupl(self.variables, vk, v)
+                    vk = util.tostr(v.name)
+                    self.variables[vk] = v
                 for d in g.dimensions.values():
                     if d not in self.dimensions.values():
-                        self._add_or_dupl(self.dimensions, d.name, d)
+                        dk = util.tostr(d.name)
+                        self.dimensions[dk] = d
 
         return self
 
     def _add_variables(self, recdim=None):
-        self.variables = {}
         for vh, vname in self._vars():
             dims = []
             if recdim:
@@ -224,8 +214,7 @@ class TouzaNioDataset(_TouzaNio):
             var = self.createVariable(vname, dfmt, tuple(dims),
                                       handle=vh, recdim=recdim)
             vk = util.tostr(vname)
-            self._add_or_dupl(self.variables, vk, var)
-            # self.variables[vk] = var
+            self.variables[vk] = var
         return self.variables
 
     def _groups(self):
@@ -266,6 +255,37 @@ class TouzaNioDataset(_TouzaNio):
         """Dummy procedure to return 0 for number of records"""
         return 0
 
+    def get(self, elem, default=None, sep=None):
+        """Recursive search of group/variable."""
+        sep = self.sep
+        if isinstance(elem, str):
+            path = sep.split(elem)
+        elif numpy.iterable(elem):
+            path = tuple(elem)
+        else:
+            raise ValueError
+
+        g = self
+        while path:
+            if path[0] in g.groups:
+                g = g.groups.get(path[0])
+                path = path[1:]
+            else:
+                break
+        if path:
+            v = sep.join(path)
+            if v in g.variables:
+                return g.variables[v]
+            return default
+        else:
+            return g
+
+    def __getitem__(self, elem, sep=None):
+        r = self.get(elem, sep=sep)
+        if r is None:
+            raise IndexError(f"{elem} not found in {self}")
+        return r
+
     def diag(self):
         """Call diagnose function in the library"""
         self.lib.tnb_file_diag(self.handle)
@@ -284,18 +304,22 @@ class TouzaNioDataset(_TouzaNio):
             if av:
                 dump.append(f"{tab}{ai}: {av}")
 
-        ds = tuple(f"{self._fmt_dim(d, dn)}({len(d)})"
-                   for dn, d in sorted(self.dimensions.items(),
-                                       key=lambda di: di[1].handle))
-        vs = tuple(f"{self._fmt_var(v, vn)}"
-                   for vn, v in self.variables.items())
+        ds = tuple(f"{self.dimensions.format_key(dk, sep=self.sub)}"
+                   f"({len(dd)})"
+                   for dk, dd in self.dimensions.items())
 
-        gs = tuple(self._fmt_grp(g, gn) for gn, g in self.groups.items())
+        vs = tuple(f"{str(vv.dtype)}"
+                   f" {self.variables.format_key(vk, sep=self.sub)}"
+                   + "(" + ','.join(vv.format_dims(sep=self.sub,
+                                                   group=self.root)) + ")"
+                   for vk, vv in self.variables.items())
+
+        gs = tuple(self.groups.format_key_all(sep=self.sub))
+
         dump.append(f"    dimensions(sizes): {', '.join(ds)}")
-        dump.append(f"    variables(dimensions): {' '.join(vs)}")
+        dump.append(f"    variables(dimensions): {', '.join(vs)}")
         dump.append(f"    groups: {', '.join(gs)}")
         return '\n'.join(dump)
-
 
 class TouzaNioGroup(TouzaNioDataset):
     """Emulate a hierarchical namespace of dataset."""
@@ -312,10 +336,14 @@ class TouzaNioGroup(TouzaNioDataset):
         self.sub = parent.sub
         self.cls_var = parent.cls_var
 
+        self.groups = util.NameMap()
+        self.dimensions = util.NameMap()
+
         self._add_groups()
         self._add_dimensions()
 
         recdim = self.dimensions.get(self.record)
+        self.variables = util.NameMap()
         self._add_variables(recdim)
 
     def _attrs(self, vid=None, rec=None):
@@ -339,19 +367,52 @@ class TouzaNioGroup(TouzaNioDataset):
 class TouzaNioVar(_TouzaNio):
     """Variable property"""
 
-    __slots__ = ('handle', 'dataset', 'name', 'dimensions', 'recdim', 'dtype')
+    __slots__ = ('handle', 'dataset', 'name', 'dimensions', 'recdim',
+                 'dtype', 'logical', )
 
     def __init__(self, group, name, datatype, dimensions,
                  handle, recdim=None, **kwds):
         """Constructor."""
         self.handle = handle
         self.dataset = group
+        self.logical = group
         self.name = name
         self.dimensions = dimensions
         self.dtype = numpy.dtype(datatype)
         self.recdim = recdim
-
         super().__init__(**kwds)
+
+    def copy(self, logical=None):
+        return self.__copy__(logical)
+
+    def __copy__(self, logical=None):
+        """Create copy object."""
+        obj = self.__class__(self.dataset, self.name,
+                             self.dtype, self.dimensions, self.handle,
+                             self.recdim)
+        if logical:
+            obj.logical = logical
+        return obj
+
+    def replace_dim(self, dim):
+        for j, d in enumerate(self.dimensions):
+            if dim.name == d.name:
+                break
+        else:
+            raise ValueError
+        self.dimensions = self.dimensions[:j] + (dim, ) + self.dimensions[j+1:]
+        return self.dimensions
+
+    def squeeze(self):
+        """Squeeze along record dimension."""
+        # to do: non-record dimension
+        if self.recdim:
+            if self.recdim.size <= 1:
+                j = self.dimensions.index(self.recdim)
+                self.dimensions = self.dimensions[:j] + self.dimensions[j+1:]
+                self.recdim = None
+
+        self.dimensions = tuple(filter(lambda d: d.size > 1, self.dimensions))
 
     def __getitem__(self, elem):
         nd = len(self.dimensions)
@@ -366,10 +427,14 @@ class TouzaNioVar(_TouzaNio):
         count = ()
         shape = ()
         for e, d in zip(elem, self.dimensions):
+            o = d.extent[0]
             if isinstance(e, int):
-                start = start + (e, )
+                start = start + (e + o, )
                 count = count + (1, )
             elif isinstance(e, slice):
+                if e.step is not None and e.step != 1:
+                    raise ValueError \
+                        (f"Only value 1 is allowed for slice step {e}.")
                 st = e.start or 0
                 if st < 0:
                     st = d.size + st
@@ -377,7 +442,7 @@ class TouzaNioVar(_TouzaNio):
                 if en < 0:
                     en = d.size + en
                 co = en - st
-                start = start + (st, )
+                start = start + (st + o, )
                 count = count + (co, )
                 shape = shape + (co, )
         if self.recdim:
@@ -452,27 +517,61 @@ class TouzaNioVar(_TouzaNio):
     @property
     def shape(self):
         """Array shape"""
-        c = ()
+        sh = ()
         for d in self.dimensions:
-            c = c + (d.size, )
-        return c
+            sh = sh + (d.size, )
+        return sh
+
+    def dimensions_suite(self, group=None):
+        group = group or self.dataset.root
+        return tuple(self.format_dims(group=group))
 
     @property
-    def dimensions_suite(self):
-        ds = ()
-        root = self.dataset.root
-        for d in self.dimensions:
-            dk = self.reverse_mapping(root.dimensions, d)
-            dk = self._fmt_dup(dk)
-            ds = ds + (dk, )
-        # print('suite:', ds)
-        return ds
+    def dimensions_names(self):
+        return tuple(util.tostr(d.name) for d in self.dimensions)
+
+    @property
+    def dimensions_map(self):
+        return dict((d.name, d) for d in self.dimensions)
+
+    def format_name(self, sep=True, group=None):
+        """Return canonicalized name under group"""
+        if group is None:
+            group = True
+        if group is True:
+            # group = self.dataset
+            group = self.logical
+        if group is False:
+            return self.name
+        if sep is True:
+            sep = self.sub
+        # print(group.name, repr(group))
+        return group.variables.rev_map(self, sep=sep)
+
+    def format_dims(self, sep=True, group=None):
+        """Return canonicalized name under group"""
+        if group is None:
+            group = True
+        if group is True:
+            group = self.logical
+            # group = self.dataset
+        if group is False:
+            dims = [d.name for d in self.dimensions]
+        else:
+            if sep is True:
+                sep = self.sub
+            dims = [group.dimensions.rev_map(d, sep=sep)
+                    for d in self.dimensions]
+        return dims
 
     def __str__(self):
         """return str"""
         dump = [repr(type(self))]
         tab = ' ' * 4
-        dump.append(self._fmt_var(self))
+        vt = util.tostr(self.dtype)
+        vn = self.format_name()
+        ds = ', '.join(self.format_dims())
+        dump.append(f"{vt} {vn}({ds})")
         for a, ai in self.attrs():
             av = self.getattr(a).strip()
             ai = util.tostr(ai)
@@ -485,24 +584,25 @@ class TouzaNioVar(_TouzaNio):
 class TouzaNioDimension(_TouzaNio):
     """Dimension (axis) property"""
 
-    __slots__ = ('handle', 'name', 'size', 'begin', 'end', )
+    __slots__ = ('handle', 'name', 'size', 'extent',
+                 'dataset', 'suite', )
 
     # pylint: disable=too-many-arguments
     def __init__(self, name, size=None,
-                 handle=None, begin=None, end=None, **kwds):
+                 handle=None, begin=None, end=None, group=None,
+                 **kwds):
         """Constructor."""
 
         self.handle = handle
         self.name = name
+        self.dataset = group
         if (size is None) == ((begin is None) or (end is None)):
             raise ValueError
         if size is not None:
             self.size = size
-            self.begin = 0
-            self.end = size
+            self.extent = (0, size, )
         else:
-            self.begin = begin
-            self.end = end
+            self.extent = (begin, end, )
             self.size = end - begin
 
         super().__init__(**kwds)
@@ -517,3 +617,147 @@ class TouzaNioDimension(_TouzaNio):
         p = [f"name = '{n}'",
              f"size = {self.size}", ]
         return f"{repr(type(self))}: " + ', '.join(p)
+
+    def is_record(self):
+        """Check if record dimension"""
+        return self.handle < 0
+
+    @property
+    def shape(self):
+        """1d dimension shape"""
+        return (self.size, )
+
+
+class TouzaNioCoDataset(TouzaNioDataset):
+    """TOUZA/Nio dataset accompanied by coordinate variables."""
+
+    gtax_env = 'GTAX_PATH'
+    #  Null element corresponding to internal field.
+    #  If the environemnt does not contain null element,
+    #  then null element is inserted at the first candidate.
+    #  Therefore, if you need to set precedence of external files than
+    #  the internal, then you must set explicitly the null element
+    #  somewhere in the environment, as 'dir-a:dire-b::dir-c:dir-d'.
+    #  Default candidate is ':.' (internal, then current directory).
+    #  If you want to exclude the coordinate binding, you should
+    #  not use this class, but use TouzaNioDataset instead.
+
+    def __init__(self, *args, **kwds):
+        super().__init__(*args, **kwds)
+        self.shift_variables()
+        self.bind_coordinates()
+
+    def createGroup(self, groupname,
+                    handle=None):
+        """Construct group instance."""
+        return TouzaNioCoGroup(groupname, parent=self,
+                               handle=handle)
+
+    def shift_variables(self):
+        """Shift variables to reserve spaces for coodinates."""
+        for pfx in self.dimensions.prefix_keys():
+            shift = len(self.dimensions.list_family(pfx))
+            if shift > 0:
+                if (pfx, 0) in self.variables:
+                    self.variables.insert(pfx, shift)
+                    # append dummy dimensions to force tuple-style key
+                    self.dimensions[pfx] = None
+
+    def bind_coordinates(self):
+        """Bind coordinates as additional variables"""
+        paths = self.coordinate_paths()
+
+        for d in self.dimensions.values():
+            if d.is_record():
+                # print(f"dim/rec: {d.name}[{d.extent}]")
+                continue
+            c = self.get_coordinate(d, paths, kind='loc')
+            if c:
+                okey = self.dimensions.rev_map(d)
+                if okey in self.variables:
+                    raise ValueError(f"Panic.  {okey} {self.variables}")
+                self.variables[okey] = c
+
+    def coordinate_paths(self, env=None):
+        env = env or self.gtax_env
+        paths = os.environ.get(env, '.:')
+        return paths.split(':')
+
+    def get_coordinate(self, dim, paths, kind=None):
+        """Get physical coordinate Nio-handle."""
+        item = util.tostr(dim.name)
+        kind = kind or 'loc'
+        if kind == 'loc':
+            pfx = 'GTAXLOC.'
+            xgrp = ['AXLOC', 'CAXLOC']
+        elif kind == 'wgt':
+            pfx = 'GTAXWGT.'
+            xgrp = ['AXWGT', 'CAXWGT']
+        else:
+            raise ValueError(f"Unknown coordinate kind {kind}")
+        for p in paths:
+            if not p:
+                # to implement in-file coordinate
+                continue
+            c = self.check_coordinate(xgrp, item, pfx, p)
+            if not c:
+                continue
+            for cc in c.dimensions:
+                if cc.name == dim.name:
+                    if dim.extent[0] < cc.extent[0] \
+                       or dim.extent[1] > cc.extent[1]:
+                        break
+                elif cc.size > 1:
+                    break
+            else:
+                c = c.copy(logical=self)
+                c.squeeze()
+                c.replace_dim(dim)
+                return c
+
+        return None
+
+    def check_coordinate(self, grps, item, pfx, path):
+        """Get variable object corresponding to coordinate."""
+        p = plib.Path(path)
+        if p.is_dir():
+            p = p / (pfx + item)
+        if p.is_file():
+            h = self.lib.tnb_file_is_opened(str(p))
+            if h >= 0:
+                ds = _DataSets.get(h)
+            else:
+                ds = TouzaNioDataset(str(p), cls_var=self.cls_var)
+            if ds:
+                if isinstance(grps, str):
+                    grps = [grps]
+                for g in grps:
+                    c = ds.get((g, item,))
+                    if c is not None:
+                        return c
+        return None
+
+    def search_cofile(self, base, paths):
+        """Search gtool axis file in paths"""
+        for p in paths:
+            if not p:
+                continue
+            p = plib.Path(p)
+            if p.is_dir():
+                p = p / base
+                return TouzaNioDataset(str(p))
+            if p.is_file():
+                pass
+        return None
+
+
+class TouzaNioCoGroup(TouzaNioCoDataset, TouzaNioGroup):
+    """TOUZA/Nio group accompanied by coordinate variables."""
+
+    def bind_coordinates(self):
+        """Bind coordinates inheriting parent."""
+        pass
+
+
+# handle to DataSet mapping
+_DataSets: dict[int, TouzaNioDataset] = {}

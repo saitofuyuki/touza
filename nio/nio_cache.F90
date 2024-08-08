@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2024/07/30 07:36:24 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/08/01 11:34:47 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023,2024
@@ -202,7 +202,7 @@ module TOUZA_Nio_cache
   public init_group
   public show_cache
   public cache_open_read,  cache_close
-  public cache_unit
+  public cache_unit,       cache_is_registered
   public cache_group_size, cache_group,  cache_group_name, cache_group_recs
   public cache_group_cserial
   public cache_group_coors,cache_group_coor_name, cache_group_coor_range
@@ -384,6 +384,7 @@ contains
        & (ierr, handle, path, flag, unit)
     use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_std,only: reg_entry, new_unit, sus_open
+    use TOUZA_Nio_std,only: is_msglev_WARNING, msg
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: handle
@@ -392,6 +393,7 @@ contains
     integer,optional,intent(in)  :: unit   ! allocate if not present
     integer u
     integer jc
+    character(len=lpath) :: txt
 
     ierr = 0
     u = choice(-1, unit)
@@ -406,6 +408,19 @@ contains
     if (ierr.eq.0) ierr = register_cache(u, jc)
     if (ierr.eq.0) then
        call sus_open(ierr, u, path, ACTION='R', STATUS='O')
+       ! see Note in nio_bindc::tnb_file_is_nio, about duplicate open for single file
+       if (ierr.ne.0) then
+          handle = cache_is_registered(path)
+          if (handle.ge.0) then
+             ierr = 0
+             if (is_msglev_WARNING(lev_verbose)) then
+101             format('duplicate registratin = ', A)
+                write(txt, 101) trim(path)
+                call msg(txt)
+             endif
+             return
+          endif
+       endif
     endif
     if (ierr.eq.0) call scan_file(ierr, ctables(jc), u, flag)
     if (ierr.eq.0) call settle_cache(ierr, ctables(jc), flag)
@@ -414,7 +429,7 @@ contains
        handle = conv_u2handle(u)
        ierr = min(0, handle)
     endif
-    call trace_err(ierr, asfx=path)
+    call trace_err(ierr, fun='cache_open_read', asfx=path)
   end subroutine cache_open_read
 
 !!!_  - cache_close
@@ -446,8 +461,24 @@ contains
        if (ierr.eq.0) close(unit=ufile, IOSTAT=ierr)
     endif
     if (ierr.eq.0) call free_cache(ierr, ctables(jc))
-    call trace_err(ierr, asfx=path)
+    call trace_err(ierr, fun='cache_close', isfx=handle, asfx=path)
   end subroutine cache_close
+
+!!!_  - cache_is_registered()
+  integer function cache_is_registered (path) result(handle)
+    use TOUZA_Nio_std,only: is_file_opened
+    implicit none
+    character(len=*),intent(in)  :: path
+    integer u, h, jc
+    u = is_file_opened(path)
+    if (u.ge.0) then
+       handle = conv_u2handle(u)
+       jc = extr_h2index(handle)
+       if (jc.lt.0) handle = jc
+    else
+       handle = u
+    endif
+  end function cache_is_registered
 
 !!!_  - cache_group_size()
   integer function cache_group_size(handle) result(n)
@@ -1764,6 +1795,7 @@ contains
     jg = -1
     jdrec = 0
     rpos = -1
+    rect = REC_ERROR
 
     if (ierr.eq.0) rewind(UNIT=u, IOSTAT=ierr)
     if (ierr.eq.0) then
@@ -1865,6 +1897,7 @@ contains
     enddo
     if (is_error_match(ierr, ERR_EOF)) ierr = 0
     if (ierr.eq.0) then
+       c%krect = rect
        c%ngrp = ng
        c%g => grp
     else
