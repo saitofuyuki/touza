@@ -1,10 +1,23 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2024/07/31 17:59:38 fuyuki NEWS>
+# Time-stamp: <2024/08/08 15:07:14 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.12.3.2 from 1.12.3.1
+** zbt, to release
+*** zbcont, basic implementation of contour plotter
+*** xrnio.py, dsnio.py, libtouza.py, three-level python library for TOUZA/Nio format.
+** nio [SEVERE] registration check for path
+In old fortran standard, different connection of already-opened file
+to new unit may fail.  A workaround is introduced.
+
+As far as I checked, a new unit connection for already opened file
+fails using tnb_file_is_nio(), with GNU fortran/gcc (Debian 14.1.0-5
+or 14.1.0).  On the other hand, cache_open_read() seems to accept
+this feature.
 
 * Changes in 1.12.3.1 from 1.12.3
 ** TOUZA/Zbt + TOUZA/Jmz/ConvOy alpha releases
