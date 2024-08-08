@@ -21,6 +21,9 @@
 /* trp is enabled */
 #undef ENABLE_TOUZA_TRP
 
+/* zbt is enabled */
+#undef ENABLE_TOUZA_ZBT
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
@@ -36,8 +39,17 @@
 /* // works */
 #undef HAVE_FC_CONCATENATION
 
+/* whether function acosh works */
+#undef HAVE_FORTRAN_ACOSH
+
 /* whether function amt works */
 #undef HAVE_FORTRAN_AMT
+
+/* whether function asinh works */
+#undef HAVE_FORTRAN_ASINH
+
+/* whether function atanh works */
+#undef HAVE_FORTRAN_ATANH
 
 /* whether function command_argument_count works */
 #undef HAVE_FORTRAN_COMMAND_ARGUMENT_COUNT
@@ -56,6 +68,9 @@
 
 /* whether statement flush works with unit specifier */
 #undef HAVE_FORTRAN_FLUSH_UNIT
+
+/* whether statement format works with zero_width_real specifier */
+#undef HAVE_FORTRAN_FORMAT_ZERO_WIDTH_REAL
 
 /* whether function fseek works */
 #undef HAVE_FORTRAN_FSEEK
@@ -92,6 +107,9 @@
 
 /* whether function huge works */
 #undef HAVE_FORTRAN_HUGE
+
+/* whether function hypot works */
+#undef HAVE_FORTRAN_HYPOT
 
 /* whether function iargc works */
 #undef HAVE_FORTRAN_IARGC
@@ -210,6 +228,9 @@
 /* whether module mpi works with mpi_isend */
 #undef HAVE_FORTRAN_MPI_MPI_ISEND
 
+/* whether function new_line works */
+#undef HAVE_FORTRAN_NEW_LINE
+
 /* whether statement open works with convert specifier */
 #undef HAVE_FORTRAN_OPEN_CONVERT
 
@@ -260,6 +281,9 @@
 
 /* prefer elemental function */
 #undef OPT_ENABLE_FORTRAN_ELEMENTAL
+
+/* binary128 precision */
+#undef OPT_REAL_QUADRUPLE_DIGITS
 
 /* fortran i/o unit for stderr */
 #undef OPT_STDERR_UNIT

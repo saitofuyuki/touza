@@ -27,7 +27,7 @@
 #
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Thu Jul 20 08:29:01 JST 2023
+# from AX_AM_MACROS_STATIC on Mon Aug 12 06:52:56 JST 2024
 
 
 
@@ -126,7 +126,8 @@ am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
 	$(top_srcdir)/std/mt_local.m4 $(top_srcdir)/emu/mt_local.m4 \
 	$(top_srcdir)/cal/mt_local.m4 $(top_srcdir)/trp/mt_local.m4 \
 	$(top_srcdir)/ppp/mt_local.m4 $(top_srcdir)/nio/mt_local.m4 \
-	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/zbt/mt_local.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(include_HEADERS) \
@@ -409,6 +410,7 @@ FC_INCLUDE_touza_nio = @FC_INCLUDE_touza_nio@
 FC_INCLUDE_touza_ppp = @FC_INCLUDE_touza_ppp@
 FC_INCLUDE_touza_std = @FC_INCLUDE_touza_std@
 FC_INCLUDE_touza_trp = @FC_INCLUDE_touza_trp@
+FC_INCLUDE_touza_zbt = @FC_INCLUDE_touza_zbt@
 FC_LDADD_touza_ami = @FC_LDADD_touza_ami@
 FC_LDADD_touza_cal = @FC_LDADD_touza_cal@
 FC_LDADD_touza_emu = @FC_LDADD_touza_emu@
@@ -416,6 +418,7 @@ FC_LDADD_touza_nio = @FC_LDADD_touza_nio@
 FC_LDADD_touza_ppp = @FC_LDADD_touza_ppp@
 FC_LDADD_touza_std = @FC_LDADD_touza_std@
 FC_LDADD_touza_trp = @FC_LDADD_touza_trp@
+FC_LDADD_touza_zbt = @FC_LDADD_touza_zbt@
 FC_MODEXT = @FC_MODEXT@
 FC_MODINC = @FC_MODINC@
 FC_MODOUT = @FC_MODOUT@
@@ -426,6 +429,7 @@ FC_MODULE_touza_nio = @FC_MODULE_touza_nio@
 FC_MODULE_touza_ppp = @FC_MODULE_touza_ppp@
 FC_MODULE_touza_std = @FC_MODULE_touza_std@
 FC_MODULE_touza_trp = @FC_MODULE_touza_trp@
+FC_MODULE_touza_zbt = @FC_MODULE_touza_zbt@
 FFLAGS = @FFLAGS@
 FGREP = @FGREP@
 FILECMD = @FILECMD@
@@ -482,6 +486,14 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
+PYTHON = @PYTHON@
+PYTHON_BIN = @PYTHON_BIN@
+PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
+PYTHON_INCLUDE_DIR = @PYTHON_INCLUDE_DIR@
+PYTHON_LIB = @PYTHON_LIB@
+PYTHON_PLATFORM = @PYTHON_PLATFORM@
+PYTHON_PREFIX = @PYTHON_PREFIX@
+PYTHON_VERSION = @PYTHON_VERSION@
 RANLIB = @RANLIB@
 REALPATH = @REALPATH@
 SED = @SED@
@@ -490,6 +502,7 @@ SHELL = @SHELL@
 STRIP = @STRIP@
 TOUZA_NAME = @TOUZA_NAME@
 VERSION = @VERSION@
+ZSH = @ZSH@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -519,6 +532,7 @@ builddir_touza_nio = @builddir_touza_nio@
 builddir_touza_ppp = @builddir_touza_ppp@
 builddir_touza_std = @builddir_touza_std@
 builddir_touza_trp = @builddir_touza_trp@
+builddir_touza_zbt = @builddir_touza_zbt@
 datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
@@ -543,9 +557,13 @@ moddir = @moddir@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 pkgconfig_CPPFLAGS = @pkgconfig_CPPFLAGS@
+pkgpyexecdir = @pkgpyexecdir@
+pkgpythondir = @pkgpythondir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pyexecdir = @pyexecdir@
+pythondir = @pythondir@
 runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
@@ -557,6 +575,7 @@ srcdir_touza_nio = @srcdir_touza_nio@
 srcdir_touza_ppp = @srcdir_touza_ppp@
 srcdir_touza_std = @srcdir_touza_std@
 srcdir_touza_trp = @srcdir_touza_trp@
+srcdir_touza_zbt = @srcdir_touza_zbt@
 subdirs_extra = @subdirs_extra@
 switchdir = @switchdir@
 sysconfdir = @sysconfdir@
@@ -666,49 +685,40 @@ test_std_SOURCES = std.F90
 test_std_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD=1
 test_std_LDADD = $(TEST_COMMON_LIBS)
 EXTRA_test_std_DEPENDENCIES = $(test_std_LDADD)
-@enable_module_dependencies_TRUE@std_lo_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_arg.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_sus.$(FC_MODEXT) $(builddir)/touza_std_bld.$(FC_MODEXT) $(builddir)/touza_std_wsh.$(FC_MODEXT) $(builddir)/touza_std_htb.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_arg.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_sus.$(FC_MODEXT) $(builddir)/touza_std_bld.$(FC_MODEXT) $(builddir)/touza_std_wsh.$(FC_MODEXT) $(builddir)/touza_std_htb.$(FC_MODEXT) $(builddir)/touza_std.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_arg_lo_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_arg_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_arg.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_bld_lo_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_bld_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_bld.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_env_lo_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_env_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_fun_lo_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_fun_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_htb_lo_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_htb_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_htb.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_lo_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_arg.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_sus.$(FC_MODEXT) $(builddir)/touza_std_bld.$(FC_MODEXT) $(builddir)/touza_std_wsh.$(FC_MODEXT) $(builddir)/touza_std_htb.$(FC_MODEXT) $(builddir)/touza_std_ipc.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_arg.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_sus.$(FC_MODEXT) $(builddir)/touza_std_bld.$(FC_MODEXT) $(builddir)/touza_std_wsh.$(FC_MODEXT) $(builddir)/touza_std_htb.$(FC_MODEXT) $(builddir)/touza_std_ipc.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_arg_lo_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_arg_o_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_bld_lo_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_bld_o_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_env_lo_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_env_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_fun_lo_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_fun_o_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_htb_lo_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_htb_o_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_ipc_lo_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_ipc_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@std_log_lo_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_log_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_mwe_lo_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_mwe_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_prc_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_sus_lo_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_sus_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_sus.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_log_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_mwe_lo_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_mwe_o_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_sus_lo_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_sus_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@std_utl_lo_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@std_utl_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@std_utl_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@std_wsh_lo_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@std_wsh_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_std_std_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_arg.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_sus.$(FC_MODEXT) $(builddir)/touza_std_bld.$(FC_MODEXT) $(builddir)/touza_std_wsh.$(FC_MODEXT) $(builddir)/touza_std_htb.$(FC_MODEXT) $(builddir)/touza_std.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_std_arg_std_arg_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_arg.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_std_bld_std_bld_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_bld.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_std_env_std_env_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_std_fun_std_fun_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_std_htb_std_htb_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_htb.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_std_log_std_log_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_std_mwe_std_mwe_o_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_std_prc_std_prc_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_std_sus_std_sus_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_sus.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_std_utl_std_utl_o_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_std_mod_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_arg.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_sus.$(FC_MODEXT) $(builddir)/touza_std_bld.$(FC_MODEXT) $(builddir)/touza_std_wsh.$(FC_MODEXT) $(builddir)/touza_std_htb.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_std_arg_mod_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_std_bld_mod_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_std_env_mod_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_std_fun_mod_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_std_htb_mod_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_std_mod_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_arg.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_std_sus.$(FC_MODEXT) $(builddir)/touza_std_bld.$(FC_MODEXT) $(builddir)/touza_std_wsh.$(FC_MODEXT) $(builddir)/touza_std_htb.$(FC_MODEXT) $(builddir)/touza_std_ipc.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_std_arg_mod_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_std_bld_mod_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_std_env_mod_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_std_fun_mod_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_mwe.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_std_htb_mod_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_std_ipc_mod_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@touza_std_log_mod_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_prc.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_std_mwe_mod_MODULE_DEPS = $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_std_sus_mod_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_std_mwe_mod_MODULE_DEPS = $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_std_sus_mod_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_env.$(FC_MODEXT) $(builddir)/touza_std_log.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT) $(builddir)/touza_std_fun.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@touza_std_utl_mod_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@touza_std_wsh_mod_MODULE_DEPS = $(builddir)/touza_std_prc.$(FC_MODEXT) $(builddir)/touza_std_utl.$(FC_MODEXT)
 all: all-recursive
@@ -1433,10 +1443,10 @@ $(builddir)/std_arg.lo: $(std_arg_lo_MODULE_DEPS)
 $(builddir)/std_arg.o: $(srcdir)/std_arg.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
 $(builddir)/std_arg.o: $(std_arg_o_MODULE_DEPS)
 
-$(builddir)/std_bld.lo: $(srcdir)/std_bld.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
+$(builddir)/std_bld.lo: $(srcdir)/std_bld.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h $(top_builddir)/autorevision.h
 $(builddir)/std_bld.lo: $(std_bld_lo_MODULE_DEPS)
 
-$(builddir)/std_bld.o: $(srcdir)/std_bld.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
+$(builddir)/std_bld.o: $(srcdir)/std_bld.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h $(top_builddir)/autorevision.h
 $(builddir)/std_bld.o: $(std_bld_o_MODULE_DEPS)
 
 $(builddir)/std_env.lo: $(srcdir)/std_env.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
@@ -1457,6 +1467,12 @@ $(builddir)/std_htb.lo: $(std_htb_lo_MODULE_DEPS)
 $(builddir)/std_htb.o: $(srcdir)/std_htb.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
 $(builddir)/std_htb.o: $(std_htb_o_MODULE_DEPS)
 
+$(builddir)/std_ipc.lo: $(srcdir)/std_ipc.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
+$(builddir)/std_ipc.lo: $(std_ipc_lo_MODULE_DEPS)
+
+$(builddir)/std_ipc.o: $(srcdir)/std_ipc.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
+$(builddir)/std_ipc.o: $(std_ipc_o_MODULE_DEPS)
+
 $(builddir)/std_log.lo: $(srcdir)/std_log.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
 $(builddir)/std_log.lo: $(std_log_lo_MODULE_DEPS)
 
@@ -1472,7 +1488,6 @@ $(builddir)/std_mwe.o: $(std_mwe_o_MODULE_DEPS)
 $(builddir)/std_prc.lo: $(srcdir)/std_prc.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
 
 $(builddir)/std_prc.o: $(srcdir)/std_prc.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/std_prc.o: $(std_prc_o_MODULE_DEPS)
 
 $(builddir)/std_sus.lo: $(srcdir)/std_sus.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
 $(builddir)/std_sus.lo: $(std_sus_lo_MODULE_DEPS)
@@ -1492,46 +1507,13 @@ $(builddir)/std_wsh.lo: $(std_wsh_lo_MODULE_DEPS)
 $(builddir)/std_wsh.o: $(srcdir)/std_wsh.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
 $(builddir)/std_wsh.o: $(std_wsh_o_MODULE_DEPS)
 
-$(builddir)/test_std-std.o: $(srcdir)/std.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/test_std-std.o: $(test_std_std_o_MODULE_DEPS)
-
-$(builddir)/test_std_arg-std_arg.o: $(srcdir)/std_arg.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/test_std_arg-std_arg.o: $(test_std_arg_std_arg_o_MODULE_DEPS)
-
-$(builddir)/test_std_bld-std_bld.o: $(srcdir)/std_bld.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/test_std_bld-std_bld.o: $(test_std_bld_std_bld_o_MODULE_DEPS)
-
-$(builddir)/test_std_env-std_env.o: $(srcdir)/std_env.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/test_std_env-std_env.o: $(test_std_env_std_env_o_MODULE_DEPS)
-
-$(builddir)/test_std_fun-std_fun.o: $(srcdir)/std_fun.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/test_std_fun-std_fun.o: $(test_std_fun_std_fun_o_MODULE_DEPS)
-
-$(builddir)/test_std_htb-std_htb.o: $(srcdir)/std_htb.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/test_std_htb-std_htb.o: $(test_std_htb_std_htb_o_MODULE_DEPS)
-
-$(builddir)/test_std_log-std_log.o: $(srcdir)/std_log.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/test_std_log-std_log.o: $(test_std_log_std_log_o_MODULE_DEPS)
-
-$(builddir)/test_std_mwe-std_mwe.o: $(srcdir)/std_mwe.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/test_std_mwe-std_mwe.o: $(test_std_mwe_std_mwe_o_MODULE_DEPS)
-
-$(builddir)/test_std_prc-std_prc.o: $(srcdir)/std_prc.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/test_std_prc-std_prc.o: $(test_std_prc_std_prc_o_MODULE_DEPS)
-
-$(builddir)/test_std_sus-std_sus.o: $(srcdir)/std_sus.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/test_std_sus-std_sus.o: $(test_std_sus_std_sus_o_MODULE_DEPS)
-
-$(builddir)/test_std_utl-std_utl.o: $(srcdir)/std_utl.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
-$(builddir)/test_std_utl-std_utl.o: $(test_std_utl_std_utl_o_MODULE_DEPS)
-
 $(builddir)/touza_std.$(FC_MODEXT): $(srcdir)/std.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
 $(builddir)/touza_std.$(FC_MODEXT): $(touza_std_mod_MODULE_DEPS)
 
 $(builddir)/touza_std_arg.$(FC_MODEXT): $(srcdir)/std_arg.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
 $(builddir)/touza_std_arg.$(FC_MODEXT): $(touza_std_arg_mod_MODULE_DEPS)
 
-$(builddir)/touza_std_bld.$(FC_MODEXT): $(srcdir)/std_bld.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
+$(builddir)/touza_std_bld.$(FC_MODEXT): $(srcdir)/std_bld.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h $(top_builddir)/autorevision.h
 $(builddir)/touza_std_bld.$(FC_MODEXT): $(touza_std_bld_mod_MODULE_DEPS)
 
 $(builddir)/touza_std_env.$(FC_MODEXT): $(srcdir)/std_env.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
@@ -1542,6 +1524,9 @@ $(builddir)/touza_std_fun.$(FC_MODEXT): $(touza_std_fun_mod_MODULE_DEPS)
 
 $(builddir)/touza_std_htb.$(FC_MODEXT): $(srcdir)/std_htb.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
 $(builddir)/touza_std_htb.$(FC_MODEXT): $(touza_std_htb_mod_MODULE_DEPS)
+
+$(builddir)/touza_std_ipc.$(FC_MODEXT): $(srcdir)/std_ipc.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
+$(builddir)/touza_std_ipc.$(FC_MODEXT): $(touza_std_ipc_mod_MODULE_DEPS)
 
 $(builddir)/touza_std_log.$(FC_MODEXT): $(srcdir)/std_log.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_std.h $(top_srcdir)/touza.h
 $(builddir)/touza_std_log.$(FC_MODEXT): $(touza_std_log_mod_MODULE_DEPS)
@@ -1561,6 +1546,8 @@ $(builddir)/touza_std_wsh.$(FC_MODEXT): $(srcdir)/std_wsh.F90 $(top_builddir)/to
 $(builddir)/touza_std_wsh.$(FC_MODEXT): $(touza_std_wsh_mod_MODULE_DEPS)
 
 $(srcdir)/touza_std.h: 
+
+$(top_builddir)/autorevision.h: 
 
 $(top_builddir)/touza_config.h: 
 

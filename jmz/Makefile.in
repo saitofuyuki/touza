@@ -17,9 +17,9 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2023/06/30 07:19:20 fuyuki Makefile.am>
+# Time-stamp: <2024/06/28 07:32:08 fuyuki Makefile.am>
 
-# Copyright (C) 2021,2022,2023
+# Copyright (C) 2021,2022,2023,2024
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -102,7 +102,7 @@ build_triplet = @build@
 host_triplet = @host@
 noinst_PROGRAMS =
 EXTRA_PROGRAMS = jmzcmp$(EXEEXT)
-bin_PROGRAMS = chak$(EXEEXT)
+bin_PROGRAMS = chak$(EXEEXT) $(am__EXEEXT_1) $(am__EXEEXT_2)
 check_PROGRAMS = test_chak_file$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -117,12 +117,15 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = jmz_config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__installdirs = "$(DESTDIR)$(bindir)"
+am__EXEEXT_1 = convoy$(EXEEXT)
+am__EXEEXT_2 = qoxi$(EXEEXT)
+am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libjmz_local_la_LIBADD =
-am_libjmz_local_la_OBJECTS = jmzlib.lo chak_lib.lo chak_opr.lo \
-	chak_file.lo
+am_libjmz_local_la_OBJECTS = jmz_param.lo jmz_base.lo jmz_coor.lo \
+	jmz_file.lo jmz_buf.lo jmzlib.lo jmz_psprop.lo jmz_geogr.lo \
+	chak_lib.lo chak_opr.lo chak_file.lo
 libjmz_local_la_OBJECTS = $(am_libjmz_local_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -134,16 +137,52 @@ chak_LDADD = $(LDADD)
 am__DEPENDENCIES_1 =
 am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1)
 chak_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_2)
+am_convoy_OBJECTS = convoy_util.$(OBJEXT) convoy_ps2g.$(OBJEXT) \
+	convoy_r2g.$(OBJEXT) $(CONVOY).$(OBJEXT)
+convoy_OBJECTS = $(am_convoy_OBJECTS)
+convoy_LDADD = $(LDADD)
+convoy_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_2)
 am_jmzcmp_OBJECTS = jmzcmp.$(OBJEXT)
 jmzcmp_OBJECTS = $(am_jmzcmp_OBJECTS)
 jmzcmp_LDADD = $(LDADD)
 jmzcmp_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_2)
+am_qoxi_OBJECTS = $(QOXI).$(OBJEXT)
+qoxi_OBJECTS = $(am_qoxi_OBJECTS)
+qoxi_LDADD = $(LDADD)
+qoxi_DEPENDENCIES = libjmz_local.la $(am__DEPENDENCIES_2)
 am_test_chak_file_OBJECTS = test_chak_file-chak_file.$(OBJEXT)
 test_chak_file_OBJECTS = $(am_test_chak_file_OBJECTS)
 am__DEPENDENCIES_3 = libjmz_local.la $(am__DEPENDENCIES_2)
 test_chak_file_DEPENDENCIES = $(TEST_COMMON_LIBS) \
 	$(am__DEPENDENCIES_3)
-SCRIPTS = $(noinst_SCRIPTS)
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
+am__install_max = 40
+am__nobase_strip_setup = \
+  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
+am__nobase_strip = \
+  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
+am__nobase_list = $(am__nobase_strip_setup); \
+  for p in $$list; do echo "$$p $$p"; done | \
+  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
+  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
+    if (++n[$$2] == $(am__install_max)) \
+      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
+    END { for (dir in files) print dir, files[dir] }'
+am__base_list = \
+  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
+  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
+am__uninstall_files_from_dir = { \
+  test -z "$$files" \
+    || { test ! -d "$$dir" && test ! -f "$$dir" && test ! -r "$$dir"; } \
+    || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
+         $(am__cd) "$$dir" && rm -f $$files; }; \
+  }
+SCRIPTS = $(bin_SCRIPTS) $(noinst_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -193,10 +232,11 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libjmz_local_la_SOURCES) $(chak_SOURCES) $(jmzcmp_SOURCES) \
-	$(test_chak_file_SOURCES)
+SOURCES = $(libjmz_local_la_SOURCES) $(chak_SOURCES) $(convoy_SOURCES) \
+	$(jmzcmp_SOURCES) $(qoxi_SOURCES) $(test_chak_file_SOURCES)
 DIST_SOURCES = $(libjmz_local_la_SOURCES) $(chak_SOURCES) \
-	$(jmzcmp_SOURCES) $(test_chak_file_SOURCES)
+	$(convoy_SOURCES) $(jmzcmp_SOURCES) $(qoxi_SOURCES) \
+	$(test_chak_file_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -383,6 +423,7 @@ TOUZA_LIBS = $(TOUZA_LIBRARY) @TOUZA_LIBS@
 TOUZA_NAME = @TOUZA_NAME@
 TOUZA_VERSION = @TOUZA_VERSION@
 TOUZA_top_builddir = @TOUZA_top_builddir@
+TR = @TR@
 VERSION = @VERSION@
 ZSH = @ZSH@
 abs_builddir = @abs_builddir@
@@ -446,26 +487,47 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I ../m4c
-EXTRA_DIST = ocheck.sh.in jmzdepf90.sh.in demo-chak.sh.in \
+EXTRA_DIST = demo-chak.sh.in demo-convoy.sh.in ocheck.sh.in \
+	$(GTEML_SRC) gtfna.in gtfnb.in wtest_gt.sh.in jmzdepf90.sh.in \
 	$(chak_to_include) README-jmz.org
 AM_FCFLAGS_MODULE = $(DEBUG) $(TOUZA_CFLAGS)
 AM_LDFLAGS = $(TOUZA_LDFLAGS)
 LDADD = libjmz_local.la $(TOUZA_LIBS)
-noinst_SCRIPTS = jmzdepf90 demo-chak.sh ocheck.sh
+noinst_SCRIPTS = jmzdepf90 demo-chak.sh demo-convoy.sh ocheck.sh \
+	wtest_gt.sh
 noinst_LTLIBRARIES = libjmz_local.la
-libjmz_local_la_SOURCES = jmzlib.F90 chak_lib.F90 chak_opr.F90 chak_file.F90
+libjmz_local_la_SOURCES = jmz_param.F90 jmz_base.F90 jmz_coor.F90 \
+	jmz_file.F90 jmz_buf.F90 jmzlib.F90 jmz_psprop.F90 \
+	jmz_geogr.F90 chak_lib.F90 chak_opr.F90 chak_file.F90
+# libjmz_local_la_SOURCES += chak_handles.F90
 jmzcmp_SOURCES = jmzcmp.F90 jmz.h
+CHAK = chak
 chak_SOURCES = chak.F90 jmz.h
 chak_to_include = chak_decl.F90 chak_reg.F90
 EXTRA_chak_DEPENDENCIES = $(TOUZA_LIBRARY)
+CONVOY = convoy
+convoy_SOURCES = convoy_util.F90 convoy_ps2g.F90 convoy_r2g.F90 \
+	$(CONVOY).F90 jmz.h
+convoy_to_include = 
+EXTRA_convoy_DEPENDENCIES = $(TOUZA_LIBRARY)
+QOXI = qoxi
+qoxi_SOURCES = $(QOXI).F90 jmz.h
+qoxi_to_include = 
+EXTRA_qoxi_DEPENDENCIES = $(TOUZA_LIBRARY)
 noinst_PYTHON = jmznml.py
 TEST_COMMON_LIBS = $(noinst_LTLIBRARIES)
 test_chak_file_SOURCES = chak_file.F90
 test_chak_file_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_CHAK_FILE=1
 test_chak_file_LDADD = $(TEST_COMMON_LIBS) $(LDADD)
-MOSTLYCLEANFILES = *.$(FC_MODEXT)
+@with_emulates_TRUE@bin_SCRIPTS = gtfna gtfnb
+GTEML_SRC = gteml.in
+GTFNA_NAMES = gtabs gtatan gtcos gtexp gtinv gtlog gtlog10 gtsin gtsqr \
+	gtsqrt gttan gttanh
+GTFNB_NAMES = gtadd gtamp gtarg gtdiv gtmask gtmlt gtmod gtpwr gtsub
+MOSTLYCLEANFILES = *.$(FC_MODEXT) $(LIST_SYMLINKS)
 CLEANFILES = $(bin_SCRIPTS) $(noinst_SCRIPTS)
 SUBDIRS = .
+LIST_SYMLINKS = .symlinks
 all: jmz_config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
@@ -605,13 +667,56 @@ chak$(EXEEXT): $(chak_OBJECTS) $(chak_DEPENDENCIES) $(EXTRA_chak_DEPENDENCIES)
 	@rm -f chak$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(chak_OBJECTS) $(chak_LDADD) $(LIBS)
 
+convoy$(EXEEXT): $(convoy_OBJECTS) $(convoy_DEPENDENCIES) $(EXTRA_convoy_DEPENDENCIES) 
+	@rm -f convoy$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(convoy_OBJECTS) $(convoy_LDADD) $(LIBS)
+
 jmzcmp$(EXEEXT): $(jmzcmp_OBJECTS) $(jmzcmp_DEPENDENCIES) $(EXTRA_jmzcmp_DEPENDENCIES) 
 	@rm -f jmzcmp$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(jmzcmp_OBJECTS) $(jmzcmp_LDADD) $(LIBS)
 
+qoxi$(EXEEXT): $(qoxi_OBJECTS) $(qoxi_DEPENDENCIES) $(EXTRA_qoxi_DEPENDENCIES) 
+	@rm -f qoxi$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(qoxi_OBJECTS) $(qoxi_LDADD) $(LIBS)
+
 test_chak_file$(EXEEXT): $(test_chak_file_OBJECTS) $(test_chak_file_DEPENDENCIES) $(EXTRA_test_chak_file_DEPENDENCIES) 
 	@rm -f test_chak_file$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_chak_file_OBJECTS) $(test_chak_file_LDADD) $(LIBS)
+install-binSCRIPTS: $(bin_SCRIPTS)
+	@$(NORMAL_INSTALL)
+	@list='$(bin_SCRIPTS)'; test -n "$(bindir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(bindir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(bindir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  if test -f "$$d$$p"; then echo "$$d$$p"; echo "$$p"; else :; fi; \
+	done | \
+	sed -e 'p;s,.*/,,;n' \
+	    -e 'h;s|.*|.|' \
+	    -e 'p;x;s,.*/,,;$(transform)' | sed 'N;N;N;s,\n, ,g' | \
+	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1; } \
+	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
+	    if ($$2 == $$4) { files[d] = files[d] " " $$1; \
+	      if (++n[d] == $(am__install_max)) { \
+		print "f", d, files[d]; n[d] = 0; files[d] = "" } } \
+	    else { print "f", d "/" $$4, $$1 } } \
+	  END { for (d in files) print "f", d, files[d] }' | \
+	while read type dir files; do \
+	     if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
+	     test -z "$$files" || { \
+	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(bindir)$$dir'"; \
+	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
+	     } \
+	; done
+
+uninstall-binSCRIPTS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(bin_SCRIPTS)'; test -n "$(bindir)" || exit 0; \
+	files=`for p in $$list; do echo "$$p"; done | \
+	       sed -e 's,.*/,,;$(transform)'`; \
+	dir='$(DESTDIR)$(bindir)'; $(am__uninstall_files_from_dir)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -951,7 +1056,7 @@ check: check-recursive
 all-am: Makefile $(PROGRAMS) $(LTLIBRARIES) $(SCRIPTS) jmz_config.h
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(bindir)"; do \
+	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-recursive
@@ -986,6 +1091,8 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
+@with_emulates_FALSE@install-exec-hook:
+@with_emulates_FALSE@uninstall-hook:
 clean: clean-recursive
 
 clean-am: clean-binPROGRAMS clean-checkPROGRAMS clean-generic \
@@ -1016,8 +1123,9 @@ install-dvi: install-dvi-recursive
 
 install-dvi-am:
 
-install-exec-am: install-binPROGRAMS
-
+install-exec-am: install-binPROGRAMS install-binSCRIPTS
+	@$(NORMAL_INSTALL)
+	$(MAKE) $(AM_MAKEFLAGS) install-exec-hook
 install-html: install-html-recursive
 
 install-html-am:
@@ -1057,9 +1165,11 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-binPROGRAMS
-
-.MAKE: $(am__recursive_targets) all check-am install-am install-strip
+uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS
+	@$(NORMAL_INSTALL)
+	$(MAKE) $(AM_MAKEFLAGS) uninstall-hook
+.MAKE: $(am__recursive_targets) all check-am install-am \
+	install-exec-am install-strip uninstall-am
 
 .PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am \
 	am--refresh check check-am clean clean-binPROGRAMS \
@@ -1071,15 +1181,16 @@ uninstall-am: uninstall-binPROGRAMS
 	distclean-generic distclean-hdr distclean-libtool \
 	distclean-tags distcleancheck distdir distuninstallcheck dvi \
 	dvi-am html html-am info info-am install install-am \
-	install-binPROGRAMS install-data install-data-am install-dvi \
-	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	installdirs-am maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-compile mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-am uninstall \
-	uninstall-am uninstall-binPROGRAMS
+	install-binPROGRAMS install-binSCRIPTS install-data \
+	install-data-am install-dvi install-dvi-am install-exec \
+	install-exec-am install-exec-hook install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs installdirs-am \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
+	uninstall-binPROGRAMS uninstall-binSCRIPTS uninstall-hook
 
 .PRECIOUS: Makefile
 
@@ -1099,12 +1210,45 @@ demo-chak.sh: demo-chak.sh.in
          -e 's,[@]srcdir[@],$(srcdir),g' \
 		$< >$@; chmod +x $@
 
+demo-convoy.sh: demo-convoy.sh.in
+	@sed -e 's,[@]ZSH[@],$(ZSH),g' \
+         -e 's,[@]srcdir[@],$(srcdir),g' \
+		$< >$@; chmod +x $@
+
 ocheck.sh: ocheck.sh.in
-	@sed -e 's,[@]CHAK[@],$(abs_builddir)/chak,g' \
+	@sed -e 's,[@]CHAK[@],$(abs_builddir)/$(CHAK),g' \
 		 -e 's,[@]CHAK_OPTS[@],$(CHAK_OPTS),g' < $< >$@; chmod +x $@
 
+gtfna: $(GTEML_SRC) gtfna.in
+gtfnb: $(GTEML_SRC) gtfnb.in
+
+gtfna gtfnb: 
+	@sed -e '/@GTEML@/,$$d' $(srcdir)/$@.in > $@
+	sed -e 's,[@]PACKAGE_STRING[@],$(PACKAGE_STRING),g' \
+        -e 's,[@]TOUZA_VERSION[@],$(TOUZA_VERSION),g' \
+        -e 's,[@]VERSION[@],$(VERSION),g' \
+        -e 's,[@]TR[@],$(TR),g' \
+        -e 's,[@]CHAK[@],$(bindir)/$(CHAK),g' \
+        < $(srcdir)/$(GTEML_SRC) >>$@
+	sed -e '1,/@GTEML@/d' $(srcdir)/$@.in >> $@
+	chmod +x $@
+
+wtest_gt.sh: wtest_gt.sh.in
+	@if test -e $<; then \
+		sed -e 's,[@]ZSH[@],$(ZSH),g' \
+            -e 's,[@]PACKAGE_STRING[@],$(PACKAGE_STRING),g' \
+            -e 's,[@]TOUZA_VERSION[@],$(TOUZA_VERSION),g' \
+            -e 's,[@]VERSION[@],$(VERSION),g' \
+            -e 's,[@]TR[@],$(TR),g' \
+            -e 's,[@]srcdir[@],$(srcdir),g' \
+            -e 's,[@]builddir[@],$(builddir),g' \
+            -e 's,[@]CHAK[@],$(bindir)/$(CHAK),g' \
+			 < $< >$@; \
+		chmod +x $@; \
+	fi
+
 genx2.sh: genx2.sh.in
-	if test -e $<; then \
+	@if test -e $<; then \
 		sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@; \
 		chmod +x $@; \
 	fi
@@ -1123,6 +1267,39 @@ rebuild-lib:
 	@if test "$(TOUZA_top_builddir)"; \
 	then cd $(TOUZA_top_builddir) && $(MAKE) clean all; \
 	else echo "Need to set TOUZA_top_builddir" >&2; exit 1; fi
+
+@with_emulates_TRUE@install-exec-hook: install-gtfna-family install-gtfnb-family
+@with_emulates_TRUE@uninstall-hook: uninstall-symlinks
+
+list_symlinks:
+	touch $(LIST_SYMLINKS)
+
+install-gtfna-family: list_symlinks
+	s=gtfna; d=$(DESTDIR)$(bindir); \
+	for n in $(GTFNA_NAMES); do \
+	  if test -e $$d/$$n; then :; \
+      else \
+	  	( cd $$d && $(LN_S) $$s $$n ); \
+	    grep --silent "^$$n\$$" $(LIST_SYMLINKS) || \
+           echo "$$n" >> $(LIST_SYMLINKS); \
+	  fi; \
+	done
+
+install-gtfnb-family: list_symlinks
+	s=gtfnb; d=$(DESTDIR)$(bindir); \
+	for n in $(GTFNB_NAMES); do \
+	  if test -e $$d/$$n; then :; \
+      else \
+	  	( cd $$d && $(LN_S) $$s $$n ); \
+	    grep --silent "^$$n\$$" $(LIST_SYMLINKS) || \
+           echo "$$n" >> $(LIST_SYMLINKS); \
+	  fi; \
+	done
+
+uninstall-symlinks:
+	list=`test -e $(LIST_SYMLINKS) && cat $(LIST_SYMLINKS)`; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+    dir='$(DESTDIR)$(bindir)'; $(am__uninstall_files_from_dir)
 
 ### Local Variables:
 ### mode: makefile-automake

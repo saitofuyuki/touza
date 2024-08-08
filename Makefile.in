@@ -17,16 +17,16 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2023/07/05 19:08:59 fuyuki Makefile.am>
+# Time-stamp: <2024/08/12 06:50:58 fuyuki Makefile.am>
 
-# Copyright (C) 2020-2023
+# Copyright (C) 2020-2024
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Thu Jul 20 08:29:01 JST 2023
+# from AX_AM_MACROS_STATIC on Mon Aug 12 06:52:56 JST 2024
 
 
 
@@ -136,6 +136,7 @@ target_triplet = @target@
 @BUILD_ami_TRUE@am__append_19 = ami
 @BUILD_ami_TRUE@am__append_20 = ami/$(local_name)
 @BUILD_ami_TRUE@am__append_21 = $(FC_MODULE_touza_ami)
+@BUILD_zbt_TRUE@am__append_22 = zbt
 check_PROGRAMS = test_touza$(EXEEXT)
 @NEVER_TRUE@EXTRA_PROGRAMS = dummy_never_built$(EXEEXT)
 subdir = .
@@ -144,7 +145,8 @@ am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
 	$(top_srcdir)/std/mt_local.m4 $(top_srcdir)/emu/mt_local.m4 \
 	$(top_srcdir)/cal/mt_local.m4 $(top_srcdir)/trp/mt_local.m4 \
 	$(top_srcdir)/ppp/mt_local.m4 $(top_srcdir)/nio/mt_local.m4 \
-	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/zbt/mt_local.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(top_srcdir)/configure \
@@ -304,7 +306,7 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-DIST_SUBDIRS = std emu cal trp nio ppp ami m4c . @subdirs_extra@
+DIST_SUBDIRS = std emu cal trp nio ppp ami zbt m4c . @subdirs_extra@
 am__DIST_COMMON = $(srcdir)/Makedep.inc $(srcdir)/Makefile.in \
 	$(srcdir)/makeshift.in $(srcdir)/touza.pc.in \
 	$(srcdir)/touza_config.h.in $(top_srcdir)/aminclude_static.am \
@@ -318,7 +320,8 @@ am__DIST_COMMON = $(srcdir)/Makedep.inc $(srcdir)/Makefile.in \
 	$(top_srcdir)/build-aux/tap-driver.sh AUTHORS ChangeLog \
 	INSTALL NEWS README build-aux/ar-lib build-aux/compile \
 	build-aux/config.guess build-aux/config.sub build-aux/depcomp \
-	build-aux/install-sh build-aux/ltmain.sh build-aux/missing
+	build-aux/install-sh build-aux/ltmain.sh build-aux/missing \
+	build-aux/py-compile
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -406,6 +409,7 @@ FC_INCLUDE_touza_nio = @FC_INCLUDE_touza_nio@
 FC_INCLUDE_touza_ppp = @FC_INCLUDE_touza_ppp@
 FC_INCLUDE_touza_std = @FC_INCLUDE_touza_std@
 FC_INCLUDE_touza_trp = @FC_INCLUDE_touza_trp@
+FC_INCLUDE_touza_zbt = @FC_INCLUDE_touza_zbt@
 FC_LDADD_touza_ami = @FC_LDADD_touza_ami@
 FC_LDADD_touza_cal = @FC_LDADD_touza_cal@
 FC_LDADD_touza_emu = @FC_LDADD_touza_emu@
@@ -413,6 +417,7 @@ FC_LDADD_touza_nio = @FC_LDADD_touza_nio@
 FC_LDADD_touza_ppp = @FC_LDADD_touza_ppp@
 FC_LDADD_touza_std = @FC_LDADD_touza_std@
 FC_LDADD_touza_trp = @FC_LDADD_touza_trp@
+FC_LDADD_touza_zbt = @FC_LDADD_touza_zbt@
 FC_MODEXT = @FC_MODEXT@
 FC_MODINC = @FC_MODINC@
 FC_MODOUT = @FC_MODOUT@
@@ -423,6 +428,7 @@ FC_MODULE_touza_nio = @FC_MODULE_touza_nio@
 FC_MODULE_touza_ppp = @FC_MODULE_touza_ppp@
 FC_MODULE_touza_std = @FC_MODULE_touza_std@
 FC_MODULE_touza_trp = @FC_MODULE_touza_trp@
+FC_MODULE_touza_zbt = @FC_MODULE_touza_zbt@
 FFLAGS = @FFLAGS@
 FGREP = @FGREP@
 FILECMD = @FILECMD@
@@ -479,6 +485,14 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
+PYTHON = @PYTHON@
+PYTHON_BIN = @PYTHON_BIN@
+PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
+PYTHON_INCLUDE_DIR = @PYTHON_INCLUDE_DIR@
+PYTHON_LIB = @PYTHON_LIB@
+PYTHON_PLATFORM = @PYTHON_PLATFORM@
+PYTHON_PREFIX = @PYTHON_PREFIX@
+PYTHON_VERSION = @PYTHON_VERSION@
 RANLIB = @RANLIB@
 REALPATH = @REALPATH@
 SED = @SED@
@@ -487,6 +501,7 @@ SHELL = @SHELL@
 STRIP = @STRIP@
 TOUZA_NAME = @TOUZA_NAME@
 VERSION = @VERSION@
+ZSH = @ZSH@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -516,6 +531,7 @@ builddir_touza_nio = @builddir_touza_nio@
 builddir_touza_ppp = @builddir_touza_ppp@
 builddir_touza_std = @builddir_touza_std@
 builddir_touza_trp = @builddir_touza_trp@
+builddir_touza_zbt = @builddir_touza_zbt@
 datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
@@ -540,9 +556,13 @@ moddir = @moddir@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 pkgconfig_CPPFLAGS = @pkgconfig_CPPFLAGS@
+pkgpyexecdir = @pkgpyexecdir@
+pkgpythondir = @pkgpythondir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pyexecdir = @pyexecdir@
+pythondir = @pythondir@
 runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
@@ -554,6 +574,7 @@ srcdir_touza_nio = @srcdir_touza_nio@
 srcdir_touza_ppp = @srcdir_touza_ppp@
 srcdir_touza_std = @srcdir_touza_std@
 srcdir_touza_trp = @srcdir_touza_trp@
+srcdir_touza_zbt = @srcdir_touza_zbt@
 subdirs_extra = @subdirs_extra@
 switchdir = @switchdir@
 sysconfdir = @sysconfdir@
@@ -583,19 +604,21 @@ AM_FCFLAGS_MODULE = $(FC_MODULE_touza_std) $(am__append_6) \
 COPY_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=copy-%)
 DIFF_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=diff-%)
 switch_DATA = 
-lib@TOUZA_NAME@_la_LDFLAGS = -version-info 1:2:0
+include_HEADERS = touza.h $(CONFIG_HEADER)
+lib_LTLIBRARIES = lib@TOUZA_NAME@.la
+lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
+lib@TOUZA_NAME@_la_LDFLAGS = $(lib@TOUZA_NAME@_version) \
+	$(NETCDF4_FLIBS) $(NETCDF4_LIBS)
+lib@TOUZA_NAME@_version = 
 noinst_SCRIPTS = makeshift
 SUBDIRS = std $(am__append_4) $(am__append_7) $(am__append_10) \
-	$(am__append_13) $(am__append_16) $(am__append_19) m4c . \
-	$(subdirs_extra)
+	$(am__append_13) $(am__append_16) $(am__append_19) \
+	$(am__append_22) m4c . $(subdirs_extra)
 lib@TOUZA_NAME@_la_LIBADD = std/$(local_name) $(am__append_5) \
 	$(am__append_8) $(am__append_11) $(am__append_14) \
 	$(am__append_17) $(am__append_20)
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = touza.pc
-include_HEADERS = touza.h $(CONFIG_HEADER)
-lib_LTLIBRARIES = lib@TOUZA_NAME@.la
-lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
+pkgconfig_DATA = @TOUZA_NAME@.pc
 local_name = libtouza_local.la
 test_touza_SOURCES = touza.F90
 test_touza_LDADD = $(lib_LTLIBRARIES)

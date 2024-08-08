@@ -14,20 +14,16 @@
 
 @SET_MAKE@
 
-# touza/m4c Makefile.am
+# touza/zbt/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
-# Created: Jan 20 2021
-# Time-stamp: <2022/11/24 16:51:36 fuyuki Makefile.am>
+# Created: Jul 24 2024
+# Time-stamp: <2024/08/11 16:47:30 fuyuki Makefile.am>
 
-# Copyright (C) 2021, 2022
+# Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
+#
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
-
-# # need for exteranl distdir
-# MOSTLYCLEANFILES	=
-# include $(top_srcdir)/aminclude_static.am
-
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -103,7 +99,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-subdir = m4c
+subdir = zbt/zbt
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
 	$(top_srcdir)/std/mt_local.m4 $(top_srcdir)/emu/mt_local.m4 \
@@ -113,7 +109,7 @@ am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
-DIST_COMMON = $(srcdir)/Makefile.am $(dist_pkgdata_DATA) \
+DIST_COMMON = $(srcdir)/Makefile.am $(pkgpython_PYTHON) \
 	$(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/touza_config.h
@@ -165,10 +161,14 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(pkgdatadir)"
-DATA = $(dist_pkgdata_DATA)
+am__py_compile = PYTHON=$(PYTHON) $(SHELL) $(py_compile)
+am__installdirs = "$(DESTDIR)$(pkgpythondir)"
+am__pep3147_tweak = \
+  sed -e 's|\.py$$||' -e 's|[^/]*$$|__pycache__/&.*.pyc __pycache__/&.*.pyo|'
+py_compile = $(top_srcdir)/build-aux/py-compile
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
-am__DIST_COMMON = $(srcdir)/Makefile.in
+am__DIST_COMMON = $(srcdir)/Makefile.in \
+	$(top_srcdir)/build-aux/py-compile
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
@@ -360,7 +360,7 @@ oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 pkgconfig_CPPFLAGS = @pkgconfig_CPPFLAGS@
 pkgpyexecdir = @pkgpyexecdir@
-pkgpythondir = @pkgpythondir@
+pkgpythondir = $(pythondir)/zbt
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
@@ -389,10 +389,11 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-EXTRA_DIST = mt_am_include.m4 mt_fortran_check.m4 mt_init.m4 \
-	mt_define.m4 mt_package.m4 mt_prog_fc_mpi.m4 mt_shell.m4 \
-	ax_lib_netcdf4.m4
-dist_pkgdata_DATA = $(EXTRA_DIST)
+pkgpython_PYTHON = __init__.py util.py libtouza.py dsnio.py xrnio.py \
+	param.py
+
+# BUILT_SOURCE = param.py
+GENPARAM = $(srcdir)/../param.sh
 all: all-am
 
 .SUFFIXES:
@@ -405,9 +406,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign m4c/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign zbt/zbt/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign m4c/Makefile
+	  $(AUTOMAKE) --foreign zbt/zbt/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -431,27 +432,49 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
-install-dist_pkgdataDATA: $(dist_pkgdata_DATA)
+install-pkgpythonPYTHON: $(pkgpython_PYTHON)
 	@$(NORMAL_INSTALL)
-	@list='$(dist_pkgdata_DATA)'; test -n "$(pkgdatadir)" || list=; \
+	@list='$(pkgpython_PYTHON)'; dlist=; list2=; test -n "$(pkgpythondir)" || list=; \
 	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(pkgdatadir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(pkgdatadir)" || exit 1; \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(pkgpythondir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(pkgpythondir)" || exit 1; \
 	fi; \
 	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  echo "$$d$$p"; \
-	done | $(am__base_list) | \
+	  if test -f "$$p"; then b=; else b="$(srcdir)/"; fi; \
+	  if test -f $$b$$p; then \
+	    $(am__strip_dir) \
+	    dlist="$$dlist $$f"; \
+	    list2="$$list2 $$b$$p"; \
+	  else :; fi; \
+	done; \
+	for file in $$list2; do echo $$file; done | $(am__base_list) | \
 	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(pkgdatadir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgdatadir)" || exit $$?; \
-	done
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(pkgpythondir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgpythondir)" || exit $$?; \
+	done || exit $$?; \
+	if test -n "$$dlist"; then \
+	  $(am__py_compile) --destdir "$(DESTDIR)" \
+	                    --basedir "$(pkgpythondir)" $$dlist; \
+	else :; fi
 
-uninstall-dist_pkgdataDATA:
+uninstall-pkgpythonPYTHON:
 	@$(NORMAL_UNINSTALL)
-	@list='$(dist_pkgdata_DATA)'; test -n "$(pkgdatadir)" || list=; \
-	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	dir='$(DESTDIR)$(pkgdatadir)'; $(am__uninstall_files_from_dir)
+	@list='$(pkgpython_PYTHON)'; test -n "$(pkgpythondir)" || list=; \
+	py_files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	test -n "$$py_files" || exit 0; \
+	dir='$(DESTDIR)$(pkgpythondir)'; \
+	pyc_files=`echo "$$py_files" | sed 's|$$|c|'`; \
+	pyo_files=`echo "$$py_files" | sed 's|$$|o|'`; \
+	st=0; \
+	for files in "$$py_files" "$$pyc_files" "$$pyo_files"; do \
+	  $(am__uninstall_files_from_dir) || st=$$?; \
+	done; \
+	dir='$(DESTDIR)$(pkgpythondir)'; \
+	echo "$$py_files" | $(am__pep3147_tweak) | $(am__base_list) | \
+	  while read files; do \
+	    $(am__uninstall_files_from_dir) || st=$$?; \
+	  done || exit $$?; \
+	exit $$st
 tags TAGS:
 
 ctags CTAGS:
@@ -493,9 +516,9 @@ distdir-am: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(DATA)
+all-am: Makefile
 installdirs:
-	for dir in "$(DESTDIR)$(pkgdatadir)"; do \
+	for dir in "$(DESTDIR)$(pkgpythondir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -548,7 +571,7 @@ info: info-am
 
 info-am:
 
-install-data-am: install-dist_pkgdataDATA
+install-data-am: install-pkgpythonPYTHON
 
 install-dvi: install-dvi-am
 
@@ -592,36 +615,35 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-dist_pkgdataDATA
+uninstall-am: uninstall-pkgpythonPYTHON
 
 .MAKE: install-am install-strip
 
 .PHONY: all all-am check check-am clean clean-generic clean-libtool \
 	cscopelist-am ctags-am distclean distclean-generic \
 	distclean-libtool distdir dvi dvi-am html html-am info info-am \
-	install install-am install-data install-data-am \
-	install-dist_pkgdataDATA install-dvi install-dvi-am \
-	install-exec install-exec-am install-html install-html-am \
-	install-info install-info-am install-man install-pdf \
-	install-pdf-am install-ps install-ps-am install-strip \
-	installcheck installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags-am uninstall \
-	uninstall-am uninstall-dist_pkgdataDATA
+	install install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am install-man \
+	install-pdf install-pdf-am install-pkgpythonPYTHON install-ps \
+	install-ps-am install-strip installcheck installcheck-am \
+	installdirs maintainer-clean maintainer-clean-generic \
+	mostlyclean mostlyclean-generic mostlyclean-libtool pdf pdf-am \
+	ps ps-am tags-am uninstall uninstall-am \
+	uninstall-pkgpythonPYTHON
 
 .PRECIOUS: Makefile
 
 
-uninstall-mod:
-	@:
-install-mod:
-	@:
-check-bin:
-	@:
+# dummy
+all: $(BUILT_SOURCE)
 
-### Local Variables:
-### mode: makefile-automake
-### end:
+install-mod:
+
+uninstall-mod:
+
+param.py: $(top_srcdir)/nio/touza_nio_param.h
+	$(SHELL) $(GENPARAM) -o $@ ParamTouzaNio $(top_srcdir)/nio/touza_nio_param.h || rm -f $@
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -17,15 +17,15 @@
 # touza/ami Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 2 2022
-# Time-stamp: <2022/06/27 11:21:10 fuyuki Makefile.am>
+# Time-stamp: <2024/02/02 21:27:00 fuyuki Makefile.am>
 
-# Copyright (C) 2022
+# Copyright (C) 2022,2023,2024
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Thu Jul 20 08:29:01 JST 2023
+# from AX_AM_MACROS_STATIC on Mon Aug 12 06:52:56 JST 2024
 
 
 
@@ -108,14 +108,18 @@ target_triplet = @target@
 # AM_FCFLAGS_DEP = -MD -MP -MF $*.dep
 @gcc_dependencies_TRUE@am__append_2 = $(AM_FCFLAGS_DEP)
 @gcc_dependencies_TRUE@am__append_3 = *.dep
-check_PROGRAMS = test_ami_table$(EXEEXT)
+@with_nctcdf_TRUE@am__append_4 = $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
+check_PROGRAMS = test_ami_table$(EXEEXT) test_ami_utils$(EXEEXT) \
+	test_ami_legacy$(EXEEXT) test_ami_nio$(EXEEXT) \
+	test_ami_miroc$(EXEEXT) test_ami_xform$(EXEEXT)
 subdir = ami
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
 	$(top_srcdir)/std/mt_local.m4 $(top_srcdir)/emu/mt_local.m4 \
 	$(top_srcdir)/cal/mt_local.m4 $(top_srcdir)/trp/mt_local.m4 \
 	$(top_srcdir)/ppp/mt_local.m4 $(top_srcdir)/nio/mt_local.m4 \
-	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/zbt/mt_local.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(include_HEADERS) \
@@ -127,18 +131,38 @@ CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libtouza_local_la_LIBADD =
 am__objects_1 =
-am_libtouza_local_la_OBJECTS = ami_std.lo ami_table.lo \
+am_libtouza_local_la_OBJECTS = ami_std.lo ami_table.lo ami_utils.lo \
+	ami_legacy.lo ami_nio.lo ami_xform.lo ami.lo $(am__objects_1) \
 	$(am__objects_1)
 libtouza_local_la_OBJECTS = $(am_libtouza_local_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+am_test_ami_legacy_OBJECTS = test_ami_legacy-ami_legacy.$(OBJEXT)
+test_ami_legacy_OBJECTS = $(am_test_ami_legacy_OBJECTS)
+am__DEPENDENCIES_1 =
+@with_nctcdf_TRUE@am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1) \
+@with_nctcdf_TRUE@	$(am__DEPENDENCIES_1)
+am__DEPENDENCIES_3 = $(noinst_LTLIBRARIES) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2)
+test_ami_legacy_DEPENDENCIES = $(am__DEPENDENCIES_3)
+am_test_ami_miroc_OBJECTS = test_ami_miroc-ami_miroc.$(OBJEXT)
+test_ami_miroc_OBJECTS = $(am_test_ami_miroc_OBJECTS)
+test_ami_miroc_DEPENDENCIES = $(am__DEPENDENCIES_3)
+am_test_ami_nio_OBJECTS = test_ami_nio-ami_nio.$(OBJEXT)
+test_ami_nio_OBJECTS = $(am_test_ami_nio_OBJECTS)
+test_ami_nio_DEPENDENCIES = $(am__DEPENDENCIES_3)
 am_test_ami_table_OBJECTS = test_ami_table-ami_table.$(OBJEXT)
 test_ami_table_OBJECTS = $(am_test_ami_table_OBJECTS)
-am__DEPENDENCIES_1 =
-am__DEPENDENCIES_2 = $(noinst_LTLIBRARIES) $(am__DEPENDENCIES_1)
-test_ami_table_DEPENDENCIES = $(am__DEPENDENCIES_2)
+test_ami_table_DEPENDENCIES = $(am__DEPENDENCIES_3)
+am_test_ami_utils_OBJECTS = test_ami_utils-ami_utils.$(OBJEXT)
+test_ami_utils_OBJECTS = $(am_test_ami_utils_OBJECTS)
+test_ami_utils_DEPENDENCIES = $(am__DEPENDENCIES_3)
+am_test_ami_xform_OBJECTS = test_ami_xform-ami_xform.$(OBJEXT)
+test_ami_xform_OBJECTS = $(am_test_ami_xform_OBJECTS)
+test_ami_xform_DEPENDENCIES = $(am__DEPENDENCIES_3)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -188,8 +212,16 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libtouza_local_la_SOURCES) $(test_ami_table_SOURCES)
-DIST_SOURCES = $(libtouza_local_la_SOURCES) $(test_ami_table_SOURCES)
+SOURCES = $(libtouza_local_la_SOURCES) \
+	$(EXTRA_libtouza_local_la_SOURCES) $(test_ami_legacy_SOURCES) \
+	$(test_ami_miroc_SOURCES) $(test_ami_nio_SOURCES) \
+	$(test_ami_table_SOURCES) $(test_ami_utils_SOURCES) \
+	$(test_ami_xform_SOURCES)
+DIST_SOURCES = $(libtouza_local_la_SOURCES) \
+	$(EXTRA_libtouza_local_la_SOURCES) $(test_ami_legacy_SOURCES) \
+	$(test_ami_miroc_SOURCES) $(test_ami_nio_SOURCES) \
+	$(test_ami_table_SOURCES) $(test_ami_utils_SOURCES) \
+	$(test_ami_xform_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -330,6 +362,7 @@ FC_INCLUDE_touza_nio = @FC_INCLUDE_touza_nio@
 FC_INCLUDE_touza_ppp = @FC_INCLUDE_touza_ppp@
 FC_INCLUDE_touza_std = @FC_INCLUDE_touza_std@
 FC_INCLUDE_touza_trp = @FC_INCLUDE_touza_trp@
+FC_INCLUDE_touza_zbt = @FC_INCLUDE_touza_zbt@
 FC_LDADD_touza_ami = @FC_LDADD_touza_ami@
 FC_LDADD_touza_cal = @FC_LDADD_touza_cal@
 FC_LDADD_touza_emu = @FC_LDADD_touza_emu@
@@ -337,6 +370,7 @@ FC_LDADD_touza_nio = @FC_LDADD_touza_nio@
 FC_LDADD_touza_ppp = @FC_LDADD_touza_ppp@
 FC_LDADD_touza_std = @FC_LDADD_touza_std@
 FC_LDADD_touza_trp = @FC_LDADD_touza_trp@
+FC_LDADD_touza_zbt = @FC_LDADD_touza_zbt@
 FC_MODEXT = @FC_MODEXT@
 FC_MODINC = @FC_MODINC@
 FC_MODOUT = @FC_MODOUT@
@@ -347,6 +381,7 @@ FC_MODULE_touza_nio = @FC_MODULE_touza_nio@
 FC_MODULE_touza_ppp = @FC_MODULE_touza_ppp@
 FC_MODULE_touza_std = @FC_MODULE_touza_std@
 FC_MODULE_touza_trp = @FC_MODULE_touza_trp@
+FC_MODULE_touza_zbt = @FC_MODULE_touza_zbt@
 FFLAGS = @FFLAGS@
 FGREP = @FGREP@
 FILECMD = @FILECMD@
@@ -403,6 +438,14 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
+PYTHON = @PYTHON@
+PYTHON_BIN = @PYTHON_BIN@
+PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
+PYTHON_INCLUDE_DIR = @PYTHON_INCLUDE_DIR@
+PYTHON_LIB = @PYTHON_LIB@
+PYTHON_PLATFORM = @PYTHON_PLATFORM@
+PYTHON_PREFIX = @PYTHON_PREFIX@
+PYTHON_VERSION = @PYTHON_VERSION@
 RANLIB = @RANLIB@
 REALPATH = @REALPATH@
 SED = @SED@
@@ -411,6 +454,7 @@ SHELL = @SHELL@
 STRIP = @STRIP@
 TOUZA_NAME = @TOUZA_NAME@
 VERSION = @VERSION@
+ZSH = @ZSH@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -440,6 +484,7 @@ builddir_touza_nio = @builddir_touza_nio@
 builddir_touza_ppp = @builddir_touza_ppp@
 builddir_touza_std = @builddir_touza_std@
 builddir_touza_trp = @builddir_touza_trp@
+builddir_touza_zbt = @builddir_touza_zbt@
 datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
@@ -464,9 +509,13 @@ moddir = @moddir@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 pkgconfig_CPPFLAGS = @pkgconfig_CPPFLAGS@
+pkgpyexecdir = @pkgpyexecdir@
+pkgpythondir = @pkgpythondir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pyexecdir = @pyexecdir@
+pythondir = @pythondir@
 runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
@@ -478,6 +527,7 @@ srcdir_touza_nio = @srcdir_touza_nio@
 srcdir_touza_ppp = @srcdir_touza_ppp@
 srcdir_touza_std = @srcdir_touza_std@
 srcdir_touza_trp = @srcdir_touza_trp@
+srcdir_touza_zbt = @srcdir_touza_zbt@
 subdirs_extra = @subdirs_extra@
 switchdir = @switchdir@
 sysconfdir = @sysconfdir@
@@ -500,30 +550,74 @@ AM_CPPFLAGS = -I$(top_srcdir)
 
 # no blank between -MT and NAME
 AM_FCFLAGS_DEP = '-MT$@' -MD -MP -MF $*.dep
-# TEST_COMMON_LIBS	+= $(FC_LDADD_touza_emu)
-AM_FCFLAGS_MODULE = $(FC_MODULE_touza_std)
+AM_FCFLAGS_MODULE = $(FC_MODULE_touza_trp) $(FC_MODULE_touza_nio) \
+	$(FC_MODULE_touza_emu) $(FC_MODULE_touza_std)
 COPY_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=copy-%)
 DIFF_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=diff-%)
-switch_DATA = 
+switch_DATA = ami_miroc.F90
 include_HEADERS = touza_ami.h
 noinst_LTLIBRARIES = libtouza_local.la
-libtouza_local_la_SOURCES = ami_std.F90 ami_table.F90 $(include_HEADERS)
-
-# switch_DATA	+= ami_miroc.F90
-# EXTRA_libtouza_local_la_SOURCES	= ami_miroc.F90
-# libtouza_local_la_SOURCES	+=	$(libtouza_APPENDS)
-# libtouza_APPENDS =
-TEST_COMMON_LIBS = $(noinst_LTLIBRARIES) $(FC_LDADD_touza_std)
+libtouza_local_la_SOURCES = ami_std.F90 ami_table.F90 ami_utils.F90 \
+	ami_legacy.F90 ami_nio.F90 ami_xform.F90 ami.F90 \
+	$(include_HEADERS) $(libtouza_APPENDS)
+libtouza_APPENDS = 
+EXTRA_libtouza_local_la_SOURCES = ami_miroc.F90
+TEST_COMMON_LIBS = $(noinst_LTLIBRARIES) $(FC_LDADD_touza_nio) \
+	$(FC_LDADD_touza_trp) $(FC_LDADD_touza_emu) \
+	$(FC_LDADD_touza_std) $(am__append_4)
 test_ami_table_SOURCES = $(TEST_COMMON_SOURCES) ami_table.F90
 test_ami_table_LDADD = $(TEST_COMMON_LIBS)
 test_ami_table_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_AMI_TABLE=1
-@enable_module_dependencies_TRUE@ami_std_lo_MODULE_DEPS = $(top_builddir)/std/touza_std_prc.$(FC_MODEXT) $(top_builddir)/std/touza_std_utl.$(FC_MODEXT) $(top_builddir)/std/touza_std_log.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(top_builddir)/std/touza_std_env.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@ami_std_o_MODULE_DEPS = $(top_builddir)/std/touza_std_prc.$(FC_MODEXT) $(top_builddir)/std/touza_std_utl.$(FC_MODEXT) $(top_builddir)/std/touza_std_log.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(top_builddir)/std/touza_std_env.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@ami_table_lo_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@ami_table_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(builddir)/touza_ami_table.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_ami_table_ami_table_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(builddir)/touza_ami_table.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_ami_std_mod_MODULE_DEPS = $(top_builddir)/std/touza_std_prc.$(FC_MODEXT) $(top_builddir)/std/touza_std_utl.$(FC_MODEXT) $(top_builddir)/std/touza_std_log.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(top_builddir)/std/touza_std_env.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_ami_table_mod_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT)
+EXTRA_test_ami_table_DEPENDENCIES = $(test_ami_table_LDADD)
+test_ami_utils_SOURCES = $(TEST_COMMON_SOURCES) ami_utils.F90
+test_ami_utils_LDADD = $(TEST_COMMON_LIBS)
+test_ami_utils_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_AMI_UTILS=1
+EXTRA_test_ami_utils_DEPENDENCIES = $(test_ami_utils_LDADD)
+test_ami_legacy_SOURCES = $(TEST_COMMON_SOURCES) ami_legacy.F90
+test_ami_legacy_LDADD = $(TEST_COMMON_LIBS)
+test_ami_legacy_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_AMI_LEGACY=1
+EXTRA_test_ami_legacy_DEPENDENCIES = $(test_ami_legacy_LDADD)
+test_ami_nio_SOURCES = $(TEST_COMMON_SOURCES) ami_nio.F90
+test_ami_nio_LDADD = $(TEST_COMMON_LIBS)
+test_ami_nio_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_AMI_NIO=1
+EXTRA_test_ami_nio_DEPENDENCIES = $(test_ami_nio_LDADD)
+test_ami_miroc_SOURCES = $(TEST_COMMON_SOURCES) ami_miroc.F90
+test_ami_miroc_LDADD = $(TEST_COMMON_LIBS)
+test_ami_miroc_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_AMI_MIROC=1
+EXTRA_test_ami_miroc_DEPENDENCIES = $(test_ami_miroc_LDADD)
+test_ami_xform_SOURCES = $(TEST_COMMON_SOURCES) ami_xform.F90
+test_ami_xform_LDADD = $(TEST_COMMON_LIBS)
+test_ami_xform_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_AMI_XFORM=1
+EXTRA_test_ami_xform_DEPENDENCIES = $(test_ami_xform_LDADD)
+@enable_module_dependencies_TRUE@ami_lo_MODULE_DEPS = $(builddir)/touza_ami_legacy.$(FC_MODEXT) $(builddir)/touza_ami_nio.$(FC_MODEXT) $(builddir)/touza_ami_table.$(FC_MODEXT) $(builddir)/touza_ami_xform.$(FC_MODEXT) $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_o_MODULE_DEPS = $(builddir)/touza_ami_legacy.$(FC_MODEXT) $(builddir)/touza_ami_nio.$(FC_MODEXT) $(builddir)/touza_ami_table.$(FC_MODEXT) $(builddir)/touza_ami_xform.$(FC_MODEXT) $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_legacy_lo_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_legacy_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(builddir)/touza_ami_legacy.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_miroc_o_MODULE_DEPS = $(builddir)/touza_ami_legacy.$(FC_MODEXT) $(builddir)/touza_ami_std.$(FC_MODEXT) $(builddir)/touza_ami_miroc.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_nio_lo_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/nio/touza_nio.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_nio_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/nio/touza_nio.$(FC_MODEXT) $(builddir)/touza_ami_legacy.$(FC_MODEXT) $(builddir)/touza_ami_nio.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_std_lo_MODULE_DEPS = $(top_builddir)/std/touza_std_prc.$(FC_MODEXT) $(top_builddir)/std/touza_std_utl.$(FC_MODEXT) $(top_builddir)/std/touza_std_log.$(FC_MODEXT) $(top_builddir)/std/touza_std_env.$(FC_MODEXT) $(top_builddir)/std/touza_std_fun.$(FC_MODEXT) $(top_builddir)/std/touza_std_sus.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_std_o_MODULE_DEPS = $(top_builddir)/std/touza_std_prc.$(FC_MODEXT) $(top_builddir)/std/touza_std_utl.$(FC_MODEXT) $(top_builddir)/std/touza_std_log.$(FC_MODEXT) $(top_builddir)/std/touza_std_env.$(FC_MODEXT) $(top_builddir)/std/touza_std_fun.$(FC_MODEXT) $(top_builddir)/std/touza_std_sus.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_table_lo_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/emu/touza_emu.$(FC_MODEXT) $(top_builddir)/emu/touza_emu_ugg.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_table_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/emu/touza_emu.$(FC_MODEXT) $(top_builddir)/emu/touza_emu_ugg.$(FC_MODEXT) $(builddir)/touza_ami_table.$(FC_MODEXT) $(top_builddir)/nio/touza_nio.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_utils_lo_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_utils_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(builddir)/touza_ami_utils.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_xform_lo_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ami_xform_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(builddir)/touza_ami_xform.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@test_ami_legacy_ami_legacy_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(builddir)/touza_ami_legacy.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@test_ami_miroc_ami_miroc_o_MODULE_DEPS = $(builddir)/touza_ami_legacy.$(FC_MODEXT) $(builddir)/touza_ami_std.$(FC_MODEXT) $(builddir)/touza_ami_miroc.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@test_ami_nio_ami_nio_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/nio/touza_nio.$(FC_MODEXT) $(builddir)/touza_ami_legacy.$(FC_MODEXT) $(builddir)/touza_ami_nio.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@test_ami_table_ami_table_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/emu/touza_emu.$(FC_MODEXT) $(top_builddir)/emu/touza_emu_ugg.$(FC_MODEXT) $(builddir)/touza_ami_table.$(FC_MODEXT) $(top_builddir)/nio/touza_nio.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@test_ami_utils_ami_utils_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(builddir)/touza_ami_utils.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@test_ami_xform_ami_xform_o_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(builddir)/touza_ami_xform.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_ami_mod_MODULE_DEPS = $(builddir)/touza_ami_legacy.$(FC_MODEXT) $(builddir)/touza_ami_nio.$(FC_MODEXT) $(builddir)/touza_ami_table.$(FC_MODEXT) $(builddir)/touza_ami_xform.$(FC_MODEXT) $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_ami_legacy_mod_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_ami_miroc_mod_MODULE_DEPS = $(builddir)/touza_ami_legacy.$(FC_MODEXT) $(builddir)/touza_ami_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_ami_nio_mod_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/nio/touza_nio.$(FC_MODEXT) $(builddir)/touza_ami_legacy.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_ami_std_mod_MODULE_DEPS = $(top_builddir)/std/touza_std_prc.$(FC_MODEXT) $(top_builddir)/std/touza_std_utl.$(FC_MODEXT) $(top_builddir)/std/touza_std_log.$(FC_MODEXT) $(top_builddir)/std/touza_std_env.$(FC_MODEXT) $(top_builddir)/std/touza_std_fun.$(FC_MODEXT) $(top_builddir)/std/touza_std_sus.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_ami_table_mod_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/emu/touza_emu.$(FC_MODEXT) $(top_builddir)/emu/touza_emu_ugg.$(FC_MODEXT) $(top_builddir)/nio/touza_nio.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_ami_utils_mod_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_ami_xform_mod_MODULE_DEPS = $(builddir)/touza_ami_std.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
 all: all-recursive
 
 .SUFFIXES:
@@ -582,9 +676,29 @@ clean-noinstLTLIBRARIES:
 libtouza_local.la: $(libtouza_local_la_OBJECTS) $(libtouza_local_la_DEPENDENCIES) $(EXTRA_libtouza_local_la_DEPENDENCIES) 
 	$(AM_V_FCLD)$(FCLINK)  $(libtouza_local_la_OBJECTS) $(libtouza_local_la_LIBADD) $(LIBS)
 
+test_ami_legacy$(EXEEXT): $(test_ami_legacy_OBJECTS) $(test_ami_legacy_DEPENDENCIES) $(EXTRA_test_ami_legacy_DEPENDENCIES) 
+	@rm -f test_ami_legacy$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_ami_legacy_OBJECTS) $(test_ami_legacy_LDADD) $(LIBS)
+
+test_ami_miroc$(EXEEXT): $(test_ami_miroc_OBJECTS) $(test_ami_miroc_DEPENDENCIES) $(EXTRA_test_ami_miroc_DEPENDENCIES) 
+	@rm -f test_ami_miroc$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_ami_miroc_OBJECTS) $(test_ami_miroc_LDADD) $(LIBS)
+
+test_ami_nio$(EXEEXT): $(test_ami_nio_OBJECTS) $(test_ami_nio_DEPENDENCIES) $(EXTRA_test_ami_nio_DEPENDENCIES) 
+	@rm -f test_ami_nio$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_ami_nio_OBJECTS) $(test_ami_nio_LDADD) $(LIBS)
+
 test_ami_table$(EXEEXT): $(test_ami_table_OBJECTS) $(test_ami_table_DEPENDENCIES) $(EXTRA_test_ami_table_DEPENDENCIES) 
 	@rm -f test_ami_table$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_ami_table_OBJECTS) $(test_ami_table_LDADD) $(LIBS)
+
+test_ami_utils$(EXEEXT): $(test_ami_utils_OBJECTS) $(test_ami_utils_DEPENDENCIES) $(EXTRA_test_ami_utils_DEPENDENCIES) 
+	@rm -f test_ami_utils$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_ami_utils_OBJECTS) $(test_ami_utils_LDADD) $(LIBS)
+
+test_ami_xform$(EXEEXT): $(test_ami_xform_OBJECTS) $(test_ami_xform_DEPENDENCIES) $(EXTRA_test_ami_xform_DEPENDENCIES) 
+	@rm -f test_ami_xform$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_ami_xform_OBJECTS) $(test_ami_xform_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -601,11 +715,41 @@ distclean-compile:
 .F90.lo:
 	$(AM_V_PPFC)$(LTPPFCCOMPILE) -c -o $@ $<
 
+test_ami_legacy-ami_legacy.o: ami_legacy.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_legacy_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_legacy-ami_legacy.o `test -f 'ami_legacy.F90' || echo '$(srcdir)/'`ami_legacy.F90
+
+test_ami_legacy-ami_legacy.obj: ami_legacy.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_legacy_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_legacy-ami_legacy.obj `if test -f 'ami_legacy.F90'; then $(CYGPATH_W) 'ami_legacy.F90'; else $(CYGPATH_W) '$(srcdir)/ami_legacy.F90'; fi`
+
+test_ami_miroc-ami_miroc.o: ami_miroc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_miroc_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_miroc-ami_miroc.o `test -f 'ami_miroc.F90' || echo '$(srcdir)/'`ami_miroc.F90
+
+test_ami_miroc-ami_miroc.obj: ami_miroc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_miroc_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_miroc-ami_miroc.obj `if test -f 'ami_miroc.F90'; then $(CYGPATH_W) 'ami_miroc.F90'; else $(CYGPATH_W) '$(srcdir)/ami_miroc.F90'; fi`
+
+test_ami_nio-ami_nio.o: ami_nio.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_nio_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_nio-ami_nio.o `test -f 'ami_nio.F90' || echo '$(srcdir)/'`ami_nio.F90
+
+test_ami_nio-ami_nio.obj: ami_nio.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_nio_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_nio-ami_nio.obj `if test -f 'ami_nio.F90'; then $(CYGPATH_W) 'ami_nio.F90'; else $(CYGPATH_W) '$(srcdir)/ami_nio.F90'; fi`
+
 test_ami_table-ami_table.o: ami_table.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_table_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_table-ami_table.o `test -f 'ami_table.F90' || echo '$(srcdir)/'`ami_table.F90
 
 test_ami_table-ami_table.obj: ami_table.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_table_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_table-ami_table.obj `if test -f 'ami_table.F90'; then $(CYGPATH_W) 'ami_table.F90'; else $(CYGPATH_W) '$(srcdir)/ami_table.F90'; fi`
+
+test_ami_utils-ami_utils.o: ami_utils.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_utils_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_utils-ami_utils.o `test -f 'ami_utils.F90' || echo '$(srcdir)/'`ami_utils.F90
+
+test_ami_utils-ami_utils.obj: ami_utils.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_utils_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_utils-ami_utils.obj `if test -f 'ami_utils.F90'; then $(CYGPATH_W) 'ami_utils.F90'; else $(CYGPATH_W) '$(srcdir)/ami_utils.F90'; fi`
+
+test_ami_xform-ami_xform.o: ami_xform.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_xform_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_xform-ami_xform.o `test -f 'ami_xform.F90' || echo '$(srcdir)/'`ami_xform.F90
+
+test_ami_xform-ami_xform.obj: ami_xform.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ami_xform_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ami_xform-ami_xform.obj `if test -f 'ami_xform.F90'; then $(CYGPATH_W) 'ami_xform.F90'; else $(CYGPATH_W) '$(srcdir)/ami_xform.F90'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -1065,7 +1209,31 @@ check-bin-am:$(check_PROGRAMS)
 
 install-data-hook: install-switchDATA
 
+lib-nio:
+	cd ../nio; $(MAKE)
+
 ### automatic dependency
+$(builddir)/ami.lo: $(srcdir)/ami.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/ami.lo: $(ami_lo_MODULE_DEPS)
+
+$(builddir)/ami.o: $(srcdir)/ami.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/ami.o: $(ami_o_MODULE_DEPS)
+
+$(builddir)/ami_legacy.lo: $(srcdir)/ami_legacy.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/ami_legacy.lo: $(ami_legacy_lo_MODULE_DEPS)
+
+$(builddir)/ami_legacy.o: $(srcdir)/ami_legacy.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/ami_legacy.o: $(ami_legacy_o_MODULE_DEPS)
+
+$(builddir)/ami_miroc.o: $(srcdir)/ami_miroc.F90 $(top_builddir)/touza_config.h
+$(builddir)/ami_miroc.o: $(ami_miroc_o_MODULE_DEPS)
+
+$(builddir)/ami_nio.lo: $(srcdir)/ami_nio.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/ami_nio.lo: $(ami_nio_lo_MODULE_DEPS)
+
+$(builddir)/ami_nio.o: $(srcdir)/ami_nio.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/ami_nio.o: $(ami_nio_o_MODULE_DEPS)
+
 $(builddir)/ami_std.lo: $(srcdir)/ami_std.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
 $(builddir)/ami_std.lo: $(ami_std_lo_MODULE_DEPS)
 
@@ -1078,8 +1246,47 @@ $(builddir)/ami_table.lo: $(ami_table_lo_MODULE_DEPS)
 $(builddir)/ami_table.o: $(srcdir)/ami_table.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
 $(builddir)/ami_table.o: $(ami_table_o_MODULE_DEPS)
 
+$(builddir)/ami_utils.lo: $(srcdir)/ami_utils.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/ami_utils.lo: $(ami_utils_lo_MODULE_DEPS)
+
+$(builddir)/ami_utils.o: $(srcdir)/ami_utils.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/ami_utils.o: $(ami_utils_o_MODULE_DEPS)
+
+$(builddir)/ami_xform.lo: $(srcdir)/ami_xform.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/ami_xform.lo: $(ami_xform_lo_MODULE_DEPS)
+
+$(builddir)/ami_xform.o: $(srcdir)/ami_xform.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/ami_xform.o: $(ami_xform_o_MODULE_DEPS)
+
+$(builddir)/test_ami_legacy-ami_legacy.o: $(srcdir)/ami_legacy.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/test_ami_legacy-ami_legacy.o: $(test_ami_legacy_ami_legacy_o_MODULE_DEPS)
+
+$(builddir)/test_ami_miroc-ami_miroc.o: $(srcdir)/ami_miroc.F90 $(top_builddir)/touza_config.h
+$(builddir)/test_ami_miroc-ami_miroc.o: $(test_ami_miroc_ami_miroc_o_MODULE_DEPS)
+
+$(builddir)/test_ami_nio-ami_nio.o: $(srcdir)/ami_nio.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/test_ami_nio-ami_nio.o: $(test_ami_nio_ami_nio_o_MODULE_DEPS)
+
 $(builddir)/test_ami_table-ami_table.o: $(srcdir)/ami_table.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
 $(builddir)/test_ami_table-ami_table.o: $(test_ami_table_ami_table_o_MODULE_DEPS)
+
+$(builddir)/test_ami_utils-ami_utils.o: $(srcdir)/ami_utils.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/test_ami_utils-ami_utils.o: $(test_ami_utils_ami_utils_o_MODULE_DEPS)
+
+$(builddir)/test_ami_xform-ami_xform.o: $(srcdir)/ami_xform.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/test_ami_xform-ami_xform.o: $(test_ami_xform_ami_xform_o_MODULE_DEPS)
+
+$(builddir)/touza_ami.$(FC_MODEXT): $(srcdir)/ami.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/touza_ami.$(FC_MODEXT): $(touza_ami_mod_MODULE_DEPS)
+
+$(builddir)/touza_ami_legacy.$(FC_MODEXT): $(srcdir)/ami_legacy.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/touza_ami_legacy.$(FC_MODEXT): $(touza_ami_legacy_mod_MODULE_DEPS)
+
+$(builddir)/touza_ami_miroc.$(FC_MODEXT): $(srcdir)/ami_miroc.F90 $(top_builddir)/touza_config.h
+$(builddir)/touza_ami_miroc.$(FC_MODEXT): $(touza_ami_miroc_mod_MODULE_DEPS)
+
+$(builddir)/touza_ami_nio.$(FC_MODEXT): $(srcdir)/ami_nio.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/touza_ami_nio.$(FC_MODEXT): $(touza_ami_nio_mod_MODULE_DEPS)
 
 $(builddir)/touza_ami_std.$(FC_MODEXT): $(srcdir)/ami_std.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
 $(builddir)/touza_ami_std.$(FC_MODEXT): $(touza_ami_std_mod_MODULE_DEPS)
@@ -1087,17 +1294,33 @@ $(builddir)/touza_ami_std.$(FC_MODEXT): $(touza_ami_std_mod_MODULE_DEPS)
 $(builddir)/touza_ami_table.$(FC_MODEXT): $(srcdir)/ami_table.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
 $(builddir)/touza_ami_table.$(FC_MODEXT): $(touza_ami_table_mod_MODULE_DEPS)
 
+$(builddir)/touza_ami_utils.$(FC_MODEXT): $(srcdir)/ami_utils.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/touza_ami_utils.$(FC_MODEXT): $(touza_ami_utils_mod_MODULE_DEPS)
+
+$(builddir)/touza_ami_xform.$(FC_MODEXT): $(srcdir)/ami_xform.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ami.h $(top_srcdir)/touza.h
+$(builddir)/touza_ami_xform.$(FC_MODEXT): $(touza_ami_xform_mod_MODULE_DEPS)
+
 $(srcdir)/touza_ami.h: 
+
+$(top_builddir)/emu/touza_emu.$(FC_MODEXT): 
+
+$(top_builddir)/emu/touza_emu_ugg.$(FC_MODEXT): 
+
+$(top_builddir)/nio/touza_nio.$(FC_MODEXT): 
 
 $(top_builddir)/std/touza_std.$(FC_MODEXT): 
 
 $(top_builddir)/std/touza_std_env.$(FC_MODEXT): 
+
+$(top_builddir)/std/touza_std_fun.$(FC_MODEXT): 
 
 $(top_builddir)/std/touza_std_log.$(FC_MODEXT): 
 
 $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT): 
 
 $(top_builddir)/std/touza_std_prc.$(FC_MODEXT): 
+
+$(top_builddir)/std/touza_std_sus.$(FC_MODEXT): 
 
 $(top_builddir)/std/touza_std_utl.$(FC_MODEXT): 
 

@@ -17,15 +17,16 @@
 # touza/emu Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 15 2020
-# Time-stamp: <2022/06/27 11:20:59 fuyuki Makefile.am>
+# Time-stamp: <2024/07/04 17:25:51 fuyuki Makefile.am>
 
-# Copyright (C) 2020, 2021, 2022
+# Copyright (C) 2020-2024
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Thu Jul 20 08:29:01 JST 2023
+# from AX_AM_MACROS_STATIC on Mon Aug 12 06:52:56 JST 2024
+
 
 
 
@@ -108,14 +109,17 @@ target_triplet = @target@
 # AM_FCFLAGS_DEP = -MD -MP -MF $*.dep
 @gcc_dependencies_TRUE@am__append_2 = $(AM_FCFLAGS_DEP)
 @gcc_dependencies_TRUE@am__append_3 = *.dep
-check_PROGRAMS = test_emu_msg$(EXEEXT) test_emu_usi$(EXEEXT)
+@MAINTAINER_MODE_TRUE@am__append_4 = wrap-ugg.sh demo_stp.sh.in
+check_PROGRAMS = test_emu_msg$(EXEEXT) test_emu_usi$(EXEEXT) \
+	test_emu_ugg$(EXEEXT)
 subdir = emu
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
 	$(top_srcdir)/std/mt_local.m4 $(top_srcdir)/emu/mt_local.m4 \
 	$(top_srcdir)/cal/mt_local.m4 $(top_srcdir)/trp/mt_local.m4 \
 	$(top_srcdir)/ppp/mt_local.m4 $(top_srcdir)/nio/mt_local.m4 \
-	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/zbt/mt_local.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(include_HEADERS) \
@@ -127,7 +131,7 @@ CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libtouza_local_la_LIBADD =
 am__objects_1 =
-am_libtouza_local_la_OBJECTS = emu_usi.lo emu_rpx.lo emu.lo \
+am_libtouza_local_la_OBJECTS = emu_usi.lo emu_rpx.lo emu_ugg.lo emu.lo \
 	$(am__objects_1)
 libtouza_local_la_OBJECTS = $(am_libtouza_local_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -139,9 +143,13 @@ test_emu_msg_OBJECTS = $(am_test_emu_msg_OBJECTS)
 am__DEPENDENCIES_1 =
 am__DEPENDENCIES_2 = $(noinst_LTLIBRARIES) $(am__DEPENDENCIES_1)
 test_emu_msg_DEPENDENCIES = $(am__DEPENDENCIES_2)
+am_test_emu_ugg_OBJECTS = test_emu_ugg-emu_ugg.$(OBJEXT)
+test_emu_ugg_OBJECTS = $(am_test_emu_ugg_OBJECTS)
+test_emu_ugg_DEPENDENCIES = $(am__DEPENDENCIES_2)
 am_test_emu_usi_OBJECTS = test_emu_usi-emu_usi.$(OBJEXT)
 test_emu_usi_OBJECTS = $(am_test_emu_usi_OBJECTS)
 test_emu_usi_DEPENDENCIES = $(am__DEPENDENCIES_2)
+SCRIPTS = $(noinst_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -193,10 +201,10 @@ am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libtouza_local_la_SOURCES) \
 	$(EXTRA_libtouza_local_la_SOURCES) $(test_emu_msg_SOURCES) \
-	$(test_emu_usi_SOURCES)
+	$(test_emu_ugg_SOURCES) $(test_emu_usi_SOURCES)
 DIST_SOURCES = $(libtouza_local_la_SOURCES) \
 	$(EXTRA_libtouza_local_la_SOURCES) $(test_emu_msg_SOURCES) \
-	$(test_emu_usi_SOURCES)
+	$(test_emu_ugg_SOURCES) $(test_emu_usi_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -337,6 +345,7 @@ FC_INCLUDE_touza_nio = @FC_INCLUDE_touza_nio@
 FC_INCLUDE_touza_ppp = @FC_INCLUDE_touza_ppp@
 FC_INCLUDE_touza_std = @FC_INCLUDE_touza_std@
 FC_INCLUDE_touza_trp = @FC_INCLUDE_touza_trp@
+FC_INCLUDE_touza_zbt = @FC_INCLUDE_touza_zbt@
 FC_LDADD_touza_ami = @FC_LDADD_touza_ami@
 FC_LDADD_touza_cal = @FC_LDADD_touza_cal@
 FC_LDADD_touza_emu = @FC_LDADD_touza_emu@
@@ -344,6 +353,7 @@ FC_LDADD_touza_nio = @FC_LDADD_touza_nio@
 FC_LDADD_touza_ppp = @FC_LDADD_touza_ppp@
 FC_LDADD_touza_std = @FC_LDADD_touza_std@
 FC_LDADD_touza_trp = @FC_LDADD_touza_trp@
+FC_LDADD_touza_zbt = @FC_LDADD_touza_zbt@
 FC_MODEXT = @FC_MODEXT@
 FC_MODINC = @FC_MODINC@
 FC_MODOUT = @FC_MODOUT@
@@ -354,6 +364,7 @@ FC_MODULE_touza_nio = @FC_MODULE_touza_nio@
 FC_MODULE_touza_ppp = @FC_MODULE_touza_ppp@
 FC_MODULE_touza_std = @FC_MODULE_touza_std@
 FC_MODULE_touza_trp = @FC_MODULE_touza_trp@
+FC_MODULE_touza_zbt = @FC_MODULE_touza_zbt@
 FFLAGS = @FFLAGS@
 FGREP = @FGREP@
 FILECMD = @FILECMD@
@@ -410,6 +421,14 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
+PYTHON = @PYTHON@
+PYTHON_BIN = @PYTHON_BIN@
+PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
+PYTHON_INCLUDE_DIR = @PYTHON_INCLUDE_DIR@
+PYTHON_LIB = @PYTHON_LIB@
+PYTHON_PLATFORM = @PYTHON_PLATFORM@
+PYTHON_PREFIX = @PYTHON_PREFIX@
+PYTHON_VERSION = @PYTHON_VERSION@
 RANLIB = @RANLIB@
 REALPATH = @REALPATH@
 SED = @SED@
@@ -418,6 +437,7 @@ SHELL = @SHELL@
 STRIP = @STRIP@
 TOUZA_NAME = @TOUZA_NAME@
 VERSION = @VERSION@
+ZSH = @ZSH@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -447,6 +467,7 @@ builddir_touza_nio = @builddir_touza_nio@
 builddir_touza_ppp = @builddir_touza_ppp@
 builddir_touza_std = @builddir_touza_std@
 builddir_touza_trp = @builddir_touza_trp@
+builddir_touza_zbt = @builddir_touza_zbt@
 datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
@@ -471,9 +492,13 @@ moddir = @moddir@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 pkgconfig_CPPFLAGS = @pkgconfig_CPPFLAGS@
+pkgpyexecdir = @pkgpyexecdir@
+pkgpythondir = @pkgpythondir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+pyexecdir = @pyexecdir@
+pythondir = @pythondir@
 runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
@@ -485,6 +510,7 @@ srcdir_touza_nio = @srcdir_touza_nio@
 srcdir_touza_ppp = @srcdir_touza_ppp@
 srcdir_touza_std = @srcdir_touza_std@
 srcdir_touza_trp = @srcdir_touza_trp@
+srcdir_touza_zbt = @srcdir_touza_zbt@
 subdirs_extra = @subdirs_extra@
 switchdir = @switchdir@
 sysconfdir = @sysconfdir@
@@ -496,10 +522,10 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-EXTRA_DIST = README-emu.org
+EXTRA_DIST = README-emu.org ggf agmp
 SUBDIRS = .
 BUILD_AUX = $(top_srcdir)/build-aux
-CLEANFILES = 
+CLEANFILES = $(noinst_SCRIPTS)
 MOSTLYCLEANFILES = $(am__append_1) $(am__append_3)
 LIST_MODFILES = .modfiles
 DEBUG = 
@@ -513,8 +539,10 @@ DIFF_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=diff-%)
 switch_DATA = 
 include_HEADERS = touza_emu.h
 noinst_LTLIBRARIES = libtouza_local.la
-libtouza_local_la_SOURCES = emu_usi.F90 emu_rpx.F90 emu.F90 $(include_HEADERS)
+libtouza_local_la_SOURCES = emu_usi.F90 emu_rpx.F90 emu_ugg.F90 \
+	emu.F90 $(include_HEADERS)
 EXTRA_libtouza_local_la_SOURCES = emu_msg.F90
+noinst_SCRIPTS = $(am__append_4)
 TEST_COMMON_LIBS = $(noinst_LTLIBRARIES) $(FC_LDADD_touza_std)
 test_emu_usi_SOURCES = emu_usi.F90
 test_emu_usi_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_USI=1
@@ -522,6 +550,9 @@ test_emu_usi_LDADD = $(TEST_COMMON_LIBS)
 test_emu_msg_SOURCES = emu_msg.F90
 test_emu_msg_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_MSG=1
 test_emu_msg_LDADD = $(TEST_COMMON_LIBS)
+test_emu_ugg_SOURCES = emu_ugg.F90
+test_emu_ugg_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_UGG=1
+test_emu_ugg_LDADD = $(TEST_COMMON_LIBS)
 @enable_module_dependencies_TRUE@emu_lo_MODULE_DEPS = $(builddir)/touza_emu_usi.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@emu_o_MODULE_DEPS = $(builddir)/touza_emu_usi.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@emu_msg_o_MODULE_DEPS = $(top_builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/touza_emu_msg.$(FC_MODEXT)
@@ -594,6 +625,10 @@ test_emu_msg$(EXEEXT): $(test_emu_msg_OBJECTS) $(test_emu_msg_DEPENDENCIES) $(EX
 	@rm -f test_emu_msg$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_emu_msg_OBJECTS) $(test_emu_msg_LDADD) $(LIBS)
 
+test_emu_ugg$(EXEEXT): $(test_emu_ugg_OBJECTS) $(test_emu_ugg_DEPENDENCIES) $(EXTRA_test_emu_ugg_DEPENDENCIES) 
+	@rm -f test_emu_ugg$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_emu_ugg_OBJECTS) $(test_emu_ugg_LDADD) $(LIBS)
+
 test_emu_usi$(EXEEXT): $(test_emu_usi_OBJECTS) $(test_emu_usi_DEPENDENCIES) $(EXTRA_test_emu_usi_DEPENDENCIES) 
 	@rm -f test_emu_usi$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_emu_usi_OBJECTS) $(test_emu_usi_LDADD) $(LIBS)
@@ -618,6 +653,12 @@ test_emu_msg-emu_msg.o: emu_msg.F90
 
 test_emu_msg-emu_msg.obj: emu_msg.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_msg_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_msg-emu_msg.obj `if test -f 'emu_msg.F90'; then $(CYGPATH_W) 'emu_msg.F90'; else $(CYGPATH_W) '$(srcdir)/emu_msg.F90'; fi`
+
+test_emu_ugg-emu_ugg.o: emu_ugg.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_ugg_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_ugg-emu_ugg.o `test -f 'emu_ugg.F90' || echo '$(srcdir)/'`emu_ugg.F90
+
+test_emu_ugg-emu_ugg.obj: emu_ugg.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_ugg_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_ugg-emu_ugg.obj `if test -f 'emu_ugg.F90'; then $(CYGPATH_W) 'emu_ugg.F90'; else $(CYGPATH_W) '$(srcdir)/emu_ugg.F90'; fi`
 
 test_emu_usi-emu_usi.o: emu_usi.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_usi_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_usi-emu_usi.o `test -f 'emu_usi.F90' || echo '$(srcdir)/'`emu_usi.F90
@@ -832,7 +873,7 @@ distdir-am: $(DISTFILES)
 check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: check-recursive
-all-am: Makefile $(LTLIBRARIES) $(DATA) $(HEADERS)
+all-am: Makefile $(LTLIBRARIES) $(SCRIPTS) $(DATA) $(HEADERS)
 installdirs: installdirs-recursive
 installdirs-am:
 	for dir in "$(DESTDIR)$(switchdir)" "$(DESTDIR)$(includedir)"; do \
@@ -1082,6 +1123,14 @@ check-bin: check-bin-recursive
 check-bin-am:$(check_PROGRAMS)
 
 install-data-hook: install-switchDATA
+
+wrap-ugg.sh: wrap-ugg.sh.in
+	sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@
+	chmod +x $@
+
+demo_stp.sh: demo_stp.sh.in
+	sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@
+	chmod +x $@
 
 ### automatic dependency
 $(builddir)/emu.lo: $(srcdir)/emu.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_emu.h $(top_srcdir)/std/touza_std.h $(top_srcdir)/touza.h
