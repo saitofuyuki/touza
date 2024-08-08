@@ -1,10 +1,10 @@
 !!!_! nio_control.F90 - TOUZA/Nio control center
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 12 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/08 13:18:05 fuyuki nio_control.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/07/26 16:50:18 fuyuki nio_control.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023
+! Copyright (C) 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -14,6 +14,7 @@
 #  include "touza_config.h"
 #endif
 #include "touza_nio.h"
+#include "touza_nio_param.h"
 #ifndef   OPT_NIO_CTRL_SIZE
 #  define OPT_NIO_CTRL_SIZE 512
 #endif
@@ -21,7 +22,7 @@
 module TOUZA_Nio_control
 !!!_ = declaration
   use TOUZA_Nio_std,only: KI32, KI64, KDBL, KFLT, KIOFS
-  use TOUZA_Nio_std,only: get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Nio_std,only: get_logu,    unit_global,   trace_fine,   trace_control
   use TOUZA_Nio_header, nh_init=>init, nh_diag=>diag, nh_finalize=>finalize
   implicit none
   private
@@ -30,14 +31,20 @@ module TOUZA_Nio_control
   integer,parameter,public :: nio_format_std   = 1   ! standard Nio format, MIROC/gtool-3.5 compatible
   integer,parameter,public :: nio_format_ext   = 2   ! extended Nio format
 
-  integer,parameter,public :: enable_cache      = 1    ! enable cache-mode
-  integer,parameter,public :: enable_sequential = 2    ! enable sequential-mode
+  ! integer,parameter,public :: enable_cache      = 1    ! enable cache-mode
+  ! integer,parameter,public :: enable_sequential = 2    ! enable sequential-mode
+  ! integer,parameter,public :: enable_auto       = 4    ! enable auto detection
+  integer,parameter,public :: enable_cache      = NIO_CONTROL_ENABLE_CACHE      ! enable cache-mode
+  integer,parameter,public :: enable_sequential = NIO_CONTROL_ENABLE_SEQUENTIAL ! enable sequential-mode
+  integer,parameter,public :: enable_auto       = NIO_CONTROL_ENABLE_AUTO       ! enable auto detection
+
+  character(len=*),parameter,public :: seps_file_item = '/?'   ! separators between file and item
 
   ! integer,parameter,public :: flag_default = enable_cache + enable_sequential
   integer,parameter,public :: flag_default = enable_cache
   !     embedded cache    no embedded cache
   ! 01    cache                cache
-  ! 10    seqeuntial           sequential
+  ! 10    sequential           sequential
   ! 11    cache                sequential
 !!!_  - private parameter
 !!!_  - control tables
@@ -345,7 +352,7 @@ contains
     integer,         intent(in)  :: flag
     integer,optional,intent(in)  :: unit
     integer f
-    integer ch, stt, m
+    integer ch, m
     logical bcache, bseq
 
     ierr = err_default
@@ -421,10 +428,10 @@ contains
 !!!_  - nio_search
   subroutine nio_search_d &
        & (ierr,   status, &
-       &  handle, item,   timel, timeh, func, iniv, inir, group)
+       &  handle, item,   timel, timeh, func, iniv, inir)
     use TOUZA_Nio_std,only: KTGT=>KDBL
     use TOUZA_Nio_std,only: choice
-    use TOUZA_Nio_cache,only: cache_var_id, cache_rec_id, gid_suite
+    use TOUZA_Nio_cache,only: cache_var_id, cache_time_rec, grp_suite
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: status        ! current status
@@ -432,7 +439,6 @@ contains
     character(len=*),intent(in)  :: item
     real(kind=KTGT), intent(in)  :: timel, timeh
     integer,optional,intent(in)  :: iniv,  inir   ! search initialization flag
-    integer,optional,intent(in)  :: group
     interface
        logical function func(dstr, tstr, timel, timeh)
          use TOUZA_Nio_std,only: KTGT=>KDBL
@@ -444,7 +450,7 @@ contains
     end interface
 
     real(kind=KTGT) :: tl, th
-    integer b, ch, gid, vid, rid
+    integer b, ch, vid, rid
 
     ierr = 0
     tl = nio_time_repl(timel, -HUGE(timel))
@@ -455,9 +461,8 @@ contains
     if (ierr.eq.0) then
        ch = is_cache_bind(b)
        if (ch.ge.0) then
-          gid = choice(gid_suite, group)
-          vid = cache_var_id(item, ch, gid, iniv)
-          rid = cache_rec_id(ch, gid, vid, tl, th, func, inir)
+          vid = cache_var_id(item, ch, iniv)
+          rid = cache_time_rec(ch, vid, tl, th, func, inir)
           status = rid
        else
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)

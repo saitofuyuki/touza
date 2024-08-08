@@ -1,7 +1,7 @@
 /* test_nio_bindc.c - test TOUZA/Nio bind(c) interfaces */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Feb 16 2023 */
-/* Time-stamp: <2023/03/19 14:16:02 fuyuki test_nio_bindc.c> */
+/* Time-stamp: <2024/02/25 09:27:19 fuyuki test_nio_bindc.c> */
 /* Copyright (C) 2023 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -19,9 +19,10 @@ int main (int argc, char **argv)
   int mode = MODE_DEEPEST;
   int levv = -1;
   int j;
-  int krect, nioh;
+  int krect, nioh, grph;
   int jg, ngrps;
   int jv, nvars;
+  char grp[64];
   char var[64];
   int jd, nd;
   int dims[3];
@@ -45,23 +46,43 @@ int main (int argc, char **argv)
       printf("  groups: %d\n", ngrps);
       for (jg = 0; jg < ngrps; jg++)
         {
-          nvars = tnb_group_vars(nioh, jg);
-          nrecs = tnb_group_recs(nioh, jg);
+          grph = tnb_group(nioh, jg);
+          tnb_group_name(grp, grph);
+          printf("  group[%d]: %d %s\n", jg, grph, grp);
+          nvars = tnb_group_vars(grph);
+          nrecs = tnb_group_recs(grph);
           printf("  vars[%d]: %d\n", jg, nvars);
           printf("  recs[%d]: %d\n", jg, nrecs);
-          ierr = tnb_get_attr(attr, "UTIM", nioh, jg, -1, -1);
+          ierr = tnb_get_attr(attr, "UTIM", grph, -1, -1);
           printf("  utime[%d]: %s\n", jg, attr);
           for (jv = 0; jv < nvars; jv++)
             {
-              tnb_var_name(var, nioh, jg, jv);
+              tnb_var_name(var, grph, jv);
               printf("    var[%d]: %s\n", jv, var);
-              nd = tnb_var_nco(nioh, jg, jv);
+              nd = tnb_co_size(grph, jv);
               for (jd = 0; jd < nd; jd++)
                 {
-                  tnb_co_name(co, nioh, jg, jv, jd);
-                  dims[jd] = tnb_co_size(nioh, jg, jv, jd);
+                  tnb_co_name(co, grph, jv, jd);
+                  dims[jd] = tnb_co_len(grph, jv, jd);
                   printf("      dim[%d]: %d %s\n", jd, dims[jd], co);
                 }
+            }
+        }
+      grph = nioh;
+      nvars = tnb_group_vars(grph);
+      printf("  vars[suite]: %d\n", nvars);
+      for (jv = 0; jv < nvars; jv++)
+        {
+          tnb_var_name(var, grph, jv);
+          nrecs = tnb_var_recs(grph, jv);
+          tnb_var_name(var, grph, jv);
+          printf("    var[%d]: %d %s\n", jv, nrecs, var);
+          nd = tnb_co_size(grph, jv);
+          for (jd = 0; jd < nd; jd++)
+            {
+              tnb_co_name(co, grph, jv, jd);
+              dims[jd] = tnb_co_len(grph, jv, jd);
+              printf("      dim[%d]: %d %s\n", jd, dims[jd], co);
             }
         }
     }

@@ -3,14 +3,14 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Nov 24 2021
-# Time-stamp: <2023/07/05 22:46:55 fuyuki configure.ac>
+# Time-stamp: <2024/06/20 08:33:58 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
-AC_INIT([touza-jmz],[1.3.0],[saitofuyuki@jamstec.go.jp])
+AC_INIT([touza-jmz],[1.3.9],[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
-Copyright (C) 2022,2023 Japan Agency for Marine-Earth Science and Technology
+Copyright (C) 2022,2023,2024 Japan Agency for Marine-Earth Science and Technology
 
 This is TOUZA/Jmz (Ji-Mo-Tsu), a collection of sample programs using TOUZA.
 
@@ -109,6 +109,12 @@ AM_CONDITIONAL([with_nctcdf], [test x"[$]use_nctcdf" = xyes])
 AS_IF([test x"[$]use_nctcdf" = xyes],
       [AC_DEFINE([OPT_WITH_NCTCDF], [1], [build with TOUZA/Nio/nctcdf])])
 
+AC_ARG_ENABLE([emulates],
+[AS_HELP_STRING([--enable-emulates], [enable gtool-3.5 compatible gt* commands @<:@default=yes@:>@])],
+ [use_emulates=$enableval],
+ [use_emulates=yes])
+
+AM_CONDITIONAL([with_emulates], [test x"[$]use_emulates" != xno])
 
 AM_PATH_PYTHON([3.9], , [:])
 AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
@@ -116,5 +122,6 @@ AX_PYTHON()
 AX_PYTHON_MODULE([pyparsing], , [python3])
 
 AC_PATH_PROGS([ZSH], [zsh], [:])
+AC_PATH_PROGS([TR], [tr], [:])
 
 AC_OUTPUT

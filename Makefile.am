@@ -1,9 +1,9 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2023/07/05 19:08:59 fuyuki Makefile.am>
+# Time-stamp: <2024/07/24 15:47:34 fuyuki Makefile.am>
 
-# Copyright (C) 2020-2023
+# Copyright (C) 2020-2024
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
@@ -13,7 +13,11 @@ ACLOCAL_AMFLAGS	=	-I m4c
 EXTRA_DIST	=	autogen.sh README-touza.org LICENSE NOTICE
 include $(top_srcdir)/aminclude_static.am
 
-lib@TOUZA_NAME@_la_LDFLAGS = -version-info 1:2:0
+include_HEADERS		= touza.h $(CONFIG_HEADER)
+lib_LTLIBRARIES 	= lib@TOUZA_NAME@.la
+lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
+lib@TOUZA_NAME@_la_LDFLAGS = -version-info 1:3:0
+lib@TOUZA_NAME@_la_LDFLAGS += $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 
 noinst_SCRIPTS 	= makeshift
 CLEANFILES += $(noinst_bin_SCRIPTS)
@@ -66,16 +70,16 @@ lib@TOUZA_NAME@_la_LIBADD += ami/$(local_name)
 AM_FCFLAGS_MODULE         += $(FC_MODULE_touza_ami)
 endif
 
+if BUILD_zbt
+SUBDIRS += zbt
+endif
+
 pkgconfigdir	=	$(libdir)/pkgconfig
-pkgconfig_DATA	=	touza.pc
+pkgconfig_DATA	=	@TOUZA_NAME@.pc
 
 SUBDIRS	+=	m4c
 
 SUBDIRS	+=	. $(subdirs_extra)
-
-include_HEADERS		= touza.h $(CONFIG_HEADER)
-lib_LTLIBRARIES 	= lib@TOUZA_NAME@.la
-lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
 
 local_name			= libtouza_local.la
 

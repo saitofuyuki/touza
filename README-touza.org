@@ -110,6 +110,6 @@ please manually remove the quotation, such as:
 : NETCDF4_LDFLAGS = -L/usr/lib/x86_64-linux-gnu/hdf5/serial -L/usr/lib/x86_64-linux-gnu
 
 * Copyright and license
-Copyright 2020-2023 Japan Agency for Marine-Earth Science and Technology
+Copyright 2020-2024 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)

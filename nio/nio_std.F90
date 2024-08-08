@@ -1,10 +1,10 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/25 09:34:39 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/08/01 11:27:10 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022, 2023
+! Copyright (C) 2021, 2022, 2023, 2024
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -20,12 +20,14 @@ module TOUZA_Nio_std
 !!!_  - modules
   use TOUZA_Std,only: KI32,             KI64,           KDBL,             KFLT
   use TOUZA_Std,only: choice,           choice_a,       condop,           upcase
+  use TOUZA_Std,only: set_if_present
   use TOUZA_Std,only: control_deep,     control_mode,   is_first_force,   parse_number
-  use TOUZA_Std,only: split_list,       join_list
+  use TOUZA_Std,only: split_list,       join_list,      find_first
   use TOUZA_Std,only: is_msglev
   use TOUZA_Std,only: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
-  use TOUZA_Std,only: is_msglev_severe, is_msglev_fatal
+  use TOUZA_Std,only: is_msglev_severe, is_msglev_fatal,is_msglev_warning
   use TOUZA_Std,only: get_logu,         unit_global,    trace_fine,       trace_control
+  use TOUZA_Std,only: trace_err
   use TOUZA_Std,only: is_error_match
   use TOUZA_Std,only: KIOFS
   use TOUZA_Std,only: nc_strm,          nbits_byte
@@ -35,6 +37,7 @@ module TOUZA_Nio_std
   use TOUZA_Std,only: endian_BIG,       endian_LITTLE,  endian_OTHER
   use TOUZA_Std,only: is_eof_ss
   use TOUZA_Std,only: new_unit,         search_from_last
+  use TOUZA_Std,only: is_file_opened
   use TOUZA_Std,only: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
   use TOUZA_Std,only: sus_open,         sus_close
   use TOUZA_Std,only: sus_write_irec,   sus_read_irec,  sus_skip_irec,    sus_pad_irec
@@ -49,6 +52,8 @@ module TOUZA_Nio_std
   use TOUZA_Std,only: max_members,      is_irec_overflow, sus_record_mems_irec
   use TOUZA_Std,only: def_block,        ignore_small,     ignore_bigger,  ignore_always
   use TOUZA_Std,only: sus_is_status_new
+  use TOUZA_Std,only: set_slice_loop,   init_offset,      next_offset,    set_runl_loop
+  use TOUZA_Std,only: debug_status
   use TOUZA_Std,only: new_htable,       reg_entry,        query_status
 !!!_  - default
   implicit none
@@ -78,12 +83,14 @@ module TOUZA_Nio_std
 !!!_   . TOUZA_Std
   public :: KI32,             KI64,           KDBL,             KFLT
   public :: choice,           choice_a,       condop,           upcase
+  public :: set_if_present
   public :: control_deep,     control_mode,   is_first_force,   parse_number
-  public :: split_list,       join_list
+  public :: split_list,       join_list,      find_first
   public :: is_msglev
   public :: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
-  public :: is_msglev_severe, is_msglev_fatal
+  public :: is_msglev_severe, is_msglev_fatal,is_msglev_warning
   public :: get_logu,         unit_global,    trace_fine,       trace_control
+  public :: trace_err
   public :: is_error_match
   public :: KIOFS
   public :: nc_strm,          nbits_byte
@@ -93,6 +100,7 @@ module TOUZA_Nio_std
   public :: endian_BIG,       endian_LITTLE,  endian_OTHER
   public :: is_eof_ss
   public :: new_unit,         search_from_last
+  public :: is_file_opened
   public :: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
   public :: sus_open,         sus_close
   public :: sus_write_irec,   sus_read_irec,  sus_skip_irec,    sus_pad_irec
@@ -107,12 +115,15 @@ module TOUZA_Nio_std
   public :: max_members,      is_irec_overflow, sus_record_mems_irec
   public :: def_block,        ignore_small,     ignore_bigger,  ignore_always
   public :: sus_is_status_new
+  public :: set_slice_loop,   init_offset,      next_offset,    set_runl_loop
+  public :: debug_status
   public :: new_htable,       reg_entry,        query_status
 contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
-    use TOUZA_Std,only: env_init, sus_init, bld_init, htb_init
+    ! use TOUZA_Std,only: env_init
+    use TOUZA_Std,only: sus_init, bld_init, htb_init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -135,8 +146,8 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           lev_stdv = choice(lev_stdv, stdv)
+          ! if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm) ! included by TOUZA_Std_sus
           if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
-          if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call sus_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call htb_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
        endif
@@ -148,7 +159,8 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std,only: env_diag, sus_diag, bld_diag, htb_diag
+    ! use TOUZA_Std,only: env_diag
+    use TOUZA_Std,only: sus_diag, bld_diag, htb_diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -172,8 +184,8 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
+          ! if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call bld_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
-          if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call sus_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call htb_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
        endif
@@ -184,7 +196,8 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std,only: env_finalize, sus_finalize, bld_finalize, htb_finalize
+    ! use TOUZA_Std,only: env_finalize
+    use TOUZA_Std,only: sus_finalize, bld_finalize, htb_finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -205,8 +218,8 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
+          ! if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call bld_finalize(ierr, utmp, lev_stdv, mode=lmd)
-          if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call sus_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call htb_finalize(ierr, utmp, lev_stdv, mode=lmd)
        endif

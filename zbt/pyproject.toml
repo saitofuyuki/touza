@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+# requires = ["hatchling"]
+# build-backend = "hatchling.build"
+
+[project]
+name = "TOUZA-Zbt"
+version = "0.1"
+authors = [{name="SAITO Fuyuki", email="saitofuyuki@jamstec.go.jp"}, ]
+description = "Python extensions with TOUZA"
+readme = {file = "README-zbt.org", content-type = "text/plain"}
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+# dynamic = ["version"]
+
+dependencies = [
+    "numpy", "matplotlib", "xarray",
+]
+
+[tool.setuptools]
+packages = ["zbt"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["zbt"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["draft"]
+
+[project.urls]
+Homepage = "https://github.com/saitofuyuki/touza"
+Issues = "https://github.com/saitofuyuki/touza/issues"
+
+[project.entry-points."xarray.backends"]
+zbt = "zbt.xrnio:xrNioBackendEntrypoint"
+
+[project.scripts]
+zbcont = "zbt.zbcont:_driver"

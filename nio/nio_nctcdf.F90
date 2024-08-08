@@ -1,7 +1,7 @@
 !!!_! nio_nctcdf.F90 - TOUZA/Nio nanchatte netcdf interface
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 28 2022
-#define TIME_STAMP 'Time-stamp: <2023/06/01 21:32:52 fuyuki nio_nctcdf.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/02/02 09:48:46 fuyuki nio_nctcdf.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -322,7 +322,7 @@ contains
 
     integer istt
     integer ncid, varid
-    character(len=litem) :: hitm, htim
+    character(len=litem) :: hitm
     integer ofs(3)
     integer itime(1)
 
