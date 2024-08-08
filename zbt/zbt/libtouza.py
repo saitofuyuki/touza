@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/07/30 07:38:13 fuyuki libtouza.py>
+# Time-stamp: <2024/08/02 07:21:50 fuyuki libtouza.py>
 
 __doc__ = \
     """
@@ -86,6 +86,11 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                                (CT.c_int, self.intent_in, 'flag',
                                 self.NIO_CACHE_COLL_DEFAULT, ),
                                err=self.errcheck_handle)
+        # extern int tnb_file_open(const char *path, const int flag);
+        self.register_function("tnb_file_is_opened",
+                               CT.c_int,
+                               (util.AutoString, self.intent_in, 'path',),
+                               err=None)
         # extern int tnb_file_diag(const int handle, const int lev);
         self.register_function("tnb_file_diag",
                                CT.c_int,
@@ -398,6 +403,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
     @staticmethod
     def errcheck_format(result, _func, _args):
         """Result checker for format."""
+        # print(f'format: {result} {_args}')
         return result >= 0
 
     @staticmethod
