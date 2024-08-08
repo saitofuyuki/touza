@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2024/02/27 08:46:35 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/08/01 09:48:04 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020,2021,2022,2023,2024
@@ -74,7 +74,7 @@ module TOUZA_Std_fun
   public new_unit
   public new_unit_tmp, set_tempfile
   public set_tmptmpl
-  public is_file_exist, is_unit_opened
+  public is_file_exist, is_unit_opened, is_file_opened
 !!!_ + common interfaces
 contains
 !!!_  & init
@@ -463,6 +463,39 @@ contains
   end subroutine open_scratch
 
 !!!_ + inquire wrappers
+!!!_  & is_file_opened() - return connected unit or negative value
+  integer function is_file_opened &
+       & (file, iostat, iomsg) &
+       & result(u)
+    implicit none
+    character(len=*),intent(in)           :: file
+    integer,         intent(out),optional :: iostat
+    character(len=*),intent(out),optional :: iomsg
+    integer jerr
+#if HAVE_FORTRAN_OPEN_IOMSG
+    inquire(FILE=file, NUMBER=u, IOSTAT=jerr, IOMSG=iomsg)
+    if (jerr.ne.0) then
+       u = min(-1, jerr)
+    endif
+    if (present(iostat)) then
+       iostat = jerr
+    endif
+#else  /* not HAVE_FORTRAN_OPEN_IOMSG */
+    inquire(FILE=file, NUMBER=u, IOSTAT=jerr)
+    if (jerr.ne.0) then
+       u = min(-1, jerr)
+    endif
+    if (present(iostat)) then
+       iostat = jerr
+    endif
+    if (jerr.ne.0) then
+       if (present(iomsg)) then
+101       format('error at unit check: ', A)
+          write(iomsg, 101, IOSTAT=jerr) trim(file)
+       endif
+    endif
+#endif /* not HAVE_FORTRAN_OPEN_IOMSG */
+  end function is_file_opened
 !!!_  & is_unit_opened() - return a defined value (.false.) even at error
   logical function is_unit_opened &
        & (unit, iostat, iomsg) &

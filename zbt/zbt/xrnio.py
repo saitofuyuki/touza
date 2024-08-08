@@ -68,15 +68,22 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
                      decode_timedelta=True,
                      decode_coords=True,
                      **kwds):
-        ds = dsnio.TouzaNioDataset(filename_or_obj, cls_var=xrNioBackendArray,
-                                   **kwds)
+        if decode_coords:
+            ds = dsnio.TouzaNioCoDataset(filename_or_obj,
+                                         cls_var=xrNioBackendArray,
+                                         **kwds)
+        else:
+            ds = dsnio.TouzaNioDataset(filename_or_obj,
+                                       cls_var=xrNioBackendArray,
+                                       **kwds)
         vars = {}
         for v in ds.variables.values():
-            dims = v.dimensions_suite
+            vn = ds.variables.rev_map(v, sep=ds.sub)
+            dims = v.dimensions_suite(group=ds)
+            # vn = v.reverse_key(ds, raw=False)
             data = xr.core.indexing.LazilyIndexedArray(v)
-            # var = xr.Variable(dims, data, attrs=attrs, encoding=encoding)
             var = xr.Variable(dims, data)
-            vars[v.name] = var
+            vars[util.tostr(vn)] = var
 
         # print (vars)
         return xr.Dataset(vars)

@@ -1,3 +1,9 @@
+Release-1.12.3.2 / 2024-08-08
+=============================
+
+  * Import of zbt development, to release.
+  * nio: [SEVERE] registration check introduced.
+
 Release-1.12.3.1 / 2024-07-31
 =============================
   * Squash import of zbt and/or convoy developments (for test release).

@@ -1,7 +1,7 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2024/02/25 22:34:47 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/08/01 11:27:10 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021, 2022, 2023, 2024
@@ -25,7 +25,7 @@ module TOUZA_Nio_std
   use TOUZA_Std,only: split_list,       join_list,      find_first
   use TOUZA_Std,only: is_msglev
   use TOUZA_Std,only: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
-  use TOUZA_Std,only: is_msglev_severe, is_msglev_fatal
+  use TOUZA_Std,only: is_msglev_severe, is_msglev_fatal,is_msglev_warning
   use TOUZA_Std,only: get_logu,         unit_global,    trace_fine,       trace_control
   use TOUZA_Std,only: trace_err
   use TOUZA_Std,only: is_error_match
@@ -37,6 +37,7 @@ module TOUZA_Nio_std
   use TOUZA_Std,only: endian_BIG,       endian_LITTLE,  endian_OTHER
   use TOUZA_Std,only: is_eof_ss
   use TOUZA_Std,only: new_unit,         search_from_last
+  use TOUZA_Std,only: is_file_opened
   use TOUZA_Std,only: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
   use TOUZA_Std,only: sus_open,         sus_close
   use TOUZA_Std,only: sus_write_irec,   sus_read_irec,  sus_skip_irec,    sus_pad_irec
@@ -87,7 +88,7 @@ module TOUZA_Nio_std
   public :: split_list,       join_list,      find_first
   public :: is_msglev
   public :: is_msglev_debug,  is_msglev_info, is_msglev_normal, is_msglev_detail
-  public :: is_msglev_severe, is_msglev_fatal
+  public :: is_msglev_severe, is_msglev_fatal,is_msglev_warning
   public :: get_logu,         unit_global,    trace_fine,       trace_control
   public :: trace_err
   public :: is_error_match
@@ -99,6 +100,7 @@ module TOUZA_Nio_std
   public :: endian_BIG,       endian_LITTLE,  endian_OTHER
   public :: is_eof_ss
   public :: new_unit,         search_from_last
+  public :: is_file_opened
   public :: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
   public :: sus_open,         sus_close
   public :: sus_write_irec,   sus_read_irec,  sus_skip_irec,    sus_pad_irec

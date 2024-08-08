@@ -5,14 +5,185 @@
 
 * Introduction
 * Installation
+* Quick start guide
+** A simple example (2d plot of a GTOOL3 file)
+A typical variable file is prepared for demonstration:
+: % ngtls T2
+:    1 T2        8332296H 74400   UR4 09570626 120000 GLON128,GGLA64,SFC1
+:    2 T2        8333004H 67776   UR4 09570725 120000 GLON128,GGLA64,SFC1
+:    3 T2        8333712H 74400   UR4 09570826 000000 GLON128,GGLA64,SFC1
+:    4 T2        8334444H 72000   UR4 09570926 000000 GLON128,GGLA64,SFC1
+:    5 T2        8335176H 74400   UR4 09571026 120000 GLON128,GGLA64,SFC1
+:    6 T2        8335908H 72000   UR4 09571126 120000 GLON128,GGLA64,SFC1
+:    7 T2        8336640H 74400   UR4 09571227 000000 GLON128,GGLA64,SFC1
+:    8 T2        8337384H 74400   UR4 09580127 120000 GLON128,GGLA64,SFC1
+:    9 T2        8338116H 72000   UR4 09580227 120000 GLON128,GGLA64,SFC1
+:   10 T2        8338848H 74400   UR4 09580328 000000 GLON128,GGLA64,SFC1
+:   11 T2        8339580H 72000   UR4 09580428 000000 GLON128,GGLA64,SFC1
+:   12 T2        8340312H 74400   UR4 09580528 120000 GLON128,GGLA64,SFC1
+*** Preparation
+Set environment variables ~TOUZA_LIB~ and ~GTAX_PATH~.
+: export TOUZA_LIB=/SOMEWHERE/lib/libtouza.so
+: export GTAX_PATH=.:/SOMEWHERE/gtool/lib/gt3
+*** To begin
+: >>> import xarray as xr
+: >>> import matplotlib.pyplot as plt
+*** Create ~xarray.dataset~ object with GTOOL3 file
+: >>> xds = xr.open_dataset("T2")
+: >>> xds
+: <xarray.Dataset> Size: 394kB
+: Dimensions:  (record: 12, SFC1: 1, GGLA64: 64, GLON128: 128)
+: Coordinates:
+:   * GLON128  (GLON128) float32 512B 0.0 2.812 5.625 8.438 ... 351.6 354.4 357.2
+:   * GGLA64   (GGLA64) float32 256B 87.86 85.1 82.31 ... -82.31 -85.1 -87.86
+: Dimensions without coordinates: record, SFC1
+: Data variables:
+:     T2       (record, SFC1, GGLA64, GLON128) float32 393kB ...
+
+The GTOOL3 file is analyzed into a netCDF-like structure.  In this
+case, 12 records are interpreted as time-slices of one 3-dimension
+variable, creating a 4-dimension variable of shape (12,1,64,128).
+Dimensions which the module can find the corresponding GTOOL3 axis
+file (in this case, =GTAXLOC.GLON128= and =GTAXLOC.GGLA64=) are
+automatically converted into ~xarray~ coordinates.  You may need valid
+=GTAX_PATH= environment to find the axis files.
+*** Dataset attributes
+You can examine =dims=, =coords=, =data_vars= attributes of the
+=Dataset= object.
+: >>> xds.dims
+: FrozenMappingWarningOnValuesAccess({'record': 12, 'SFC1': 1, 'GGLA64': 64, 'GLON128': 128})
+: >>> xds.coords
+: Coordinates:
+:   * GLON128  (GLON128) float32 512B 0.0 2.812 5.625 8.438 ... 351.6 354.4 357.2
+:   * GGLA64   (GGLA64) float32 256B 87.86 85.1 82.31 ... -82.31 -85.1 -87.86
+: >>> xds.data_vars
+: Data variables:
+:     T2       (record, SFC1, GGLA64, GLON128) float32 393kB ...
+*** DataArray objects
+Use dictionary or dot indexing to pull out Dataset variables as
+DataArray objects.
+
+: >>> v = xds.data_vars['T2']
+: >>> v
+: <xarray.DataArray 'T2' (record: 12, SFC1: 1, GGLA64: 64, GLON128: 128)> Size: 393kB
+: [98304 values with dtype=float32]
+: Coordinates:
+:   * GLON128  (GLON128) float32 512B 0.0 2.812 5.625 8.438 ... 351.6 354.4 357.2
+:   * GGLA64   (GGLA64) float32 256B 87.86 85.1 82.31 ... -82.31 -85.1 -87.86
+: Dimensions without coordinates: record, SFC1
+: >>> v.shape
+: (12, 1, 64, 128)
+
+*** Slicing and indexing
+Slicing and indexing can be examined:
+: >>> sel = v[0,0]
+: >>> sel
+: <xarray.DataArray 'T2' (GGLA64: 64, GLON128: 128)> Size: 33kB
+: [8192 values with dtype=float32]
+: Coordinates:
+:   * GLON128  (GLON128) float32 512B 0.0 2.812 5.625 8.438 ... 351.6 354.4 357.2
+:   * GGLA64   (GGLA64) float32 256B 87.86 85.1 82.31 ... -82.31 -85.1 -87.86
+: >>> sel.shape
+: (64, 128)
+
+: >>> xds.T2[:,:,0:32]
+: <xarray.DataArray 'T2' (record: 12, SFC1: 1, GGLA64: 32, GLON128: 128)> Size: 197kB
+: [49152 values with dtype=float32]
+: Coordinates:
+:   * GLON128  (GLON128) float32 512B 0.0 2.812 5.625 8.438 ... 351.6 354.4 357.2
+:   * GGLA64   (GGLA64) float32 128B 87.86 85.1 82.31 79.53 ... 6.977 4.186 1.395
+: Dimensions without coordinates: record, SFC1
+:
+: >>> xds.T2[:,:,0:32].shape
+: (12, 1, 32, 128)
+
+At the moment, slice with step does not work.
+
+*** Simple plotting using ~xarray~ and ~matplotlib~
+: >>> sel = v[0,0]
+: >>> fig, ax = plt.subplots()
+: >>> sel.plot(ax=ax)
+: <matplotlib.collections.QuadMesh at 0x7fbc7db6ff80>
+: >>> plt.show()
+
+** More examples
+See =zbt/tests/test_xrnio.py= for xarray+zbt procedures.
+See =zbt/tests/test_dsnio.py= for netCDF4-like dataset procedures.
+
 * Description of TOUZA/Zbt commands
-* Description of TOUZA/Zbt library
-** ~zbt.libtouza~ - lower-level interface on touza library
-** ~zbt.dsnio~ - medium-level layer of TOUZA/Nio array interfaces
-** ~zbt.xrnio~ - ~xarray~ backends for TOUZA/Nio array
+** ~zbcont~ - a sample command of contour plot
+*** usage
+: zbcont FILE [FILE...]
+*** key binding
+- ~q~ :: quit
+- ~D~ :: duplicate
+- space, shift+up :: next slice
+- shift+down :: previous slice
+- ctrl+up :: next file
+- ctrl+down :: previous file
+- up :: next variable
+- down :: previous variable
+
+* Description of TOUZA/Zbt package
+** ~zbt.libtouza~ - low-level interface on TOUZA(/Nio) library
+*** Requirement
+A shared library of TOUZA (version 1.12.3.1 or later) must be
+installed somewhere the module can find.
+If you encounter following message, it means that the module fails to
+find the library.
+
+: Cannot load touza library.  Setting TOUZA_LIB environment may help.
+: Traceback (most recent call last):
+: :
+: :
+: AttributeError: /usr/.....so: undefined symbol: _touza
+
+In this case, you must define the environment variable TOUZA_LIB to
+define the path to the library.
+
+: export TOUZA_LIB=/SOMEWHERE/lib/libtouza.so
+** ~zbt.dsnio~ - TOUZA/Nio dataset module, to emulate ~netcdf4-python~
+This is minimum emulation of Dataset class in netcdf4-python for
+GTOOL3 (TOUZA/Nio) format file, based on ~zbt.libtouza~ module.
+*** Usage
+
+*** Limitation (some are reserved to be improved )
+- Only file reading is implemented (file writing is reserved for
+  future development).
+- Only c-style array indexing is implemented.  It means that the time
+  series of a 3 dimension variable is represented as =V[0:NT, 0:NZ,
+  0:NY, 0:NX]=.
+- Due to much freedom originating from the GTOOL3 format policy,
+  automatic conversion to a dataset might be different from what the
+  user expects.
+- For a compromise of simple transformation from GTOOL3 format file to
+  something like netCDF4, all the variables share the record
+  dimension among a group generated by ~TouzaNioDataset~ class,
+  except for root (suite) class.
+- Slice accesses of array at file reading are partially implemented:
+  Any step except for 1 does not work correctly.
+  This limitation is only at file read, thus, the following works,
+  : ds = TouzaNioDataset('gtool-file.dat')
+  : v = ds['var'][2:5]  # read file and set v slice without step
+  : print(v[::2] )      # slicing with step
+  while the following not,
+  : ds = TouzaNioDataset('gtool-file.dat')
+  : v = ds['var']     # file reading is not performed
+  : print(v[2:5:2] )  # read file and set v slice, which will fail.
+- =TouzaNioCoDataset= class does not parse time coordinate.
+
+** ~zbt.xrnio~ - ~xarray~ backends of zbt.dsnio module
 
 * Acknowledgements
 * Copyright and license
 Copyright 2024 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)
+
+#  LocalWords:  TOUZA Zbt SAITO Fuyuki saitofuyuki jamstec jp zbt Nio
+#  LocalWords:  libtouza touza Traceback AttributeError dsnio netcdf
+#  LocalWords:  GTOOL NX netCDF TouzaNioDataset ds gtool dat xrnio xr
+#  LocalWords:  TouzaNioCoDataset xarray backends GTAX ngtls GLON SFC
+#  LocalWords:  GGLA matplotlib pyplot plt xds kB GTAXLOC coords sel
+#  LocalWords:  FrozenMappingWarningOnValuesAccess DataArray dtype
+#  LocalWords:  fbc
