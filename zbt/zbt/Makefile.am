@@ -1,7 +1,7 @@
 # touza/zbt/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/08/08 18:28:01 fuyuki Makefile.am>
+# Time-stamp: <2024/08/11 16:47:30 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -17,7 +17,7 @@ pkgpython_PYTHON += param.py
 
 pkgpythondir = $(pythondir)/zbt
 
-BUILT_SOURCE = param.py
+# BUILT_SOURCE = param.py
 
 GENPARAM = $(srcdir)/../param.sh
 
