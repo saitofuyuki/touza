@@ -259,7 +259,7 @@ class TouzaNioDataset(_TouzaNio):
         """Recursive search of group/variable."""
         sep = self.sep
         if isinstance(elem, str):
-            path = sep.split(elem)
+            path = elem.split(sep)
         elif numpy.iterable(elem):
             path = tuple(elem)
         else:
