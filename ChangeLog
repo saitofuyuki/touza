@@ -1,3 +1,13 @@
+Release-1.12.3.3 / 2024-08-13
+=============================
+
+  * Import of zbt development, to release.
+  * zbt: (dsnio) [SEVERE] wrong usage of split().
+  * zbt: (build) [SEVERE] import updates for debian packaging.
+  * zbt: (dsnio) introduced a new class TouzaMemVar
+  * zbt: (xrnio) slightly improved coordinates.
+  * zbt: (zbcont) ticks adjustment.
+
 Release-1.12.3.2 / 2024-08-08
 =============================
 

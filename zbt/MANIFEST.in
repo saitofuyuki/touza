@@ -1,0 +1,6 @@
+include README*
+
+exclude *.m4
+exclude *.sh
+exclude */Makefile.*
+exclude */*.sh
