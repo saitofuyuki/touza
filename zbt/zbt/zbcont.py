@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/08/08 13:34:50 fuyuki zbcont.py>
+# Time-stamp: <2024/08/13 11:28:57 fuyuki zbcont.py>
 
 import sys
+import math
+import numpy as np
 import argparse as ap
 import xarray as xr
-# import xarray.plot as xplt
 import matplotlib.pyplot as plt
-# import zbt.util as zu
-
 
 class SliceStatus:
     """tuple of slices with bidirectional increment"""
@@ -121,6 +120,24 @@ class SliceStatus:
             return var[sel]
         raise ValueError(f"Extraction out of bounds {self.status}")
 
+    def pos_phys(self, var, dataset):
+        """Get physical coordinate of the slice"""
+        dims = var.dims
+        coords = var.coords
+        # print(dataset.dims)
+        # print(dataset.coords)
+        pos = ()
+        for j, sel in enumerate(self.sel):
+            if sel is None:
+                continue
+            d = dims[j]
+            if d in dataset.coords:
+                c = coords[d]
+                pos = pos + ((d, sel, c.data[sel]), )
+            else:
+                pos = pos + ((d, sel), )
+        return pos
+
     def __str__(self):
         if self.status == 0:
             return ','.join(str(s) if s is not None else ':'
@@ -200,7 +217,7 @@ class ContourPlot:
         """Allocate new figure."""
         if self.cid:
             self.fig.canvas.flush_events()
-            self.fig.canvas.mpl_disconnect(self.cid)
+            # self.fig.canvas.mpl_disconnect(self.cid)
 
         self.fig, self.ax = plt.subplots()
         self.fig.canvas.manager.show()
@@ -270,11 +287,41 @@ class ContourPlot:
                 self.jsel.wait()
                 continue
             break
+        self.set_ticks(vv.dims, vv.coords)
 
-        print(f"# plot: {vk}[{self.jsel}]")
-        self.jsel.extract(vv).plot(ax=self.ax, cbar_ax=self.cax)
+        pos = []
+        for p in self.jsel.pos_phys(vv, ds):
+            s = f"{p[0]}[{p[1]}]"
+            if len(p) > 2:
+                s = s + f"={p[2]}"
+            pos.append(s)
+        pos = ' '.join(pos)
+        print(f"# plot: {vk}[{self.jsel}] <{pos}>")
+        # print(vv.dims)
+        # print(self.jsel.pos_phys(vv, ds))
+        xv = self.jsel.extract(vv)
+        # print(xv)
+        xv.plot(ax=self.ax, cbar_ax=self.cax)
         self.fig.canvas.draw()
 
+    def set_ticks(self, dims, coords):
+        for c, f in [(-1, self.ax.set_xticks),
+                     (-2, self.ax.set_yticks)]:
+            x = coords[dims[c]]
+            l = x.data[0]
+            h = x.data[-1]
+            if l > h:
+                l, h = h, l
+            v = x.attrs.get('DIVL')
+            if v:
+                l = math.floor(l / v) * v
+                h = math.ceil(h / v) * v
+                f(np.arange(l, h + v, v))
+            v = x.attrs.get('DIVS')
+            if v:
+                l = math.floor(l / v) * v
+                h = math.ceil(h / v) * v
+                f(np.arange(l, h + v, v), minor=True)
 
 def main(argv, root=None):
     """Contour plot with TOUZA/Zbt."""
@@ -283,7 +330,6 @@ def main(argv, root=None):
     plt.rcParams.update({'figure.autolayout': True})
     cp = ContourPlot(opts)
     plt.show()
-
 
 def parse_arguments(argv, root=None):
     """Command line parser."""

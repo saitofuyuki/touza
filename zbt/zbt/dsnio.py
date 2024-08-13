@@ -58,11 +58,12 @@ class TouzaNioDataset(_TouzaNio):
     __slots__ = ('handle', 'root', 'parent', 'name',
                  'groups', 'variables',
                  'dimensions',
-                 'record', 'recdim', 'cls_var')
+                 'record', 'recdim', 'cls_var', 'cls_arr',)
 
     def __init__(self, filename,
                  record=None,
-                 flatten=True, cls_var=None, **kwds):
+                 flatten=True, cls_var=None, cls_arr=None,
+                 **kwds):
         """Bind TOUZA/Nio properties from file."""
 
         if not self.lib.tnb_file_is_nio(filename):
@@ -78,11 +79,12 @@ class TouzaNioDataset(_TouzaNio):
         super().__init__(**kwds)
 
         handle = self.lib.tnb_file_open(filename, flag=flag)
-        self.assign_nio(handle, filename, self, None, None, flatten, cls_var)
+        self.assign_nio(handle, filename, self, None, None,
+                        flatten, cls_var, cls_arr)
 
     def assign_nio(self, handle, filename,
                    root=None, parent=None, record=None, flatten=True,
-                   cls_var=None):
+                   cls_var=None, cls_arr=None):
         """Bind TOUZA/Nio properties from cache handle"""
 
         _DataSets[handle] = self
@@ -92,6 +94,7 @@ class TouzaNioDataset(_TouzaNio):
         self.root = root
         self.parent = parent
         self.cls_var = cls_var or TouzaNioVar
+        self.cls_arr = cls_arr or TouzaMemVar
         self.record = record or 'record'  # name of record dimension
 
         self.recdim = None
@@ -123,19 +126,30 @@ class TouzaNioDataset(_TouzaNio):
 
     # pylint: disable=invalid-name
     def createVariable(self, varname, datatype, dimensions,
-                       handle=None, recdim=None):
+                       handle=None, recdim=None, cls=None, **kwds):
         """Construct variable instance."""
-        return self.cls_var(self,
-                            varname, datatype, dimensions,
-                            handle=handle, recdim=recdim)
+        cls = cls or self.cls_var
+        return cls(self,
+                   varname, datatype, dimensions,
+                   handle=handle, recdim=recdim, **kwds)
+
+    def createArray(self, varname, datatype, dimensions,
+                    handle=None, recdim=None, cls=None, **kwds):
+        """Construct variable instance."""
+        cls = cls or self.cls_arr
+        return cls(self,
+                   varname, datatype, dimensions,
+                   handle=handle, recdim=recdim, **kwds)
 
     # pylint: disable=invalid-name,too-many-arguments
     def createDimension(self, dimname, size=None,
-                        handle=None, begin=None, end=None):
+                        handle=None, begin=None, end=None,
+                        group=None):
         """Construct variable instance."""
+        group = group or self.root
         return TouzaNioDimension(dimname, size,
                                  handle=handle, begin=begin, end=end,
-                                 group=self.root)
+                                 group=group)
 
     def search_dim(self, ser):
         """Search parent corresponding to serial"""
@@ -157,7 +171,7 @@ class TouzaNioDataset(_TouzaNio):
         """Iterator of the attributes."""
         yield from self._attrs()
 
-    def getattr(self, item, conv=None):
+    def getattr(self, item, conv=None, **kwds):
         """Get attribute corresponding to item (number or name)."""
         return self.lib.header_get_attr(item, self.handle, conv=conv)
 
@@ -173,7 +187,8 @@ class TouzaNioDataset(_TouzaNio):
         nr = self._recs()
         if nr:
             cname = self.record
-            self.recdim = self.createDimension(cname, size=nr, handle=-1)
+            self.recdim = self.createDimension(cname, size=nr, handle=-1,
+                                               group=self)
             ck = util.tostr(cname)
             self.dimensions[ck] = self.recdim
         for ch, cname in self._dimensions():
@@ -259,7 +274,7 @@ class TouzaNioDataset(_TouzaNio):
         """Recursive search of group/variable."""
         sep = self.sep
         if isinstance(elem, str):
-            path = sep.split(elem)
+            path = elem.split(sep)
         elif numpy.iterable(elem):
             path = tuple(elem)
         else:
@@ -277,8 +292,7 @@ class TouzaNioDataset(_TouzaNio):
             if v in g.variables:
                 return g.variables[v]
             return default
-        else:
-            return g
+        return g
 
     def __getitem__(self, elem, sep=None):
         r = self.get(elem, sep=sep)
@@ -321,6 +335,7 @@ class TouzaNioDataset(_TouzaNio):
         dump.append(f"    groups: {', '.join(gs)}")
         return '\n'.join(dump)
 
+
 class TouzaNioGroup(TouzaNioDataset):
     """Emulate a hierarchical namespace of dataset."""
 
@@ -335,6 +350,7 @@ class TouzaNioGroup(TouzaNioDataset):
         self.record = parent.record
         self.sub = parent.sub
         self.cls_var = parent.cls_var
+        self.cls_arr = parent.cls_arr
 
         self.groups = util.NameMap()
         self.dimensions = util.NameMap()
@@ -364,8 +380,8 @@ class TouzaNioGroup(TouzaNioDataset):
         return self.lib.tnb_group_recs(self.handle)
 
 
-class TouzaNioVar(_TouzaNio):
-    """Variable property"""
+class _TouzaCoreVar(_TouzaNio):
+    """Variable core property"""
 
     __slots__ = ('handle', 'dataset', 'name', 'dimensions', 'recdim',
                  'dtype', 'logical', )
@@ -383,18 +399,11 @@ class TouzaNioVar(_TouzaNio):
         super().__init__(**kwds)
 
     def copy(self, logical=None):
+        """simple copy."""
         return self.__copy__(logical)
 
-    def __copy__(self, logical=None):
-        """Create copy object."""
-        obj = self.__class__(self.dataset, self.name,
-                             self.dtype, self.dimensions, self.handle,
-                             self.recdim)
-        if logical:
-            obj.logical = logical
-        return obj
-
     def replace_dim(self, dim):
+        """Replace dimension element."""
         for j, d in enumerate(self.dimensions):
             if dim.name == d.name:
                 break
@@ -413,6 +422,149 @@ class TouzaNioVar(_TouzaNio):
                 self.recdim = None
 
         self.dimensions = tuple(filter(lambda d: d.size > 1, self.dimensions))
+
+    def __copy__(self, *args, **kwds):
+        """Placeholder."""
+        raise NotImplementedError
+
+    def getattr(self, item, **kwds):
+        """Placeholder."""
+        raise NotImplementedError
+
+    def _attrs(self, *args, **kwds):
+        """Placeholder."""
+        raise NotImplementedError
+
+    def attrs(self, rec=None):
+        """Iterator of the attributes."""
+        yield from self._attrs(rec=rec)
+
+    @property
+    def shape(self):
+        """Array shape"""
+        sh = ()
+        for d in self.dimensions:
+            sh = sh + (d.size, )
+        return sh
+
+    def dimensions_suite(self, group=None):
+        """Canonicalized dimension tuple"""
+        group = group or self.dataset.root
+        return tuple(self.format_dims(group=group))
+
+    @property
+    def dimensions_names(self):
+        """Normalize dimension names"""
+        return tuple(util.tostr(d.name) for d in self.dimensions)
+
+    @property
+    def dimensions_map(self):
+        """Dimension mapping"""
+        return dict((d.name, d) for d in self.dimensions)
+
+    def format_name(self, sep=True, group=None):
+        """Return canonicalized name under group"""
+        if group is None:
+            group = True
+        if group is True:
+            # group = self.dataset
+            group = self.logical
+        if group is False:
+            return self.name
+        if sep is True:
+            sep = self.sub
+        return group.variables.rev_map(self, sep=sep)
+
+    def format_dims(self, sep=True, group=None):
+        """Return canonicalized name under group"""
+        if group is None:
+            group = True
+        if group is True:
+            group = self.logical
+            # group = self.dataset
+        if group is False:
+            dims = [d.name for d in self.dimensions]
+        else:
+            if sep is True:
+                sep = self.sub
+            dims = [group.dimensions.rev_map(d, sep=sep)
+                    for d in self.dimensions]
+        return dims
+
+    def __str__(self):
+        """return str"""
+        dump = [repr(type(self))]
+        tab = ' ' * 4
+        vt = util.tostr(self.dtype)
+        vn = self.format_name()
+        ds = ', '.join(self.format_dims())
+        dump.append(f"{vt} {vn}({ds})")
+        for a, ai in self.attrs():
+            av = self.getattr(a).strip()
+            ai = util.tostr(ai)
+            if av:
+                dump.append(f"{tab}{ai}: {av}")
+        dump.append(f"shape = {self.shape}")
+        return '\n'.join(dump)
+
+
+class TouzaMemVar(_TouzaCoreVar):
+    """Variable property"""
+
+    __slots__ = ('array', '_mattrs')
+
+    def __init__(self, *args, array=None, **kwds):
+        """Constructor."""
+        super().__init__(*args, **kwds)
+        self._mattrs = {}
+        if array is not None:
+            self.array = numpy.asarray(array)
+        else:
+            self.array = None
+
+    def __copy__(self, logical=None):
+        """Create copy object."""
+        obj = self.__class__(self.dataset, self.name,
+                             self.dtype, self.dimensions, self.handle,
+                             self.recdim, array=self.array)
+        if logical:
+            obj.logical = logical
+        return obj
+
+    def __getitem__(self, elem):
+        # print(elem)
+        # return self.array[elem]
+        return self.array
+
+    def getattr(self, item, **kwds):
+        """Get attribute corresponding to item (number or name)."""
+        return self._mattrs.get(item, '')
+
+    def setattr(self, item, val):
+        """Set attribute."""
+        self._mattrs[item] = val
+        return self._mattrs[item]
+
+    def _attrs(self, **kwds):
+        """Iterator of attributes in Nio variable"""
+        yield from enumerate(self._mattrs)
+
+
+class TouzaNioVar(_TouzaCoreVar):
+    """Variable property"""
+
+    def __init__(self, *args, **kwds):
+        """Constructor."""
+        super().__init__(*args, **kwds)
+
+    def __copy__(self, logical=None):
+        """Create copy object."""
+        obj = self.__class__(self.dataset, self.name,
+                             self.dtype, self.dimensions, self.handle,
+                             self.recdim)
+        if logical:
+            obj.logical = logical
+        return obj
 
     def __getitem__(self, elem):
         nd = len(self.dimensions)
@@ -433,8 +585,8 @@ class TouzaNioVar(_TouzaNio):
                 count = count + (1, )
             elif isinstance(e, slice):
                 if e.step is not None and e.step != 1:
-                    raise ValueError \
-                        (f"Only value 1 is allowed for slice step {e}.")
+                    raise ValueError("Only value 1 "
+                                     f"is allowed for slice step {e}.")
                 st = e.start or 0
                 if st < 0:
                     st = d.size + st
@@ -492,11 +644,7 @@ class TouzaNioVar(_TouzaNio):
         buf = buf.reshape(shape)
         return buf
 
-    def attrs(self, rec=None):
-        """Iterator of the attributes."""
-        yield from self._attrs(rec)
-
-    def getattr(self, item, rec=None, conv=None):
+    def getattr(self, item, rec=None, conv=None, **kwds):
         """Get attribute corresponding to item (number or name)."""
         ds = self.dataset
         rec = rec or 0
@@ -513,72 +661,6 @@ class TouzaNioVar(_TouzaNio):
             item = CT.create_string_buffer(la + 1)
             ds.lib.tnb_get_attr_name(item, a)
             yield (a, item.value)
-
-    @property
-    def shape(self):
-        """Array shape"""
-        sh = ()
-        for d in self.dimensions:
-            sh = sh + (d.size, )
-        return sh
-
-    def dimensions_suite(self, group=None):
-        group = group or self.dataset.root
-        return tuple(self.format_dims(group=group))
-
-    @property
-    def dimensions_names(self):
-        return tuple(util.tostr(d.name) for d in self.dimensions)
-
-    @property
-    def dimensions_map(self):
-        return dict((d.name, d) for d in self.dimensions)
-
-    def format_name(self, sep=True, group=None):
-        """Return canonicalized name under group"""
-        if group is None:
-            group = True
-        if group is True:
-            # group = self.dataset
-            group = self.logical
-        if group is False:
-            return self.name
-        if sep is True:
-            sep = self.sub
-        # print(group.name, repr(group))
-        return group.variables.rev_map(self, sep=sep)
-
-    def format_dims(self, sep=True, group=None):
-        """Return canonicalized name under group"""
-        if group is None:
-            group = True
-        if group is True:
-            group = self.logical
-            # group = self.dataset
-        if group is False:
-            dims = [d.name for d in self.dimensions]
-        else:
-            if sep is True:
-                sep = self.sub
-            dims = [group.dimensions.rev_map(d, sep=sep)
-                    for d in self.dimensions]
-        return dims
-
-    def __str__(self):
-        """return str"""
-        dump = [repr(type(self))]
-        tab = ' ' * 4
-        vt = util.tostr(self.dtype)
-        vn = self.format_name()
-        ds = ', '.join(self.format_dims())
-        dump.append(f"{vt} {vn}({ds})")
-        for a, ai in self.attrs():
-            av = self.getattr(a).strip()
-            ai = util.tostr(ai)
-            if av:
-                dump.append(f"{tab}{ai}: {av}")
-        dump.append(f"shape = {self.shape}")
-        return '\n'.join(dump)
 
 
 class TouzaNioDimension(_TouzaNio):
@@ -669,7 +751,26 @@ class TouzaNioCoDataset(TouzaNioDataset):
 
         for d in self.dimensions.values():
             if d.is_record():
-                # print(f"dim/rec: {d.name}[{d.extent}]")
+                # print(d.name, repr(d.dataset), repr(d.dataset.root))
+                time = []
+                for rec in range(*d.extent):
+                    t = self.lib.header_get_attr('time',
+                                                 handle=d.dataset.handle,
+                                                 vid=0,
+                                                 rec=rec)
+                    t = int(t)
+                    time.append(t)
+                okey = self.dimensions.rev_map(d)
+                # print(okey, time)
+                c = self.createArray(d.name, 'i4', (d, ), -1, None,
+                                     array=time)
+                a = self.lib.header_get_attr('utim',
+                                             handle=d.dataset.handle,
+                                             vid=0,
+                                             rec=0)
+                self.variables[okey] = c
+                c.setattr('UNIT', a)
+                c.setattr('TITL1', 'time')
                 continue
             c = self.get_coordinate(d, paths, kind='loc')
             if c:
@@ -679,6 +780,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
                 self.variables[okey] = c
 
     def coordinate_paths(self, env=None):
+        """Parse axis file paths"""
         env = env or self.gtax_env
         paths = os.environ.get(env, '.:')
         return paths.split(':')
@@ -756,7 +858,6 @@ class TouzaNioCoGroup(TouzaNioCoDataset, TouzaNioGroup):
 
     def bind_coordinates(self):
         """Bind coordinates inheriting parent."""
-        pass
 
 
 # handle to DataSet mapping
