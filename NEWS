@@ -1,10 +1,13 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2024/08/13 14:22:23 fuyuki NEWS>
+# Time-stamp: <2024/08/15 13:17:18 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.12.3.4 from 1.12.3.3
+** Minor improvements around build and installation
 
 * Changes in 1.12.3.3 from 1.12.3.2
 ** Bug fixes

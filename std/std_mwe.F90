@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2024/07/11 22:54:55 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/08/13 20:03:26 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2024
@@ -79,6 +79,7 @@ module TOUZA_Std_mwe
   public MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
   public MPI_COMM_CREATE,   MPI_COMM_SPLIT, MPI_COMM_GROUP
   public MPI_WAIT, MPI_BARRIER
+  public MPI_PROBE, MPI_GET_COUNT
 
 !!!_  - misc
   character(len=128) tmsg
@@ -558,7 +559,7 @@ contains
   end subroutine show_mpi_type
 !!!_ + dummy interfaces
 #if OPT_USE_MPI
-#else
+#else /* not OPT_USE_MPI */
   subroutine MPI_COMM_CREATE &
        & (COMM, GROUP, NEWCOMM, IERROR)
     implicit none
@@ -614,7 +615,21 @@ contains
     INTEGER   COMM, IERROR
     IERROR = ERR_NOT_IMPLEMENTED
   end subroutine MPI_BARRIER
-#endif
+
+  subroutine MPI_GET_COUNT &
+       & (STATUS, DATATYPE, COUNT, IERROR)
+    implicit none
+    INTEGER   STATUS(*), DATATYPE, COUNT, IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_GET_COUNT
+
+  subroutine MPI_PROBE &
+       & (SOURCE, TAG, COMM, STATUS, IERROR)
+    INTEGER   SOURCE, TAG, COMM, STATUS(*), IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_PROBE
+
+#endif /* not OPT_USE_MPI */
 #if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
 #else
   subroutine MPI_GROUP_TRANSLATE_RANKS &
