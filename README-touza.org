@@ -94,6 +94,8 @@ find (e.g., gfortran).  If configure is successful, =*.mod= files
 are installed into =EPREFIX/include/touza=, which can be controlled
 with =--enable-install-modules= at =configure=.
 
+** note on python package (TOUZA/Zbt)
+Read =zbt/README-zbt.org= to learn how to install the python package.
 ** system-dependent features
 *** ifort
 Need =-heap-arrays= option in =FCFLAGS= and =FFLAGS=, which must be

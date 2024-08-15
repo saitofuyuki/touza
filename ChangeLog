@@ -1,3 +1,10 @@
+Release-1.12.3.4 / 2024-08-15
+=============================
+
+  * Import of updated zbt evelopment for build and installation
+  * build: (configure) build-only choice for sub package.
+  * std: (mwe, trp) introduce dummy MPI_PROBE, MPI_GET_COUNT.
+
 Release-1.12.3.3 / 2024-08-13
 =============================
 
