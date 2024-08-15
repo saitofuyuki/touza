@@ -861,4 +861,7 @@ class TouzaNioCoGroup(TouzaNioCoDataset, TouzaNioGroup):
 
 
 # handle to DataSet mapping
-_DataSets: dict[int, TouzaNioDataset] = {}
+if sys.version_info[:2] > (3, 9):
+    _DataSets: dict[int, TouzaNioDataset] = {}
+else:
+    _DataSets = {}

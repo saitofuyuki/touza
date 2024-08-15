@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/07/24 13:21:31 fuyuki test_libtouza.py>
+# Time-stamp: <2024/08/13 21:29:26 fuyuki test_libtouza.py>
 
 import sys
 import functools as ft
 import operator as op
 
 from zbt.libtouza import *
-
 
 def main(argv):
     """Sample driver."""

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/08/02 07:21:50 fuyuki libtouza.py>
+# Time-stamp: <2024/08/14 10:42:58 fuyuki libtouza.py>
 
 __doc__ = \
     """
@@ -14,14 +14,20 @@ Python interface on TOUZA library
 
 import os
 import sys
+import pathlib as plib
 import ctypes as CT
+import ctypes.util as CTU
 
 from . import util
 from . import param
 
-ENV_TOUZA_LIB = 'TOUZA_LIB'
-LIBTOUZA = 'libtouza.so'
+try:
+    from .config import *
+except:
+    TOUZA_NAME = 'touza'
+    LIBRARY_DIR = '.'
 
+ENV_TOUZA_LIB = 'TOUZA_LIBRARY'
 
 class LibTouzaException(Exception):
     """Base exception for TOUZA library."""
@@ -30,11 +36,14 @@ class LibTouzaException(Exception):
 class LibTouzaCore(util.WrapCDLL):
     """Low-level class for TOUZA library"""
 
-    def __init__(self, name, *args, touza=None, **kwds):
+    def __init__(self, name=None, *args, touza=None, **kwds):
         """Initialize CDLL after TOUZA."""
         if not name:
             name = os.environ.get(ENV_TOUZA_LIB)
-            name = name or LIBTOUZA
+        if not name:
+            name = CTU.find_library(TOUZA_NAME)
+        if not name:
+            name = plib.Path(LIBRARY_DIR) / ('lib' + TOUZA_NAME + '.so')
         try:
             super().__init__(name, *args, **kwds)
         except OSError:
@@ -389,6 +398,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                      (self.tnb_var_read_float, CT.c_float),
                      (self.tnb_var_read_double, CT.c_double),]:
             if isinstance(d, CT.POINTER(t)):
+                # print('read: ', handle, vid, rec, start[:], count[:])
                 return f(d, rec, start, count, handle, vid)
         raise TypeError
 
