@@ -43,6 +43,8 @@ class xrNioBackendArray(xr.backends.BackendArray, dsnio.TouzaNioVar):
     def _raw_indexing_method(self, key: tuple) \
             -> np.typing.ArrayLike:
         arr = super().__getitem__(key)
+        if self.dtype.kind in ['i', 'u', ]:
+            return arr
         return arr.filled(fill_value=np.nan)
         # pass
 
