@@ -17,7 +17,7 @@
 # touza/ami Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 2 2022
-# Time-stamp: <2024/02/02 21:27:00 fuyuki Makefile.am>
+# Time-stamp: <2024/08/14 09:32:03 fuyuki Makefile.am>
 
 # Copyright (C) 2022,2023,2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -25,7 +25,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Tue Aug 13 14:34:43 JST 2024
+# from AX_AM_MACROS_STATIC on Thu Aug 15 13:26:55 JST 2024
 
 
 
@@ -583,7 +583,7 @@ test_ami_nio_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_AMI_NIO=1
 EXTRA_test_ami_nio_DEPENDENCIES = $(test_ami_nio_LDADD)
 test_ami_miroc_SOURCES = $(TEST_COMMON_SOURCES) ami_miroc.F90
 test_ami_miroc_LDADD = $(TEST_COMMON_LIBS)
-test_ami_miroc_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_AMI_MIROC=1
+test_ami_miroc_CPPFLAGS = $(AM_CPPFLAGS) $(FC_INCLUDE_touza_nio) -DTEST_AMI_MIROC=1
 EXTRA_test_ami_miroc_DEPENDENCIES = $(test_ami_miroc_LDADD)
 test_ami_xform_SOURCES = $(TEST_COMMON_SOURCES) ami_xform.F90
 test_ami_xform_LDADD = $(TEST_COMMON_LIBS)

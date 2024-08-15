@@ -17,7 +17,7 @@
 # touza/zbt/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/08/11 16:47:30 fuyuki Makefile.am>
+# Time-stamp: <2024/08/15 10:55:26 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -109,7 +109,7 @@ am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
-DIST_COMMON = $(srcdir)/Makefile.am $(pkgpython_PYTHON) \
+DIST_COMMON = $(srcdir)/Makefile.am $(am__pkgpython_PYTHON_DIST) \
 	$(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/touza_config.h
@@ -162,9 +162,12 @@ am__uninstall_files_from_dir = { \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
 am__py_compile = PYTHON=$(PYTHON) $(SHELL) $(py_compile)
-am__installdirs = "$(DESTDIR)$(pkgpythondir)"
+am__installdirs = "$(DESTDIR)$(pkgpythondir)" \
+	"$(DESTDIR)$(pkgpythondir)"
 am__pep3147_tweak = \
   sed -e 's|\.py$$||' -e 's|[^/]*$$|__pycache__/&.*.pyc __pycache__/&.*.pyo|'
+am__pkgpython_PYTHON_DIST = __init__.py util.py libtouza.py dsnio.py \
+	xrnio.py zbcont.py
 py_compile = $(top_srcdir)/build-aux/py-compile
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 am__DIST_COMMON = $(srcdir)/Makefile.in \
@@ -389,11 +392,18 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-pkgpython_PYTHON = __init__.py util.py libtouza.py dsnio.py xrnio.py \
-	param.py
+@ZBT_BUILD_ONLY_FALSE@pkgpython_PYTHON = __init__.py util.py \
+@ZBT_BUILD_ONLY_FALSE@	libtouza.py dsnio.py xrnio.py zbcont.py
 
-# BUILT_SOURCE = param.py
+# pkgpython_PYTHON += param.py
+@ZBT_BUILD_ONLY_FALSE@nodist_pkgpython_PYTHON = config.py param.py
+copy_sources = __init__.py util.py libtouza.py dsnio.py xrnio.py \
+	zbcont.py
+EXTRA_PYTHON = $(copy_sources) config.py param.py
+BUILT_SOURCE = param.py config.py
+CLEANFILES = $(BUILT_SOURCE)
 GENPARAM = $(srcdir)/../param.sh
+COPY_SOURCES_TARGETS = $(copy_sources:%=copy-%)
 all: all-am
 
 .SUFFIXES:
@@ -432,6 +442,49 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
+install-nodist_pkgpythonPYTHON: $(nodist_pkgpython_PYTHON)
+	@$(NORMAL_INSTALL)
+	@list='$(nodist_pkgpython_PYTHON)'; dlist=; list2=; test -n "$(pkgpythondir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(pkgpythondir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(pkgpythondir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then b=; else b="$(srcdir)/"; fi; \
+	  if test -f $$b$$p; then \
+	    $(am__strip_dir) \
+	    dlist="$$dlist $$f"; \
+	    list2="$$list2 $$b$$p"; \
+	  else :; fi; \
+	done; \
+	for file in $$list2; do echo $$file; done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(pkgpythondir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgpythondir)" || exit $$?; \
+	done || exit $$?; \
+	if test -n "$$dlist"; then \
+	  $(am__py_compile) --destdir "$(DESTDIR)" \
+	                    --basedir "$(pkgpythondir)" $$dlist; \
+	else :; fi
+
+uninstall-nodist_pkgpythonPYTHON:
+	@$(NORMAL_UNINSTALL)
+	@list='$(nodist_pkgpython_PYTHON)'; test -n "$(pkgpythondir)" || list=; \
+	py_files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	test -n "$$py_files" || exit 0; \
+	dir='$(DESTDIR)$(pkgpythondir)'; \
+	pyc_files=`echo "$$py_files" | sed 's|$$|c|'`; \
+	pyo_files=`echo "$$py_files" | sed 's|$$|o|'`; \
+	st=0; \
+	for files in "$$py_files" "$$pyc_files" "$$pyo_files"; do \
+	  $(am__uninstall_files_from_dir) || st=$$?; \
+	done; \
+	dir='$(DESTDIR)$(pkgpythondir)'; \
+	echo "$$py_files" | $(am__pep3147_tweak) | $(am__base_list) | \
+	  while read files; do \
+	    $(am__uninstall_files_from_dir) || st=$$?; \
+	  done || exit $$?; \
+	exit $$st
 install-pkgpythonPYTHON: $(pkgpython_PYTHON)
 	@$(NORMAL_INSTALL)
 	@list='$(pkgpython_PYTHON)'; dlist=; list2=; test -n "$(pkgpythondir)" || list=; \
@@ -518,7 +571,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile
 installdirs:
-	for dir in "$(DESTDIR)$(pkgpythondir)"; do \
+	for dir in "$(DESTDIR)$(pkgpythondir)" "$(DESTDIR)$(pkgpythondir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -543,6 +596,7 @@ install-strip:
 mostlyclean-generic:
 
 clean-generic:
+	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
@@ -571,7 +625,8 @@ info: info-am
 
 info-am:
 
-install-data-am: install-pkgpythonPYTHON
+install-data-am: install-nodist_pkgpythonPYTHON \
+	install-pkgpythonPYTHON
 
 install-dvi: install-dvi-am
 
@@ -615,7 +670,8 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-pkgpythonPYTHON
+uninstall-am: uninstall-nodist_pkgpythonPYTHON \
+	uninstall-pkgpythonPYTHON
 
 .MAKE: install-am install-strip
 
@@ -625,11 +681,12 @@ uninstall-am: uninstall-pkgpythonPYTHON
 	install install-am install-data install-data-am install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-pkgpythonPYTHON install-ps \
-	install-ps-am install-strip installcheck installcheck-am \
-	installdirs maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-generic mostlyclean-libtool pdf pdf-am \
-	ps ps-am tags-am uninstall uninstall-am \
+	install-nodist_pkgpythonPYTHON install-pdf install-pdf-am \
+	install-pkgpythonPYTHON install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-generic \
+	mostlyclean-libtool pdf pdf-am ps ps-am tags-am uninstall \
+	uninstall-am uninstall-nodist_pkgpythonPYTHON \
 	uninstall-pkgpythonPYTHON
 
 .PRECIOUS: Makefile
@@ -644,6 +701,24 @@ uninstall-mod:
 
 param.py: $(top_srcdir)/nio/touza_nio_param.h
 	$(SHELL) $(GENPARAM) -o $@ ParamTouzaNio $(top_srcdir)/nio/touza_nio_param.h || rm -f $@
+
+config.py:
+	echo "# pythondir=$(pythondir)" > $@
+	echo "TOUZA_NAME = '$(TOUZA_NAME)'" >> $@
+	echo "LIBRARY_DIR = '$(libdir)'" >> $@
+
+copy-sources: $(BUILT_SOURCE) copy-sources-prepare $(COPY_SOURCES_TARGETS)
+
+copy-sources-prepare:
+
+$(COPY_SOURCES_TARGETS):
+	@target=`echo "$@" | sed -e 's/^copy-//'`;\
+	if test -e $(builddir)/$${target}; then \
+		echo "exists $${target}."; \
+	else \
+		echo "clone $(srcdir)/$${target}"; \
+		cp $(srcdir)/$${target} $(builddir)/$${target} || exit $$?; \
+	fi
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
