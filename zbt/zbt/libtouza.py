@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/08/14 10:42:58 fuyuki libtouza.py>
+# Time-stamp: <2024/08/15 16:53:54 fuyuki libtouza.py>
 
 __doc__ = \
     """
@@ -381,9 +381,9 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
             return attr
         attr = attr.value.decode()
         try:
-            if conv == [CT.c_int, int]:
+            if conv in [int, CT.c_int, ]:
                 a = int(float(attr))
-            elif conv in [float, CT.c_float, CT.c_double]:
+            elif conv in [float, CT.c_float, CT.c_double, ]:
                 a = float(attr)
             else:
                 a = attr

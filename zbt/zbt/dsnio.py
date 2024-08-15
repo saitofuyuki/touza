@@ -758,7 +758,11 @@ class TouzaNioCoDataset(TouzaNioDataset):
                                                  handle=d.dataset.handle,
                                                  vid=0,
                                                  rec=rec)
-                    t = int(t)
+                    try:
+                        t = int(t)
+                    except ValueError:
+                        time = list(range(*d.extent))
+                        break
                     time.append(t)
                 okey = self.dimensions.rev_map(d)
                 # print(okey, time)
