@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "TOUZA-Zbt"
-version = "0.1"
+version = "0.2"
 authors = [{name="SAITO Fuyuki", email="saitofuyuki@jamstec.go.jp"}, ]
 description = "Python extensions with TOUZA"
 readme = {file = "README-zbt.org", content-type = "text/plain"}
@@ -25,6 +25,9 @@ dependencies = [
 
 [tool.setuptools]
 packages = ["zbt"]
+
+# [tool.setuptools.exclude-package-data]
+# zbt = ["tests"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["zbt"]

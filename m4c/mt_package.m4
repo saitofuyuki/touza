@@ -1,7 +1,7 @@
 dnl Filename:   touza/m4c/mt_package.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 7 2020
-dnl Time-stamp: <2023/01/31 08:50:08 fuyuki mt_package.m4>
+dnl Time-stamp: <2024/08/14 13:01:43 fuyuki mt_package.m4>
 
 dnl Copyright: 2020, 2021 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -81,7 +81,7 @@ AC_DEFUN([_MT_SUB_PACKAGE],
        [AC_ARG_ENABLE([sub-$1],
                       [AS_HELP_STRING([--enable-sub-$1=(yes|no)],
                                       [whether to build $1 subpackage.  @<:@default=yes@:>@])],
-                      [], [])],
+                      [], [MT_VAR_ENABLE([$1])=$2])],
        )])# _MT_SUB_PACKAGE
 
 # MT_VAR_ENABLE(SUB)
@@ -202,6 +202,7 @@ AC_DEFUN([_MT_PACKAGE_LOAD],
          [yes],    [AC_MSG_NOTICE([load subpackage $1])],
          [dep],    [AC_MSG_NOTICE([load subpackage $1 (dependency)])],
          [no],     [AC_MSG_NOTICE([skip subpackage $1])],
+         [build],  [AC_MSG_NOTICE([(if possible) build-only subpackage $1])],
          [AC_MSG_FAILURE([invalid switch for subpackage $1 @S|@$2."])])
 AS_IF([test x"@S|@$2" != xno],
       [MT_LOAD([$3], [$1])])

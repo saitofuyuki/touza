@@ -1,7 +1,7 @@
 !!!_! trapiche_transfer.F90 - TOUZA/Trapiche(trapiche) communication
 ! Maintainer: SAITO Fuyuki
 ! Created: May 21 2022
-#define TIME_STAMP 'Time-stamp: <2024/02/02 09:41:39 fuyuki trapiche_transfer.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/08/13 20:14:23 fuyuki trapiche_transfer.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -20,6 +20,7 @@ module TOUZA_Trp_transfer
 !!!_ = declaration
   use TOUZA_Trp_std,only: KI32, KDBL, KFLT
   use TOUZA_Trp_std,only: unit_global,  trace_fine,   trace_control
+  use TOUZA_Trp_std,only: MPI_PROBE, MPI_GET_COUNT
   implicit none
   private
 !!!_  - parameters
@@ -204,7 +205,11 @@ contains
     endif
     if (ierr.eq.0) nw = retrieve_nbgz(works) + KB_HEAD
     if (ierr.eq.0) then
+#if HAVE_FORTRAN_MPI_MPI_ISEND
        call MPI_Isend(works, nw, KMTGT, irank, ktag, icomm, ireq, ierr)
+#else
+       ierr = ERR_NOT_IMPLEMENTED
+#endif
     endif
     ! if (ierr.eq.0) then
     !    call show_bagazo_props(ierr, works)
@@ -218,7 +223,7 @@ contains
        &  vmiss)
     use TOUZA_Trp_std,only: MPI_INTEGER, MPI_STATUS_SIZE
 #if OPT_USE_MPI
-    use MPI,only: MPI_Probe
+    ! use MPI,only: MPI_Probe, MPI_Get_count
 #endif /* OPT_USE_MPI */
 #  if HAVE_FORTRAN_MPI_MPI_IRECV
     use MPI,only: MPI_Irecv
@@ -250,7 +255,11 @@ contains
        endif
     endif
     if (ierr.eq.0) then
+#  if HAVE_FORTRAN_MPI_MPI_IRECV
        call MPI_Irecv(workr, nw, KMTGT, irank, ktag, icomm, ireq, ierr)
+#  else
+       ierr = ERR_NOT_IMPLEMENTED
+#  endif
     endif
     if (ierr.eq.0) then
        nc = retrieve_ncnz(workr)
@@ -380,16 +389,28 @@ contains
        case (SCHEME_PLAIN)
           ! out-bound
           if (ir.eq.irfrom) then
+#if HAVE_FORTRAN_MPI_MPI_ISEND
              call MPI_Isend(v0, n, KMTGT, irto,   ktag, icomm, ireqs, ierr)
+#else
+       ierr = ERR_NOT_IMPLEMENTED
+#endif
           endif
           if (ir.eq.irto) then
+#  if HAVE_FORTRAN_MPI_MPI_IRECV
              call MPI_Irecv(v1, n, KMTGT, irfrom, ktag, icomm, ireqr, ierr)
+#  else
+             ierr = ERR_NOT_IMPLEMENTED
+#  endif
           endif
           if (ir.eq.irfrom) call MPI_Wait(ireqs, istts, ierr)
           if (ir.eq.irto)   call MPI_Wait(ireqr, isttr, ierr)
           ! in-bound
           if (ir.eq.irto) then
+#if HAVE_FORTRAN_MPI_MPI_ISEND
              call MPI_Isend(v1, n, KMTGT, irfrom, ktag, icomm, ireqs, ierr)
+#else
+             ierr = ERR_NOT_IMPLEMENTED
+#endif
           endif
           if (ir.eq.irfrom) then
              call MPI_Irecv(v2, n, KMTGT, irto,   ktag, icomm, ireqr, ierr)
