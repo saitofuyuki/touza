@@ -1,7 +1,7 @@
 # touza/zbt/tests Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/08/15 11:07:23 fuyuki Makefile.am>
+# Time-stamp: <2024/08/21 00:24:53 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -34,3 +34,27 @@ $(COPY_SOURCES_TARGETS):
 		echo "clone $(srcdir)/$${target}"; \
 		cp $(srcdir)/$${target} $(builddir)/$${target} || exit $$?; \
 	fi
+
+link-sources: link-sources-am
+
+clean-link-sources: clean-link-sources-am
+
+link-sources-am:
+	@for target in $(COPY_SOURCES_TARGETS); do \
+		target=`echo "$$target" | sed -e 's/^copy-//'`; \
+		if test -e $(builddir)/$${target}; then \
+			echo "exists $${target}."; \
+		else \
+			echo "symbolic link $(srcdir)/$${target}"; \
+			$(LN_S) $(srcdir)/$${target} $(builddir)/$${target} || exit $$?; \
+		fi; \
+	done
+
+clean-link-sources-am:
+	@for target in $(COPY_SOURCES_TARGETS); do \
+		target=`echo "$$target" | sed -e 's/^copy-//'`; \
+		if test -h $(builddir)/$${target}; then \
+			echo "remove symbolic link $${target}."; \
+			rm $(builddir)/$${target} || exit $$?; \
+		fi; \
+	done
