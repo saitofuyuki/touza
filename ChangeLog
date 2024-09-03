@@ -1,3 +1,10 @@
+Release-1.12.3.6 / 2024-09-03
+=============================
+
+  * zbt: increment version.
+  * zbt: (zbcont) color method, title text, etc (to improve more).
+  * zbt: (dsnio) attributes improved (workaround for eta coordinates)
+
 Release-1.12.3.5 / 2024-08-15
 =============================
 

@@ -270,7 +270,7 @@ class TouzaNioDataset(_TouzaNio):
         """Dummy procedure to return 0 for number of records"""
         return 0
 
-    def get(self, elem, default=None, sep=None):
+    def get(self, elem, default=None, sep=None, family=False):
         """Recursive search of group/variable."""
         sep = self.sep
         if isinstance(elem, str):
@@ -289,8 +289,11 @@ class TouzaNioDataset(_TouzaNio):
                 break
         if path:
             v = sep.join(path)
-            if v in g.variables:
-                return g.variables[v]
+            fam = g.variables.get_family(v, [])
+            if family:
+                return fam or default
+            if len(fam) == 1:
+                return fam[0]
             return default
         return g
 
@@ -644,12 +647,21 @@ class TouzaNioVar(_TouzaCoreVar):
         buf = buf.reshape(shape)
         return buf
 
-    def getattr(self, item, rec=None, conv=None, **kwds):
+    def getattr(self, item, rec=None, conv=None, uniq=False, **kwds):
         """Get attribute corresponding to item (number or name)."""
         ds = self.dataset
         rec = rec or 0
-        return ds.lib.header_get_attr(item, ds.handle, self.handle,
-                                      rec=rec, conv=conv)
+        if numpy.iterable(rec):
+            res = [ds.lib.header_get_attr(item, ds.handle, self.handle,
+                                          rec=r, conv=conv)
+                   for r in rec]
+            if uniq:
+                if len(set(res)) == 1:
+                    return res[0]
+            return type(rec)(res)
+        else:
+            return ds.lib.header_get_attr(item, ds.handle, self.handle,
+                                          rec=rec, conv=conv)
 
     def _attrs(self, rec=None):
         """Iterator of attributes in Nio variable"""
@@ -838,10 +850,19 @@ class TouzaNioCoDataset(TouzaNioDataset):
                 if isinstance(grps, str):
                     grps = [grps]
                 for g in grps:
-                    c = ds.get((g, item,))
-                    if c is not None:
-                        return c
+                    if self.is_eta_coordinate(item):
+                        cc = ds.get((g, item,), family=True)
+                        if cc:
+                            return cc[0]
+                    else:
+                        c = ds.get((g, item,))
+                        if c is not None:
+                            return c
         return None
+
+    def is_eta_coordinate(self, item):
+        item = item.lower()
+        return item[1:].startswith('eta')
 
     def search_cofile(self, base, paths):
         """Search gtool axis file in paths"""
