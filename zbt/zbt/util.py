@@ -163,6 +163,13 @@ class NameMap(dict):
         arr = super().__getitem__(key)
         arr[idx:idx] = [None] * num
 
+    def get_family(self, key, default=None):
+        """Get all the values or default corresponding to key-name."""
+        key, _ = self._decompose_key(key)
+        if super().__contains__(key):
+            return [val for val in super().__getitem__(key) if val is not None]
+        return default
+
     def list_family(self, key):
         """Get all the values corresponding to key-name."""
         key, _ = self._decompose_key(key)

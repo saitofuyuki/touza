@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/08/13 11:28:57 fuyuki zbcont.py>
+# Time-stamp: <2024/09/03 15:31:48 fuyuki zbcont.py>
 
 import sys
 import math
 import numpy as np
 import argparse as ap
 import xarray as xr
+import cProfile
+import matplotlib as mplib
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtc
+import matplotlib.gridspec as mgs
+import mpl_toolkits.axes_grid1 as mag
+import util
 
 class SliceStatus:
     """tuple of slices with bidirectional increment"""
@@ -113,11 +119,49 @@ class SliceStatus:
         return self.status < 0
 
     def extract(self, var):
-        """Slice extraction"""
+        """Slice extraction.  A workaround to update record attributes."""
         if self.status == 0:
             sel = tuple(s if s is not None else slice(None, None)
                         for s in self.sel)
-            return var[sel]
+            # print(sel)
+            nv = var.attrs.get('_nio_var')
+            # assume record dimension is the first
+            if nv.recdim:
+                rec = sel[0]
+            else:
+                rec = None
+            attrs = {}
+            for a, ai in nv.attrs():
+                av = nv.getattr(a, rec=rec).strip()
+                ai = util.tostr(ai)
+                if av:
+                    attrs[ai] = av
+            for ak in ['ETTL', 'EDIT', ]:
+                aa = []
+                for a, ai in nv.attrs():
+                    ai = util.tostr(ai)
+                    if ai.startswith(ak):
+                        av = nv.getattr(a, rec=rec).strip()
+                        if av:
+                            aa.append(av)
+                if aa:
+                    attrs[ak] = aa
+
+            for ai in ['DIVL', 'DIVS', 'DMIN', 'DMAX', ]:
+                if ai in attrs:
+                    attrs[ai] = float(attrs[ai])
+            for src in [('units', 'UNIT'),
+                        ('long_name', 'TITL1', 'TITL2'), ]:
+                dst = src[0]
+                av = ''
+                for i in src[1:]:
+                    av = av + attrs.get(i, '')
+                if av:
+                    attrs[dst] = av
+
+            vsel = var[sel]
+            vsel.attrs.update(attrs)
+            return vsel
         raise ValueError(f"Extraction out of bounds {self.status}")
 
     def pos_phys(self, var, dataset):
@@ -148,6 +192,9 @@ class SliceStatus:
 class ContourPlot:
     """Contour plot with key-press control"""
     figdim = 2
+    prompt = '>'
+    bar_ratio = (20, 1)
+    contour_linewidths = [1.0, 1.5, 2.0, ]
 
     def __init__(self,  opts):
         self.opts = opts
@@ -161,13 +208,6 @@ class ContourPlot:
         self.cid = None
 
         self.new_figure()
-        # fig, ax = plt.subplots()
-        # cax = ax.inset_axes([1.03, 0, 0.05, 1], transform=ax.transAxes)
-
-        # self.cid = fig.canvas.mpl_connect('key_press_event', self)
-        # self.fig = fig
-        # self.ax = ax
-        # self.cax = cax
 
         self.update()
 
@@ -219,17 +259,15 @@ class ContourPlot:
             self.fig.canvas.flush_events()
             # self.fig.canvas.mpl_disconnect(self.cid)
 
-        self.fig, self.ax = plt.subplots()
-        self.fig.canvas.manager.show()
-        self.cax = self.ax.inset_axes([1.03, 0, 0.05, 1],
+        self.fig = plt.figure(figsize=[9.6, 4.8])
+        # self.gs = mgs.GridSpec(1, 2, width_ratios=self.bar_ratio)
 
-                                      transform=self.ax.transAxes)
+        self.fig.canvas.manager.show()
         self.cid = self.fig.canvas.mpl_connect('key_press_event', self)
 
 
     def update(self):
         """Update plot"""
-        # print('status:', self.jsel.status, self.jsel.sel, self.jvar, self.jfile)
         while True:
             if self.jsel.status < -1 or self.jsel.status > +1:
                 plt.close()
@@ -287,7 +325,6 @@ class ContourPlot:
                 self.jsel.wait()
                 continue
             break
-        self.set_ticks(vv.dims, vv.coords)
 
         pos = []
         for p in self.jsel.pos_phys(vv, ds):
@@ -296,13 +333,175 @@ class ContourPlot:
                 s = s + f"={p[2]}"
             pos.append(s)
         pos = ' '.join(pos)
-        print(f"# plot: {vk}[{self.jsel}] <{pos}>")
-        # print(vv.dims)
-        # print(self.jsel.pos_phys(vv, ds))
+        print(f"\rplot: {vk}[{self.jsel}] <{pos}>")
+
+        self.fig.clf()
+        self.ax = self.fig.add_subplot()
+        self.ax.set_aspect(1)
+
         xv = self.jsel.extract(vv)
-        # print(xv)
-        xv.plot(ax=self.ax, cbar_ax=self.cax)
+        self.set_ticks(xv.dims, xv.coords)
+
+        vkw = {}
+        if self.opts.range is not None:
+            r = self.opts.range + ','
+            r = r.split(',')
+            if r[0]:
+                vkw['vmin'] = float(r[0])
+            if r[1]:
+                vkw['vmax'] = float(r[1])
+
+        self.color(self.opts.colors, xv, self.opts.color_method, **vkw)
+        self.contour(self.opts.contours, xv, colors='k', **vkw)
+        self.add_titles(xv, self.opts)
+
+        # self.ax.set_title('Left title\n' '123', loc='left')
+
         self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+        # wpx = int(self.fig.get_figwidth()  * self.fig.get_dpi())
+        # hpx = int(self.fig.get_figheight() * self.fig.get_dpi())
+        # print(f'figure size: {wpx} x {hpx} [px]')
+        print(self.prompt, end=' ', flush=True)
+
+    def add_titles(self, vv, opts, **kw):
+        """annotation"""
+        # layout 3 of gtool
+        left = []
+        left.append(vv.attrs.get('long_name', ''))
+        left.append(vv.attrs.get('units', ''))
+        left.append(vv.attrs.get('ITEM', '')
+                    + ' '
+                    + ' '.join(vv.attrs.get('ETTL', [''])))
+
+        self.ax.set_title('\n'.join(left), loc='left')
+
+        right = []
+        right.append(vv.attrs.get('DSET', ''))
+        dt0 = self.parse_date(vv.attrs, 'DATE')
+        dt1 = self.parse_date(vv.attrs, 'DATE1')
+        dt2 = self.parse_date(vv.attrs, 'DATE2')
+        if (dt0 != dt1 or dt1 != dt2 or dt2 != dt0) and dt1 and dt2:
+            cal = '/'.join(dt1[:3]) + ' ' + ':'.join(dt1[3:6])
+            cal = cal + '-'
+            cal = cal + '/'.join(dt2[:3]) + ' ' + ':'.join(dt2[3:6])
+        else:
+            cal = '/'.join(dt0[:3]) + ' ' + ':'.join(dt0[3:6])
+        right.append(cal)
+        right.append('')
+
+        self.ax.set_title('\n'.join(right), loc='right')
+
+    def parse_date(self, attrs, key):
+        dt = attrs.get(key, '').strip()
+        if dt:
+            dt = dt.split(' ')
+            if len(dt) == 1:
+                d = dt[-2:]
+                m = dt[-4:-2]
+                y = dt[:-4]
+                h, mi, s = '', '', ''
+            else:
+                tm = dt[1]
+                dt = dt[0]
+                d = dt[-2:]
+                m = dt[-4:-2]
+                y = dt[:-4]
+                s = tm[-2:]
+                mi = tm[-4:-2]
+                h = tm[:-4]
+
+            return (y, m, d, h, mi, s)
+        else:
+            return None
+
+    def contour(self, opts, array, **vkw):
+        """matplotlib contour wrapper."""
+        # --contours=0              no contour
+        # --contours=INT[/INT...]   contour intervals
+        # --contours=LEV,[LEV,...]  explicit contour levels
+        # --contours=NUM:[STEP]     total number of contour lines
+        if opts is None:
+            c = array.plot.contour(ax=self.ax, **vkw)
+            self.ax.clabel(c)
+            return
+        isep = '/'
+        lsep = ','
+        nsep = ':'
+
+        for j, item in enumerate(opts.split(isep)):
+            jw = min(j, len(self.contour_linewidths) - 1)
+            w = self.contour_linewidths[jw]
+            step = 0
+            kw = {}
+            if lsep in item:
+                kw['levels'] = [float(jj) for jj in item.split(lsep) if jj]
+            elif nsep in item:
+                nums = [int(jj) for jj in item.split(nsep) if jj]
+                kw['locator'] = mtc.MaxNLocator(nums[0] + 1)
+                step = nums[1]
+            else:
+                item = float(item)
+                if item <= 0:
+                    continue
+                kw['locator'] = mtc.MultipleLocator(item)
+
+            c = array.plot.contour(ax=self.ax, linewidths=w, **vkw, **kw)
+            self.ax.clabel(c)
+            print(c.levels)
+            if step > 1:
+                jw2 = min(jw + 1, len(self.contour_linewidths) - 1)
+                w2 = self.contour_linewidths[jw2]
+                c = array.plot.contour(ax=self.ax, levels=c.levels[::step],
+                                       linewidths=w2)
+
+    def color(self, opts, array, method=None, **vkw):
+        """matplotlib contour wrapper."""
+        # --colors=0                 no fill
+        # --colors=INT               intervals
+        # --colors=LEV,[LEV,...]     explicit levels
+        # --colors=NUM:              total number of colors
+
+        # Notes: xarray.plot.contourf and locator
+        #    Since locator argument is not passed to matplotlib in xarray,
+        #    a different approach from contour().is needed.
+
+        method = method or 'contourf'
+
+        kw = {}
+        item = opts
+        # print(item)
+        if item is None:
+            kw['levels'] = None
+        else:
+            lsep = ','
+            nsep = ':'
+            if lsep in item:
+                kw['levels'] = [float(jj) for jj in item.split(lsep) if jj]
+            elif nsep in item:
+                nums = [int(jj) for jj in item.split(nsep) if jj]
+                loc = mtc.MaxNLocator(nums[0] + 1)
+                vmin = vkw.get('vmin') or array.min().values
+                vmax = vkw.get('vmax') or array.max().values
+                kw['levels'] = loc.tick_values(vmin, vmax)
+            else:
+                item = float(item)
+                if item > 0:
+                    loc = mtc.MultipleLocator(item)
+                    vmin = vkw.get('vmin') or array.min().values
+                    vmax = vkw.get('vmax') or array.max().values
+                    kw['levels'] = loc.tick_values(vmin, vmax)
+                else:
+                    return
+        func = getattr(array.plot, method, None)
+        if func is None:
+            raise ValueError(f"invalid method {method}.")
+        c = func(ax=self.ax, add_colorbar=True,
+                 cbar_kwargs={'shrink': 0.6},
+                 **vkw, **kw)
+        # c = array.plot.contourf(ax=self.ax, add_colorbar=True,
+        #                         cbar_kwargs={'shrink': 0.6},
+        #                         **vkw, **kw)
 
     def set_ticks(self, dims, coords):
         for c, f in [(-1, self.ax.set_xticks),
@@ -323,6 +522,26 @@ class ContourPlot:
                 h = math.ceil(h / v) * v
                 f(np.arange(l, h + v, v), minor=True)
 
+def num_or_list(arg, array, lsep=None, isep=None):
+    """Parse arg as number if single or list if with separator."""
+    if arg is None:
+        return None
+    lsep = lsep or ','
+    if lsep in arg:
+        return [int(j) for j in arg.split(lsep)]
+    isep = isep or '/'
+    if isep in arg:
+        low, high = array.min().values, array.max().values
+        ret = []
+        for ci in arg.split(isep):
+            if ci:
+                ci = float(ci)
+                le = math.floor(low / ci) * ci
+                he = math.ceil(high / ci) * ci
+                ret.append(np.arange(le, he, ci))
+        return ret
+    return int(arg)
+
 def main(argv, root=None):
     """Contour plot with TOUZA/Zbt."""
     opts = parse_arguments(argv, root)
@@ -342,13 +561,36 @@ def parse_arguments(argv, root=None):
                         type=str,
                         nargs='+',
                         help='files, possibly with specifiers')
+    parser.add_argument('--contours',
+                        metavar='INTERVAL[/...]|LEVEL,[...]|NUMBER:[STEP]',
+                        type=str,
+                        help='list of contour intervals, '
+                             'list of specified levels, '
+                             'or number of contour levels')
+    parser.add_argument('--colors',
+                        metavar='INTERVAL|LEVEL,[...]|NUMBER:',
+                        type=str,
+                        help='list of color intervals, '
+                             'list of specified levels, '
+                             'or number of color levels')
+    parser.add_argument('--color-method',
+                        metavar='METHOD',
+                        choices=['contourf', 'pcolormesh', 'imshow'],
+                        help='coloring method')
+
+    parser.add_argument('--range',
+                        metavar='[LOW][,[HIGH]]',
+                        type=str,
+                        help='data range to draw')
     return parser.parse_args(argv)
 
 
 def _driver():
     """Command line driver."""
     main(sys.argv[1:], sys.argv[0])
-
+    # with cProfile.Profile() as pr:
+        # main(sys.argv[1:], sys.argv[0])
+        # pr.print_stats()
 
 if __name__ == '__main__':
     _driver()

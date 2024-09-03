@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 # build-backend = "hatchling.build"
 
 [project]
-name = "TOUZA-Zbt"
-version = "0.2"
+name = "touza-zbt"
+version = "0.2.1"
 authors = [{name="SAITO Fuyuki", email="saitofuyuki@jamstec.go.jp"}, ]
 description = "Python extensions with TOUZA"
 readme = {file = "README-zbt.org", content-type = "text/plain"}
