@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/08/15 10:46:53 fuyuki configure.ac>
+# Time-stamp: <2024/09/03 22:28:38 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -227,6 +227,7 @@ AX_PYTHON()
 AX_PYTHON_MODULE([ctypes], , [python3])
 AX_PYTHON_MODULE([numpy], , [python3])])
 AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
+AC_CONFIG_FILES([zbt/pyproject.toml:zbt/pyproject.in])
 AC_CONFIG_FILES([zbt/zbt/Makefile])
 AC_CONFIG_FILES([zbt/tests/Makefile])
 AM_CONDITIONAL([ZBT_BUILD_ONLY], [test "x$enable_sub_zbt" = xbuild])
