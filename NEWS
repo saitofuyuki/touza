@@ -1,12 +1,13 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2024/09/03 16:47:49 fuyuki NEWS>
+# Time-stamp: <2024/09/04 08:04:44 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
-* Changes in 1.12.3.6 from 1.12.3.5
+* Changes in 1.12.3.7 from 1.12.3.5
+- synchronize python package version
 - improve zbcont, to emulate legacy gtcont
 - restructure and clean python packaging.
 
