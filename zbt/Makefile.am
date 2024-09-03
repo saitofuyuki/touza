@@ -1,7 +1,7 @@
 # touza/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/08/15 11:09:34 fuyuki Makefile.am>
+# Time-stamp: <2024/08/21 00:24:04 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -29,6 +29,34 @@ python-build-prepare: copy-sources
 
 python-build: python-build-prepare
 	$(PYTHON) -m build
+
+link-sources: link-sources-am
+	@for d in $(SUBDIRS); \
+		do ( cd $$d; $(MAKE) link-sources ); done
+
+clean-link-sources: clean-link-sources-am
+	@for d in $(SUBDIRS); \
+		do ( cd $$d; $(MAKE) clean-link-sources ); done
+
+link-sources-am:
+	@for target in $(COPY_SOURCES_TARGETS); do \
+		target=`echo "$$target" | sed -e 's/^copy-//'`; \
+		if test -e $(builddir)/$${target}; then \
+			echo "exists $${target}."; \
+		else \
+			echo "symbolic link $(srcdir)/$${target}"; \
+			$(LN_S) $(srcdir)/$${target} $(builddir)/$${target} || exit $$?; \
+		fi; \
+	done
+
+clean-link-sources-am:
+	@for target in $(COPY_SOURCES_TARGETS); do \
+		target=`echo "$$target" | sed -e 's/^copy-//'`; \
+		if test -h $(builddir)/$${target}; then \
+			echo "remove symbolic link $${target}."; \
+			rm $(builddir)/$${target} || exit $$?; \
+		fi; \
+	done
 
 copy-sources: $(COPY_SOURCES_TARGETS)
 
