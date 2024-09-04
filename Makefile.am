@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/08/12 06:50:58 fuyuki Makefile.am>
+# Time-stamp: <2024/09/03 22:36:32 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -136,6 +136,11 @@ export: $(AUTOREVISION_h)
 		export=`$(REALPATH) --relative-to=$(top_builddir) $(EXPORT)` || exit $$?; \
 		$(MAKE) distdir=$${export} distdir; \
 	fi
+
+if BUILD_zbt
+python-build:
+	@cd zbt; $(MAKE) $@
+endif
 
 include Makedep.inc
 

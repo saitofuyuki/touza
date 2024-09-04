@@ -1,7 +1,7 @@
-Release-1.12.3.6 / 2024-09-03
+Release-1.12.3.7 / 2024-09-04
 =============================
 
-  * zbt: increment version.
+  * zbt: synchronize python version with the package.
   * zbt: (zbcont) color method, title text, etc (to improve more).
   * zbt: (dsnio) attributes improved (workaround for eta coordinates)
 

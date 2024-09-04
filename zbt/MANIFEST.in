@@ -1,6 +1,7 @@
 include README*
 include tests
 
+exclude pyproject.in
 exclude *.m4
 exclude *.sh
 exclude */Makefile.*
