@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/09/03 15:31:48 fuyuki zbcont.py>
+# Time-stamp: <2024/09/04 08:53:56 fuyuki zbcont.py>
 
 import sys
 import math
@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtc
 import matplotlib.gridspec as mgs
 import mpl_toolkits.axes_grid1 as mag
-import util
+import zbt.util as zu
+import pathlib as plib
 
 class SliceStatus:
     """tuple of slices with bidirectional increment"""
@@ -133,13 +134,13 @@ class SliceStatus:
             attrs = {}
             for a, ai in nv.attrs():
                 av = nv.getattr(a, rec=rec).strip()
-                ai = util.tostr(ai)
+                ai = zu.tostr(ai)
                 if av:
                     attrs[ai] = av
             for ak in ['ETTL', 'EDIT', ]:
                 aa = []
                 for a, ai in nv.attrs():
-                    ai = util.tostr(ai)
+                    ai = zu.tostr(ai)
                     if ai.startswith(ak):
                         av = nv.getattr(a, rec=rec).strip()
                         if av:
@@ -552,7 +553,7 @@ def main(argv, root=None):
 
 def parse_arguments(argv, root=None):
     """Command line parser."""
-    parser = ap.ArgumentParser(prog=root)
+    parser = ap.ArgumentParser(prog=plib.Path(root).name)
     parser.add_argument('--no-decode_coords',
                         dest='decode_coords',
                         action='store_false',

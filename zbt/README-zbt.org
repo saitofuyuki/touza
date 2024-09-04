@@ -26,9 +26,9 @@ python-build~ under =zbt= directory:
 : % cd zbt
 : % make python-build
 : % ls dist
-: touza_zbt-0.2.1-py3-none-any.whl  touza_zbt-0.2.1.tar.gz
+: touza_zbt-1.12.3.7-py3-none-any.whl  touza_zbt-1.12.3.7.tar.gz
 : % . SOMEWHERE/bin/activate # switch to virtual env
-: (python3) % python3 -m pip install dist/touza_zbt-0.2.1-py3-none-any.whl
+: (python3) % python3 -m pip install dist/touza_zbt-1.12.3.7-py3-none-any.whl
 
 The shared library path is hard-coded in =zbt/zbt/config.py=, which is
 automatically generated during make.
@@ -159,7 +159,7 @@ Usage is shown by =zbcont --help=:
 : usage: zbcont [-h] [--no-decode_coords]
 :               [--contours INTERVAL[/...]|LEVEL,[...]|NUMBER:[STEP]]
 :               [--colors INTERVAL|LEVEL,[...]|NUMBER:]
-:               [--range [LOW][,[HIGH]]]
+:               [--color-method METHOD] [--range [LOW][,[HIGH]]]
 :               FILE[/SPEC] [FILE[/SPEC] ...]
 :
 : positional arguments:

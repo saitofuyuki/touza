@@ -6,8 +6,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "touza-zbt"
-version = "0.2.1"
-authors = [{name="SAITO Fuyuki", email="saitofuyuki@jamstec.go.jp"}, ]
+version = "@VERSION@"
+authors = [{name="SAITO Fuyuki", email="@PACKAGE_BUGREPORT@"}, ]
 description = "Python extensions with TOUZA"
 readme = {file = "README-zbt.org", content-type = "text/plain"}
 requires-python = ">=3.8"
