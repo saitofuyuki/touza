@@ -443,6 +443,13 @@ class _TouzaCoreVar(_TouzaNio):
         yield from self._attrs(rec=rec)
 
     @property
+    def recidx(self):
+        """Record coordinate index or None"""
+        if self.recdim:
+            return self.dimensions.index(self.recdim)
+        return None
+
+    @property
     def shape(self):
         """Array shape"""
         sh = ()
@@ -510,6 +517,11 @@ class _TouzaCoreVar(_TouzaNio):
         dump.append(f"shape = {self.shape}")
         return '\n'.join(dump)
 
+    def get_amap(self, rec=None, conv=None, uniq=False, **kwds):
+        """Dummy procedure to overload."""
+        # print(self, rec, conv, uniq, kwds)
+        return {}
+
 
 class TouzaMemVar(_TouzaCoreVar):
     """Variable property"""
@@ -570,40 +582,29 @@ class TouzaNioVar(_TouzaCoreVar):
         return obj
 
     def __getitem__(self, elem):
-        nd = len(self.dimensions)
-        if numpy.iterable(elem):
-            if len(elem) > nd:
-                raise TypeError
-            elem = tuple(elem)
-            elem = elem + (slice(None, None, None), ) * (nd - len(elem))
-        else:
-            elem = (elem,) + (slice(None, None, None), ) * (nd - 1)
+        elem = util.Selection(elem, self.dimensions)
         start = ()
         count = ()
-        shape = ()
         for e, d in zip(elem, self.dimensions):
             o = d.extent[0]
-            if isinstance(e, int):
-                start = start + (e + o, )
-                count = count + (1, )
-            elif isinstance(e, slice):
-                if e.step is not None and e.step != 1:
-                    raise ValueError("Only value 1 "
-                                     f"is allowed for slice step {e}.")
-                st = e.start or 0
-                if st < 0:
-                    st = d.size + st
-                en = e.stop or d.size
-                if en < 0:
-                    en = d.size + en
-                co = en - st
-                start = start + (st + o, )
-                count = count + (co, )
-                shape = shape + (co, )
+            if e.step is not None and e.step != 1:
+                raise ValueError("Only value 1 "
+                                 f"is allowed for slice step {e}.")
+            st = e.start or 0
+            if st < 0:
+                st = d.size + st
+            en = e.stop or d.size
+            if en < 0:
+                en = d.size + en
+            co = en - st
+            start = start + (st + o, )
+            count = count + (co, )
+        shape = count
         if self.recdim:
-            recs = (start[0], count[0])
-            start = start[1:]
-            count = count[1:]
+            jrec = self.dimensions.index(self.recdim)
+            recs = (start[jrec], count[jrec])
+            start = start[:jrec] + start[jrec+1:]
+            count = count[:jrec] + count[jrec+1:]
         else:
             recs = (0, 1)
         unit = numpy.prod(count)
@@ -645,13 +646,78 @@ class TouzaNioVar(_TouzaCoreVar):
         if miss:
             buf = numpy.ma.masked_equal(buf, miss)
         buf = buf.reshape(shape)
+        # buf = buf.reshape(count)
+        # buf = buf.squeeze()
         return buf
+
+    def attr_map(self, rec=None, cls=None, conv=None, **kwds):
+        ds = self.dataset
+        rec = rec or 0
+        hd = ds.lib.header_list_attrs(ds.handle, self.handle, rec=rec,
+                                      conv=conv)
+        cls = cls or dict
+        if issubclass(cls, list):
+            return cls(hd)
+        if issubclass(cls, tuple):
+            return cls(hd)
+        if issubclass(cls, dict):
+            ret = {}
+            la = ds.lib.tnb_attr_len(' ', ds.handle, self.handle)
+            for a in range(ds.lib.tnb_attr_size(ds.handle, self.handle, rec)):
+                a = a + 1
+                item = CT.create_string_buffer(la + 1)
+                ds.lib.tnb_get_attr_name(item, a)
+                k = item.value
+                if conv:
+                    k = k.decode()
+                ret[k] = hd[a-1]
+            return ret
+        return hd
+
+    def get_amap(self, rec=None, conv=None, uniq=False, **kwds):
+        if isinstance(rec, slice):
+            if self.recdim:
+                r = rec.indices(self.recdim.size)
+                rec = range(r[0], r[1])
+            else:
+                rec = [None]
+        elif numpy.iterable(rec):
+            pass
+        else:
+            rec = [rec, ]
+        res = {}
+        for r in rec:
+            buf = self.attr_map(r, dict, conv=conv)
+            for k, v in buf.items():
+                if k in res:
+                    res[k].append(v)
+                else:
+                    res[k] = [v]
+        if uniq:
+            for k, v in res.items():
+                if len(set(v)) == 1:
+                    res[k] = v[0]
+        # print(res)
+        return res
 
     def getattr(self, item, rec=None, conv=None, uniq=False, **kwds):
         """Get attribute corresponding to item (number or name)."""
         ds = self.dataset
         rec = rec or 0
-        if numpy.iterable(rec):
+        if isinstance(rec, slice):
+            if self.recdim:
+                r = rec.indices(self.recdim.size)
+                rec = range(r[0], r[1])
+            else:
+                rec = [None]
+            res = [ds.lib.header_get_attr(item, ds.handle, self.handle,
+                                          rec=r, conv=conv)
+                   for r in rec]
+            if uniq:
+                if len(set(res)) == 1:
+                    return res[0]
+            return tuple(res)
+        elif numpy.iterable(rec):
             res = [ds.lib.header_get_attr(item, ds.handle, self.handle,
                                           rec=r, conv=conv)
                    for r in rec]
