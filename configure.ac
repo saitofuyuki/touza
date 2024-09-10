@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/09/03 22:28:38 fuyuki configure.ac>
+# Time-stamp: <2024/10/15 15:54:11 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -221,11 +221,16 @@ AM_CONDITIONAL([enable_module_dependencies], [
   && test x"$ax_f90_modext" != xunknown])
 
 AS_IF([test "x$enable_sub_zbt" != xno],
-[AM_PATH_PYTHON([3.8], ,
+[AM_PATH_PYTHON([3.9], ,
                 [AC_MSG_ERROR([cannot enable zbt.  check python environemnt])])
 AX_PYTHON()
-AX_PYTHON_MODULE([ctypes], , [python3])
-AX_PYTHON_MODULE([numpy], , [python3])])
+AX_PYTHON_MODULE([ctypes], [FATAL], [python3])
+AX_PYTHON_MODULE([numpy], [FATAL], [python3])
+AX_PYTHON_MODULE([xarray], [FATAL], [python3])
+AX_PYTHON_MODULE([build], [FATAL], [python3])
+AX_PYTHON_MODULE([matplotlib], [FATAL], [python3])])
+AX_PYTHON_MODULE([cartopy], [FATAL], [python3])
+AX_PYTHON_MODULE([tomllib], [FATAL], [python3])
 AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
 AC_CONFIG_FILES([zbt/pyproject.toml:zbt/pyproject.in])
 AC_CONFIG_FILES([zbt/zbt/Makefile])

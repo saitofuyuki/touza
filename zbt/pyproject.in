@@ -10,7 +10,7 @@ version = "@VERSION@"
 authors = [{name="SAITO Fuyuki", email="@PACKAGE_BUGREPORT@"}, ]
 description = "Python extensions with TOUZA"
 readme = {file = "README-zbt.org", content-type = "text/plain"}
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",
@@ -20,7 +20,7 @@ classifiers = [
 # dynamic = ["version"]
 
 dependencies = [
-    "numpy", "matplotlib", "xarray",
+    "numpy", "matplotlib", "xarray", "cartopy",
 ]
 
 [tool.setuptools]
