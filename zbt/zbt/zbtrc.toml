@@ -1,5 +1,8 @@
 [zbcont]
 
+[zbcont.option]
+permute.skip_single = true
+
 [zbcont.keymap]
 quit = 'Q'
 next_cyclic = 'right'
@@ -12,6 +15,7 @@ mark = 'M'
 enlarge = '+'
 shrink = '-'
 reset_geometry = '='
+print = 'p'
 
 [zbcont.keymap.figure]
 quit = 'q'
@@ -21,8 +25,8 @@ info = 'i'
 mark = 'm'
 
 [zbcont.keymap.coordinate]
-next_cyclic = 'a'
-prev_cyclic = ''
+next_cyclic = ']'
+prev_cyclic = '['
 next = ''
 prev = ''
 transpose = ':'

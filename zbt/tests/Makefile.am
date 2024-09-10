@@ -1,7 +1,7 @@
 # touza/zbt/tests Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/08/21 00:24:53 fuyuki Makefile.am>
+# Time-stamp: <2024/10/09 07:45:52 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -13,6 +13,7 @@ EXTRA_DIST = gen_demo.sh
 
 noinst_PYTHON = 
 noinst_PYTHON += test_libtouza.py test_xrnio.py test_dsnio.py
+noinst_PYTHON += test_iter.py test_linkedarray.py
 
 copy_sources = $(noinst_PYTHON)
 COPY_SOURCES_TARGETS = $(copy_sources:%=copy-%)

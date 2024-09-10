@@ -1,7 +1,7 @@
 # touza/zbt/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/09/27 15:09:23 fuyuki Makefile.am>
+# Time-stamp: <2024/10/09 16:50:35 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -14,6 +14,7 @@ else
 pkgpython_PYTHON = __init__.py
 pkgpython_PYTHON += util.py libtouza.py dsnio.py
 pkgpython_PYTHON += xrnio.py
+pkgpython_PYTHON += layout.py plot.py control.py
 pkgpython_PYTHON += zbcont.py
 
 # pkgpython_PYTHON += param.py
@@ -25,6 +26,7 @@ endif
 copy_sources = __init__.py
 copy_sources += util.py libtouza.py dsnio.py
 copy_sources += xrnio.py zbcont.py
+copy_sources += layout.py plot.py control.py
 copy_sources += zbtrc.toml
 
 EXTRA_PYTHON =

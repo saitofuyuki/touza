@@ -20,8 +20,8 @@ from . import dsnio
 from . import util
 
 
-# special_attr = '_nio_var'
-_recdim_attr = '_nio_recdim'
+_RECDIM_ATTR = '_nio_recdim'
+
 
 class xrNioDataArray(xr.DataArray):
     """Wrap class Xarray.DataArray for TOUZA/Nio integration."""
@@ -30,76 +30,32 @@ class xrNioDataArray(xr.DataArray):
     def isel(self, indexers=None, drop=False,
              missing_dims='raise', **indexers_kwargs):
         va = super().isel(indexers, drop, missing_dims, **indexers_kwargs)
-        recdim = va.attrs.get(_recdim_attr, None)
-        d0 = self.attrs.get('_ignore_DMIN', None)
+        recdim = va.attrs.get(_RECDIM_ATTR, None)
+        # d0 = self.attrs.get('_ignore_DMIN', None)
         # print(recdim)
         # print(indexers, self.dims, va.dims)
-        if recdim:
-            rsel = indexers.get(recdim, None)
-            # print(rsel)
-            if rsel is not None:
-                for k, v in va.attrs.items():
-                    if isinstance(v, tuple):
-                        va.attrs[k] = v[rsel]
-        for co, sel in indexers.items():
-            oco = self.coords[co]
-            nco = va.coords.get(co, None)
-            if nco is None:
-                continue
-            if isinstance(sel, slice):
-                dmin, dmax = 'DMIN', 'DMAX'
-                if oco[0] > oco[-1]:
-                    dmin, dmax = dmax, dmin
-                if sel.start is not None:
-                    nco.attrs[f'_ignore_{dmin}'] = True
-                if sel.stop is not None:
-                    nco.attrs[f'_ignore_{dmax}'] = True
-                # for d in [dmin, dmax]:
-                #     k = f'_ignore_{d}'
-                #     print(self.name, oco.name,
-                #           oco.attrs.get(k, None), oco.shape,
-                #           nco.attrs.get(k, None), nco.shape)
+        if indexers:
+            if recdim:
+                rsel = indexers.get(recdim, None)
+                # print(rsel)
+                if rsel is not None:
+                    for k, v in va.attrs.items():
+                        if isinstance(v, tuple):
+                            va.attrs[k] = v[rsel]
+            for co, sel in indexers.items():
+                oco = self.coords[co]
+                nco = va.coords.get(co, None)
+                if nco is None:
+                    continue
+                if isinstance(sel, slice):
+                    dmin, dmax = 'DMIN', 'DMAX'
+                    if oco[0] > oco[-1]:
+                        dmin, dmax = dmax, dmin
+                    if sel.start is not None:
+                        nco.attrs[f'_ignore_{dmin}'] = True
+                    if sel.stop is not None:
+                        nco.attrs[f'_ignore_{dmax}'] = True
         return va
-
-    # def __getitem__(self, key):
-    #     va = super().__getitem__(key)
-    #     # print(f'{key=}')
-    #     # print(f"{self.attrs=}")
-    #     # print(f"{recidx=}")
-    #     if isinstance(key, str):
-    #         pass
-    #     elif recidx is not None:
-    #         print(f"{va.dims=}")
-    #         knml = util.Selection(key, self.shape)
-    #         # print(knml)
-    #         rec = knml[recidx]
-    #         for k, v in va.attrs.items():
-    #             # print(f"{k=} {v=}")
-    #             if isinstance(v, tuple):
-    #                 v = v[rec]
-    #                 va.attrs[k] = v
-    #     # print(va.dims)
-
-    #     # nv = va.attrs.get(_special_attr)
-    #     # # print(f"{self=} {key=} {va.shape=}")
-    #     # if nv:
-    #     #     # print(f"{nv.recidx=}")
-    #     #     if nv.recidx is None:
-    #     #         rec = None
-    #     #     else:
-    #     #         rec = key[nv.recidx]
-    #     #     amap = {}
-    #     #     for k, v in nv.get_amap(rec=rec, conv=True, uniq=True).items():
-    #     #         if isinstance(v, list):
-    #     #             v = [e.strip() for e in v]
-    #     #         else:
-    #     #             v = v.strip()
-    #     #         # if k in ['DIVL', 'DIVS', 'DMIN', 'DMAX', ]:
-    #     #         #     v = float(v)
-    #     #         amap[k] = v
-    #     #     va.attrs.update(amap)
-    #     # print(f"{va.attrs=}")
-    #     return va
 
 
 class xrNioVariable(xr.Variable):
@@ -223,7 +179,7 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
                 pass
             else:
                 recdim = dims[v.recidx]
-                attrs[_recdim_attr] = recdim
+                attrs[_RECDIM_ATTR] = recdim
 
             if decode_attrs:
                 for src in [('units', 'UNIT'),
@@ -239,11 +195,6 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
                                    strip=True, uniq=True)
                     dst = util.tostr(ai)
                     attrs[dst] = av
-                    # if isinstance(av, tuple):
-                    #     pass
-                    # else:
-                    #     dst = util.tostr(ai)
-                    #     attrs[dst] = av.strip()
 
             data = xr.core.indexing.LazilyIndexedArray(v)
             var = xrNioVariable(dims, data, attrs=attrs)

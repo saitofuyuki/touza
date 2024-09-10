@@ -28,6 +28,8 @@ def diag_datasets():
     for h, ds in _DataSets.items():
         print(f"handle: {h}")
         print(ds)
+        for gn, gg in ds.groups.items():
+            print(gg.short())
         print()
 
 
@@ -307,19 +309,34 @@ class TouzaNioDataset(_TouzaNio):
         """Call diagnose function in the library"""
         self.lib.tnb_file_diag(self.handle)
 
+    def short(self):
+        """Retrun short str version."""
+        dump = []
+        return dump
+
     def __str__(self):
         """Return str version."""
+        return self._info(attrs=True)
+
+    def short(self):
+        """Return short str version."""
+        return self._info(attrs=False)
+
+    def _info(self, attrs=None, lev=None):
+        """Return str version."""
+        attrs = True if attrs is None else False
         dump = [repr(type(self))]
         tab = ' ' * 4
         if self.parent is None:
             dump.append("root(suite) group")
         else:
             dump.append(f"group: {self.name}")
-        for a, ai in self.attrs():
-            av = self.getattr(a).strip()
-            ai = util.tostr(ai)
-            if av:
-                dump.append(f"{tab}{ai}: {av}")
+        if attrs:
+            for a, ai in self.attrs():
+                av = self.getattr(a).strip()
+                ai = util.tostr(ai)
+                if av:
+                    dump.append(f"{tab}{ai}: {av}")
 
         ds = tuple(f"{self.dimensions.format_key(dk, sep=self.sub)}"
                    f"({len(dd)})"
@@ -336,6 +353,7 @@ class TouzaNioDataset(_TouzaNio):
         dump.append(f"    dimensions(sizes): {', '.join(ds)}")
         dump.append(f"    variables(dimensions): {', '.join(vs)}")
         dump.append(f"    groups: {', '.join(gs)}")
+
         return '\n'.join(dump)
 
 
@@ -501,19 +519,29 @@ class _TouzaCoreVar(_TouzaNio):
                     for d in self.dimensions]
         return dims
 
+    def short(self):
+        """return short str"""
+        return self._info(attrs=False)
+
     def __str__(self):
         """return str"""
+        return self._info(attrs=True)
+
+    def _info(self, attrs=None):
+        """return str"""
+        attrs = True if attrs is None else False
         dump = [repr(type(self))]
         tab = ' ' * 4
         vt = util.tostr(self.dtype)
         vn = self.format_name()
         ds = ', '.join(self.format_dims())
         dump.append(f"{vt} {vn}({ds})")
-        for a, ai in self.attrs():
-            av = self.getattr(a).strip()
-            ai = util.tostr(ai)
-            if av:
-                dump.append(f"{tab}{ai}: {av}")
+        if attrs:
+            for a, ai in self.attrs():
+                av = self.getattr(a).strip()
+                ai = util.tostr(ai)
+                if av:
+                    dump.append(f"{tab}{ai}: {av}")
         dump.append(f"shape = {self.shape}")
         return '\n'.join(dump)
 
@@ -585,21 +613,27 @@ class TouzaNioVar(_TouzaCoreVar):
         elem = util.Selection(elem, self.dimensions)
         start = ()
         count = ()
+        shape = ()
+        # slicing follows numpy design:
+        #    An integer, i, returns the same values as i:i+1
+        #    except the dimensionality of the returned object is reduced by 1.
         for e, d in zip(elem, self.dimensions):
             o = d.extent[0]
-            if e.step is not None and e.step != 1:
-                raise ValueError("Only value 1 "
-                                 f"is allowed for slice step {e}.")
-            st = e.start or 0
-            if st < 0:
-                st = d.size + st
-            en = e.stop or d.size
-            if en < 0:
-                en = d.size + en
+            if isinstance(e, slice):
+                if e.step is not None and e.step != 1:
+                    raise ValueError("Only value 1 "
+                                     f"is allowed for slice step {e}.")
+                st, en, _ = e.indices(d.size)
+            else:
+                st = e
+                if st < 0:
+                    st = d.size + st
+                en = st + 1
             co = en - st
             start = start + (st + o, )
             count = count + (co, )
-        shape = count
+            if isinstance(e, slice):
+                shape = shape + (co, )
         if self.recdim:
             jrec = self.dimensions.index(self.recdim)
             recs = (start[jrec], count[jrec])
@@ -646,8 +680,6 @@ class TouzaNioVar(_TouzaCoreVar):
         if miss:
             buf = numpy.ma.masked_equal(buf, miss)
         buf = buf.reshape(shape)
-        # buf = buf.reshape(count)
-        # buf = buf.squeeze()
         return buf
 
     def attr_map(self, rec=None, cls=None, conv=None, **kwds):
@@ -792,6 +824,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
     """TOUZA/Nio dataset accompanied by coordinate variables."""
 
     gtax_env = 'GTAX_PATH'
+    _embedded = ''
     #  Null element corresponding to internal field.
     #  If the environemnt does not contain null element,
     #  then null element is inserted at the first candidate.
@@ -804,8 +837,15 @@ class TouzaNioCoDataset(TouzaNioDataset):
 
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
+        # print(f"{self.groups=}")
+
         self.shift_variables()
+        # print(self.variables)
         self.bind_coordinates()
+        # print(f'final: {self.name}', self.variables)
+        # print(f'final: {self.name}')
+        # for vn, vv in self.variables.items():
+        #     print(f"   {vv.name} {vv.dimensions_names} {id(vv)}")
 
     def createGroup(self, groupname,
                     handle=None):
@@ -814,7 +854,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
                                handle=handle)
 
     def shift_variables(self):
-        """Shift variables to reserve spaces for coodinates."""
+        """Shift variables to reserve spaces for coordinates."""
         for pfx in self.dimensions.prefix_keys():
             shift = len(self.dimensions.list_family(pfx))
             if shift > 0:
@@ -857,6 +897,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
             c = self.get_coordinate(d, paths, kind='loc')
             if c:
                 okey = self.dimensions.rev_map(d)
+                # print(f"found {okey}, {c.name}")
                 if okey in self.variables:
                     raise ValueError(f"Panic.  {okey} {self.variables}")
                 self.variables[okey] = c
@@ -865,7 +906,10 @@ class TouzaNioCoDataset(TouzaNioDataset):
         """Parse axis file paths"""
         env = env or self.gtax_env
         paths = os.environ.get(env, '.:')
-        return paths.split(':')
+        paths = paths.split(':')
+        if self._embedded not in paths:
+            paths.insert(0, self._embedded)
+        return paths
 
     def get_coordinate(self, dim, paths, kind=None):
         """Get physical coordinate Nio-handle."""
@@ -880,28 +924,47 @@ class TouzaNioCoDataset(TouzaNioDataset):
         else:
             raise ValueError(f"Unknown coordinate kind {kind}")
         for p in paths:
-            if not p:
-                # to implement in-file coordinate
-                continue
-            c = self.check_coordinate(xgrp, item, pfx, p)
+            if p == self._embedded:
+                c = self.check_coordinate_embedded(xgrp, item)
+                # if c:
+                #     print(f'embedded: {c.short()}')
+                # c = None
+            else:
+                c = self.check_coordinate_external(xgrp, item, pfx, p)
             if not c:
                 continue
+            # print(item, type(c))
             for cc in c.dimensions:
+                ## check first coordinate with the same name
+                # print('>> ', cc.name, cc.size, cc.extent)
                 if cc.name == dim.name:
                     if dim.extent[0] < cc.extent[0] \
                        or dim.extent[1] > cc.extent[1]:
                         break
                 elif cc.size > 1:
+                    ## break if the first coordinate is non scalar.
                     break
             else:
-                c = c.copy(logical=self)
-                c.squeeze()
+                # if p != self._embedded:
+                if True:
+                    c = c.copy(logical=self)
+                    c.squeeze()
                 c.replace_dim(dim)
                 return c
 
         return None
 
-    def check_coordinate(self, grps, item, pfx, path):
+    def check_coordinate_embedded(self, grps, item):
+        for gn in grps:
+            for g in self.groups.get(gn, single=False):
+                # print(gn, list(g.variables.keys()))
+                for cv in g.variables.get(item, single=False):
+                    if cv:
+                        # print(item, cv.name)
+                        return cv
+        return None
+
+    def check_coordinate_external(self, grps, item, pfx, path):
         """Get variable object corresponding to coordinate."""
         p = plib.Path(path)
         if p.is_dir():
