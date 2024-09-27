@@ -1,0 +1,46 @@
+[zbcont]
+
+[zbcont.keymap]
+quit = 'Q'
+next_cyclic = 'right'
+prev_cyclic = 'left'
+next = ' '
+prev = 'backspace'
+info = 'I'
+unmark = 'U'
+mark = 'M'
+enlarge = '+'
+shrink = '-'
+reset_geometry = '='
+
+[zbcont.keymap.figure]
+quit = 'q'
+duplicate = 'D'
+new = 'N'
+info = 'i'
+mark = 'm'
+
+[zbcont.keymap.coordinate]
+next_cyclic = 'a'
+prev_cyclic = ''
+next = ''
+prev = ''
+transpose = ':'
+
+[zbcont.keymap.file]
+next_cyclic = 'f'
+prev_cyclic = ''
+next = 'F'
+prev = ''
+
+[zbcont.keymap.variable]
+next_cyclic = 'v'
+prev_cyclic = ''
+next = 'V'
+prev = ''
+
+[zbcont.keymap.record]
+next_cyclic = 'r'
+prev_cyclic = ''
+next = ''
+prev = ''
