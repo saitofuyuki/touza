@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2024/08/01 11:34:47 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/10/07 09:23:54 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023,2024
@@ -215,7 +215,7 @@ module TOUZA_Nio_cache
   public cache_store_v0
   public cache_var_read
   public cache_read_header
-  public cache_get_attr
+  public cache_get_attr,      cache_get_header
   public cache_sparse_review, cache_restore_csr
 !!!_  - public shared
 contains
@@ -414,7 +414,7 @@ contains
           if (handle.ge.0) then
              ierr = 0
              if (is_msglev_WARNING(lev_verbose)) then
-101             format('duplicate registratin = ', A)
+101             format('duplicate registration = ', A)
                 write(txt, 101) trim(path)
                 call msg(txt)
              endif
@@ -1029,6 +1029,47 @@ contains
        enddo
     endif
   end function cache_co_idx
+
+!!!_  - cache_get_header - get all the attributes as single string
+  subroutine cache_get_header(ierr, head, handle, vid, rec)
+    use TOUZA_Nio_std,only: choice
+    use TOUZA_Nio_std,only: WHENCE_BEGIN
+    use TOUZA_Nio_header,only: get_item
+    use TOUZA_Nio_record,only: nio_read_header
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: head(*)
+    integer,         intent(in)  :: handle
+    integer,optional,intent(in)  :: vid
+    integer,optional,intent(in)  :: rec
+    integer jc, gid, rser
+    integer ufile, krect
+    integer(kind=KIOFS) rpos
+
+    jc = is_valid(handle, vid)
+    ierr = min(0, jc)
+    if (present(vid)) then
+       if (ierr.eq.0) then
+          ufile = extr_h2unit(handle)
+          rser = get_rserial(handle, vid, choice(0, rec))
+          ierr = min(0, rser)
+          if (ierr.eq.0) then
+             rpos = ctables(jc)%rpos(rser)
+             call nio_read_header(ierr, head, krect, ufile, rpos, WHENCE_BEGIN)
+          endif
+       endif
+    else
+       if (ierr.eq.0) gid = extr_h2group(handle)
+       if (ierr.eq.0) ierr = min(0, gid)
+       if (ierr.eq.0) then
+          if (gid.eq.grp_suite) then
+             ierr = _ERROR(ERR_INVALID_PARAMETER)
+          else
+             head(1:nitem) = ctables(jc)%g(gid)%h(1:nitem)
+          endif
+       endif
+    endif
+  end subroutine cache_get_header
 
 !!!_  - cache_geti_attr - by item id
   subroutine cache_geti_attr_a(ierr, attr, item, handle, vid, rec)
