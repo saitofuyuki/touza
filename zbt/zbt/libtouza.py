@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/08/15 16:53:54 fuyuki libtouza.py>
+# Time-stamp: <2024/09/30 16:25:51 fuyuki libtouza.py>
 
 __doc__ = \
     """
@@ -237,6 +237,17 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'vid', -1),
                                (CT.c_int, self.intent_in, 'rec', -1))
+        # extern int tnb_get_header(char * const head,
+        #                           const int handle, const int vid,
+        #                           const int rec);
+        self.register_function("tnb_get_header",
+                               CT.c_int,
+                               (util.AutoString, self.intent_in, 'head',),
+                               (CT.c_int, self.intent_in, 'handle',),
+                               (CT.c_int, self.intent_in, 'vid', -1),
+                               (CT.c_int, self.intent_in, 'rec', -1),
+                               err=self.errcheck_strict)
+
         # extern int tnb_get_attr(char * const attr, const char *item,
         #                         const int handle, const int vid,
         #                         const int rec);
@@ -363,6 +374,23 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         if raw:
             return (jbgn, jend, )
         return (jbgn.value, jend.value, )
+
+    def header_list_attrs(self, handle, vid=None, rec=None, conv=None):
+        if vid is None:
+            vid = -1
+        if rec is None:
+            rec = -1
+        la = self.tnb_attr_len(0, handle, vid, rec)
+        na = self.tnb_attr_size(handle, vid, rec)
+        buf = CT.create_string_buffer(na * la + 1)
+
+        # print(la, na, buf)
+        self.tnb_get_header(buf, handle, vid, rec)
+        # print(buf)
+        if conv is True:
+            buf = buf.value.decode()
+        hd = [buf[j:j+la] for j in range(0, la * na, la)]
+        return hd
 
     # pylint: disable=too-many-arguments
     def header_get_attr(self, item, handle, vid=None, rec=None, conv=None):
