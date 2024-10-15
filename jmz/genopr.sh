@@ -1,5 +1,5 @@
 #!/usr/bin/zsh -f
-# Time-stamp: <2023/12/24 21:28:50 fuyuki genopr.sh>
+# Time-stamp: <2024/10/15 11:41:03 fuyuki genopr.sh>
 
 this=$0:t
 jmzd=$0:h
@@ -289,7 +289,7 @@ register_all ()
   # register -g reduce -n 1,1 -i call -p RANK -s 'MAX=' UMAX    'maximum'
 
   # transform operation
-  #### coor=0,1,2,name,alias for coodinate, -1 or s for stack
+  #### coor=0,1,2,name,alias for coordinate, -1 or s for stack
   # register COUNT=COOR
   # register AVR=COOR
   # register MEAN=COOR
