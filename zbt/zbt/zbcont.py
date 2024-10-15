@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/15 11:40:29 fuyuki zbcont.py>
+# Time-stamp: <2024/10/16 18:28:17 fuyuki zbcont.py>
 
 import sys
 import math
@@ -14,6 +14,8 @@ import cartopy.util
 import xarray as xr
 import matplotlib as mplib
 import matplotlib.pyplot as plt
+import matplotlib.backends.backend_pdf as mppdf
+
 # import matplotlib.ticker as mtc
 # import matplotlib.gridspec as mgs
 # import mpl_toolkits.axes_grid1 as mag
@@ -25,7 +27,7 @@ import zbt.util as zu
 import zbt.control as zctl
 import zbt.plot as zplt
 
-mplib.use('Qt5Agg')
+# mplib.use('Qt5Agg')
 
 class Options(ap.Namespace):
     """Namespace to hold options"""
@@ -54,8 +56,12 @@ class Options(ap.Namespace):
                                    epilog=epilog,
                                    formatter_class=ap.RawTextHelpFormatter)
         parser.add_argument('--verbose',
-                            action='store_const', const=1,
+                            action='store_const', default=0, const=1,
                             help='Be verbose')
+
+        parser.add_argument('--debug',
+                            action='store_const', default=0, const=1,
+                            help='show debug information')
 
         parser.add_argument('--no-decode_coords',
                             dest='decode_coords', action='store_false',
@@ -88,7 +94,7 @@ class Options(ap.Namespace):
                             help='variable filter')
         parser.add_argument('-x', '--coordinate',
                             dest='coors',
-                            metavar='HORIZONTAL,VERTICAL', default=None,
+                            metavar='VERTICAL[,HORIZONTAL]', default=None,
                             type=str,
                             help='figure coordinates')
         parser.add_argument('-o', '--output',
@@ -100,13 +106,25 @@ class Options(ap.Namespace):
         parser.parse_args(argv, namespace=self)
 
         self.coors = self.parse_coors(self.coors)
+        self.output = self.parse_output(self.output)
+
+        if self.interactive is None:
+            self.interactive = not bool(self.output)
 
         self.tweak()
 
     def parse_coors(self, coors=None):
         if coors:
             coors = tuple(zu.toint(c) for c in coors.split(self.lsep))
+            if len(coors) == 1:
+                coors = coors + ('', )
+        # print(f"{coors=}")
         return coors
+
+    def parse_output(self, output=None):
+        if output:
+            output = plib.Path(output)
+        return output
 
     def tweak(self, method=None, colors=None, contours=None):
         """Tweak options"""
@@ -226,8 +244,17 @@ def main(argv, cmd=None):
         cmd = plib.Path(cmd)
         files.append(cmd.parent)
         cstem = cmd.stem
+    loc = plib.Path(__file__)
+    files.append(loc.parent)
 
     opts = Options(argv, cmd)
+
+    if opts.debug > 0:
+        import zbt.dsnio as znio
+        znio.TouzaNioDataset.debug()
+        print(f"{loc}")
+        for m in [zu, zctl, zplt, ]:
+            print(f"{m}")
 
     cfg = load_config(opts, *files, cmd=cstem)
 
@@ -242,10 +269,18 @@ def main(argv, cmd=None):
                             method=opts.color_method, cmap=opts.cmap)
 
     Figs = zctl.FigureControl(Plot, File,
-                              output=opts.output,
-                              config=cfg[cstem], params=plt.rcParams)
+                              interactive=opts.interactive,
+                              config=cfg.get(cstem), params=plt.rcParams)
+
+    output = opts.output
+    if output and output.exists():
+        raise ValueError(f"Exists {output}")
     try:
-        Figs()
+        if output and output.suffix == '.pdf':
+            with mppdf.PdfPages(output) as output:
+                Figs(output)
+        else:
+            Figs()
     except StopIteration as err:
         print(err)
         sys.exit(1)

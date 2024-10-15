@@ -51,6 +51,11 @@ class _TouzaNio(param.ParamTouzaNio):
             return cls.lib.tnb_file_is_nio(path)
         return False
 
+    @classmethod
+    def debug(cls):
+        """Show debug properties."""
+        print(f"{cls}: {cls.lib}")
+
 
 # pylint: disable=too-many-ancestors
 # pylint: disable=too-many-instance-attributes

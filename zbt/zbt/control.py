@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/16 17:42:41 fuyuki control.py>
+# Time-stamp: <2024/10/16 18:05:17 fuyuki control.py>
 
 __doc__ = \
     """
@@ -588,7 +588,7 @@ class VariableIter(LinkedArray):
             # mask = self.c2mask(self.coors, shape)
             mask = self.c2mask(csel, shape, v.dims)
             self.child.transpose(csel)
-            self.child.offset(sel)
+            self.child.offset(self.sel)
             self.switch(cls=ArrayIter,
                         array=v, key=shape, mask=mask)
             if cue:
@@ -840,6 +840,7 @@ class FigureControl():
     """Figure iteration controller."""
 
     def __init__(self, plot, trees,
+                 interactive=True,
                  layout=None, config=None, params=None):
         self.parse_config(config, params)
 
@@ -848,6 +849,7 @@ class FigureControl():
         self.figs = {}
         self.trees = trees
         self.output = None
+        self.interactive = interactive
 
     def __call__(self, output=None):
         self.output = output or None
@@ -858,8 +860,11 @@ class FigureControl():
         # trees = copy.deepcopy(self.trees)
         trees = self.trees.copy()
         fig.bind(trees)
-        self._draw(jfig)
-        plt.show()
+        if self.interactive:
+            self._draw(jfig)
+            plt.show()
+        else:
+            self._batch(jfig)
 
     def _prompt(self):
         print('> ', end=' ', flush=True)
@@ -896,6 +901,17 @@ class FigureControl():
         #              msg="warning: virtually less than two dimensions")
         self._prompt()
         fig.connect(self.event_handler)
+
+    def _batch(self, jfig):
+        fig, axs = self.figs[jfig]
+        while True:
+            try:
+                trees, stat = fig.loop()
+                data = stat[-1]
+                self.plot(fig=fig, axs=axs, data=data, title=fig.sel)
+                self._savefig(jfig)
+            except StopIteration:
+                break
 
     def diag(self, jfig):
         fig, _ = self.figs[jfig]
