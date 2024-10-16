@@ -5,7 +5,7 @@ __doc__ = \
     """
 zbt.util
 ~~~~~~~~
-Common helper utilities for TOUZA/tupy
+Common helper utilities for TOUZA/zbt
 
 :Source:     zbt/util.py
 :Maintainer: SAITO Fuyuki <saitofuyuki@jamstec.go.jp>
@@ -13,15 +13,21 @@ Common helper utilities for TOUZA/tupy
 """
 
 import ctypes as CT
-# import pprint as ppr
+import collections.abc as cabc
+import numpy as np
+# import traceback
+# import collections as cols
+import pprint as ppr
 # import pynput.keyboard as PK
 # import termios
 
-__all__ = ['WrapCDLL', 'AutoString', 'NameMap', 'tostr', ]
+__all__ = ['WrapCDLL', 'AutoString', 'NameMap', 'tostr', 'toint',
+           'expand', 'flatten', 'map_recursive', 'join_attrs', ]
 
 
+# pylint: disable=too-few-public-methods
 class WrapCDLL(CT.CDLL):
-    """Abstract layer of TOUZA utilities."""
+    """Abstract CDLL layer of TOUZA utilities."""
     intent_in = 1
     intent_out = 2
     intent_inout = intent_in + intent_out
@@ -50,6 +56,7 @@ class AutoString(CT.c_char_p):
     """Wrap string encoder for character pointer."""
     @classmethod
     def from_param(cls, value):
+        """Encoder according to input value."""
         if isinstance(value, bytes):
             return value
         if isinstance(value, str):
@@ -119,7 +126,7 @@ class NameMap(dict):
             return len(arr) == 1
         return False
 
-    def get(self, key, default=None):
+    def get(self, key, default=None, single=True):
         if isinstance(key, tuple):
             key, idx = self._decompose_key(key)
             if super().__contains__(key):
@@ -127,17 +134,27 @@ class NameMap(dict):
                 val = arr[idx]
                 return val or default
             return default
+        default = default or []
+        if not isinstance(default, list):
+            default = [default]
         if super().__contains__(key):
-            arr = super().__getitem__(key)
-            if len(arr) == 1:
-                return arr[0] or default
-            return default
+            arr = super().get(key, default)
+            if single:
+                if len(arr) == 1:
+                    return arr[0]
+                if len(arr) == 0:
+                    return None
+            # print(f"{key} {arr=}")
+            return arr
+        if single:
+            return default[0]
         return default
 
     def keys(self):
         return iter(self)
 
     def prefix_keys(self):
+        """Iterator of base-class."""
         yield from super().keys()
 
     def values(self):
@@ -233,19 +250,93 @@ class NameMap(dict):
             return key
         return (key, 0, )
 
+    def __str__(self):
+        return ppr.pformat(dict(super().items()))
+
+# ###  Not applicable
+# class SliceTuple(slice):
+#     """Easy access of slice attributes."""
+#     def __getitem__(self, elem):
+#         if elem in [0, 'start']:
+#             return self.start
+#         if elem in [1, 'stop']:
+#             return self.stop
+#         if elem in [2, -1, 'step']:
+#             return self.step
+#         raise ValueError(f"Invalid element {elem} for SliceTuple")
+
+
+class Selection(tuple):
+    """Tuple of Slice or index for array elements selection."""
+
+    def __new__(cls, elem, dim=None):
+        if dim is None:
+            dim = elem
+        elif np.iterable(dim):
+            dim = len(dim)
+
+        if np.iterable(elem):
+            ne = elem.count(Ellipsis)
+            if ne > 1:
+                raise TypeError(f"Multiple ellipsis {elem}")
+            je = elem.index(Ellipsis) if ne == 1 else len(elem)
+        else:
+            if elem is Ellipsis:
+                je = 0
+                elem = (elem, )
+            else:
+                je = 1
+                elem = (elem, Ellipsis, )
+        # ehead = tuple(slice(e, e + 1)
+        #               if isinstance(e, int) else e for e in elem[:je])
+        # etail = tuple(slice(e, e + 1)
+        #               if isinstance(e, int) else e for e in elem[je+1:])
+        ehead = elem[:je]
+        etail = elem[je+1:]
+        emid = (slice(None, None, None), ) * (dim - len(ehead + etail))
+        # print (ehead, etail, emid)
+        return super(Selection, cls).__new__(cls, ehead + emid + etail)
+
+    def __str__(self):
+        ret = []
+        for slc in self:
+            if isinstance(slc, int):
+                p = str(slc)
+            else:
+                b, e, s = slc.start, slc.stop, slc.step
+                p = ''
+                p = p + ('' if b is None else str(b))
+                p = p + ':'
+                p = p + ('' if e is None else str(e))
+                if s is None or s == 1:
+                    pass
+                else:
+                    p = p + ':' + str(s)
+            ret.append(p)
+        return ','.join(ret)
+
 
 def tostr(s):
     """String conversion"""
     try:
         ss = s.decode()
+# pylint: disable=bare-except
     except:
         try:
             ss = str(s)
+# pylint: disable=bare-except
         except:
             ss = s
     return ss
 
 
+def toint(s):
+    """Integer conversion if possible."""
+    try:
+        n = int(s)
+        return n
+    except ValueError:
+        return s
 
 
 def expand(array, mask, default=None):
@@ -264,15 +355,58 @@ def expand(array, mask, default=None):
     return type(array)(r)
 
 
+def flatten(data):
+    """Flatten list."""
+    # other sequences?
+    if isinstance(data, (list, tuple, )):
+        for item in data:
+            yield from flatten(item)
+    else:
+        yield data
+
+
+def map_recursive(func, data):
+    """Recursive mapping to apply function."""
+    # other sequences?
+    if isinstance(data, (list, tuple, )):
+        return [map_recursive(func, v) for v in data]
+    return func(data)
+
+
+def join_attrs(attrs: dict, head: str,
+               strip: bool = False,
+               sep: str | None = None,
+               sort: cabc.Callable | None = None) -> list | str:
+    """Join all the values of keys as head*."""
+    a = {}
+    lh = len(head)
+    for k, v in attrs.items():
+        if k.startswith(head):
+            k = k[lh:]
+            a[k] = v
+    def do_strip(s):
+        return s.strip()
+    if strip:
+        # ret = [str(a[k]).strip() for k in sorted(a.keys(), key=sort)]
+        ret = [map_recursive(do_strip, a[k])
+               for k in sorted(a.keys(), key=sort)]
+    else:
+        ret = [a[k] for k in sorted(a.keys(), key=sort)]
+    if sep is None:
+        return ret
+    return sep.join(flatten(ret))
+
+
 def main(argv):
+    """Test driver."""
     import pprint as ppr
     X = NameMap()
     k = 'a'
     X[k] = f"{k}/0"
     X[k] = f"{k}/1"
     X[k] = f"{k}/2"
-    X[k,1] = f"{k}/1 change"
-    X[k,4] = f"{k}/4 skip"
+    X[k, 1] = f"{k}/1 change"
+    X[k, 4] = f"{k}/4 skip"
 
     k = 'b'
     X[k] = f"{k}/0"
@@ -286,8 +420,8 @@ def main(argv):
         print(k, X[k])
 
     print("keys()")
-    for k in X.keys():
-        print(k, X[k])
+    for k, v in X.items():
+        print(k, v)
 
     print("values()")
     for v in X.values():
@@ -321,6 +455,16 @@ def main(argv):
         except Exception as e:
             print(f"name-only[{k}] failed / {chk}")
             print(f"{type(e)}{e}")
+
+    attrs = {'x0': 'X000 ', 'x10': ' X010 ', 'x2': ' X002',
+             'y0': 'Y000 ', 'y10': ' Y010 ', 'y2': ' Y002', }
+    print(join_attrs(attrs, 'x'))
+    print(join_attrs(attrs, 'x', sep='--'))
+    print(join_attrs(attrs, 'x', sep='--', strip=True))
+    print(join_attrs(attrs, 'x', sep='--', sort=int))
+
+    # FI = TupleIterator('figure', None, ['Fig-a', 'Figb', ], )
+    # print(FI)
 
 # def on_press(key):
 #     try:

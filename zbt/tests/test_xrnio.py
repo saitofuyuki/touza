@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/08/07 10:27:55 fuyuki test_xrnio.py>
+# Time-stamp: <2024/10/02 18:16:47 fuyuki test_xrnio.py>
 
 import sys
 import xarray as xr
@@ -30,6 +30,7 @@ def main(argv):
             for vn, vv in g.data_vars.items():
                 print(f"# var:{vn} {vv.shape} {type(vv)}")
                 print(vv)
+                print(vv.attrs)
                 if plot:
                     ext = vv.shape[:-2]
                     for x in itertools.product(*tuple(range(n) for n in ext)):
@@ -37,7 +38,12 @@ def main(argv):
                         s = ','.join([str(idx) for idx in x])
                         print(f"# plot: {vn}[{s},:,:]")
                         sel = vv[x]
-
+                        # sel = sel.squeeze()
+                        # print(sel)
+                        # print(sel.shape)
+                        # print(sel.dims)
+                        # print(sel.coords)
+                        print(sel.attrs)
                         fig, ax = plt.subplots()
                         try:
                             sel.plot(ax=ax)

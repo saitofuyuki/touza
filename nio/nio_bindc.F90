@@ -1,7 +1,7 @@
 !!!_! nio_bindc.F90 - TOUZA/Nio bind(c) interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2023
-#define TIME_STAMP 'Time-stamp: <2024/08/02 07:18:53 fuyuki nio_bindc.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/09/30 15:58:56 fuyuki nio_bindc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023, 2024
@@ -57,7 +57,7 @@ module TOUZA_Nio_bindc
   public :: tnb_co_name,       tnb_co_len,     tnb_co_idx,     tnb_co_serial
   public :: tnb_rec_date,      tnb_rec_time
   public :: tnb_attr_size,     tnb_attr_len
-  public :: tnb_get_attr
+  public :: tnb_get_attr,      tnb_get_header
   public :: tnb_get_attr_byid, tnb_get_attr_name
   public :: tnb_get_attr_int,  tnb_get_attr_float, tnb_get_attr_double
   public :: tnb_var_read_int,  tnb_var_read_float, tnb_var_read_double
@@ -578,6 +578,36 @@ contains
     n = litem
   end function tnb_attr_len
 
+!!!_  - tnb_get_header()
+  integer(kind=C_INT) function tnb_get_header &
+       & (head, handle, vid, rec) BIND(C) result(ierr)
+    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_cache,only: cache_get_header
+    implicit none
+    character(len=1,kind=C_CHAR),intent(out)      :: head(*)
+    integer(kind=C_INT),         intent(in),value :: handle
+    integer(kind=C_INT),         intent(in),value :: vid
+    integer(kind=C_INT),         intent(in),value :: rec
+    character(len=litem) :: buf(nitem)
+    character(len=litem*nitem) :: buf1
+    integer jerr
+    ierr = 0
+    if (vid.lt.0) then
+       call cache_get_header(jerr, buf, int(handle))
+    else if (rec.lt.0) then
+       call cache_get_header(jerr, buf, int(handle), int(vid))
+    else
+       call cache_get_header(jerr, buf, int(handle), int(vid), int(rec))
+    endif
+    if (jerr.eq.0) then
+       buf1 = transfer(buf, buf1)
+       call f2c_string(head, buf1, strip=.FALSE.)
+    else
+       call f2c_string(head)
+    endif
+    ierr = jerr
+  end function tnb_get_header
+
 !!!_  - tnb_get_attr()
   integer(kind=C_INT) function tnb_get_attr &
        & (attr, item, handle, vid, rec) BIND(C) result(ierr)
@@ -962,13 +992,19 @@ contains
   end subroutine c2f_string
 
 !!!_  & f2c_string - convert character to char
-  subroutine f2c_string(dest, src)
+  subroutine f2c_string(dest, src, strip)
+    use TOUZA_Nio_std,only: choice
     implicit none
     character(len=1,kind=C_CHAR),intent(out) :: dest(0:*)
     character(len=*),optional,   intent(in)  :: src
+    logical,         optional,   intent(in)  :: strip
     integer j, l
     if (present(src)) then
-       l = len_trim(src)
+       if (choice(.TRUE., strip)) then
+          l = len_trim(src)
+       else
+          l = len(src)
+       endif
        do j = 0, l - 1
           dest(j) = src(j+1:j+1)
        enddo

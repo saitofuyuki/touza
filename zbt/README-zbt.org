@@ -156,11 +156,10 @@ See =zbt/tests/test_dsnio.py= for netCDF4-like dataset procedures.
 
 Usage is shown by =zbcont --help=:
 : % zbcont --help
-: usage: zbcont [-h] [--no-decode_coords]
-:               [--contours INTERVAL[/...]|LEVEL,[...]|NUMBER:[STEP]]
-:               [--colors INTERVAL|LEVEL,[...]|NUMBER:]
-:               [--color-method METHOD] [--range [LOW][,[HIGH]]]
-:               FILE[/SPEC] [FILE[/SPEC] ...]
+:
+: usage: zbcont.py [-h] [--no-decode_coords] [-c SPEC] [-C SPEC] [-M METHOD/CMAP]
+:                  [-r [LOW][:[HIGH]]] [-d DIM,[[LOW]:[HIGH]]] [-v VAR[,VAR...]]
+:                  FILE[/SPEC] [FILE[/SPEC] ...]
 :
 : positional arguments:
 :   FILE[/SPEC]           files, possibly with specifiers
@@ -168,16 +167,30 @@ Usage is shown by =zbcont --help=:
 : options:
 :   -h, --help            show this help message and exit
 :   --no-decode_coords    skip auto coordinate inclusion
-:   --contours INTERVAL[/...]|LEVEL,[...]|NUMBER:[STEP]
-:                         list of contour intervals, list of specified levels,
-:                         or number of contour levels
-:   --colors INTERVAL|LEVEL,[...]|NUMBER:
-:                         list of color intervals, list of specified levels,
-:                         or number of color levels
-:   --color-method METHOD
-:                         coloring method
-:   --range [LOW][,[HIGH]]
+:   -c SPEC, --contours SPEC
+:                         contour intervals or levels specification
+:   -C SPEC, --colors SPEC
+:                         color intervals or levels specification.
+:   -M METHOD/CMAP, --color-method METHOD/CMAP
+:                         coloring method and map {contour(c) contourf(f) pcolormesh(p) imshow(i)}
+:   -r [LOW][:[HIGH]], --range [LOW][:[HIGH]]
 :                         data range to draw
+:   -d DIM,[[LOW]:[HIGH]], --dim DIM,[[LOW]:[HIGH]]
+:                         coordinate clipping
+:   -v VAR[,VAR...], --variable VAR[,VAR...]
+:                         variable filter
+:
+: contour spec
+:  * contour specification
+:    INTERVAL[/....]      contour intervals (e.g., -C10/20)
+:    LEVEL,[...]          explicit contour levels (e.g., -C133,)
+:    NUMBER:[STEP]        number of contour levels (e.g., -C16:)
+:
+:  * color specification
+:    INTERVAL
+:    LEVEL,[...]
+:    NUMBER:
+
 *** contour line options
 : --contours INTERVAL[/INTERVAL[/...]]
 Draw contours with INTERVAL interval.
@@ -205,12 +218,31 @@ Fill color with NUMBER levels.
 The separator colon is mandatory.
 
 *** fill-color methods
-: --color-method=contourf|pcolormesh|imshow
+: --color-method=METHOD[/]
+: --color-method=[/]MAP
+: --color-method=METHOD/MAP
+
 Apply METHOD function for the color plot.  Default is ~contourf~.
 
+Possible methods are contour, contourf, pcolormesh, imshow,
+which can be abbreviated as c, f, p, i, respectively.
+
+If method is not detected, it is interpreted as MAP.
+
+Colormap is specified with MAP (default is viridis).
+
 *** range clipping
-:  --range [LOW][,[HIGH]]
+:  --range [LOW][:[HIGH]]
 The value smaller than low or greater than HIGH is ignored to plot.
+
+*** dimension clipping
+:  --dim DIM,[LOW][:[HIGH]]
+Clip along dimension DIM with the index range of LOW:HIGH.
+DIM should be a coordinate name, or 'x', 'y', 'z', 't'.
+
+*** variable filter
+:  --variable VAR[,....]
+Only draw VAR.
 
 *** key binding
 - ~q~ :: quit
@@ -284,5 +316,6 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  TouzaNioCoDataset xarray backends GTAX ngtls GLON SFC
 #  LocalWords:  GGLA matplotlib pyplot plt xds kB GTAXLOC coords sel
 #  LocalWords:  FrozenMappingWarningOnValuesAccess DataArray dtype cd
-#  LocalWords:  fbc jmz nctcdf pkgconfig env LD LibTouzaNio zbcont
-#  LocalWords:  PYTHONPATH ctrl contourf pcolormesh imshow
+#  LocalWords:  fbc jmz nctcdf pkgconfig env LD LibTouzaNio zbcont py
+#  LocalWords:  PYTHONPATH ctrl contourf pcolormesh imshow CMAP
+#  LocalWords:  Colormap viridis
