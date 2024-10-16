@@ -1,7 +1,7 @@
 # touza/zbt/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/08/21 00:25:05 fuyuki Makefile.am>
+# Time-stamp: <2024/10/15 14:06:12 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -9,21 +9,31 @@
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
+BUILT_SOURCE =
+EXTRA_DIST =
+
 if ZBT_BUILD_ONLY
 else
 pkgpython_PYTHON = __init__.py
 pkgpython_PYTHON += util.py libtouza.py dsnio.py
 pkgpython_PYTHON += xrnio.py
+pkgpython_PYTHON += plot.py control.py
 pkgpython_PYTHON += zbcont.py
 
 # pkgpython_PYTHON += param.py
 nodist_pkgpython_PYTHON = config.py param.py
+pkgpython_DATA = zbtrc.toml
 
+bin_SCRIPTS = zbcont
+BUILT_SOURCE += $(bin_SCRIPTS)
 endif
+EXTRA_DIST += zbcont.in
 
 copy_sources = __init__.py
 copy_sources += util.py libtouza.py dsnio.py
 copy_sources += xrnio.py zbcont.py
+copy_sources += plot.py control.py
+copy_sources += zbtrc.toml
 
 EXTRA_PYTHON =
 EXTRA_PYTHON += $(copy_sources)
@@ -31,7 +41,7 @@ EXTRA_PYTHON += config.py param.py
 
 pkgpythondir = $(pythondir)/zbt
 
-BUILT_SOURCE = param.py config.py
+BUILT_SOURCE += param.py config.py
 
 CLEANFILES = $(BUILT_SOURCE)
 
@@ -51,6 +61,13 @@ config.py:
 	echo "# pythondir=$(pythondir)" > $@
 	echo "TOUZA_NAME = '$(TOUZA_NAME)'" >> $@
 	echo "LIBRARY_DIR = '$(libdir)'" >> $@
+
+zbcont: zbcont.in
+	sed -e 's![@]PYTHON[@]!$(PYTHON)!' \
+	    -e 's![@]PYTHON_BIN[@]!$(PYTHON_BIN)!' \
+		-e 's![@]pythondir[@]!$(pythondir)!' \
+		-e 's![@]pkgpythondir[@]!$(pkgpythondir)!' \
+		$< > $@
 
 copy-sources: $(BUILT_SOURCE) copy-sources-prepare $(COPY_SOURCES_TARGETS)
 

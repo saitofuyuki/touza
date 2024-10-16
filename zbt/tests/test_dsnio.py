@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/08/08 14:14:39 fuyuki test_dsnio.py>
+# Time-stamp: <2024/10/16 09:25:31 fuyuki test_dsnio.py>
 
+import os
 import sys
 import itertools
 import matplotlib.pyplot as plt
 
 import netCDF4 as nc4
-from zbt.dsnio import *
+
+sys.path.insert(0, os.getcwd())
+
+import zbt.dsnio as znio
+
 
 def main(argv):
     """Sample driver."""
-    test_class = TouzaNioDataset
+    test_class = znio.TouzaNioDataset
     diag = False
     show = False
     suite = False
@@ -19,7 +24,7 @@ def main(argv):
         if argv[0][0] != '-':
             break
         if argv[0] == '-c':
-            test_class = TouzaNioCoDataset
+            test_class = znio.TouzaNioCoDataset
         elif argv[0] == '-d':
             diag = True
         elif argv[0] == '-v':
@@ -75,14 +80,12 @@ def main(argv):
                             CS = ax.contourf(sel, levels=16)
                             ax.clabel(CS, inline=True, fontsize=10)
                             plt.show()
-
-    ds.close()
-
     if diag:
         print()
         print('#' * 10, 'diag')
-        diag_datasets()
+        znio.diag_datasets()
 
+    ds.close()
 
 if __name__ == '__main__':
     main(sys.argv[1:])

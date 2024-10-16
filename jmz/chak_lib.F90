@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2024/06/21 17:23:49 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2024/10/15 11:41:38 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -94,9 +94,9 @@ module chak_lib
   integer,parameter :: cmode_xundef     = 8   ! exclude undefined at flushing
   integer,parameter :: cmode_column     = 16  ! columned
 
-  integer,parameter :: cmode_keep       = 32     ! keep blank single-element coordiante
-  integer,parameter :: cmode_hungry     = 64     ! skip blank single-element coordiante
-  integer,parameter :: cmode_greedy     = 64+32  ! skip even non-blank single-element coordiante
+  integer,parameter :: cmode_keep       = 32     ! keep blank single-element coordinate
+  integer,parameter :: cmode_hungry     = 64     ! skip blank single-element coordinate
+  integer,parameter :: cmode_greedy     = 64+32  ! skip even non-blank single-element coordinate
 
   integer,parameter :: cmode_compromise = 7      ! mask
   integer,parameter :: cmode_flush      = 8+16   ! mask
@@ -1069,7 +1069,7 @@ contains
     integer,       intent(out)   :: ierr
     type(domain_t),intent(inout) :: domL  ! domain for loop
     type(domain_t),intent(inout) :: domR  ! domain for reduction
-    type(loop_t),  intent(inout) :: pcp(0:*)  ! physical coordinate to store reduction coordintate
+    type(loop_t),  intent(inout) :: pcp(0:*)  ! physical coordinate to store reduction coordinate
     type(loop_t),  intent(in)    :: lcp(0:*)  ! logical coordinate
 
     integer jo, jc

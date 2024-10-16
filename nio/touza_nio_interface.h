@@ -1,7 +1,7 @@
 /* touza_nio_interface.h - TOUZA/Nio c interfaces */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Feb 16 2023 */
-/* Time-stamp: <2024/08/02 07:18:16 fuyuki touza_nio_interface.h> */
+/* Time-stamp: <2024/09/30 15:01:29 fuyuki touza_nio_interface.h> */
 /* Copyright (C) 2023, 2024 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
@@ -61,6 +61,9 @@ extern int tnb_attr_size(const int handle, const int vid,
 extern int tnb_attr_len(const char *item,
                         const int handle, const int vid,
                         const int rec);
+extern int tnb_get_header(char * const head,
+                          const int handle, const int vid,
+                          const int rec);
 extern int tnb_get_attr(char * const attr, const char *item,
                         const int handle, const int vid,
                         const int rec);
