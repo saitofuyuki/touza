@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/09/30 16:25:51 fuyuki libtouza.py>
+# Time-stamp: <2024/10/17 07:43:58 fuyuki libtouza.py>
 
 __doc__ = \
     """
@@ -39,11 +39,11 @@ class LibTouzaCore(util.WrapCDLL):
     def __init__(self, name=None, *args, touza=None, **kwds):
         """Initialize CDLL after TOUZA."""
         if not name:
+            name = plib.Path(LIBRARY_DIR) / ('lib' + TOUZA_NAME + '.so')
+        if not name:
             name = os.environ.get(ENV_TOUZA_LIB)
         if not name:
             name = CTU.find_library(TOUZA_NAME)
-        if not name:
-            name = plib.Path(LIBRARY_DIR) / ('lib' + TOUZA_NAME + '.so')
         try:
             super().__init__(name, *args, **kwds)
         except OSError:
