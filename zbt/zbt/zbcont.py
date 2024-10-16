@@ -1,597 +1,297 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/09/04 08:53:56 fuyuki zbcont.py>
+# Time-stamp: <2024/10/16 18:28:17 fuyuki zbcont.py>
 
 import sys
 import math
-import numpy as np
 import argparse as ap
-import xarray as xr
+import pathlib as plib
 import cProfile
+import tomllib as toml
+
+import cartopy
+import cartopy.util
+# import numpy as np
+import xarray as xr
 import matplotlib as mplib
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mtc
-import matplotlib.gridspec as mgs
-import mpl_toolkits.axes_grid1 as mag
+import matplotlib.backends.backend_pdf as mppdf
+
+# import matplotlib.ticker as mtc
+# import matplotlib.gridspec as mgs
+# import mpl_toolkits.axes_grid1 as mag
+
+# import os
+# sys.path.insert(0, os.getcwd())
+
 import zbt.util as zu
-import pathlib as plib
+import zbt.control as zctl
+import zbt.plot as zplt
 
-class SliceStatus:
-    """tuple of slices with bidirectional increment"""
-    __slots__ = ("shape", "sel", "status", )
+# mplib.use('Qt5Agg')
 
-    def __init__(self, shape, mask=0, back=False):
-        self.shape = shape or ()
-        self.status = 0
+class Options(ap.Namespace):
+    """Namespace to hold options"""
 
-        if back:
-            self.sel = tuple(j - 1 for j in self.shape)
-        else:
-            self.sel = (0, ) * len(self.shape)
+    method_table = {'f': 'contourf', 'c': 'contour',
+                    'p': 'pcolormesh', 'i': 'imshow',
+                    's': 'surface', }
 
-        if mask < 0:
-            nfull = - mask
-            jfull = 0
-            sel = ()
-            for n in reversed(self.shape):
-                b = (n > 1) and jfull < nfull
-                sel = (b, ) + sel
-                if b:
-                    jfull = jfull + 1
-            self.sel = tuple(None if b else n for n, b in zip(self.sel, sel))
-        elif mask > 0:
-            nfull = mask
-            jfull = 0
-            sel = ()
-            for n in self.shape:
-                b = (n > 1) and jfull < nfull
-                sel = sel + (b, )
-                if not b:
-                    jfull = jfull + 1
-            self.sel = tuple(None if b else n for n, b in zip(self.sel, sel))
+    lsep = ','
 
-    def count_span(self):
-        """Count active dimensions"""
-        return self.sel.count(None)
+    def __init__(self, argv, cmd=None):
+        """Wrap argument parser."""
+        epilog = """contour spec
+ * contour specification
+   INTERVAL[/....]      contour intervals (e.g., -C10/20)
+   LEVEL,[...]          explicit contour levels (e.g., -C133,)
+   NUMBER:[STEP]        number of contour levels (e.g., -C16:)
 
-    def wait(self):
-        """Set condition to wait"""
-        self.shape = ()
+ * color specification
+   INTERVAL
+   LEVEL,[...]
+   NUMBER:
+"""
 
-    def incr(self):
-        """Increment selection.
-        Return 0 if succeed or return number of calls
-        after reaching the final."""
-        if self.status == 0:
-            sel = ()
-            for j, h in zip(self.sel, self.shape):
-                if j is None:
-                    sel = sel + (None, )
-                else:
-                    j = j + 1
-                    if j < h:
-                        sel = sel + (j, )
-                        rem = len(sel)
-                        self.sel = sel + self.sel[rem:]
-                        break
-                    sel = sel + (0, )
-            else:
-                self.status = 1  # reached last
-        else:
-            self.status = self.status + 1
-        return self.status
+        parser = ap.ArgumentParser(prog=plib.Path(cmd).name,
+                                   epilog=epilog,
+                                   formatter_class=ap.RawTextHelpFormatter)
+        parser.add_argument('--verbose',
+                            action='store_const', default=0, const=1,
+                            help='Be verbose')
 
-    def decr(self):
-        """Increment selection.
-        Return 0 if succeed or return negative number of calls
-        after reaching the final."""
-        if self.status == 0:
-            sel = ()
-            for j, h in zip(self.sel, self.shape):
-                if j is None:
-                    sel = sel + (None, )
-                else:
-                    j = j - 1
-                    if j >= 0:
-                        sel = sel + (j, )
-                        rem = len(sel)
-                        self.sel = sel + self.sel[rem:]
-                        break
-                    sel = sel + (h - 1, )
-            else:
-                self.status = -1   # reached last
-        else:
-            self.status = self.status - 1
-        return self.status
+        parser.add_argument('--debug',
+                            action='store_const', default=0, const=1,
+                            help='show debug information')
 
-    def is_wait(self):
-        """Check if in the wait"""
-        return not self.shape
+        parser.add_argument('--no-decode_coords',
+                            dest='decode_coords', action='store_false',
+                            help='skip auto coordinate inclusion')
+        parser.add_argument('files', metavar='FILE[/SPEC]',
+                            type=str, nargs='+',
+                            help='files, possibly with specifiers')
+        parser.add_argument('-c', '--contours',
+                            metavar='SPEC', default=None, type=str,
+                            help='contour intervals or levels specification')
+        parser.add_argument('-C', '--colors',
+                            metavar='SPEC', default=None, type=str,
+                            help='color intervals or levels specification.')
+        parser.add_argument('-M', '--color-method',
+                            metavar='METHOD/CMAP',
+                            default=None, type=str,
+                            help='coloring method and map'
+                            ' {contour(c) contourf(f) pcolormesh(p)'
+                            ' imshow(i) surface(s)}')
+        parser.add_argument('-r', '--range',
+                            metavar='[LOW][:[HIGH]]', dest='limit', type=str,
+                            help='data range to draw')
+        parser.add_argument('-d', '--dim',
+                            metavar='DIM,[[LOW]:[HIGH]]', action='append',
+                            type=str,
+                            help='coordinate clipping')
+        parser.add_argument('-v', '--variable',
+                            metavar='VAR[,VAR...]', default=[], action='append',
+                            type=str,
+                            help='variable filter')
+        parser.add_argument('-x', '--coordinate',
+                            dest='coors',
+                            metavar='VERTICAL[,HORIZONTAL]', default=None,
+                            type=str,
+                            help='figure coordinates')
+        parser.add_argument('-o', '--output',
+                            metavar='FILE', type=str,
+                            help='output filename')
+        parser.add_argument('-i', '--interactive',
+                            action='store_const', const=True, default=None,
+                            help='interactive mode')
+        parser.parse_args(argv, namespace=self)
 
-    def is_loop(self):
-        """Check if in the loop"""
-        return self.status == 0
+        self.coors = self.parse_coors(self.coors)
+        self.output = self.parse_output(self.output)
 
-    def is_reach_last(self):
-        """Check if exhausted at final end"""
-        return self.status > 0
+        if self.interactive is None:
+            self.interactive = not bool(self.output)
 
-    def is_reach_first(self):
-        """Check if exhausted at first end"""
-        return self.status < 0
+        self.tweak()
 
-    def extract(self, var):
-        """Slice extraction.  A workaround to update record attributes."""
-        if self.status == 0:
-            sel = tuple(s if s is not None else slice(None, None)
-                        for s in self.sel)
-            # print(sel)
-            nv = var.attrs.get('_nio_var')
-            # assume record dimension is the first
-            if nv.recdim:
-                rec = sel[0]
-            else:
-                rec = None
-            attrs = {}
-            for a, ai in nv.attrs():
-                av = nv.getattr(a, rec=rec).strip()
-                ai = zu.tostr(ai)
-                if av:
-                    attrs[ai] = av
-            for ak in ['ETTL', 'EDIT', ]:
-                aa = []
-                for a, ai in nv.attrs():
-                    ai = zu.tostr(ai)
-                    if ai.startswith(ak):
-                        av = nv.getattr(a, rec=rec).strip()
-                        if av:
-                            aa.append(av)
-                if aa:
-                    attrs[ak] = aa
+    def parse_coors(self, coors=None):
+        if coors:
+            coors = tuple(zu.toint(c) for c in coors.split(self.lsep))
+            if len(coors) == 1:
+                coors = coors + ('', )
+        # print(f"{coors=}")
+        return coors
 
-            for ai in ['DIVL', 'DIVS', 'DMIN', 'DMAX', ]:
-                if ai in attrs:
-                    attrs[ai] = float(attrs[ai])
-            for src in [('units', 'UNIT'),
-                        ('long_name', 'TITL1', 'TITL2'), ]:
-                dst = src[0]
-                av = ''
-                for i in src[1:]:
-                    av = av + attrs.get(i, '')
-                if av:
-                    attrs[dst] = av
+    def parse_output(self, output=None):
+        if output:
+            output = plib.Path(output)
+        return output
 
-            vsel = var[sel]
-            vsel.attrs.update(attrs)
-            return vsel
-        raise ValueError(f"Extraction out of bounds {self.status}")
+    def tweak(self, method=None, colors=None, contours=None):
+        """Tweak options"""
+        method = method or self.color_method
+        colors = colors or self.colors
+        contours = contours or self.contours
 
-    def pos_phys(self, var, dataset):
-        """Get physical coordinate of the slice"""
-        dims = var.dims
-        coords = var.coords
-        # print(dataset.dims)
-        # print(dataset.coords)
-        pos = ()
-        for j, sel in enumerate(self.sel):
-            if sel is None:
-                continue
-            d = dims[j]
-            if d in dataset.coords:
-                c = coords[d]
-                pos = pos + ((d, sel, c.data[sel]), )
-            else:
-                pos = pos + ((d, sel), )
-        return pos
+        method = method or ''
+        method = tuple(method.split('/')) + (None, None)
+        method, cmap = method[:2]
+        method = self.method_table.get(method, method)
 
-    def __str__(self):
-        if self.status == 0:
-            return ','.join(str(s) if s is not None else ':'
-                            for s in self.sel)
-        return f"{self.status:+d}"
-
-
-class ContourPlot:
-    """Contour plot with key-press control"""
-    figdim = 2
-    prompt = '>'
-    bar_ratio = (20, 1)
-    contour_linewidths = [1.0, 1.5, 2.0, ]
-
-    def __init__(self,  opts):
-        self.opts = opts
-        self.files = opts.files
-        self.dstab = [None] * len(self.files)
-        self.jfile = 0
-        self.jvar = None
-        self.jsel = SliceStatus(None)
-        self.vlist = None
-
-        self.cid = None
-
-        self.new_figure()
-
-        self.update()
-
-
-    def __call__(self, event):
-        """Event handler"""
-        # print(event.key, self.jfile, self.jvar, self.jsel)
-        kev = event.key
-        if kev == 'q':
-            plt.close()
-            return
-
-        if kev == 'ctrl+down':
-            self.jfile = self.jfile - 1
-            self.jvar = None
-            self.update()
-        elif kev == 'ctrl+up':
-            self.jfile = self.jfile + 1
-            self.jvar = None
-            self.update()
-        elif kev == 'down':
-            if self.jvar is None:
-                self.jfile = self.jfile - 1
-            else:
-                self.jvar = self.jvar - 1
-            self.jsel.wait()
-            self.update()
-        elif kev == 'up':
-            if self.jvar is None:
-                self.jfile = self.jfile + 1
-            else:
-                self.jvar = self.jvar + 1
-            self.jsel.wait()
-            self.update()
-        elif kev in [' ', 'shift+up', ]:
-            self.jsel.incr()
-            self.jfile = max(0, self.jfile)
-            self.update()
-        elif kev == 'shift+down':
-            self.jsel.decr()
-            self.update()
-        elif kev == 'D':
-            self.new_figure()
-            self.update()
-
-    def new_figure(self):
-        """Allocate new figure."""
-        if self.cid:
-            self.fig.canvas.flush_events()
-            # self.fig.canvas.mpl_disconnect(self.cid)
-
-        self.fig = plt.figure(figsize=[9.6, 4.8])
-        # self.gs = mgs.GridSpec(1, 2, width_ratios=self.bar_ratio)
-
-        self.fig.canvas.manager.show()
-        self.cid = self.fig.canvas.mpl_connect('key_press_event', self)
-
-
-    def update(self):
-        """Update plot"""
-        while True:
-            if self.jsel.status < -1 or self.jsel.status > +1:
-                plt.close()
-                return
-            if self.jfile == -1:
-                print("Reach first file.  Backword again to quit.")
-                self.jsel.decr()
-                return
-            if self.jfile == len(self.files):
-                print("Reach last file.   Forward again to quit.")
-                self.jsel.incr()
-                return
-            if self.jfile > len(self.files) or self.jfile < 0:
-                plt.close()
-                return
-            ds = self.dstab[self.jfile]
-            f = self.files[self.jfile]
-            if ds is None:
-                ds = xr.open_dataset(f, decode_coords=self.opts.decode_coords)
-                self.dstab[self.jfile] = ds
-
-            if self.jvar is None:
-                self.jvar = 0
-                self.vlist = list(ds.data_vars.items())
-            elif self.jvar >= len(self.vlist):
-                self.jvar = None
-                self.jfile = self.jfile + 1
-                continue
-            elif self.jvar < 0:
-                self.jvar = None
-                self.jfile = self.jfile - 1
-                continue
-
-            vk, vv = self.vlist[self.jvar]
-            # if self.jsel.is_wait():
-            #     pass
-            if self.jsel.is_wait():
-                pass
-            elif self.jsel.is_loop():
-                break
-            elif self.jsel.is_reach_last():
-                self.jvar = self.jvar + 1
-                self.jsel.wait()
-                continue
-            elif self.jsel.is_reach_first():
-                self.jvar = self.jvar - 1
-                self.jsel.wait()
-                continue
-
-            self.jsel = SliceStatus(vv.shape, mask=-self.figdim,
-                                    back=self.jsel.status < 0)
-            if self.jsel.count_span() < self.figdim:
-                print(f"{f}/{vk}: virtually less than two dimensions")
-                self.jvar = self.jvar + 1
-                self.jsel.wait()
-                continue
-            break
-
-        pos = []
-        for p in self.jsel.pos_phys(vv, ds):
-            s = f"{p[0]}[{p[1]}]"
-            if len(p) > 2:
-                s = s + f"={p[2]}"
-            pos.append(s)
-        pos = ' '.join(pos)
-        print(f"\rplot: {vk}[{self.jsel}] <{pos}>")
-
-        self.fig.clf()
-        self.ax = self.fig.add_subplot()
-        self.ax.set_aspect(1)
-
-        xv = self.jsel.extract(vv)
-        self.set_ticks(xv.dims, xv.coords)
-
-        vkw = {}
-        if self.opts.range is not None:
-            r = self.opts.range + ','
-            r = r.split(',')
-            if r[0]:
-                vkw['vmin'] = float(r[0])
-            if r[1]:
-                vkw['vmax'] = float(r[1])
-
-        self.color(self.opts.colors, xv, self.opts.color_method, **vkw)
-        self.contour(self.opts.contours, xv, colors='k', **vkw)
-        self.add_titles(xv, self.opts)
-
-        # self.ax.set_title('Left title\n' '123', loc='left')
-
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
-        # wpx = int(self.fig.get_figwidth()  * self.fig.get_dpi())
-        # hpx = int(self.fig.get_figheight() * self.fig.get_dpi())
-        # print(f'figure size: {wpx} x {hpx} [px]')
-        print(self.prompt, end=' ', flush=True)
-
-    def add_titles(self, vv, opts, **kw):
-        """annotation"""
-        # layout 3 of gtool
-        left = []
-        left.append(vv.attrs.get('long_name', ''))
-        left.append(vv.attrs.get('units', ''))
-        left.append(vv.attrs.get('ITEM', '')
-                    + ' '
-                    + ' '.join(vv.attrs.get('ETTL', [''])))
-
-        self.ax.set_title('\n'.join(left), loc='left')
-
-        right = []
-        right.append(vv.attrs.get('DSET', ''))
-        dt0 = self.parse_date(vv.attrs, 'DATE')
-        dt1 = self.parse_date(vv.attrs, 'DATE1')
-        dt2 = self.parse_date(vv.attrs, 'DATE2')
-        if (dt0 != dt1 or dt1 != dt2 or dt2 != dt0) and dt1 and dt2:
-            cal = '/'.join(dt1[:3]) + ' ' + ':'.join(dt1[3:6])
-            cal = cal + '-'
-            cal = cal + '/'.join(dt2[:3]) + ' ' + ':'.join(dt2[3:6])
-        else:
-            cal = '/'.join(dt0[:3]) + ' ' + ':'.join(dt0[3:6])
-        right.append(cal)
-        right.append('')
-
-        self.ax.set_title('\n'.join(right), loc='right')
-
-    def parse_date(self, attrs, key):
-        dt = attrs.get(key, '').strip()
-        if dt:
-            dt = dt.split(' ')
-            if len(dt) == 1:
-                d = dt[-2:]
-                m = dt[-4:-2]
-                y = dt[:-4]
-                h, mi, s = '', '', ''
-            else:
-                tm = dt[1]
-                dt = dt[0]
-                d = dt[-2:]
-                m = dt[-4:-2]
-                y = dt[:-4]
-                s = tm[-2:]
-                mi = tm[-4:-2]
-                h = tm[:-4]
-
-            return (y, m, d, h, mi, s)
-        else:
-            return None
-
-    def contour(self, opts, array, **vkw):
-        """matplotlib contour wrapper."""
-        # --contours=0              no contour
-        # --contours=INT[/INT...]   contour intervals
-        # --contours=LEV,[LEV,...]  explicit contour levels
-        # --contours=NUM:[STEP]     total number of contour lines
-        if opts is None:
-            c = array.plot.contour(ax=self.ax, **vkw)
-            self.ax.clabel(c)
-            return
-        isep = '/'
-        lsep = ','
-        nsep = ':'
-
-        for j, item in enumerate(opts.split(isep)):
-            jw = min(j, len(self.contour_linewidths) - 1)
-            w = self.contour_linewidths[jw]
-            step = 0
-            kw = {}
-            if lsep in item:
-                kw['levels'] = [float(jj) for jj in item.split(lsep) if jj]
-            elif nsep in item:
-                nums = [int(jj) for jj in item.split(nsep) if jj]
-                kw['locator'] = mtc.MaxNLocator(nums[0] + 1)
-                step = nums[1]
-            else:
-                item = float(item)
-                if item <= 0:
-                    continue
-                kw['locator'] = mtc.MultipleLocator(item)
-
-            c = array.plot.contour(ax=self.ax, linewidths=w, **vkw, **kw)
-            self.ax.clabel(c)
-            print(c.levels)
-            if step > 1:
-                jw2 = min(jw + 1, len(self.contour_linewidths) - 1)
-                w2 = self.contour_linewidths[jw2]
-                c = array.plot.contour(ax=self.ax, levels=c.levels[::step],
-                                       linewidths=w2)
-
-    def color(self, opts, array, method=None, **vkw):
-        """matplotlib contour wrapper."""
-        # --colors=0                 no fill
-        # --colors=INT               intervals
-        # --colors=LEV,[LEV,...]     explicit levels
-        # --colors=NUM:              total number of colors
-
-        # Notes: xarray.plot.contourf and locator
-        #    Since locator argument is not passed to matplotlib in xarray,
-        #    a different approach from contour().is needed.
-
+        if method in self.method_table:
+            pass
+        elif cmap is None:
+            if method in mplib.colormaps:
+                method, cmap = None, method
         method = method or 'contourf'
 
-        kw = {}
-        item = opts
-        # print(item)
-        if item is None:
-            kw['levels'] = None
+        self.colors_first = True
+
+        if method == 'contour':
+            # if color==contour, then contours are disabled default
+            self.colors_first = False
+            if contours is None:
+                contours = False
+
+        self.cmap = cmap
+        self.color_method = method
+        self.colors = colors
+        self.contours = contours
+
+        var = []
+        self.variable = self.variable or []
+
+        for v in self.variable:
+            var.extend(v.split(','))
+        if not var:
+            self.variable = True
         else:
-            lsep = ','
-            nsep = ':'
-            if lsep in item:
-                kw['levels'] = [float(jj) for jj in item.split(lsep) if jj]
-            elif nsep in item:
-                nums = [int(jj) for jj in item.split(nsep) if jj]
-                loc = mtc.MaxNLocator(nums[0] + 1)
-                vmin = vkw.get('vmin') or array.min().values
-                vmax = vkw.get('vmax') or array.max().values
-                kw['levels'] = loc.tick_values(vmin, vmax)
+            self.variable = var
+
+        dim = {}
+        self.dim = self.dim or []
+        for d in self.dim:
+            dd = d.split(',')
+            if len(dd) != 2:
+                raise ValueError(f"Invalid dim filter: {d}.")
+            dn = dd[0]
+            dj = [None if j == '' else int(j) for j in dd[1].split(':')]
+            try:
+                dn = int(dn)
+            except ValueError:
+                pass
+            if len(dj) == 1:
+                # dim[dn] = slice(dj[0], dj[0]+1, None)
+                dim[dn] = dj[0]
             else:
-                item = float(item)
-                if item > 0:
-                    loc = mtc.MultipleLocator(item)
-                    vmin = vkw.get('vmin') or array.min().values
-                    vmax = vkw.get('vmax') or array.max().values
-                    kw['levels'] = loc.tick_values(vmin, vmax)
-                else:
-                    return
-        func = getattr(array.plot, method, None)
-        if func is None:
-            raise ValueError(f"invalid method {method}.")
-        c = func(ax=self.ax, add_colorbar=True,
-                 cbar_kwargs={'shrink': 0.6},
-                 **vkw, **kw)
-        # c = array.plot.contourf(ax=self.ax, add_colorbar=True,
-        #                         cbar_kwargs={'shrink': 0.6},
-        #                         **vkw, **kw)
+                dim[dn] = slice(dj[0], dj[1], None)
+        self.dim = dim
 
-    def set_ticks(self, dims, coords):
-        for c, f in [(-1, self.ax.set_xticks),
-                     (-2, self.ax.set_yticks)]:
-            x = coords[dims[c]]
-            l = x.data[0]
-            h = x.data[-1]
-            if l > h:
-                l, h = h, l
-            v = x.attrs.get('DIVL')
-            if v:
-                l = math.floor(l / v) * v
-                h = math.ceil(h / v) * v
-                f(np.arange(l, h + v, v))
-            v = x.attrs.get('DIVS')
-            if v:
-                l = math.floor(l / v) * v
-                h = math.ceil(h / v) * v
-                f(np.arange(l, h + v, v), minor=True)
+        if self.limit is not None:
+            r = self.limit + ':'
+            r = r.split(':')
+            self.limit = ((float(r[0]) if r[0] != '' else None), )
+            self.limit = self.limit + ((float(r[1]) if r[1] != '' else None), )
+        else:
+            self.limit = None, None
 
-def num_or_list(arg, array, lsep=None, isep=None):
-    """Parse arg as number if single or list if with separator."""
-    if arg is None:
-        return None
-    lsep = lsep or ','
-    if lsep in arg:
-        return [int(j) for j in arg.split(lsep)]
-    isep = isep or '/'
-    if isep in arg:
-        low, high = array.min().values, array.max().values
-        ret = []
-        for ci in arg.split(isep):
-            if ci:
-                ci = float(ci)
-                le = math.floor(low / ci) * ci
-                he = math.ceil(high / ci) * ci
-                ret.append(np.arange(le, he, ci))
-        return ret
-    return int(arg)
 
-def main(argv, root=None):
+def load_config(opts, *files, cmd=None, base=None):
+    """Load multiple configuration files."""
+    base = base or 'zbtrc.toml'
+    config = {}
+    files = list(files)
+    if cmd:
+        files.insert(0, cmd)
+    for f in files:
+        if f is None:
+            continue
+        f = plib.Path(f)
+        if f.is_dir():
+            f = f / base
+        if f.exists():
+            with open(f, "rb") as fp:
+                c = toml.load(fp)
+                config.update(c)
+
+    # if cmd:
+    #     kbase = config.get(cmd.stem, {})
+    # else:
+    #     kbase = config
+    # opts.keymap = {}
+    # parse_keymap(opts.keymap, kbase.get('keymap', {}))
+
+    return config
+
+
+def parse_keymap(opts, config, group=None):
+    group = group or ()
+    for f, c in config.items():
+        if isinstance(c, dict):
+            parse_keymap(opts, c, group + (f, ))
+        elif isinstance(c, list):
+            for k in c:
+                opts[k] = (f, ) + group
+        elif c != '':
+            opts[c] = (f, ) + group
+
+
+def main(argv, cmd=None):
     """Contour plot with TOUZA/Zbt."""
-    opts = parse_arguments(argv, root)
+    # opts = parse_arguments(argv, cmd)
+    files = []
+    cstem = None
+    if cmd:
+        cmd = plib.Path(cmd)
+        files.append(cmd.parent)
+        cstem = cmd.stem
+    loc = plib.Path(__file__)
+    files.append(loc.parent)
 
-    plt.rcParams.update({'figure.autolayout': True})
-    cp = ContourPlot(opts)
-    plt.show()
+    opts = Options(argv, cmd)
 
-def parse_arguments(argv, root=None):
-    """Command line parser."""
-    parser = ap.ArgumentParser(prog=plib.Path(root).name)
-    parser.add_argument('--no-decode_coords',
-                        dest='decode_coords',
-                        action='store_false',
-                        help='skip auto coordinate inclusion')
-    parser.add_argument('files', metavar='FILE[/SPEC]',
-                        type=str,
-                        nargs='+',
-                        help='files, possibly with specifiers')
-    parser.add_argument('--contours',
-                        metavar='INTERVAL[/...]|LEVEL,[...]|NUMBER:[STEP]',
-                        type=str,
-                        help='list of contour intervals, '
-                             'list of specified levels, '
-                             'or number of contour levels')
-    parser.add_argument('--colors',
-                        metavar='INTERVAL|LEVEL,[...]|NUMBER:',
-                        type=str,
-                        help='list of color intervals, '
-                             'list of specified levels, '
-                             'or number of color levels')
-    parser.add_argument('--color-method',
-                        metavar='METHOD',
-                        choices=['contourf', 'pcolormesh', 'imshow'],
-                        help='coloring method')
+    if opts.debug > 0:
+        import zbt.dsnio as znio
+        znio.TouzaNioDataset.debug()
+        print(f"{loc}")
+        for m in [zu, zctl, zplt, ]:
+            print(f"{m}")
 
-    parser.add_argument('--range',
-                        metavar='[LOW][,[HIGH]]',
-                        type=str,
-                        help='data range to draw')
-    return parser.parse_args(argv)
+    cfg = load_config(opts, *files, cmd=cstem)
 
+    Array = zctl.ArrayIter()
+    Var = zctl.VariableIter(child=Array, dim=opts.dim, coors=opts.coors)
+    File = zctl.FileIter(opts.files, child=Var,
+                         variables=opts.variable)
+
+    Plot = zplt.ContourPlot(limit=opts.limit,
+                            contour=opts.contours, color=opts.colors,
+                            colors_first=opts.colors_first,
+                            method=opts.color_method, cmap=opts.cmap)
+
+    Figs = zctl.FigureControl(Plot, File,
+                              interactive=opts.interactive,
+                              config=cfg.get(cstem), params=plt.rcParams)
+
+    output = opts.output
+    if output and output.exists():
+        raise ValueError(f"Exists {output}")
+    try:
+        if output and output.suffix == '.pdf':
+            with mppdf.PdfPages(output) as output:
+                Figs(output)
+        else:
+            Figs()
+    except StopIteration as err:
+        print(err)
+        sys.exit(1)
 
 def _driver():
     """Command line driver."""
     main(sys.argv[1:], sys.argv[0])
     # with cProfile.Profile() as pr:
-        # main(sys.argv[1:], sys.argv[0])
-        # pr.print_stats()
+    #     main(sys.argv[1:], sys.argv[0])
+    #     pr.print_stats()
+
 
 if __name__ == '__main__':
     _driver()
