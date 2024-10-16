@@ -1,0 +1,162 @@
+
+# aminclude_static.am generated automatically by Autoconf
+# from AX_AM_MACROS_STATIC on Wed Sep  4 09:10:50 JST 2024
+
+BUILD_AUX  =    $(top_srcdir)/build-aux
+CLEANFILES =
+MOSTLYCLEANFILES =
+
+LIST_MODFILES = .modfiles
+
+if CLEAN_FCMOD
+MOSTLYCLEANFILES += *.$(FC_MODEXT) $(LIST_MODFILES)
+endif
+
+DEBUG   =
+AM_FCFLAGS=@AM_FCFLAGS@ $(DEBUG)
+AM_CPPFLAGS=-I$(top_srcdir)
+
+# no blank between -MT and NAME
+AM_FCFLAGS_DEP='-MT$@' -MD -MP -MF $*.dep
+# AM_FCFLAGS_DEP = -MD -MP -MF $*.dep
+if gcc_dependencies
+AM_FCFLAGS+=$(AM_FCFLAGS_DEP)
+MOSTLYCLEANFILES += *.dep
+endif
+
+AM_FCFLAGS_MODULE=
+AM_FCFLAGS+=$(AM_FCFLAGS_MODULE)
+
+moddir      = @moddir@
+install-exec-hook: install-mod
+uninstall-hook: uninstall-mod
+
+echo-srcdir:
+	@echo $(srcdir)
+echo-builddir:
+	@echo $(builddir)
+echo-top_srcdir:
+	@echo $(top_srcdir)
+echo-top_builddir:
+	@echo $(top_builddir)
+echo-build_aux:
+	@echo $(BUILD_AUX)
+
+lib:
+	@if test "$(top_builddir)" = "$(builddir)"; then :; \
+	else cd $(top_builddir) && $(MAKE); fi
+rebuild-lib:
+	@if test "$(top_builddir)" = "$(builddir)"; then :; \
+	else cd $(top_builddir) && $(MAKE) clean all; fi
+
+COPY_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=copy-%)
+DIFF_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=diff-%)
+$(COPY_SOURCE_TARGETS):
+	@target=`echo "$@" | sed -e 's/^copy-//'`;\
+	if test -e $(builddir)/$${target}; then \
+	  echo "exists $${target}."; \
+	else \
+	  echo "clone $(srcdir)/$${target}"; \
+	  cp $(srcdir)/$${target} $(builddir)/$${target} || exit $$?; \
+	fi
+$(DIFF_SOURCE_TARGETS):
+	@target=`echo "$@" | sed -e 's/^diff-//'`;\
+	diff $(srcdir)/$${target} $(builddir)/$${target}
+
+install-mod-recursive:
+	@set fnord $$MAKEFLAGS; amf=$$2; \
+	dot_seen=no; \
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  echo "Making install-mod in $$subdir"; \
+	  if test "$$subdir" = "."; then \
+	    dot_seen=yes; \
+	    local_target="install-mod-am"; \
+	  else \
+	    local_target="install-mod"; \
+	  fi; \
+	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
+	done; \
+	if test "$$dot_seen" = "no"; then \
+	  $(MAKE) $(AM_MAKEFLAGS) "install-mod-am" || exit 1; \
+	fi; test -z "$$fail"
+
+install-mod: install-mod-recursive
+
+install-mod-am:
+if INSTALL_MODULES
+	@$(NORMAL_INSTALL)
+	if test -z '$(moddir)'; then false; \
+	else \
+		rm -f $(LIST_MODFILES); touch $(LIST_MODFILES);\
+		for dir in $(DESTDIR)$(moddir); do \
+		test -z $$dir || $(MKDIR_P) $$dir; \
+		done; \
+		for modfile in *.$(FC_MODEXT); \
+		do test -e $$modfile || continue; \
+		$(install_sh_DATA) -t $(DESTDIR)$(moddir) $$modfile; \
+		echo $$modfile >> $(LIST_MODFILES); \
+		done; \
+	fi
+endif
+
+
+
+uninstall-mod-recursive:
+	@set fnord $$MAKEFLAGS; amf=$$2; \
+	dot_seen=no; \
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  echo "Making uninstall-mod in $$subdir"; \
+	  if test "$$subdir" = "."; then \
+	    dot_seen=yes; \
+	    local_target="uninstall-mod-am"; \
+	  else \
+	    local_target="uninstall-mod"; \
+	  fi; \
+	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
+	done; \
+	if test "$$dot_seen" = "no"; then \
+	  $(MAKE) $(AM_MAKEFLAGS) "uninstall-mod-am" || exit 1; \
+	fi; test -z "$$fail"
+
+uninstall-mod: uninstall-mod-recursive
+
+uninstall-mod-am:
+if INSTALL_MODULES
+	if test -z '$(moddir)'; then false; \
+	else \
+		list=`test -e $(LIST_MODFILES) && cat $(LIST_MODFILES)`; \
+		files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+		dir='$(DESTDIR)$(moddir)'; $(am__uninstall_files_from_dir); \
+	fi
+endif
+
+
+
+check-bin-recursive:
+	@set fnord $$MAKEFLAGS; amf=$$2; \
+	dot_seen=no; \
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  echo "Making check-bin in $$subdir"; \
+	  if test "$$subdir" = "."; then \
+	    dot_seen=yes; \
+	    local_target="check-bin-am"; \
+	  else \
+	    local_target="check-bin"; \
+	  fi; \
+	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
+	done; \
+	if test "$$dot_seen" = "no"; then \
+	  $(MAKE) $(AM_MAKEFLAGS) "check-bin-am" || exit 1; \
+	fi; test -z "$$fail"
+
+check-bin: check-bin-recursive
+
+check-bin-am:$(check_PROGRAMS)
+
+
+install-data-hook: install-switchDATA
+switchdir     = @switchdir@
+switch_DATA   =
