@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/10/15 15:54:11 fuyuki configure.ac>
+# Time-stamp: <2024/10/17 13:09:13 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -235,7 +235,18 @@ AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
 AC_CONFIG_FILES([zbt/pyproject.toml:zbt/pyproject.in])
 AC_CONFIG_FILES([zbt/zbt/Makefile])
 AC_CONFIG_FILES([zbt/tests/Makefile])
+
 AM_CONDITIONAL([ZBT_BUILD_ONLY], [test "x$enable_sub_zbt" = xbuild])
+
+AC_ARG_ENABLE([zbt-embed-libdir],
+[AS_HELP_STRING([--enable-zbt-embed-libdir],
+ [enable hard-coded libtouza dlocation @<:@default=no@:>@])],
+ [enable_zbt_embed_libdir=$enableval],
+ [enable_zbt_embed_libdir=no])
+AM_CONDITIONAL([enable_module_dependencies], [
+  test "x$use_mod_dependencies" != xno \
+  && test x"$ax_f90_modext" != xunknown])
+AM_CONDITIONAL([zbt_embed_libdir], [test "x$enable_zbt_embed_libdir" = xyes])
 
 dnl AM_CONDITIONAL([am__fastdepFC], [false])
 
