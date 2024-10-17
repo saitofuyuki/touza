@@ -1,3 +1,10 @@
+Release-1.13.0 / 2024-10-17
+===========================
+
+  * doc: (zbt) updated (least) to the latest feature.
+  * zbt: (libtouza) [SEVERE] change library search order.
+  * build: (zbt) hard-coded library location disabled by default.
+
 Release-1.13 / 2024-10-16
 =========================
 
