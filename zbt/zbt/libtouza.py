@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/17 07:43:58 fuyuki libtouza.py>
+# Time-stamp: <2024/10/17 09:18:32 fuyuki libtouza.py>
 
 __doc__ = \
     """
@@ -36,18 +36,36 @@ class LibTouzaException(Exception):
 class LibTouzaCore(util.WrapCDLL):
     """Low-level class for TOUZA library"""
 
-    def __init__(self, name=None, *args, touza=None, **kwds):
+    def __init__(self, name, *args, path=None, touza=None, **kwds):
         """Initialize CDLL after TOUZA."""
-        if not name:
-            name = plib.Path(LIBRARY_DIR) / ('lib' + TOUZA_NAME + '.so')
-        if not name:
-            name = os.environ.get(ENV_TOUZA_LIB)
+        search = []
+        if name is None:
+            if not path:
+                if isinstance(path, list):
+                    search.extend(path)
+                else:
+                    search.append(path)
+            search.append(LIBRARY_DIR)
+            search.append(os.environ.get(ENV_TOUZA_LIB))
+
+            base = 'lib' + TOUZA_NAME + '.so'
+
+            for p in search:
+                if not p:
+                    continue
+                p = plib.Path(p)
+                if p.is_dir():
+                    p = p / base
+                if p.exists():
+                    name = p
+                    break
         if not name:
             name = CTU.find_library(TOUZA_NAME)
+
         try:
             super().__init__(name, *args, **kwds)
         except OSError:
-            sys.stderr.write("Cannot load touza library.  "
+            sys.stderr.write("Cannot load touza library {name}.  "
                              f"Setting {ENV_TOUZA_LIB} environment may help."
                              "\n")
             raise

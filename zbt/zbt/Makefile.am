@@ -1,7 +1,7 @@
 # touza/zbt/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/10/15 14:06:12 fuyuki Makefile.am>
+# Time-stamp: <2024/10/17 13:05:37 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -47,6 +47,12 @@ CLEANFILES = $(BUILT_SOURCE)
 
 GENPARAM = $(srcdir)/../param.sh
 
+if zbt_embed_libdir
+zbt_libtouza_dir = $(libdir)
+else
+zbt_libtouza_dir =
+endif
+
 # dummy
 all: $(BUILT_SOURCE)
 
@@ -58,9 +64,8 @@ param.py: $(top_srcdir)/nio/touza_nio_param.h
 	$(SHELL) $(GENPARAM) -o $@ ParamTouzaNio $(top_srcdir)/nio/touza_nio_param.h || rm -f $@
 
 config.py:
-	echo "# pythondir=$(pythondir)" > $@
 	echo "TOUZA_NAME = '$(TOUZA_NAME)'" >> $@
-	echo "LIBRARY_DIR = '$(libdir)'" >> $@
+	echo "LIBRARY_DIR = '$(zbt_libtouza_dir)'" >> $@
 
 zbcont: zbcont.in
 	sed -e 's![@]PYTHON[@]!$(PYTHON)!' \

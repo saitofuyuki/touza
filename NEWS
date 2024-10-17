@@ -1,12 +1,12 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2024/10/16 23:29:37 fuyuki NEWS>
+# Time-stamp: <2024/10/17 12:05:23 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
-* Changes in 1.13 from 1.12.3.7
+* Changes in 1.13.0 from 1.12.3.7
 - zbcont beta release
 
 * Changes in 1.12.3.7 from 1.12.3.5
