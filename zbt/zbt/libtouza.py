@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/17 09:18:32 fuyuki libtouza.py>
+# Time-stamp: <2024/10/18 08:50:05 fuyuki libtouza.py>
 
 __doc__ = \
     """
@@ -334,9 +334,9 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                                CT.c_int,
                                (CT.POINTER(CT.c_int), self.intent_in, 'd',),
                                (CT.c_size_t, self.intent_in, "rec"),
-                               (CT.POINTER(CT.c_size_t),
+                               (util.AutoArray(CT.c_size_t),
                                 self.intent_in, "start"),
-                               (CT.POINTER(CT.c_size_t),
+                               (util.AutoArray(CT.c_size_t),
                                 self.intent_in, "count"),
                                (CT.c_int, self.intent_in, 'handle'),
                                (CT.c_int, self.intent_in, 'vid'),
@@ -349,9 +349,9 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                                CT.c_int,
                                (CT.POINTER(CT.c_float), self.intent_in, 'd',),
                                (CT.c_size_t, self.intent_in, "rec"),
-                               (CT.POINTER(CT.c_size_t),
+                               (util.AutoArray(CT.c_size_t),
                                 self.intent_in, "start"),
-                               (CT.POINTER(CT.c_size_t),
+                               (util.AutoArray(CT.c_size_t),
                                 self.intent_in, "count"),
                                (CT.c_int, self.intent_in, 'handle'),
                                (CT.c_int, self.intent_in, 'vid'),
@@ -364,9 +364,9 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                                CT.c_int,
                                (CT.POINTER(CT.c_double), self.intent_in, 'd',),
                                (CT.c_size_t, self.intent_in, "rec"),
-                               (CT.POINTER(CT.c_size_t),
+                               (util.AutoArray(CT.c_size_t),
                                 self.intent_in, "start"),
-                               (CT.POINTER(CT.c_size_t),
+                               (util.AutoArray(CT.c_size_t),
                                 self.intent_in, "count"),
                                (CT.c_int, self.intent_in, 'handle'),
                                (CT.c_int, self.intent_in, 'vid'),
