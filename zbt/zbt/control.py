@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/16 18:05:17 fuyuki control.py>
+# Time-stamp: <2024/10/22 12:05:30 fuyuki control.py>
 
 __doc__ = \
     """
@@ -530,8 +530,6 @@ class VariableIter(LinkedArray):
     def __init__(self, coors=None, dim=None, **kw):
         super().__init__(array=None, name='VAR', **kw)
         self.coors = coors or (-2, -1)
-        # if self.coors[0] > self.coors[1]:
-        #     self.coors = self.coors[1], self.coors[0]
         self.dim = dim
         self.sel = None
 
@@ -613,7 +611,7 @@ class VariableIter(LinkedArray):
                     except ValueError:
                         raise UserWarning
             except UserWarning:
-                print(f"no coordinate to plot: {c}")
+                print(f"no coordinate to plot {c}.  Available={dims}")
             else:
                 clist.append(c)
         rem = w
@@ -755,6 +753,16 @@ class FileIter(LinkedArray):
                 txt = txt + ' ' + ch
         return txt
 
+    def plot_coordinates(self, data):
+        coors = None
+        var = self.inquire(prop='self', cls=VariableIter, single=True)
+        arr = self.inquire(prop='self', cls=ArrayIter, single=True)
+        print(f"{var.coors=}")
+        print(f"{arr._transpose=}")
+        print(f"{arr.mask=}")
+        print(f"{data.dims=}")
+        return coors
+
 
 class FigureInteractive(zplt.FigureBase):
     """Matplotlib figure class with interactive methods."""
@@ -767,7 +775,6 @@ class FigureInteractive(zplt.FigureBase):
         self._lock = False
         self.fc = []
         self.sel = None
-        # self.transpose = False
 
     def connect(self, handler=None):
         self.cid = self.canvas.mpl_connect('key_press_event', handler)
@@ -841,24 +848,26 @@ class FigureControl():
 
     def __init__(self, plot, trees,
                  interactive=True,
+                 styles=None,
                  layout=None, config=None, params=None):
         self.parse_config(config, params)
 
         self.plot = plot
-        self.layout = layout or zplt.LayoutLegacy3()
+        self.layout = layout or zplt.LayoutLegacy3(cls=FigureInteractive)
         self.figs = {}
-        self.trees = trees
+        self.ref_trees = trees
         self.output = None
         self.interactive = interactive
+        self.styles = styles or {}
 
     def __call__(self, output=None):
         self.output = output or None
-        fx = self.layout(cls=FigureInteractive)
+        fx = self.layout()
         fig = fx[0]
         jfig = fig.number
         self.figs[jfig] = fx
         # trees = copy.deepcopy(self.trees)
-        trees = self.trees.copy()
+        trees = self.ref_trees.copy()
         fig.bind(trees)
         if self.interactive:
             self._draw(jfig)
@@ -882,23 +891,19 @@ class FigureControl():
                 raise StopIteration(f"\r({jfig}) no effective data.") from None
 
         data = stat[-1]
+        # print(self.styles)
+        var = fig.trees.inquire(prop='self', cls=VariableIter, single=True)
+        arr = fig.trees.inquire(prop='self', cls=ArrayIter, single=True)
+        print(fig.trees.plot_coordinates(data))
+        # print(f"{data.dims=}")
+        # print(trees[-1])
         # print(f'_draw: {data.shape=}')
         try:
+            self.layout.reset(fig, axs)
             self.plot(fig=fig, axs=axs, data=data, title=fig.sel)
             fig.info(pfx=f'\r({jfig}) ', msg=msg)
         except UserWarning as err:
             fig.info(pfx=f'\r({jfig}) ', msg=err)
-        # if all(w > 1 for w in data.shape):
-        #     if fig.transpose:
-        #         self.plot(fig=fig, axs=axs, data=data.T, title=fig.sel)
-        #     else:
-        #         self.plot(fig=fig, axs=axs, data=data, title=fig.sel)
-        #     fig.info(pfx=f'\r({jfig}) ', msg=msg)
-        #     # stt = fig.trees.status(recurse=True)
-        #     # print(f"\r({jfig}) {stt}")
-        # else:
-        #     fig.info(pfx=f'\r({jfig}) ',
-        #              msg="warning: virtually less than two dimensions")
         self._prompt()
         fig.connect(self.event_handler)
 
@@ -981,15 +986,7 @@ class FigureControl():
     def _resize(self, jfig, rate=None):
         fx = self.figs[jfig]
         fig = fx[0]
-        if rate is None:
-            geo = self.layout.geometry
-        else:
-            geo = fig.get_size_inches()
-            if rate >= 0:
-                geo = geo * (1.0 + rate)
-            else:
-                geo = geo / (1.0 - rate)
-        fig.set_size_inches(geo)
+        self.layout.resize(fig, rate=rate)
 
     def event_handler(self, event):
         """Event handler"""
@@ -1042,7 +1039,7 @@ class FigureControl():
                     self.switch(jfig, cls=(True, cls), step=-1)
             elif cmd in ['duplicate', 'new', ]:
                 fig.disconnect()
-                nfx = self.layout(cls=FigureInteractive, figsize=fig)
+                nfx = self.layout(figsize=fig)
                 nfig = nfx[0]
                 jfig = nfig.number
                 self.figs[jfig] = nfx
@@ -1076,9 +1073,9 @@ class FigureControl():
             elif cmd == 'transpose':
                 self.map_figures(self._transpose, jfig)
             elif cmd == 'enlarge':
-                self.map_figures(self._resize, jfig, +0.25)
+                self.map_figures(self._resize, jfig, +self.opts['resize_step'])
             elif cmd == 'shrink':
-                self.map_figures(self._resize, jfig, -0.25)
+                self.map_figures(self._resize, jfig, -self.opts['resize_step'])
             elif cmd == 'reset_geometry':
                 self.map_figures(self._resize, jfig)
             elif cmd == 'print':
@@ -1087,6 +1084,9 @@ class FigureControl():
     def parse_config(self, config, params):
         config = config or {}
         self.kmap = self.parse_keymap({}, config.get('keymap', {}))
+        self.opts = config.get('option', {})
+        self.opts['resize_step'] = self.opts.get('resize_step') or 0.25
+
         if params:
             for k in params.find_all(r'^keymap\.*'):
                 for p in params[k]:

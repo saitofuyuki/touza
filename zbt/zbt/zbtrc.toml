@@ -2,6 +2,7 @@
 
 [zbcont.option]
 permute.skip_single = true
+resize_step = 0.25
 
 [zbcont.keymap]
 quit = 'Q'

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/16 18:28:17 fuyuki zbcont.py>
+# Time-stamp: <2024/10/20 15:17:29 fuyuki zbcont.py>
 
 import sys
-import math
+# import math
 import argparse as ap
 import pathlib as plib
 import cProfile
@@ -16,7 +16,7 @@ import matplotlib as mplib
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf as mppdf
 
-# import matplotlib.ticker as mtc
+import matplotlib.ticker as mtc
 # import matplotlib.gridspec as mgs
 # import mpl_toolkits.axes_grid1 as mag
 
@@ -36,7 +36,9 @@ class Options(ap.Namespace):
                     'p': 'pcolormesh', 'i': 'imshow',
                     's': 'surface', }
 
+    isep = '/'
     lsep = ','
+    nsep = ':'
 
     def __init__(self, argv, cmd=None):
         """Wrap argument parser."""
@@ -69,10 +71,12 @@ class Options(ap.Namespace):
         parser.add_argument('files', metavar='FILE[/SPEC]',
                             type=str, nargs='+',
                             help='files, possibly with specifiers')
-        parser.add_argument('-c', '--contours',
+        parser.add_argument('-c', '--contours', '--contour',
+                            dest='contour',
                             metavar='SPEC', default=None, type=str,
                             help='contour intervals or levels specification')
-        parser.add_argument('-C', '--colors',
+        parser.add_argument('-C', '--colors', '--color',
+                            dest='color',
                             metavar='SPEC', default=None, type=str,
                             help='color intervals or levels specification.')
         parser.add_argument('-M', '--color-method',
@@ -103,10 +107,34 @@ class Options(ap.Namespace):
         parser.add_argument('-i', '--interactive',
                             action='store_const', const=True, default=None,
                             help='interactive mode')
+        parser.add_argument('-m', '--map',
+                            nargs=1, default=None,
+                            help='map overlay')
+        parser.add_argument('-p', '--projection',
+                            nargs=1, default=None,
+                            help='map projection')
+
         parser.parse_args(argv, namespace=self)
 
         self.coors = self.parse_coors(self.coors)
         self.output = self.parse_output(self.output)
+
+        color = {}
+        contour = {}
+        method, cmap, clevs = \
+            self.parse_method(self.color_method, self.contour)
+
+        contour['levels'] = self.parse_levels(clevs, single=False)
+        color['levels'] = self.parse_levels(self.color, single=True)
+        color['method'] = method
+        color['cmap'] = cmap
+
+        limit = self.parse_limit(self.limit)
+        contour.update(limit)
+        color.update(limit)
+
+        self.color = color
+        self.contour = contour
 
         if self.interactive is None:
             self.interactive = not bool(self.output)
@@ -126,12 +154,7 @@ class Options(ap.Namespace):
             output = plib.Path(output)
         return output
 
-    def tweak(self, method=None, colors=None, contours=None):
-        """Tweak options"""
-        method = method or self.color_method
-        colors = colors or self.colors
-        contours = contours or self.contours
-
+    def parse_method(self, method, contour=None):
         method = method or ''
         method = tuple(method.split('/')) + (None, None)
         method, cmap = method[:2]
@@ -144,18 +167,98 @@ class Options(ap.Namespace):
                 method, cmap = None, method
         method = method or 'contourf'
 
-        self.colors_first = True
-
         if method == 'contour':
-            # if color==contour, then contours are disabled default
-            self.colors_first = False
-            if contours is None:
-                contours = False
+            if contour is None:
+                contour = False
+        return method, cmap, contour
 
-        self.cmap = cmap
-        self.color_method = method
-        self.colors = colors
-        self.contours = contours
+    def parse_levels(self, text, single=False):
+        # --contours=0              no contour
+        # --contours=INT[/INT...]   contour intervals
+        # --contours=LEV,[LEV,...]  explicit contour levels
+        # --contours=NUM:[NUM,...]  total number of contour lines
+
+        # --colors=0                 no fill
+        # --colors=INT               intervals
+        # --colors=LEV,[LEV,...]     explicit levels
+        # --colors=NUM:              total number of colors
+        if text is False:
+            pat = [False]
+        elif text is True:
+            pat = [True]
+        else:
+            text = text or ''
+            pat = []
+            for item in text.split(self.isep):
+                if self.lsep in item:
+                    pat.append([float(jj)
+                                for jj in item.split(self.lsep) if jj])
+                elif self.nsep in item:
+                    for n in [int(jj)
+                              for jj in item.split(self.nsep) if jj]:
+                        loc = mtc.MaxNLocator(n + 1)
+                        pat.append(loc.tick_values)
+                elif item:
+                    item = float(item)
+                    if item > 0:
+                        loc = mtc.MultipleLocator(item)
+                        pat.append(loc.tick_values)
+                    else:
+                        pat.append(False)
+        if single:
+            if len(pat) == 0:
+                pat = None
+            elif len(pat) == 1:
+                pat = pat[0]
+            else:
+                raise ValueError(f"Non single level specification {text}.")
+        # print(pat)
+        return pat
+
+    def parse_limit(self, limit=None):
+        limit = limit or ''
+        limit = limit.split(':')
+        low = float(limit[0]) if limit[0] != '' else None
+        limit = limit[1:] or ('', )
+        high = float(limit[0]) if limit[0] != '' else None
+
+        limit = {}
+        if low is not None:
+            limit['vmin'] = low
+        if high is not None:
+            limit['vmax'] = high
+        return limit
+
+    def tweak(self, method=None, colors=None, contours=None):
+        """Tweak options"""
+        # method = method or self.color_method
+        # colors = colors or self.colors
+        # contours = contours or self.contours
+
+        # method = method or ''
+        # method = tuple(method.split('/')) + (None, None)
+        # method, cmap = method[:2]
+        # method = self.method_table.get(method, method)
+
+        # if method in self.method_table:
+        #     pass
+        # elif cmap is None:
+        #     if method in mplib.colormaps:
+        #         method, cmap = None, method
+        # method = method or 'contourf'
+
+        # self.colors_first = True
+
+        # if method == 'contour':
+        #     # if color==contour, then contours are disabled default
+        #     self.colors_first = False
+        #     if contours is None:
+        #         contours = False
+
+        # self.cmap = cmap
+        # self.color_method = method
+        # self.colors = colors
+        # self.contours = contours
 
         var = []
         self.variable = self.variable or []
@@ -185,15 +288,6 @@ class Options(ap.Namespace):
             else:
                 dim[dn] = slice(dj[0], dj[1], None)
         self.dim = dim
-
-        if self.limit is not None:
-            r = self.limit + ':'
-            r = r.split(':')
-            self.limit = ((float(r[0]) if r[0] != '' else None), )
-            self.limit = self.limit + ((float(r[1]) if r[1] != '' else None), )
-        else:
-            self.limit = None, None
-
 
 def load_config(opts, *files, cmd=None, base=None):
     """Load multiple configuration files."""
@@ -263,10 +357,7 @@ def main(argv, cmd=None):
     File = zctl.FileIter(opts.files, child=Var,
                          variables=opts.variable)
 
-    Plot = zplt.ContourPlot(limit=opts.limit,
-                            contour=opts.contours, color=opts.colors,
-                            colors_first=opts.colors_first,
-                            method=opts.color_method, cmap=opts.cmap)
+    Plot = zplt.ContourPlot(contour=opts.contour, color=opts.color)
 
     Figs = zctl.FigureControl(Plot, File,
                               interactive=opts.interactive,

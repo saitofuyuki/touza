@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/18 13:27:50 fuyuki test_plot.py>
+# Time-stamp: <2024/10/22 08:54:50 fuyuki test_plot.py>
 
 import sys
 import xarray as xr
@@ -20,21 +20,61 @@ def main(argv):
     decode_coords = False
     proj = None
     transf = None
+    crs = None
+    features = []
     while argv:
         if argv[0][0] != '-':
             break
         if argv[0] == '-c':
             decode_coords = True
-        elif argv[0] == '-C':
-            proj = ccrs.Robinson()
-            # proj = ccrs.PlateCarree()
+        elif argv[0][:2] == '-C':
+            if argv[0][2:] == '':
+                proj = ccrs.PlateCarree()
+            elif argv[0][2:] == 'm':
+                proj = ccrs.Mercator()
+            elif argv[0][2:] == 'mo':
+                proj = ccrs.Mollweide()
+            elif argv[0][2:] == 'ns':
+                proj = ccrs.NorthPolarStereo()
+            elif argv[0][2:] == 'ss':
+                proj = ccrs.SouthPolarStereo()
+            elif argv[0][2:] == 'np':
+                proj = ccrs.NearsidePerspective()
+            elif argv[0][2:] == 'h':
+                proj = ccrs.Hammer()
+            else:
+                proj = ccrs.Robinson()
             transf = ccrs.PlateCarree()
+        elif argv[0][:2] == '-M':
+            if argv[0][2:] == '':
+                features.append('COASTLINE')
+            else:
+                if 'c' in argv[0][2:]:
+                    features.append('COASTLINE')
+                if 'l' in argv[0][2:]:
+                    features.append('LAND')
+                if 'o' in argv[0][2:]:
+                    features.append('OCEAN')
+                if 'b' in argv[0][2:]:
+                    features.append('BORDERS')
+                if 'r' in argv[0][2:]:
+                    features.append('RIVERS')
+                if 'L' in argv[0][2:]:
+                    features.append('LAKES')
         argv = argv[1:]
 
-    Plot = zplt.ContourPlot(method='imshow')
+    crs = transf if crs is None else crs
+    color = dict(method='imshow', alpha=0.2)
+    contour = {}
+    # contour = {'transform': transf }
+    # if proj:
+    #     color['transform'] = transf
+    Plot = zplt.ContourPlot(color=color, contour=contour)
+    body = dict(transform=transf, crs=crs, features=features)
+    # Plot = zplt.ContourPlot(method='contourf')
+    # Plot = zplt.ContourPlot(method='pcolormesh')
     Lay = zplt.LayoutLegacy3()
-    fig, axs = Lay(projection=proj)
-
+    fig, axs = Lay(body=dict(projection=proj))
     for a in argv:
         print(f'##### file: {a}')
         xds = zxr.open_dataset(a, decode_coords=decode_coords)
@@ -48,7 +88,10 @@ def main(argv):
                     s = ','.join([str(idx) for idx in x])
                     print(f"# plot: {vn}[{s},:,:]")
                     sel = vv[x]
-                    Plot(fig, axs, sel, transform=transf)
+                    # Plot(fig, axs, sel, transform=transf, crs=crs)
+                    Lay.reset(fig, axs)
+                    Plot(fig, axs, sel, body=body)
+                    # Plot(fig, axs, sel)
                     break
                 break
             break
