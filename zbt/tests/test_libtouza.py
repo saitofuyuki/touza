@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/08/13 21:29:26 fuyuki test_libtouza.py>
+# Time-stamp: <2024/10/18 10:32:14 fuyuki test_libtouza.py>
 
 import sys
 import functools as ft
 import operator as op
+import ctypes as CT
+import pathlib as plib
+import numpy as np
 
-from zbt.libtouza import *
+sys.path.insert(0, str(plib.Path(__file__).parents[1]))
+
+from zbt import libtouza as zlt
+from zbt import util as zu
+
 
 def main(argv):
     """Sample driver."""
 
-    lib = LibTouzaNio(name=None)
-
-    # lib.tnb_diag()
-    # print(lib.__dict__)
+    lib = zlt.LibTouzaNio(name=None)
+    print(f"{zlt=}")
+    print(f"{lib=}")
 
     def show_file(hfile, indent=None, diag=False, array=True, **kwds):
         """Show file information."""
@@ -119,11 +125,15 @@ def main(argv):
         nco = lib.tnb_co_size(hgrp, vidx)
         nrecs = lib.tnb_var_recs(hgrp, vidx)
         start = (0, ) * nco
-        count = tuple(lib.tnb_co_len(hgrp, vidx, c) for c in range(nco))
+        shape = zu.Shape(*tuple(lib.tnb_co_len(hgrp, vidx, c)
+                                for c in range(nco)))
+        count = (1, ) * (nco - 1) + shape[-1:]
+        step  = (0, ) * (nco - 2) + (1, )
         full = ft.reduce(op.mul, count, 1)
 
-        start = (CT.c_size_t * len(start))(*start)
-        count = (CT.c_size_t * len(count))(*count)
+        print(f"{shape=} {count=} {step=}")
+        # start = (CT.c_size_t * len(start))(*start)
+        # count = (CT.c_size_t * len(count))(*count)
 
         ct = CT.c_double
         cbuf = (ct * full)()
@@ -133,9 +143,23 @@ def main(argv):
         for r in range(nrecs):
             print(f"{tab}rec[{r}]:")
             show_attr(vidx, hgrp, r, indent + 2)
-            lib.tnb_var_read(p, r, start, count, hgrp, vidx)
-            for j in range(0, full, mdl):
-                print(f"{tab}  {cbuf[j:min(j+mdl, full)]}")
+            pos = start
+            for pos in shape(step, start):
+                lib.tnb_var_read(p, r, pos, count, hgrp, vidx)
+                print(f"{tab}  pos[{pos}]:")
+                for j in range(0, full, mdl):
+                    data = np.around(cbuf[j:min(j+mdl, full)], decimals=2)
+                    print(f"{tab}    {data}")
+            # while True:
+            #     try:
+            #         lib.tnb_var_read(p, r, pos, count, hgrp, vidx)
+            #         print(f"{tab}  pos[{pos}]:")
+            #         for j in range(0, full, mdl):
+            #             data = np.around(cbuf[j:min(j+mdl, full)], decimals=2)
+            #             print(f"{tab}    {data}")
+            #         pos = shape.step(pos, step)
+            #     except OverflowError:
+            #         break
 
     def show_attr(vidx, hgrp, rec, indent=None):
         indent = indent or 0
