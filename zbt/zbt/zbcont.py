@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/20 15:17:29 fuyuki zbcont.py>
+# Time-stamp: <2024/10/23 14:30:30 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -7,9 +7,12 @@ import argparse as ap
 import pathlib as plib
 import cProfile
 import tomllib as toml
+import re
 
 import cartopy
-import cartopy.util
+# import cartopy.util
+import cartopy.crs as ccrs
+
 # import numpy as np
 import xarray as xr
 import matplotlib as mplib
@@ -39,6 +42,7 @@ class Options(ap.Namespace):
     isep = '/'
     lsep = ','
     nsep = ':'
+    psep = '+'
 
     def __init__(self, argv, cmd=None):
         """Wrap argument parser."""
@@ -60,6 +64,10 @@ class Options(ap.Namespace):
         parser.add_argument('--verbose',
                             action='store_const', default=0, const=1,
                             help='Be verbose')
+        parser.add_argument('--quiet', '--silent',
+                            dest='quiet',
+                            action='store_const', default=0, const=-1,
+                            help='Be quiet')
 
         parser.add_argument('--debug',
                             action='store_const', default=0, const=1,
@@ -69,7 +77,7 @@ class Options(ap.Namespace):
                             dest='decode_coords', action='store_false',
                             help='skip auto coordinate inclusion')
         parser.add_argument('files', metavar='FILE[/SPEC]',
-                            type=str, nargs='+',
+                            type=str, nargs='*',
                             help='files, possibly with specifiers')
         parser.add_argument('-c', '--contours', '--contour',
                             dest='contour',
@@ -108,10 +116,13 @@ class Options(ap.Namespace):
                             action='store_const', const=True, default=None,
                             help='interactive mode')
         parser.add_argument('-m', '--map',
-                            nargs=1, default=None,
+                            metavar='MAP-SPECS', type=str,
+                            default=None,
+                            # nargs='?', default=None, const=True,
                             help='map overlay')
         parser.add_argument('-p', '--projection',
-                            nargs=1, default=None,
+                            metavar='PROJECTION', type=str,
+                            default=None,
                             help='map projection')
 
         parser.parse_args(argv, namespace=self)
@@ -121,13 +132,14 @@ class Options(ap.Namespace):
 
         color = {}
         contour = {}
-        method, cmap, clevs = \
-            self.parse_method(self.color_method, self.contour)
+        # method, cmap, clevs =
+        color, clevs = \
+            self.parse_method(self.color_method, self.contour, color=color)
 
         contour['levels'] = self.parse_levels(clevs, single=False)
         color['levels'] = self.parse_levels(self.color, single=True)
-        color['method'] = method
-        color['cmap'] = cmap
+        # color['method'] = method
+        # color['cmap'] = cmap
 
         limit = self.parse_limit(self.limit)
         contour.update(limit)
@@ -136,10 +148,16 @@ class Options(ap.Namespace):
         self.color = color
         self.contour = contour
 
+        self.styles = self.parse_styles(self.map, self.projection)
+
         if self.interactive is None:
             self.interactive = not bool(self.output)
 
         self.tweak()
+
+        self.verbose = self.verbose - self.quiet
+
+        self.parser = parser
 
     def parse_coors(self, coors=None):
         if coors:
@@ -154,8 +172,12 @@ class Options(ap.Namespace):
             output = plib.Path(output)
         return output
 
-    def parse_method(self, method, contour=None):
+    def parse_method(self, method, contour=None, color=None):
+        color = color or {}
+
         method = method or ''
+        method ,_, params = method.partition(self.psep)
+
         method = tuple(method.split('/')) + (None, None)
         method, cmap = method[:2]
         method = self.method_table.get(method, method)
@@ -170,7 +192,11 @@ class Options(ap.Namespace):
         if method == 'contour':
             if contour is None:
                 contour = False
-        return method, cmap, contour
+        color['method'] = method
+        color['cmap'] = cmap
+        if params:
+            color['alpha'] = float(params)
+        return color, contour
 
     def parse_levels(self, text, single=False):
         # --contours=0              no contour
@@ -229,36 +255,8 @@ class Options(ap.Namespace):
             limit['vmax'] = high
         return limit
 
-    def tweak(self, method=None, colors=None, contours=None):
+    def tweak(self):
         """Tweak options"""
-        # method = method or self.color_method
-        # colors = colors or self.colors
-        # contours = contours or self.contours
-
-        # method = method or ''
-        # method = tuple(method.split('/')) + (None, None)
-        # method, cmap = method[:2]
-        # method = self.method_table.get(method, method)
-
-        # if method in self.method_table:
-        #     pass
-        # elif cmap is None:
-        #     if method in mplib.colormaps:
-        #         method, cmap = None, method
-        # method = method or 'contourf'
-
-        # self.colors_first = True
-
-        # if method == 'contour':
-        #     # if color==contour, then contours are disabled default
-        #     self.colors_first = False
-        #     if contours is None:
-        #         contours = False
-
-        # self.cmap = cmap
-        # self.color_method = method
-        # self.colors = colors
-        # self.contours = contours
 
         var = []
         self.variable = self.variable or []
@@ -288,6 +286,113 @@ class Options(ap.Namespace):
             else:
                 dim[dn] = slice(dj[0], dj[1], None)
         self.dim = dim
+
+    def parse_styles(self, maps=None, projection=None,
+                     crs=None, transform=None):
+        styles = {}
+        # print(maps, type(maps))
+        if isinstance(maps, str):
+            f = []
+            if self.lsep in maps:
+                maps = maps.split(self.lsep)
+            for c in maps:
+                if c in ['c', 'coast', ]:
+                    f.append('COASTLINE')
+                elif c in ['l', 'land', ]:
+                    f.append('LAND')
+                elif c in ['o', 'ocean', ]:
+                    f.append('OCEAN')
+                elif c in ['b', 'border', ]:
+                    f.append('BORDERS')
+                elif c in ['r', 'river', ]:
+                    f.append('RIVERS')
+                elif c in ['L', 'lake', ]:
+                    f.append('LAKES')
+                elif c in ['-', '', ]:
+                    f.append(None)
+                else:
+                    raise ValueError(f"Invalid feature {c}")
+            maps = f or [None]
+        elif isinstance(maps, list):
+            pass
+        # elif maps is not None:
+        else:
+            maps = [maps or None]
+        styles['features'] = maps
+
+        # --projection=PROJ[<+->lon[<+->lat]][,Y,X]
+        #   +NUM > +NUM    +-NUM > -NUM   ++NUM > +NUM
+        #   -NUM > -NUM    -+NUM > +NUM   --NUM > -NUM
+        if isinstance(projection, str):
+            projection = projection.split(self.lsep)
+            proj = projection.pop(0)
+            coor = projection
+
+            pm = re.compile(r'(\w+)((?:[-+]{1,2}\w+)*)')
+            m = pm.match(proj)
+            proj = m.group(1)
+            pm = re.compile(r'[-+]{1,2}\w+')
+            params = pm.findall(m.group(2)) + [None] * 3
+
+            clon = self.parse_float(params[0]) or 0
+            clat = self.parse_float(params[1]) or 0
+            height = self.parse_float(params[2]) or None
+
+            if proj in ['m', 'mercator', ]:
+                projection = ccrs.Mercator(central_longitude=clon)
+            elif proj in ['w', 'mo', 'mollweide', ]:
+                projection = ccrs.Mollweide(central_longitude=clon)
+            elif proj in ['nps', 'northpolarstereo', ]:
+                projection = ccrs.NorthPolarStereo(central_longitude=clon)
+            elif proj in ['sps', 'southpolarstereo', ]:
+                projection = ccrs.SouthPolarStereo(central_longitude=clon)
+            elif proj in ['np', 'nearsideperspective', ]:
+                kw = {}
+                if height is not None:
+                    kw['satellite_height'] = height
+                projection = ccrs.NearsidePerspective(central_longitude=clon,
+                                                      central_latitude=clat,
+                                                      **kw,)
+            elif proj in ['g', 'orthographic', ]:
+                projection = ccrs.Orthographic(central_longitude=clon,
+                                               central_latitude=clat, )
+            elif proj in ['h', 'hammer', ]:
+                projection = ccrs.Hammer(central_longitude=clon)
+            elif proj in ['', 'pc', 'platecarree', ]:
+                projection = ccrs.PlateCarree(central_longitude=clon)
+            else:
+                raise ValueError(f"Invalid feature {proj}")
+            # print(projection)
+            # print(f"{maps=}")
+        if bool(maps):
+            if not transform:
+                transform = ccrs.PlateCarree()
+            if not crs:
+                crs = transform
+            if not projection:
+                projection = transform
+        styles['projection'] = projection
+        styles['crs'] = crs
+        styles['transform'] = transform
+
+        # print(f"{styles=}")
+
+        coors = (-2, -1)
+
+        return {coors: styles}
+
+    def parse_float(self, text):
+        if text:
+            if text[1] in ['+', '-']:
+                text = text[1:]
+            return float(text)
+        return None
+
+    def print_help(self, *args, **kwds):
+        self.parser.print_help(*args, **kwds)
+
+    def print_usage(self, *args, **kwds):
+        self.parser.print_usage(*args, **kwds)
 
 def load_config(opts, *files, cmd=None, base=None):
     """Load multiple configuration files."""
@@ -352,6 +457,10 @@ def main(argv, cmd=None):
 
     cfg = load_config(opts, *files, cmd=cstem)
 
+    if len(opts.files) == 0:
+        opts.print_usage()
+        sys.exit(0)
+
     Array = zctl.ArrayIter()
     Var = zctl.VariableIter(child=Array, dim=opts.dim, coors=opts.coors)
     File = zctl.FileIter(opts.files, child=Var,
@@ -361,6 +470,7 @@ def main(argv, cmd=None):
 
     Figs = zctl.FigureControl(Plot, File,
                               interactive=opts.interactive,
+                              styles=opts.styles,
                               config=cfg.get(cstem), params=plt.rcParams)
 
     output = opts.output
