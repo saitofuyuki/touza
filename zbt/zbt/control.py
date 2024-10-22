@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/22 12:05:30 fuyuki control.py>
+# Time-stamp: <2024/10/22 20:56:20 fuyuki control.py>
 
 __doc__ = \
     """
@@ -518,6 +518,15 @@ class ArrayIter(LinkedArray):
             else:
                 data = data.transpose(*self._transpose)
         # print(f'_array  {id(self)}: {self._transpose}, {data.shape}')
+        # print(f"{data.dims=}")
+        # print(f"{data.coords=}")
+        # for d in data.dims:
+        #     c = data.coords[d]
+        #     # print(d, c.attrs.get('DSET'), type(c))
+        #     print(d, c.attrs.get('cyclic_coordinate'), type(c))
+        #     # print(c.attrs.get('_nio_dataset'))
+        #     # print(c._getitem_(-1))
+        #     # print(c.variable)
         return data
 
     def __getitem__(self, key):
@@ -592,7 +601,23 @@ class VariableIter(LinkedArray):
             if cue:
                 self.child.cue(cue)
 
-    def set_coors(self, coors, dims):
+    def transpose(self, switch=None, key=None):
+        k = self.l2p(key)
+        v = self.array.get(k)
+        if isinstance(switch, tuple):
+            self.coors = switch
+        elif switch is not None:
+            order = sorted(list(self.set_coors(self.coors, v.dims)))
+            if not switch:
+                order = reversed(order)
+            self.coors = tuple(order)
+        else:
+            self.coors = self.coors[1:] + self.coors[:1]
+
+        switch = self.set_coors(self.coors, v.dims)
+        return self.child.transpose(switch)
+
+    def set_coors(self, coors, dims, prop=None):
         """Set coordinate tuple."""
         clist = []
         w = len(dims)
@@ -625,7 +650,12 @@ class VariableIter(LinkedArray):
                 rem = c
             nlist.insert(0, c)
         # print(f"{nlist=}")
-        return tuple(dims[c] for c in nlist if c >= 0)
+        if prop is None:
+            return tuple(dims[c] for c in nlist if c >= 0)
+        if prop < 0:
+            return tuple(c - w for c in nlist if c >= 0)
+        else:
+            return tuple(c for c in nlist if c >= 0)
 
     def c2mask(self, coors, shape, dims):
         w = len(shape)
@@ -756,11 +786,13 @@ class FileIter(LinkedArray):
     def plot_coordinates(self, data):
         coors = None
         var = self.inquire(prop='self', cls=VariableIter, single=True)
-        arr = self.inquire(prop='self', cls=ArrayIter, single=True)
-        print(f"{var.coors=}")
-        print(f"{arr._transpose=}")
-        print(f"{arr.mask=}")
-        print(f"{data.dims=}")
+        # arr = self.inquire(prop='self', cls=ArrayIter, single=True)
+        # print(f"{var.coors=}")
+        v = var.value(None)
+        coors = var.set_coors(var.coors, v.dims, prop=-1)
+        # print(f"{arr._transpose=}")
+        # print(f"{arr.mask=}")
+        # print(f"{data.dims=}")
         return coors
 
 
@@ -894,13 +926,15 @@ class FigureControl():
         # print(self.styles)
         var = fig.trees.inquire(prop='self', cls=VariableIter, single=True)
         arr = fig.trees.inquire(prop='self', cls=ArrayIter, single=True)
-        print(fig.trees.plot_coordinates(data))
+        pco = fig.trees.plot_coordinates(data)
         # print(f"{data.dims=}")
         # print(trees[-1])
         # print(f'_draw: {data.shape=}')
+        body = self.styles.get(pco) or {}
+        layout = {k:body.get(k) for k in ['projection'] }
         try:
-            self.layout.reset(fig, axs)
-            self.plot(fig=fig, axs=axs, data=data, title=fig.sel)
+            self.layout.reset(fig, axs, body=layout)
+            self.plot(fig=fig, axs=axs, data=data, title=fig.sel, body=body)
             fig.info(pfx=f'\r({jfig}) ', msg=msg)
         except UserWarning as err:
             fig.info(pfx=f'\r({jfig}) ', msg=err)
@@ -978,7 +1012,8 @@ class FigureControl():
     def _transpose(self, jfig):
         fx = self.figs[jfig]
         fig = fx[0]
-        base = fig.trees.inquire(prop='self', cls=ArrayIter, single=True)
+        # base = fig.trees.inquire(prop='self', cls=ArrayIter, single=True)
+        base = fig.trees.inquire(prop='self', cls=VariableIter, single=True)
         if base:
             base.transpose()
         self._draw(jfig, step=False, msg='transposed')
