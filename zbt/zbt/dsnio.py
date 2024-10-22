@@ -329,7 +329,7 @@ class TouzaNioDataset(_TouzaNio):
 
     def _info(self, attrs=None, lev=None):
         """Return str version."""
-        attrs = True if attrs is None else False
+        attrs = True if attrs is None else attrs
         dump = [repr(type(self))]
         tab = ' ' * 4
         if self.parent is None:
@@ -534,7 +534,8 @@ class _TouzaCoreVar(_TouzaNio):
 
     def _info(self, attrs=None):
         """return str"""
-        attrs = True if attrs is None else False
+        attrs = True if attrs is None else attrs
+        # print(f"{attrs=}")
         dump = [repr(type(self))]
         tab = ' ' * 4
         vt = util.tostr(self.dtype)
@@ -543,7 +544,9 @@ class _TouzaCoreVar(_TouzaNio):
         dump.append(f"{vt} {vn}({ds})")
         if attrs:
             for a, ai in self.attrs():
-                av = self.getattr(a).strip()
+                av = self.getattr(a)
+                if isinstance(av, str):
+                    av = av.strip()
                 ai = util.tostr(ai)
                 if av:
                     dump.append(f"{tab}{ai}: {av}")
@@ -604,6 +607,7 @@ class TouzaNioVar(_TouzaCoreVar):
     def __init__(self, *args, **kwds):
         """Constructor."""
         super().__init__(*args, **kwds)
+        self._internal_attrs = {}
 
     def __copy__(self, logical=None):
         """Create copy object."""
@@ -615,6 +619,10 @@ class TouzaNioVar(_TouzaCoreVar):
         return obj
 
     def __getitem__(self, elem):
+        return self._getitem_(elem)
+
+    def _getitem_(self, elem):
+        """__getitem__() core to call original function."""
         elem = util.Selection(elem, self.dimensions)
         start = ()
         count = ()
@@ -739,6 +747,9 @@ class TouzaNioVar(_TouzaCoreVar):
 
     def getattr(self, item, rec=None, conv=None, uniq=False, **kwds):
         """Get attribute corresponding to item (number or name)."""
+        if item in self._internal_attrs:
+            return self._internal_attrs[item]
+
         ds = self.dataset
         rec = rec or 0
         if isinstance(rec, slice):
@@ -766,6 +777,10 @@ class TouzaNioVar(_TouzaCoreVar):
             return ds.lib.header_get_attr(item, ds.handle, self.handle,
                                           rec=rec, conv=conv)
 
+    def setattr(self, item, val):
+        """Set attribute."""
+        self._internal_attrs[item] = val
+
     def _attrs(self, rec=None):
         """Iterator of attributes in Nio variable"""
         ds = self.dataset
@@ -776,6 +791,8 @@ class TouzaNioVar(_TouzaCoreVar):
             item = CT.create_string_buffer(la + 1)
             ds.lib.tnb_get_attr_name(item, a)
             yield (a, item.value)
+        for a in self._internal_attrs.keys():
+            yield (a, a)
 
 
 class TouzaNioDimension(_TouzaNio):
@@ -897,6 +914,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
                                              rec=0)
                 self.variables[okey] = c
                 c.setattr('UNIT', a)
+                # c.setattr('UNIT', 'hours since 0000-01-01')
                 c.setattr('TITL1', 'time')
                 continue
             c = self.get_coordinate(d, paths, kind='loc')
@@ -950,10 +968,20 @@ class TouzaNioCoDataset(TouzaNioDataset):
                     ## break if the first coordinate is non scalar.
                     break
             else:
+                # print(f"{type(c)=} {c.shape} {c.__getitem__}")
                 # if p != self._embedded:
                 if True:
                     c = c.copy(logical=self)
                     c.squeeze()
+                if c.getattr('DSET', '').startswith('C'):
+                    cyclic = (c.shape[0],
+                              c._getitem_(0).item(), c._getitem_(-1).item())
+                    c.setattr('cyclic_coordinate', cyclic)
+                    # print(c.attrs())
+                    # print(type(c))
+                    # print(c.shape)
+                    # print(c._getitem_(-1))
+                    # print(c)
                 c.replace_dim(dim)
                 return c
 
@@ -979,7 +1007,9 @@ class TouzaNioCoDataset(TouzaNioDataset):
             if h >= 0:
                 ds = _DataSets.get(h)
             else:
+                # print(f"{self.cls_var=}")
                 ds = TouzaNioDataset(str(p), cls_var=self.cls_var)
+                # ds = TouzaNioDataset(str(p))
             if ds:
                 if isinstance(grps, str):
                     grps = [grps]
