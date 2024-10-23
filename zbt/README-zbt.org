@@ -252,10 +252,12 @@ See https://docs.xarray.dev/ for ~xarray~ reference.
 : zbcont [OPTIONS...] FILE [FILE...]
 
 Usage is shown by =zbcont --help=:
-: usage: zbcont [-h] [--verbose] [--debug] [--no-decode_coords] [-c SPEC] [-C SPEC]
-:               [-M METHOD/CMAP] [-r [LOW][:[HIGH]]] [-d DIM,[[LOW]:[HIGH]]]
-:               [-v VAR[,VAR...]] [-x VERTICAL[,HORIZONTAL]] [-o FILE] [-i]
-:               FILE[/SPEC] [FILE[/SPEC] ...]
+
+: usage: zbcont [-h] [--verbose] [--quiet] [--debug] [--no-decode_coords] [-c SPEC]
+:               [-C SPEC] [-M METHOD/CMAP] [-r [LOW][:[HIGH]]]
+:               [-d DIM,[[LOW]:[HIGH]]] [-v VAR[,VAR...]] [-x VERTICAL[,HORIZONTAL]]
+:               [-o FILE] [-i] [-m MAP-SPECS] [-p PROJECTION]
+:               [FILE[/SPEC] ...]
 :
 : positional arguments:
 :   FILE[/SPEC]           files, possibly with specifiers
@@ -263,14 +265,16 @@ Usage is shown by =zbcont --help=:
 : options:
 :   -h, --help            show this help message and exit
 :   --verbose             Be verbose
+:   --quiet, --silent     Be quiet
 :   --debug               show debug information
 :   --no-decode_coords    skip auto coordinate inclusion
-:   -c SPEC, --contours SPEC
+:   -c SPEC, --contours SPEC, --contour SPEC
 :                         contour intervals or levels specification
-:   -C SPEC, --colors SPEC
+:   -C SPEC, --colors SPEC, --color SPEC
 :                         color intervals or levels specification.
 :   -M METHOD/CMAP, --color-method METHOD/CMAP
-:                         coloring method and map {contour(c) contourf(f) pcolormesh(p) imshow(i) surface(s)}
+:                         coloring method and map {contour(c) contourf(f)
+:                         pcolormesh(p) imshow(i) surface(s)}
 :   -r [LOW][:[HIGH]], --range [LOW][:[HIGH]]
 :                         data range to draw
 :   -d DIM,[[LOW]:[HIGH]], --dim DIM,[[LOW]:[HIGH]]
@@ -282,6 +286,10 @@ Usage is shown by =zbcont --help=:
 :   -o FILE, --output FILE
 :                         output filename
 :   -i, --interactive     interactive mode
+:   -m MAP-SPECS, --map MAP-SPECS
+:                         map overlay
+:   -p PROJECTION, --projection PROJECTION
+:                         map projection
 :
 : contour spec
 :  * contour specification
@@ -395,6 +403,37 @@ Only draw VAR.
 : % zbcont --coordinate ,record   # change the horizontal coordinate as record
 : % zbcont --coordinate 0,-1      # change the vertical and horizontal coordinate
 :                                 # as the first and the last, respectively
+*** map overlay (experimental)
+: % zbcont -m LETTERS
+: % zbcont -m FEATURE[,FEATURE...]
+| letter | string | feature                               |
+|--------+--------+---------------------------------------|
+| c      | coast  | add coastline                         |
+| o      | ocean  | fill ocean                            |
+| l      | land   | fill land                             |
+| b      | border | add borders                           |
+| r      | river  | add rivers                            |
+| L      | lake   | add lakes                             |
+| -      | (null) | dummy, to activate carotpy projection |
+**** examples
+: % zbcont -m c  FILE            # add coastline
+: % zbcont -m ol FILE            # fill ocean and land
+: % zbcont -m river,lake FILE    # add rivers and lakes
+*** projection (experimental)
+: % zbcont -p PROJECTION[+LON[+LAT[+HEIGHT]]]
+| string                 | projection          | parameters                          |
+|------------------------+---------------------+-------------------------------------|
+| m mercator             | Mercator            | central longitude                   |
+| w mo mollweide         | Mollweide           | central longitude                   |
+| nps northpolarstereo   | NorthPolarStereo    | central longitude                   |
+| sps southpolarstereo   | SouthPolarStereo    | central longitude                   |
+| np nearsideperspective | NearsidePerspective | central longitude, latitude, height |
+| g orthographic         | Orthographic        | central longitude, latitude         |
+| h hammer               | Hammer              | central longitude                   |
+| pc platecarree         | PlateCarree         | central longitude                   |
+
+**** examples
+: % zbcont -ppc+135 FILE    # central longitude on 135E.
 
 *** output
 : --output FILENAME

@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/16 09:25:31 fuyuki test_dsnio.py>
+# Time-stamp: <2024/10/18 14:58:51 fuyuki test_dsnio.py>
 
 import os
 import sys
 import itertools
+import pathlib as plib
+
 import matplotlib.pyplot as plt
-
 import netCDF4 as nc4
+import cartopy.crs as ccrs
 
-sys.path.insert(0, os.getcwd())
+
+sys.path.insert(0, str(plib.Path(__file__).parents[1]))
 
 import zbt.dsnio as znio
 
@@ -20,6 +23,7 @@ def main(argv):
     show = False
     suite = False
     plot = False
+    proj = None
     while argv:
         if argv[0][0] != '-':
             break
@@ -33,6 +37,8 @@ def main(argv):
             suite = True
         elif argv[0] == '-P':
             plot = True
+        elif argv[0] == '-C':
+            proj = ccrs.Robinson()
         argv = argv[1:]
 
     for a in argv:
@@ -63,6 +69,7 @@ def main(argv):
                 print(dd)
             for vn, vv in g.variables.items():
                 # print(f"# var:{vn} {vv.shape} {vv.dimensions_suite()} {vv.dataset.root.handle}")
+                # print(f"# var:{vn} {vv.dimensions} {vv.shape}")
                 print(f"# var:{vn} {vv.shape}")
                 print(vv)
                 if show:
@@ -75,7 +82,12 @@ def main(argv):
                             # x = x + plane
                             s = ','.join([str(idx) for idx in x])
                             print(f"# plot: {vv.name}[{s},:,:]")
-                            fig, ax = plt.subplots()
+                            fig = plt.figure()
+                            ax = fig.add_subplot(projection=proj)
+                            if proj:
+                                ax.set_global()
+                                # ax.stock_img()
+                                ax.coastlines()
                             sel = vv[x]
                             CS = ax.contourf(sel, levels=16)
                             ax.clabel(CS, inline=True, fontsize=10)
@@ -85,7 +97,7 @@ def main(argv):
         print('#' * 10, 'diag')
         znio.diag_datasets()
 
-    ds.close()
+    # ds.close()
 
 if __name__ == '__main__':
     main(sys.argv[1:])

@@ -1,10 +1,14 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2024/10/17 12:05:23 fuyuki NEWS>
+# Time-stamp: <2024/10/23 15:33:38 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.13.1 from 1.13.0a
+- cartopy feature introduced in zbcont (still experimental)
+- cyclic coordinate introduced (probably work on the limited cases)
 
 * Changes in 1.13.0 from 1.12.3.7
 - zbcont beta release
