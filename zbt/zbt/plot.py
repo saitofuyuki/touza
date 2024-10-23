@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/16 14:35:38 fuyuki plot.py>
+# Time-stamp: <2024/10/23 12:52:17 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -15,12 +15,21 @@ Plotter collections.
 import collections.abc as cabc
 import numbers as nums
 
+import numpy as np
 import matplotlib as mplib
 import matplotlib.ticker as mtc
 import matplotlib.pyplot as plt
 import matplotlib.backend_tools as mpbt
 
+import xarray as xr
 import xarray.plot.utils as xrpu
+import cartopy.crs as ccrs
+import cartopy.mpl.geoaxes as cmgeo
+import cartopy.mpl.ticker as cmtick
+import cartopy.feature as cfeature
+import cartopy.util as cutil
+
+# import cartopy.crs as ccrs
 
 from . import util
 
@@ -40,35 +49,75 @@ class LayoutBase():
     Contains three matplotlib axes.
     """
 
-    def __init__(self, figsize, layout=None, **kw):
+    def __init__(self, figsize, layout=None, cls=None, **kw):
         self.figsize = figsize
+        self.enlarge = 0
         self.layout = layout or "none"
         self.figkw = kw
 
-        self.ax = None
-        self.cax = None
-        self.tax = None
+        # set cls=False to clear cls
+        cls = FigureBase if cls is None else cls
+        self.cls = cls or None
 
-    def __call__(self, cls=None, axs=None, **kw):
+        self.axkw = {}
+        self.atbl = {}
+
+    def __call__(self, axs=None, **kwds):
         """Create figure and axes."""
-        cls = cls or FigureBase
-        if cls is True:
-            cls = None
-        fig = plt.figure(figsize=self.figsize, layout=self.layout,
-                         FigureClass=cls, **self.figkw)
 
-        # fig.canvas.manager.toolmanager.add_tool('TEST00', TestTools)
-
+        fig = plt.figure(figsize=self.figsize,
+                         layout=self.layout, FigureClass=self.cls,
+                         **self.figkw)
+        if self.figsize is None:
+            self.figsize = fig.get_size_inches()
+        self.enlarge = 0.0
+        # dummy
         axs = axs or self
+        self.axkw = kwds
         return fig, axs
 
-    def reset(self, fig, axs=None):
+    def reset(self, fig, axs=None, **kwds):
         """Dummy procedure to reset figure."""
 
-    def parse_coor(self, coor):
+    def _resize_calc(self, base, rate):
+        if rate >= 0:
+            return base * (1 + rate)
+        return base / (1 - rate)
+
+    def _resize_prop(self, org, cur, rate):
+        if rate is None:
+            return 0
+        cur = self._resize_calc(cur, rate)
+        r = cur / org
+        if r >= 1:
+            return r - 1
+        return 1 - org / cur
+
+    def resize(self, fig, axs=None, rate=None):
+        """Resize figure."""
+        geo = fig.get_size_inches()
+        self.enlarge = self._resize_prop(self.figsize[0], geo[0], rate)
+        geo = self._resize_calc(np.array(self.figsize), self.enlarge)
+        fig.set_size_inches(geo)
+
+        # if rate >= 0:
+        #     for o in fig.findobj(mplib.text.Text):
+        #         o.set_fontsize(o.get_fontsize() * (1 + rate))
+        # else:
+        #     for o in fig.findobj(mplib.text.Text):
+        #         o.set_fontsize(o.get_fontsize() / (1 - rate))
+
+    def parse_coor(self, coor, item=False):
         """Fallback coordinate limit parser"""
         dmax = coor[-1]
         dmin = coor[0]
+        if item:
+            dmax = dmax.item()
+            dmin = dmin.item()
+        if dmin > dmax:
+            dmin, dmax = dmax, dmin
+        # print(coor[-1], dmax)
+        # print(coor[0], dmin)
         return (dmin, dmax)
 
     def parse_ticks(self, _, default=0):
@@ -77,13 +126,16 @@ class LayoutBase():
         minor = default
         return (major, minor)
 
-    def set_ticks(self, x, y, axs=None, major=None, minor=None):
+    def set_ticks(self, x, y, axs=None, major=None, minor=None, key=None):
         """Set tick labels."""
         axs = axs or self
+        key = key or 'body'
+        ax = axs.atbl.get(key, None)
+
         major = major or {}
         minor = minor or {}
-        for co, axis, limf in [(x, axs.ax.xaxis, axs.ax.set_xlim),
-                               (y, axs.ax.yaxis, axs.ax.set_ylim)]:
+        for co, axis, limf in [(x, ax.xaxis, ax.set_xlim),
+                               (y, ax.yaxis, ax.set_ylim)]:
             dmin, dmax = self.parse_coor(co)
             span = abs(dmax - dmin)
             vmaj, vmin = self.parse_ticks(co.attrs)
@@ -97,14 +149,133 @@ class LayoutBase():
             if dmin != dmax:
                 limf(dmin, dmax)
 
-    def cbar_set_ticks(self, axs=None,
-                       major=None, minor=None):
-        """Set tick labels of colorbar."""
+    def set_geoticks(self, x, y, axs=None, major=None, minor=None,
+                     crs=None, key=None):
+        """Set GeoAxes extent and tick labels."""
         axs = axs or self
+        key = key or 'body'
+        ax = axs.atbl.get(key, None)
+
+        lon = x
+        lat = y
+
+        x0, x1 = self.parse_coor(lon)
+        y0, y1 = self.parse_coor(lat)
+
+        # print(x0, x1, y0, y1)
+        try:
+            if abs(x1 - x0) > 359 and abs(y1 - y0) > 179:
+                raise ValueError(f"Force to set global {x0}:{x1}")
+            if abs(x1 - x0) >= 360:
+                if x1 > x0:
+                    x1 = x1 + 0.01
+                else:
+                    x0 = x0 + 0.01
+            ax.set_extent((x0, x1, y0, y1), crs=crs)
+        except ValueError as err:
+            print(err)
+            ax.set_global()
+
+        major = major or dict(labelsize=13)
+        minor = minor or {}
+
+        try:
+            self.set_lon_ticks(ax, lon, crs, major, minor)
+            self.set_lat_ticks(ax, lat, crs, major, minor)
+        except RuntimeError as err:
+            print(err)
+            gl = ax.gridlines(draw_labels=True)
+            gl.top_labels = False
+            gl.right_labels = False
+
+    def set_lon_ticks(self, ax, lon, crs, major=None, minor=None):
         major = major or {}
         minor = minor or {}
-        axs.cax.tick_params(which='major', **major)
-        axs.cax.tick_params(which='minor', **minor)
+        x0, x1 = self.parse_coor(lon, item=True)
+        span = abs(x1 - x0)
+        vmaj, vmin = self.parse_ticks(lon.attrs)
+        # print(f"lon:{span=} {vmaj=}")
+        if span > vmaj > 0:
+            loc = mtc.MultipleLocator(vmaj)
+        else:
+            loc = cmtick.LongitudeLocator()
+        # print(type(loc), loc)
+        loc = [lo for lo in loc.tick_values(x0, x1)
+               if x0 <= lo <= x1]
+        # print((x0, x1), loc)
+        loc = sorted([lo - 360 if lo >= 180 else lo for lo in loc])
+        ax.set_xticks(ticks=loc, crs=crs)
+
+        if vmin > 0:
+            loc = mtc.MultipleLocator(vmin)
+        else:
+            loc = cmtick.LongitudeLocator()
+        loc = [lo for lo in loc.tick_values(x0, x1)
+               if x0 <= lo <= x1]
+        loc = sorted([lo - 360 if lo >= 180 else lo for lo in loc])
+        ax.set_xticks(ticks=loc, minor=True, crs=crs)
+
+        fmt = cmtick.LongitudeFormatter()
+        ax.xaxis.set_major_formatter(fmt)
+        # ax.xaxis.set_minor_formatter(fmt)
+        ax.xaxis.set_tick_params(which='major', **major)
+        ax.xaxis.set_tick_params(which='minor', **minor)
+
+    def set_lat_ticks(self, ax, lat, crs, major=None, minor=None):
+        major = major or {}
+        minor = minor or {}
+        x0, x1 = self.parse_coor(lat, item=True)
+        if x0 > x1:
+            x0, x1 = x1, x0
+        # print(x0, x1)
+        span = abs(x1 - x0)
+        vmaj, vmin = self.parse_ticks(lat.attrs)
+        # print(f"{span=}\n{vmaj=}\n{vmin=}")
+        # print((x0, x1))
+        if span > vmaj > 0:
+            loc = mtc.MultipleLocator(vmaj)
+        else:
+            loc = cmtick.LatitudeLocator()
+        loc = [lo for lo in loc.tick_values(x0, x1)
+               if x0 <= lo <= x1]
+        ax.set_yticks(ticks=loc, crs=crs)
+
+        if vmin > 0:
+            loc = mtc.MultipleLocator(vmin)
+        else:
+            loc = cmtick.LatitudeLocator()
+        loc = [lo for lo in loc.tick_values(x0, x1)
+               if x0 <= lo <= x1]
+        ax.set_yticks(ticks=loc, minor=True, crs=crs)
+
+        fmt = cmtick.LatitudeFormatter()
+        ax.yaxis.set_major_formatter(fmt)
+        ax.yaxis.set_tick_params(which='major', **major)
+        ax.yaxis.set_tick_params(which='minor', **minor)
+
+    def add_features(self, /, *features, axs=None, key=None):
+        """Set GeoAxes extent and tick labels."""
+        axs = axs or self
+        key = key or 'body'
+        ax = axs.atbl.get(key, None)
+
+        for ft in features:
+            if isinstance(ft, str):
+                ft = getattr(cfeature, ft)
+            if ft:
+                ax.add_feature(ft)
+
+    def cbar_set_ticks(self, axs=None,
+                       major=None, minor=None, key=None):
+        """Set tick labels of colorbar."""
+        axs = axs or self
+        key = key or 'colorbar'
+        cax = axs.atbl.get(key, None)
+
+        major = major or {}
+        minor = minor or {}
+        cax.tick_params(which='major', **major)
+        cax.tick_params(which='minor', **minor)
 
 
 class LegacyParser(LayoutBase):
@@ -193,7 +364,7 @@ class LegacyParser(LayoutBase):
         minor = subst(minor)
         return (major, minor)
 
-    def parse_coor(self, coor):
+    def parse_coor(self, coor, item=False):
         """Parse axis limit."""
         miss = coor.attrs.get('MISS', '').strip()
 
@@ -211,9 +382,10 @@ class LegacyParser(LayoutBase):
             dmax = float(dmax)
             dmin = float(dmin)
         else:
-            vmin, vmax = super().parse_coor(coor)
+            vmin, vmax = super().parse_coor(coor, item=item)
             dmax = float(dmax) if dmax else vmax
             dmin = float(dmin) if dmin else vmin
+        # print(f"{dmin=} {dmax=}")
         return (dmin, dmax)
 
     def parse_calendar(self, attrs, default=None):
@@ -272,22 +444,34 @@ class LayoutLegacy3(LegacyParser, LayoutBase):
 
     geometry = (10.45, 7.39)
 
-    def __init__(self, *args,
-                 figsize=None, layout=None, **kw):
-        figsize = figsize or self.geometry
-        # layout = layout or "none"
-        layout = layout or "none"
-        super().__init__(*args,
-                         figsize=figsize, layout=layout,
-                         **kw)
+    ofx, ofy = 0.2, 0.02
+    rect = {'body': (0.129, 0.225, 0.830, 0.585),
+            # 'info': (0.129 + ofx, 0.070 - ofy, 0.830 - ofx * 2, 0.057 + ofy),
+            'info': (0.129 + ofx, ofy, 0.830 - ofx * 2, 0.1042 - ofy),
+            'colorbar': (0.061, 0.070, 0.245, 0.057), }
 
-    def __call__(self, *args, figsize=None, **kw):
+    tkw = {'pad': 18.7,
+           'linespacing': 1.3,
+           'fontsize': 14, }
+    ckw = {'fontsize': 12, }
+
+    def __init__(self, *args, figsize=None, **kw):
+        figsize = figsize or self.geometry
+        super().__init__(*args, figsize=figsize, **kw)
+
+    def __call__(self, axs=None, figsize=None, **kw):
         """Create figure and standard axes."""
-        fig, axs = super().__call__(*args, **kw)
+        fig, axs = super().__call__(axs=axs, **kw)
 
         if figsize:
             if figsize is True:
                 figsize = self.geometry
+            elif isinstance(figsize, (int, float)):
+                geo = figsize.get_size_inches()
+                if figsize >= 0:
+                    figsize = geo * (1.0 + figsize)
+                else:
+                    figsize = geo / (1.0 - figsize)
             elif hasattr(figsize, 'get_size_inches'):
                 figsize = figsize.get_size_inches()
             fig.set_size_inches(figsize)
@@ -295,19 +479,19 @@ class LayoutLegacy3(LegacyParser, LayoutBase):
         self.reset(fig, axs)
         return fig, axs
 
-    def reset(self, fig, axs=None, **kw):
+    def reset(self, fig, axs=None, **kwds):
         """Bind standard axes."""
         axs = axs or self
 
         fig.clf()
 
-        axs.ax = fig.add_axes([0.129, 0.225, 0.830, 0.585],
-                              label='body', **kw)
-        axs.tax = fig.add_axes([0.129, 0.070, 0.830, 0.057],
-                               label='info', )
-        axs.cax = fig.add_axes([0.061, 0.070, 0.245, 0.057],
-                               label='colorbar', )
-        axs.tax.set_axis_off()
+        for lab, rc in self.rect.items():
+            axkw = (self.axkw.get(lab, None) or {})\
+                | (kwds.get(lab, None) or {})
+            # print(lab, axkw)
+            self.atbl[lab] = fig.add_axes(rc, label=lab, **axkw)
+            # print(lab, self.atbl[lab])
+        self.atbl['info'].set_axis_off()
 
         return axs
 
@@ -317,44 +501,52 @@ class LayoutLegacy3(LegacyParser, LayoutBase):
         minor = minor or self.minor
         super().set_ticks(*args, major=major, minor=minor, **kw)
 
-    def cbar_set_ticks(self, axs=None,
-                       major=None, minor=None):
+    def cbar_set_ticks(self, *args, major=None, minor=None, **kw):
         """Set colorbar ticks."""
         major = major or self.cbar_major
         minor = minor or self.cbar_minor
-        super().cbar_set_ticks(axs=axs, major=major, minor=minor)
+        super().cbar_set_ticks(*args, major=major, minor=minor, **kw)
 
-    def add_titles(self, data, axs=None, contours=None, **kw):
+    def add_titles(self, data, axs=None, contours=None,
+                   key=None, tkey=None, **kw):
         """Add title."""
+
         axs = axs or self
+        key = key or 'body'
+        tkey = tkey or 'info'
+        ax = axs.atbl.get(key, None)
+        tax = axs.atbl.get(tkey, None)
+
         tkw = {'pad': 18.7,
                'linespacing': 1.3,
                'fontsize': 14, }
         tkw.update(kw)
 
         left = self.parse_titles(data.attrs, data.coords, default='')
-        axs.ax.set_title('\n'.join(left), loc='left', **tkw)
+        ax.set_title('\n'.join(left), loc='left', **tkw)
 
         dset = self.parse_dataset(data.attrs, default='')
         cal = self.parse_calendar(data.attrs, default='')
         right = (dset, cal, '')
 
-        axs.ax.set_title('\n'.join(right), loc='right', **tkw)
+        ax.set_title('\n'.join(right), loc='right', **tkw)
 
         if contours:
             dc = contours[0].levels[1:] - contours[0].levels[:-1]
             if len(set(dc)) == 1:
                 ctext = f'CONTOUR INTERVAL = {dc[0]}'
-                axs.tax.text(0.5, 0.5, ctext,
-                             horizontalalignment='center',
-                             verticalalignment='top',
-                             fontsize=12)
+                tax.text(0.5, 1.0, ctext,
+                         horizontalalignment='center',
+                         verticalalignment='top',
+                         fontsize=12)
 
-    def colorbar(self, fig, *args, axs=None, orientation=None, **kw):
+    def colorbar(self, fig, *args, axs=None, orientation=None, key=None, **kw):
         """Wrap colorbar"""
         axs = axs or self
+        key = key or 'colorbar'
+        cax = axs.atbl.get(key, None)
         orientation = orientation or 'horizontal'
-        return fig.colorbar(*args, cax=axs.cax, orientation=orientation, **kw)
+        return fig.colorbar(*args, cax=cax, orientation=orientation, **kw)
 
 
 class ContourPlot:
@@ -373,76 +565,85 @@ class ContourPlot:
                     'p': 'pcolormesh', 'i': 'imshow',
                     's': 'surface', }
 
-    def __init__(self,
-                 limit=None,
-                 common=None, contour=None, color=None,
-                 colors_first=None,
-                 method=None, cmap=None):
-        self._common = common or {}
+    def __init__(self, contour=None, color=None):
         self._contour = {'colors': 'black'}
         self._color = {}
-        if isinstance(contour, str):
-            contour = self.parse_levels(contour, single=False)
-        self._contour['levels'] = contour or []
-        if isinstance(color, str):
-            color = self.parse_levels(color, single=True)
-        self._color['levels'] = color or None
-        # if isinstance(method, str):
-        #     method, cmap = self.parse_method(method, cmap)
-        # print(cmap)
-        self._color['method'] = method
-        self._color['cmap'] = cmap
-        self.colors_first = colors_first
 
-        limit = limit or (None, None)
-        if limit[0] is not None:
-            self._common['vmin'] = limit[0]
-        if limit[1] is not None:
-            self._common['vmax'] = limit[1]
+        self._contour.update(contour or {})
+        self._color.update(color or {})
 
-        # print(self._color)
-
-    def __call__(self, fig, axs, data, title=None, **kwds):
+    def __call__(self, fig, axs, data, cyclic=None, title=None, **kwds):
         """Batch plotter."""
         if any(w <= 1 for w in data.shape):
             raise UserWarning("virtually less than two dimensions")
 
-        axs.reset(fig)
+        # axs.reset(fig, **kwds.fromkeys(axs.axkw))
+        # print(axs.ax)
         coords = data.coords
-        # cj = [d for d, c in coords.items() if c.size > 1]
         cj = [d for d in data.dims if coords[d].size > 1]
         if len(cj) != 2:
             raise ValueError(f"Not 2d shape={cj}")
         xco = coords[cj[1]]
         yco = coords[cj[0]]
-        # print(xco)
-        axs.set_ticks(x=xco, y=yco)
-        axs.cbar_set_ticks()
 
-        common = self._common
-        contour = self._contour
-        color = self._color
+        if cyclic is None:
+            for ck in [0, 1, ]:
+                c = coords[cj[ck]]
+                cc = c.attrs.get('cyclic_coordinate')
+                if not cc:
+                    continue
+                w, org, dup = cc
+                if len(c) == w - 1 \
+                   and c[0] == org \
+                   and c[-1] != dup:
+                    cd, cx = cutil.add_cyclic(data, c, axis=ck,
+                                              cyclic=dup)
+                    nco = dict(data.coords.items())
+                    nco[cj[ck]] = cx
+                    data = xr.DataArray(cd, coords=nco,
+                                        dims=data.dims, attrs=data.attrs)
+                    break
 
-        if self.colors_first:
-            col, cbr = self.color(fig, axs, data, **common, **color)
-            con = self.contour(axs, data, **common, **contour)
+        ax = axs.atbl.get('body')
+        body = (axs.axkw.get('body') or {}) | (kwds.get('body') or {})
+
+        if isinstance(ax, cmgeo.GeoAxes):
+            axs.set_geoticks(x=xco, y=yco, crs=body.get('crs'))
+            axs.add_features(*body.get('features'))
         else:
-            con = self.contour(axs, data, **common, **contour)
-            col, cbr = self.color(fig, axs, data, **common, **color)
+            # pass
+            axs.set_ticks(x=xco, y=yco)
+
+        stat = {}
+        contour = self._contour | (kwds.get('contour') or {})
+        color = self._color | (kwds.get('color') or {})
+
+        if isinstance(ax, cmgeo.GeoAxes):
+            transf = body.get('transform')
+            if transf:
+                contour.setdefault('transform', transf)
+                color.setdefault('transform', transf)
+
+        if color['method'] == 'contour':
+            col, cbr = self.color(fig, axs, data, stat, **color)
+            con = self.contour(axs, data, **stat, **contour)
+        else:
+            con = self.contour(axs, data, stat, **contour)
+            col, cbr = self.color(fig, axs, data, **stat, **color)
 
         if cbr:
             for c in con:
                 cbr.add_lines(c, erase=False)
         else:
-            bkw = {}
-            cbr = fig.colorbar(con[0], **bkw)
+            cbr = axs.colorbar(fig, con[0])
             for c in con[1:]:
                 cbr.add_lines(c, erase=False)
 
         axs.add_titles(data, contours=con)
+        axs.cbar_set_ticks()
 
         fig.canvas.draw()
-        fig.canvas.flush_events()
+        # fig.canvas.flush_events()
         # Not yet working....
         if title:
             for a in ['set_window_title', 'setWindowTitle', ]:
@@ -451,70 +652,12 @@ class ContourPlot:
                     f(f'Figure: {title}')
                     break
 
-    def parse_levels(self, text, single=False):
-        # --contours=0              no contour
-        # --contours=INT[/INT...]   contour intervals
-        # --contours=LEV,[LEV,...]  explicit contour levels
-        # --contours=NUM:[NUM,...]  total number of contour lines
-
-        # --colors=0                 no fill
-        # --colors=INT               intervals
-        # --colors=LEV,[LEV,...]     explicit levels
-        # --colors=NUM:              total number of colors
-        if text is False:
-            pat = []
-        elif text is True:
-            pat = [True]
-        else:
-            pat = []
-            for item in text.split(self.isep):
-                if self.lsep in item:
-                    pat.append([float(jj)
-                                for jj in item.split(self.lsep) if jj])
-                elif self.nsep in item:
-                    for n in [int(jj)
-                              for jj in item.split(self.nsep) if jj]:
-                        loc = mtc.MaxNLocator(n + 1)
-                        pat.append(loc.tick_values)
-                elif item:
-                    item = float(item)
-                    if item > 0:
-                        loc = mtc.MultipleLocator(item)
-                        pat.append(loc.tick_values)
-                    else:
-                        pat.append(False)
-        if single:
-            if len(pat) == 0:
-                pat = None
-            elif len(pat) == 1:
-                pat = pat[0]
-            else:
-                raise ValueError(f"Non single level specification {text}.")
-        # print(pat)
-        return pat
-
-    def parse_method(self, method, cmap=None):
-        # print(method, cmap)
-        method = method or ''
-        method = tuple(method.split('/'))
-        if len(method) >= 2:
-            method, cmap = method[:2]
-        elif method:
-            method = method[0]
-        else:
-            method = None
-        # print(method, cmap)
-        method = self.method_table.get(method, method)
-        if method in self.method_table:
-            pass
-        elif cmap is None:
-            if method in mplib.colormaps:
-                method, cmap = None, method
-        method = method or 'contourf'
-        return method, cmap
-
-    def contour(self, axs, data, levels=None, **kw):
+    def contour(self, axs, data, stat=None,
+                levels=None, key=None, **kw):
         """matplotlib contour wrapper."""
+        key = key or 'body'
+        ax = axs.atbl.get(key)
+
         cc = []
         levels = levels or True
         if not isinstance(levels, cabc.Iterable):
@@ -526,7 +669,7 @@ class ContourPlot:
                 levels = [levels]
 
         def run(idx, **args):
-            return data.plot.contour(ax=axs.ax, **args,
+            return data.plot.contour(ax=ax, **args,
                                      **(self.opts | kw))
         for j, lev in enumerate(levels):
             if lev is True:
@@ -536,21 +679,20 @@ class ContourPlot:
             elif isinstance(lev, list):
                 c = run(j, levels=lev)
             elif isinstance(lev, cabc.Callable):
-                vmin = kw.get('vmin')
-                if vmin is None:
-                    vmin = data.min().values
-                vmax = kw.get('vmax')
-                if vmax is None:
-                    vmax = data.max().values
+                vmin, vmax = self.get_range(data, stat, **kw)
                 c = run(j, levels=lev(vmin, vmax))
             else:
                 raise TypeError(f"invalid level specifier {c}.")
             cc.append(c)
         return cc
 
-    def color(self, fig, axs, data,
-              method=None, cmap=None, levels=None, **kw):
+    def color(self, fig, axs, data, stat=None,
+              method=None, cmap=None, levels=None,
+              key=None, **kw):
         """matplotlib contour wrapper."""
+        key = key or 'body'
+        ax = axs.atbl.get(key)
+        # print(ax)
         if method is None:
             method = True
         if method is True:
@@ -558,6 +700,7 @@ class ContourPlot:
         if method is False:
             col, cbr = None, None
         else:
+            # print(data.dims)
             func = getattr(data.plot, method, None)
             if func is None:
                 raise ValueError(f"invalid method {method}.")
@@ -570,12 +713,7 @@ class ContourPlot:
             elif isinstance(levels, list):
                 pass
             elif isinstance(levels, cabc.Callable):
-                vmin = kw.get('vmin')
-                if vmin is None:
-                    vmin = data.min().values
-                vmax = kw.get('vmax')
-                if vmax is None:
-                    vmax = data.max().values
+                vmin, vmax = self.get_range(data, stat, **kw)
                 levels = levels(vmin, vmax)
             else:
                 raise TypeError(f"invalid level specifier {levels}.")
@@ -583,8 +721,25 @@ class ContourPlot:
             if levels is False:
                 col, cbr = None, None
             else:
-                col = func(ax=axs.ax, add_colorbar=False,
+                col = func(ax=ax, add_colorbar=False,
+                           # x=data.dims[-1], y=data.dims[0],
+                           # transform=None,
                            levels=levels, cmap=cmap,
                            **(self.opts | kw))
-                cbr = axs.colorbar(fig, col)
+                if method == 'contour' and len(col.levels) <= 1:
+                    cbr = None
+                else:
+                    cbr = axs.colorbar(fig, col)
         return (col, cbr)
+
+    def get_range(self, data, stat, vmin=None, vmax=None, **kw):
+        stat = stat or {}
+        vmin = vmin or stat.get('vmin')
+        vmax = vmax or stat.get('vmax')
+        if vmin is None:
+            vmin = data.min().values
+            stat['vmin'] = vmin
+        if vmax is None:
+            vmax = data.max().values
+            stat['vmax'] = vmax
+        return vmin, vmax
