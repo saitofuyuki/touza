@@ -1,5 +1,19 @@
 [zbcont]
 
+[zbcont.Legacy3]
+# geometry = [10.45, 7.39]
+# contour_text.fontsize = ""
+# title_text.fontsize = ""
+
+[zbcont.Legacy3.rect]
+# body =  [0.129, 0.225, 0.830, 0.585]
+# colorbar = [0.061, 0.070, 0.245, 0.057]
+
+[zbcont.Legacy3.cbar_major]
+# labelsize = ""
+
+[zbcont.ContourPlot]
+
 [zbcont.option]
 permute.skip_single = true
 resize_step = 0.25
@@ -17,6 +31,8 @@ enlarge = '+'
 shrink = '-'
 reset_geometry = '='
 print = 'p'
+toggle_clabel = 'c'
+toggle_cmap = 'C'
 
 [zbcont.keymap.figure]
 quit = 'q'
