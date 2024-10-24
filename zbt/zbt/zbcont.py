@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/23 14:30:30 fuyuki zbcont.py>
+# Time-stamp: <2024/10/24 15:03:52 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -36,8 +36,8 @@ class Options(ap.Namespace):
     """Namespace to hold options"""
 
     method_table = {'f': 'contourf', 'c': 'contour',
-                    'p': 'pcolormesh', 'i': 'imshow',
-                    's': 'surface', }
+                    'p': 'pcolormesh', 'i': 'imshow', }
+    # reserved:  {'s': 'surface'}
 
     isep = '/'
     lsep = ','
@@ -92,7 +92,7 @@ class Options(ap.Namespace):
                             default=None, type=str,
                             help='coloring method and map'
                             ' {contour(c) contourf(f) pcolormesh(p)'
-                            ' imshow(i) surface(s)}')
+                            ' imshow(i)}')
         parser.add_argument('-r', '--range',
                             metavar='[LOW][:[HIGH]]', dest='limit', type=str,
                             help='data range to draw')
@@ -124,6 +124,10 @@ class Options(ap.Namespace):
                             metavar='PROJECTION', type=str,
                             default=None,
                             help='map projection')
+        parser.add_argument('-W', '--each-file',
+                            dest='window',
+                            action='store_const', default=0, const=1,
+                            help='Create figure for each file')
 
         parser.parse_args(argv, namespace=self)
 
@@ -315,10 +319,9 @@ class Options(ap.Namespace):
             maps = f or [None]
         elif isinstance(maps, list):
             pass
-        # elif maps is not None:
-        else:
+        elif maps is not None:
             maps = [maps or None]
-        styles['features'] = maps
+        # else:
 
         # --projection=PROJ[<+->lon[<+->lat]][,Y,X]
         #   +NUM > +NUM    +-NUM > -NUM   ++NUM > +NUM
@@ -364,6 +367,8 @@ class Options(ap.Namespace):
                 raise ValueError(f"Invalid feature {proj}")
             # print(projection)
             # print(f"{maps=}")
+        if bool(projection):
+            maps = maps or [None]
         if bool(maps):
             if not transform:
                 transform = ccrs.PlateCarree()
@@ -371,6 +376,8 @@ class Options(ap.Namespace):
                 crs = transform
             if not projection:
                 projection = transform
+
+        styles['features'] = maps
         styles['projection'] = projection
         styles['crs'] = crs
         styles['transform'] = transform
@@ -411,14 +418,10 @@ def load_config(opts, *files, cmd=None, base=None):
             with open(f, "rb") as fp:
                 c = toml.load(fp)
                 config.update(c)
-
-    # if cmd:
-    #     kbase = config.get(cmd.stem, {})
-    # else:
-    #     kbase = config
-    # opts.keymap = {}
-    # parse_keymap(opts.keymap, kbase.get('keymap', {}))
-
+    for attr in ['verbose', ]:
+        if hasattr(opts, attr):
+            param = getattr(opts, attr)
+            config[cmd][attr] = param
     return config
 
 
@@ -433,6 +436,29 @@ def parse_keymap(opts, config, group=None):
         elif c != '':
             opts[c] = (f, ) + group
 
+class Output:
+    def __init__(self, name, method=None):
+        method = method or 'serial'
+        self._method = getattr(self, method, None)
+        if self._method is None:
+            raise ValueError(f"Unknown output method {method}")
+        self.name = plib.Path(name)
+        self.num = 0
+
+    def __call__(self, *args):
+        return self._method(*args)
+
+    def format(self, num):
+        return f"-{num}"
+
+    def serial(self, *args):
+        rev = self.format(self.num)
+        base = self.name.stem + rev + self.name.suffix
+        path = self.name.parent / base
+        if path.exists():
+            raise ValueError(f"Exists {path}")
+        self.num = self.num + 1
+        return path
 
 def main(argv, cmd=None):
     """Contour plot with TOUZA/Zbt."""
@@ -461,27 +487,41 @@ def main(argv, cmd=None):
         opts.print_usage()
         sys.exit(0)
 
-    Array = zctl.ArrayIter()
-    Var = zctl.VariableIter(child=Array, dim=opts.dim, coors=opts.coors)
-    File = zctl.FileIter(opts.files, child=Var,
-                         variables=opts.variable)
+    if opts.window > 0:
+        Iter = []
+        for f in opts.files:
+            Array = zctl.ArrayIter()
+            Var = zctl.VariableIter(child=Array, dim=opts.dim,
+                                    coors=opts.coors)
+            Iter.append(zctl.FileIter([f], child=Var,
+                                      variables=opts.variable))
+    else:
+        Array = zctl.ArrayIter()
+        Var = zctl.VariableIter(child=Array, dim=opts.dim, coors=opts.coors)
+        Iter = zctl.FileIter(opts.files, child=Var,
+                             variables=opts.variable)
+
+    Layout = zplt.LayoutLegacy3
 
     Plot = zplt.ContourPlot(contour=opts.contour, color=opts.color)
 
-    Figs = zctl.FigureControl(Plot, File,
+    Figs = zctl.FigureControl(Plot, Iter,
                               interactive=opts.interactive,
+                              layout=Layout,
                               styles=opts.styles,
                               config=cfg.get(cstem), params=plt.rcParams)
 
     output = opts.output
-    if output and output.exists():
-        raise ValueError(f"Exists {output}")
     try:
         if output and output.suffix == '.pdf':
+            if output and output.exists():
+                raise ValueError(f"Exists {output}")
             with mppdf.PdfPages(output) as output:
                 Figs(output)
         else:
-            Figs()
+            if output:
+                output = Output(name=output)
+            Figs(output)
     except StopIteration as err:
         print(err)
         sys.exit(1)
