@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/23 12:52:17 fuyuki plot.py>
+# Time-stamp: <2024/10/24 17:04:41 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -12,6 +12,7 @@ Plotter collections.
 :Created:    Oct 9 2024
 """
 
+import sys
 import collections.abc as cabc
 import numbers as nums
 
@@ -62,11 +63,16 @@ class LayoutBase():
         self.axkw = {}
         self.atbl = {}
 
-    def __call__(self, axs=None, **kwds):
+    def __call__(self, axs=None,
+                 figsize=None, layout=None, FigureClass=None,
+                 **kwds):
         """Create figure and axes."""
+        figsize = figsize or self.figsize
+        layout = layout or self.layout
+        FigureClass = FigureClass or self.cls
 
-        fig = plt.figure(figsize=self.figsize,
-                         layout=self.layout, FigureClass=self.cls,
+        fig = plt.figure(figsize=figsize,
+                         layout=layout, FigureClass=FigureClass,
                          **self.figkw)
         if self.figsize is None:
             self.figsize = fig.get_size_inches()
@@ -99,13 +105,6 @@ class LayoutBase():
         self.enlarge = self._resize_prop(self.figsize[0], geo[0], rate)
         geo = self._resize_calc(np.array(self.figsize), self.enlarge)
         fig.set_size_inches(geo)
-
-        # if rate >= 0:
-        #     for o in fig.findobj(mplib.text.Text):
-        #         o.set_fontsize(o.get_fontsize() * (1 + rate))
-        # else:
-        #     for o in fig.findobj(mplib.text.Text):
-        #         o.set_fontsize(o.get_fontsize() / (1 - rate))
 
     def parse_coor(self, coor, item=False):
         """Fallback coordinate limit parser"""
@@ -165,7 +164,9 @@ class LayoutBase():
         # print(x0, x1, y0, y1)
         try:
             if abs(x1 - x0) > 359 and abs(y1 - y0) > 179:
-                raise ValueError(f"Force to set global {x0}:{x1}")
+                # raise ValueError(f"Force to set global {x0}:{x1}")
+                # raise ValueError(f"Force to set global.")
+                raise ValueError('')
             if abs(x1 - x0) >= 360:
                 if x1 > x0:
                     x1 = x1 + 0.01
@@ -173,7 +174,8 @@ class LayoutBase():
                     x0 = x0 + 0.01
             ax.set_extent((x0, x1, y0, y1), crs=crs)
         except ValueError as err:
-            print(err)
+            if str(err):
+                print(err)
             ax.set_global()
 
         major = major or dict(labelsize=13)
@@ -187,6 +189,8 @@ class LayoutBase():
             gl = ax.gridlines(draw_labels=True)
             gl.top_labels = False
             gl.right_labels = False
+        ax.xaxis.set_label_text(xrpu.label_from_attrs(lon), fontsize=13)
+        ax.yaxis.set_label_text(xrpu.label_from_attrs(lat), fontsize=13)
 
     def set_lon_ticks(self, ax, lon, crs, major=None, minor=None):
         major = major or {}
@@ -431,6 +435,7 @@ class LegacyParser(LayoutBase):
 
 class LayoutLegacy3(LegacyParser, LayoutBase):
     """gtcont layout 3 emulation."""
+    name = 'Legacy3'
 
     pos = {'bottom': True, 'top': True, 'right': True, 'left': True, }
     major = {'length': 10.8, 'width': 1, 'pad': 5.8, 'labelsize': 14, }
@@ -450,12 +455,13 @@ class LayoutLegacy3(LegacyParser, LayoutBase):
             'info': (0.129 + ofx, ofy, 0.830 - ofx * 2, 0.1042 - ofy),
             'colorbar': (0.061, 0.070, 0.245, 0.057), }
 
-    tkw = {'pad': 18.7,
-           'linespacing': 1.3,
-           'fontsize': 14, }
-    ckw = {'fontsize': 12, }
+    title_text = {'pad': 18.7,
+                  'linespacing': 1.3,
+                  'fontsize': 14, }
+    contour_text = {'fontsize': 12, }
 
-    def __init__(self, *args, figsize=None, **kw):
+    def __init__(self, *args, figsize=None, config=None, **kw):
+        self.config(config)
         figsize = figsize or self.geometry
         super().__init__(*args, figsize=figsize, **kw)
 
@@ -478,6 +484,15 @@ class LayoutLegacy3(LegacyParser, LayoutBase):
 
         self.reset(fig, axs)
         return fig, axs
+
+    def config(self, config=None):
+        config = config or {}
+        verbose = config.get('verbose') or 0
+        config = config.get(self.name) or {}
+        if verbose > 0:
+            verbose = sys.stdout
+        util.update_config(self, config, pfx=f'config[{self.name}]',
+                           verbose=verbose)
 
     def reset(self, fig, axs=None, **kwds):
         """Bind standard axes."""
@@ -517,10 +532,7 @@ class LayoutLegacy3(LegacyParser, LayoutBase):
         ax = axs.atbl.get(key, None)
         tax = axs.atbl.get(tkey, None)
 
-        tkw = {'pad': 18.7,
-               'linespacing': 1.3,
-               'fontsize': 14, }
-        tkw.update(kw)
+        tkw = self.title_text | kw
 
         left = self.parse_titles(data.attrs, data.coords, default='')
         ax.set_title('\n'.join(left), loc='left', **tkw)
@@ -538,7 +550,7 @@ class LayoutLegacy3(LegacyParser, LayoutBase):
                 tax.text(0.5, 1.0, ctext,
                          horizontalalignment='center',
                          verticalalignment='top',
-                         fontsize=12)
+                         **self.contour_text)
 
     def colorbar(self, fig, *args, axs=None, orientation=None, key=None, **kw):
         """Wrap colorbar"""
@@ -577,8 +589,6 @@ class ContourPlot:
         if any(w <= 1 for w in data.shape):
             raise UserWarning("virtually less than two dimensions")
 
-        # axs.reset(fig, **kwds.fromkeys(axs.axkw))
-        # print(axs.ax)
         coords = data.coords
         cj = [d for d in data.dims if coords[d].size > 1]
         if len(cj) != 2:
@@ -608,8 +618,13 @@ class ContourPlot:
         body = (axs.axkw.get('body') or {}) | (kwds.get('body') or {})
 
         if isinstance(ax, cmgeo.GeoAxes):
-            axs.set_geoticks(x=xco, y=yco, crs=body.get('crs'))
-            axs.add_features(*body.get('features'))
+            if cj[0] in coords and cj[1] in coords:
+                axs.set_geoticks(x=xco, y=yco, crs=body.get('crs'))
+                args = body.get('features') or []
+                axs.add_features(*args)
+            else:
+                raise ValueError("Physical coordinate not defined:"
+                                 f"{cj[0]} {cj[1]}.")
         else:
             # pass
             axs.set_ticks(x=xco, y=yco)
@@ -631,6 +646,7 @@ class ContourPlot:
             con = self.contour(axs, data, stat, **contour)
             col, cbr = self.color(fig, axs, data, **stat, **color)
 
+        # print(col, col.cmap)
         if cbr:
             for c in con:
                 cbr.add_lines(c, erase=False)
@@ -642,8 +658,6 @@ class ContourPlot:
         axs.add_titles(data, contours=con)
         axs.cbar_set_ticks()
 
-        fig.canvas.draw()
-        # fig.canvas.flush_events()
         # Not yet working....
         if title:
             for a in ['set_window_title', 'setWindowTitle', ]:
@@ -653,7 +667,7 @@ class ContourPlot:
                     break
 
     def contour(self, axs, data, stat=None,
-                levels=None, key=None, **kw):
+                levels=None, clabel=None, key=None, **kw):
         """matplotlib contour wrapper."""
         key = key or 'body'
         ax = axs.atbl.get(key)
@@ -668,9 +682,29 @@ class ContourPlot:
             else:
                 levels = [levels]
 
+        clabel = util.set_default(clabel, True)
+        if clabel is True:
+            clabel = slice(min(1, len(levels) - 1), None, None)
+        if isinstance(clabel, slice):
+            clabel = range(*clabel.indices(len(levels)))
+        if isinstance(clabel, cabc.Iterable):
+            _clabel = clabel
+            # print(levels, list(_clabel))
+            def check_clabel(idx):
+                return bool(idx in _clabel)
+            clabel = check_clabel
+        if clabel is False:
+            clabel = lambda idx: False
+        if not isinstance(clabel, cabc.Callable):
+            raise(f"invalid clabel argument {clabel}")
+
         def run(idx, **args):
-            return data.plot.contour(ax=ax, **args,
+            cp = data.plot.contour(ax=ax, **args,
                                      **(self.opts | kw))
+            if clabel(idx):
+                ax.clabel(cp)
+            return cp
+
         for j, lev in enumerate(levels):
             if lev is True:
                 c = run(j)
