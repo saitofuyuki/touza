@@ -14,6 +14,7 @@ Common helper utilities for TOUZA/zbt
 
 import ctypes as CT
 import collections.abc as cabc
+import numbers as nums
 import numpy as np
 # import traceback
 # import collections as cols
@@ -22,7 +23,8 @@ import pprint as ppr
 # import termios
 
 __all__ = ['WrapCDLL', 'AutoString', 'NameMap', 'tostr', 'toint',
-           'expand', 'flatten', 'map_recursive', 'join_attrs', ]
+           'expand', 'flatten', 'map_recursive', 'join_attrs',
+           'set_default', 'update_config', ]
 
 
 # pylint: disable=too-few-public-methods
@@ -465,6 +467,63 @@ def join_attrs(attrs: dict, head: str,
         return ret
     return sep.join(flatten(ret))
 
+
+def set_default(var, default, null=None):
+    """Return default if var is null."""
+    if var == null:
+        return default
+    return var
+
+
+def update_config(ref, cfg=None, pfx=None, parent=None, verbose=None):
+    """Recursive update of config dict."""
+    parent = parent or []
+    cfg = cfg or {}
+    pfx = pfx or ''
+    def error(msg, key):
+        key = '.'.join(key)
+        raise ValueError(f"{pfx}[{key}] {msg}")
+
+    for ck, cv in cfg.items():
+        # print(parent, ck, cv)
+        if cv == '':
+            continue
+        par = parent + [ck]
+        if isinstance(ref, dict):
+            attr = False
+            if ck in ref:
+                rv = ref[ck]
+            else:
+                error("Invalid configuration key", par)
+        else:
+            attr = hasattr(ref, ck)
+            if attr:
+                rv = getattr(ref, ck)
+            else:
+                error("Invalid configuration key", par)
+        if isinstance(rv, dict):
+            if not isinstance(cv, dict):
+                error("Inconsistent type", par)
+            cv = update_config(rv, cfg[ck], pfx=pfx,
+                               parent=par, verbose=verbose)
+        else:
+            if isinstance(rv, nums.Number):
+                if not isinstance(cv, nums.Number):
+                    error("Inconsistent type", par)
+            elif isinstance(rv, tuple):
+                if not isinstance(cv, list):
+                    error("Inconsistent type", par)
+                if len(rv) != len(cv):
+                    error("Inconsistent length", par)
+            cv = type(rv)(cv)
+            if verbose:
+                key = '.'.join(par)
+                verbose.write(f"{pfx}[{key}] {rv} > {cv}\n")
+        if attr:
+            setattr(ref, ck, cv)
+        else:
+            ref[ck] = cv
+    return ref
 
 def main(argv):
     """Test driver."""
