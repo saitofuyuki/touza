@@ -20,7 +20,7 @@ classifiers = [
 # dynamic = ["version"]
 
 dependencies = [
-    "numpy", "matplotlib", "xarray", "cartopy",
+    "numpy", "matplotlib", "xarray", "cartopy", "tomllib",
 ]
 
 [tool.setuptools]
