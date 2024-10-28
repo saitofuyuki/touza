@@ -1,22 +1,56 @@
 [zbcont]
 
-[zbcont.Legacy3]
-# geometry = [10.45, 7.39]
-# contour_text.fontsize = ""
-# title_text.fontsize = ""
+# [Legacy3]
+# geometry = [20.0, 10.0]
 
-[zbcont.Legacy3.rect]
-# body =  [0.129, 0.225, 0.830, 0.585]
-# colorbar = [0.061, 0.070, 0.245, 0.057]
+[Legacy3.guide]
+color = 'red'
+alpha = 0.7
+linewidth = 8.0
 
-[zbcont.Legacy3.cbar_major]
-# labelsize = ""
+# [zbcont.Legacy3.colorbar.major]
+# # labelsize = ""
+
+# [zbcont.Legacy3.info]
 
 [zbcont.ContourPlot]
 
 [zbcont.option]
 permute.skip_single = true
 resize_step = 0.25
+
+[zbcont.mouse.body]
+select_h = 'left'
+select_hv = 'middle'
+select_v = 'right'
+anchor_h = 'shift+left'
+anchor_hv = 'shift+middle'
+anchor_v = 'shift+right'
+
+[zbcont.mouse.axis]
+next_cyclic = 'left'
+prev_cyclic = 'right'
+next = ''
+prev = ''
+transpose = 'middle'
+
+[zbcont.mouse.spine]
+select = 'left'
+anchor = 'shift+left'
+reverse = 'middle'
+next_norm = 'right'
+# next_cyclic = 'left'
+# lock = 'middle'
+
+[zbcont.mouse.colorbar]
+next_cyclic = 'left'
+prev_cyclic = ''
+next_group = 'right'
+prev_group = ''
+reverse = 'middle'
+
+[zbcont.mouse.spine.colorbar]
+lock = 'middle'
 
 [zbcont.keymap]
 quit = 'Q'
@@ -29,39 +63,71 @@ unmark = 'U'
 mark = 'M'
 enlarge = '+'
 shrink = '-'
-reset_geometry = '='
+sync_geometry = '='
+reset_geometry = ','
 print = 'p'
 toggle_clabel = 'c'
-toggle_cmap = 'C'
+turn_cmap = 'C'
+turn_norm = 'N'
+redraw = '.'
+reverse_horizontal = '#'
+reverse_vertical = '%'
+entire_view = 'w'
+
+# [zbcont.keymap.colorbar]
+# next_cyclic = 'C'
+# prev_cyclic = ''
+# next_norm = ''
+# prev_norm = ''
+# transpose = ''
 
 [zbcont.keymap.figure]
 quit = 'q'
 duplicate = 'D'
-new = 'N'
+new = 'ctrl+n'
+refresh = 'ctrl+r'
 info = 'i'
 mark = 'm'
 
 [zbcont.keymap.coordinate]
-next_cyclic = ']'
-prev_cyclic = '['
+next_cyclic = '['
+prev_cyclic = ']'
 next = ''
 prev = ''
 transpose = ':'
 
+x.next_cyclic = ''
+x.prev_cyclic = ''
+x.next = ''
+x.prev = ''
+
+y.next_cyclic = ''
+y.prev_cyclic = ''
+y.next = ''
+y.prev = ''
+
+[zbcont.keymap.anchor]
+next_cyclic = '('
+prev_cyclic = ')'
+next = ''
+prev = ''
+clear = '!'
+
 [zbcont.keymap.file]
 next_cyclic = 'f'
-prev_cyclic = ''
+prev_cyclic = 'alt+f'
 next = 'F'
-prev = ''
+prev = 'alt+F'
 
 [zbcont.keymap.variable]
 next_cyclic = 'v'
-prev_cyclic = ''
+prev_cyclic = 'alt+v'
 next = 'V'
-prev = ''
+prev = 'alt+V'
+rewind = '0'
 
-[zbcont.keymap.record]
-next_cyclic = 'r'
-prev_cyclic = ''
-next = ''
-prev = ''
+# [zbcont.keymap.record]
+# next_cyclic = 'r'
+# prev_cyclic = ''
+# next = ''
+# prev = ''
