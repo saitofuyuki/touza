@@ -18,10 +18,12 @@ import pathlib as plib
 import ctypes as CT
 import numpy
 
+# from . import util
+import zbt.util as zu
 from . import libtouza
-from . import util
 from . import param
 
+locallog = zu.LocalAdapter('dsnio')
 
 def diag_datasets():
     """Show registered dataset table for debug."""
@@ -54,7 +56,7 @@ class _TouzaNio(param.ParamTouzaNio):
     @classmethod
     def debug(cls):
         """Show debug properties."""
-        print(f"{cls}: {cls.lib}")
+        locallog.debug(f"{cls}: {cls.lib}")
 
 
 # pylint: disable=too-many-ancestors
@@ -106,12 +108,12 @@ class TouzaNioDataset(_TouzaNio):
 
         self.recdim = None
 
-        self.groups = util.NameMap()
-        self.dimensions = util.NameMap()
+        self.groups = zu.NameMap()
+        self.dimensions = zu.NameMap()
         # add dimensions first to share among groups
         self._add_dimensions()
         self._add_groups()
-        self.variables = util.NameMap()
+        self.variables = zu.NameMap()
         self._flatten_suites(flatten)
 
     def close(self):
@@ -186,7 +188,7 @@ class TouzaNioDataset(_TouzaNio):
         """Bind NIO groups in NIO object"""
         for gh, gname in self._groups():
             grp = self.createGroup(gname, gh)
-            gk = util.tostr(gname)
+            gk = zu.tostr(gname)
             self.groups[gk] = grp
         return self.groups
 
@@ -196,7 +198,7 @@ class TouzaNioDataset(_TouzaNio):
             cname = self.record
             self.recdim = self.createDimension(cname, size=nr, handle=-1,
                                                group=self)
-            ck = util.tostr(cname)
+            ck = zu.tostr(cname)
             self.dimensions[ck] = self.recdim
         for ch, cname in self._dimensions():
             (begin, end) = self.lib.group_co_range(self.handle, ch)
@@ -207,7 +209,7 @@ class TouzaNioDataset(_TouzaNio):
             if not dim:
                 dim = self.createDimension(cname, begin=begin, end=end,
                                            handle=ch)
-            ck = util.tostr(cname)
+            ck = zu.tostr(cname)
             self.dimensions[ck] = dim
         return self.dimensions
 
@@ -215,11 +217,11 @@ class TouzaNioDataset(_TouzaNio):
         if flatten:
             for g in self.groups.values():
                 for v in g.variables.values():
-                    vk = util.tostr(v.name)
+                    vk = zu.tostr(v.name)
                     self.variables[vk] = v
                 for d in g.dimensions.values():
                     if d not in self.dimensions.values():
-                        dk = util.tostr(d.name)
+                        dk = zu.tostr(d.name)
                         self.dimensions[dk] = d
 
         return self
@@ -235,7 +237,7 @@ class TouzaNioDataset(_TouzaNio):
             dfmt = self.datatype_from_dfmt(attr)
             var = self.createVariable(vname, dfmt, tuple(dims),
                                       handle=vh, recdim=recdim)
-            vk = util.tostr(vname)
+            vk = zu.tostr(vname)
             self.variables[vk] = var
         return self.variables
 
@@ -339,7 +341,7 @@ class TouzaNioDataset(_TouzaNio):
         if attrs:
             for a, ai in self.attrs():
                 av = self.getattr(a).strip()
-                ai = util.tostr(ai)
+                ai = zu.tostr(ai)
                 if av:
                     dump.append(f"{tab}{ai}: {av}")
 
@@ -378,14 +380,14 @@ class TouzaNioGroup(TouzaNioDataset):
         self.cls_var = parent.cls_var
         self.cls_arr = parent.cls_arr
 
-        self.groups = util.NameMap()
-        self.dimensions = util.NameMap()
+        self.groups = zu.NameMap()
+        self.dimensions = zu.NameMap()
 
         self._add_groups()
         self._add_dimensions()
 
         recdim = self.dimensions.get(self.record)
-        self.variables = util.NameMap()
+        self.variables = zu.NameMap()
         self._add_variables(recdim)
 
     def _attrs(self, vid=None, rec=None):
@@ -488,7 +490,7 @@ class _TouzaCoreVar(_TouzaNio):
     @property
     def dimensions_names(self):
         """Normalize dimension names"""
-        return tuple(util.tostr(d.name) for d in self.dimensions)
+        return tuple(zu.tostr(d.name) for d in self.dimensions)
 
     @property
     def dimensions_map(self):
@@ -535,10 +537,9 @@ class _TouzaCoreVar(_TouzaNio):
     def _info(self, attrs=None):
         """return str"""
         attrs = True if attrs is None else attrs
-        # print(f"{attrs=}")
         dump = [repr(type(self))]
         tab = ' ' * 4
-        vt = util.tostr(self.dtype)
+        vt = zu.tostr(self.dtype)
         vn = self.format_name()
         ds = ', '.join(self.format_dims())
         dump.append(f"{vt} {vn}({ds})")
@@ -547,7 +548,7 @@ class _TouzaCoreVar(_TouzaNio):
                 av = self.getattr(a)
                 if isinstance(av, str):
                     av = av.strip()
-                ai = util.tostr(ai)
+                ai = zu.tostr(ai)
                 if av:
                     dump.append(f"{tab}{ai}: {av}")
         dump.append(f"shape = {self.shape}")
@@ -555,7 +556,6 @@ class _TouzaCoreVar(_TouzaNio):
 
     def get_amap(self, rec=None, conv=None, uniq=False, **kwds):
         """Dummy procedure to overload."""
-        # print(self, rec, conv, uniq, kwds)
         return {}
 
 
@@ -583,8 +583,6 @@ class TouzaMemVar(_TouzaCoreVar):
         return obj
 
     def __getitem__(self, elem):
-        # print(elem)
-        # return self.array[elem]
         return self.array
 
     def getattr(self, item, **kwds):
@@ -623,7 +621,7 @@ class TouzaNioVar(_TouzaCoreVar):
 
     def _getitem_(self, elem):
         """__getitem__() core to call original function."""
-        elem = util.Selection(elem, self.dimensions)
+        elem = zu.Selection(elem, self.dimensions)
         start = ()
         count = ()
         shape = ()
@@ -742,7 +740,6 @@ class TouzaNioVar(_TouzaCoreVar):
             for k, v in res.items():
                 if len(set(v)) == 1:
                     res[k] = v[0]
-        # print(res)
         return res
 
     def getattr(self, item, rec=None, conv=None, uniq=False, **kwds):
@@ -827,7 +824,7 @@ class TouzaNioDimension(_TouzaNio):
 
     def __str__(self):
         """return str"""
-        n = util.tostr(self.name)
+        n = zu.tostr(self.name)
         p = [f"name = '{n}'",
              f"size = {self.size}", ]
         return f"{repr(type(self))}: " + ', '.join(p)
@@ -847,6 +844,9 @@ class TouzaNioCoDataset(TouzaNioDataset):
 
     gtax_env = 'GTAX_PATH'
     _embedded = ''
+
+    attr_cyclic = 'cyclic_coordinate'
+
     #  Null element corresponding to internal field.
     #  If the environemnt does not contain null element,
     #  then null element is inserted at the first candidate.
@@ -859,15 +859,16 @@ class TouzaNioCoDataset(TouzaNioDataset):
 
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
-        # print(f"{self.groups=}")
+        self._init_(**kwds)
 
+    def _init_(self, co_int=None, **kwds):
+        """Internal init procedures."""
+        # whether to introduce integer-array coordinate
+        if co_int is None:
+            co_int = True
+        self.co_int = co_int
         self.shift_variables()
-        # print(self.variables)
         self.bind_coordinates()
-        # print(f'final: {self.name}', self.variables)
-        # print(f'final: {self.name}')
-        # for vn, vv in self.variables.items():
-        #     print(f"   {vv.name} {vv.dimensions_names} {id(vv)}")
 
     def createGroup(self, groupname,
                     handle=None):
@@ -891,7 +892,6 @@ class TouzaNioCoDataset(TouzaNioDataset):
 
         for d in self.dimensions.values():
             if d.is_record():
-                # print(d.name, repr(d.dataset), repr(d.dataset.root))
                 time = []
                 for rec in range(*d.extent):
                     t = self.lib.header_get_attr('time',
@@ -905,8 +905,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
                         break
                     time.append(t)
                 okey = self.dimensions.rev_map(d)
-                # print(okey, time)
-                c = self.createArray(d.name, 'i4', (d, ), -1, None,
+                c = self.createArray(d.name, 'f8', (d, ), -1, None,
                                      array=time)
                 a = self.lib.header_get_attr('utim',
                                              handle=d.dataset.handle,
@@ -920,7 +919,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
             c = self.get_coordinate(d, paths, kind='loc')
             if c:
                 okey = self.dimensions.rev_map(d)
-                # print(f"found {okey}, {c.name}")
+                locallog.debug(f"found {okey}, {c.name}")
                 if okey in self.variables:
                     raise ValueError(f"Panic.  {okey} {self.variables}")
                 self.variables[okey] = c
@@ -936,7 +935,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
 
     def get_coordinate(self, dim, paths, kind=None):
         """Get physical coordinate Nio-handle."""
-        item = util.tostr(dim.name)
+        item = zu.tostr(dim.name)
         kind = kind or 'loc'
         if kind == 'loc':
             pfx = 'GTAXLOC.'
@@ -949,17 +948,12 @@ class TouzaNioCoDataset(TouzaNioDataset):
         for p in paths:
             if p == self._embedded:
                 c = self.check_coordinate_embedded(xgrp, item)
-                # if c:
-                #     print(f'embedded: {c.short()}')
-                # c = None
             else:
                 c = self.check_coordinate_external(xgrp, item, pfx, p)
             if not c:
                 continue
-            # print(item, type(c))
             for cc in c.dimensions:
                 ## check first coordinate with the same name
-                # print('>> ', cc.name, cc.size, cc.extent)
                 if cc.name == dim.name:
                     if dim.extent[0] < cc.extent[0] \
                        or dim.extent[1] > cc.extent[1]:
@@ -968,32 +962,27 @@ class TouzaNioCoDataset(TouzaNioDataset):
                     ## break if the first coordinate is non scalar.
                     break
             else:
-                # print(f"{type(c)=} {c.shape} {c.__getitem__}")
-                # if p != self._embedded:
                 if True:
                     c = c.copy(logical=self)
                     c.squeeze()
                 if c.getattr('DSET', '').startswith('C'):
                     cyclic = (c.shape[0],
                               c._getitem_(0).item(), c._getitem_(-1).item())
-                    c.setattr('cyclic_coordinate', cyclic)
-                    # print(c.attrs())
-                    # print(type(c))
-                    # print(c.shape)
-                    # print(c._getitem_(-1))
-                    # print(c)
+                    c.setattr(self.attr_cyclic, cyclic)
                 c.replace_dim(dim)
                 return c
 
+        if self.co_int:
+            c = self.createArray(dim.name, 'f8', (dim, ), -1, None,
+                                 array=list(range(dim.size)))
+            return c
         return None
 
     def check_coordinate_embedded(self, grps, item):
         for gn in grps:
             for g in self.groups.get(gn, single=False):
-                # print(gn, list(g.variables.keys()))
                 for cv in g.variables.get(item, single=False):
                     if cv:
-                        # print(item, cv.name)
                         return cv
         return None
 
@@ -1007,7 +996,6 @@ class TouzaNioCoDataset(TouzaNioDataset):
             if h >= 0:
                 ds = _DataSets.get(h)
             else:
-                # print(f"{self.cls_var=}")
                 ds = TouzaNioDataset(str(p), cls_var=self.cls_var)
                 # ds = TouzaNioDataset(str(p))
             if ds:
