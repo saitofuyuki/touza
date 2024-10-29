@@ -22,39 +22,71 @@ from . import util
 
 _RECDIM_ATTR = '_nio_recdim'
 
+__all__ = ["xrNioDataArray", "xrNioVariable", "xrNioDataset",
+           "xrNioBackendArray", "xrMemBackendArray",
+           "xrNioBackendEntrypoint", "open_dataset",
+           "search_coordinate", ]
 
 class xrNioDataArray(xr.DataArray):
     """Wrap class Xarray.DataArray for TOUZA/Nio integration."""
     __slots__ = ()
 
+    def sel(self, indexers=None,
+            method=None, tolerance=None, drop=False, **indexers_kwargs):
+        va = super().sel(indexers, method=method, tolerance=tolerance,
+                         drop=drop, **indexers_kwargs)
+        recdim = va.attrs.get(_RECDIM_ATTR, None)
+        rsel = None
+        if recdim:
+            rsel = indexers.get(recdim, None)
+            if rsel is not None:
+                crec = self.coords[recdim].to_index()
+                if isinstance(rsel, slice):
+                    start = rsel.start
+                    if start is not None:
+                        start = crec.get_loc(start)
+                    stop = rsel.stop
+                    if stop is not None:
+                        stop = crec.get_loc(stop)
+                    rsel = slice(start, stop, rsel.step)
+                else:
+                # xs = v.coords[c].sel({c: xs}, method='nearest')
+                    rsel = crec.get_loc(rsel)
+            # print(rsel, idx, crec, self.coords[recdim])
+        va = self._tweak(va, indexers, rsel=rsel)
+        return va
+
     def isel(self, indexers=None, drop=False,
              missing_dims='raise', **indexers_kwargs):
         va = super().isel(indexers, drop, missing_dims, **indexers_kwargs)
+        va = self._tweak(va, indexers)
+        return va
+
+    def _tweak(self, va, indexers=None, rsel=None):
+        """Attribute tweaking."""
+        if indexers is None:
+            return va
+
         recdim = va.attrs.get(_RECDIM_ATTR, None)
-        # d0 = self.attrs.get('_ignore_DMIN', None)
-        # print(recdim)
-        # print(indexers, self.dims, va.dims)
-        if indexers:
-            if recdim:
-                rsel = indexers.get(recdim, None)
-                # print(rsel)
-                if rsel is not None:
-                    for k, v in va.attrs.items():
-                        if isinstance(v, tuple):
-                            va.attrs[k] = v[rsel]
-            for co, sel in indexers.items():
-                oco = self.coords[co]
-                nco = va.coords.get(co, None)
-                if nco is None:
-                    continue
-                if isinstance(sel, slice):
-                    dmin, dmax = 'DMIN', 'DMAX'
-                    if oco[0] > oco[-1]:
-                        dmin, dmax = dmax, dmin
-                    if sel.start is not None:
-                        nco.attrs[f'_ignore_{dmin}'] = True
-                    if sel.stop is not None:
-                        nco.attrs[f'_ignore_{dmax}'] = True
+        if recdim:
+            rsel = rsel or indexers.get(recdim, None)
+            if rsel is not None:
+                for k, v in va.attrs.items():
+                    if isinstance(v, tuple):
+                        va.attrs[k] = v[rsel]
+        for co, sel in indexers.items():
+            oco = self.coords[co]
+            nco = va.coords.get(co, None)
+            if nco is None:
+                continue
+            if isinstance(sel, slice):
+                dmin, dmax = 'DMIN', 'DMAX'
+                if oco[0] > oco[-1]:
+                    dmin, dmax = dmax, dmin
+                if sel.start is not None:
+                    nco.attrs[f'_ignore_{dmin}'] = True
+                if sel.stop is not None:
+                    nco.attrs[f'_ignore_{dmax}'] = True
         return va
 
 
@@ -221,3 +253,16 @@ def open_dataset(filename_or_obj, *args, engine=None, **kwargs):
         xds = xr.open_dataset(filename_or_obj, *args, engine=engine, **kwargs)
 
     return xds
+
+
+def search_coordinate(array, name):
+    """Search coordinate key corresponding to name using conventions."""
+    if name in array.dims:
+        return name
+
+    for d in array.dims:
+        for a in ['long_name', 'standard_name', ]:
+            if array.coords[d].attrs.get(a) == name:
+                return d
+
+    raise KeyError(f"No coordinate corresponding to {name}")
