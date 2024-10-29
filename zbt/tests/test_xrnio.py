@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/18 12:38:59 fuyuki test_xrnio.py>
+# Time-stamp: <2024/11/01 23:16:57 fuyuki test_xrnio.py>
 
 import sys
 import xarray as xr
@@ -40,7 +40,7 @@ def main(argv):
             for vn, vv in g.data_vars.items():
                 print(f"# var:{vn} {vv.shape} {type(vv)}")
                 # print(vv)
-                # print(vv.attrs)
+                print(vv.attrs)
                 if plot:
                     ext = vv.shape[:-2]
                     for x in itertools.product(*tuple(range(n) for n in ext)):
@@ -51,9 +51,9 @@ def main(argv):
                         # sel = sel.squeeze()
                         # print(sel)
                         # print(sel.shape)
-                        # print(sel.dims)
-                        # print(sel.coords)
-                        # print(sel.attrs)
+                        print(sel.dims)
+                        print(sel.coords)
+                        print(sel.attrs)
                         # fig, ax = plt.subplots()
                         fig = plt.figure(figsize=(10, 5))
                         ax = fig.add_subplot(1, 1, 1, projection=proj)
