@@ -59,7 +59,7 @@ This feature is enabled at ~configure~ time using
 : ...  zbcont*
 
 ** TOUZA Library location
-The shared library path is hard-coded in =zbt/zbt/config.py=, which is
+The shared library path is hard-coded in =zbt/zbt/env.py=, which is
 automatically generated during make.
 When loading of the shared library fails, try one of the following
 for manual configuration:
