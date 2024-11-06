@@ -25,7 +25,7 @@ _RECDIM_ATTR = '_nio_recdim'
 __all__ = ["xrNioDataArray", "xrNioVariable", "xrNioDataset",
            "xrNioBackendArray", "xrMemBackendArray",
            "xrNioBackendEntrypoint", "open_dataset",
-           "search_coordinate", ]
+           "search_coordinate", "match_coordinate", ]
 
 class xrNioDataArray(xr.DataArray):
     """Wrap class Xarray.DataArray for TOUZA/Nio integration."""
@@ -47,12 +47,13 @@ class xrNioDataArray(xr.DataArray):
                         start = crec.get_loc(start)
                     stop = rsel.stop
                     if stop is not None:
-                        stop = crec.get_loc(stop)
+                        stop = crec.get_loc(stop) + 1
                     rsel = slice(start, stop, rsel.step)
                 else:
                 # xs = v.coords[c].sel({c: xs}, method='nearest')
                     rsel = crec.get_loc(rsel)
-            # print(rsel, idx, crec, self.coords[recdim])
+            # print(rsel, crec, self.coords[recdim])
+        # print(f"{rsel=}")
         va = self._tweak(va, indexers, rsel=rsel)
         return va
 
@@ -69,7 +70,7 @@ class xrNioDataArray(xr.DataArray):
 
         recdim = va.attrs.get(_RECDIM_ATTR, None)
         if recdim:
-            rsel = rsel or indexers.get(recdim, None)
+            rsel = util.set_default(rsel, indexers.get(recdim, None))
             if rsel is not None:
                 for k, v in va.attrs.items():
                     if isinstance(v, tuple):
@@ -266,3 +267,18 @@ def search_coordinate(array, name):
                 return d
 
     raise KeyError(f"No coordinate corresponding to {name}")
+
+def match_coordinate(array, name, kw):
+    """Search coordinate matches in kw."""
+    if name in array.dims:
+        co = array.coords[name]
+        if name in kw:
+            return kw[name]
+
+        else:
+            for a in ['long_name', 'standard_name', ]:
+                a = co.attrs.get(a)
+                if a and a in kw:
+                    return kw[a]
+
+    raise KeyError(f"No match corresponding to coordinate {name}")
