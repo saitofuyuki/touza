@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/11/11 09:43:19 fuyuki control.py>
+# Time-stamp: <2024/11/14 22:05:20 fuyuki control.py>
 
 __doc__ = \
     """
@@ -331,13 +331,14 @@ class LinkedArray:
         # print(f"<{self.name}:__iter__> reset {self.mask=}")
 
         while ret is not None:
+            # print(f"iter: {ret=} {self.step=}")
             # ret = self._mask(ret, self.mask)
 
             self.update(ret)
             self._current = ret
 
             ret = self._mask(ret, self.mask)
-            # print(ret, self.mask)
+            # print(f"iter:mask: {ret=} {self.step=}")
             if self.child and self.recurse:
                 for c in self.child:
                     yield (ret, ) + c
@@ -362,6 +363,13 @@ class LinkedArray:
         for v, m in zip(val, mask):
             # if m is False:
             if m in [False, True, ]:
+                # if v is True:
+                #     if self.step == 0:
+                #         raise ValueError(f"Panic in _mask: {val=} {mask=}")
+                #     elif self.step > 0:
+                #         v = 0
+                #     else:
+                #         v = -1
                 ret = ret + (v, )
             elif m is None:
                 pass
@@ -413,6 +421,11 @@ class LinkedArray:
     def value(self, key=None):
         return self._value(key)
 
+    def get(self, key=None, default=None):
+        """Get array value."""
+        k = self.l2p(key)
+        return self.array.get(k, default)
+
     def reset(self):
         """Reset self and children."""
         # print(f'reset<{self.name=}>: {self.init} {self._current}')
@@ -421,6 +434,7 @@ class LinkedArray:
             init = None
         else:
             init = self.init
+            # print(f'reset: {init=} {self._current=}')
             if init:   # natural or prescribed initial
                 if init is True:
                     if self._current:
@@ -439,6 +453,12 @@ class LinkedArray:
                 if self._current and len(self._current) == len(self.shape):
                     # keep current
                     init = self._current
+                    if self.step > 0:
+                        init = tuple(0 if j is True else j
+                                     for j in init)
+                    elif self.step < 0:
+                        init = tuple(w - 1 if j is True else j
+                                     for j, w in zip(init, self.shape))
                 else:
                     init = (0, ) * len(self.shape)
         # print(f"{init=}")
@@ -446,7 +466,7 @@ class LinkedArray:
 
     def cue(self, init):
         """Cueing."""
-        # print(f"cue: {init}")
+        # print(f"cue: {self._current=} {init}")
         if init is True:
             self._current = None
             self.init = True
@@ -628,17 +648,18 @@ class VariableIter(LinkedArray):
 
     def __init__(self, coors=None, dim=None, anchors=None, debug=None, **kw):
         super().__init__(array=None, name='VAR', **kw)
-        self.anchors = anchors or ()
         self.debug = debug or 0
-        self.coors = coors or (-2, -1)
+        self.coors = coors
         self.dim = dim
         self.nsel = None
         self.xsel = None
+        self.init_anchors(anchors)
 
     def update(self, key):
         """Update current and child status."""
-        k = self.l2p(key)
-        ov = self.array.get(k)
+        ov = self.get(key)
+        # k = self.l2p(key)
+        # ov = self.array.get(k)
         v = ov
         if v is None:
             self.switch(cls=ArrayIter, array=None, key=0, )
@@ -656,17 +677,22 @@ class VariableIter(LinkedArray):
                     xs = v.coords[c].sel({c: xs}, method='nearest')
                     self.nsel[c] = xs.item()
             v = v.sel(self.nsel)
+            # print(f"{self.nsel=}")
+            # print(f"{v=}")
         else:
             v = v.sel(self.nsel, method='nearest')
 
         shape = v.shape
-        cue = self.adjust_cue(shape)
-
+        # print(f"{shape=}")
         opts = self.opts or {}
 
-        asel = self.set_anchors(self.anchors, v)
-        csel = self.set_coors(self.coors, v)
+        if self.debug > 0:
+            print(f"Variable:{v.dims=}")
+        asel = self.get_anchors(self.anchors, v)
+        csel = self.set_coors(self.coors, v, anchors=asel)
         mask = self.c2mask(csel, asel, shape, v.dims)
+        cue = self.adjust_cue(shape, v.dims, v.coords, asel)
+
         self.child.transpose(csel)
         self.child.offset(self.nsel, self.xsel, v.dims)
         self.switch(cls=ArrayIter,
@@ -680,8 +706,11 @@ class VariableIter(LinkedArray):
             print(f"Variable:{asel=}")
             print(f"Variable:{mask=}")
 
-    def adjust_cue(self, shape):
+    def adjust_cue(self, shape, dims, coords, anchors=None):
         """Update child cue."""
+        anchors = anchors or {}
+        # print(list(zip(dims, shape)))
+        # print(anchors)
         cue = False
         cidx = self.child.l2i()
         if cidx is None:
@@ -698,6 +727,21 @@ class VariableIter(LinkedArray):
                     init = init + (c, )
             if cue:
                 cue = init
+        if cue is True:
+            cue = []
+            for d in dims:
+                sel = anchors.get(d, True)
+                if isinstance(sel, (int, slice)) or sel is None:
+                    pass
+                else:
+                    sel = coords[d].sel({d: sel}, method='nearest')
+                    sel = sel.item()
+                    co = coords[d].to_index()
+                    sel = co.get_loc(sel)
+                    # print(d, sel)
+                cue.append(sel)
+            # cue = tuple(anchors.get(d, True) for d in dims)
+            cue = tuple(cue)
         return cue
 
     def transpose(self, switch=None, key=None):
@@ -715,88 +759,103 @@ class VariableIter(LinkedArray):
         if isinstance(switch, tuple):
             self.coors = switch
         elif switch is not None:
-            # order = sorted(list(self.set_coors(self.coors, v)))
             order = sorted(list(self.set_coors(self.coors, arr)))
             if not switch:
                 order = reversed(order)
             self.coors = tuple(order)
         else:
-            # csel = self.set_coors(self.coors, v)
             csel = self.set_coors(self.coors, arr)
-            # self.coors = self.coors[1:] + self.coors[:1]
             self.coors = csel[1:] + csel[:1]
-            # print(f" >> {switch=} {self.coors=} {csel=} {v.dims=} {v.coords}")
 
-        # switch = self.set_coors(self.coors, v)
         switch = self.set_coors(self.coors, arr)
-        # print(f" >> {switch=} {self.coors=} {v.dims=} {v.coords}")
         return self.child.transpose(switch)
 
-    def set_anchors(self, anchors, data):
-        """Set lock coordinates."""
-        clist = []
-        for c in anchors:
-            try:
-                c = parse_coord(data, c)
-                print("set_anchors:", c, data.dims, data.coords[c])
-                clist.append(c)
-            except UserWarning:
-                print(f"no coordinate to anchor {c}.")
-        return clist
+    def init_anchors(self, anchors=None):
+        """Set anchors mapping."""
+        anchors = anchors or {}
+        self.anchors = {}
+        for c, s in anchors.items():
+            if isinstance(s, slice) or s is None:
+                pass
+            else:
+                self.anchors[c] = s
+        return self.anchors
 
-    def set_coors(self, coors, data, prop=None):
-        """Set coordinate tuple."""
-        clist = []
-        for c in coors:
-            try:
-                c = parse_coord(data, c)
-                clist.append(data.dims.index(c))
-            except UserWarning:
-                if c == '':
-                    clist.append(c)
-                else:
-                    print(f"no coordinate to plot {c}.  Available={data.dims}")
+    def update_anchors(self, mask, cidx, anchors=None):
+        """Get lock coordinates, return index-list."""
+        # k = self.l2p()
+        # data = self.array.get(k)
+        # k = self.l2p()
+        data = self.get()
+        anchors = anchors or {}
+
+        # print(f"update_anchors/ini: {anchors=}")
+        # print(f"{cidx=}")
+        # print(f"{data.dims=}")
+        # print(f"{mask=}")
+        for j, m in enumerate(mask):
+            d = data.dims[j]
+            if m is True:
+                c = data.coords[d]
+                pos = c[cidx[j]]
+                # print(j, d, pos.item())
+                anchors[d] = pos.item()
+            elif d in anchors:
+                # del anchors[d]
+                anchors[d] = False
+        # print(f"update_anchors/ret: {anchors=}")
+        return anchors
+
+    def get_anchors(self, anchors, data):
+        """Get lock coordinates, return index-list."""
+        asel = {}
+        if self.debug > 0:
+            print(f"get_anchors: {anchors=} {data.dims=}")
         w = len(data.dims)
-        # print(f"set_coors: {coors=} {w=} {data.dims=}")
-        # shape = self.inquire(prop='shape', cls=ArrayIter, single=True)
-        rem = w
-        nlist = []
-        for c in reversed(clist):
-            if c == '':
-                c = rem - 1
-                # print(f"{c=} {shape[c]=}")
-                while c in clist:
-                    c = c - 1
-                rem = c
-            nlist.insert(0, c)
-        if prop is None:
-            return tuple(data.dims[c] for c in nlist if c >= 0)
-        if prop < 0:
-            return tuple(c - w for c in nlist if c >= 0)
-        return tuple(c for c in nlist if c >= 0)
+        for jd, d in enumerate(data.dims):
+            try:
+                pos = match_coordinate(data, d, anchors)
+                if pos is not False:
+                    # clist.append(d)
+                    asel[d] = pos
+            except KeyError as exc:
+                for cj in [jd, jd - w, ]:
+                    pos = anchors.get(cj, False)
+                    if pos is not False:
+                        # clist.append(d)
+                        asel[d] = pos
+                        break
+        # for c, pos in anchors.items():
+        #     if pos is False:
+        #         continue
+        #     try:
+        #         c = parse_coord(data, c)
+        #         # print("get_anchors:", c, pos, data.dims, data.coords[c])
+        #         clist.append(c)
+        #     except UserWarning:
+        #         print(f"no coordinate to anchor {c}.")
+        # asel = {c: anchors[c] for c in clist}
+        # return tuple(clist)
+        return asel
 
     def c2mask(self, coors, anchors, shape, dims):
         w = len(shape)
-        # print(shape, anchors)
-        # print(coors, dims, anchors)
-        mask = ()
+        mask = []
         for d in dims:
-            d = d in anchors
-            mask = mask + (d, )
-        # mask = (False, ) * w
+            # mask.append(anchors.get(d, False))
+            mask.append(d in anchors)
         colon = slice(None, None, None)
         for c in coors:
             if c in dims:
                 c = dims.index(c)
-            mask = mask[:c] + (colon, ) + mask[c+1:]
+            mask[c] = colon
         mask = mask[:w]
-        return mask
+        return tuple(mask)
 
     def permute_anchor(self, switch):
         """Anchor permutation."""
         mask = self.inquire(prop='mask', cls=ArrayIter, single=True)
         cidx = self.child.l2i()
-        print(f"{cidx=}")
 
         w = len(mask)
         if switch == 0:
@@ -813,8 +872,12 @@ class VariableIter(LinkedArray):
                 if not pat[j]:
                     break
         self.switch(cls=ArrayIter, mask=tuple(npat))
-        self.anchors = tuple(- w + j
-                             for j, m in enumerate(npat) if m is True)
+        self.anchors = self.update_anchors(npat, cidx, self.anchors)
+        # if self.debug > 0:
+        #     print(f"Variable:permute_anchor: {self.anchors=}")
+        #     print(f"Variable:permute_anchor: {npat=}")
+        # self.anchors = tuple(- w + j
+        #                      for j, m in enumerate(npat) if m is True)
         if self.debug > 0:
             print(f"Variable:permute_anchor: {self.anchors=}")
 
@@ -845,9 +908,6 @@ class VariableIter(LinkedArray):
 
         pat.append(mshp)
         fskip.append(0)
-        # print(pat)
-        # print(shape)
-        # print(fskip)
 
         for _ in range(math.comb(mshp, mpat)):
             pos = 0
@@ -876,9 +936,6 @@ class VariableIter(LinkedArray):
 
         arr = self.inquire(prop='self', cls=ArrayIter, single=True)
         v = arr.array
-        # print(v.dims)
-        # v = self.value()
-        # print(v.dims)
         csel = self.set_coors(self.coors, v)
         self.child.transpose(csel)
 
@@ -887,18 +944,16 @@ class VariableIter(LinkedArray):
         #     mask[-1] = True
         mask = [m if m is True else n
                 for m, n in zip(mask, nmask)]
-        # print(mask)
         self.switch(cls=ArrayIter, mask=tuple(mask))
-        # print(f"permute: {csel=} {mask=} {v.shape}")
 
     def point_selection(self, sel, skip_single=True):
         """Axis permutation."""
         mask = self.inquire(prop='mask', cls=ArrayIter, single=True)
         shape = self.inquire(prop='shape', cls=ArrayIter, single=True)
 
-        print(f"{sel=}")
-        print(f"{mask=}")
-        print(f"{shape=}")
+        # print(f"{sel=}")
+        # print(f"{mask=}")
+        # print(f"{shape=}")
 
         return
 
@@ -922,9 +977,6 @@ class VariableIter(LinkedArray):
 
         pat.append(mshp)
         fskip.append(0)
-        # print(pat)
-        # print(shape)
-        # print(fskip)
 
         for _ in range(math.comb(mshp, mpat)):
             pos = 0
@@ -953,9 +1005,6 @@ class VariableIter(LinkedArray):
 
         arr = self.inquire(prop='self', cls=ArrayIter, single=True)
         v = arr.array
-        # print(v.dims)
-        # v = self.value()
-        # print(v.dims)
         csel = self.set_coors(self.coors, v)
         self.child.transpose(csel)
 
@@ -987,14 +1036,57 @@ class VariableIter(LinkedArray):
         # print(f"l2p:v: {r}")
         return r
 
+    def set_coors(self, coors, data, prop=None, anchors=None,
+                  skip_single=True):
+        """Set coordinate tuple."""
+        anchors = anchors or {}
+        if self.debug > 0:
+            print(f"set_coors: {coors=} {data.dims=} {data.shape=} {anchors=}")
+        clist = []
+        for c in coors:
+            try:
+                c = parse_coord(data, c)
+                cj = data.dims.index(c)
+                if skip_single and data.shape[cj] < 2:
+                    continue
+                # m = match_coordinate(data, c, anchors)
+                clist.append(cj)
+            except UserWarning:
+                if c == '':
+                    clist.append(c)
+                else:
+                    print(f"no coordinate to plot {c}.  Available={data.dims}")
+        if self.debug > 0:
+            print(f"set_coors:first try: {clist=}")
+        w = len(data.dims)
+        rem = w
+        nlist = []
+        for cj in reversed(clist):
+            if cj == '':
+                cj = rem - 1
+                # print(f"{c=} {shape[c]=}")
+                while cj in clist or data.dims[cj] in anchors \
+                      or (skip_single and data.shape[cj] < 2):
+                    cj = cj - 1
+                rem = cj
+            nlist.insert(0, cj)
+        if self.debug > 0:
+            print(f"set_coors:final: {nlist=}")
+        if prop is None:
+            return tuple(data.dims[c] for c in nlist if c >= 0)
+        if prop < 0:
+            return tuple(c - w for c in nlist if c >= 0)
+        return tuple(c for c in nlist if c >= 0)
+
 
 class FileIter(LinkedArray):
     """File (or dataset) level iterator."""
 
-    def __init__(self, files, variables=None, **kw):
+    def __init__(self, files, variables=None, debug=None, **kw):
         super().__init__(array={}, key=files, name='FILE', **kw)
         variables = False if variables is None else variables
         self.variables = variables
+        self.debug = debug or 0
 
     def update(self, key):
         f = self.l2p(key)
@@ -1040,8 +1132,16 @@ class FileIter(LinkedArray):
         coors = None
         var = self.inquire(prop='self', cls=VariableIter, single=True)
         v = var.value(None)
-        coors = var.set_coors(var.coors, v, prop=-1)
-        return coors
+        # if self.debug > 0:
+        #     print(f"plot_coordinates: {data.dims=}")
+        #     print(f"plot_coordinates: {v.dims=} {v.shape=}")
+        coors = []
+        for d in data.dims:
+            coors.append(v.dims.index(d))
+        # coors = var.set_coors(var.coors, v, prop=-1)
+        # if self.debug > 0:
+        #     print(f"plot_coordinates: {coors=}")
+        return tuple(coors)
 
 
 class CmapIter(LinkedArray):
@@ -1191,6 +1291,7 @@ class FigureInteractive(zplt.FigureCore):
     def restore_view(self, axs):
         """Restore current (previous) figure extent."""
         prev = self.loop(step=False) or (None, None)
+        # print(f"{prev=}")
         # prev = prev or (None, None)
         _, pdata = prev
         if axs:
@@ -1199,18 +1300,25 @@ class FigureInteractive(zplt.FigureCore):
             ext = None
         if pdata and ext:
             parr = pdata[-1]
-            y, x = ext
-            ## dict order must be guaranteed (python >= 3.9)
+            y, x, c = ext
+            # dict order must be guaranteed (python >= 3.9)
             prev = {parr.dims[0]: slice(x[0], x[1], None),
-                    parr.dims[-1]: slice(y[0], y[1], None)}
+                    parr.dims[-1]: slice(y[0], y[1], None), }
+            if c:
+                prev[c[0]] = c[1]
+            # print(f"{c=}")
             # print(f"{parr.dims=} {ext}")
             # print(f"{parr.coords=}")
         else:
             prev = {}
-        # print(prev)
+        # for c, x in prev.items():
+        #     c = str(c)[:10]
+        #     print(f"prev[{c}]={x}")
+        # print(f"restore: {prev=}")
         return prev
 
-    def parse_view(self, coors, draw=None, prev=None):
+    def parse_view(self, axs, coors, draw=None, prev=None,
+                   crs=None, **kwds):
         """Set figure coordinate."""
         var = self.trees.inquire(prop='self', cls=VariableIter, single=True)
         data = var.value(None)
@@ -1218,9 +1326,21 @@ class FigureInteractive(zplt.FigureCore):
         view = {}
         draw = draw or {}
         prev = prev or {}
+
+        if crs:
+            ext = prev.get(crs)
+            view['extent'] = ext
+            # view['extent'] = None
+            # print(f"crs={str(crs)[:10]} {ext}")
+
+        # for c, x in prev.items():
+        #     c = str(c)[:10]
+        #     print(f"prev[{c}]={x}")
         # print(f"{draw=}")
         # print(f"{prev=}")
         self.view.update(prev)
+        # print(axs)
+        # print(self.view.keys())
         # draw.update(prev)
         # print(f"{coors=} {prev=} {data.dims=} {self.view=}")
         for c in coors:
@@ -1232,7 +1352,7 @@ class FigureInteractive(zplt.FigureCore):
                 s = draw.get(d)
             else:
                 try:
-                    s = zxr.match_coordinate(data, d, draw)
+                    s = match_coordinate(data, d, draw)
                 except KeyError as exc:
                     if isinstance(c, int):
                         for j in [c, len(data.dims) + c, ]:
@@ -1240,7 +1360,7 @@ class FigureInteractive(zplt.FigureCore):
                                 s = draw.get(j)
                                 break
 
-            if s:
+            if isinstance(s, slice):
                 mm = {}
                 if isinstance(s.start, int):
                     mm['dmin'] = data.coords[d][s.start].item()
@@ -1252,6 +1372,10 @@ class FigureInteractive(zplt.FigureCore):
                     mm['dmax'] = s.stop
                 if mm:
                     view[d] = mm
+            else:
+                # # ignore anchor (non-slice view)
+                # print(f"parse_view: {d}={s}")
+                pass
         return view
 
 
@@ -1260,18 +1384,19 @@ class FigureControl():
 
     def __init__(self, pic, plot, root,
                  interactive=True,
-                 layout=None, cmap=None,
-                 styles=None, draw=None,
+                 figure=None, layout=None,
+                 cmap=None, styles=None, draw=None,
                  config=None, params=None):
         self.parse_config(config, params)
 
-        self.draw = draw or {}
+        self.view = draw or {}
         self.plot = plot
         self.pic = pic
         self.layout = layout
+        self.figure = figure or FigureInteractive
 
         if inspect.isclass(self.pic):
-            self.pic = self.pic(FigureClass=FigureInteractive,
+            self.pic = self.pic(FigureClass=self.figure,
                                 LayoutClass=self.layout)
 
         self.figs = {}
@@ -1431,11 +1556,11 @@ class FigureControl():
             # 'key_press_event', handler
             fig.connect(key_press_event=self.event_handler)
 
-
     def _interactive(self, jfig, step=True, msg=None, prev=None):
         fig, axs = self.figs[jfig]
         fig.disconnect('key_press_event')
         # prev = prev or fig.loop(step=False)
+        # print("_interactive:")
         prev = prev or fig.restore_view(axs)
         # prev = fig.loop(step=False)
         # print(f"{prev[0]=}")
@@ -1452,7 +1577,7 @@ class FigureControl():
         # print(trees)
         data = stat[-1]
         # print(data.indexes)
-        # print(data.dims)
+        # print(f"{data.dims=}")
         # print(data.coords)
         try:
             print(f'\r({jfig}) drawing...', end='', flush=True)
@@ -1524,16 +1649,51 @@ class FigureControl():
 
     def _update(self, data, fig, axs, view=None):
         """Draw core."""
-        pco = fig.trees.plot_coordinates(data)
-        view = fig.parse_view(pco, self.draw, view)
-        body = self.styles.get(pco) or {}
+        vdims = self.source_dims(fig)
+        pco = self.plot_coordinates(data, vdims)
+        body = self.get_style(self.styles, data, vdims) or {}
         layout = {k: body.get(k) for k in ['projection', ]}
+        # print(f"{body.keys()}")
+        # body = self.styles.get(pco) or {}
+        # print()
+        view = fig.parse_view(axs, pco, self.view, view, **body)
         # axs.reset(fig, body=layout, colorbar=dict(fresh=True))
         axs.reset(fig, body=layout)
         axs.cla()
         fig.set_hook(self._prompt)
         return self.plot(fig=fig, axs=axs, data=data, title=fig.sel,
                          view=view, body=body)
+
+    def source_dims(self, fig):
+        """Get original dimensions of the variable."""
+        var = fig.trees.inquire(prop='self', cls=VariableIter, single=True)
+        v = var.value(None)
+        return v.dims
+
+    def plot_coordinates(self, data, vdims):
+        coors = []
+        for d in data.dims:
+            coors.append(vdims.index(d))
+        return tuple(coors)
+
+    def get_style(self, styles, data, vdims, default=None):
+        """Get style properties corresponding coordinate combination
+        pattern."""
+        w = len(vdims)
+        for cc in styles.keys():
+            # print(cc, data.dims, w, vdims)
+            for c, d in zip(cc, data.dims):
+                jd = vdims.index(d)
+                # print(c, jd, d)
+                if isinstance(c, int):
+                    if c != jd and w + c != jd:
+                        break
+                elif not is_match_coordinate(data, d, c):
+                    break
+            else:
+                # print(f"matches {cc=} {styles[cc]}")
+                return styles[cc]
+        return default
 
     def diag(self, jfig):
         fig, _ = self.figs[jfig]
@@ -1548,7 +1708,7 @@ class FigureControl():
         fig, _ = self.figs[jfig]
         return fig.is_locked()
 
-    def switch(self, jfig, draw=True, *args, **kw):
+    def switch(self, jfig, *args, step=None, **kwds):
         if self._is_locked(jfig):
             targets = filter(self._is_locked, self.figs.keys())
         else:
@@ -1556,11 +1716,13 @@ class FigureControl():
         for jf in targets:
             fig, axs = self.figs[jf]
             # prev = fig.loop(step=False)
+            # print(f"switch[{jf}]:{args}{kwds}")
             prev = fig.restore_view(axs)
+            # print(f"{prev.values()=}")
             child = fig.trees
-            child.switch(*args, **kw)
-            if draw:
-                self._interactive(jf, prev=prev)
+            child.switch(*args, step=0)
+            child.switch(*args, step=step, **kwds)
+            self._interactive(jf, prev=prev)
 
     def map_figures(self, func, jfig, *args, **kw):
         if self._is_locked(jfig):
@@ -1592,6 +1754,7 @@ class FigureControl():
         """Point selection by mouse click."""
         button = event.button
         x, y = (event.xdata, event.ydata)
+        # print("point_selection:")
         prev = fig.restore_view(axs)
         ## dict order must be guaranteed (python >= 3.9)
         co = list(prev.keys())
@@ -1619,7 +1782,8 @@ class FigureControl():
     def _anchor(self, jfig, step):
         fig, _ = self.figs[jfig]
         fig.permute_anchor(step)
-        fig.info(pfx=f'\r({jfig}) ', msg='anchor permuted.', sync=True)
+        msg = 'anchor permuted.' if step else 'anchor cleared.'
+        fig.info(pfx=f'\r({jfig}) ', msg=msg, sync=True)
         self._prompt(event=None)
 
     def _transpose(self, jfig):
@@ -1734,7 +1898,7 @@ class FigureControl():
                 elif sub == 'anchor':
                     self.map_figures(self._anchor, jfig, +1)
                 else:
-                    self.switch(jfig, draw=False, step=0)
+                    # self.switch(jfig, draw=False, step=0)
                     self.switch(jfig, cls=cls, step=+1)
             elif cmd == 'prev_cyclic':
                 if sub == 'coordinate':
@@ -1742,19 +1906,19 @@ class FigureControl():
                 elif sub == 'anchor':
                     self.map_figures(self._anchor, jfig, -1)
                 else:
-                    self.switch(jfig, draw=False, step=0)
+                    # self.switch(jfig, draw=False, step=0)
                     self.switch(jfig, cls=cls, step=-1)
             elif cmd == 'next':
                 if sub == 'coordinate':
                     self.map_figures(self._permute, jfig, +1)
                 else:
-                    self.switch(jfig, draw=False, step=0)
+                    # self.switch(jfig, draw=False, step=0)
                     self.switch(jfig, cls=(True, cls), step=+1)
             elif cmd == 'prev':
                 if sub == 'coordinate':
                     self.map_figures(self._permute, jfig, -1)
                 else:
-                    self.switch(jfig, draw=False, step=0)
+                    # self.switch(jfig, draw=False, step=0)
                     self.switch(jfig, cls=(True, cls), step=-1)
             elif cmd == 'clear':
                 if sub == 'anchor':
@@ -1839,22 +2003,32 @@ def extract_sels(sel, data, strict=None):
         try:
             co = parse_coord(data, co)
             esel[co] = sp
+            cv = data.coords[co]
+            # print(f"extract_sels: {len(cv)} {co=} {sp=}")
             if isinstance(sp, slice):
                 start, stop = sp.start, sp.stop
-                if isinstance(start, int):
-                    start = data.coords[co][start].item()
-                if isinstance(stop, int):
+                bstart = isinstance(start, int)
+                bstop = isinstance(stop, int)
+                if bstart:
+                    start = cv[start].item()
+                if bstop:
                     # stop = data.coords[co][stop].item()
-                    stop = data.coords[co][stop-1].item()
+                    stop = cv[stop-1].item()
+                if not (bstart and bstop):
+                    if cv[0].item() > cv[-1].item():
+                        start, stop = stop, start
+                        print(f"Exchange {co} limit range as ({start}, {stop}).")
                 sp = slice(start, stop, sp.step)
             elif isinstance(sp, int):
-                sp = data.coords[co][sp].item()
+                sp = cv[sp].item()
             nsel[co] = sp
         except UserWarning as exc:
             msg = f"no coordinate to select: {co}"
             if strict is True:
                 raise UserWarning(msg) from exc
             print(msg)
+    # print(f"extract_sels: {esel=}")
+    # print(f"extract_sels: {nsel=}")
     return esel, nsel
 
 
@@ -1869,7 +2043,45 @@ def parse_coord(data, name):
         pass
     else:
         try:
-            name = zxr.search_coordinate(data, name)
+            name = search_coordinate(data, name)
         except KeyError as exc:
             raise UserWarning from exc
     return name
+
+
+def is_match_coordinate(array, name, pat):
+    """check if coordinate matches to pattern."""
+    if name == pat:
+        return True
+    for a in ['long_name', 'standard_name', ]:
+        if array.coords[name].attrs.get(a) == pat:
+            return True
+    return False
+
+
+def search_coordinate(array, name):
+    """Search coordinate key corresponding to name using conventions."""
+    if name in array.dims:
+        return name
+
+    for d in array.dims:
+        for a in ['long_name', 'standard_name', ]:
+            if array.coords[d].attrs.get(a) == name:
+                return d
+
+    raise KeyError(f"No coordinate corresponding to {name}")
+
+
+def match_coordinate(array, name, kw):
+    """Search coordinate matches in kw."""
+    if name in array.dims:
+        if name in kw:
+            return kw[name]
+        else:
+            co = array.coords[name]
+            for a in ['long_name', 'standard_name', ]:
+                a = co.attrs.get(a)
+                if a and a in kw:
+                    return kw[a]
+
+    raise KeyError(f"No match corresponding to coordinate {name}")

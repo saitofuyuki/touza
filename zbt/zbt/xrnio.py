@@ -17,15 +17,17 @@ import numpy as np
 
 from . import libtouza
 from . import dsnio
-from . import util
+import zbt.util as zu
+
+
+locallog = zu.LocalAdapter('xrnio')
 
 
 _RECDIM_ATTR = '_nio_recdim'
 
 __all__ = ["xrNioDataArray", "xrNioVariable", "xrNioDataset",
            "xrNioBackendArray", "xrMemBackendArray",
-           "xrNioBackendEntrypoint", "open_dataset",
-           "search_coordinate", "match_coordinate", ]
+           "xrNioBackendEntrypoint", "open_dataset", ]
 
 class xrNioDataArray(xr.DataArray):
     """Wrap class Xarray.DataArray for TOUZA/Nio integration."""
@@ -50,10 +52,8 @@ class xrNioDataArray(xr.DataArray):
                         stop = crec.get_loc(stop) + 1
                     rsel = slice(start, stop, rsel.step)
                 else:
-                # xs = v.coords[c].sel({c: xs}, method='nearest')
+                    # xs = v.coords[c].sel({c: xs}, method='nearest')
                     rsel = crec.get_loc(rsel)
-            # print(rsel, crec, self.coords[recdim])
-        # print(f"{rsel=}")
         va = self._tweak(va, indexers, rsel=rsel)
         return va
 
@@ -70,7 +70,7 @@ class xrNioDataArray(xr.DataArray):
 
         recdim = va.attrs.get(_RECDIM_ATTR, None)
         if recdim:
-            rsel = util.set_default(rsel, indexers.get(recdim, None))
+            rsel = zu.set_default(rsel, indexers.get(recdim, None))
             if rsel is not None:
                 for k, v in va.attrs.items():
                     if isinstance(v, tuple):
@@ -121,10 +121,9 @@ class xrNioBackendArray(xr.backends.BackendArray, dsnio.TouzaNioVar):
 
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
-        # print('ba:', self.dimensions)
         self.dims = []
         for d in self.dimensions:
-            self.dims.append(util.tostr(d.name))
+            self.dims.append(zu.tostr(d.name))
 
     def __getitem__(self,
                     key: xr.core.indexing.ExplicitIndexer) \
@@ -151,7 +150,7 @@ class xrMemBackendArray(xr.backends.BackendArray, dsnio.TouzaMemVar):
         super().__init__(*args, **kwds)
         self.dims = []
         for d in self.dimensions:
-            self.dims.append(util.tostr(d.name))
+            self.dims.append(zu.tostr(d.name))
 
     def __getitem__(self,
                     key: xr.core.indexing.ExplicitIndexer) \
@@ -226,12 +225,12 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
                 for a, ai in v.attrs():
                     av = v.getattr(a, rec=slice(None, None),
                                    strip=True, uniq=True)
-                    dst = util.tostr(ai)
+                    dst = zu.tostr(ai)
                     attrs[dst] = av
 
             data = xr.core.indexing.LazilyIndexedArray(v)
             var = xrNioVariable(dims, data, attrs=attrs)
-            variables[util.tostr(vn)] = var
+            variables[zu.tostr(vn)] = var
 
         return xrNioDataset(variables)
 
@@ -254,31 +253,3 @@ def open_dataset(filename_or_obj, *args, engine=None, **kwargs):
         xds = xr.open_dataset(filename_or_obj, *args, engine=engine, **kwargs)
 
     return xds
-
-
-def search_coordinate(array, name):
-    """Search coordinate key corresponding to name using conventions."""
-    if name in array.dims:
-        return name
-
-    for d in array.dims:
-        for a in ['long_name', 'standard_name', ]:
-            if array.coords[d].attrs.get(a) == name:
-                return d
-
-    raise KeyError(f"No coordinate corresponding to {name}")
-
-def match_coordinate(array, name, kw):
-    """Search coordinate matches in kw."""
-    if name in array.dims:
-        co = array.coords[name]
-        if name in kw:
-            return kw[name]
-
-        else:
-            for a in ['long_name', 'standard_name', ]:
-                a = co.attrs.get(a)
-                if a and a in kw:
-                    return kw[a]
-
-    raise KeyError(f"No match corresponding to coordinate {name}")

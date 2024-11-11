@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/11/12 22:45:36 fuyuki plot.py>
+# Time-stamp: <2024/11/14 22:05:37 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -292,7 +292,8 @@ class LayoutBase(zcfg.ConfigBase):
         # side effects (to set figure size)
         self.resize(fig, figsize=figsize, ref=self.geometry)
         self.orig_size = fig.get_size_inches()
-        self.crs = {}
+        # self.crs = {}
+        self.projp = {}   # projection properites == (crs, transform)
 
     def _iter_axes(self):
         try:
@@ -487,8 +488,10 @@ class LayoutBase(zcfg.ConfigBase):
         """Get extent tuple of tuples.
         Return (xl, xh), (yl, yh), (crs, extent)"""
         ax = self._get_axes(ax)
+        pp = self.projp.get(ax) or None
         if crs is None:
-            crs = self.crs.get(ax)
+            crs = pp
+            # crs = self.crs.get(ax)
         elif crs is False:
             crs = None
         # print(f"{type(crs)=} {crs=}")
@@ -500,6 +503,7 @@ class LayoutBase(zcfg.ConfigBase):
                 ylim = xy[2:]
                 if crs:
                     cxy = (crs, ax.get_extent())
+                # print('extent:', xy, cxy[1])
             except AttributeError as exc:
                 xlim = ax.get_xlim()
                 ylim = ax.get_ylim()
@@ -564,7 +568,8 @@ class LayoutBase(zcfg.ConfigBase):
         if isinstance(ax, cmgeo.GeoAxes):
             artists = self.set_geo_view(data, ax=ax, artists=artists,
                                         x=x, y=y, crs=crs, **kwds)
-            self.crs[ax] = crs
+            # self.crs[ax] = crs
+            self.projp[ax] = crs
         elif ax:
             co = [d for d in data.dims if data.coords[d].size > 1]
             if len(co) != 2:
@@ -618,11 +623,14 @@ class LayoutBase(zcfg.ConfigBase):
             scf(scale)
 
     def set_geo_view(self, data, ax=None, artists=None,
-                     x=None, y=None, crs=None, **kwds):
+                     x=None, y=None,
+                     crs=None, extent=None, **kwds):
         artists = artists or []
         if not ax:
             return artists
 
+        # print(f"{extent=}")
+        # print(f"{kwds=}")
         co = [d for d in data.dims if data.coords[d].size > 1]
         if len(co) != 2:
             raise ValueError(f"Not 2d shape={co}")
@@ -659,14 +667,18 @@ class LayoutBase(zcfg.ConfigBase):
         y1 = zu.set_default(view_y.get('dmax'), y1)
 
         try:
-            if abs(x1 - x0) > 359 and abs(y1 - y0) > 179:
-                raise ValueError('')
-            if abs(x1 - x0) >= 360:
-                if x1 > x0:
-                    x1 = x1 + 0.01
-                else:
-                    x0 = x0 + 0.01
-            ax.set_extent((x0, x1, y0, y1), crs=crs)
+            if extent:
+                proj = getattr(ax, 'projection', None)
+                ax.set_extent(extent, crs=proj)
+            else:
+                if abs(x1 - x0) > 359 and abs(y1 - y0) > 179:
+                    raise ValueError('')
+                if abs(x1 - x0) >= 360:
+                    if x1 > x0:
+                        x1 = x1 + 0.01
+                    else:
+                        x0 = x0 + 0.01
+                ax.set_extent((x0, x1, y0, y1), crs=crs)
         except ValueError as err:
             if str(err):
                 print(err)
@@ -1072,6 +1084,8 @@ class ContourPlot(PlotBase, _ConfigType):
         # if isinstance(ax, cmgeo.GeoAxes):
         body = kwds.get('body') or {}
         transf = body.get('transform')
+        crs = body.get('crs')
+
         if transf:
             contour.setdefault('transform', transf)
             color.setdefault('transform', transf)
@@ -1095,8 +1109,7 @@ class ContourPlot(PlotBase, _ConfigType):
         artists.extend(ttl)
 
         artists = self.set_view(axs, data, artists=artists,
-                                crs=body.get('crs'),
-                                **(view or {}))
+                                crs=crs, **(view or {}))
 
         fts = body.get('features') or []
         fts = axs.add_features(*fts)
