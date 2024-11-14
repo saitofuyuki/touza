@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/11/11 09:06:20 fuyuki zbcont.py>
+# Time-stamp: <2024/12/13 08:51:11 fuyuki zbcont.py>
 
 import sys
 # import math
 import argparse as ap
 import pathlib as plib
-import cProfile
 import tomllib as toml
 import re
 import functools as ft
+import logging
+# import cProfile
+# import pprint as ppr
 
 import matplotlib as mplib
 import matplotlib.pyplot as plt
@@ -18,10 +20,7 @@ import matplotlib.ticker as mtc
 # import matplotlib.gridspec as mgs
 # import mpl_toolkits.axes_grid1 as mag
 
-import cartopy
-# import cartopy.util
 import cartopy.crs as ccrs
-# import numpy as np
 import xarray as xr
 
 # import os
@@ -30,6 +29,8 @@ import xarray as xr
 import zbt.util as zu
 import zbt.control as zctl
 import zbt.plot as zplt
+
+locallog = zu.LocalAdapter('zbcont')
 
 class ParserUtils():
     """Common parameters and methods for parser."""
@@ -41,13 +42,22 @@ class ParserUtils():
 
     def parse_float(self, text):
         if text:
-            if text[1] in ['+', '-']:
+            if text[:2] in ['++', '+-', '-+', '--', ]:
                 text = text[1:]
             return float(text)
         return None
 
 
 class Projection(ParserUtils):
+    """Management layer of cartopy projecition.
+
+    ``table`` is dict of key of projection name
+    and variable as tuple of projection class and its arguments.
+    The key is full name of projection method to be parsed in
+    the command-line arguments.
+    ``alias`` is prepared as shortcuts of ``table`` keys.
+    """
+
     table = {'platecarree': (ccrs.PlateCarree, 'central_longitude', ),
              'mercator': (ccrs.Mercator, 'central_longitude', ),
              'mollweide': (ccrs.Mollweide, 'central_longitude', ),
@@ -80,9 +90,10 @@ class Projection(ParserUtils):
     #   +NUM > +NUM    +-NUM > -NUM   ++NUM > +NUM
     #   -NUM > -NUM    -+NUM > +NUM   --NUM > -NUM
 
-    def __init__(self, param):
+    def __init__(self, param, allow_abbrev=None):
         param = param.split(self.lsep)
         proj = param.pop(0)
+        allow_abbrev = True if allow_abbrev is None else allow_abbrev
         self.coor = param
 
         m = self.ppr.match(proj)
@@ -95,14 +106,25 @@ class Projection(ParserUtils):
 
         proj = self.alias.get(proj, proj)
         if proj not in self.table:
-            raise ValueError(f"Invalid projection {proj}")
+            abb = []
+            for k in self.table:
+                if k.startswith(proj):
+                    abb.append(k)
+            if len(abb) == 1:
+                proj = abb[0]
+            else:
+                if len(abb) > 1:
+                    msg = f"Ambiguous projection {proj}, to match {abb}."
+                else:
+                    msg = f"Invalid projection {proj}"
+                raise ValueError(msg)
         self.proj = proj
 
         self.cache = {}
 
     def __call__(self, **kwds):
         if self.proj not in self.table:
-            raise ValueError(f"Invalid projection {proj}")
+            raise ValueError(f"Invalid projection {self.proj}")
         args = self.table[self.proj]
         cls = args[0]
         args = args[1:]
@@ -172,6 +194,15 @@ class Options(ParserUtils, ap.Namespace):
                             action='store_const', default=0, const=1,
                             help='show debug information')
 
+        parser.add_argument('--log-level', metavar='LEVEL',
+                            dest='loglev',
+                            type=str, default=None,
+                            help='logging level')
+        parser.add_argument('--log-file', metavar='FILE',
+                            dest='logf',
+                            type=str, default=None,
+                            help='file for logging')
+
         parser.add_argument('--force',
                             dest='force', action='store_true',
                             help='overwrite outputs')
@@ -183,11 +214,11 @@ class Options(ParserUtils, ap.Namespace):
         parser.add_argument('files', metavar='FILE[/SPEC]',
                             type=str, nargs='*',
                             help='files, possibly with specifiers')
-        parser.add_argument('-c', '--contours', '--contour',
+        parser.add_argument('-c', '--contours',
                             dest='contour',
                             metavar='SPEC', default=None, type=str,
                             help='contour intervals or levels specification')
-        parser.add_argument('-C', '--colors', '--color',
+        parser.add_argument('-C', '--colors',
                             dest='color',
                             metavar='SPEC', default=None, type=str,
                             help='color intervals or levels specification.')
@@ -200,28 +231,29 @@ class Options(ParserUtils, ap.Namespace):
         parser.add_argument('-r', '--range',
                             metavar='[LOW][:[HIGH]]', dest='limit', type=str,
                             help='data range to draw')
-        parser.add_argument('-v', '--variable',
+        parser.add_argument('-v', '--variables',
                             metavar='VAR[,VAR...]', default=[], action='append',
                             type=str,
                             help='variable filter')
         # --dim DIM/LOW:HIGH
-        # --dim DIM,LOW:HIGH       (deprecated)
-        parser.add_argument('-d', '--dim',
-                            metavar='DIM,[[LOW]:[HIGH]]', action='append',
+        parser.add_argument('-d','--dimensions',
+                            dest='dims',
+                            metavar='DIM/SELECTION[,...]', action='append',
                             type=str,
                             help='coordinate clipping')
         # --draw DIM/NAME/LOW:HIGH,DIM/NAME/LOW:HIGH
         parser.add_argument('-D', '--draw',
                             dest='draw',
-                            metavar='COORDINATE/RANGE[,...]', action='append',
+                            metavar='COORDINATE[/SELECTION][,...]',
+                            action='append',
                             type=str,
                             help='figure coordinates')
-        # --coordinate VERTICAL,HORIZONTAL       (deprecated)
-        parser.add_argument('-x', '--coordinate',
-                            dest='coors',
-                            metavar='VERTICAL[,HORIZONTAL]', default=None,
-                            type=str,
-                            help='figure coordinates')
+        # # --coordinate VERTICAL,HORIZONTAL       (deprecated)
+        # parser.add_argument('-x', '--coordinates',
+        #                     dest='coors',
+        #                     metavar='VERTICAL[,HORIZONTAL]', default=None,
+        #                     type=str,
+        #                     help='figure coordinates')
         parser.add_argument('-o', '--output',
                             metavar='FILE', type=str,
                             help='output filename')
@@ -241,18 +273,29 @@ class Options(ParserUtils, ap.Namespace):
                             dest='window',
                             action='store_const', default=0, const=1,
                             help='Create figure for each file')
+        parser.add_argument('-g', '--geometry',
+                            dest='geometry',
+                            metavar='[W][,[H]]', default=None, type=str,
+                            help='figure geometry')
 
         parser.parse_args(argv, namespace=self)
+
+        self.logger = self.parse_logging(self.verbose, self.quiet,
+                                         self.debug,
+                                         self.loglev, self.logf)
+
         self.verbose = self.verbose - self.quiet
 
-        self.coors = self.parse_coors(self.coors)
         self.output = self.parse_output(self.output)
-        if self.coors:
-            print(f"deprecated: {self.coors}")
-            self.coors = self.parse_coors(self.coors)
-            self.draw, _ = self.parse_draw(self.draw)
-        else:
-            self.draw, self.coors = self.parse_draw(self.draw)
+
+        # self.coors = self.parse_coors(self.coors)
+        # if self.coors:
+        #     print(f"deprecated: {self.coors}")
+        #     self.coors = self.parse_coors(self.coors)
+        #     self.draw, _ = self.parse_draw(self.draw)
+        # else:
+        self.draw = self.parse_draw(self.draw)
+        self.coords = self.extract_view(self.draw)
 
         color = {}
         contour = {}
@@ -277,106 +320,89 @@ class Options(ParserUtils, ap.Namespace):
         if self.interactive is None:
             self.interactive = not bool(self.output)
 
-        self.tweak()
+        self.variables = self.parse_variables(self.variables)
+        self.dims = self.parse_draw(self.dims)
 
         self.parser = parser
 
-    def parse_coors(self, coors=None):
-        """Parse coordinate(selection) parameters."""
-        if coors:
-            coors = tuple(zu.toint(c) for c in coors.split(self.lsep))
-            if len(coors) == 1:
-                coors = coors + ('', )
-        # print(f"{coors=}")
-        return coors
+    def parse_logging(self, verbose, quiet, debug,
+                      loglev, logfile, name=None):
+        if loglev:
+            loglev = zu.toint(loglev)
+            if isinstance(loglev, str):
+                loglev = logging.getLevelName(loglev.upper())
+        elif debug:
+            loglev = logging.DEBUG
+        else:
+            loglev = logging.INFO - (verbose - quiet) * 10
+        logger = zu.logger
+        logger.setLevel(loglev)
+        return logger
+
+    def extract_view(self, draw=None):
+        """Extract view coordinates."""
+        draw = draw or {}
+        coords = []
+        for d, s in draw.items():
+            if isinstance(s, slice) or s is None:
+                coords.append(d)
+        coords = tuple(coords + ['', '', ])[:2]
+        return coords
 
     def parse_draw(self, draw=None):
         """Parse draw(view) parameters.
-        --dimension=[COORDINATE[/SELECTION]][,[COORDINATE[/SELECTION]][,[...]]]
+        --draw=[COORDINATE[/SELECTION]][,[COORDINATE[/SELECTION]][,[...]]]
         COORAINATE can be either index or (long-)name.
         SELECTION can be RANGE, POINT, or empty.
 
-        --dimension=-3          Set dims[-3] as y-coordinate.
-        --dimension=,-2         Set dims[-2] as x-coordinate.
-        --dimension=-1/10       Set dims[-1] anchor as index 10.
-                                Plot will be with other effective coordinates.
-        --dimension=-1/10 --dimension=-3
-        --dimension=-1/10,-3    Set dims[-1] anchor as index 10,
-                                and set dims[-3] as y-coordinate.
-        --dimension=-1/10,,-2   Set dims[-1] anchor as index 10,
-                                and set dims[-2] as x-coordinate.
-        --dimension=-3/10:      Set dims[-3] as y-coordinate,
-                                with initial view of index 10 to the end
-                                (== 10 to -1)
-        --dimension=-3/:20      Set dims[-3] as y-coordinate,
-                                with initial view of index 0 to 20 (== 0 to 19)
-        --dimension=-3/10:20    Set dims[-3] as y-coordinate,
-                                with initial view of index 10:20  (== 10 to 19)
-        --dimension=-3/10:20.   Set dims[-3] as y-coordinate,
-                                with initial view from index 10 to point 20.0
-                                (inclusive)
-        --dimension=-3/10.:20.  Set dims[-3] as y-coordinate,
-                                with initial view range from point 10.0 to 20.0
-                                (inclusive)
-        --dimension=time        Set dimension to match with `time'
-                                as y-coordinate.
+        --draw=-3          Set dims[-3] as y-coordinate.
+        --draw=,-2         Set dims[-2] as x-coordinate.
+        --draw=-1/10       Set dims[-1] anchor as index 10.
+                           Plot will be with other effective coordinates.
+        --draw=-1/10 --draw=-3
+        --draw=-1/10,-3    Set dims[-1] anchor as index 10,
+                           and set dims[-3] as y-coordinate.
+        --draw=-1/10,,-2   Set dims[-1] anchor as index 10,
+                           and set dims[-2] as x-coordinate.
+        --draw=-3/10:      Set dims[-3] as y-coordinate,
+                           with initial view of index 10 to the end
+                           (== 10 to -1)
+        --draw=-3/:20      Set dims[-3] as y-coordinate,
+                           with initial view of index 0 to 20 (== 0 to 19)
+        --draw=-3/10:20    Set dims[-3] as y-coordinate,
+                           with initial view of index 10:20  (== 10 to 19)
+        --draw=-3/10:20.   Set dims[-3] as y-coordinate,
+                           with initial view from index 10 to point 20.0
+                           (inclusive)
+        --draw=-3/10.:20.  Set dims[-3] as y-coordinate,
+                           with initial view range from point 10.0 to 20.0
+                           (inclusive)
+        --draw=time        Set dimension to match with `time'
+                           as y-coordinate.
         """
         draw = draw or {}
-        if draw:
-            _draw = {}
-            for od in self.chain_split(draw, self.lsep):
-                d = od.split(self.isep)
-                if len(d) == 0:
-                    pass
-                elif len(d) == 1:
-                    c = zu.toint(d[0])
-                    _draw[c] = None
-                elif len(d) == 2:
-                    c = zu.toint(d[0])
-                    d[1] = d[1] or self.nsep
-                    s = [None if j == '' else zu.tonumber(j)
-                         for j in d[1].split(self.nsep)]
-                    if len(s) == 2:
-                        _draw[c] = slice(s[0], s[1], None)
-                    elif len(s) == 1:
-                        _draw[c] = s[0]
-                    else:
-                        raise ValueError(f'Need valid range {od}')
+        _draw = {}
+        for od in self.chain_split(draw, self.lsep):
+            d = od.split(self.isep)
+            if len(d) == 0:
+                pass
+            elif len(d) == 1:
+                c = zu.toint(d[0])
+                _draw[c] = None
+            elif len(d) == 2:
+                c = zu.toint(d[0])
+                d[1] = d[1] or self.nsep
+                s = [None if j == '' else zu.tonumber(j)
+                     for j in d[1].split(self.nsep)]
+                if len(s) == 2:
+                    _draw[c] = slice(s[0], s[1], None)
+                elif len(s) == 1:
+                    _draw[c] = s[0]
                 else:
-                    raise ValueError(f'invalid draw {od}')
-            # for od in draw or []:
-            #     for od in od.split(self.lsep):
-            #         d = od.split(self.isep)
-            #         if len(d) == 0:
-            #             pass
-            #         elif len(d) == 1:
-            #             c = zu.toint(d[0])
-            #             _draw[c] = None
-            #         elif len(d) == 2:
-            #             c = zu.toint(d[0])
-            #             d[1] = d[1] or self.nsep
-            #             s = [None if j == '' else zu.tonumber(j)
-            #                  for j in d[1].split(self.nsep)]
-            #             if len(s) == 2:
-            #                 _draw[c] = slice(s[0], s[1], None)
-            #             elif len(s) == 1:
-            #                 _draw[c] = s[0]
-            #             else:
-            #                 raise ValueError(f'Need valid range {od}')
-            #         else:
-            #             raise ValueError(f'invalid draw {od}')
-            draw = _draw
-        coors = []
-        for d, s in draw.items():
-            if isinstance(s, slice) or s is None:
-                coors.append(d)
-        coors = tuple(coors + ['', '', ])[:2]
-        # coors = list(draw.keys()) + ['', '']
-        # coors = tuple(coors[:2])
-        if self.debug > 0:
-            print(f"{draw=} {coors=}")
-
-        return draw, coors
+                    raise ValueError(f'Need valid range {od}')
+            else:
+                raise ValueError(f'invalid draw {od}')
+        return _draw
 
     def chain_split(self, args, sep=None):
         """Iterator to split all the list items."""
@@ -385,11 +411,13 @@ class Options(ParserUtils, ap.Namespace):
             yield from a.split(sep)
 
     def parse_output(self, output=None):
+        """Parse output argument."""
         if output:
             output = plib.Path(output)
         return output
 
     def parse_method(self, method, contour=None, color=None):
+        """Parse contour/color methods."""
         color = color or {}
 
         method = method or ''
@@ -410,12 +438,13 @@ class Options(ParserUtils, ap.Namespace):
             if contour is None:
                 contour = False
         color['method'] = method
-        color['cmap'] = cmap
+        color['cmap'] = [cmap]
         if params:
             color['alpha'] = float(params)
         return color, contour
 
     def parse_levels(self, text, single=False):
+        """Parse contour/color levels."""
         # --contours=0              no contour
         # --contours=INT[/INT...]   contour intervals
         # --contours=LEV,[LEV,...]  explicit contour levels
@@ -459,6 +488,7 @@ class Options(ParserUtils, ap.Namespace):
         return pat
 
     def parse_limit(self, limit=None):
+        """Parse data limits."""
         limit = limit or ''
         limit = limit.split(':')
         low = float(limit[0]) if limit[0] != '' else None
@@ -472,43 +502,28 @@ class Options(ParserUtils, ap.Namespace):
             limit['vmax'] = high
         return limit
 
-    def tweak(self):
-        """Tweak options"""
-
-        var = []
-        self.variable = self.variable or []
-
-        for v in self.variable:
-            var.extend(v.split(','))
-        if not var:
-            self.variable = True
+    def parse_variables(self, variables=None):
+        """Parse variable filter."""
+        variables = variables or True
+        if variables is True:
+            pass
         else:
-            self.variable = var
-
-        dim = {}
-        self.dim = self.dim or []
-        for d in self.dim:
-            dd = d.split(self.isep)
-            if len(dd) != 2:
-                dd = d.split(self.lsep)
-                if len(dd) != 2:
-                    raise ValueError(f"Invalid dim filter: {d}.")
-                else:
-                    print(f"Deprecated.  Use --dim/LOW:HIGH format.")
-
-            dn = dd[0]
-            dj = [None if j == '' else zu.tonumber(j)
-                  for j in dd[1].split(':')]
-            dn = zu.toint(dn)
-            if len(dj) == 1:
-                # dim[dn] = slice(dj[0], dj[0]+1, None)
-                dim[dn] = dj[0]
-            else:
-                dim[dn] = slice(dj[0], dj[1], None)
-        self.dim = dim
+            variables = list(self.chain_split(variables or [], self.lsep))
+            pm = re.compile(r'[][+^*.?${}|]')
+            if any(pm.search(v) for v in variables):
+                pats = [re.compile(v) for v in variables]
+                def match_variable(item):
+                    """re matching with variable item."""
+                    for p in pats:
+                        if p.match(item):
+                            return True
+                    return False
+                variables = match_variable
+        return variables
 
     def parse_styles(self, maps=None, projection=None,
                      crs=None, transform=None):
+        """Parse map and projection styles."""
         styles = {}
         # print(maps, type(maps))
         if isinstance(maps, str):
@@ -565,15 +580,18 @@ class Options(ParserUtils, ap.Namespace):
 
         # print(f"{styles=}")
 
-        coors = (-2, -1)
+        coords = (-2, -1)
 
-        return {coors: styles}
+        return {coords: styles}
 
     def print_help(self, *args, **kwds):
+        """Wrap print_help()."""
         self.parser.print_help(*args, **kwds)
 
     def print_usage(self, *args, **kwds):
+        """Wrap print_usage()."""
         self.parser.print_usage(*args, **kwds)
+
 
 def load_config(opts, *files, cmd=None, base=None):
     """Load multiple configuration files."""
@@ -599,16 +617,16 @@ def load_config(opts, *files, cmd=None, base=None):
     return config
 
 
-def parse_keymap(opts, config, group=None):
-    group = group or ()
-    for f, c in config.items():
-        if isinstance(c, dict):
-            parse_keymap(opts, c, group + (f, ))
-        elif isinstance(c, list):
-            for k in c:
-                opts[k] = (f, ) + group
-        elif c != '':
-            opts[c] = (f, ) + group
+# def parse_keymap(opts, config, group=None):
+#     group = group or ()
+#     for f, c in config.items():
+#         if isinstance(c, dict):
+#             parse_keymap(opts, c, group + (f, ))
+#         elif isinstance(c, list):
+#             for k in c:
+#                 opts[k] = (f, ) + group
+#         elif c != '':
+#             opts[c] = (f, ) + group
 
 class Output:
     def __init__(self, name, force=None, method=None):
@@ -667,12 +685,12 @@ def main(argv, cmd=None):
 
     opts = Options(argv, cmd)
 
-    if opts.debug > 0:
+    if locallog.is_debug():
         import zbt.dsnio as znio
         znio.TouzaNioDataset.debug()
-        print(f"{loc}")
+        locallog.debug(f"(main) {loc}")
         for m in [zu, zctl, zplt, ]:
-            print(f"{m}")
+            locallog.debug(f"{m}")
 
     cfg = load_config(opts, *files, cmd=cstem)
 
@@ -682,48 +700,48 @@ def main(argv, cmd=None):
 
     fopts = dict(decode_coords=opts.decode_coords)
 
+    fiter = ft.partial(zctl.FileIter,
+                       variables=opts.variables, opts=fopts)
     viter = ft.partial(zctl.VariableIter,
-                       dim=opts.dim, coors=opts.coors,
-                       anchors=opts.draw, debug=opts.debug)
+                       dims=opts.dims, coords=opts.coords,
+                       anchors=opts.draw)
+    aiter = ft.partial(zctl.ArrayIter,
+                       coords=opts.coords, anchors=opts.draw)
 
     if opts.window > 0:
         Iter = []
         for f in opts.files:
-            Array = zctl.ArrayIter()
+            Array = aiter()
             Var = viter(child=Array)
-            # Var = zctl.VariableIter(child=Array, dim=opts.dim,
-            #                         coors=opts.coors)
-            Iter.append(zctl.FileIter([f], child=Var,
-                                      variables=opts.variable, opts=fopts))
+            Iter.append(fiter([f], child=Var))
     else:
-        Array = zctl.ArrayIter()
-        # Var = zctl.VariableIter(child=Array, dim=opts.dim, coors=opts.coors)
+        Array = aiter()
         Var = viter(child=Array)
-        Iter = zctl.FileIter(opts.files, child=Var,
-                             variables=opts.variable, opts=fopts)
+        Iter = fiter(opts.files, child=Var)
 
     Layout = zplt.LayoutLegacy3
     Layout.config(cfg, verbose=True)
-    if opts.debug > 0:
+    if locallog.is_debug():
         Layout.diag(strip=False)
 
     Plot = zplt.ContourPlot
     Plot.config(cfg, verbose=True)
-    if opts.debug > 0:
+    if locallog.is_debug():
         Plot.diag(strip=False)
 
-    Cmap = zctl.CmapIter()
-    if opts.color.get('cmap') is None:
-        opts.color['cmap'] = Cmap.value
+    Cmap = zctl.CmapIter(*(opts.color.get('cmap') or []))
+    Norm = zctl.NormIter(*(opts.color.get('norm') or []))
+    # if opts.color.get('cmap') is None:
+    opts.color['cmap'] = Cmap.put_or_get
+    opts.color['norm'] = Norm.value
 
     Pic = zplt.Picture
     plot = Plot(contour=opts.contour, color=opts.color)
-    # pic = zplt.Picture(Layout)
-    # Plot = zplt.ContourPlot(contour=opts.contour, color=opts.color)
 
     Ctl = zctl.FigureControl(Pic, plot, Iter,
                              interactive=opts.interactive,
                              cmap=Cmap,
+                             norm=Norm,
                              layout=Layout,
                              styles=opts.styles,
                              draw=opts.draw,
