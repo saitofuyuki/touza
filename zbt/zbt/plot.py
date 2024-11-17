@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/12/05 14:43:37 fuyuki plot.py>
+# Time-stamp: <2024/12/10 17:55:27 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -342,6 +342,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         self.orig_size = fig.get_size_inches()
         # self.crs = {}
         self.projp = {}   # projection properites == (crs, transform)
+        self.bg = {}
 
     def _iter_axes(self):
         try:
@@ -349,7 +350,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 amap = getattr(self, grp)
                 yield from amap.items()
         except AttributeError as exc:
-            raise exc(f"No layout/axes map {grp} in {self}.")
+            raise AttributeError(f"No layout/axes map {grp} in {self}.") from exc
 
     def tweak_axes(self, ax, lab):
         """Dummy axes modifier."""
@@ -960,6 +961,15 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 preg[pk] = mtr.Bbox.from_extents(*xspine)
                 locallog.debug(f"{gid} {which}: {xbody=} {tbody=}")
 
+                # rect = mpatches.Rectangle((xspine[0], xspine[1]),
+                #                           xspine[2] - xspine[0],
+                #                           xspine[3] - xspine[1],
+                #                           transform=None,
+                #                           facecolor='red',
+                #                           alpha=0.25)
+                # print(rect)
+                # fig.add_artist(rect)
+
                 # ff = inv.transform(preg[pk])
                 # print(preg[pk], ff)
                 # # aline = mplib.lines.Line2D([ff[0][0], ff[1][0]],
@@ -980,8 +990,14 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 # print(rect)
                 # fig.add_artist(rect)
 
-                # fbb = preg[pk].transformed(inv)
-                # pax = fig.add_axes(fbb)
+                fbb = preg[pk].transformed(inv)
+                pax = fig.add_axes(fbb)
+                pax.set_axis_off()
+                pax.add_artist(pax.patch)
+                pax.set(zorder=-1)
+                bg = fig.canvas.copy_from_bbox(pax.bbox)
+                self.bg[pax] = bg
+
                 # self.tweak_axes(pax, pk)
                 # locallog.debug(f"{gid} {which}: {fbb}")
 
@@ -1106,7 +1122,7 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
 
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
-        self.bg = None
+        self.bg = {}
 
         self.picks = {}
         # self.pbg = {}
@@ -1337,7 +1353,7 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
         return ''
 
     def on_draw(self, fig, ax=None, **kwds):
-        self.bg = None
+        self.bg = {}
         self.picks = {}
         # self.pbg = {}
 
@@ -1348,13 +1364,15 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
         # ax = ax or 'body'
         ax = self._get_axes(ax)
         if ax:
-            if not self.bg:
-                self.bg = fig.canvas.copy_from_bbox(ax.bbox)
+            bg = self.bg.get(ax)
+            if not bg:
+                bg = fig.canvas.copy_from_bbox(ax.bbox)
+                self.bg[ax] = bg
             at = ax.texts[0]
             at.set_visible(True)
             # at.set_visible(False)
             at.set_text(text, **kwds)
-            fig.canvas.restore_region(self.bg)
+            fig.canvas.restore_region(bg)
             ax.draw_artist(at)
             fig.canvas.blit(ax.bbox)
         return
