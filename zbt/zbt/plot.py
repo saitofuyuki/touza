@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/11/14 22:05:37 fuyuki plot.py>
+# Time-stamp: <2024/12/05 14:43:37 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -24,6 +24,8 @@ import matplotlib.ticker as mtc
 import matplotlib.pyplot as plt
 import matplotlib.backend_tools as mpbt
 import matplotlib.contour as mcnt
+import matplotlib.patches as mpatches
+import matplotlib.transforms as mtr
 
 import xarray as xr
 import xarray.plot.utils as xrpu
@@ -36,6 +38,9 @@ import cartopy.mpl.ticker as cmtick
 
 import zbt.util as zu
 import zbt.config as zcfg
+
+locallog = zu.LocalAdapter('plot')
+
 
 _ConfigType = zcfg.ConfigRigid
 
@@ -77,9 +82,53 @@ class Picture(PictureCore):
 class FigureCore(mplib.figure.Figure):
     """Abstract base layer of matplotlib figure for zbt."""
 
+    _cache_patches = ['facecolor', ]
+
+    def __init__(self, *args, **kwds):
+        super().__init__(*args, **kwds)
+        self._stack_patches = []
+
     def __str__(self):
         return super().__str__()
 
+    def _store_patch(self):
+        c = {}
+        for p in self._cache_patches:
+            f = getattr(self.patch, f'get_{p}')
+            c[p] = f()
+        self._stack_patches.append(c)
+
+    def push_patch(self, **kwds):
+        self._store_patch()
+        self.patch.set(**kwds)
+        return kwds
+
+    def switch_patch(self, pos):
+        try:
+            kwds = self._stack_patches[pos]
+            self._store_patch()
+            self.patch.set(**kwds)
+        except IndexError:
+            self._store_patch()
+            kwds = None
+        return kwds
+
+    def pop_patch(self, pos=None):
+        if pos is None:
+            pos = -1
+        kwds = self._stack_patches.pop(pos)
+        self.patch.set(**kwds)
+        return kwds
+
+    def get_patch(self, pos=None):
+        if pos is None:
+            pos = -1
+        return self._stack_patches[pos]
+
+    def diag_patches(self):
+        for j, s in enumerate(self._stack_patches):
+            s = ' '.join(f"[{k}]={v}" for k, v in s.items())
+            print(f"stack[{j}]: {s}")
 
 # # ### Axes
 # class EmptyAxes(mplib.axes.Axes):
@@ -106,6 +155,10 @@ class ParserBase():
             dmin = dmin.item()
         return (dmin, dmax, scale)
 
+    def parse_ticks(self, attrs, default=0):
+        """Fallback for major and minor locators."""
+        return (default, default)
+
 
 class LegacyParser(ParserBase):
     """GTOOL3 legacy attribute parser methods."""
@@ -126,7 +179,6 @@ class LegacyParser(ParserBase):
         """Parse slice properties."""
         sel = []
         for d, c in coords.items():
-            # print(d, c)
             if c.size == 1:
                 dt, du = self.extract_titles(c.attrs)
                 dt = dt or d
@@ -209,8 +261,6 @@ class LegacyParser(ParserBase):
         dmin = parse_sub('DMIN')
         styp = int(parse_sub('STYP') or 0)
         sc = ''
-        # print(f"{dmin=} {dmax=}")
-        # print(styp)
         if abs(styp) == 2:
             sc = 'log'
         if dmax and dmin:
@@ -227,8 +277,6 @@ class LegacyParser(ParserBase):
             vmin, vmax, _ = super().parse_coor(coor, item=item)
             dmax = float(dmax) if dmax else vmax
             dmin = float(dmin) if dmin else vmin
-        # print(f"{dmin=} {dmax=}")
-        # print(dmin, dmax, sc)
         return dmin, dmax, sc
 
     def parse_calendar(self, attrs, default=None):
@@ -274,7 +322,7 @@ class LegacyParser(ParserBase):
 
 # ### Layout
 
-class LayoutBase(zcfg.ConfigBase):
+class LayoutBase(ParserBase, zcfg.ConfigBase):
     """Base layer of figure/axes manipulation."""
     names = ('layout', )
     _axes_keys = ()
@@ -370,7 +418,6 @@ class LayoutBase(zcfg.ConfigBase):
             ref = self.orig_size
         elif ref is True:
             ref = self.geometry
-        # print(f"in: {ref=} {figsize=}")
 
         figsize = zu.set_default(figsize, True)
         if figsize is True:
@@ -393,7 +440,6 @@ class LayoutBase(zcfg.ConfigBase):
             figsize = figsize.get_size_inches()
 
         fig.set_size_inches(*figsize, forward=True)
-        # print(f"out: {fig.get_size_inches()} {figsize=}")
 
     # plot methods
     def reset(self, fig, default=None, **kwds):
@@ -424,7 +470,7 @@ class LayoutBase(zcfg.ConfigBase):
                 axkw = ax_args | axkw
                 axkw[kpr] = nproj
                 if oproj and nproj is None:
-                    print(f"warning: {kpr}={oproj} is cleared.")
+                    locallog.warning(f"{kpr}={oproj} is cleared.")
                 axkw.setdefault('label', lab)
                 rect = axkw.pop('rect', rect)
                 axkw.pop('fresh', None)
@@ -477,12 +523,47 @@ class LayoutBase(zcfg.ConfigBase):
         else:
             axs = [axs]
         for ax in axs:
+            ax_ = ax
             ax = self._get_axes(ax)
             if ax:
                 ax.cla()
                 lab = ax.get_label()
                 # caution,  kept.
                 _ = self.tweak_axes(ax, lab)
+
+    def get_position(self, x, y, ax=None, crs=None):
+        """Get position on data coordinates"""
+        ax = self._get_axes(ax)
+        pp = self.projp.get(ax) or None
+        proj = getattr(ax, 'projection', None)
+
+        if crs is None:
+            crs = pp
+        elif crs is False:
+            crs = None
+        if proj and crs:
+            x, y = crs.transform_point(x, y, src_crs=proj)
+        return x, y
+
+    def position_transform(self, x, y, ax=None, crs=None):
+        """Transform (display) position to data coordinates"""
+        ax = self._get_axes(ax)
+        if x is not None:
+            transf = ax.get_xaxis_transform().inverted()
+            x = transf.transform((x, 0))[0]
+        if y is not None:
+            transf = ax.get_yaxis_transform().inverted()
+            y = transf.transform((0, y))[1]
+        # pp = self.projp.get(ax) or None
+        # proj = getattr(ax, 'projection', None)
+
+        # if crs is None:
+        #     crs = pp
+        # elif crs is False:
+        #     crs = None
+        # if proj and crs:
+        #     x, y = crs.transform_point(x, y, src_crs=proj)
+        return x, y
 
     def get_extent(self, ax=None, crs=None, **kwds):
         """Get extent tuple of tuples.
@@ -494,7 +575,6 @@ class LayoutBase(zcfg.ConfigBase):
             # crs = self.crs.get(ax)
         elif crs is False:
             crs = None
-        # print(f"{type(crs)=} {crs=}")
         cxy = None
         if ax:
             try:
@@ -503,7 +583,6 @@ class LayoutBase(zcfg.ConfigBase):
                 ylim = xy[2:]
                 if crs:
                     cxy = (crs, ax.get_extent())
-                # print('extent:', xy, cxy[1])
             except AttributeError as exc:
                 xlim = ax.get_xlim()
                 ylim = ax.get_ylim()
@@ -580,24 +659,25 @@ class LayoutBase(zcfg.ConfigBase):
             xc = data.coords[x]
             yc = data.coords[y]
 
-            self._set_tick(xc, ax.xaxis, ax.set_xlim, ax.set_xscale,
-                           **(kwds.get(x) or {}))
-            self._set_tick(yc, ax.yaxis, ax.set_ylim, ax.set_yscale,
-                           **(kwds.get(y) or {}))
+            self.set_tick(xc, ax, 'x', **(kwds.get(x) or {}))
+            self.set_tick(yc, ax, 'y', **(kwds.get(y) or {}))
 
             artists.extend([ax.xaxis, ax.yaxis,
                             ax.xaxis.get_offset_text(),
                             ax.yaxis.get_offset_text()])
-
             # ax.xaxis.get_offset_text().set_fontsize(24)
             # ax.yaxis.get_offset_text().set_fontsize(24)
-            # print('xaxis:', ax.xaxis.get_offset_text())
-            # print('yaxis:', ax.yaxis.get_offset_text())
             return artists
 
-    def _set_tick(self, co, axis, limf, scf,
-                  major=None, minor=None, dmin=None, dmax=None,
-                  **kwds):
+    def set_tick(self, co, ax, which,
+                 major=None, minor=None, dmin=None, dmax=None,
+                 **kwds):
+        """Draw axis."""
+        if which == 'x':
+            axis, limf, scf = ax.xaxis, ax.set_xlim, ax.set_xscale
+        else:
+            axis, limf, scf = ax.yaxis, ax.set_ylim, ax.set_yscale
+
         cmin, cmax, scale = self.parse_coor(co)
         dmin = zu.set_default(dmin, cmin)
         dmax = zu.set_default(dmax, cmax)
@@ -611,10 +691,12 @@ class LayoutBase(zcfg.ConfigBase):
         txt = xrpu.label_from_attrs(co)
         ltx = axis.set_label_text(txt, fontsize=13)
         ltx.set_picker(True)
-        ltx.set_gid(f"coordinate:{co.name}")
+        # ltx.set_gid(f"axis:{co.name}")
+        ltx.set_gid(f"axis:{which}")
         axis.set_picker(True)
         # axis.set_picker(self.axis_picker)
-        axis.set_gid(f"tick:{co.name}")
+        # axis.set_gid(f"tick:{co.name}")
+        axis.set_gid(f"tick:{which}")
         axis.set_tick_params(which='major', **(major or {}))
         axis.set_tick_params(which='minor', **(minor or {}))
         if dmin != dmax:
@@ -629,8 +711,6 @@ class LayoutBase(zcfg.ConfigBase):
         if not ax:
             return artists
 
-        # print(f"{extent=}")
-        # print(f"{kwds=}")
         co = [d for d in data.dims if data.coords[d].size > 1]
         if len(co) != 2:
             raise ValueError(f"Not 2d shape={co}")
@@ -755,6 +835,162 @@ class LayoutBase(zcfg.ConfigBase):
                     artists.append(ax.add_feature(ft))
         return artists
 
+    def set_picks(self, ax=None, preg=None, **kwds):
+        """Set pick region."""
+        # print(f'set_picks: {ax}')
+        ax = self._get_axes(ax)
+        preg = preg or {}
+        if ax:
+            lab = ax.get_label()
+            if lab in self.prop('graph'):
+                preg = self.set_axis_picks(ax, 'x', preg=preg, **kwds)
+                preg = self.set_axis_picks(ax, 'y', preg=preg, **kwds)
+        return preg
+
+    def set_axis_picks(self, ax, which, preg=None, tol=None):
+        if which not in ['x', 'y']:
+            raise ValueError(f'Panic.  Invalid argument {which}')
+
+        fig = ax.figure
+        inv = fig.transFigure.inverted()
+        preg = preg or {}
+        if tol is None:
+            tol = 5.0
+
+        def bounds(bb, other=None):
+            cond = 'y' if bool(other) else 'x'
+            try:
+                if which == cond:
+                    return bb.ymin, bb.ymax    # intentional
+                return bb.xmin, bb.xmax
+            except AttributeError:
+                return None
+
+        def reset(bb, other):
+            if which == 'x':
+                # intentional
+                return (other[0], bb[0], other[1], bb[1])
+            return (bb[0], other[0], bb[1], other[1])
+
+        def extent(obj, other=None):
+            return bounds(obj.get_window_extent(), other)
+
+        def tightbbox(obj, other=None):
+            return bounds(obj.get_tightbbox(), other)
+
+        gid = ax.get_gid()
+
+        # print(ax.get_tightbbox())
+        # print(ax.get_window_extent())
+
+        tbody = tightbbox(ax)
+        xbody = extent(ax)
+
+        if which == 'x':
+            axis = ax.xaxis
+        else:
+            axis = ax.yaxis
+
+        xt = axis.get_label()
+        txt = xt.get_text()
+        xlabel = list(extent(xt))
+        wlabel = extent(xt, other=True)
+        wlabel = (wlabel[0] - tol,  wlabel[1] + tol)
+
+        taxis = tightbbox(axis)
+        waxis = tightbbox(axis, other=True)
+
+        locallog.debug(f"{gid} {which}: {xlabel=} {wlabel=} {taxis=} {waxis=}")
+
+        if which == 'x':
+            skeys = ['top', 'bottom']
+        else:
+            skeys = ['left', 'right']
+
+        ## detect spine with axis label (just choose the closest)
+        if taxis:
+            aorg = taxis[1] + taxis[0]
+            dist = []
+            for k, sp in ax.spines.items():
+                xsp = extent(sp)
+                sorg = xsp[1] + xsp[0]
+                dist.append((abs(aorg - sorg), k))
+            _, aspine = min(dist)
+            if aspine not in skeys:
+                skeys.insert(aspine, 0)
+        else:
+            aspine = None
+
+        def is_finite(bb):
+            return bb[0] != bb[2] and bb[1] != bb[3]
+
+        for k in skeys:
+            sp = ax.spines[k]
+            xspine = list(extent(sp))
+            wspine = list(extent(sp, other=True))
+
+            if aspine == k:
+                # LABEL SPINE
+                if xspine[1] > xlabel[1]:
+                    xspine[0] = min(xspine[0], xlabel[1])
+                    xlabel[1] = xspine[0]
+                    xlabel[0] = xlabel[0] - tol
+                # SPINE LABEL
+                elif xspine[0] < xlabel[0]:
+                    xspine[1] = max(xspine[1], xlabel[0])
+                    xlabel[0] = xspine[1]
+                    xlabel[1] = xlabel[0] + tol
+                xlabel = reset(xlabel, wlabel)
+                if is_finite(xlabel):
+                    pk = 'axis', gid, k
+                    preg[pk] = mtr.Bbox.from_extents(*xlabel)
+
+            if xspine[1] > xbody[1]:
+                xspine[0] = max(xspine[0], xbody[1])
+            elif xspine[0] < xbody[0]:
+                xspine[1] = min(xspine[1], xbody[0])
+
+            if aspine == k and waxis:
+                wspine[0] = min(wspine[0], waxis[0])
+                wspine[1] = max(wspine[1], waxis[1])
+            xspine = reset(xspine, wspine)
+            locallog.debug(f"{gid} {which}: {k} {xspine=}")
+            if is_finite(xspine):
+                pk = 'spine', gid, k
+                preg[pk] = mtr.Bbox.from_extents(*xspine)
+                locallog.debug(f"{gid} {which}: {xbody=} {tbody=}")
+
+                # ff = inv.transform(preg[pk])
+                # print(preg[pk], ff)
+                # # aline = mplib.lines.Line2D([ff[0][0], ff[1][0]],
+                # #                            [ff[0][1], ff[1][1]])
+                # # print(aline)
+                # # fig.add_artist(aline)
+
+                # rect = mpatches.Rectangle(ff[0], *(ff[1]-ff[0]),
+                #                           facecolor='red',
+                #                           alpha=0.25)
+                # # rect = mpatches.Rectangle((xspine[0], xspine[1]),
+                # #                           xspine[2] - xspine[0],
+                # #                           xspine[3] - xspine[1],
+                # #                           transform=fig.dpi_scale_trans.inverted(),
+                # #                           # transform=inv,
+                # #                           facecolor='red',
+                # #                           alpha=0.25)
+                # print(rect)
+                # fig.add_artist(rect)
+
+                # fbb = preg[pk].transformed(inv)
+                # pax = fig.add_axes(fbb)
+                # self.tweak_axes(pax, pk)
+                # locallog.debug(f"{gid} {which}: {fbb}")
+
+        locallog.debug(f"{gid} {which}: {xbody=} {tbody=}")
+        locallog.debug(f"{gid} {which}: {taxis=}")
+        locallog.debug(f"{gid} {which}: {xlabel=}")
+
+        return preg
+
     def add_titles(self, *args,
                    ax=None, artists=None, **kwds):
         """Add title."""
@@ -796,14 +1032,27 @@ class LayoutBase(zcfg.ConfigBase):
             return ax.findobj(*args, **kwds)
         return None
 
-    def retrieve_event(self, event):
+    def retrieve_event(self, event, tol=None):
         """Get axes label corresponding to event."""
         ax = event.inaxes
         if ax:
             for lab, a in self.items():
                 if a == ax:
                     return lab
+        else:
+            px, py = event.x, event.y
+            if not self.picks:
+                preg = {}
+                for lab in self.keys():
+                    # locallog.debug(f'retrieve: {lab}')
+                    preg = self.set_picks(ax=lab, preg=preg, tol=tol)
+                self.picks = preg
+            for lab, bb in self.picks.items():
+                if bb.contains(px, py):
+                # if bb[0] <= px <= bb[2] and bb[1] <= py <= bb[3]:
+                    return lab
         return None
+
 
 class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
     """Emulate GTOOL3/gtcont layout 3."""
@@ -814,6 +1063,8 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
 
     geometry = (10.45, 7.39)
     gunit = 1.0 / 128
+
+    axis_ = {'tol': 5.0 }
 
     _pos = {'bottom': True, 'top': True, 'right': True, 'left': True, }
     _major = {'length': 10.8, 'width': 1.0, 'pad': 5.8, 'labelsize': 14.0, }
@@ -836,6 +1087,7 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
     info_ = {'title':
              {'contour': {'format': '.3'}, }}
     info_ |=  _contour_text
+    monitor_ = {'fontsize': 15.0 }
 
     _ofx, _ofy = 0.2, 0.02
     _lb, _wb = 0.129, 0.830
@@ -846,20 +1098,30 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
 
     text = {'info': (_lb + _ofx, _ofy, _wb - _ofx * 2, 0.1042 - _ofy),
             'left_title': (_lb, _bt, _wb / 2, _ht),
-            'right_title': (_lb + _wb / 2, _bt, _wb / 2, _ht), }
+            'right_title': (_lb + _wb / 2, _bt, _wb / 2, _ht),
+            'monitor': (1 - 0.061 - 0.245, 0.070 - 0.03,
+                        0.245, 0.057 + 0.03), }
 
     _axes_keys = LayoutBase._axes_keys + ('graph', 'text', )
 
-    def tweak_axes(self, ax, lab):
+    def __init__(self, *args, **kwds):
+        super().__init__(*args, **kwds)
+        self.bg = None
+
+        self.picks = {}
+        # self.pbg = {}
+
+    def tweak_axes(self, ax, lab, attr=None):
         """Tweaking of axes at creation."""
-        attr = self.prop(lab, {})
+        if attr is None:
+            attr = self.prop(lab, {})
         gid = attr.setdefault('gid', lab)
         ax.set_gid(gid)
         if lab not in self.prop('graph'):
             ax.format_coord = lambda x, y: ''
             ax.set_axis_off()
             ax.add_artist(ax.patch)
-            if lab.endswith('_title'):
+            if isinstance(lab, str) and lab.endswith('_title'):
                 ax.set(zorder=-1)
         if lab in self.prop('graph'):
             if lab == 'body':
@@ -873,7 +1135,27 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
             elif lab == 'colorbar':
                 for m in ['major', 'minor']:
                     ax.tick_params(which=m, **(attr.get(m) or {}))
+        if lab in ['monitor']:
+            kwds = self.prop(lab, {})
+            ax.text(0, 0.98, '',
+                    transform=ax.transAxes,
+                    animated=True,
+                    va='top', ha='left', color='grey', **kwds)
+            # bg = fig.canvas.copy_from_bbox(fig.bbox)
+        # if lab in ['body']:
+        #     kwds = self.prop(lab, {})
+        #     ax.text(0.5, 0.5, 'BODY',
+        #             transform=ax.transAxes,
+        #             animated=True,
+        #             va='top', ha='left', color='red')
         return ax
+
+    def cla(self, axs=None):
+        # if axs is None:
+        #     axs = list(self.keys())
+        #     axs.remove('monitor')
+        # print(axs)
+        super().cla(axs)
 
     def which(self, func, ax=None):
         ax = ax or 'body'
@@ -922,6 +1204,10 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
         ax = ax or 'body'
         return super().set_view(*args, ax=ax, **kwds)
 
+    def set_picks(self, *args, ax=None, **kwds):
+        ax = ax or 'body'
+        return super().set_picks(*args, ax=ax, **kwds)
+
     def add_features(self, /, *args, ax=None, **kwds):
         ax = ax or 'body'
         return super().add_features(*args, ax=ax, **kwds)
@@ -960,8 +1246,8 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
             if sk not in aux:
                 continue
             sopts = title[sk]
-            sv = aux.get(sk)
-            if sk == 'contour':
+            sv = aux.get(sk) or []
+            if sk == 'contour' and len(sv) > 0:
                 fmt = sopts.get('format', '')
                 dc = sv[0].levels[1:] - sv[0].levels[:-1]
                 if len(dc) == 0:
@@ -1039,6 +1325,47 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
             artists.extend(a)
         return artists
 
+    def pop_monitor(self, ax=None):
+        """matplotlib contour wrapper."""
+        ax = ax or 'monitor'
+        ax = self._get_axes(ax)
+        if ax:
+            at = ax.texts[0]
+            text = at.get_text()
+            at.set_visible(False)
+            return text
+        return ''
+
+    def on_draw(self, fig, ax=None, **kwds):
+        self.bg = None
+        self.picks = {}
+        # self.pbg = {}
+
+    def monitor(self, fig, text, *args,
+                ax=None, **kwds):
+        """matplotlib contour wrapper."""
+        ax = ax or 'monitor'
+        # ax = ax or 'body'
+        ax = self._get_axes(ax)
+        if ax:
+            if not self.bg:
+                self.bg = fig.canvas.copy_from_bbox(ax.bbox)
+            at = ax.texts[0]
+            at.set_visible(True)
+            # at.set_visible(False)
+            at.set_text(text, **kwds)
+            fig.canvas.restore_region(self.bg)
+            ax.draw_artist(at)
+            fig.canvas.blit(ax.bbox)
+        return
+
+    def retrieve_event(self, event, tol=None):
+        if tol is None:
+            axp = self.prop('axis')
+            tol = axp.get('tol')
+        lab = super().retrieve_event(event, tol=tol)
+        return lab
+
 
 # ## Plot ############################################################
 class PlotBase(zcfg.ConfigBase):
@@ -1068,8 +1395,6 @@ class ContourPlot(PlotBase, _ConfigType):
             raise UserWarning("virtually less than two dimensions")
 
         artists = artists or []
-
-        # ppr.pprint(axs.findobj(ax='body', match=mplib.spines.Spine))
 
         coords = data.coords
         cj = [d for d in data.dims if coords[d].size > 1]
@@ -1110,6 +1435,8 @@ class ContourPlot(PlotBase, _ConfigType):
 
         artists = self.set_view(axs, data, artists=artists,
                                 crs=crs, **(view or {}))
+
+        # self.set_picks(axs)
 
         fts = body.get('features') or []
         fts = axs.add_features(*fts)
@@ -1157,6 +1484,9 @@ class ContourPlot(PlotBase, _ConfigType):
         artists.extend(vx or [])
         return artists
 
+    def set_picks(self, axs, key=None, **kwds):
+        return axs.set_picks(ax=key, **kwds)
+
     def contour(self, axs, data,
                 levels=None, clabel=None, key=None,
                 artists=None, **kwds):
@@ -1179,7 +1509,7 @@ class ContourPlot(PlotBase, _ConfigType):
             elif isinstance(lev, list):
                 c = run(levels=lev)
             elif isinstance(lev, cabc.Callable):
-                vmin, vmax = self.get_range(data)
+                vmin, vmax = self.get_range(data, **kwds)
                 c = run(levels=lev(vmin, vmax))
             else:
                 raise TypeError(f"invalid level specifier {c}.")
@@ -1230,7 +1560,7 @@ class ContourPlot(PlotBase, _ConfigType):
             elif isinstance(levels, list):
                 pass
             elif isinstance(levels, cabc.Callable):
-                vmin, vmax = self.get_range(data)
+                vmin, vmax = self.get_range(data, **kwds)
                 levels = levels(vmin, vmax)
             else:
                 raise TypeError(f"invalid level specifier {levels}.")
@@ -1240,7 +1570,6 @@ class ContourPlot(PlotBase, _ConfigType):
             else:
                 if isinstance(cmap, cabc.Callable):
                     cmap = cmap()
-
                 col = axs.color(data, ax=key,
                                 method=method,
                                 add_colorbar=False,
@@ -1262,21 +1591,22 @@ class ContourPlot(PlotBase, _ConfigType):
 
         bar = None
         ticks = []
-        # print(method, cols[0])
-        if method == 'contour':
-            ticks = cols[0].levels
-        else:
-            bar, cax, = axs.colorbar(fig, cols[0],
-                                     alpha=color.get('alpha'))
+        if cols[0]:
+            if method == 'contour':
+                ticks = cols[0].levels
+            else:
+                bar, cax, = axs.colorbar(fig, cols[0],
+                                         alpha=color.get('alpha'))
 
         for cs in cons:
             if isinstance(cs, mcnt.QuadContourSet):
                 if bar:
                     bar.add_lines(cs, erase=False)
                 else:
-                    if len(ticks) > len(cs.levels):
-                        ticks = cs.levels
                     m = len(ticks)
+                    if m == 0 or m > len(cs.levels):
+                        ticks = cs.levels
+                        m = len(ticks)
                     if m > 5:
                         ticks = ticks[::m//5]
                     bar, cax, = axs.colorbar(fig, cs, ticks=ticks)
@@ -1292,10 +1622,12 @@ class ContourPlot(PlotBase, _ConfigType):
         artists.extend([bar, cax, ])
         return artists
 
-    def get_range(self, data):
+    def get_range(self, data, vmin=None, vmax=None, **kwds):
         """Data range computation."""
-        vmin = data.attrs.get('vmin')
-        vmax = data.attrs.get('vmax')
+        if vmin is None:
+            vmin = data.attrs.get('vmin')
+        if vmax is None:
+            vmax = data.attrs.get('vmax')
 
         if vmin is None:
             vmin = data.min().values
