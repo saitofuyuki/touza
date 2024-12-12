@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/12/13 15:37:31 fuyuki control.py>
+# Time-stamp: <2024/12/23 11:55:02 fuyuki control.py>
 
 __doc__ = \
     """
@@ -62,7 +62,6 @@ class LinkedArray:
         #   -1: backword
         self.step = +1
 
-
         # current
         #   None:  exhausted
         self._current = None
@@ -83,14 +82,6 @@ class LinkedArray:
             pass
         elif not isinstance(child, LinkedArray):
             raise ValueError(f"Invalid child type {type(child)}.")
-
-    def append(self, item, key=None):
-        """Append item to array."""
-        if isinstance(self.base, list):
-            self.base.append(item)
-            self.refresh(base=self.base, key=key)
-        else:
-            raise TypeError(f"invalid item to append on {type(self.base)}.")
 
     def update(self, key):
         """Dummy hook to update current status."""
@@ -294,6 +285,20 @@ class LinkedArray:
         # self.debug('value enter')
         return self._value(key)
 
+    def append(self, item, key=None):
+        """Append item to array."""
+        if isinstance(self.base, list):
+            self.base.append(item)
+            self.refresh(base=self.base, key=key)
+        else:
+            raise TypeError(f"invalid item to append on {type(self.base)}.")
+
+    def put(self, key=None, value=None):
+        """Put base value."""
+        k = self.l2p(key)
+        self.base[k] = value
+        return self.base[k]
+
     def get(self, key=None, default=None):
         """Get base value."""
         k = self.l2p(key)
@@ -422,6 +427,8 @@ class LinkedArray:
         ret = self.reset()
 
         while ret is not None:
+            # locallog.debug(f"__iter__ {self}")
+            # locallog.debug(f"__iter__ {ret} {id(self)} {self._current=}")
             self.update(ret)
             self._current = ret
 
@@ -1256,93 +1263,568 @@ class DataTree():
         return self.root.linked(cls=ArrayIter)
 
 
-class NormIter(LinkedArray):
-    def __init__(self, *args, **kw):
-        if not args:
-            args = ['', ]
-        self.Norms = list(args)
-        self.Rev = [False, True]
+# class NormIter(LinkedArray):
+#     def __init__(self, *args, **kw):
+#         if not args:
+#             args = ['', ]
+#         self.Norms = list(args)
+#         self.Rev = [False, True]
 
-        shape = (len(self.Norms), len(self.Rev))
-        super().__init__(base=None, key=shape, name='NORM', **kw)
+#         shape = (len(self.Norms), len(self.Rev))
+#         super().__init__(base=None, key=shape, name='NORM', **kw)
 
+#         self._loop = iter(self.items())
+#         _ = next(self._loop)
+
+#     def _value(self, key=None):
+#         if key is None:
+#             key = self._current
+#         if isinstance(key, tuple):
+#             return self.Norms[key[0]], self.Rev[key[1]]
+#         return None
+
+#     def advance(self, step):
+#         self.switch(step=step)
+#         try:
+#             next(self._loop)
+#         except StopIteration:
+#             self._loop = iter(self.items())
+#             _ = next(self._loop)
+
+#     def fwd(self):
+#         self.advance(+1)
+
+#     def bwd(self):
+#         self.advance(-1)
+
+
+# class CmapIter(LinkedArray):
+#     def __init__(self, *args, num=None, **kw):
+#         if not args:
+#             args = [None]
+
+#         # locallog.debug(f"{args=}")
+
+#         cmaps = [*args] + [k for k in mplib.colormaps.keys()
+#                                if not k.endswith(r'_r')]
+#         self._force = None
+
+#         if num is None:
+#             num = True
+#         if num is True:
+#             num = 10
+#         elif num is False:
+#             num = 0
+#         # locallog.debug(f"{cmaps[:10]=}")
+#         if num != 0:
+#             base = cmaps[:num]
+#         else:
+#             base = cmaps
+
+#         super().__init__(base=base, name='CMAP', **kw)
+
+#         self.reverse = False
+#         self.cmap = None
+#         self.cmap_r = None
+
+#         # cgrp = {}
+#         # for k, cm in mplib.colormaps.items():
+#         #     if k.endswith(r'_r'):
+#         #         continue
+#         #     g = type(cm)
+#         #     cgrp.setdefault(g, {})
+#         #     cgrp[g][k] = cm
+#         # ppr.pprint(cgrp)
+
+#         self._loop = iter(self.items())
+#         _ = next(self._loop)
+
+#     def put_or_get(self, cmap=None):
+#         if cmap is None:
+#             return self.value()
+#         return self.set_force(cmap or None)
+
+#     def _value(self, key=None):
+#         if key is None:
+#             key = self._current
+#         v = super()._value(key)
+#         # print(v, self._force)
+#         return self._force or v
+
+#     def set_force(self, cmap=None):
+#         return self.bind(cmap)
+
+#     def bind(self, cmap=None):
+#         self._force = cmap
+#         return cmap
+
+#     def toggle_reverse(self, switch=None):
+#         if switch is None:
+#             switch = True
+#             self.reverse = not self.reverse
+#         else:
+#             switch = bool(switch)
+#             switch = not (self.reverse is switch)
+#             self.reverse = switch
+
+#     def advance(self, step):
+#         self.switch(step=step)
+#         try:
+#             next(self._loop)
+#         except StopIteration:
+#             self._loop = iter(self.items())
+#             _ = next(self._loop)
+
+#     def fwd(self):
+#         self.set_force()
+#         self.switch(step=+1)
+#         try:
+#             next(self._loop)
+#         except StopIteration:
+#             self._loop = iter(self.items())
+#             _ = next(self._loop)
+
+#     def bwd(self):
+#         self.set_force()
+#         self.switch(step=-1)
+#         try:
+#             next(self._loop)
+#         except StopIteration:
+#             self._loop = iter(self.items())
+#             _ = next(self._loop)
+
+
+# class PlotParamsCore():
+#     """Base layer of plot options control."""
+
+#     def __init__(self, nml=None, **kwds):
+#         raise NotImplementedError
+
+#     def __call__(self, keys=None, **kwds):
+#         raise NotImplementedError
+
+#     def __getitem__(self, key):
+#         raise NotImplementedError
+
+
+class PlotParams():
+    """Plot options complex."""
+
+    def __init__(self, nml=None, **kwds):
+        nml = 'variable' if nml is None else nml
+        if not isinstance(nml, (tuple, list)):
+            nml = (nml, )
+        self.nml = {}
+        self.root = {}
+        self.cache = {}
+        for a, v in kwds.items():
+            if not isinstance(v, (tuple, list)):
+                v = v, None
+            self.root[a] = v[0]
+            self.nml[a] = nml if v[1] is None else v[1]
+            self.cache[a] = {}
+
+    def __call__(self, *args, **kwds):
+        params = {}
+        if args:
+            if args[0] in [True, False]:
+                d = args.pop(0)
+            else:
+                d = False
+        else:
+            d = False
+            args = self.root.keys()
+
+        if d:
+            args = [a for a in self.root.keys() if not a in args]
+        for a in args:
+            k = self.normalize(a, **kwds)
+            disp = self.get_disp(a, default=None, **kwds)
+            if disp is None:
+                disp = self.reg_disp(a, **kwds)
+            params[a] = disp.params(**kwds)
+
+        return params
+
+    def get_disp(self, arg, /, default=None, **kwds):
+        k = self.normalize(arg, **kwds)
+        return self.cache[arg].get(k, default)
+
+    def reg_disp(self, arg, **kwds):
+        disp = self.root[arg]()
+        k = self.normalize(arg, **kwds)
+        self.cache[arg][k] = disp
+        return disp
+
+    def normalize(self, arg, **kwds):
+        return 'default'
+
+
+class ParamsDispatcher():
+    def params(self, **kwds):
+        raise NotImplementedError
+
+
+class CmapStatus():
+    """cmap and norm placeholdere."""
+    def __init__(self, artist, reverse=None):
+        self.mixin = artist
+        self.norm = artist.norm
+        if reverse:
+            self.cmap_r = artist.get_cmap()
+            self.cmap = None
+        else:
+            self.cmap = artist.get_cmap()
+            self.cmap_r = None
+
+    def get_cmap(self, reverse=None):
+        reverse = bool(reverse)
+        if reverse:
+            if not self.cmap_r and self.cmap:
+                self.cmap_r = self.cmap.reversed()
+            if self.cmap_r is None:
+                locallog.info("cannot provide reversed cmap")
+                cm = self.cmap
+            else:
+                cm = self.cmap_r
+        else:
+            if not self.cmap and self.cmap_r:
+                self.cmap = self.cmap_r.reversed()
+            if self.cmap is None:
+                locallog.info("cannot provide cmap")
+                cm = self.cmap_r
+            else:
+                cm = self.cmap
+
+        return cm, self.norm
+
+    # def update_cmap(self, cm):
+    #     return self.mixin.set_cmap(cm)
+
+
+class CmapLink(LinkedArray, ParamsDispatcher):
+    serial = 0
+
+    def __init__(self, cmap=None, norm=None, reverse=None,
+                 num=None,
+                 method=None, levels=None, **kw):
+
+        # locallog.debug(f"{args=}")
+        self.method = method
+        self.levels = levels
+
+        if not isinstance(cmap, (tuple, list)):
+            cmap = [cmap]
+
+        cmap = list(cmap) + [k for k in mplib.colormaps.keys()
+                             if not k.endswith(r'_r')]
+        if num is None:
+            num = True
+        if num is True:
+            num = 10
+        elif num is False:
+            num = 0
+        # locallog.debug(f"{cmaps[:10]=}")
+        if num != 0:
+            cmap = cmap[:num]
+
+        # if norm is None:
+        #     norm = [None, 'log', ]
+        if not isinstance(norm, (tuple, list)):
+            norm = [norm]
+
+        self.reverse = bool(reverse)
+
+        self.cmaps = cmap
+        self.norms = norm
+        shape = (len(self.norms), len(self.cmaps))
+        # mask = False, False
+        # mask = None
+        mask = (True, False)
+        name = f"CMAP-{self.serial}"
+        super().__init__(base=None, key=shape, mask=mask, name=name, **kw)
+
+        self.serial = self.serial + 1
+
+        self._loop = None
+        self.var = 0
+        self.cache = {}
+        self._norm = None
+
+    def params(self, **kwds):
+        if not self._loop:
+            self.loop()
+        p = {}
+        cmap, norm = self.value()
+        locallog.debug(f"{self.reverse=} {norm} {cmap}")
+        if norm == 'log':
+            norm = mplib.colors.SymLogNorm(1.0e-10)
+
+        p['norm'] = norm
+        p['cmap'] = cmap
+        p['bind'] = self.bind
+        return p
+
+    def loop(self):
         self._loop = iter(self.items())
         _ = next(self._loop)
 
+    # def update(self, key):
+    #     """Dummy hook to update current status."""
+    #     locallog.debug(f"update: {key=}")
+
     def _value(self, key=None):
+        okey = key
         if key is None:
             key = self._current
-        if isinstance(key, tuple):
-            return self.Norms[key[0]], self.Rev[key[1]]
-        return None
+        # k = self.l2p(key)
+        k = self.l2i(key)
+        v = self.cache.get(k)
+        self.diag()
+        locallog.debug(f"[{okey}/{key}/{k}]={v}")
+        if self._norm:
+            locallog.debug(f"{self._norm.vmin}:{self._norm.vmax}")
+        if v is None:
+            n = self._norm or self.norms[k[0]]
+            c = self.cmaps[k[1]]
+            if self.reverse and c:
+                c = mplib.colormaps.get(c)
+                if c:
+                    c = c.reversed()
+        else:
+            c, n = v.get_cmap(self.reverse)
+        # elif isinstance(v, mplib.cm.ScalarMappable):
+        #     n = v.norm
+        #     # locallog.debug(f"<{n.vmin} {n.vmax}>")
+        #     # n = self.norm[k[0]]
+        #     # n.vmin, n.vmax = None, None
+        #     c = v.get_cmap()
+        # elif isinstance(v, tuple):
+        #     n, c = v
+        # else:
+        #     n = None
+        #     c = v
+        # ## n = mplib.colors.LogNorm()
+        return c, n
+        # v = super()._value(key)
+        # if v is None:
+        #     return self.l2p(key)
+        # if not isinstance(v, tuple):
+        #     v = (v, )
+        #     if self.switch >= len(v):
+        #         locallog.warning(f"no variation in cmap {self.switch}")
+        #     v = v[0]
+        # else:
+        #     v = v[self.switch]
+        # return v
+
+    def bind(self, *, key=None, artist=None, **kwds):
+        if key is None:
+            key = self._current
+        v = self.value(key)
+        locallog.debug(f"bind: [{key}]={v} {artist}")
+        self.cache[key] = CmapStatus(artist, self.reverse)
+
+    def transpose(self, switch=None, key=None):
+        if switch is None:
+            self.reverse = not bool(self.reverse)
+        else:
+            self.reverse = bool(switch)
+        # if key is None:
+        #     key = self._current
+        # _, c = self.value(key)
+        # k = self.l2p(key)
+        # v = self.cache.get(k)
+        # v.update_cmap(c)
+        return self.reverse
+    # def toggle_reverse(self, key=None, switch=None):
+    #     v = super()._value(key)
+    #     if v is None:
+    #         locallog.warning(f"cannot reverse current cmap.")
+    #         return
+
+    #     if switch is None:
+    #         self.switch = 1 - self.switch
+    #     else:
+    #         self.switch = 1 if switch else 0
+    #     jt = self.switch
+    #     if v[jt] is None:
+    #         jo = 1 - jt
+    #         cm = v[jo]
+    #         if isinstance(cm, mplib.cm.ScalarMappable):
+    #             cm = cm.get_cmap()
+    #             v[jo] = cm.reversed()
+    #         else:
+    #             raise ValueError(f"Panic in cmap reverse {cm=}.")
 
     def advance(self, step):
+        key = self._current
+        k = self.l2p(key)
+        v = self.cache.get(k)
+        if v is not None:
+            self._norm = v.norm
+
         self.switch(step=step)
         try:
-            next(self._loop)
+            v = next(self._loop)
         except StopIteration:
             self._loop = iter(self.items())
-            _ = next(self._loop)
+            v = next(self._loop)
+        return v
 
     def fwd(self):
-        self.advance(+1)
+        return self.advance(+1)
 
     def bwd(self):
-        self.advance(-1)
+        return self.advance(-1)
 
-
-class CmapIter(LinkedArray):
-    def __init__(self, *args, **kw):
-        if not args:
-            args = [None]
-
-        cmaps = [*args] + [k for k in mplib.colormaps.keys()
-                           if not k.endswith(r'_r')]
-        self._force = None
-        super().__init__(base=cmaps[:10], name='CMAP', **kw)
-
-        # cgrp = {}
-        # for k, cm in mplib.colormaps.items():
-        #     if k.endswith(r'_r'):
-        #         continue
-        #     g = type(cm)
-        #     cgrp.setdefault(g, {})
-        #     cgrp[g][k] = cm
-        # ppr.pprint(cgrp)
-
-        self._loop = iter(self.items())
-        _ = next(self._loop)
-
-    def put_or_get(self, cmap=None):
-        if cmap is None:
-            return self.value()
-        return self.set_force(cmap or None)
-
-    def set_force(self, cmap=None):
-        self._force = cmap
-
-    def _value(self, key=None):
-        v = super()._value(key)
-        print(v, self._force)
-        return self._force or v
-
-    def fwd(self):
-        self.set_force()
-        self.switch(step=+1)
+    def norm_advance(self, step):
+        self._norm = None
+        self.switch(step=step, mask=(False, True))
         try:
-            next(self._loop)
+            v = next(self._loop)
         except StopIteration:
             self._loop = iter(self.items())
-            _ = next(self._loop)
+            v = next(self._loop)
+        self.switch(mask=(True, False))
+        return v
 
-    def bwd(self):
-        self.set_force()
-        self.switch(step=-1)
-        try:
-            next(self._loop)
-        except StopIteration:
-            self._loop = iter(self.items())
-            _ = next(self._loop)
+    def norm_fwd(self):
+        return self.norm_advance(+1)
+
+    def norm_bwd(self):
+        return self.norm_advance(-1)
+
+# class CmapParams():
+#     """Base plot option for colormap."""
+
+#     def __init__(self, *args,
+#                  keys=None, cmap=None, levels=None,
+#                  norm=None, method=None,
+#                  **kwds):
+#         # super().__init__()
+#         self.root = CmapLink(cmap, norm, *args, **kwds)
+
+#         keys = 'variable' if keys is None else keys
+#         self.keys = keys
+
+#         # self.method = method
+#         # self.levels = levels
+#         # self.norm = norm
+
+#         self.cache = {}
+#         self.root.diag()
+
+#         # locallog.debug(f"{self.root.base=}")
+
+#     def nml_key(self, key):
+#         return 'default'
+
+#     def register(self, key=None):
+#         key = self.nml_key(key)
+#         if key not in self.cache:
+#             link = self.root.copy()
+#             self.cache[key] = link
+#             link.loop()
+#         return self.cache[key]
+
+#     def get_link(self, key=None, reg=None, **kwds):
+#         key = self.nml_key(key)
+#         link = self.cache.get(key, None)
+#         if link is None:
+#             reg = True if reg is None else reg
+#             if bool(reg):
+#                 link = self.register(key)
+#         return link
+
+#     #     if clink is None:
+#     #         reg = True if reg is None else reg
+
+#     # def toggle_reverse(self, key=None, switch=None):
+#     #     clink = self.get_link(key)
+#     #     if clink:
+#     #         return clink.toggle_reverse(switch)
+#     #     return None
+
+#     # def bind(self, artist, key=None):
+#     #     clink = self.get_link(key)
+#     #     if clink:
+#     #         return clink.bind(artist)
+#     #     return None
+
+#     # def params(self, dest=None, key=None, reg=None, **kwds):
+#     #     clink = self.get_link(key)
+#     #     if clink is None:
+#     #         reg = True if reg is None else reg
+#     #         if bool(reg):
+#     #             clink = self.register(key)
+#     #     locallog.debug(f"params: {self.cache=}")
+#     #     locallog.debug(f"params: {clink=}")
+#     #     locallog.debug(f"params: {key=}")
+#     #     if clink:
+#     #         cm = clink.value()
+#     #         print(cm)
+#     #     return None
+
+#     # def gen_cmap(self, cmap, rev):
+#     #     nm = None
+#     #     cm = cmap
+#     #     cm = mplib.colormaps.get(cm, cm)
+#     #     if isinstance(cm, mplib.cm.ScalarMappable):
+#     #         cm = cm.get_cmap()
+#     #         nm = cm.norm
+#     #     if rev:
+#     #         cm = cm.reversed()
+#     #     return cm, nm
+
+#     # def gen_levels(self, levels, data, **kwds):
+#     #     if levels in [True, None]:
+#     #         levels = None
+#     #     elif levels is False:
+#     #         pass
+#     #     elif isinstance(levels, list):
+#     #         pass
+#     #     elif isinstance(levels, cabc.Callable):
+#     #         vmin, vmax = self.get_range(data, **kwds)
+#     #         levels = levels(vmin, vmax)
+#     #     else:
+#     #         raise TypeError(f"invalid level specifier {levels}.")
+#     #     return levels
+
+#     # def get_range(self, data, vmin=None, vmax=None, **kwds):
+#     #     """Data range computation."""
+#     #     if vmin is None:
+#     #         vmin = data.attrs.get('vmin')
+#     #     if vmax is None:
+#     #         vmax = data.attrs.get('vmax')
+
+#     #     if vmin is None:
+#     #         vmin = data.min().values
+#     #     if vmax is None:
+#     #         vmax = data.max().values
+#     #     return vmin, vmax
+
+#     # def advance(self, key, step):
+#     #     pass
+#     #     # self.switch(step=step)
+#     #     # try:
+#     #     #     next(self._loop)
+#     #     # except StopIteration:
+#     #     #     self._loop = iter(self.items())
+#     #     #     _ = next(self._loop)
+
+#     # def fwd(self, key):
+#     #     self.advance(key, +1)
+
+#     # def bwd(self, key):
+#     #     self.advance(key, -1)
+
+# # class PlotParams(PlotParamsCore):
+# #     """Base plot option controler."""
+
+# #     def __init__(self, cmap=None, contour=None):
+# #         self.cmap = cmap
+# #         self.contour = contour
 
 
 class FigureInteractive(zplt.FigureCore, DataTree):
@@ -1365,6 +1847,8 @@ class FigureInteractive(zplt.FigureCore, DataTree):
 
         self.coll = None
         self.hooks = []
+
+        self.params = None      # plot parameter complex
 
     def connect(self, **handlers):
         for k, h in handlers.items():
@@ -1428,7 +1912,6 @@ class FigureInteractive(zplt.FigureCore, DataTree):
             if p:
                 self.pop_patch()
                 # self.diag_patches()
-        self.canvas.draw()
         return self._lock
 
     def is_locked(self):
@@ -1544,9 +2027,10 @@ class FigureControl():
     def __init__(self, pic, plot, root,
                  interactive=True,
                  figure=None, layout=None,
-                 cmap=None, norm=None, styles=None, draw=None,
-                 config=None, params=None):
-        self.parse_config(config, params)
+                 params=None,
+                 styles=None, draw=None,
+                 config=None, rc=None):
+        self.parse_config(config, rc)
 
         self.draw = draw or {}
         self.plot = plot
@@ -1565,8 +2049,7 @@ class FigureControl():
         self.output = None
         self._interactive = interactive
         self.styles = styles or {}
-        self.cmap = cmap
-        self.norm = norm
+        self.params = params
 
         self._cache_events = []
 
@@ -1650,10 +2133,9 @@ class FigureControl():
             except StopIteration:
                 raise StopIteration(f"\r({jfig}) no effective data.") from None
 
-        arr = stat[-1]
         try:
             print(f'\r({jfig}) drawing...', end='', flush=True)
-            artists = self.invoke(arr, fig, axs, prev)
+            artists = self.invoke(trees, stat, fig, axs, prev)
             # for a in artists:
             #     gid = a.get_gid()
             #     print(gid, a)
@@ -1676,8 +2158,7 @@ class FigureControl():
         while True:
             try:
                 trees, stat = fig.loop()
-                arr = stat[-1]
-                artists = self.invoke(arr, fig, axs)
+                artists = self.invoke(trees, stat, fig, axs)
                 self.savefig(fig, ref=n)
             except StopIteration:
                 break
@@ -1719,8 +2200,9 @@ class FigureControl():
     #     ani.save("movie.mp4")
     #     plt.show()
 
-    def invoke(self, arr, fig, axs, view=None):
+    def invoke(self, trees, stat, fig, axs, view=None):
         """Draw core."""
+        arr = stat[-1]
         src = fig.source_data()
         style = self.view_style(arr, src) or {}
         layout = {k: style.get(k) for k in ['projection', ]}
@@ -1728,16 +2210,33 @@ class FigureControl():
         view = fig.parse_view(arr, src, self.draw, **style)
         axs.reset(fig, body=layout)
         axs.cla(fig)
-        if locallog.is_debug():
-            for ch in fig.get_children():
-                gid = ch.get_gid()
-                locallog.debug(f"[{gid}]={ch}")
+        # if locallog.is_debug():
+        #     for ch in fig.get_children():
+        #         gid = ch.get_gid()
+        #         locallog.debug(f"[{gid}]={ch}")
         # fig.set_hook(self.prompt)
+        # params = self.params.get_link(key=trees, fig=fig, array=arr)
+        params = self.view_params(fig, src=src, array=arr)
+        # print(params.params())
         # locallog.info("invoke: before plot")
         # print(view, style)
-        r = self.plot(fig=fig, axs=axs, data=arr, view=view, body=style)
+        r = self.plot(fig=fig, axs=axs, data=arr,
+                      view=view, body=style, **params)
         # locallog.info(f"invoke: after plot")
         return r
+
+    def view_params(self, fig, *args, src=None, array=None, **kwds):
+        src = fig.source_data() if src is None else src
+        array = fig.draw_data() if array is None else array
+        params = self.params(*args, fig=fig, src=src, array=array, **kwds)
+        return params
+
+    def get_disp(self, arg, fig, src=None, array=None, default=None, **kwds):
+        src = fig.source_data() if src is None else src
+        array = fig.draw_data() if array is None else array
+        disp = self.params.get_disp(arg, fig=fig, src=src, array=array,
+                                    default=default, **kwds)
+        return disp
 
     def prompt(self, event):
         """Event handler"""
@@ -1824,6 +2323,13 @@ class FigureControl():
         else:
             locallog.warning(f"No output defined.")
 
+    def toggle_mark(self, fig, force=None):
+        """Toggle figure grouping."""
+        axs = self.figs[fig]
+        axs.toggle_guides(fig, False)
+        fig.toggle_lock(force)
+        fig.canvas.draw()
+
     def permute_anchor(self, fig, step):
         """Entry for anchor-coordinate permutation."""
         jfig = fig.number
@@ -1855,40 +2361,57 @@ class FigureControl():
 
     def resize(self, fig, figsize=None, ref=None):
         axs = self.figs[fig]
+        axs.toggle_guides(fig, False)
         axs.resize(fig, figsize=figsize, ref=ref)
         # fig.canvas.draw()
 
     def redraw(self, fig):
+        axs = self.figs[fig]
+        axs.toggle_guides(fig, False)
         fig.canvas.draw()
 
-    def toggle_cmap(self, fig, step=None):
+    def turn_cmap(self, fig, step=None):
         step = step or +1
-        if self.cmap:
+        disp = self.get_disp('color', fig)
+        if disp:
             if step > 0:
-                self.cmap.fwd()
+                cmap = disp.fwd()
             else:
-                self.cmap.bwd()
-            cmap = self.cmap.value()
-            self.interactive(fig, step=False, msg=f'colormap: {cmap}')
+                cmap = disp.bwd()
+            self.interactive(fig, step=False, msg=f'colormap:{cmap}')
+        # if self.cmap:
+        #     if step > 0:
+        #         self.cmap.fwd()
+        #     else:
+        #         self.cmap.bwd()
+        #     cmap = self.cmap.value()
+        #     self.interactive(fig, step=False, msg=f'colormap: {cmap}')
 
-    def toggle_norm(self, fig, step=None):
+    def turn_norm(self, fig, step=None):
         step = step or +1
-        self.norm.advance(step)
-        norm = self.norm.value()
-        # self.cmap.set_force('viridis')
-        cmap = self.cmap.value()
-        if norm:
-            norm, revc = norm
-            norm = norm or ''
-            norm = [f"{norm}"]
-            if revc:
-                norm = norm + ["reversed"]
-        else:
-            norm = []
-        norm = ','.join(norm)
-        if norm:
-            norm = f'[{norm}]'
-        self.interactive(fig, step=False, msg=f'colormap: {cmap}{norm}')
+        disp = self.get_disp('color', fig)
+        if disp:
+            if step > 0:
+                cmap = disp.norm_fwd()
+            else:
+                cmap = disp.norm_bwd()
+            self.interactive(fig, step=False, msg=f'colormap:{cmap}')
+        # self.norm.advance(step)
+        # norm = self.norm.value()
+        # # self.cmap.set_force('viridis')
+        # cmap = self.cmap.value()
+        # if norm:
+        #     norm, revc = norm
+        #     norm = norm or ''
+        #     norm = [f"{norm}"]
+        #     if revc:
+        #         norm = norm + ["reversed"]
+        # else:
+        #     norm = []
+        # norm = ','.join(norm)
+        # if norm:
+        #     norm = f'[{norm}]'
+        # self.interactive(fig, step=False, msg=f'colormap: {cmap}{norm}')
 
     def _toggle_visible(self, fig):
         axs = self.figs[fig]
@@ -1897,9 +2420,15 @@ class FigureControl():
 
     def toggle_axis(self, fig, which, ax=None):
         axs = self.figs[fig]
-        axs.toggle_guides(fig, False)
-        axs.toggle_axis(which, ax=ax)
-        fig.canvas.draw()
+        if ax in ['colorbar', ]:
+            disp = self.get_disp('color', fig)
+            if disp:
+                disp.transpose()
+            self.interactive(fig, step=False, msg='transpose colormap')
+        else:
+            axs.toggle_guides(fig, False)
+            axs.toggle_axis(which, ax=ax)
+            fig.canvas.draw()
 
     def entire_view(self, fig):
         """Entire view mode."""
@@ -1941,6 +2470,25 @@ class FigureControl():
 
         return nfig
 
+    def diag_childlen(self, fig):
+        jfig = fig.number
+        CH = []
+        for ch in fig.get_children():
+            gid = ch.get_gid()
+            CH.append(f"({jfig}) [{gid}]={ch}")
+        for ch in sorted(CH):
+            locallog.debug(ch)
+
+    def show_info(self, fig):
+        jfig = fig.number
+        fig.info(pfx=f'\r({jfig}) info: ')
+        if locallog.is_debug():
+            self.diag_childlen(fig)
+            axs = self.figs[fig]
+            for ax, bg in axs.bg.items():
+                gid = ax.get_gid() or ax
+                print(f"bg[{gid}]={bg}")
+
     def mouse_handler(self, event, fig, axs, lab, cmd, sub, aux=None):
         """Mouse event handler core."""
         wlock = fig.canvas.widgetlock.locked()
@@ -1963,12 +2511,12 @@ class FigureControl():
             if lab == 'axis':
                 self.switch_draw(fig, aux, +1)
             elif lab == 'colorbar' and not wlock:
-                self.map_figures(self.toggle_cmap, fig, step=+1)
+                self.map_figures(self.turn_cmap, fig, step=+1)
         elif cmd == 'prev_cyclic':
             if lab == 'axis':
                 self.switch_draw(fig, aux, -1)
             elif lab == 'colorbar'  and not wlock:
-                self.map_figures(self.toggle_cmap, fig, step=-1)
+                self.map_figures(self.turn_cmap, fig, step=-1)
         elif cmd == 'transpose':
             if lab == 'axis':
                 self.map_figures(self.transpose, fig)
@@ -1977,7 +2525,7 @@ class FigureControl():
                                  ax=aux[0], which=aux[1])
         elif cmd == 'next_norm':
             if lab == 'colorbar' and not wlock:
-                self.map_figures(self.toggle_norm, fig, step=+1)
+                self.map_figures(self.turn_norm, fig, step=+1)
 
         # print()
         # ax = event.inaxes
@@ -2043,21 +2591,23 @@ class FigureControl():
                     self.map_figures(self.permute_anchor, fig, 0)
             elif cmd == 'info':
                 if hseq:
-                    jfig = fig.number
-                    fig.info(pfx=f'\r({jfig}) info: ')
+                    self.show_info(fig)
+                    # jfig = fig.number
+                    # fig.info(pfx=f'\r({jfig}) info: ')
                 else:
                     for fig in self.figs:
-                        jfig = fig.number
-                        fig.info(pfx=f'\r({jfig}) info: ')
+                        self.show_info(fig)
+                        # jfig = fig.number
+                        # fig.info(pfx=f'\r({jfig}) info: ')
             elif cmd == 'mark':
                 if hseq:
-                    fig.toggle_lock()
+                    self.toggle_mark(fig)
                 else:
                     for fig in self.figs:
-                        fig.toggle_lock()
+                        self.toggle_mark(fig)
             elif cmd == 'unmark':
                 for fig in self.figs:
-                    fig.toggle_lock(force=False)
+                    self.toggle_mark(fig, force=False)
             elif cmd == 'transpose':
                 self.map_figures(self.transpose, fig)
             elif cmd == 'enlarge':
@@ -2070,10 +2620,10 @@ class FigureControl():
                 self.map_figures(self.resize, fig, True, ref=False)
             elif cmd == 'print':
                 self.map_figures(self.savefig, fig)
-            elif cmd == 'toggle_cmap':
-                self.map_figures(self.toggle_cmap, fig)
-            elif cmd == 'toggle_norm':
-                self.map_figures(self.toggle_norm, fig)
+            elif cmd == 'turn_cmap':
+                self.map_figures(self.turn_cmap, fig)
+            # elif cmd == 'toggle_norm':
+            #     self.map_figures(self.toggle_norm, fig)
             elif cmd == 'toggle_horizontal':
                 self.map_figures(self.toggle_axis, fig, 'h')
             elif cmd == 'toggle_vertical':
@@ -2261,11 +2811,12 @@ class FigureControl():
         body = lab[1]
         dpos = axs.position_transform(event.x, event.y, ax=body)
         axs.draw_guide(fig, event.inaxes, event.xdata, event.ydata, pos=dpos)
-        axs.draw_guide(fig, body, *dpos)
         fmt = r'{:.2f}'
         if lab[2] in ['left', 'right']:
+            axs.draw_guide(fig, body, None, dpos[1])
             text = 'y=' + (fmt.format(dpos[1]))
         else:
+            axs.draw_guide(fig, body, dpos[0], None)
             text = 'x=' + (fmt.format(dpos[0]))
         axs.monitor(fig, text)
 
@@ -2312,8 +2863,10 @@ class FigureControl():
         #     stf = '/'.join(stf.parts[-2:])
         #     print(f"{stf}:{st.lineno}:{st.function}: {st.code_context[0]}", end='')
         # print('-' * 20)
-        # locallog.info(f'on_draw {event}')
+        locallog.info(f'on_draw {event}')
+        self.diag_childlen(fig)
         axs.on_draw(fig)
+        # self.diag_childlen(fig)
         # for ax in fig.get_children():
         #     gid = ax.get_gid()
         #     if gid == 'body':
@@ -2404,7 +2957,7 @@ class FigureControl():
         #         self.point_selection(fig, axs, lab, cmds[1:], event,
         #                              anchor=True)
 
-    def parse_config(self, config, params):
+    def parse_config(self, config, rcparams):
         config = config or {}
         verbose = config.get('verbose', 0)
         self.kmap = self.parse_keymap({}, config.get('keymap', {}))
@@ -2416,12 +2969,13 @@ class FigureControl():
         self.opts = config.get('option', {})
         self.opts['resize_step'] = self.opts.get('resize_step') or 0.25
 
-        if params:
-            for k in params.find_all(r'^keymap\.*'):
-                for p in params[k]:
+        if rcparams:
+            for k in rcparams.find_all(r'^keymap\.*'):
+                for p in rcparams[k]:
                     if p in self.kmap:
-                        locallog.warning(f"Remove default keymap for <{p}> from {k}.")
-                        params[k].remove(p)
+                        locallog.warning(f"Remove default keymap for <{p}>"
+                                         f" from {k}.")
+                        rcparams[k].remove(p)
 
     def parse_keymap(self, kmap, config, group=()):
         for f, c in config.items():

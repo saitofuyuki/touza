@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/12/10 17:55:27 fuyuki plot.py>
+# Time-stamp: <2024/12/23 10:15:06 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -16,6 +16,7 @@ import sys
 import collections.abc as cabc
 import numbers as nums
 import pprint as ppr
+import logging
 
 import numpy as np
 
@@ -48,6 +49,55 @@ _ConfigType = zcfg.ConfigRigid
 def is_xr(obj):
     """Check if obj is DataArray instance"""
     return isinstance(obj, xr.DataArray)
+
+
+class VarLevelsCore():
+    """Base layer of cmap/contour-levels control."""
+
+    nimsg = r"VarLevelsCore.{}() not implemented."
+
+    def _raise(self, name):
+        msg = f"VarLevelsCore.{name}() not implemented."
+        raise NotImplementedError(msg)
+
+    def get_cmap(self, *args, **kwds):
+        """Dummy method to retrieve current cmap"""
+        self._raise('get_cmap')
+
+    def put_cmap(self, *args, **kwds):
+        """Dummy method to register current cmap"""
+        self._raise('put_cmap')
+
+    def get_contour(self, *args, **kwds):
+        """Dummy method to retrieve current contour levels"""
+        self._raise('get_contour')
+
+    def put_contour(self, *args, **kwds):
+        """Dummy method to register current contour levels"""
+        self._raise('put_contour')
+
+
+class VarLevelsMinimum(VarLevelsCore):
+    """Minimum Cmap Controler to get a constant map."""
+
+    def __init__(self, cmap=None, contour=None):
+        self.cmap = cmap
+        self.contour = contour
+
+    def put_cmap(self, *args, **kwds):
+        pass
+
+    def put_contour(self, *args, **kwds):
+        pass
+
+    def get_cmap(self, *args, **kwds):
+        if isinstance(self.cmap, cabc.Callable):
+            return self.cmap()
+        return self.cmap
+
+    def get_contour(self, *args, **kwds):
+        return self.contour
+
 
 # ### Picture
 
@@ -191,9 +241,12 @@ class LegacyParser(ParserBase):
         sel = ' '.join(sel)
         return sel
 
-    def parse_titles(self, attrs, coords, default=None):
+    def parse_titles(self, data, default=None):
         """Parse basic title properties.
         Return a tuple of (title, unit, others). """
+
+        attrs = data.attrs
+        coords = data.coords
 
         size = 3
         if isinstance(default, tuple):
@@ -206,6 +259,8 @@ class LegacyParser(ParserBase):
             raise ValueError(f"invalid argument: {default=}")
 
         title, units = self.extract_titles(attrs)
+        title = title or data.name
+
         item = attrs.get('ITEM', None)
         ettl = zu.join_attrs(attrs, 'ETTL', sep='', strip=True)
         # ## hack
@@ -329,7 +384,11 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
     geometry = None
     gunit = 0.0
 
-    def __init__(self, fig, figsize=None, **kwds):
+    guide_ = {'color': 'red',
+              'alpha': 0.5,
+              'linewidth': 10.0 }
+
+    def __init__(self, fig, figsize=None, reset=None, **kwds):
         # _axes stores arguments to create axes.
         # Once created, it stores generated axes instance.
         self._axes = {}
@@ -343,6 +402,11 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         # self.crs = {}
         self.projp = {}   # projection properites == (crs, transform)
         self.bg = {}
+        self.fragiles = []
+        self.guides = {}
+        reset = True if reset is None else reset
+        if bool(reset):
+            self.reset(fig)
 
     def _iter_axes(self):
         try:
@@ -479,7 +543,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             else:
                 if axkw is True:
                     axkw = None
-                axkw = dict(rect=rect) | (axkw or {})
+                axkw = {'rect': rect} | (axkw or {})
                 ax = self.scan_or_new(fig, lab, ax_args, **axkw)
             self[lab] = self.tweak_axes(ax, lab)
 
@@ -516,7 +580,8 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             ax.set_visible(True)
         return ax
 
-    def cla(self, axs=None):
+    def cla(self, fig, axs=None, fragiles=None):
+        self.cla_fragiles(fig, fragiles)
         if axs is None:
             axs = self.keys()
         elif isinstance(axs, list):
@@ -531,6 +596,77 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 lab = ax.get_label()
                 # caution,  kept.
                 _ = self.tweak_axes(ax, lab)
+
+    def cla_fragiles(self, fig, axs=None):
+        # if axs is None:
+        #     self.guides = {}
+        if axs is None:
+            axs = self.fragiles[:]
+        elif isinstance(axs, list):
+            pass
+        else:
+            axs = [axs]
+        for ax in axs:
+            if ax in self.fragiles:
+                fig.delaxes(ax)
+                self.fragiles.remove(ax)
+
+
+    # def cla_guides(self, axs=None):
+    #     # if axs is None:
+    #     #     self.guides = {}
+    #     if axs is None:
+    #         axs = list(self.guides.keys())
+    #     elif isinstance(axs, list):
+    #         pass
+    #     else:
+    #         axs = [axs]
+    #     for ax in axs:
+    #         at = self.guides.get(ax)
+    #         if at:
+    #             _, at = at
+    #             at.set_visible(False)
+    #         del(self.guides[ax])
+    #         fig = ax.figure
+    #         fig.delaxes(ax)
+
+    def toggle_guides(self, fig, switch=None):
+        if bool(switch):
+            pass
+        else:
+            for ax in self.guides.keys():
+                self.clear_guide(fig, ax)
+        # switch = bool(switch)
+        # for ax in self.guides.keys():
+        #     # print('clear:', ax.get_gid())
+        #     ax = self._get_axes(ax)
+        #     at = self.guides.get(ax) or [None]
+        #     for g in at:
+        #         if g:
+        #             g.set_visible(switch)
+
+    def add_guides(self, ax, which=None, visible=None, **kwds):
+        ax = self._get_axes(ax)
+        if ax:
+            # bg = fig.canvas.copy_from_bbox(ax.bbox)
+            # self.bg[ax] = bg
+            # print(ax.get_lines())
+            if which is None:
+                which = ['x', 'y']
+            elif isinstance(which, (list, tuple, str)):
+                pass
+            else:
+                which = [which]
+            g = [None] * 2
+            for w in which:
+                if w == 'x':
+                    at = ax.axvline(x=0, **kwds)
+                    g[0] = at
+                else:
+                    at = ax.axhline(y=0, **kwds)
+                    g[1] = at
+                at.set_visible(bool(visible))
+            self.guides[ax] = g
 
     def get_position(self, x, y, ax=None, crs=None):
         """Get position on data coordinates"""
@@ -624,6 +760,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         ax = self._get_axes(ax)
         artists = artists or []
         if ax:
+            locallog.debug(f"{args=} {kwds=}")
             if is_xr(data):
                 cp = method(ax=ax, *args, **kwds)
             else:
@@ -637,6 +774,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         """Wrap figure.colorbar()"""
         cax = self._get_axes(cax)
         artists = artists or []
+        locallog.debug(f"colorbar: {args} {kwds}")
         bar = fig.colorbar(*args, cax=cax, **kwds)
         artists.extend([bar, cax, ])
         return artists
@@ -708,6 +846,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
     def set_geo_view(self, data, ax=None, artists=None,
                      x=None, y=None,
                      crs=None, extent=None, **kwds):
+        print(f"{extent=}")
         artists = artists or []
         if not ax:
             return artists
@@ -724,6 +863,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         view_x = kwds.get(x) or {}
         view_y = kwds.get(y) or {}
 
+        print(f"{view_x=} {view_y=}")
         if x in data.coords and y in data.coords:
             try:
                 self.set_lon_view(ax, xc, crs, **view_x)
@@ -836,176 +976,181 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                     artists.append(ax.add_feature(ft))
         return artists
 
-    def set_picks(self, ax=None, preg=None, **kwds):
-        """Set pick region."""
-        # print(f'set_picks: {ax}')
+    def add_aux_axes(self, fig, ax, which, tol=None, **kwds):
+        """Introduce auxiliary axes, such as axis and spine."""
         ax = self._get_axes(ax)
-        preg = preg or {}
-        if ax:
-            lab = ax.get_label()
-            if lab in self.prop('graph'):
-                preg = self.set_axis_picks(ax, 'x', preg=preg, **kwds)
-                preg = self.set_axis_picks(ax, 'y', preg=preg, **kwds)
-        return preg
-
-    def set_axis_picks(self, ax, which, preg=None, tol=None):
-        if which not in ['x', 'y']:
-            raise ValueError(f'Panic.  Invalid argument {which}')
-
-        fig = ax.figure
-        inv = fig.transFigure.inverted()
-        preg = preg or {}
-        if tol is None:
-            tol = 5.0
-
-        def bounds(bb, other=None):
-            cond = 'y' if bool(other) else 'x'
-            try:
-                if which == cond:
-                    return bb.ymin, bb.ymax    # intentional
-                return bb.xmin, bb.xmax
-            except AttributeError:
-                return None
-
-        def reset(bb, other):
-            if which == 'x':
-                # intentional
-                return (other[0], bb[0], other[1], bb[1])
-            return (bb[0], other[0], bb[1], other[1])
-
-        def extent(obj, other=None):
-            return bounds(obj.get_window_extent(), other)
-
-        def tightbbox(obj, other=None):
-            return bounds(obj.get_tightbbox(), other)
-
-        gid = ax.get_gid()
-
-        # print(ax.get_tightbbox())
-        # print(ax.get_window_extent())
-
-        tbody = tightbbox(ax)
-        xbody = extent(ax)
-
         if which == 'x':
             axis = ax.xaxis
-        else:
-            axis = ax.yaxis
-
-        xt = axis.get_label()
-        txt = xt.get_text()
-        xlabel = list(extent(xt))
-        wlabel = extent(xt, other=True)
-        wlabel = (wlabel[0] - tol,  wlabel[1] + tol)
-
-        taxis = tightbbox(axis)
-        waxis = tightbbox(axis, other=True)
-
-        locallog.debug(f"{gid} {which}: {xlabel=} {wlabel=} {taxis=} {waxis=}")
-
-        if which == 'x':
             skeys = ['top', 'bottom']
-        else:
+            other = 'y'
+        elif which == 'y':
+            axis = ax.yaxis
             skeys = ['left', 'right']
-
-        ## detect spine with axis label (just choose the closest)
-        if taxis:
-            aorg = taxis[1] + taxis[0]
-            dist = []
-            for k, sp in ax.spines.items():
-                xsp = extent(sp)
-                sorg = xsp[1] + xsp[0]
-                dist.append((abs(aorg - sorg), k))
-            _, aspine = min(dist)
-            if aspine not in skeys:
-                skeys.insert(aspine, 0)
+            other = 'x'
         else:
-            aspine = None
+            raise ValueError(f'Panic.  Invalid argument {which}')
 
-        def is_finite(bb):
-            return bb[0] != bb[2] and bb[1] != bb[3]
+        # tol = 20.0
+        if tol is None:
+            tol = 10.0
+
+        lab = ax.get_label()
+        gid = ax.get_gid()
+
+        txt = axis.get_label()
+        xlabel = list(self.extent(txt, which))
+        wlabel = self.extent(txt, other, ext=tol)
+        locallog.debug(f"{lab}/{which} <{txt.get_text()}> {xlabel=} {wlabel=}")
+
+        if txt.get_text():
+            taxis = self.tightbbox(axis, which)
+            waxis = self.tightbbox(axis, other)
+            aspine = self.search_labeled_spine(taxis, ax, which)
+        else:
+            taxis = None
+            waxis = None
+            aspine = None
+        locallog.debug(f"{lab}/{which} {aspine=} {taxis=} {waxis=}")
+        if aspine and aspine not in skeys:
+            skeys.insert(aspine, 0)
+
+        xbody = self.extent(ax, which)
+
+        gprop = self.prop('guide') or {}
 
         for k in skeys:
             sp = ax.spines[k]
-            xspine = list(extent(sp))
-            wspine = list(extent(sp, other=True))
+            xspine = list(self.extent(sp, which))
+            wspine = list(self.extent(sp, other))
+
+            xspine = self.adjust_spine_bb(xspine, xbody, xlabel)
+            locallog.debug(f"{lab}/{which} <{k}> {xspine=}")
+
+            sax = self.register_bg(fig, xspine, wspine, which,
+                                   ('spine', gid, k), zorder=-2)
+            if sax:
+                if which == 'x':
+                    at = sax.axvline(x=0, **gprop)
+                    self.guides[sax] = (at, None)
+                else:
+                    at = sax.axhline(y=0, **gprop)
+                    self.guides[sax] = (None, at)
+                at.set_visible(False)
 
             if aspine == k:
-                # LABEL SPINE
-                if xspine[1] > xlabel[1]:
-                    xspine[0] = min(xspine[0], xlabel[1])
-                    xlabel[1] = xspine[0]
-                    xlabel[0] = xlabel[0] - tol
-                # SPINE LABEL
-                elif xspine[0] < xlabel[0]:
-                    xspine[1] = max(xspine[1], xlabel[0])
-                    xlabel[0] = xspine[1]
-                    xlabel[1] = xlabel[0] + tol
-                xlabel = reset(xlabel, wlabel)
-                if is_finite(xlabel):
-                    pk = 'axis', gid, k
-                    preg[pk] = mtr.Bbox.from_extents(*xlabel)
+                xlabel[1] = max(xlabel[1] + tol, xspine[0])
+                xlabel[0] = min(xlabel[0] - tol, xspine[1])
+                locallog.debug(f"{lab}/{which} <{k}> {xlabel=}")
+                self.register_bg(fig, xlabel, wlabel, which,
+                                 ('axis', gid, k), zorder=-1)
 
-            if xspine[1] > xbody[1]:
-                xspine[0] = max(xspine[0], xbody[1])
-            elif xspine[0] < xbody[0]:
-                xspine[1] = min(xspine[1], xbody[0])
+    def register_bg(self, fig, bbw, bbo, which, key, gid=None, **kwds):
+        if gid is None:
+            gid = key
+        if which == 'x':
+            bb = (bbo[0], bbw[0], bbo[1], bbw[1])
+        else:
+            bb = (bbw[0], bbo[0], bbw[1], bbo[1])
+        if bb[0] != bb[2] and bb[1] != bb[3]:
+            reg = mtr.Bbox.from_extents(*bb)
+            inv = fig.transFigure.inverted()
+            fbb = reg.transformed(inv)
+            ax = fig.add_axes(fbb)
+            self.fragiles.append(ax)
+            ax.set_axis_off()
+            ax.add_artist(ax.patch)
+            ax.set_gid(gid)
+            ax.set(**kwds)
+            bg = fig.canvas.copy_from_bbox(ax.bbox)
+            self.bg[ax] = bg
+        else:
+            ax = None
+        return ax
 
-            if aspine == k and waxis:
-                wspine[0] = min(wspine[0], waxis[0])
-                wspine[1] = max(wspine[1], waxis[1])
-            xspine = reset(xspine, wspine)
-            locallog.debug(f"{gid} {which}: {k} {xspine=}")
-            if is_finite(xspine):
-                pk = 'spine', gid, k
-                preg[pk] = mtr.Bbox.from_extents(*xspine)
-                locallog.debug(f"{gid} {which}: {xbody=} {tbody=}")
+    def search_labeled_spine(self, bb, ax, which):
+        if bb:
+            aorg = bb[1] + bb[0]
+            dist = []
+            for k, sp in ax.spines.items():
+                xsp = self.extent(sp, which)
+                sorg = xsp[1] + xsp[0]
+                dist.append((abs(aorg - sorg), k))
+            _, spine = min(dist)
+        else:
+            spine = None
+        return spine
 
-                # rect = mpatches.Rectangle((xspine[0], xspine[1]),
-                #                           xspine[2] - xspine[0],
-                #                           xspine[3] - xspine[1],
-                #                           transform=None,
-                #                           facecolor='red',
-                #                           alpha=0.25)
-                # print(rect)
-                # fig.add_artist(rect)
+    def adjust_spine_bb(self, spine, body, label=None, rate=None):
+        rate = 0.5 if rate is None else rate
+        # rate = 1 if rate is None else rate
+        if label:
+            # LABEL SPINE
+            if spine[1] > label[1]:
+                end = min(spine[0], label[1])
+                spine[0] = spine[0] + (end - spine[0]) * rate
+            # SPINE LABEL
+            elif spine[0] < label[0]:
+                end = max(spine[1], label[0])
+                spine[1] = spine[1] + (end - spine[1]) * rate
 
-                # ff = inv.transform(preg[pk])
-                # print(preg[pk], ff)
-                # # aline = mplib.lines.Line2D([ff[0][0], ff[1][0]],
-                # #                            [ff[0][1], ff[1][1]])
-                # # print(aline)
-                # # fig.add_artist(aline)
+        if spine[1] > body[1]:
+            spine[0] = max(spine[0], body[1])
+        elif spine[0] < body[0]:
+            spine[1] = min(spine[1], body[0])
 
-                # rect = mpatches.Rectangle(ff[0], *(ff[1]-ff[0]),
-                #                           facecolor='red',
-                #                           alpha=0.25)
-                # # rect = mpatches.Rectangle((xspine[0], xspine[1]),
-                # #                           xspine[2] - xspine[0],
-                # #                           xspine[3] - xspine[1],
-                # #                           transform=fig.dpi_scale_trans.inverted(),
-                # #                           # transform=inv,
-                # #                           facecolor='red',
-                # #                           alpha=0.25)
-                # print(rect)
-                # fig.add_artist(rect)
+        return spine
 
-                fbb = preg[pk].transformed(inv)
-                pax = fig.add_axes(fbb)
-                pax.set_axis_off()
-                pax.add_artist(pax.patch)
-                pax.set(zorder=-1)
-                bg = fig.canvas.copy_from_bbox(pax.bbox)
-                self.bg[pax] = bg
+    def bounds(self, bb, which, ext=None):
+        try:
+            if which == 'x':
+                bb = bb.ymin, bb.ymax    # intentional
+            else:
+                bb = bb.xmin, bb.xmax
+        except AttributeError:
+            return None
+        if isinstance(ext, tuple):
+            bb = bb[0] + ext[0], bb[1] + ext[1]
+        elif isinstance(ext, (int, float)):
+            bb = bb[0] - ext, bb[1] + ext
+        return bb
 
-                # self.tweak_axes(pax, pk)
-                # locallog.debug(f"{gid} {which}: {fbb}")
+    def extent(self, obj, which, ext=None):
+        return self.bounds(obj.get_window_extent(), which, ext)
 
-        locallog.debug(f"{gid} {which}: {xbody=} {tbody=}")
-        locallog.debug(f"{gid} {which}: {taxis=}")
-        locallog.debug(f"{gid} {which}: {xlabel=}")
+    def tightbbox(self, obj, which, ext=None):
+        return self.bounds(obj.get_tightbbox(), which, ext)
 
-        return preg
+    def clear_guide(self, fig, ax):
+        ax = self._get_axes(ax)
+        bg = self.bg.get(ax)
+        at = self.guides.get(ax) or [None]
+        for g in at:
+            if g:
+                g.set_visible(False)
+        if bg:
+            fig.canvas.restore_region(bg)
+            fig.canvas.blit(ax.bbox)
+
+    def draw_guide(self, fig, ax, x=None, y=None, pos=None, **kwds):
+        ax = self._get_axes(ax)
+        at = self.guides.get(ax)
+
+        # locallog.debug(f"{ax=} {at=}")
+        # print(ax.get_lines())
+        if at:
+            xg, yg = at
+            bg = self.bg.get(ax)
+            if bg:
+                fig.canvas.restore_region(bg)
+            if xg and x is not None:
+                xg.set_xdata([x])
+                xg.set_visible(True)
+                ax.draw_artist(xg)
+            if yg and y is not None:
+                yg.set_ydata([y])
+                yg.set_visible(True)
+                ax.draw_artist(yg)
+            fig.canvas.blit(ax.bbox)
 
     def add_titles(self, *args,
                    ax=None, artists=None, **kwds):
@@ -1021,10 +1166,13 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
     def toggle_axis(self, which, ax=None):
         ax = self._get_axes(ax)
         if ax:
-            if which.lower() in ['x', 'h', ]:
+            which = which.lower()
+            if which in ['x', 'h', 'bottom', 'top', ]:
                 f = ax.xaxis
-            else:
+            elif which in ['y', 'v', 'left', 'right', ]:
                 f = ax.yaxis
+            else:
+                raise ValueError(f"invalid axis target {which}.")
             f.set_inverted(not f.get_inverted())
         return ax
 
@@ -1048,25 +1196,18 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             return ax.findobj(*args, **kwds)
         return None
 
-    def retrieve_event(self, event, tol=None):
+    def retrieve_event(self, event):
         """Get axes label corresponding to event."""
         ax = event.inaxes
         if ax:
             for lab, a in self.items():
                 if a == ax:
                     return lab
-        else:
-            px, py = event.x, event.y
-            if not self.picks:
-                preg = {}
-                for lab in self.keys():
-                    # locallog.debug(f'retrieve: {lab}')
-                    preg = self.set_picks(ax=lab, preg=preg, tol=tol)
-                self.picks = preg
-            for lab, bb in self.picks.items():
-                if bb.contains(px, py):
-                # if bb[0] <= px <= bb[2] and bb[1] <= py <= bb[3]:
-                    return lab
+            else:
+                gid = ax.get_gid()
+                if gid:
+                    return gid
+                return ax
         return None
 
 
@@ -1075,7 +1216,8 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
 
     _config = False
 
-    names = ('Legacy3', )    # no dependency
+    # names = ('Legacy3', ) + LayoutBase.names
+    names = ('Legacy3', )   # no dependency
 
     geometry = (10.45, 7.39)
     gunit = 1.0 / 128
@@ -1093,7 +1235,8 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
 
     colorbar_ = {'major': {'bottom': True, 'length': 10.8,
                            'width': 1.0, 'pad': 5.8, 'labelsize': 14.0, },
-                 'minor': False, }
+                 'minor': False,
+                 'guide': {'color': True, 'alpha': 1.0, 'linewidth': 20.0 }, }
 
     _title_text = {'linespacing': 1.3, 'fontsize': 14.0, }
     _contour_text = {'fontsize': 12.0, }
@@ -1124,9 +1267,6 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
         super().__init__(*args, **kwds)
         self.bg = {}
 
-        self.picks = {}
-        # self.pbg = {}
-
     def tweak_axes(self, ax, lab, attr=None):
         """Tweaking of axes at creation."""
         if attr is None:
@@ -1138,7 +1278,8 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
             ax.set_axis_off()
             ax.add_artist(ax.patch)
             if isinstance(lab, str) and lab.endswith('_title'):
-                ax.set(zorder=-1)
+                ax.set(zorder=-3)
+        gprop = self.prop('guide') or {}
         if lab in self.prop('graph'):
             if lab == 'body':
                 for axis in [ax.xaxis, ax.yaxis]:
@@ -1148,6 +1289,7 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
                         a = attr.get(m) or {}
                         axis.set_tick_params(which=m, **a)
                     axis.set_gid(gid)
+                self.add_guides(ax, 'xy', **gprop)
             elif lab == 'colorbar':
                 for m in ['major', 'minor']:
                     ax.tick_params(which=m, **(attr.get(m) or {}))
@@ -1166,12 +1308,12 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
         #             va='top', ha='left', color='red')
         return ax
 
-    def cla(self, axs=None):
+    def cla(self, fig, axs=None):
         # if axs is None:
         #     axs = list(self.keys())
         #     axs.remove('monitor')
         # print(axs)
-        super().cla(axs)
+        super().cla(fig, axs)
 
     def which(self, func, ax=None):
         ax = ax or 'body'
@@ -1219,10 +1361,6 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
     def set_view(self, *args, ax=None, **kwds):
         ax = ax or 'body'
         return super().set_view(*args, ax=ax, **kwds)
-
-    def set_picks(self, *args, ax=None, **kwds):
-        ax = ax or 'body'
-        return super().set_picks(*args, ax=ax, **kwds)
 
     def add_features(self, /, *args, ax=None, **kwds):
         ax = ax or 'body'
@@ -1303,7 +1441,7 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
         title = kwds.pop('title')
         title = zu.set_default(title, True)
         if title is True:
-            title = self.parse_titles(data.attrs, data.coords, default='')
+            title = self.parse_titles(data, default='')
         if isinstance(title, (list, tuple)):
             title = '\n'.join(str(s) for s in title)
         if title:
@@ -1354,8 +1492,20 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
 
     def on_draw(self, fig, ax=None, **kwds):
         self.bg = {}
-        self.picks = {}
-        # self.pbg = {}
+        self.cla_fragiles(fig)
+        # locallog.info(f'on_draw')
+        # if self.skip_fragiles:
+        #     self.skip_fragiles = False
+        # else:
+        for lab in self.keys():
+            ax = self._get_axes(lab)
+            if isinstance(ax, cmgeo.GeoAxes):
+                continue
+            if lab in self.prop('graph'):
+                self.add_aux_axes(fig, lab, 'x', **kwds)
+                self.add_aux_axes(fig, lab, 'y', **kwds)
+                bg = fig.canvas.copy_from_bbox(ax.bbox)
+                self.bg[ax] = bg
 
     def monitor(self, fig, text, *args,
                 ax=None, **kwds):
@@ -1377,12 +1527,12 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
             fig.canvas.blit(ax.bbox)
         return
 
-    def retrieve_event(self, event, tol=None):
-        if tol is None:
-            axp = self.prop('axis')
-            tol = axp.get('tol')
-        lab = super().retrieve_event(event, tol=tol)
-        return lab
+    # def retrieve_event(self, event, tol=None):
+    #     if tol is None:
+    #         axp = self.prop('axis')
+    #         tol = axp.get('tol')
+    #     lab = super().retrieve_event(event, tol=tol)
+    #     return lab
 
 
 # ## Plot ############################################################
@@ -1397,7 +1547,7 @@ class ContourPlot(PlotBase, _ConfigType):
 
     _opts = {'add_labels': False, }
 
-    color_ = {'method': 'imshow', } | _opts
+    color_ = {'method': 'pcolormesh', } | _opts
     contour_ = {'colors': 'black', } | _opts
 
     def __init__(self, contour=None, color=None):
@@ -1423,6 +1573,7 @@ class ContourPlot(PlotBase, _ConfigType):
 
         contour = self._contour | (kwds.get('contour') or {})
         color = self._color | (kwds.get('color') or {})
+        locallog.debug(f"{color=}")
 
         # if isinstance(ax, cmgeo.GeoAxes):
         body = kwds.get('body') or {}
@@ -1451,10 +1602,9 @@ class ContourPlot(PlotBase, _ConfigType):
         ttl = axs.add_titles(data, aux=aux, **kwds)
         artists.extend(ttl)
 
+        # print(f"{view=}")
         artists = self.set_view(axs, data, artists=artists,
                                 crs=crs, **(view or {}))
-
-        # self.set_picks(axs)
 
         fts = body.get('features') or []
         fts = axs.add_features(*fts)
@@ -1502,9 +1652,6 @@ class ContourPlot(PlotBase, _ConfigType):
         artists.extend(vx or [])
         return artists
 
-    def set_picks(self, axs, key=None, **kwds):
-        return axs.set_picks(ax=key, **kwds)
-
     def contour(self, axs, data,
                 levels=None, clabel=None, key=None,
                 artists=None, **kwds):
@@ -1545,7 +1692,7 @@ class ContourPlot(PlotBase, _ConfigType):
         if method is None:
             method = True
         if method is True:
-            method = 'imshow'
+            method = 'pcolormesh'
 
         if method is False:
             return method
@@ -1561,16 +1708,22 @@ class ContourPlot(PlotBase, _ConfigType):
             raise ValueError(f"invalid method {method}.")
 
     def color(self, axs, data,
-              method=None, cmap=None, levels=None,
-              key=None, artists=None, **kwds):
+              method=None, cmap=None, norm=None, levels=None,
+              key=None, artists=None, bind=None, **kwds):
         """matplotlib contour wrapper."""
         artists = artists or []
 
         method = self.check_method(axs, data, method, key)
+        # locallog.debug(f"color:{kwds=}")
 
         if method is False:
             pass
         else:
+            revc = False
+            # if isinstance(norm, cabc.Callable):
+            #     norm = norm()
+            #     if norm:
+            #         norm, revc = norm
             if levels in [True, None]:
                 levels = None
             elif levels is False:
@@ -1586,14 +1739,39 @@ class ContourPlot(PlotBase, _ConfigType):
             if levels is False:
                 pass
             else:
-                if isinstance(cmap, cabc.Callable):
-                    cmap = cmap()
+                cm = cmap
+                # if isinstance(cmap, cabc.Callable):
+                #     cm = cmap()
+                if isinstance(cm, mplib.cm.ScalarMappable):
+                    locallog.debug(f'colors: {cm.get_clim()=}')
+                    cm = cm.get_cmap()
+                # if revc and cm:
+                #     if isinstance(cm, list):
+                #         cm = list(reversed(cm))
+                #     elif isinstance(cm, mplib.colors.Colormap):
+                #         cm = cm.reversed()
+                #     else:
+                #         cmt = mplib.colormaps.get(cm)
+                #         if cmt:
+                #             cm = cmt.reversed()
+                # # print(revc, cmap)
+                # if isinstance(cm, list):
+                #     ckw = {'colors': cm}
+                # else:
+                #     ckw = {'cmap': cm}
+                #     # locallog.debug(f"color: {cm=} {ckw}")
+                # print(levels)
+                ckw = {'cmap': cm, 'norm': norm, }
                 col = axs.color(data, ax=key,
                                 method=method,
                                 add_colorbar=False,
-                                levels=levels, cmap=cmap,
+                                levels=levels,
+                                **ckw,
                                 **kwds)
+                if isinstance(bind, cabc.Callable):
+                    bind(artist=col[0])
                 artists.extend(col)
+        # locallog.debug(f"color:return: {artists}")
         return artists
 
     def colorbar(self, fig, axs, cons=None, cols=None,
@@ -1666,24 +1844,30 @@ def main(*args):
         config.update(c)
     # ppr.pprint(config)
 
+    logger = zu.logger
+    logger.setLevel(logging.INFO)
+
     LayoutTest = LayoutLegacy3
 
-    LayoutTest.config(config, groups=('zbcont', 'test', ),
-                      verbose=True)
+    LayoutTest.config(config, groups=('zbcont', 'test', ))
     LayoutTest.diag(strip=False)
 
     # fig = plt.figure(FigureClass=FigureCore)
     # lay = LayoutTest(fig)
 
     Pic = Picture(LayoutClass=LayoutTest)
-    fig1, lay1 = Pic()
-    fig2, lay2 = Pic()
+    fig1, lay1 = Pic(reset=True)
+    fig2, lay2 = Pic(reset=True)
+
+    # print(fig1, lay1)
+    # print(lay1['body'])
+    # lay1.reset(fig1)
+    # lay2.reset(fig2)
+
     lay1['body'].plot([0, 1, 2, 3], [3, 2, 1, 0])
     lay2['body'].plot([0, 1, 2, 3], [0, 3, 1, 2])
 
-
-    ContourPlot.config(config, groups=('zbcont', 'test', ),
-                       verbose=True)
+    ContourPlot.config(config, groups=('zbcont', 'test', ))
 
     ContourPlot.diag(strip=False)
 

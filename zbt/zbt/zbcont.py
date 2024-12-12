@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/12/13 08:51:11 fuyuki zbcont.py>
+# Time-stamp: <2024/12/23 11:15:04 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -162,7 +162,9 @@ class Options(ParserUtils, ap.Namespace):
     """Namespace to hold options"""
 
     method_table = {'f': 'contourf', 'c': 'contour',
-                    'p': 'pcolormesh', 'i': 'imshow', }
+                    'p': 'pcolormesh', }
+
+    # reserved:  {'i': 'imshow'}
     # reserved:  {'s': 'surface'}
 
     def __init__(self, argv, cmd=None):
@@ -226,8 +228,8 @@ class Options(ParserUtils, ap.Namespace):
                             metavar='METHOD/CMAP',
                             default=None, type=str,
                             help='coloring method and map'
-                            ' {contour(c) contourf(f) pcolormesh(p)'
-                            ' imshow(i)}')
+                            ' {contour(c) contourf(f) pcolormesh(p)}')
+        ### 'imshow(i)'
         parser.add_argument('-r', '--range',
                             metavar='[LOW][:[HIGH]]', dest='limit', type=str,
                             help='data range to draw')
@@ -606,10 +608,12 @@ def load_config(opts, *files, cmd=None, base=None):
         f = plib.Path(f)
         if f.is_dir():
             f = f / base
+        locallog.debug(f"load_config={f}")
         if f.exists():
             with open(f, "rb") as fp:
                 c = toml.load(fp)
                 config.update(c)
+    # locallog.debug(f"{config=}")
     for attr in ['verbose', ]:
         if hasattr(opts, attr):
             param = getattr(opts, attr)
@@ -720,32 +724,34 @@ def main(argv, cmd=None):
         Iter = fiter(opts.files, child=Var)
 
     Layout = zplt.LayoutLegacy3
-    Layout.config(cfg, verbose=True)
+    Layout.config(cfg)
     if locallog.is_debug():
         Layout.diag(strip=False)
 
     Plot = zplt.ContourPlot
-    Plot.config(cfg, verbose=True)
+    Plot.config(cfg)
     if locallog.is_debug():
         Plot.diag(strip=False)
 
-    Cmap = zctl.CmapIter(*(opts.color.get('cmap') or []))
-    Norm = zctl.NormIter(*(opts.color.get('norm') or []))
+    CmapP = ft.partial(zctl.CmapLink, **opts.color)
+    Params = zctl.PlotParams(color=CmapP)
+
+    # Cmap = zctl.CmapIter(*(opts.color.get('cmap') or []))
+    # Norm = zctl.NormIter(*(opts.color.get('norm') or []))
     # if opts.color.get('cmap') is None:
-    opts.color['cmap'] = Cmap.put_or_get
-    opts.color['norm'] = Norm.value
+    # opts.color['cmap'] = Cmap.put_or_get
+    # opts.color['norm'] = Norm.value
 
     Pic = zplt.Picture
     plot = Plot(contour=opts.contour, color=opts.color)
 
     Ctl = zctl.FigureControl(Pic, plot, Iter,
                              interactive=opts.interactive,
-                             cmap=Cmap,
-                             norm=Norm,
+                             params=Params,
                              layout=Layout,
                              styles=opts.styles,
                              draw=opts.draw,
-                             config=cfg.get(cstem), params=plt.rcParams)
+                             config=cfg.get(cstem), rc=plt.rcParams)
     output = opts.output
     try:
         if output and output.suffix == '.pdf':
