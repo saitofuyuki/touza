@@ -274,7 +274,7 @@ Usage is shown by =zbcont --help=:
 :                         color intervals or levels specification.
 :   -M METHOD/CMAP, --color-method METHOD/CMAP
 :                         coloring method and map {contour(c) contourf(f)
-:                         pcolormesh(p) imshow(i) surface(s)}
+:                         pcolormesh(p)}
 :   -r [LOW][:[HIGH]], --range [LOW][:[HIGH]]
 :                         data range to draw
 :   -d DIM,[[LOW]:[HIGH]], --dim DIM,[[LOW]:[HIGH]]
@@ -372,8 +372,8 @@ The separator colon is mandatory.
 
 Apply METHOD function for the color plot.  Default is ~contourf~.
 
-Possible methods are contour, contourf, pcolormesh, imshow,
-which can be abbreviated as c, f, p, i, respectively.
+Possible methods are contour, contourf, pcolormesh,
+which can be abbreviated as c, f, p, respectively.
 
 If method is not detected, it is interpreted as MAP.
 
