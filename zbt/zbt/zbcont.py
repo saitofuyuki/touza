@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/12/23 11:15:04 fuyuki zbcont.py>
+# Time-stamp: <2024/12/27 22:03:16 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -316,6 +316,7 @@ class Options(ParserUtils, ap.Namespace):
 
         self.color = color
         self.contour = contour
+        self.cnorm = {}
 
         self.styles = self.parse_styles(self.map, self.projection)
 
@@ -734,7 +735,10 @@ def main(argv, cmd=None):
         Plot.diag(strip=False)
 
     CmapP = ft.partial(zctl.CmapLink, **opts.color)
-    Params = zctl.PlotParams(color=CmapP)
+    NormP = ft.partial(zctl.NormLink, **opts.cnorm)
+    Params = zctl.PlotParams()
+    Params.reg_entry('color', CmapP)
+    Params.reg_entry('cnorm', NormP)
 
     # Cmap = zctl.CmapIter(*(opts.color.get('cmap') or []))
     # Norm = zctl.NormIter(*(opts.color.get('norm') or []))
@@ -743,7 +747,8 @@ def main(argv, cmd=None):
     # opts.color['norm'] = Norm.value
 
     Pic = zplt.Picture
-    plot = Plot(contour=opts.contour, color=opts.color)
+    # plot = Plot(contour=opts.contour, color=opts.color)
+    plot = Plot(contour=opts.contour)
 
     Ctl = zctl.FigureControl(Pic, plot, Iter,
                              interactive=opts.interactive,

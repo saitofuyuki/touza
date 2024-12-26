@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/12/23 11:55:02 fuyuki control.py>
+# Time-stamp: <2025/01/09 12:32:47 fuyuki control.py>
 
 __doc__ = \
     """
@@ -34,12 +34,17 @@ import mpl_toolkits.axes_grid1.inset_locator as m1i
 import cartopy.util as cutil
 
 import zbt.plot as zplt
-import zbt.xrnio as zxr
-import zbt.util as zu
+try:
+    import zbt.xrnio as zxr
+except ModuleNotFoundError:
+    zxr = xr
 
+import zbt.util as zu
+import zbt.config as zcfg
 
 locallog = zu.LocalAdapter('control')
 
+_ConfigType = zcfg.ConfigRigid
 
 class LinkedArray:
     """Helper class of recursive iteration."""
@@ -557,29 +562,29 @@ class ArrayIter(LinkedArray):
             self.xsel = xsel
 
         if base is not None:
-            debug(f"{pdims=}")
-            debug(f"{self.draw=}")
-            debug(f"{src.dims=}")
-            debug(f"{base.dims=}")
+            # debug(f"{pdims=}")
+            # debug(f"{self.draw=}")
+            # debug(f"{src.dims=}")
+            # debug(f"{base.dims=}")
 
             asel = filter_coords(base, src.dims, self.anchors)
-            debug(f"{asel=}")
+            # debug(f"{asel=}")
             csel = draw_coords(base, src, pdims, self.draw,
                                self.coords, anchors=asel)
-            debug(f"{csel=}")
+            # debug(f"{csel=}")
             mask = gen_mask(base, csel, asel)
-            debug(f"{mask=}")
+            # debug(f"{mask=}")
             cue = self.adjust_cue(base, asel) or None
-            debug(f"{cue=}")
+            # debug(f"{cue=}")
 
-            debug("return")
+            # debug("return")
             self.draw = csel
             self.data = None
 
             return super().refresh(base=base,
                                    key=base.shape, mask=mask, init=cue, **kwds)
 
-        debug("return (no base)")
+        # debug("return (no base)")
         return super().refresh(base=base, **kwds)
 
     def permute_draw(self, switch, skip_single=True):
@@ -635,8 +640,8 @@ class ArrayIter(LinkedArray):
 
         self.draw = tuple(self.base.dims[j] for j in cidx)
         mask = [m if m is True else n for m, n in zip(mask, nmask)]
-        debug(f"{self.draw=}")
-        debug(f"{mask=}")
+        # debug(f"{self.draw=}")
+        # debug(f"{mask=}")
         self.switch(mask=tuple(mask))
 
         self.data = None
@@ -649,7 +654,7 @@ class ArrayIter(LinkedArray):
         mask = self.mask
         shape = self.shape
         coord = None
-        which = aux[1]
+        which = aux[0]
         if which in ['left', 'right', ]:
             coord = self.draw[0]
         elif which in ['top', 'bottom', ]:
@@ -657,7 +662,7 @@ class ArrayIter(LinkedArray):
 
         dims = self.base.dims
         if coord not in dims:
-            debug(f"return ({coord})")
+            # debug(f"return ({coord})")
             return
 
         tgt = dims.index(coord)
@@ -685,8 +690,8 @@ class ArrayIter(LinkedArray):
         asel = filter_coords(self.base, self.src.dims, self.anchors)
         mask = gen_mask(self.base, nd, asel)
 
-        debug(f"{coord} to {tgt}")
-        debug(f"{self.draw} to {nd}")
+        # debug(f"{coord} to {tgt}")
+        # debug(f"{self.draw} to {nd}")
 
         self.switch(mask=tuple(mask))
         self.data = None
@@ -717,7 +722,7 @@ class ArrayIter(LinkedArray):
 
         self.switch(mask=tuple(npat))
         self.anchors = self.update_anchors(npat, cidx, self.anchors)
-        debug(f"{self.anchors=}")
+        # debug(f"{self.anchors=}")
         return self.anchors
 
     def update_anchors(self, mask, cidx, anchors=None):
@@ -738,23 +743,23 @@ class ArrayIter(LinkedArray):
     def point_selection(self, sel, anchor=None, skip_single=True):
         """Point selection."""
         debug = ft.partial(self.debug, func='point_selection')
-        debug(f"{type(self)=}")
+        # debug(f"{type(self)=}")
 
         debug(f"{sel=}")
 
         base = self.base
         mask = self.mask
         shape = self.shape
-        debug(f"{base.dims=}")
-        debug(f"{mask=}")
-        debug(f"{shape=}")
+        # debug(f"{base.dims=}")
+        # debug(f"{mask=}")
+        # debug(f"{shape=}")
 
         arr = self.value()
         # debug(f"{arr.dims=} {arr.shape=}")
         nco = len(arr.dims)
 
         asel = filter_coords(base, self.src.dims, self.anchors)
-        debug(f"{asel=}")
+        # debug(f"{asel=}")
 
         ctmp = []
         # base
@@ -776,7 +781,7 @@ class ArrayIter(LinkedArray):
                 if skip_single and w < 2:
                     continue
                 ctmp.append(d)
-            debug(f"try[{t}]: {ctmp}")
+            # debug(f"try[{t}]: {ctmp}")
             if len(ctmp) >= nco:
                 break
         else:
@@ -791,15 +796,15 @@ class ArrayIter(LinkedArray):
         for j in range(nco):
             if not csel[j] in ctmp:
                 csel[j] = nrem.pop(0)
-        debug(f"{csel=}")
+        # debug(f"{csel=}")
         if anchor:
             asel.update(sel)
         mask = gen_mask(base, csel, asel)
-        debug(f"{mask=}")
+        # debug(f"{mask=}")
         cue = self.adjust_cue(base, asel, cue=sel) or None
         debug(f"{cue=}")
 
-        debug("return")
+        # debug("return")
         self.draw = tuple(csel)
         self.data = None
 
@@ -820,7 +825,7 @@ class ArrayIter(LinkedArray):
 
         cidx = self.l2i()
         prev = self.base
-        debug(f"{cidx=}")
+        # debug(f"{cidx=}")
         cprv = dict(zip(prev.dims, cidx)) if prev is not None else {}
         cnxt = dict.fromkeys(base.dims)
 
@@ -844,7 +849,7 @@ class ArrayIter(LinkedArray):
             else:
                 cnxt[nd] = shape[jd] - 1
                 locallog.info(f"rewind in the coordinate {nd}")
-        debug(f"{cnxt=}")
+        # debug(f"{cnxt=}")
         cue = []
         for d in dims:
             sel = cnxt.get(d)
@@ -853,19 +858,16 @@ class ArrayIter(LinkedArray):
             elif isinstance(sel, (int, slice)):
                 pass
             else:
-                sel = coords[d].sel({d: sel}, method='nearest')
-                sel = sel.item()
-                co = coords[d].to_index()
-                sel = co.get_loc(sel)
+                sel = normalize_selection(coords[d], sel, index=True)
             cue.append(sel)
         cue = tuple(cue)
-        debug(f"{cue=}")
+        # debug(f"{cue=}")
 
         return cue
 
     def update(self, key):
         debug = ft.partial(self.debug, func='update')
-        debug(f"{key=}")
+        # debug(f"{key=}")
         self.data = None
 
     @staticmethod
@@ -949,31 +951,32 @@ class ArrayIter(LinkedArray):
             else:
                 self.draw = self.draw[1:] + self.draw[:1]
         self.data = None
-        debug(f"{self.draw}")
+        # debug(f"{self.draw}")
         return self.draw
 
     def _value(self, key=None):
         """draw-array adjustment."""
         debug = ft.partial(self.debug, func='_value')
-        debug(f"{key=}")
+        # debug(f"{key=}")
 
         if self.data is not None:
-            debug(f'cached=={key}')
+            # debug(f'cached={key}')
             return self.data
 
         data = super()._value(key)
-        debug(f"{data.dims=}")
+        # debug(f"{data.dims=}")
 
         data = data.transpose(*self.draw)
-        debug(f"{data.shape=}")
-        debug('cyclic in')
+        # debug(f"{data.name=} {data.shape=}")
+        # debug('cyclic in')
+        odata = data
         for cn in data.coords:
             if cn not in data.dims:
                 continue
             ck = data.dims.index(cn)
             co = data[cn]
-            cc = co.attrs.get('cyclic_coordinate')
-            debug(f"{cn} {cc}")
+            cc = is_cyclic_coord(co)
+            # debug(f"{cn} {cc}")
             if not cc:
                 continue
             w, org, dup = cc
@@ -984,8 +987,11 @@ class ArrayIter(LinkedArray):
                 nco[cn] = xr.DataArray(cx, dims=co.dims, attrs=co.attrs)
                 data = xr.DataArray(cd, coords=nco,
                                     dims=data.dims, attrs=data.attrs)
-        debug('cyclic out')
-        debug(f"{data.shape=}")
+        if not data is odata:
+            data.name = odata.name
+            data.assign_attrs(**odata.attrs)
+        # debug('cyclic out')
+        # debug(f"{data.name=} {data.shape=}")
         # store cache
         self.data = data
         return data
@@ -1015,7 +1021,7 @@ class VariableIter(LinkedArray):
         src = self.get(key)
         psrc = self.get()
         pdim = psrc.dims if psrc is not None else ()
-        debug(f"{pdim} to {src.dims}")
+        # debug(f"{pdim} to {src.dims}")
 
         alink = self.linked(ArrayIter)
 
@@ -1024,18 +1030,18 @@ class VariableIter(LinkedArray):
             return
 
         src = self.assign_coord(src)
-        debug(f"source='{src.name}'{src.dims}{src.shape}")
+        # debug(f"source='{src.name}'{src.dims}{src.shape}")
 
         try:
             xsel, nsel = extract_sels(self.lims, src)
-            debug(f"{nsel=}")
-            debug(f"{xsel=}")
+            # debug(f"{nsel=}")
+            # debug(f"{xsel=}")
         except UserWarning:
             alink.refresh(base=None, )
             return
 
         base = extract_base_array(src, nsel, xsel)
-        debug(f"base='{base.name}'{base.dims}{base.shape}")
+        # debug(f"base='{base.name}'{base.dims}{base.shape}")
 
         alink.refresh(base=base, src=src, nsel=nsel, xsel=xsel)
 
@@ -1043,7 +1049,7 @@ class VariableIter(LinkedArray):
         """Assign default (index) coordinate if empty."""
         for d in data.dims:
             if not d in data.coords and len(data[d]) > 1:
-                locallog.debug(f"Dummy index coordinate introduced [{d}].")
+                # locallog.debug(f"Dummy index coordinate introduced [{d}].")
                 data[d] = np.arange(len(data[d]), dtype=float)
         return data
 
@@ -1196,11 +1202,32 @@ class DataTree():
             pass
 
     def point_selection(self, sel, anchor=None):
-        locallog.debug(f"datatree {sel=}")
+        # locallog.debug(f"datatree {sel=}")
         try:
             self._alink.point_selection(sel, anchor=anchor)
         except AttributeError as exc:
             locallog.debug(f"{exc}")
+
+    # def get_points(self, x=None, y=None):
+    #     """Get coordinate index and value on the source array."""
+    #     r = {}
+    #     arr = self.draw_data()
+    #     src = self.source_data()
+    #     # locallog.debug(f"get_points {arr.dims=} {src.dims=} {kwds=}")
+
+    #     for j, pos in [(1, x), (0, y), ]:
+    #         if pos:
+    #             co = arr.dims[j]
+    #             xsel = src.coords[co].sel({co: pos}, method='nearest')
+    #             xsel = xsel.item()
+
+    #             cidx = src.coords[co].to_index()
+    #             jsel = cidx.get_loc(xsel)
+
+    #             # locallog.debug(f"get_points {co}[{jsel}:{xsel}]={pos}")
+    #             r[co] = (jsel, xsel)
+    #         # pass
+    #     return r
 
     def source_data(self, key=None):
         """Get source (file) data-array."""
@@ -1263,172 +1290,34 @@ class DataTree():
         return self.root.linked(cls=ArrayIter)
 
 
-# class NormIter(LinkedArray):
-#     def __init__(self, *args, **kw):
-#         if not args:
-#             args = ['', ]
-#         self.Norms = list(args)
-#         self.Rev = [False, True]
-
-#         shape = (len(self.Norms), len(self.Rev))
-#         super().__init__(base=None, key=shape, name='NORM', **kw)
-
-#         self._loop = iter(self.items())
-#         _ = next(self._loop)
-
-#     def _value(self, key=None):
-#         if key is None:
-#             key = self._current
-#         if isinstance(key, tuple):
-#             return self.Norms[key[0]], self.Rev[key[1]]
-#         return None
-
-#     def advance(self, step):
-#         self.switch(step=step)
-#         try:
-#             next(self._loop)
-#         except StopIteration:
-#             self._loop = iter(self.items())
-#             _ = next(self._loop)
-
-#     def fwd(self):
-#         self.advance(+1)
-
-#     def bwd(self):
-#         self.advance(-1)
-
-
-# class CmapIter(LinkedArray):
-#     def __init__(self, *args, num=None, **kw):
-#         if not args:
-#             args = [None]
-
-#         # locallog.debug(f"{args=}")
-
-#         cmaps = [*args] + [k for k in mplib.colormaps.keys()
-#                                if not k.endswith(r'_r')]
-#         self._force = None
-
-#         if num is None:
-#             num = True
-#         if num is True:
-#             num = 10
-#         elif num is False:
-#             num = 0
-#         # locallog.debug(f"{cmaps[:10]=}")
-#         if num != 0:
-#             base = cmaps[:num]
-#         else:
-#             base = cmaps
-
-#         super().__init__(base=base, name='CMAP', **kw)
-
-#         self.reverse = False
-#         self.cmap = None
-#         self.cmap_r = None
-
-#         # cgrp = {}
-#         # for k, cm in mplib.colormaps.items():
-#         #     if k.endswith(r'_r'):
-#         #         continue
-#         #     g = type(cm)
-#         #     cgrp.setdefault(g, {})
-#         #     cgrp[g][k] = cm
-#         # ppr.pprint(cgrp)
-
-#         self._loop = iter(self.items())
-#         _ = next(self._loop)
-
-#     def put_or_get(self, cmap=None):
-#         if cmap is None:
-#             return self.value()
-#         return self.set_force(cmap or None)
-
-#     def _value(self, key=None):
-#         if key is None:
-#             key = self._current
-#         v = super()._value(key)
-#         # print(v, self._force)
-#         return self._force or v
-
-#     def set_force(self, cmap=None):
-#         return self.bind(cmap)
-
-#     def bind(self, cmap=None):
-#         self._force = cmap
-#         return cmap
-
-#     def toggle_reverse(self, switch=None):
-#         if switch is None:
-#             switch = True
-#             self.reverse = not self.reverse
-#         else:
-#             switch = bool(switch)
-#             switch = not (self.reverse is switch)
-#             self.reverse = switch
-
-#     def advance(self, step):
-#         self.switch(step=step)
-#         try:
-#             next(self._loop)
-#         except StopIteration:
-#             self._loop = iter(self.items())
-#             _ = next(self._loop)
-
-#     def fwd(self):
-#         self.set_force()
-#         self.switch(step=+1)
-#         try:
-#             next(self._loop)
-#         except StopIteration:
-#             self._loop = iter(self.items())
-#             _ = next(self._loop)
-
-#     def bwd(self):
-#         self.set_force()
-#         self.switch(step=-1)
-#         try:
-#             next(self._loop)
-#         except StopIteration:
-#             self._loop = iter(self.items())
-#             _ = next(self._loop)
-
-
-# class PlotParamsCore():
-#     """Base layer of plot options control."""
-
-#     def __init__(self, nml=None, **kwds):
-#         raise NotImplementedError
-
-#     def __call__(self, keys=None, **kwds):
-#         raise NotImplementedError
-
-#     def __getitem__(self, key):
-#         raise NotImplementedError
-
-
 class PlotParams():
     """Plot options complex."""
 
-    def __init__(self, nml=None, **kwds):
+    def __init__(self, nml=None):
         nml = 'variable' if nml is None else nml
         if not isinstance(nml, (tuple, list)):
             nml = (nml, )
-        self.nml = {}
+        self._nml = nml
         self.root = {}
         self.cache = {}
-        for a, v in kwds.items():
-            if not isinstance(v, (tuple, list)):
-                v = v, None
-            self.root[a] = v[0]
-            self.nml[a] = nml if v[1] is None else v[1]
-            self.cache[a] = {}
+        self.nml = {}
+
+    def reg_entry(self, arg, entry, nml=None):
+        # if not isinstance(entry, (tuple, list)):
+        #     entry = [entry]
+        self.root[arg] = entry
+        if nml is None:
+            nml = self._nml
+        self.nml[arg] = nml
+        self.cache[arg] = {}
 
     def __call__(self, *args, **kwds):
+        # locallog.debug(f"__call__: {kwds.keys()}")
         params = {}
         if args:
             if args[0] in [True, False]:
-                d = args.pop(0)
+                d = args[0]
+                args = args[1:]
             else:
                 d = False
         else:
@@ -1438,26 +1327,37 @@ class PlotParams():
         if d:
             args = [a for a in self.root.keys() if not a in args]
         for a in args:
-            k = self.normalize(a, **kwds)
             disp = self.get_disp(a, default=None, **kwds)
             if disp is None:
                 disp = self.reg_disp(a, **kwds)
-            params[a] = disp.params(**kwds)
-
+            params[a] = {}
+            dp = disp.params(**kwds)
+            if dp:
+                params[a].update(dp)
         return params
 
     def get_disp(self, arg, /, default=None, **kwds):
+        """Get parameter dispatcher."""
         k = self.normalize(arg, **kwds)
         return self.cache[arg].get(k, default)
 
     def reg_disp(self, arg, **kwds):
-        disp = self.root[arg]()
+        """Register parameter dispatcher."""
         k = self.normalize(arg, **kwds)
-        self.cache[arg][k] = disp
-        return disp
+        disps = self.root[arg]()
+        self.cache[arg][k] = disps
+        return disps
 
-    def normalize(self, arg, **kwds):
-        return 'default'
+    def normalize(self, arg, fig=None, src=None, array=None, name=None,
+                  **kwds):
+        if name is None:
+            name = ''
+            if array is not None:
+                name = array.name
+            if not name:
+                if src is not None:
+                    name = src.name
+        return fig, name
 
 
 class ParamsDispatcher():
@@ -1466,7 +1366,7 @@ class ParamsDispatcher():
 
 
 class CmapStatus():
-    """cmap and norm placeholdere."""
+    """cmap and norm placeholder."""
     def __init__(self, artist, reverse=None):
         self.mixin = artist
         self.norm = artist.norm
@@ -1496,181 +1396,46 @@ class CmapStatus():
             else:
                 cm = self.cmap
 
-        return cm, self.norm
-
-    # def update_cmap(self, cm):
-    #     return self.mixin.set_cmap(cm)
+        return cm
 
 
-class CmapLink(LinkedArray, ParamsDispatcher):
-    serial = 0
+class AxisScaleLink(LinkedArray, ParamsDispatcher):
+    # to do: 'index'
+    scales_ = ['', 'linear', 'log', ]
 
-    def __init__(self, cmap=None, norm=None, reverse=None,
-                 num=None,
-                 method=None, levels=None, **kw):
+    def __init__(self, scales=None, **kw):
+        if scales is None:
+            scales = self.scales_
+        if not isinstance(scales, (tuple, list)):
+            scales = [scales]
 
-        # locallog.debug(f"{args=}")
-        self.method = method
-        self.levels = levels
-
-        if not isinstance(cmap, (tuple, list)):
-            cmap = [cmap]
-
-        cmap = list(cmap) + [k for k in mplib.colormaps.keys()
-                             if not k.endswith(r'_r')]
-        if num is None:
-            num = True
-        if num is True:
-            num = 10
-        elif num is False:
-            num = 0
-        # locallog.debug(f"{cmaps[:10]=}")
-        if num != 0:
-            cmap = cmap[:num]
-
-        # if norm is None:
-        #     norm = [None, 'log', ]
-        if not isinstance(norm, (tuple, list)):
-            norm = [norm]
-
-        self.reverse = bool(reverse)
-
-        self.cmaps = cmap
-        self.norms = norm
-        shape = (len(self.norms), len(self.cmaps))
-        # mask = False, False
-        # mask = None
-        mask = (True, False)
-        name = f"CMAP-{self.serial}"
-        super().__init__(base=None, key=shape, mask=mask, name=name, **kw)
-
-        self.serial = self.serial + 1
+        name = "SCALE"
+        super().__init__(base=scales[:], name=name, **kw)
 
         self._loop = None
-        self.var = 0
-        self.cache = {}
-        self._norm = None
-
-    def params(self, **kwds):
-        if not self._loop:
-            self.loop()
-        p = {}
-        cmap, norm = self.value()
-        locallog.debug(f"{self.reverse=} {norm} {cmap}")
-        if norm == 'log':
-            norm = mplib.colors.SymLogNorm(1.0e-10)
-
-        p['norm'] = norm
-        p['cmap'] = cmap
-        p['bind'] = self.bind
-        return p
 
     def loop(self):
         self._loop = iter(self.items())
         _ = next(self._loop)
 
-    # def update(self, key):
-    #     """Dummy hook to update current status."""
-    #     locallog.debug(f"update: {key=}")
+    def params(self, **kwds):
+        p = {}
 
-    def _value(self, key=None):
-        okey = key
-        if key is None:
-            key = self._current
-        # k = self.l2p(key)
-        k = self.l2i(key)
-        v = self.cache.get(k)
-        self.diag()
-        locallog.debug(f"[{okey}/{key}/{k}]={v}")
-        if self._norm:
-            locallog.debug(f"{self._norm.vmin}:{self._norm.vmax}")
-        if v is None:
-            n = self._norm or self.norms[k[0]]
-            c = self.cmaps[k[1]]
-            if self.reverse and c:
-                c = mplib.colormaps.get(c)
-                if c:
-                    c = c.reversed()
-        else:
-            c, n = v.get_cmap(self.reverse)
-        # elif isinstance(v, mplib.cm.ScalarMappable):
-        #     n = v.norm
-        #     # locallog.debug(f"<{n.vmin} {n.vmax}>")
-        #     # n = self.norm[k[0]]
-        #     # n.vmin, n.vmax = None, None
-        #     c = v.get_cmap()
-        # elif isinstance(v, tuple):
-        #     n, c = v
-        # else:
-        #     n = None
-        #     c = v
-        # ## n = mplib.colors.LogNorm()
-        return c, n
-        # v = super()._value(key)
-        # if v is None:
-        #     return self.l2p(key)
-        # if not isinstance(v, tuple):
-        #     v = (v, )
-        #     if self.switch >= len(v):
-        #         locallog.warning(f"no variation in cmap {self.switch}")
-        #     v = v[0]
-        # else:
-        #     v = v[self.switch]
-        # return v
+        if not self._loop:
+            self.loop()
+        scale = self.value()
 
-    def bind(self, *, key=None, artist=None, **kwds):
-        if key is None:
-            key = self._current
-        v = self.value(key)
-        locallog.debug(f"bind: [{key}]={v} {artist}")
-        self.cache[key] = CmapStatus(artist, self.reverse)
-
-    def transpose(self, switch=None, key=None):
-        if switch is None:
-            self.reverse = not bool(self.reverse)
-        else:
-            self.reverse = bool(switch)
-        # if key is None:
-        #     key = self._current
-        # _, c = self.value(key)
-        # k = self.l2p(key)
-        # v = self.cache.get(k)
-        # v.update_cmap(c)
-        return self.reverse
-    # def toggle_reverse(self, key=None, switch=None):
-    #     v = super()._value(key)
-    #     if v is None:
-    #         locallog.warning(f"cannot reverse current cmap.")
-    #         return
-
-    #     if switch is None:
-    #         self.switch = 1 - self.switch
-    #     else:
-    #         self.switch = 1 if switch else 0
-    #     jt = self.switch
-    #     if v[jt] is None:
-    #         jo = 1 - jt
-    #         cm = v[jo]
-    #         if isinstance(cm, mplib.cm.ScalarMappable):
-    #             cm = cm.get_cmap()
-    #             v[jo] = cm.reversed()
-    #         else:
-    #             raise ValueError(f"Panic in cmap reverse {cm=}.")
+        p['scale'] = scale
+        return p
 
     def advance(self, step):
-        key = self._current
-        k = self.l2p(key)
-        v = self.cache.get(k)
-        if v is not None:
-            self._norm = v.norm
-
         self.switch(step=step)
         try:
-            v = next(self._loop)
+            _ = next(self._loop)
         except StopIteration:
             self._loop = iter(self.items())
-            v = next(self._loop)
-        return v
+            _ = next(self._loop)
+        return self.value()
 
     def fwd(self):
         return self.advance(+1)
@@ -1678,153 +1443,517 @@ class CmapLink(LinkedArray, ParamsDispatcher):
     def bwd(self):
         return self.advance(-1)
 
-    def norm_advance(self, step):
-        self._norm = None
-        self.switch(step=step, mask=(False, True))
+
+class NormLink(LinkedArray, ParamsDispatcher):
+    _serial = 0
+    norms_ = ['', 'log',
+              ('symlog', 4, 'max'), ('symlog', 4, 'min'), ('symlog', 4),
+              ('symlog', 8, 'max'), ('symlog', 8, 'min'), ('symlog', 8),
+              'asinh',
+              ('twoslope', 0), ]
+
+    def __init__(self, norms=None, levels=None, vmin=None, vmax=None,
+                 **kw):
+
+        if norms is None:
+            norms = self.norms_
+        if not isinstance(norms, (tuple, list)):
+            norms = [norms]
+
+        name = f"NORM-{self._serial}"
+        self._serial = self._serial + 1
+        super().__init__(base=norms[:], name=name, **kw)
+
+        self.levels = levels
+
+        self._loop = None
+        self._lock = False
+        self._lims = (vmin, vmax) # user-defined range
+        self.lims = (None, None)  # run-time (possibly locked) range
+        self.cache = {}
+        self._array = None
+        self._to_adjust = None
+
+    def loop(self):
+        self._loop = iter(self.items())
+        _ = next(self._loop)
+
+    def params(self, array=None, **kwds):
+        locallog.debug(f"norm:params: {kwds.keys()}")
+        locallog.debug(f"norm:params:array: {self._array is array}")
+
+        p = {}
+
+        if not self._loop:
+            self.loop()
+        norm = self.value()
+        upd, lims = self.update_lims(array)
+        locallog.debug(f"norm:params:norm: {norm}")
+        locallog.debug(f"norm:params:lims: {lims}")
+
+        k = self.l2p(None)
+        saved = self.cache.get(k)
+        if saved is not None:
+            saved = saved.norm
+        locallog.debug(f"norm:value: {norm} {lims} {self.lims} {saved}")
+        if upd or self._to_adjust:
+            p['norm'] = self.adjust_norm(norm, saved, lims, **kwds)
+        else:
+            p['norm'] = saved
+        self._to_adjust = False
+        return p
+
+    def update_lims(self, array):
+        vmin, vmax = self.lims
+        if self._lock:
+            upd = False
+        elif self._array is array:
+            upd = False
+        elif array is not None:
+            upd = True
+            # if vmin is None:
+            #     vmin = self._lims[0]
+            # if vmax is None:
+            #     vmax = self._lims[1]
+            if self._lims[0] is None:
+                amin = array.min().item()
+                if vmin is not None:
+                    vmin = min(amin, vmin)
+                else:
+                    vmin = amin
+            else:
+                vmin = self._lims[0]
+            if self._lims[1] is None:
+                amax = array.max().item()
+                if vmax is not None:
+                    vmax = max(amax, vmax)
+                else:
+                    vmax = amax
+            else:
+                vmax = self._lims[1]
+            if vmin == vmax:
+                locallog.info(f"Constant field ({vmin})")
+
+        # update current target array
+        self.lims = vmin, vmax
+        self._array = array
+        return upd, self.lims
+
+    def adjust_norm(self, norm, saved, lims, **kwds):
+        norm = norm or ''
+        if norm in ['', 'linear', ]:
+            if saved:
+                norm = saved
+                norm.autoscale(lims)
+            else:
+                norm = mplib.colors.Normalize(vmin=lims[0], vmax=lims[1])
+        elif norm == 'log':
+            norm = self.LogNorm(lims)
+        elif norm == 'asinh':
+            norm = self.AsinhNorm(lims, sym='max')
+        elif norm[0] == 'symlog':
+            sym = None if len(norm) <= 2 else norm[2]
+            norm = self.SymLogNorm(lims, width=norm[1], sym=sym)
+        elif norm[0] == 'twoslope':
+            norm = self.TwoSlopeNorm(lims, vcenter=norm[1])
+        elif isinstance(norm, str):
+            if norm == 'symlog':
+                raise ValueError(f"{norm} norm requires one parameter.")
+            if norm == 'twoslope':
+                raise ValueError(f"{norm} norm requires one parameter.")
+            raise ValueError(f"Unknown colormap norm {norm}")
+        elif isinstance(norm, mplib.colors.Normalize):
+            sc = [v for v in lims if v is not None]
+            norm.autoscale(sc or [0])
+        # print(f"{self._norm=}")
+        # locallog.debug(f"norm:adjust: {saved=}")
+        # locallog.debug(f"norm:adjust: {norm=}")
+        # locallog.debug(f"norm:range: {norm.vmin}:{norm.vmax}")
+
+        return norm
+
+    def LogNorm(self, lims, width=None):
+        width = width or 12
+        vmin, vmax = lims
+        if vmin is None or vmin <= 0:
+            if vmax is None or vmax <= 0:
+                vmin = math.pow(10, - width)
+                vmax = math.pow(10, - width + 1)
+            else:
+                vmin = math.pow(10, math.floor(math.log(vmax, 10)) - width)
+        return mplib.colors.LogNorm(vmin, vmax)
+
+    def AsinhNorm(self, lims, sym=None):
+        vmin, vmax = lims
+        vmin, vmax = self.adjust_norm_range(vmin, vmax, sym)
+        return mplib.colors.AsinhNorm(vmin=vmin, vmax=vmax)
+
+    def SymLogNorm(self, lims, width=None, sym=None, linthresh=None):
+        vmin, vmax = lims
+        if sym == 'min':
+            am = min(abs(vmin), abs(vmax))
+            vmin, vmax = -am, +am
+        else:
+            am = max(abs(vmin), abs(vmax))
+            if sym == 'max':
+                vmin, vmax = -am, +am
+
+        if linthresh is None:
+            width = width or 12
+            if am == 0.0:
+                linthresh = math.pow(10, -width)
+                vmin, vmax = None, None
+            else:
+                linthresh = math.pow(10, math.floor(math.log(am, 10)) - width)
+        n = mplib.colors.SymLogNorm(linthresh, vmin=vmin, vmax=vmax)
+        # print(linthresh, lims, vmin, vmax, n.vmin, n.vmax)
+        return n
+
+    def adjust_norm_range(self, vmin, vmax, sym):
+        if sym == 'min':
+            am = min(abs(vmin), abs(vmax))
+            vmin, vmax = -am, +am
+        else:
+            am = max(abs(vmin), abs(vmax))
+            if sym == 'max':
+                vmin, vmax = -am, +am
+        return vmin, vmax
+
+    def TwoSlopeNorm(self, lims, vcenter=None):
+        vmin, vmax = lims
+        vcenter = vcenter or 0
+        if vmax <= vcenter:
+            if vmin <= vcenter:
+                vmin, vmax = None, None
+            else:
+                vmax = None
+        elif vmin >= vcenter:
+            if vmax >= vcenter:
+                vmin, vmax = None, None
+            else:
+                vmin = None
+        return mplib.colors.TwoSlopeNorm(vcenter, vmin=vmin, vmax=vmax)
+
+    def toggle_lock(self, fig, switch=None):
+        p = self._lock
+        if switch is not None:
+            self._lock = bool(switch)
+        else:
+            self._lock = not self._lock
+
+        # if self._lock:
+        #     if not p:
+        #         fig.push_patch(**self.mark)
+        # else:
+        #     if p:
+        #         fig.pop_patch()
+        if self._lock:
+            key = self._current
+            k = self.l2p(key)
+            v = self.cache.get(k)
+            if v is not None:
+                self.lims = v.norm.vmin, v.norm.vmax
+
+        return self._lock
+
+    def record(self, key=None):
+        if key is None:
+            key = self._current
+        k = self.l2p(key)
+        v = self.cache.get(k)
+        n = self.value()
+        lmin, lmax = self.lims
+        if lmin == lmax:
+            locallog.warning("Dynamic range is not propagated"
+                             " when constant field.")
+        elif v is not None:
+            vmin, vmax = v.norm.vmin, v.norm.vmax
+            locallog.debug(f"norm:record: [{k}] {lmin}:{lmax} {vmin}:{vmax}")
+            # Range is not propagated when symlog:max symlog:min
+            if not isinstance(n, tuple):
+                n = (n, None, None)
+            else:
+                n = n + (None, None)
+            if n[0] == 'symlog':
+                amin, amax = abs(lmin), abs(lmax)
+                amp = None
+                if n[2] == 'max':
+                    amp = max(amin, amax)
+                elif n[2] == 'min':
+                    amp = min(amin, amax)
+                if amp is not None:
+                    if vmin != -amp or vmax != +amp:
+                        locallog.warning("Dynamic range is not propagated"
+                                         " when max/min symlog mode.")
+                    vmin, vmax = lmin, lmax
+            elif n[0] == 'log':
+                if lmin < 0:
+                    locallog.warning("Dynamic range minimum is not propagated"
+                                     " when log mode with negatives.")
+                    vmin = lmin
+            self.lims = (vmin, vmax)
+            # self.lims = v.get_clim()
+        locallog.debug(f"norm:record: [{k}]={v} {n} {self.lims}")
+
+    def advance(self, step):
+        # locallog.info(f"norm:advance: {self._current=}")
+        self.record()
+
+        self._to_adjust = bool(step != 0)
+        self.switch(step=step)
         try:
             v = next(self._loop)
         except StopIteration:
             self._loop = iter(self.items())
             v = next(self._loop)
-        self.switch(mask=(True, False))
-        return v
+        return self.value()
 
-    def norm_fwd(self):
-        return self.norm_advance(+1)
+    def fwd(self):
+        return self.advance(+1)
 
-    def norm_bwd(self):
-        return self.norm_advance(-1)
+    def bwd(self):
+        return self.advance(-1)
 
-# class CmapParams():
-#     """Base plot option for colormap."""
+    def bind(self, *, key=None, artist=None, **kwds):
+        if key is None:
+            key = self._current
+        k = self.l2p(key)
+        self.cache[k] = artist
+        locallog.debug(f"norm:bind: [{k}:{self.value()}]={self.cache[k]}"
+                       f"{self.cache[k].norm} {artist.norm}")
 
-#     def __init__(self, *args,
-#                  keys=None, cmap=None, levels=None,
-#                  norm=None, method=None,
-#                  **kwds):
-#         # super().__init__()
-#         self.root = CmapLink(cmap, norm, *args, **kwds)
 
-#         keys = 'variable' if keys is None else keys
-#         self.keys = keys
+class CmapLink(LinkedArray, ParamsDispatcher, _ConfigType):
+    serial = 0
+    _dgrp = ''
 
-#         # self.method = method
-#         # self.levels = levels
-#         # self.norm = norm
+    cmaps_ = {_dgrp: [],
+              'seq0': ['viridis', 'plasma', 'inferno', 'magma', 'cividis'],
+              'seq1': ['Greys', 'Purples', 'Blues', 'Greens', 'Oranges',
+                       'Reds',
+                       'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+                       'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn'],
+              'seq2': ['binary', 'gist_yarg', 'gist_gray', 'gray', 'bone',
+                       'pink', 'spring', 'summer', 'autumn', 'winter', 'cool',
+                       'Wistia', 'hot', 'afmhot', 'gist_heat', 'copper'],
+              'div': ['PiYG', 'PRGn', 'BrBG', 'PuOr', 'RdGy', 'RdBu', 'RdYlBu',
+                      'RdYlGn', 'Spectral', 'coolwarm', 'bwr', 'seismic', ],
+              # 'berlin', 'managua', 'vanimo'
+              'cyclic': ['twilight', 'twilight_shifted', 'hsv'],
+              'qual': ['Pastel1', 'Pastel2', 'Paired', 'Accent', 'Dark2',
+                       'Set1', 'Set2', 'Set3', 'tab10', 'tab20', 'tab20b',
+                       'tab20c'],
+              'misc': ['flag', 'prism', 'ocean', 'gist_earth', 'terrain',
+                       'gist_stern', 'gnuplot', 'gnuplot2', 'CMRmap',
+                       'cubehelix', 'brg', 'gist_rainbow', 'rainbow', 'jet',
+                       'turbo', 'nipy_spectral', 'gist_ncar']}
 
-#         self.cache = {}
-#         self.root.diag()
+    # cmaps_ = {dgrp: [],
+    #           'seq0': ['viridis', 'plasma', 'inferno', 'magma', 'cividis'],
+    #           'seq1': ['Greys', 'Purples', 'Blues', 'Greens', 'Oranges',], }
 
-#         # locallog.debug(f"{self.root.base=}")
+    cmaps_[_dgrp] = [v[0] for v in cmaps_.values() if v]
+    # cited from matplotlib document
+    #
+    # plot_color_gradients('Perceptually Uniform Sequential',
+    #                      ['viridis', 'plasma', 'inferno', 'magma', 'cividis'])
+    # plot_color_gradients('Sequential',
+    #                      ['Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
+    #                       'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+    #                       'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn'])
+    # plot_color_gradients('Sequential (2)',
+    #                      ['binary', 'gist_yarg', 'gist_gray', 'gray', 'bone',
+    #                       'pink', 'spring', 'summer', 'autumn', 'winter', 'cool',
+    #                       'Wistia', 'hot', 'afmhot', 'gist_heat', 'copper'])
+    # plot_color_gradients('Diverging',
+    #                      ['PiYG', 'PRGn', 'BrBG', 'PuOr', 'RdGy', 'RdBu', 'RdYlBu',
+    #                       'RdYlGn', 'Spectral', 'coolwarm', 'bwr', 'seismic',
+    #                       'berlin', 'managua', 'vanimo'])
+    # plot_color_gradients('Cyclic', ['twilight', 'twilight_shifted', 'hsv'])
+    # plot_color_gradients('Qualitative',
+    #                      ['Pastel1', 'Pastel2', 'Paired', 'Accent', 'Dark2',
+    #                       'Set1', 'Set2', 'Set3', 'tab10', 'tab20', 'tab20b',
+    #                       'tab20c'])
+    # plot_color_gradients('Miscellaneous',
+    #                      ['flag', 'prism', 'ocean', 'gist_earth', 'terrain',
+    #                       'gist_stern', 'gnuplot', 'gnuplot2', 'CMRmap',
+    #                       'cubehelix', 'brg', 'gist_rainbow', 'rainbow', 'jet',
+    #                       'turbo', 'nipy_spectral', 'gist_ncar'])
 
-#     def nml_key(self, key):
-#         return 'default'
+    def __init__(self, cmap=None, reverse=None,
+                 method=None, levels=None, alpha=None,
+                 chain=None, **kw):
 
-#     def register(self, key=None):
-#         key = self.nml_key(key)
-#         if key not in self.cache:
-#             link = self.root.copy()
-#             self.cache[key] = link
-#             link.loop()
-#         return self.cache[key]
+        # locallog.debug(f"{args=}")
+        self.method = method
+        self.levels = levels
+        self.alpha = alpha
 
-#     def get_link(self, key=None, reg=None, **kwds):
-#         key = self.nml_key(key)
-#         link = self.cache.get(key, None)
-#         if link is None:
-#             reg = True if reg is None else reg
-#             if bool(reg):
-#                 link = self.register(key)
-#         return link
+        if not isinstance(cmap, (tuple, list)):
+            cmap = [cmap]
 
-#     #     if clink is None:
-#     #         reg = True if reg is None else reg
+        dk = self._dgrp
+        omap = self.prop('cmaps')
 
-#     # def toggle_reverse(self, key=None, switch=None):
-#     #     clink = self.get_link(key)
-#     #     if clink:
-#     #         return clink.toggle_reverse(switch)
-#     #     return None
+        group = []
+        dmap = []
+        for c in cmap:
+            # print(c)
+            if c in omap:
+                group.append(c)
+            else:
+                if dk not in group:
+                    group.append(dk)
+                dmap.append(c)
+        # if group and dmap:
+        #     if dk not in group:
+        #         group.append(dk)
+        if not group:
+            group = omap.keys()
 
-#     # def bind(self, artist, key=None):
-#     #     clink = self.get_link(key)
-#     #     if clink:
-#     #         return clink.bind(artist)
-#     #     return None
+        if not dmap:
+            # dmap = dmap + [c for c in omap[dk] if c not in dmap]
+            dmap = omap[dk]
+        # dmap = list(cmap) + [c for c in omap[dk] if c not in cmap]
+        # print(list(group))
+        # print(list(dmap))
+        gmap = {}
+        for g in group:
+            gmap[g] = omap[g]
+        if dk in gmap:
+            gmap[dk] = dmap
+        # omap = omap.copy()
+        # omap[dk] = dmap
 
-#     # def params(self, dest=None, key=None, reg=None, **kwds):
-#     #     clink = self.get_link(key)
-#     #     if clink is None:
-#     #         reg = True if reg is None else reg
-#     #         if bool(reg):
-#     #             clink = self.register(key)
-#     #     locallog.debug(f"params: {self.cache=}")
-#     #     locallog.debug(f"params: {clink=}")
-#     #     locallog.debug(f"params: {key=}")
-#     #     if clink:
-#     #         cm = clink.value()
-#     #         print(cm)
-#     #     return None
+        self.reverse = bool(reverse)
+        self.cpos = dict.fromkeys(gmap, 0)
 
-#     # def gen_cmap(self, cmap, rev):
-#     #     nm = None
-#     #     cm = cmap
-#     #     cm = mplib.colormaps.get(cm, cm)
-#     #     if isinstance(cm, mplib.cm.ScalarMappable):
-#     #         cm = cm.get_cmap()
-#     #         nm = cm.norm
-#     #     if rev:
-#     #         cm = cm.reversed()
-#     #     return cm, nm
+        # mask = False, False
+        # mask = None
+        # mask = (True, False)
+        name = f"CMAP-{self.serial}"
+        sub = LinkedArray(base=None, name=name)
+        super().__init__(base=gmap, name=name, child=sub, **kw)
 
-#     # def gen_levels(self, levels, data, **kwds):
-#     #     if levels in [True, None]:
-#     #         levels = None
-#     #     elif levels is False:
-#     #         pass
-#     #     elif isinstance(levels, list):
-#     #         pass
-#     #     elif isinstance(levels, cabc.Callable):
-#     #         vmin, vmax = self.get_range(data, **kwds)
-#     #         levels = levels(vmin, vmax)
-#     #     else:
-#     #         raise TypeError(f"invalid level specifier {levels}.")
-#     #     return levels
+        self.serial = self.serial + 1
 
-#     # def get_range(self, data, vmin=None, vmax=None, **kwds):
-#     #     """Data range computation."""
-#     #     if vmin is None:
-#     #         vmin = data.attrs.get('vmin')
-#     #     if vmax is None:
-#     #         vmax = data.attrs.get('vmax')
+        self._loop = None
+        self.var = 0
+        self.cache = {}
 
-#     #     if vmin is None:
-#     #         vmin = data.min().values
-#     #     if vmax is None:
-#     #         vmax = data.max().values
-#     #     return vmin, vmax
+        if chain:
+            chain = chain()
+        self.chain = chain
 
-#     # def advance(self, key, step):
-#     #     pass
-#     #     # self.switch(step=step)
-#     #     # try:
-#     #     #     next(self._loop)
-#     #     # except StopIteration:
-#     #     #     self._loop = iter(self.items())
-#     #     #     _ = next(self._loop)
+    def update(self, key):
+        # idx = self.l2i(key)
+        name = self.l2p(key)
+        # locallog.debug(f"cmap:update: {key=} {idx=} {name=} {self.value(key)}")
+        # base = self.base.get(name) or []
+        cue = self.cpos[name]
+        self.child.refresh(base=self.value(key), key=None, init=(cue, ))
+        locallog.debug(f"cmap:update: {key=} {name=} {cue=}")
+        # self.child.cue()
 
-#     # def fwd(self, key):
-#     #     self.advance(key, +1)
+    def params(self, array=None, **kwds):
+        locallog.debug(f"params: {kwds.keys()}")
+        if not self._loop:
+            self.loop()
+        p = {}
+        cmap = self.child.value()
+        if cmap in self.cache:
+            cc = self.cache[cmap]
+            cmap = cc.get_cmap(self.reverse)
+        elif self.reverse:
+            cc = mplib.colormaps.get(cmap)
+            if cc:
+                cmap = cc.reversed()
+        locallog.debug(f"{self.reverse=} {cmap=}")
 
-#     # def bwd(self, key):
-#     #     self.advance(key, -1)
+        p['bind'] = self.bind
+        p['method'] = self.method
+        p['levels'] = self.levels
+        p['alpha'] = self.alpha
 
-# # class PlotParams(PlotParamsCore):
-# #     """Base plot option controler."""
+        p['cmap'] = cmap
 
-# #     def __init__(self, cmap=None, contour=None):
-# #         self.cmap = cmap
-# #         self.contour = contour
+        locallog.debug(f"params: {self.chain=}")
+        if self.chain:
+            # self.chain.record()
+            pp = self.chain.params(array, **kwds)
+            # print(pp)
+            p.update(pp)
+        return p
+
+    def loop(self):
+        self._loop = iter(self.items())
+        _ = next(self._loop)
+
+    def bind(self, *, key=None, artist=None, **kwds):
+        if key is None:
+            key = self._current
+        cname = self.child.value()
+        # locallog.debug(f"bind: [{cname}]={artist}")
+        # locallog.debug(f"bind: {artist.norm=}")
+        # locallog.debug(f"bind: {artist.get_clim()=}")
+        # locallog.debug(f"bind: {artist.get_array()=}")
+        if cname not in self.cache:
+            self.cache[cname] = CmapStatus(artist, self.reverse)
+        if self.chain:
+            self.chain.bind(artist=artist, **kwds)
+
+    def transpose(self, switch=None, key=None):
+        if switch is None:
+            self.reverse = not bool(self.reverse)
+        else:
+            self.reverse = bool(switch)
+
+        return self.reverse
+
+    def toggle_lock(self, fig, switch=None, lev=None):
+        if lev == 'norm':
+            return self.chain.toggle_lock(fig, switch)
+
+    def advance(self, step, lev=None):
+        if lev == 'norm':
+            return self.chain.advance(step)
+
+        if lev is None:
+            lev = 1
+
+        if lev == 1:
+            self.switch(step=0)
+            self.child.switch(step=step)
+        else:
+            # remember previous
+            pos = self.child.l2i()
+            name = self.l2p()
+            self.cpos[name] = pos
+
+            self.switch(step=step)
+            self.child.switch(step=0)
+
+        try:
+            v = next(self._loop)
+        except StopIteration:
+            self._loop = iter(self.items())
+            v = next(self._loop)
+
+        if lev == 1:
+            # refresh current
+            name = self.l2p()
+            self.cpos[name] = True
+
+        grp = self.l2p()
+        cname = self.child.value()
+        # print(grp, cname)
+        return grp, cname
+
+    def fwd(self, lev=None):
+        return self.advance(+1, lev=lev)
+
+    def bwd(self, lev=None):
+        return self.advance(-1, lev=lev)
 
 
 class FigureInteractive(zplt.FigureCore, DataTree):
@@ -1833,6 +1962,7 @@ class FigureInteractive(zplt.FigureCore, DataTree):
     _cache_patches = ['facecolor', 'linewidth', 'edgecolor', ]
 
     mark = {'linewidth': 20.0, 'edgecolor': 'blue', }
+    cmap_lock = {'linewidth': 3.0, 'edgecolor': 'cyan', }
 
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
@@ -1883,21 +2013,6 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         else:
             self.view = {}
 
-    # def permute_coords(self, switch):
-    #     base = self.trees.inquire(prop='self', cls=VariableIter, single=True)
-    #     if base:
-    #         base.permute_coords(switch)
-
-    # def point_selection(self, sel):
-    #     base = self.trees.inquire(prop='self', cls=VariableIter, single=True)
-    #     if base:
-    #         base.point_selection(sel)
-
-    # def permute_anchor(self, switch):
-    #     base = self.trees.inquire(prop='self', cls=VariableIter, single=True)
-    #     if base:
-    #         base.permute_anchor(switch)
-
     def toggle_lock(self, force=None):
         p = self._lock
         if force is not None:
@@ -1939,18 +2054,15 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         return n
 
     def loop(self, step=True):
-        # if self._loop is None:
-        #     self._loop = iter(self.trees.items())
-        #     step = True
         if step:
             if self._loop is None:
                 self._loop = iter(self.trees.items())
 
             try:
                 cur = next(self._loop)
-                locallog.debug(f'loop/status enter {step}')
+                # locallog.debug(f'loop/status enter {step}')
                 self.sel = self.trees.status(recurse=True)
-                locallog.debug(f'loop/status exit {step}')
+                # locallog.debug(f'loop/status exit {step}')
                 return cur
             except StopIteration:
                 self._loop = None
@@ -1960,11 +2072,11 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         elif self._loop is None:
             cur = None, None
         else:
-            locallog.debug(f'loop/status enter {step}')
+            # locallog.debug(f'loop/status enter {step}')
             k = self.trees.current
             cur = k, self.trees[k]
             self.sel = self.trees.status(recurse=True)
-            locallog.debug(f'loop/status exit {step}')
+            # locallog.debug(f'loop/status exit {step}')
         return cur
 
     def restore_view(self, axs):
@@ -2216,12 +2328,15 @@ class FigureControl():
         #         locallog.debug(f"[{gid}]={ch}")
         # fig.set_hook(self.prompt)
         # params = self.params.get_link(key=trees, fig=fig, array=arr)
-        params = self.view_params(fig, src=src, array=arr)
+        # exclude axis
+        params = self.view_params(fig, True, 'axis', src=src, array=arr)
+        # print(params)
+        axis = self.axis_params(fig, array=arr)
         # print(params.params())
         # locallog.info("invoke: before plot")
         # print(view, style)
         r = self.plot(fig=fig, axs=axs, data=arr,
-                      view=view, body=style, **params)
+                      view=view, body=style, **params, **axis)
         # locallog.info(f"invoke: after plot")
         return r
 
@@ -2229,6 +2344,16 @@ class FigureControl():
         src = fig.source_data() if src is None else src
         array = fig.draw_data() if array is None else array
         params = self.params(*args, fig=fig, src=src, array=array, **kwds)
+        return params
+
+    def axis_params(self, fig, array=None, **kwds):
+        arg = 'axis'
+        array = fig.draw_data() if array is None else array
+        params = {}
+        for dim in array.dims:
+            p = self.params(arg, fig=fig, name=dim, **kwds)
+            params[dim] = p[arg]
+        params = {arg: params}
         return params
 
     def get_disp(self, arg, fig, src=None, array=None, default=None, **kwds):
@@ -2308,18 +2433,18 @@ class FigureControl():
             axs.toggle_guides(fig, False)
             fig.switch_patch(0)
             text = axs.pop_monitor()
-            locallog.info('before savefig')
+            # locallog.info('before savefig')
             if hasattr(output, 'savefig'):
                 output.savefig(fig)
             else:
                 fig.savefig(output)
-            locallog.info('after savefig')
+            # locallog.info('after savefig')
             axs.toggle_guides(fig, True)
             fig.pop_patch()
             fig.info(pfx=f'\r({jfig}) ', msg=f"Saved: {output}")
-            locallog.info('before monitor')
+            # locallog.info('before monitor')
             axs.monitor(fig, text)
-            locallog.info('after monitor')
+            # locallog.info('after monitor')
         else:
             locallog.warning(f"No output defined.")
 
@@ -2370,48 +2495,75 @@ class FigureControl():
         axs.toggle_guides(fig, False)
         fig.canvas.draw()
 
-    def turn_cmap(self, fig, step=None):
+    def turn_cmap(self, fig, step=None, lev=None):
         step = step or +1
         disp = self.get_disp('color', fig)
         if disp:
             if step > 0:
-                cmap = disp.fwd()
+                g, c = disp.fwd(lev=lev)
             else:
-                cmap = disp.bwd()
-            self.interactive(fig, step=False, msg=f'colormap:{cmap}')
-        # if self.cmap:
-        #     if step > 0:
-        #         self.cmap.fwd()
-        #     else:
-        #         self.cmap.bwd()
-        #     cmap = self.cmap.value()
-        #     self.interactive(fig, step=False, msg=f'colormap: {cmap}')
+                g, c = disp.bwd(lev=lev)
+            try:
+                c = c.name
+            except AttributeError:
+                pass
+            g = g or 'default'
+            self.interactive(fig, step=False, msg=f'colormap[{g}] {c}')
 
     def turn_norm(self, fig, step=None):
         step = step or +1
         disp = self.get_disp('color', fig)
+        # locallog.info(f"turn_norm: {step} {disp=}")
         if disp:
             if step > 0:
-                cmap = disp.norm_fwd()
+                n = disp.fwd(lev='norm')
             else:
-                cmap = disp.norm_bwd()
-            self.interactive(fig, step=False, msg=f'colormap:{cmap}')
-        # self.norm.advance(step)
-        # norm = self.norm.value()
-        # # self.cmap.set_force('viridis')
-        # cmap = self.cmap.value()
-        # if norm:
-        #     norm, revc = norm
-        #     norm = norm or ''
-        #     norm = [f"{norm}"]
-        #     if revc:
-        #         norm = norm + ["reversed"]
-        # else:
-        #     norm = []
-        # norm = ','.join(norm)
-        # if norm:
-        #     norm = f'[{norm}]'
-        # self.interactive(fig, step=False, msg=f'colormap: {cmap}{norm}')
+                n = disp.bwd(lev='norm')
+            n = n or 'default'
+            self.interactive(fig, step=False, msg=f'colormap norm: {n}.')
+
+    def turn_axis_scale(self, fig, which, step=None):
+        step = step or +1
+        array = fig.draw_data()
+
+        if which in ['left', 'right', ]:
+            dim = array.dims[0]
+        elif which in ['top', 'bottom', ]:
+            dim = array.dims[1]
+        else:
+            return
+        disp = self.get_disp('axis', fig, name=dim)
+        if disp:
+            if step > 0:
+                sc = disp.fwd()
+            else:
+                sc = disp.bwd()
+            # locallog.info(f"turn_axis_scale: {which=} {step=} {disp=} {sc=}")
+            sc = sc or 'default'
+            self.interactive(fig, step=False,
+                             msg=f'{which} ({dim}) scale: {sc}.')
+
+    def lock_cmap_range(self, fig, ax=None, switch=None):
+        axs = self.figs[fig]
+        disp = self.get_disp('color', fig)
+        if disp:
+            b = disp.toggle_lock(fig, switch, lev='norm')
+            # if b:
+            #     fig.group_push_patch(facecolor='gray', ax=(ax, 'spine'))
+            # else:
+            #     fig.group_pop_patch(ax=(ax, 'spine'))
+            # ax = axs.get_axes(ax)
+            # bg = axs.bg.get(ax)
+            # if bg:
+            #     fig.canvas.restore_region(bg)
+            #     if switch != b:
+            #         if b:
+            #             at = m1i.BboxPatch(ax.bbox,
+            #                                edgecolor='cyan', linewidth=10.0)
+            #             ax.draw_artist(at)
+            #             fig.canvas.blit(ax.bbox)
+            b = 'locked' if b else 'unlocked'
+            self.interactive(fig, step=False, msg=f'colormap range: {b}')
 
     def _toggle_visible(self, fig):
         axs = self.figs[fig]
@@ -2424,7 +2576,7 @@ class FigureControl():
             disp = self.get_disp('color', fig)
             if disp:
                 disp.transpose()
-            self.interactive(fig, step=False, msg='transpose colormap')
+            self.interactive(fig, step=False, msg='reverse colormap')
         else:
             axs.toggle_guides(fig, False)
             axs.toggle_axis(which, ax=ax)
@@ -2482,50 +2634,70 @@ class FigureControl():
     def show_info(self, fig):
         jfig = fig.number
         fig.info(pfx=f'\r({jfig}) info: ')
-        if locallog.is_debug():
-            self.diag_childlen(fig)
-            axs = self.figs[fig]
-            for ax, bg in axs.bg.items():
-                gid = ax.get_gid() or ax
-                print(f"bg[{gid}]={bg}")
+        # if locallog.is_debug():
+        #     self.diag_childlen(fig)
+        #     axs = self.figs[fig]
+        #     for ax, bg in axs.bg.items():
+        #         gid = ax.get_gid() or ax
+        #         print(f"bg[{gid}]={bg}")
 
-    def mouse_handler(self, event, fig, axs, lab, cmd, sub, aux=None):
+    def mouse_handler(self, event, fig, axs, lab, cmd, aux=None):
         """Mouse event handler core."""
         wlock = fig.canvas.widgetlock.locked()
-        locallog.debug(f"[{wlock}] {lab=} {cmd=} {sub=} {aux=}")
+        locallog.debug(f"[{wlock}] {lab=} {cmd=} {aux=}")
+        cmd = cmd or ''
         if cmd == 'select' and not wlock:
             if lab == 'body':
-                self.point_selection(fig, axs, lab, sub, event)
-            elif lab == 'spine':
-                if aux[0] == 'body':
-                    self.spine_selection(fig, axs, lab, sub, aux, event)
+                self.spine_selection(fig, axs, lab, aux, event)
         elif cmd == 'anchor' and not wlock:
             if lab == 'body':
-                self.point_selection(fig, axs, lab, sub, event,
+                self.spine_selection(fig, axs, lab, aux, event,
                                      anchor=True)
-            elif lab == 'spine':
-                if aux[0] == 'body':
-                    self.spine_selection(fig, axs, lab, sub, aux, event,
-                                         anchor=True)
+        elif cmd.startswith('select_') and not wlock:
+            sub = cmd.index('_')
+            sub = (cmd[sub+1:], )
+            if lab == 'body':
+                self.point_selection(fig, axs, lab, sub, event)
+        elif cmd.startswith('anchor_') and not wlock:
+            sub = cmd.index('_')
+            sub = (cmd[sub+1:], )
+            if lab == 'body':
+                self.point_selection(fig, axs, lab, sub, event, anchor=True)
         elif cmd == 'next_cyclic':
-            if lab == 'axis':
+            if lab == 'body' and aux:
                 self.switch_draw(fig, aux, +1)
             elif lab == 'colorbar' and not wlock:
                 self.map_figures(self.turn_cmap, fig, step=+1)
         elif cmd == 'prev_cyclic':
-            if lab == 'axis':
+            if lab == 'body' and aux:
                 self.switch_draw(fig, aux, -1)
             elif lab == 'colorbar'  and not wlock:
                 self.map_figures(self.turn_cmap, fig, step=-1)
-        elif cmd == 'transpose':
-            if lab == 'axis':
-                self.map_figures(self.transpose, fig)
-            elif lab == 'spine':
+        elif cmd == 'next_group':
+            if lab == 'colorbar'  and not wlock:
+                self.map_figures(self.turn_cmap, fig, lev=0, step=+1)
+        elif cmd == 'prev_group':
+            if lab == 'colorbar'  and not wlock:
+                self.map_figures(self.turn_cmap, fig, lev=0, step=-1)
+        elif cmd == 'reverse':
+            if lab == 'body' and aux:
                 self.map_figures(self.toggle_axis, fig,
-                                 ax=aux[0], which=aux[1])
+                                 ax=lab, which=aux[0])
+            elif lab == 'colorbar':
+                self.map_figures(self.toggle_axis, fig,
+                                 ax=lab, which=None)
+        elif cmd == 'transpose':
+            if lab == 'body' and aux:
+                self.map_figures(self.transpose, fig)
         elif cmd == 'next_norm':
             if lab == 'colorbar' and not wlock:
                 self.map_figures(self.turn_norm, fig, step=+1)
+            elif lab == 'body' and not wlock:
+                self.map_figures(self.turn_axis_scale, fig,
+                                 which=aux[0], step=+1)
+        elif cmd == 'lock':
+            if lab == 'colorbar':
+                self.map_figures(self.lock_cmap_range, fig, ax=lab)
 
         # print()
         # ax = event.inaxes
@@ -2621,12 +2793,12 @@ class FigureControl():
             elif cmd == 'print':
                 self.map_figures(self.savefig, fig)
             elif cmd == 'turn_cmap':
-                self.map_figures(self.turn_cmap, fig)
-            # elif cmd == 'toggle_norm':
-            #     self.map_figures(self.toggle_norm, fig)
-            elif cmd == 'toggle_horizontal':
+                self.map_figures(self.turn_cmap, fig, step=+1)
+            elif cmd == 'turn_norm':
+                self.map_figures(self.turn_norm, fig, step=+1)
+            elif cmd == 'reverse_horizontal':
                 self.map_figures(self.toggle_axis, fig, 'h')
-            elif cmd == 'toggle_vertical':
+            elif cmd == 'reverse_vertical':
                 self.map_figures(self.toggle_axis, fig, 'v')
             elif cmd == 'redraw':
                 self.map_figures(self.redraw, fig)
@@ -2677,38 +2849,6 @@ class FigureControl():
             lgrp = lab[0] if isinstance(lab, tuple) else lab
             if lgrp == 'spine':
                 self.monitor_spine(fig, axs, lab, event)
-
-    # class Cursor:
-    #     """
-    #     A cross hair cursor.
-    #     """
-    #     def __init__(self, ax):
-    #         self.ax = ax
-    #         self.horizontal_line = ax.axhline(color='k', lw=0.8, ls='--')
-    #         self.vertical_line = ax.axvline(color='k', lw=0.8, ls='--')
-    #         # text location in axes coordinates
-    #         self.text = ax.text(0.72, 0.9, '', transform=ax.transAxes)
-
-    #     def set_cross_hair_visible(self, visible):
-    #         need_redraw = self.horizontal_line.get_visible() != visible
-    #         self.horizontal_line.set_visible(visible)
-    #         self.vertical_line.set_visible(visible)
-    #         self.text.set_visible(visible)
-    #         return need_redraw
-
-    #     def on_mouse_move(self, event):
-    #         if not event.inaxes:
-    #             need_redraw = self.set_cross_hair_visible(False)
-    #             if need_redraw:
-    #                 self.ax.figure.canvas.draw()
-    #         else:
-    #             self.set_cross_hair_visible(True)
-    #             x, y = event.xdata, event.ydata
-    #             # update the line positions
-    #             self.horizontal_line.set_ydata([y])
-    #             self.vertical_line.set_xdata([x])
-    #             self.text.set_text(f'x={x:1.2f}, y={y:1.2f}')
-    #             self.ax.figure.canvas.draw()
 
     def enter_axes(self, event, fig, axs):
         ax = event.inaxes
@@ -2762,49 +2902,41 @@ class FigureControl():
         x, y = axs.get_position(x, y, lab)
         prev = fig.restore_view(axs)
         co = list(prev.keys())
-        if sub[0] == 'x':
+
+        # pos = (event.x, event.y)
+        # dpos = axs.position_transform(*pos, ax=lab)
+        # print((x, y), dpos)
+
+        if sub[0] in ['x', 'h', ]:
             nsel = {co[1]: x}
-        elif sub[0] == 'xy':
+        elif sub[0] in ['xy', 'hv', ]:
             nsel = {co[0]: y, co[1]: x, }
-        elif sub[0] == 'y':
+        elif sub[0] in ['y', 'v', ]:
             nsel = {co[0]: y}
         else:
             return
         fig.point_selection(nsel, anchor=anchor)
         self.interactive(fig, step=False, msg='point', prev=prev)
 
-    def spine_selection(self, fig, axs, lab, sub, aux, event, anchor=None):
+    def spine_selection(self, fig, axs, lab, aux, event, anchor=None):
         prev = fig.restore_view(axs)
         co = list(prev.keys())
-        which = aux[1]
+        which = aux[0]
         if which in ['left', 'right', ]:
             pos = (None, event.y)
         elif which in ['top', 'bottom', ]:
             pos = (event.x, None)
         else:
             return
-        dpos = axs.position_transform(*pos, ax=aux[0])
+        dpos = axs.position_transform(*pos, ax=lab)
         nsel = {}
         for c, p in zip(co, dpos[::-1]):
             if p is not None:
                 nsel[c] = float(p)
-        locallog.debug(f"{nsel=}")
-        # locallog.debug(f"{sub=} {aux=} ({pos}) ({dpos})")
+        # locallog.debug(f"{nsel=}")
+        locallog.debug(f"{aux=} ({pos}) ({dpos})")
         fig.point_selection(nsel, anchor=anchor)
         self.interactive(fig, step=False, msg='section', prev=prev)
-        # x, y = axs.get_position(x, y, lab)
-        # prev = fig.restore_view(axs)
-        # co = list(prev.keys())
-        # if sub[0] == 'x':
-        #     nsel = {co[1]: x}
-        # elif sub[0] == 'xy':
-        #     nsel = {co[0]: y, co[1]: x, }
-        # elif sub[0] == 'y':
-        #     nsel = {co[0]: y}
-        # else:
-        #     return
-        # fig.point_selection(nsel, anchor=anchor)
-        # self.interactive(fig, step=False, msg='point', prev=prev)
 
     def monitor_spine(self, fig, axs, lab, event, aux=None):
         debug = ft.partial(self.debug, func='monitor_spine')
@@ -2821,7 +2953,7 @@ class FigureControl():
         axs.monitor(fig, text)
 
     def monitor_point(self, fig, axs, lab, event, aux=None, fmt=None):
-        """Point selection by mouse click."""
+        """Monitor point."""
         fmt = fmt or r'({x:.2f}, {y:.2f})'
 
         x, y = (event.xdata, event.ydata)
@@ -2843,6 +2975,7 @@ class FigureControl():
                     text = fmt.format(x=x, y=y)
             else:
                 text = fmt.format(x=x, y=y)
+                # print(fig.get_points(x=x, y=y))
         else:
             text = '(null)'
         if locallog.is_debug():
@@ -2863,10 +2996,12 @@ class FigureControl():
         #     stf = '/'.join(stf.parts[-2:])
         #     print(f"{stf}:{st.lineno}:{st.function}: {st.code_context[0]}", end='')
         # print('-' * 20)
-        locallog.info(f'on_draw {event}')
-        self.diag_childlen(fig)
+        # locallog.info(f'on_draw {event}')
+
+        # self.diag_childlen(fig)
         axs.on_draw(fig)
         # self.diag_childlen(fig)
+
         # for ax in fig.get_children():
         #     gid = ax.get_gid()
         #     if gid == 'body':
@@ -2881,88 +3016,56 @@ class FigureControl():
         debug = ft.partial(self.debug, func='mouse_pick')
         this = event.artist
         mouse = event.mouseevent
-        # x, y = mouse.x, mouse.y
-        # xdata = thisline.get_xdata()
-        # ydata = thisline.get_ydata()
-        # ind = event.ind
-        # points = tuple(zip(xdata[ind], ydata[ind]))
+
         gid = this.get_gid()
         aux = gid.split(':')
         lab = aux.pop(0)
 
-        # bbox = this.get_tightbbox()
-        # extent = this.get_window_extent()
-        # cbox = this.get_clip_box()
-        # if cbox:
-        #     cont = cbox.contains(x, y)
-        # else:
-        #     cont = None
-        # debug(f'onpick: {this}')
-        # debug(f'event: {x} {y}')
-        # debug(f'prop: {gid=} {bbox=} {cont=} {extent=}')
-
         nm = self.normalize_mouse(mouse)
         mseq = self.mmap.get(nm) or {}
         cmds = mseq.get(lab) or ()
-        debug(f"{mouse=} {mseq=} {lab=} {cmds=}")
+        # debug(f"{mouse=} {mseq=} {lab=} {cmds=}")
         cmds = cmds or (None, )
 
         if False:
             self.mouse_handler(event, fig, axs, lab, cmds[0], cmds[1:], aux)
-        # if cmds[0] == 'next_cyclic':
-        #     if lab == 'axis':
-        #         self.switch_draw(fig.number, aux[0], +1)
-        # elif cmds[0] == 'prev_cyclic':
-        #     if lab == 'axis':
-        #         self.switch_draw(fig.number, aux[0], -1)
-        # elif cmds[0] == 'transpose':
-        #     if lab == 'axis':
-        #         self.map_figures(self.transpose, fig.number)
-
-        # a = mart.ArtistInspector(this)
-        # ppr.pprint(a.properties())
 
     def mouse_press(self, event, fig, axs):
         """Mouse button actions on axes."""
         debug = ft.partial(self.debug, func='mouse_press')
         lab = axs.retrieve_event(event)
-        debug(f"{lab=}")
-        if isinstance(lab, tuple):
-            aux = lab[1:]
-            lab = lab[0]
-        elif lab is not None:
-            aux = lab.split(':')
-            lab = aux.pop(0)
-        else:
-            aux = None
 
         if fig.canvas.widgetlock.locked():
             self._cache_events.append(event)
 
         mouse = self.normalize_mouse(event)
         mseq = self.mmap.get(mouse) or {}
-        cmds = mseq.get(lab) or ()
-        debug(f"({event.x},{event.y})")
-        debug(f"{mouse=} <{lab=} {aux=}> {cmds=}")
-        # if lab == 'body':
-        #     self.point_selection(fig, axs, lab, mouse, event)
-        cmds = cmds or (None, )
-        self.mouse_handler(event, fig, axs, lab, cmds[0], cmds[1:], aux)
 
-        # if cmds[0] == 'select':
-        #     if lab == 'body':
-        #         self.point_selection(fig, axs, lab, cmds[1:], event)
-        # elif cmds[0] == 'anchor':
-        #     if lab == 'body':
-        #         self.point_selection(fig, axs, lab, cmds[1:], event,
-        #                              anchor=True)
+        debug(f"{lab=}")
+        debug(f"{mseq=}")
+        if isinstance(lab, tuple):
+            k = lab
+            aux = lab[2:]
+            lab = lab[1]
+            while len(k) > 1:
+                if k in mseq:
+                    cmds = mseq[k]
+                    break
+                k = k[:-1]
+            else:
+                k = k[0]
+                cmds = mseq.get(k) or ()
+        else:
+            cmds = mseq.get(lab) or ()
+            aux = None
+        self.mouse_handler(event, fig, axs, lab, cmds, aux=aux)
 
     def parse_config(self, config, rcparams):
         config = config or {}
         verbose = config.get('verbose', 0)
         self.kmap = self.parse_keymap({}, config.get('keymap', {}))
         self.mmap = self.parse_mousemap({}, config.get('mouse', {}))
-        locallog.debug(self.mmap)
+        # locallog.debug(self.mmap)
         # ppr.pprint(config.get('mouse'))
         # ppr.pprint(self.kmap)
         # ppr.pprint(self.mmap)
@@ -2996,11 +3099,18 @@ class FigureControl():
             if isinstance(c, dict):
                 # self.parse_mousemap(mmap, c, group + (f, ))
                 mmap = self.parse_mousemap(mmap, c, v, lev+1)
-            elif isinstance(c, list):
-                for k in c:
-                    mmap.setdefault(k, {})[v[0]] = v[1:]
-            elif c != '':
-                mmap.setdefault(c, {})[v[0]] = v[1:]
+            else:
+                lab = v[:-1]
+                if len(lab) <= 1:
+                    lab = lab[0]
+                cmd = v[-1]
+                if isinstance(c, list):
+                    for k in c:
+                        # mmap.setdefault(k, {})[v[0]] = v[1:]
+                        mmap.setdefault(k, {})[lab] = cmd
+                elif c != '':
+                    # mmap.setdefault(c, {})[v[0]] = v[1:]
+                    mmap.setdefault(c, {})[lab] = cmd
         return mmap
 
     def debug(self, msg, func=None, **kwds):
@@ -3046,6 +3156,8 @@ def extract_sels(sel, data, strict=None):
                 sp = slice(start, stop, sp.step)
             elif isinstance(sp, int):
                 sp = cv[sp].item()
+            else:
+                sp = normalize_selection(cv, sp)
             nsel[co] = sp
         except UserWarning as exc:
             msg = f"no coordinate to select: {co}"
@@ -3063,8 +3175,10 @@ def extract_sels(sel, data, strict=None):
             # workaround for NotImplementedError in xarray
             xs = esel[co]
             if not isinstance(xs, (slice, int)):
-                xs = data.coords[co].sel({co: xs}, method='nearest')
-                nsel[co] = xs.item()
+                nsel[co] = normalize_selection(data.coords[co],
+                                               xs, index=False)
+                # xs = data.coords[co].sel({co: xs}, method='nearest')
+                # nsel[co] = xs.item()
     return esel, nsel
 
 
@@ -3091,6 +3205,7 @@ def extract_base_array(data, nsel, xsel):
         if fsel:
             base = base.sel(fsel, method='nearest')
     return base
+
 
 def gen_mask(data, coords, anchors=None, empty=None):
     """Create mask array for iteration."""
@@ -3121,10 +3236,10 @@ def draw_coords(data, src, dims, coords, default,
     if not isinstance(coords, (tuple, list)):
         coords = tuple(coords)
 
-    locallog.debug(f"{coords} << {src.dims}")
-    locallog.debug(f"   {anchors=}")
-    locallog.debug(f"   {data.shape}")
-    locallog.debug(f"   {data.dims}")
+    # locallog.debug(f"{coords} << {src.dims}")
+    # locallog.debug(f"   {anchors=}")
+    # locallog.debug(f"   {data.shape}")
+    # locallog.debug(f"   {data.dims}")
 
     anchors = anchors or {}
     targets = []
@@ -3142,7 +3257,7 @@ def draw_coords(data, src, dims, coords, default,
                 targets.append('')
             if c != '':
                  locallog.warning(f"no coordinate to plot {c}.")
-    locallog.debug(f"first try: {targets=}")
+    # locallog.debug(f"first try: {targets=}")
     rem = len(src.dims)
     ntargets = []
     def is_valid(c, default=''):
@@ -3178,7 +3293,7 @@ def draw_coords(data, src, dims, coords, default,
     ntargets = type(coords)(ntargets)
     if len(set(ntargets)) != len(coords):
         raise ValueError(f"Invalid target coordinates {coords} >> {ntargets}")
-    locallog.debug(f"result: {ntargets=}")
+    # locallog.debug(f"result: {ntargets=}")
     return ntargets
 
 
@@ -3297,3 +3412,32 @@ def match_coordinate(array, name, kwds):
                 return kwds[a]
 
     raise KeyError(f"No match corresponding to coordinate {name}")
+
+
+def is_cyclic_coord(co):
+    """Check if coordinate is cyclic."""
+    return co.attrs.get('cyclic_coordinate', False)
+
+
+def normalize_selection(co, sel, method=None, index=None):
+    """Return index or normalized coordinate corresponding to sel."""
+    method = method or 'nearest'
+    cc = is_cyclic_coord(co)
+    if cc:
+        _, org, dup = cc
+        if org > dup:
+            org, dup = dup, org
+        cyc = dup - org
+        if sel < org:
+            while sel < org:
+                sel = sel + cyc
+        elif sel > dup:
+            while sel > dup:
+                sel = sel - cyc
+    d = co.name
+    sel = co.sel({d: sel}, method=method)
+    sel = sel.item()
+    if bool(index):
+        co = co.to_index()
+        sel = co.get_loc(sel)
+    return sel
