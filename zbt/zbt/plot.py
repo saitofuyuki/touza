@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/12/23 10:15:06 fuyuki plot.py>
+# Time-stamp: <2025/01/09 10:27:44 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -17,6 +17,8 @@ import collections.abc as cabc
 import numbers as nums
 import pprint as ppr
 import logging
+import copy
+import math
 
 import numpy as np
 
@@ -27,6 +29,7 @@ import matplotlib.backend_tools as mpbt
 import matplotlib.contour as mcnt
 import matplotlib.patches as mpatches
 import matplotlib.transforms as mtr
+import matplotlib.artist as mart
 
 import xarray as xr
 import xarray.plot.utils as xrpu
@@ -136,49 +139,55 @@ class FigureCore(mplib.figure.Figure):
 
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
-        self._stack_patches = []
+        self._stack_patches = {}
 
     def __str__(self):
         return super().__str__()
 
-    def _store_patch(self):
+    def _store_patch(self, ax):
         c = {}
+        pp = self._stack_patches.setdefault(ax, [])
         for p in self._cache_patches:
             f = getattr(self.patch, f'get_{p}')
             c[p] = f()
-        self._stack_patches.append(c)
+        pp.append(c)
+        # self._stack_patches.append(c)
 
-    def push_patch(self, **kwds):
-        self._store_patch()
-        self.patch.set(**kwds)
+    def push_patch(self, ax=None, **kwds):
+        self._store_patch(ax)
+        if ax is None:
+            self.patch.set(**kwds)
+        else:
+            ax.patch.set(**kwds)
         return kwds
 
-    def switch_patch(self, pos):
+    def switch_patch(self, pos, ax=None):
         try:
-            kwds = self._stack_patches[pos]
-            self._store_patch()
+            kwds = self._stack_patches[ax][pos]
+            self._store_patch(ax)
             self.patch.set(**kwds)
-        except IndexError:
-            self._store_patch()
+        except KeyError:
+            self._store_patch(ax)
             kwds = None
         return kwds
 
-    def pop_patch(self, pos=None):
+    def pop_patch(self, ax=None, pos=None):
         if pos is None:
             pos = -1
-        kwds = self._stack_patches.pop(pos)
+        kwds = self._stack_patches[ax].pop(pos)
         self.patch.set(**kwds)
         return kwds
 
-    def get_patch(self, pos=None):
+    def get_patch(self, ax=None, pos=None):
         if pos is None:
             pos = -1
-        return self._stack_patches[pos]
+        return self._stack_patches[ax][pos]
 
     def diag_patches(self):
-        for j, s in enumerate(self._stack_patches):
-            s = ' '.join(f"[{k}]={v}" for k, v in s.items())
-            print(f"stack[{j}]: {s}")
+        for ax, pp in self._stack_patches.items:
+            for j, s in enumerate(pp):
+                s = ' '.join(f"[{k}]={v}" for k, v in s.items())
+                print(f"<{ax}> stack[{j}]: {s}")
 
 # # ### Axes
 # class EmptyAxes(mplib.axes.Axes):
@@ -402,6 +411,8 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         # self.crs = {}
         self.projp = {}   # projection properites == (crs, transform)
         self.bg = {}
+        self.bbox = {}
+        self.cb = {}
         self.fragiles = []
         self.guides = {}
         reset = True if reset is None else reset
@@ -459,6 +470,10 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         if isinstance(ax, mplib.axes.Axes):
             return ax
         return default
+
+    def get_axes(self, key, default=None):
+        """Return key if Axes, otherwise lookup internal dict."""
+        return self._get_axes(key, default)
 
     # figure methods
     def _resize_calc(self, base, rate):
@@ -774,18 +789,33 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         """Wrap figure.colorbar()"""
         cax = self._get_axes(cax)
         artists = artists or []
-        locallog.debug(f"colorbar: {args} {kwds}")
+        # debug_artist(cax, 'colorbar:before')
+        # cax.cla()
+
+        # need refresh axes_locator to avoid
+        # undesired inheritance of colormap bounding box
+        cax.set_axes_locator(None)
+        # if 'outline' in cax.spines:
+        #     del(cax.spines['outline'])
+        # for ch in cax.get_children():
+        #     if isinstance(ch, mplib.colorbar._ColorbarSpine):
+        #         del(ch)
+
+        # debug_artist(cax, 'colorbar:cla')
+        # bar = fig.colorbar(*args, cax=copy.copy(cax), **kwds)
         bar = fig.colorbar(*args, cax=cax, **kwds)
+        # debug_artist(cax, 'colorbar:after')
         artists.extend([bar, cax, ])
         return artists
 
     def set_view(self, data, ax=None, artists=None,
-                 x=None, y=None, crs=None, **kwds):
+                 x=None, y=None, crs=None, axisp=None):
         artists = artists or []
         ax = self._get_axes(ax)
+        axisp = axisp or {}
         if isinstance(ax, cmgeo.GeoAxes):
             artists = self.set_geo_view(data, ax=ax, artists=artists,
-                                        x=x, y=y, crs=crs, **kwds)
+                                        x=x, y=y, crs=crs, axisp=axisp)
             # self.crs[ax] = crs
             self.projp[ax] = crs
         elif ax:
@@ -795,11 +825,17 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             x = x or co[-1]
             y = y or co[0]
 
+            # print(x, y)
             xc = data.coords[x]
             yc = data.coords[y]
 
-            self.set_tick(xc, ax, 'x', **(kwds.get(x) or {}))
-            self.set_tick(yc, ax, 'y', **(kwds.get(y) or {}))
+            ap = axisp.get(x) or {}
+            # ap = ap | (kwds.get(x) or {})
+            self.set_tick(xc, ax, 'x', **(ap or {}))
+
+            ap = axisp.get(y) or {}
+            # ap = ap | (kwds.get(y) or {})
+            self.set_tick(yc, ax, 'y', **(ap or {}))
 
             artists.extend([ax.xaxis, ax.yaxis,
                             ax.xaxis.get_offset_text(),
@@ -810,14 +846,15 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
 
     def set_tick(self, co, ax, which,
                  major=None, minor=None, dmin=None, dmax=None,
-                 **kwds):
+                 scale=None, **kwds):
         """Draw axis."""
         if which == 'x':
             axis, limf, scf = ax.xaxis, ax.set_xlim, ax.set_xscale
         else:
             axis, limf, scf = ax.yaxis, ax.set_ylim, ax.set_yscale
 
-        cmin, cmax, scale = self.parse_coor(co)
+        cmin, cmax, sc = self.parse_coor(co)
+        scale = scale or sc
         dmin = zu.set_default(dmin, cmin)
         dmax = zu.set_default(dmax, cmax)
         span = abs(dmax - dmin)
@@ -840,13 +877,18 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         axis.set_tick_params(which='minor', **(minor or {}))
         if dmin != dmax:
             limf(dmin, dmax)
+        if scale == 'log':
+            if dmin <= 0 or dmax <= 0:
+                locallog.warning(f"log-scale axis is ignored ({dmin}:{dmax}).")
+                scale = None
         if scale:
             scf(scale)
 
     def set_geo_view(self, data, ax=None, artists=None,
                      x=None, y=None,
-                     crs=None, extent=None, **kwds):
-        print(f"{extent=}")
+                     crs=None, extent=None, axisp=None):
+        # print(f"{extent=}")
+        axisp = axisp or {}
         artists = artists or []
         if not ax:
             return artists
@@ -860,10 +902,10 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         xc = data.coords[x]
         yc = data.coords[y]
 
-        view_x = kwds.get(x) or {}
-        view_y = kwds.get(y) or {}
+        view_x = axisp.get(x) or {}
+        view_y = axisp.get(y) or {}
 
-        print(f"{view_x=} {view_y=}")
+        # print(f"{view_x=} {view_y=}")
         if x in data.coords and y in data.coords:
             try:
                 self.set_lon_view(ax, xc, crs, **view_x)
@@ -1010,7 +1052,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             taxis = None
             waxis = None
             aspine = None
-        locallog.debug(f"{lab}/{which} {aspine=} {taxis=} {waxis=}")
+        # locallog.debug(f"{lab}/{which} {aspine=} {taxis=} {waxis=}")
         if aspine and aspine not in skeys:
             skeys.insert(aspine, 0)
 
@@ -1024,7 +1066,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             wspine = list(self.extent(sp, other))
 
             xspine = self.adjust_spine_bb(xspine, xbody, xlabel)
-            locallog.debug(f"{lab}/{which} <{k}> {xspine=}")
+            # locallog.debug(f"{lab}/{which} <{k}> {xspine=}")
 
             sax = self.register_bg(fig, xspine, wspine, which,
                                    ('spine', gid, k), zorder=-2)
@@ -1040,7 +1082,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             if aspine == k:
                 xlabel[1] = max(xlabel[1] + tol, xspine[0])
                 xlabel[0] = min(xlabel[0] - tol, xspine[1])
-                locallog.debug(f"{lab}/{which} <{k}> {xlabel=}")
+                # locallog.debug(f"{lab}/{which} <{k}> {xlabel=}")
                 self.register_bg(fig, xlabel, wlabel, which,
                                  ('axis', gid, k), zorder=-1)
 
@@ -1209,6 +1251,14 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                     return gid
                 return ax
         return None
+
+    def push_patch(self, fig, ax=None, **kwds):
+        ax = self._get_axes(ax)
+        return fig.push_patch(ax=ax, **kwds)
+
+    def pop_patch(self, fig, ax=None, pos=None):
+        ax = self._get_axes(ax)
+        return fig.pop_patch(ax=ax, pos=pos)
 
 
 class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
@@ -1500,7 +1550,12 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
         for lab in self.keys():
             ax = self._get_axes(lab)
             if isinstance(ax, cmgeo.GeoAxes):
-                continue
+                # pp = self.projp.get(ax) or None
+                proj = getattr(ax, 'projection', None)
+                if not isinstance(proj, ccrs.PlateCarree):
+                    continue
+                # print(type(pp), type(proj))
+                # continue
             if lab in self.prop('graph'):
                 self.add_aux_axes(fig, lab, 'x', **kwds)
                 self.add_aux_axes(fig, lab, 'y', **kwds)
@@ -1573,7 +1628,10 @@ class ContourPlot(PlotBase, _ConfigType):
 
         contour = self._contour | (kwds.get('contour') or {})
         color = self._color | (kwds.get('color') or {})
-        locallog.debug(f"{color=}")
+        # locallog.debug(f"{color=}")
+
+        axisp = kwds.get('axis') or {}
+        # locallog.debug(f"{axisp=}")
 
         # if isinstance(ax, cmgeo.GeoAxes):
         body = kwds.get('body') or {}
@@ -1602,9 +1660,13 @@ class ContourPlot(PlotBase, _ConfigType):
         ttl = axs.add_titles(data, aux=aux, **kwds)
         artists.extend(ttl)
 
-        # print(f"{view=}")
+        vopts = {}
+        vopts.update(**view)
+        for k, v in axisp.items():
+            vopts.setdefault(k, {})
+            vopts[k].update(v)
         artists = self.set_view(axs, data, artists=artists,
-                                crs=crs, **(view or {}))
+                                crs=crs, axisp=vopts)
 
         fts = body.get('features') or []
         fts = axs.add_features(*fts)
@@ -1713,8 +1775,25 @@ class ContourPlot(PlotBase, _ConfigType):
         """matplotlib contour wrapper."""
         artists = artists or []
 
+        # if method == 'contourf':
+        #     if 'locator' not in kwds:
+        #         kwds['locator']=mtc.LogLocator()
+        ## Need special treatment for logscale contourf
+        if method in ['contourf', 'contour', ]:
+            if isinstance(norm, mplib.colors.LogNorm):
+                is_logscale = 'log'
+            elif isinstance(norm, mplib.colors.SymLogNorm):
+                is_logscale = 'symlog'
+            else:
+                is_logscale = ''
+        else:
+            is_logscale = False
+
         method = self.check_method(axs, data, method, key)
+
         # locallog.debug(f"color:{kwds=}")
+        if norm:
+            locallog.debug(f"color:{norm.vmin=} {norm.vmax=}")
 
         if method is False:
             pass
@@ -1724,10 +1803,42 @@ class ContourPlot(PlotBase, _ConfigType):
             #     norm = norm()
             #     if norm:
             #         norm, revc = norm
+            locallog.debug(f"color: ini {levels=}")
+            if is_logscale and levels is None:
+                levels = 0
             if levels in [True, None]:
                 levels = None
             elif levels is False:
                 pass
+            elif isinstance(levels, int):
+                if is_logscale == 'log':
+                    levels = levels or None
+                    base = 10
+                    vmin, vmax = norm.vmin, norm.vmax
+                    # vmin = math.pow(base, math.floor(math.log(vmin, base)))
+                    # vmax = math.pow(base, math.ceil(math.log(vmax, base)))
+                    loc = mtc.LogLocator(numticks=levels)
+                    # levels = [z for z in loc.tick_values(vmin, vmax)
+                    #           if vmin <= z <= vmax]
+                    levels = loc.tick_values(vmin, vmax)
+                elif is_logscale == 'symlog':
+                    levels = levels or None
+                    base = 10
+                    vmin, vmax = norm.vmin, norm.vmax
+                    # vmin = math.pow(base, math.floor(math.log(vmin, base)))
+                    # vmax = math.pow(base, math.ceil(math.log(vmax, base)))
+                    loc = mtc.SymmetricalLogLocator(linthresh=norm.linthresh,
+                                                    base=base)
+                    loc.set_params(numticks=levels)
+                    vmin = vmin or (- norm.linthresh * 10)
+                    vmax = vmax or (+ norm.linthresh * 10)
+                    levels = loc.tick_values(vmin, vmax)
+                    if len(levels) == 1:
+                        levels = [levels[0] / 10, levels[0], levels[0] * 10]
+                else:
+                    vmin, vmax = self.get_range(data, **kwds)
+                    loc = mtc.MaxNLocator(levels)
+                    levels = loc.tick_values(vmin, vmax)
             elif isinstance(levels, list):
                 pass
             elif isinstance(levels, cabc.Callable):
@@ -1736,31 +1847,14 @@ class ContourPlot(PlotBase, _ConfigType):
             else:
                 raise TypeError(f"invalid level specifier {levels}.")
 
+            locallog.debug(f"color: fin {levels=}")
             if levels is False:
                 pass
             else:
                 cm = cmap
-                # if isinstance(cmap, cabc.Callable):
-                #     cm = cmap()
                 if isinstance(cm, mplib.cm.ScalarMappable):
-                    locallog.debug(f'colors: {cm.get_clim()=}')
+                    # locallog.debug(f'colors: {cm.get_clim()=}')
                     cm = cm.get_cmap()
-                # if revc and cm:
-                #     if isinstance(cm, list):
-                #         cm = list(reversed(cm))
-                #     elif isinstance(cm, mplib.colors.Colormap):
-                #         cm = cm.reversed()
-                #     else:
-                #         cmt = mplib.colormaps.get(cm)
-                #         if cmt:
-                #             cm = cmt.reversed()
-                # # print(revc, cmap)
-                # if isinstance(cm, list):
-                #     ckw = {'colors': cm}
-                # else:
-                #     ckw = {'cmap': cm}
-                #     # locallog.debug(f"color: {cm=} {ckw}")
-                # print(levels)
                 ckw = {'cmap': cm, 'norm': norm, }
                 col = axs.color(data, ax=key,
                                 method=method,
@@ -1771,7 +1865,6 @@ class ContourPlot(PlotBase, _ConfigType):
                 if isinstance(bind, cabc.Callable):
                     bind(artist=col[0])
                 artists.extend(col)
-        # locallog.debug(f"color:return: {artists}")
         return artists
 
     def colorbar(self, fig, axs, cons=None, cols=None,
@@ -1787,12 +1880,16 @@ class ContourPlot(PlotBase, _ConfigType):
 
         bar = None
         ticks = []
+        alpha = color.get('alpha')
+        # print(f"{alpha=} {cols[0]=}")
+
         if cols[0]:
             if method == 'contour':
                 ticks = cols[0].levels
             else:
-                bar, cax, = axs.colorbar(fig, cols[0],
-                                         alpha=color.get('alpha'))
+                # bar, cax, = axs.colorbar(fig, cols[0],
+                #                          alpha=color.get('alpha'))
+                bar, cax, = axs.colorbar(fig, cols[0])
 
         for cs in cons:
             if isinstance(cs, mcnt.QuadContourSet):
@@ -1875,6 +1972,23 @@ def main(*args):
 
     pass
 
+__debug_artist = {}
+def debug_artist(artist, tag=None):
+    num = __debug_artist.setdefault(tag, 0)
+    A = mart.ArtistInspector(artist)
+    print(r'=' * 20 + (tag or '') + f" {num}")
+    ppr.pprint(A.properties())
+    ppr.pprint(artist.get_children())
+    try:
+        ppr.pprint(list(artist._children))
+        ppr.pprint(dict(artist.spines.items()))
+        ppr.pprint(list(artist.spines.values()))
+        ppr.pprint(list(artist._axis_map.values()))
+        ppr.pprint(list(artist.child_axes))
+    except:
+        pass
+    print(r'=' * 20 + (tag or '') + f" {num} done")
+    __debug_artist[tag] = __debug_artist[tag] + 1
 
 if __name__ == '__main__':
     import sys
