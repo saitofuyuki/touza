@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/12/27 22:03:16 fuyuki zbcont.py>
+# Time-stamp: <2025/01/09 17:24:32 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -225,10 +225,15 @@ class Options(ParserUtils, ap.Namespace):
                             metavar='SPEC', default=None, type=str,
                             help='color intervals or levels specification.')
         parser.add_argument('-M', '--color-method',
-                            metavar='METHOD/CMAP',
+                            metavar='METHOD/CMAP[/CMAP..]',
                             default=None, type=str,
                             help='coloring method and map'
                             ' {contour(c) contourf(f) pcolormesh(p)}')
+        parser.add_argument('-N', '--color-norm',
+                            metavar='NORM',
+                            default=None, type=str,
+                            help='norm for coloring'
+                            ' {linear(li) log(lo) symlog(sl) twoslope(ts)}')
         ### 'imshow(i)'
         parser.add_argument('-r', '--range',
                             metavar='[LOW][:[HIGH]]', dest='limit', type=str,
@@ -312,11 +317,13 @@ class Options(ParserUtils, ap.Namespace):
 
         limit = self.parse_limit(self.limit)
         contour.update(limit)
-        color.update(limit)
+        # color.update(limit)
 
         self.color = color
         self.contour = contour
-        self.cnorm = {}
+
+        cnorm = self.parse_cnorm(self.color_norm, cnorm=limit)
+        self.cnorm = cnorm
 
         self.styles = self.parse_styles(self.map, self.projection)
 
@@ -350,6 +357,7 @@ class Options(ParserUtils, ap.Namespace):
             if isinstance(s, slice) or s is None:
                 coords.append(d)
         coords = tuple(coords + ['', '', ])[:2]
+        # print(f"{coords=}")
         return coords
 
     def parse_draw(self, draw=None):
@@ -426,25 +434,67 @@ class Options(ParserUtils, ap.Namespace):
         method = method or ''
         method ,_, params = method.partition(self.psep)
 
-        method = tuple(method.split('/')) + (None, None)
-        method, cmap = method[:2]
+        method = method.split('/') or [None]
+        cmap = method[1:]
+        method = method[0]
         method = self.method_table.get(method, method)
-
-        if method in self.method_table:
-            pass
-        elif cmap is None:
-            if method in mplib.colormaps:
-                method, cmap = None, method
         method = method or 'contourf'
+        if method in self.method_table.values():
+            pass
+        else:
+            cmap = [method] + cmap
 
         if method == 'contour':
             if contour is None:
                 contour = False
         color['method'] = method
-        color['cmap'] = [cmap]
+        color['cmap'] = cmap
         if params:
             color['alpha'] = float(params)
+        # print(f"{color=}")
         return color, contour
+
+    def parse_cnorm(self, param, cnorm=None):
+        """Parse color norms."""
+        cnorm = cnorm or {}
+
+        norms = []
+        param = param or ''
+
+        for a in param.split(self.lsep):
+            a = a.split(self.isep)
+            if a[0] in ['linear', 'li', '', ]:
+                norms.append('linear')
+            elif a[0] in ['log', 'lo', ]:
+                norms.append('log')
+            elif a[0] in ['symlog', 'sl', ]:
+                ap = a[1:]
+                num = -1
+                flag = None
+                if len(ap) >= 1:
+                    num = zu.toint(ap[0])
+                if len(ap) >= 2:
+                    flag = ap[1]
+                if not isinstance(num, int):
+                    raise ValueError(f"invalid parameter {num} for symlog.")
+                if num <= 0:
+                    num = 4
+                n = ('symlog', num)
+                if flag:
+                    n = n + (flag, )
+                norms.append(n)
+            elif a[0] in ['twoslope', 'ts', ]:
+                ap = a[1:]
+                org = None
+                if len(ap) >= 1:
+                    org = zu.tonumber(ap[0])
+                if not org:
+                    org = 0.0
+                norms.append(('twoslope', org) )
+            else:
+                raise ValueError(f"invalid color norm {a}.")
+        cnorm['norms'] = norms
+        return cnorm
 
     def parse_levels(self, text, single=False):
         """Parse contour/color levels."""
@@ -471,8 +521,9 @@ class Options(ParserUtils, ap.Namespace):
                 elif self.nsep in item:
                     for n in [int(jj)
                               for jj in item.split(self.nsep) if jj]:
-                        loc = mtc.MaxNLocator(n + 1)
-                        pat.append(loc.tick_values)
+                        # loc = mtc.MaxNLocator(n + 1)
+                        # pat.append(loc.tick_values)
+                        pat.append(n + 1)
                 elif item:
                     item = float(item)
                     if item > 0:
@@ -585,7 +636,11 @@ class Options(ParserUtils, ap.Namespace):
 
         coords = (-2, -1)
 
-        return {coords: styles}
+        st = {}
+        st[coords] = styles
+        # st[coords[-1]] = {'transform': transform}
+
+        return st
 
     def print_help(self, *args, **kwds):
         """Wrap print_help()."""
@@ -691,9 +746,13 @@ def main(argv, cmd=None):
     opts = Options(argv, cmd)
 
     if locallog.is_debug():
-        import zbt.dsnio as znio
-        znio.TouzaNioDataset.debug()
         locallog.debug(f"(main) {loc}")
+        try:
+            import zbt.dsnio as znio
+            locallog.debug(f"{znio}")
+            znio.TouzaNioDataset.debug()
+        except ModuleNotFoundError:
+            locallog.warning(f"ignore zbt.dsnio.")
         for m in [zu, zctl, zplt, ]:
             locallog.debug(f"{m}")
 
@@ -707,9 +766,7 @@ def main(argv, cmd=None):
 
     fiter = ft.partial(zctl.FileIter,
                        variables=opts.variables, opts=fopts)
-    viter = ft.partial(zctl.VariableIter,
-                       dims=opts.dims, coords=opts.coords,
-                       anchors=opts.draw)
+    viter = ft.partial(zctl.VariableIter, dims=opts.dims)
     aiter = ft.partial(zctl.ArrayIter,
                        coords=opts.coords, anchors=opts.draw)
 
@@ -734,20 +791,14 @@ def main(argv, cmd=None):
     if locallog.is_debug():
         Plot.diag(strip=False)
 
-    CmapP = ft.partial(zctl.CmapLink, **opts.color)
     NormP = ft.partial(zctl.NormLink, **opts.cnorm)
+    CmapP = ft.partial(zctl.CmapLink, chain=NormP, **opts.color)
+    AxisP = ft.partial(zctl.AxisScaleLink)
     Params = zctl.PlotParams()
     Params.reg_entry('color', CmapP)
-    Params.reg_entry('cnorm', NormP)
-
-    # Cmap = zctl.CmapIter(*(opts.color.get('cmap') or []))
-    # Norm = zctl.NormIter(*(opts.color.get('norm') or []))
-    # if opts.color.get('cmap') is None:
-    # opts.color['cmap'] = Cmap.put_or_get
-    # opts.color['norm'] = Norm.value
+    Params.reg_entry('axis', AxisP)
 
     Pic = zplt.Picture
-    # plot = Plot(contour=opts.contour, color=opts.color)
     plot = Plot(contour=opts.contour)
 
     Ctl = zctl.FigureControl(Pic, plot, Iter,
