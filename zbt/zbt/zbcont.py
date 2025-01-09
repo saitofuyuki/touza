@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/09 17:24:32 fuyuki zbcont.py>
+# Time-stamp: <2025/01/10 17:49:55 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -460,39 +460,40 @@ class Options(ParserUtils, ap.Namespace):
 
         norms = []
         param = param or ''
-
-        for a in param.split(self.lsep):
-            a = a.split(self.isep)
-            if a[0] in ['linear', 'li', '', ]:
-                norms.append('linear')
-            elif a[0] in ['log', 'lo', ]:
-                norms.append('log')
-            elif a[0] in ['symlog', 'sl', ]:
-                ap = a[1:]
-                num = -1
-                flag = None
-                if len(ap) >= 1:
-                    num = zu.toint(ap[0])
-                if len(ap) >= 2:
-                    flag = ap[1]
-                if not isinstance(num, int):
-                    raise ValueError(f"invalid parameter {num} for symlog.")
-                if num <= 0:
-                    num = 4
-                n = ('symlog', num)
-                if flag:
-                    n = n + (flag, )
-                norms.append(n)
-            elif a[0] in ['twoslope', 'ts', ]:
-                ap = a[1:]
-                org = None
-                if len(ap) >= 1:
-                    org = zu.tonumber(ap[0])
-                if not org:
-                    org = 0.0
-                norms.append(('twoslope', org) )
-            else:
-                raise ValueError(f"invalid color norm {a}.")
+        if param:
+            for a in param.split(self.lsep):
+                a = a.split(self.isep)
+                if a[0] in ['linear', 'li', '', ]:
+                    norms.append('linear')
+                elif a[0] in ['log', 'lo', ]:
+                    norms.append('log')
+                elif a[0] in ['symlog', 'sl', ]:
+                    ap = a[1:]
+                    num = -1
+                    flag = None
+                    if len(ap) >= 1:
+                        num = zu.toint(ap[0])
+                    if len(ap) >= 2:
+                        flag = ap[1]
+                    if not isinstance(num, int):
+                        raise ValueError(f"invalid parameter {num} for symlog.")
+                    if num <= 0:
+                        num = 4
+                    n = ('symlog', num)
+                    if flag:
+                        n = n + (flag, )
+                    norms.append(n)
+                elif a[0] in ['twoslope', 'ts', ]:
+                    ap = a[1:]
+                    org = None
+                    if len(ap) >= 1:
+                        org = zu.tonumber(ap[0])
+                    if not org:
+                        org = 0.0
+                    norms.append(('twoslope', org) )
+                else:
+                    raise ValueError(f"invalid color norm {a}.")
+        # print(f"{norms=}")
         cnorm['norms'] = norms
         return cnorm
 

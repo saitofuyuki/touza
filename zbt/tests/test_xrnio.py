@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/11/01 23:16:57 fuyuki test_xrnio.py>
+# Time-stamp: <2025/01/10 21:12:09 fuyuki test_xrnio.py>
 
 import sys
 import xarray as xr
 import itertools
 import pathlib as plib
+import numpy
 
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
@@ -19,6 +20,7 @@ def main(argv):
     decode_coords = False
     plot = False
     proj = None
+    check_record = None
     while argv:
         if argv[0][0] != '-':
             break
@@ -29,6 +31,8 @@ def main(argv):
         elif argv[0] == '-C':
             # proj = ccrs.Robinson()
             proj = ccrs.PlateCarree()
+        elif argv[0] == '-r':
+            check_record = 'record'
         argv = argv[1:]
 
     for a in argv:
@@ -70,7 +74,27 @@ def main(argv):
                             print(x)
                         plt.show()
                         # plt.close(fig)
-
+                if check_record:
+                    print(vv.coords)
+                    try:
+                        rc = vv[check_record]
+                        # print(rc)
+                        ntime = []
+                        for t in rc.values:
+                            ndt = numpy.datetime64(t)
+                            print(f"{t} {t=} {ndt}")
+                            ntime.append(ndt)
+                            #         # ntime = [numpy.datetime64(t) for t in time]
+                        try:
+                            nda = xr.DataArray(ntime, dims=(check_record, ),
+                                               name='ndate')
+                            print(nda)
+                            vv[check_record] = nda
+                        except ValueError as err:
+                            print(err)
+                        print(vv.coords)
+                    except KeyError as err:
+                        print(err)
 
 if __name__ == '__main__':
     main(sys.argv[1:])

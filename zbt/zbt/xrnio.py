@@ -14,6 +14,7 @@ numpy xarray + TOUZA/Nio extension
 
 import xarray as xr
 import numpy as np
+import cftime
 
 from . import libtouza
 from . import dsnio
@@ -179,6 +180,7 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
                                "decode_times",
                                "decode_timedelta",
                                "decode_coords",
+                               "calendar",
                                "touza_nio_option"]
 
     lib = libtouza.LibTouzaNio(name=None)
@@ -189,50 +191,83 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
                      decode_timedelta=True,
                      decode_coords=True,
                      decode_attrs=True,
+                     calendar=None,
                      **kwds):
+
         if decode_coords:
             dscls = dsnio.TouzaNioCoDataset
+            if decode_times:
+                if calendar is None:
+                    calendar = 'auto'
         else:
             dscls = dsnio.TouzaNioDataset
 
+        kwds['calendar'] = calendar
+        # print(kwds)
         ds = dscls(filename_or_obj,
                    cls_var=xrNioBackendArray,
                    cls_arr=xrMemBackendArray,
                    **kwds)
-
+        # print(f'ds={type(ds)}')
         variables = {}
         for v in ds.variables.values():
             vn = ds.variables.rev_map(v, sep=ds.sub)
-            dims = v.dimensions_suite(group=ds)
+            try:
+                dims = v.dimensions_suite(group=ds)
+            except AttributeError:
+                dims = ('record', )
 
             # attrs = {_special_attr:  v}
             attrs = {}
-            if v.recidx is None:
+            # print(dims, getattr(v, 'recidx', None))
+            recidx = getattr(v, 'recidx', None)
+            if recidx is None:
                 pass
             else:
-                recdim = dims[v.recidx]
+                recdim = dims[recidx]
                 attrs[_RECDIM_ATTR] = recdim
 
             if decode_attrs:
-                for src in [('units', 'UNIT'),
-                            ('long_name', 'TITL1', 'TITL2'), ]:
-                    dst = src[0]
-                    a = ''
-                    for i in src[1:]:
-                        a = a + v.getattr(i)
-                    if a:
-                        attrs[dst] = a
-                for a, ai in v.attrs():
-                    av = v.getattr(a, rec=slice(None, None),
-                                   strip=True, uniq=True)
-                    dst = zu.tostr(ai)
-                    attrs[dst] = av
+                try:
+                    for src in [('units', 'UNIT'),
+                                ('long_name', 'TITL1', 'TITL2'), ]:
+                        dst = src[0]
+                        a = ''
+                        for i in src[1:]:
+                            a = a + v.getattr(i)
+                        if a:
+                            attrs[dst] = a
+                    for a, ai in v.attrs():
+                        av = v.getattr(a, rec=slice(None, None),
+                                       strip=True, uniq=True)
+                        dst = zu.tostr(ai)
+                        attrs[dst] = av
+                except AttributeError:
+                    attrs = {}
 
             data = xr.core.indexing.LazilyIndexedArray(v)
             var = xrNioVariable(dims, data, attrs=attrs)
             variables[zu.tostr(vn)] = var
 
-        return xrNioDataset(variables)
+        dset = xrNioDataset(variables)
+        if calendar:
+            for cn in dset.coords:
+                co = dset[cn]
+                c0 = co.values[0]
+                if isinstance(c0, cftime.datetime):
+                    # print(cn, co.dtype, type(c0))
+                    ntime = []
+                    for t in co.values:
+                        ndt = np.datetime64(t)
+                        ntime.append(ndt)
+                    try:
+                        nda = xr.DataArray(ntime, dims=(cn, ),
+                                           name=cn)
+                        dset[cn] = nda
+                    except ValueError as err:
+                        locallog.warning(err)
+
+        return dset
 
     def guess_can_open(self, filename_or_obj):
         if isinstance(filename_or_obj, str):

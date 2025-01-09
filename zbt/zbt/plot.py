@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/09 17:07:10 fuyuki plot.py>
+# Time-stamp: <2025/01/10 18:11:52 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -166,7 +166,7 @@ class FigureCore(mplib.figure.Figure):
             kwds = self._stack_patches[ax][pos]
             self._store_patch(ax)
             self.patch.set(**kwds)
-        except KeyError:
+        except (KeyError, IndexError):
             self._store_patch(ax)
             kwds = None
         return kwds
@@ -234,7 +234,7 @@ class LegacyParser(ParserBase):
             units = ''
         return title, units
 
-    def parse_slices(self, coords):
+    def parse_slices(self, coords, ignore_time=None):
         """Parse slice properties."""
         sel = []
         for d, c in coords.items():
@@ -242,8 +242,11 @@ class LegacyParser(ParserBase):
                 dt, du = self.extract_titles(c.attrs)
                 dt = dt or d
                 if dt.lower() in ['time', 'record', ]:
-                    continue
-                ds = f"{dt}={c.values:.4f}"
+                    if bool(ignore_time):
+                        continue
+                    ds = f"{dt}={c.values}"
+                else:
+                    ds = f"{dt}={c.values:.4f}"
                 if du:
                     ds = ds + f'[{du}]'
                 sel.append(ds)
@@ -275,7 +278,7 @@ class LegacyParser(ParserBase):
         # ## hack
         if len(ettl) > 16:
             ettl = ettl[:16] + '...'
-        sel = self.parse_slices(coords)
+        sel = self.parse_slices(coords, ('IDFM' in attrs))
 
         if item:
             if ettl:
@@ -882,6 +885,11 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         axis.set_gid(f"tick:{which}")
         axis.set_tick_params(which='major', **(major or {}))
         axis.set_tick_params(which='minor', **(minor or {}))
+        # print(f"dmin/dmax: {co.name} {type(dmin)} {type(dmax)}")
+        if isinstance(dmin, xr.DataArray):
+            dmin = dmin.values
+        if isinstance(dmax, xr.DataArray):
+            dmax = dmax.values
         if dmin != dmax:
             limf(dmin, dmax)
         if scale == 'log':

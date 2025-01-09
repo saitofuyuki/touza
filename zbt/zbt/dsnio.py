@@ -17,6 +17,9 @@ import os
 import pathlib as plib
 import ctypes as CT
 import numpy
+import datetime
+# import pandas as pd
+import cftime
 
 # from . import util
 import zbt.util as zu
@@ -857,7 +860,8 @@ class TouzaNioCoDataset(TouzaNioDataset):
     #  If you want to exclude the coordinate binding, you should
     #  not use this class, but use TouzaNioDataset instead.
 
-    def __init__(self, *args, **kwds):
+    def __init__(self, *args, calendar=None, **kwds):
+        self._calendar = calendar
         super().__init__(*args, **kwds)
         self._init_(**kwds)
 
@@ -874,6 +878,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
                     handle=None):
         """Construct group instance."""
         return TouzaNioCoGroup(groupname, parent=self,
+                               calendar=self._calendar,
                                handle=handle)
 
     def shift_variables(self):
@@ -892,29 +897,30 @@ class TouzaNioCoDataset(TouzaNioDataset):
 
         for d in self.dimensions.values():
             if d.is_record():
-                time = []
-                for rec in range(*d.extent):
-                    t = self.lib.header_get_attr('time',
-                                                 handle=d.dataset.handle,
-                                                 vid=0,
-                                                 rec=rec)
-                    try:
-                        t = int(t)
-                    except ValueError:
-                        time = list(range(*d.extent))
-                        break
-                    time.append(t)
-                okey = self.dimensions.rev_map(d)
-                c = self.createArray(d.name, 'f8', (d, ), -1, None,
-                                     array=time)
-                a = self.lib.header_get_attr('utim',
-                                             handle=d.dataset.handle,
-                                             vid=0,
-                                             rec=0)
-                self.variables[okey] = c
-                c.setattr('UNIT', a)
-                # c.setattr('UNIT', 'hours since 0000-01-01')
-                c.setattr('TITL1', 'time')
+                self.bind_time_coordinate(d)
+                # time = []
+                # for rec in range(*d.extent):
+                #     t = self.lib.header_get_attr('time',
+                #                                  handle=d.dataset.handle,
+                #                                  vid=0,
+                #                                  rec=rec)
+                #     try:
+                #         t = int(t)
+                #     except ValueError:
+                #         time = list(range(*d.extent))
+                #         break
+                #     time.append(t)
+                # okey = self.dimensions.rev_map(d)
+                # c = self.createArray(d.name, 'f8', (d, ), -1, None,
+                #                      array=time)
+                # a = self.lib.header_get_attr('utim',
+                #                              handle=d.dataset.handle,
+                #                              vid=0,
+                #                              rec=0)
+                # self.variables[okey] = c
+                # c.setattr('UNIT', a)
+                # # c.setattr('UNIT', 'hours since 0000-01-01')
+                # c.setattr('TITL1', 'time')
                 continue
             c = self.get_coordinate(d, paths, kind='loc')
             if c:
@@ -923,6 +929,94 @@ class TouzaNioCoDataset(TouzaNioDataset):
                 if okey in self.variables:
                     raise ValueError(f"Panic.  {okey} {self.variables}")
                 self.variables[okey] = c
+
+    def bind_time_coordinate(self, d):
+        """Special procedure to bind time-like coordinate."""
+        time = []
+        date = []
+        cals = None
+        for rec in range(*d.extent):
+            t = self.lib.header_get_attr('time',
+                                         handle=d.dataset.handle,
+                                         vid=0,
+                                         rec=rec)
+            try:
+                t = int(t)
+            except ValueError:
+                time = list(range(*d.extent))
+                break
+            time.append(t)
+            dt = self.lib.header_get_attr('date',
+                                          handle=d.dataset.handle,
+                                          vid=0, rec=rec)
+            ut = self.lib.header_get_attr('utim',
+                                          handle=d.dataset.handle,
+                                          vid=0, rec=rec)
+            cd = auto_calendar(ut, t, dt, checks=cals)
+            cals = cd.keys()
+            date.append(cd)
+
+        # for t in zip(time, date):
+        #     print(t)
+        cals = list(cals or [])
+        okey = self.dimensions.rev_map(d)
+        if self._calendar:
+            if len(cals) == 0:
+                locallog.warning("failed to detect calendar.")
+                date = []
+        else:
+            date = []
+
+        if len(time) != len(date):
+            c = self.createArray(d.name, 'f8', (d, ), -1, None,
+                                 array=time)
+            ut = self.lib.header_get_attr('utim',
+                                          handle=d.dataset.handle,
+                                          vid=0, rec=0)
+            c.setattr('UNIT', ut)
+        else:
+            cal = cals[0]
+            time = [dt[cal] for dt in date]
+            # print(time)
+            c = self.createArray(d.name, type(time[0]), (d, ), -1, None,
+                                 array=time)
+            # a = self.lib.header_get_attr('utim',
+            #                              handle=d.dataset.handle,
+            #                              vid=0, rec=0)
+            # utim = None
+            # if self._calendar:
+            #     cals = list(cals)
+            #     utim = a.upper()
+            #     if utim[0] == 'H':
+            #         utim = 'hours'
+            #     else:
+            #         utim = None
+            #     if utim:
+            #         # utim = f"{utim} since -0001-01-01"
+            #         utim = f"{utim} since 0000-01-01"
+            #         # print(time)
+            #         # time = cftime.num2date(time, units=utim, has_year_zero=True)
+            #         time = cftime.num2date(time, units=utim,
+            #                                calendar='proleptic_gregorian')
+            #         # print(time)
+            #         c = self.createArray(d.name, type(time[0]), (d, ), -1, None, array=time)
+            #         # ntime = [numpy.datetime64(t) for t in time]
+            #         # print(ntime)
+            #         # try:
+            #         #     c = self.createArray(d.name, type(ntime[0]), (d, ), -1, None, array=ntime)
+            #         # except:
+            #         #     locallog.warning("numpy cftime")
+            #         # for j in time:
+            #         #     # print(numpy.datetime64(cftime.to_tuple(j)))
+            #         #     print(j, numpy.datetime64(j))
+            #         # print([numpy.datetime64(j.to_tuple()) for j in c])
+            #         # c = time
+            #         # print(c)
+        c.setattr('TITL1', 'time')
+        self.variables[okey] = c
+        # if utim is None:
+        #     c.setattr('UNIT', a)
+        #     # c.setattr('UNIT', 'hours since 0000-01-01')
 
     def coordinate_paths(self, env=None):
         """Parse axis file paths"""
@@ -1036,6 +1130,48 @@ class TouzaNioCoGroup(TouzaNioCoDataset, TouzaNioGroup):
     def bind_coordinates(self):
         """Bind coordinates inheriting parent."""
 
+
+def auto_calendar(unit, time, date, checks=None, first=None):
+    if checks is None:
+        checks = ['proleptic_gregorian',
+                  '360_day',
+                  'noleap',
+                  'all_leap',
+                  'julian',
+                  'gregorian',
+                  'standard', ]
+
+    first = False if first is None else bool(first)
+    cd = {}
+    if not date:
+        return cd
+    dt = date.strip()
+    dt = dt.split(' ')
+    if len(dt) == 1:
+        dt = dt[:-6], dt[-6:]
+    if len(dt) == 2:
+        dt = (dt[0][:-4], dt[0][-4:-2], dt[0][-2:],
+              dt[1][:-4], dt[1][-4:-2], dt[1][-2:])
+    else:
+        raise UserWarning(f"cannot parse {date} as date.")
+    try:
+        dt = tuple(int(d) if d else 0 for d in dt)
+    except ValueError:
+        raise UserWarning(f"cannot parse {date} as date.")
+
+    for c in checks:
+        if c in ['julian', 'gregorian', 'standard', ]:
+            u = f"{unit} since -1-1-1"
+        else:
+            u = f"{unit} since 0-1-1"
+        cft = cftime.num2date(time, units=u, calendar=c)
+        ref = cftime.datetime(*dt, calendar=c)
+        # print(c, cft == ref, cft, ref)
+        if cft == ref:
+            if first:
+                return c
+            cd[c] = cft
+    return cd
 
 # handle to DataSet mapping
 if sys.version_info[:2] > (3, 9):

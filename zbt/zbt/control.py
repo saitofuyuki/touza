@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/09 17:55:01 fuyuki control.py>
+# Time-stamp: <2025/01/10 18:13:17 fuyuki control.py>
 
 __doc__ = \
     """
@@ -30,6 +30,13 @@ import matplotlib.artist as mart
 import matplotlib.animation as animation
 import matplotlib.backend_bases as mbb
 import mpl_toolkits.axes_grid1.inset_locator as m1i
+import cftime
+try:
+    import nc_time_axis
+except ModuleNotFoundError:
+    nc_time_axis = None
+
+_nc_epoch = nc_time_axis._TIME_UNITS if nc_time_axis else None
 
 import cartopy.util as cutil
 
@@ -1468,11 +1475,11 @@ class NormLink(LinkedArray, ParamsDispatcher):
 
     def __init__(self, norms=None, levels=None, vmin=None, vmax=None,
                  **kw):
-
-        if norms is None:
+        if not norms:
             norms = self.norms_
         if not isinstance(norms, (tuple, list)):
             norms = [norms]
+        # locallog.debug(f"{norms=}")
 
         name = f"NORM-{self._serial}"
         self._serial = self._serial + 1
@@ -2973,8 +2980,10 @@ class FigureControl():
     def monitor_point(self, fig, axs, lab, event, aux=None, fmt=None):
         """Monitor point."""
         fmt = fmt or r'({x:.2f}, {y:.2f})'
+        # fmt = fmt or r'({x}, {y})'
 
         x, y = (event.xdata, event.ydata)
+        # print(x, y)
         x, y = axs.get_position(x, y, lab)
         if all(j is not None for j in [x, y]):
             if aux:
@@ -3211,7 +3220,7 @@ def extract_base_array(data, nsel, xsel):
         isel = {}
         fsel = {}
         for co, sp in nsel.items():
-            print(co, sp)
+            # print(co, sp)
             if co not in data.coords:
                 if isinstance(sp, float):
                     msg = f"{co} has no associated coordinate {sp}."
@@ -3223,7 +3232,7 @@ def extract_base_array(data, nsel, xsel):
             base = base.isel(isel)
         if fsel:
             base = base.sel(fsel, method='nearest')
-            print(nsel)
+            # print(nsel)
     # print(base.shape)
     # print(base)
     return base
@@ -3468,6 +3477,19 @@ def is_cyclic_coord(co):
 def normalize_selection(co, sel, method=None, index=None):
     """Return index or normalized coordinate corresponding to sel."""
     method = method or 'nearest'
+    locallog.debug(f"[{co.name}] {sel=}")
+    c0 = co.values[0]
+    locallog.debug(f"{c0=} {type(c0)=}")
+    if isinstance(c0, np.datetime64):
+        sel = np.datetime64(mplib.dates.num2date(sel))
+        locallog.debug(f"date: {sel=} {type(sel)=} ")
+    elif isinstance(c0, cftime.datetime):
+        cal = c0.calendar
+        # print(type(c0), cal)
+        ### "days since 2000-01-01",
+        sel = cftime.num2date(sel, units=_nc_epoch, calendar=cal)
+        locallog.debug(f"date: {sel=} {type(sel)=} ")
+
     cc = is_cyclic_coord(co)
     if cc:
         _, org, dup = cc
@@ -3482,8 +3504,27 @@ def normalize_selection(co, sel, method=None, index=None):
                 sel = sel - cyc
     d = co.name
     sel = co.sel({d: sel}, method=method)
-    sel = sel.item()
+    locallog.debug(f"sel: {sel=} {type(sel)}")
+    if isinstance(c0, np.datetime64):
+        if bool(index):
+            for j, v in enumerate(co.values):
+                if v == sel:
+                    # print(f"found: {j} {sel}")
+                    sel = j
+                    break
+            else:
+                # print(f"not found")
+                sel = None
+        return sel
+        # cp = co.to_numpy()
+        # print(cp)
+        # print([np.where(cp == sel)])
+    else:
+        sel = sel.item()
+    # print(f"sel.item {sel=} {type(sel)}")
     if bool(index):
+        # print(type(co), co)
         co = co.to_index()
+        # print(type(co), co)
         sel = co.get_loc(sel)
     return sel
