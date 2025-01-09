@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/09 10:27:44 fuyuki plot.py>
+# Time-stamp: <2025/01/09 17:07:10 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -700,12 +700,18 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
     def position_transform(self, x, y, ax=None, crs=None):
         """Transform (display) position to data coordinates"""
         ax = self._get_axes(ax)
+        # print(x, y, self.get_position(x, y, ax=ax))
         if x is not None:
             transf = ax.get_xaxis_transform().inverted()
-            x = transf.transform((x, 0))[0]
+            # x = transf.transform((x, 0))[0]
+            x, tmp = transf.transform((x, 0))
+            if crs is not False:
+                x, tmp = self.get_position(x, tmp, ax=ax, crs=crs)
         if y is not None:
             transf = ax.get_yaxis_transform().inverted()
-            y = transf.transform((0, y))[1]
+            tmp, y = transf.transform((0, y))
+            if crs is not False:
+                tmp, y = self.get_position(tmp, y, ax=ax, crs=crs)
         # pp = self.projp.get(ax) or None
         # proj = getattr(ax, 'projection', None)
 
@@ -774,6 +780,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         """matplotlib contour wrapper."""
         ax = self._get_axes(ax)
         artists = artists or []
+        # print(type(ax.transData))
         if ax:
             locallog.debug(f"{args=} {kwds=}")
             if is_xr(data):
@@ -1178,6 +1185,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         at = self.guides.get(ax)
 
         # locallog.debug(f"{ax=} {at=}")
+        # print(x, y)
         # print(ax.get_lines())
         if at:
             xg, yg = at
@@ -1638,6 +1646,16 @@ class ContourPlot(PlotBase, _ConfigType):
         transf = body.get('transform')
         crs = body.get('crs')
 
+        if isinstance(transf, tuple):
+            # for t in transf:
+            #     if t is not None:
+            #         break
+            # else:
+            #     t = None
+            # # transf = mplib.transforms.blended_transform_factory(*transf)
+            # transf = t
+            transf = None
+
         if transf:
             contour.setdefault('transform', transf)
             color.setdefault('transform', transf)
@@ -1661,6 +1679,8 @@ class ContourPlot(PlotBase, _ConfigType):
         artists.extend(ttl)
 
         vopts = {}
+        view = view or {}
+        # print(view)
         vopts.update(**view)
         for k, v in axisp.items():
             vopts.setdefault(k, {})

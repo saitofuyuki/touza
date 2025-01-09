@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/09 12:32:47 fuyuki control.py>
+# Time-stamp: <2025/01/09 17:55:01 fuyuki control.py>
 
 __doc__ = \
     """
@@ -976,17 +976,33 @@ class ArrayIter(LinkedArray):
             ck = data.dims.index(cn)
             co = data[cn]
             cc = is_cyclic_coord(co)
-            # debug(f"{cn} {cc}")
+            # debug(f"{cn=} {cc=}")
             if not cc:
                 continue
             w, org, dup = cc
             if len(co) == w - 1 and co[0] == org and co[-1] != dup:
+                # for j, p in enumerate(co):
+                #     if p >= 180:
+                #         break
+                # print(j, p.item())
+                # data = data.roll(**{co.name: j}, roll_coords=True)
+                # co = data[co.name]
                 cd, cx = cutil.add_cyclic(data, co, axis=ck,
                                           cyclic=dup-org)
                 nco = dict(data.coords.items())
                 nco[cn] = xr.DataArray(cx, dims=co.dims, attrs=co.attrs)
+                # for j, p in enumerate(nco[cn]):
+                #     if p >= 180:
+                #         break
+                # print(j, p.item())
+                # nco[cn] = (nco[cn] + 180) % 360 - 180
+                # nco[cn][-1] = nco[cn][-1] + 360
                 data = xr.DataArray(cd, coords=nco,
                                     dims=data.dims, attrs=data.attrs)
+                # data = data.roll(**{cn: j}, roll_coords=True)
+                # print(cn, j)
+                # print(data)
+                # print(cn, nco[cn])
         if not data is odata:
             data.name = odata.name
             data.assign_attrs(**odata.attrs)
@@ -1008,11 +1024,9 @@ class ArrayIter(LinkedArray):
 class VariableIter(LinkedArray):
     """Variable level iterator."""
 
-    def __init__(self, coords=None, dims=None, anchors=None, **kwds):
+    def __init__(self, dims=None, **kwds):
         super().__init__(base=None, name='VAR', **kwds)
-        self.coords = coords
         self.lims = dims
-        self.anchors = anchors or {}
 
     def update(self, key):
         """Update current and child status."""
@@ -2335,6 +2349,7 @@ class FigureControl():
         # print(params.params())
         # locallog.info("invoke: before plot")
         # print(view, style)
+        # print(f"{arr.shape=} {view=}")
         r = self.plot(fig=fig, axs=axs, data=arr,
                       view=view, body=style, **params, **axis)
         # locallog.info(f"invoke: after plot")
@@ -2493,7 +2508,8 @@ class FigureControl():
     def redraw(self, fig):
         axs = self.figs[fig]
         axs.toggle_guides(fig, False)
-        fig.canvas.draw()
+        self.interactive(fig, step=False, msg='refresh')
+        # fig.canvas.draw()
 
     def turn_cmap(self, fig, step=None, lev=None):
         step = step or +1
@@ -2941,15 +2957,17 @@ class FigureControl():
     def monitor_spine(self, fig, axs, lab, event, aux=None):
         debug = ft.partial(self.debug, func='monitor_spine')
         body = lab[1]
-        dpos = axs.position_transform(event.x, event.y, ax=body)
+        # ## Need to disable (further) transformation for guides
+        dpos = axs.position_transform(event.x, event.y, ax=body, crs=False)
+        mpos = axs.position_transform(event.x, event.y, ax=body)
         axs.draw_guide(fig, event.inaxes, event.xdata, event.ydata, pos=dpos)
         fmt = r'{:.2f}'
         if lab[2] in ['left', 'right']:
             axs.draw_guide(fig, body, None, dpos[1])
-            text = 'y=' + (fmt.format(dpos[1]))
+            text = 'y=' + (fmt.format(mpos[1]))
         else:
             axs.draw_guide(fig, body, dpos[0], None)
-            text = 'x=' + (fmt.format(dpos[0]))
+            text = 'x=' + (fmt.format(mpos[0]))
         axs.monitor(fig, text)
 
     def monitor_point(self, fig, axs, lab, event, aux=None, fmt=None):
@@ -3193,6 +3211,7 @@ def extract_base_array(data, nsel, xsel):
         isel = {}
         fsel = {}
         for co, sp in nsel.items():
+            print(co, sp)
             if co not in data.coords:
                 if isinstance(sp, float):
                     msg = f"{co} has no associated coordinate {sp}."
@@ -3204,6 +3223,9 @@ def extract_base_array(data, nsel, xsel):
             base = base.isel(isel)
         if fsel:
             base = base.sel(fsel, method='nearest')
+            print(nsel)
+    # print(base.shape)
+    # print(base)
     return base
 
 
@@ -3339,8 +3361,32 @@ def view_prop(arr, dims, *args):
                 if not collate_coord(ct, co, arr, dims):
                     break
             else:
+                # print(cc, kw[cc].keys())
                 return kw[cc]
-    raise KeyError(f"No match to view {arr.dims}")
+    prop = {}
+    for kw in args:
+        for cc, cd in kw.items():
+            if isinstance(cc, tuple):
+                continue
+            if isinstance(cc, int):
+                cc = dims[cc]
+            for cj, co in enumerate(arr.dims):
+                # print(cj, co, cc)
+                if co == cc:
+                    for ck, cv in cd.items():
+                        if ck not in prop:
+                            prop[ck] = [None] * len(arr.dims)
+                        prop[ck][cj] = cv
+    if not prop:
+        raise KeyError(f"No match to view {arr.dims}")
+    else:
+        for ck, cv in prop.items():
+            prop[ck] = tuple(cv)
+            # print(ck, tuple(type(t) for t in cv))
+            # for t in cv:
+            #     if t:
+            #         print(t.transform_point(359, 100, t))
+        return prop
 
 
 def collate_coord(pat, co, arr, dims):
