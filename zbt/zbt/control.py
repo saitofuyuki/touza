@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/10 18:13:17 fuyuki control.py>
+# Time-stamp: <2025/01/14 12:07:29 fuyuki control.py>
 
 __doc__ = \
     """
@@ -2879,14 +2879,19 @@ class FigureControl():
         gid = ax.get_gid() or ax
         gid = gid if isinstance(gid, tuple) else (gid, )
         # print(f'enter_axes {gid} {bg}')
+        # if False:
         if bg:
+            bg, bb = bg
             if gid[0] in ['spine', 'axis']:
             # at = ax.text(0, 0, 'yellow')
-                at = m1i.BboxPatch(ax.bbox, facecolor='gray', alpha=0.2)
+                # at = m1i.BboxPatch(ax.bbox, facecolor='gray', alpha=0.2)
+                at = m1i.BboxPatch(bb, facecolor='gray', alpha=0.2)
                 # at.set_visible(True)
                 fig.canvas.restore_region(bg)
                 ax.draw_artist(at)
-                fig.canvas.blit(ax.bbox)
+                # fig.canvas.blit(ax.bbox)
+                # fig.canvas.blit(bb)
+                fig.canvas.blit()
         # event.inaxes.patch.set_facecolor('yellow')
         # event.canvas.draw()
 
@@ -2895,6 +2900,7 @@ class FigureControl():
         axs.clear_guide(fig, ax)
         gid = ax.get_gid() or ax
         gid = gid if isinstance(gid, tuple) else (gid, )
+        # print(f'leave {gid=}')
         if len(gid) > 1:
             axs.clear_guide(fig, gid[1])
         # bg = axs.bg.get(ax)
@@ -2968,12 +2974,15 @@ class FigureControl():
         dpos = axs.position_transform(event.x, event.y, ax=body, crs=False)
         mpos = axs.position_transform(event.x, event.y, ax=body)
         axs.draw_guide(fig, event.inaxes, event.xdata, event.ydata, pos=dpos)
+
         fmt = r'{:.2f}'
         if lab[2] in ['left', 'right']:
-            axs.draw_guide(fig, body, None, dpos[1])
+            # axs.draw_guide(fig, body, None, dpos[1])
+            axs.draw_guide(fig, body, None, event.ydata)
             text = 'y=' + (fmt.format(mpos[1]))
         else:
-            axs.draw_guide(fig, body, dpos[0], None)
+            # axs.draw_guide(fig, body, dpos[0], None)
+            axs.draw_guide(fig, body, event.xdata, None)
             text = 'x=' + (fmt.format(mpos[0]))
         axs.monitor(fig, text)
 
@@ -3323,6 +3332,7 @@ def draw_coords(data, src, dims, coords, default,
         ntargets.insert(0, c)
     ntargets = type(coords)(ntargets)
     if len(set(ntargets)) != len(coords):
+        locallog.error(f"data shape: {data.dims} = {data.shape}")
         raise ValueError(f"Invalid target coordinates {coords} >> {ntargets}")
     # locallog.debug(f"result: {ntargets=}")
     return ntargets
