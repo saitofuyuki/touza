@@ -21,7 +21,7 @@ classifiers = [
 
 dependencies = [
     "numpy", "matplotlib", "xarray", "cartopy", "tomllib",
-    "cftime",
+    "cftime", "nc-time-axis",
 ]
 
 [tool.setuptools]
