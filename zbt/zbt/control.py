@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/17 21:39:33 fuyuki control.py>
+# Time-stamp: <2025/01/18 23:27:52 fuyuki control.py>
 
 __doc__ = \
     """
@@ -689,7 +689,7 @@ class ArrayIter(LinkedArray):
             return
 
         tgt = dims.index(coord)
-        if step > 0:
+        if step < 0:
             tgt = tgt - len(dims)
             d = 1
         else:
@@ -793,6 +793,7 @@ class ArrayIter(LinkedArray):
         return ret
 
     def turn_slice(self, step, target):
+        """Turn slice along target only."""
         sav = self.mask
         mask = [True if isinstance(m, bool) else m
                 for m in self.mask]
@@ -2365,8 +2366,10 @@ class FigureInteractive(zplt.FigureCore, DataTree):
             print(txt)
 
     def message(self, msg=None, *, pfx=None, sel=None,
-                cr=None, end=None, stream=None):
+                cr=None, end=None, stream=None, flush=None):
         """Show message on steram."""
+        if msg is False:
+            return
         if stream is None:
             stream = sys.stdout
 
@@ -2376,6 +2379,7 @@ class FigureInteractive(zplt.FigureCore, DataTree):
             jfig = self.number
             pfx = f"({jfig}) "
 
+        # cr = False
         if cr is None:
             cr = True
         cr = '\r' if cr else ''
@@ -2398,6 +2402,8 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         if end:
             txt = txt + end
         stream.write(txt)
+        if bool(flush):
+            stream.flush()
 
     def sync_message(self, *args, **kwds):
         """Message after sync."""
@@ -2600,14 +2606,14 @@ class FigureControl():
         try:
             trees, stat = fig.loop(step)
         except StopIteration:
-            print(f"\r({jfig}) no more data.")
+            fig.message("no more data.")
             try:
                 trees, stat = fig.loop(step)
             except StopIteration:
                 raise StopIteration(f"\r({jfig}) no effective data.") from None
 
         try:
-            print(f'\r({jfig}) drawing...', end='', flush=True)
+            fig.message("drawing...", end='', sel=False, flush=True)
             artists = self.invoke(trees, stat, fig, axs, prev)
             # for a in artists:
             #     gid = a.get_gid()
@@ -2621,9 +2627,7 @@ class FigureControl():
             #         # print(gid, a, a.get_size(), fm.get_size())
             # print(artists)      #
             fig.message(msg)
-            # fig.info(pfx=f'\r({jfig}) ', msg=msg)
         except UserWarning as err:
-            # fig.info(pfx=f'\r({jfig}) ', msg=err)
             fig.message(err)
         fig.canvas.draw()
 
@@ -2666,36 +2670,10 @@ class FigureControl():
             repeat_delay=10,
         )
 
-        # def anim(p):
-        #     print(p)
-        #     return [p]
-        # # print(fig)
-        # # print(fig.canvas)
-
-        # ani = animation.FuncAnimation(
-        #     fig,
-        #     anim,
-        #     interval=50,
-        #     blit=False,
-        #     frames=frames,
-        #     repeat_delay=100, )
-
-        # fig.draw_artist(frames[0][0])
-        # plt.show()
-        # # print(fig.canvas)
-        # fig.canvas.draw()
-
-        # ani = animation.ArtistAnimation(
-        #     fig,
-        #     frames,
-        #     interval=50,
-        #     blit=False,  # blitting can't be used with Figure artists
-        #     repeat_delay=100,
-        # )
-
         nfig.draw_artist(frames[0][0])
-        # # print(fig.canvas)
         nfig.canvas.draw()
+
+        # nfig.canvas.manager.show()
 
         # ani.save("movie.mp4")
         plt.show()
@@ -2709,9 +2687,9 @@ class FigureControl():
         layout = {k: style.get(k) for k in ['projection', ]}
         fig.cache_view(view)
         view = fig.parse_view(arr, src, self.draw, **style)
-        axs.reset(fig, body=layout)
         cla = True if cla is None else bool(cla)
         if cla:
+            axs.reset(fig, body=layout)
             axs.cla(fig)
         # if locallog.is_debug():
         #     for ch in fig.get_children():
@@ -2809,12 +2787,17 @@ class FigureControl():
                     del self.figs[fig]
                     fig.disconnect('key_press_event')
                     fig.message("closed", sel=False)
-                    # jfig = fig.number
-                    # print(f"\r({jfig}) closed")
+                    self.prompt(event=None)
                 else:
                     for fig in self.figs:
                         plt.close(fig)
+                    self.figs = []
+                if not self.figs:
+                    print("quit.")
+
             elif cmd == 'animate':
+                locallog.warning("not yet implemetend.")
+                self.prompt(event=None)
                 # self.animate_mode(fig, cls=cls, step=+1)
                 pass
             elif cmd == 'rewind':
@@ -2943,7 +2926,7 @@ class FigureControl():
         elif cmd == 'next_cyclic':
             if lab == 'body':
                 if aux:
-                    self.iterate_slice_draw(fig, aux, +1)
+                    self.switch_draw(fig, aux, +1)
                 elif step != 0:
                     self.iterate_slice(fig, cls=clstab[None], step=step)
             elif lab == 'colorbar' and not wlock:
@@ -2951,7 +2934,7 @@ class FigureControl():
         elif cmd == 'prev_cyclic':
             if lab == 'body':
                 if aux:
-                    self.iterate_slice_draw(fig, aux, -1)
+                    self.switch_draw(fig, aux, -1)
                 elif step != 0:
                     self.iterate_slice(fig, cls=clstab[None], step=step)
             elif lab == 'colorbar'  and not wlock:
@@ -3005,6 +2988,7 @@ class FigureControl():
             child.switch(*args, step=0)
             child.switch(*args, step=step, **kwds)
             self.animate(ff)
+        return
 
     def iterate_slice(self, fig, *args, step=None, **kwds):
         if fig.is_locked():
@@ -3067,7 +3051,7 @@ class FigureControl():
             except AttributeError:
                 saved = path
             fig.message(f"Saved: {saved}")
-            # fig.info(pfx=f'\r({jfig}) ', msg=f"Saved: {output}")
+            self.prompt(event=None)
             # locallog.info('before monitor')
             # locallog.info('after monitor')
         else:
@@ -3082,11 +3066,9 @@ class FigureControl():
 
     def permute_anchor(self, fig, step):
         """Entry for anchor-coordinate permutation."""
-        jfig = fig.number
         fig.permute_anchor(step)
         msg = 'anchor permuted.' if step else 'anchor cleared.'
         fig.sync_message(msg)
-        # fig.info(pfx=f'\r({jfig}) ', msg=msg, sync=True)
         self.prompt(event=None)
 
     def permute_draw(self, fig, step):
@@ -3116,8 +3098,6 @@ class FigureControl():
             self.interactive(fig, msg=False, prev=prev)
             fig.post_turn(rcv)
             fig.sync_message('turned')
-            # jfig = fig.number
-            # fig.info(pfx=f'\r({jfig}) ', msg='turned', sync=True)
             self.prompt(event=None)
 
     def toggle_turn(self, fig, turn=None):
@@ -3127,10 +3107,8 @@ class FigureControl():
             turn = - fig.turn_dir
         fig.turn_dir = turn
         if cur != fig.turn_dir:
-            # jfig = fig.number
             msg = f'toggle turn to {turn}'
             fig.message(msg)
-            # fig.info(pfx=f'\r({jfig}) ', msg=msg, sync=False)
             self.prompt(event=None)
 
     def transpose(self, fig):
@@ -3229,8 +3207,6 @@ class FigureControl():
             b = disp.toggle_lock(switch)
             wh = 'locked' if b else 'unlocked'
             msg = f'contour range: {wh}'
-            # jfig = fig.number
-            # fig.info(pfx=f'\r({jfig}) ', msg=msg, sync=False)
             fig.message(msg)
             self.prompt(event=None)
 
@@ -3274,12 +3250,13 @@ class FigureControl():
     def refresh(self, fig):
         """New fresh figure, close old."""
         nfig = self.duplicate(fig)
-        jfig = fig.number
         jnew = nfig.number
         plt.close(fig)
         del self.figs[fig]
         fig.disconnect('key_press_event')
-        print(f"\r({jfig}) regenerated > ({jnew})")
+        fig.message(f"regenerated > ({jnew})")
+        self.prompt(event=None)
+        # print(f"\r({jfig}) regenerated > ({jnew})")
 
     def new(self, fig):
         """New fresh figure."""
@@ -3307,8 +3284,6 @@ class FigureControl():
             locallog.debug(ch)
 
     def show_info(self, fig, **kwds):
-        # jfig = fig.number
-        # fig.info(pfx=f'\r({jfig}) info: ')
         fig.message('info')
         if kwds:
             fig.show_info(**kwds)

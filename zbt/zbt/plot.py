@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/17 14:06:21 fuyuki plot.py>
+# Time-stamp: <2025/01/18 22:19:51 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -1975,6 +1975,8 @@ class ContourPlot(PlotBase, _ConfigType):
             ax = axs.which('color', key)
             func = getattr(ax, method, None)
         if func:
+            if method == 'pcolormesh':
+                func = ft.partial(func, edgecolor='face')
             return func
         else:
             raise ValueError(f"invalid method {method}.")
@@ -2196,30 +2198,33 @@ def main(args):
         print(f"open: {a}")
         ds = zxr.open_dataset(a)
         for vk in ds.data_vars:
-            fig, axs = Pic(reset=True)
             vv = ds[vk]
             print(f"var: {vk} {vv.shape}")
-            frames = []
-            z = 0
-            vmin = vv[:,z,...].min()
-            vmax = vv[:,z,...].max()
+            nz = vv.shape[-3]
+            AA = []
+            for z in range(min(3, nz)):
+                fig, axs = Pic(reset=True)
+                frames = []
+                z = 0
+                vmin = vv[:,z,...].min()
+                vmax = vv[:,z,...].max()
 
-            for r in range(vv.shape[0]):
-                zz = vv[r,z,...]
-                print(f"rec: {r} {zz.shape}")
-                axs.reset(fig)
-                # axs.cla(fig)
-                aa = plot(fig, axs, zz, vmin=vmin, vmax=vmax)
-                frames.append(aa)
-                print(aa)
-            ani = animation.ArtistAnimation(
-                fig,
-                frames,
-                interval=100,
-                blit=False,  # blitting can't be used with Figure artists
-                repeat_delay=10,
-            )
-
+                for r in range(vv.shape[0]):
+                    zz = vv[r,z,...]
+                    print(f"rec: {z} {r} {zz.shape}")
+                    axs.reset(fig)
+                    # axs.cla(fig)
+                    aa = plot(fig, axs, zz, vmin=vmin, vmax=vmax)
+                    frames.append(aa)
+                    # print(aa)
+                ani = animation.ArtistAnimation(
+                    fig,
+                    frames,
+                    interval=30,
+                    blit=False,  # blitting can't be used with Figure artists
+                    repeat_delay=10,
+                )
+                AA.append(ani)
             # r = 0
             # zz = vv[r,z,...]
             # plot(fig, axs, zz, vmin=vmin, vmax=vmax)
