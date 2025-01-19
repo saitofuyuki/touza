@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/24 15:03:52 fuyuki zbcont.py>
+# Time-stamp: <2024/11/11 09:06:20 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -8,20 +8,21 @@ import pathlib as plib
 import cProfile
 import tomllib as toml
 import re
+import functools as ft
+
+import matplotlib as mplib
+import matplotlib.pyplot as plt
+import matplotlib.backends.backend_pdf as mppdf
+import matplotlib.ticker as mtc
+
+# import matplotlib.gridspec as mgs
+# import mpl_toolkits.axes_grid1 as mag
 
 import cartopy
 # import cartopy.util
 import cartopy.crs as ccrs
-
 # import numpy as np
 import xarray as xr
-import matplotlib as mplib
-import matplotlib.pyplot as plt
-import matplotlib.backends.backend_pdf as mppdf
-
-import matplotlib.ticker as mtc
-# import matplotlib.gridspec as mgs
-# import mpl_toolkits.axes_grid1 as mag
 
 # import os
 # sys.path.insert(0, os.getcwd())
@@ -30,19 +31,117 @@ import zbt.util as zu
 import zbt.control as zctl
 import zbt.plot as zplt
 
-# mplib.use('Qt5Agg')
-
-class Options(ap.Namespace):
-    """Namespace to hold options"""
-
-    method_table = {'f': 'contourf', 'c': 'contour',
-                    'p': 'pcolormesh', 'i': 'imshow', }
-    # reserved:  {'s': 'surface'}
+class ParserUtils():
+    """Common parameters and methods for parser."""
 
     isep = '/'
     lsep = ','
     nsep = ':'
     psep = '+'
+
+    def parse_float(self, text):
+        if text:
+            if text[1] in ['+', '-']:
+                text = text[1:]
+            return float(text)
+        return None
+
+
+class Projection(ParserUtils):
+    table = {'platecarree': (ccrs.PlateCarree, 'central_longitude', ),
+             'mercator': (ccrs.Mercator, 'central_longitude', ),
+             'mollweide': (ccrs.Mollweide, 'central_longitude', ),
+             'northpolarstereo': (ccrs.NorthPolarStereo,
+                                  'central_longitude', ),
+             'southpolarstereo': (ccrs.SouthPolarStereo,
+                                  'central_longitude', ),
+             'nearsideperspective': (ccrs.NearsidePerspective,
+                                     'central_longitude',
+                                     'central_latitude',
+                                     'satellite_height', ),
+             'orthographic': (ccrs.Orthographic,
+                              'central_longitude', 'central_latitude',),
+             'hammer': (ccrs.Hammer, 'central_longitude', ), }
+    alias = {'': 'platecarree', 'pc':'platecarree',
+             'm': 'mercator',
+             'w': 'mollweide', 'mo': 'mollweide',
+             'nps': 'northpolarstereo',
+             'sps': 'southpolarstereo',
+             'np': 'nearsideperspective',
+             'g': 'orthographic',
+             'h': 'hammer', }
+
+    keys = list(table.keys())
+
+    ppr = re.compile(r'(\w+)((?:[-+]{1,2}\w+)*)')
+    ppo = re.compile(r'[-+]{1,2}\w+')
+
+    # --projection=PROJ[<+->lon[<+->lat]][,Y,X]
+    #   +NUM > +NUM    +-NUM > -NUM   ++NUM > +NUM
+    #   -NUM > -NUM    -+NUM > +NUM   --NUM > -NUM
+
+    def __init__(self, param):
+        param = param.split(self.lsep)
+        proj = param.pop(0)
+        self.coor = param
+
+        m = self.ppr.match(proj)
+        proj = m.group(1)
+        opts = self.ppo.findall(m.group(2)) + [None] * 3
+
+        self.lon = self.parse_float(opts[0]) or 0
+        self.lat = self.parse_float(opts[1]) or 0
+        self.height = self.parse_float(opts[2]) or None
+
+        proj = self.alias.get(proj, proj)
+        if proj not in self.table:
+            raise ValueError(f"Invalid projection {proj}")
+        self.proj = proj
+
+        self.cache = {}
+
+    def __call__(self, **kwds):
+        if self.proj not in self.table:
+            raise ValueError(f"Invalid projection {proj}")
+        args = self.table[self.proj]
+        cls = args[0]
+        args = args[1:]
+        for a in args:
+            if a == 'central_longitude':
+                kwds.setdefault(a, self.lon)
+            elif a == 'central_latitude':
+                kwds.setdefault(a, self.lat)
+            elif a == 'satellite_height':
+                if self.height is not None:
+                    kwds.setdefault(a, self.height)
+            else:
+                raise ValueError(f"Panic. Unknown projection parameter {a}")
+        ck = (cls, ) + tuple(kwds.items())
+        projection = self.cache.get(ck)
+        if projection is None:
+            projection = cls(**kwds)
+            self.cache[ck] = projection
+        return projection
+
+    def switch(self, key=None):
+        if isinstance(key, int):
+            j = self.keys.index(self.proj)
+            if key > 0:
+                j = (j + 1) % len(self.keys)
+            else:
+                j = j - 1
+            key = self.table[self.keys[j]]
+        if key not in self.table:
+            raise ValueError(f"Invalid projection {key}")
+        self.proj = key
+
+
+class Options(ParserUtils, ap.Namespace):
+    """Namespace to hold options"""
+
+    method_table = {'f': 'contourf', 'c': 'contour',
+                    'p': 'pcolormesh', 'i': 'imshow', }
+    # reserved:  {'s': 'surface'}
 
     def __init__(self, argv, cmd=None):
         """Wrap argument parser."""
@@ -73,9 +172,14 @@ class Options(ap.Namespace):
                             action='store_const', default=0, const=1,
                             help='show debug information')
 
+        parser.add_argument('--force',
+                            dest='force', action='store_true',
+                            help='overwrite outputs')
+
         parser.add_argument('--no-decode_coords',
                             dest='decode_coords', action='store_false',
                             help='skip auto coordinate inclusion')
+
         parser.add_argument('files', metavar='FILE[/SPEC]',
                             type=str, nargs='*',
                             help='files, possibly with specifiers')
@@ -96,14 +200,23 @@ class Options(ap.Namespace):
         parser.add_argument('-r', '--range',
                             metavar='[LOW][:[HIGH]]', dest='limit', type=str,
                             help='data range to draw')
-        parser.add_argument('-d', '--dim',
-                            metavar='DIM,[[LOW]:[HIGH]]', action='append',
-                            type=str,
-                            help='coordinate clipping')
         parser.add_argument('-v', '--variable',
                             metavar='VAR[,VAR...]', default=[], action='append',
                             type=str,
                             help='variable filter')
+        # --dim DIM/LOW:HIGH
+        # --dim DIM,LOW:HIGH       (deprecated)
+        parser.add_argument('-d', '--dim',
+                            metavar='DIM,[[LOW]:[HIGH]]', action='append',
+                            type=str,
+                            help='coordinate clipping')
+        # --draw DIM/NAME/LOW:HIGH,DIM/NAME/LOW:HIGH
+        parser.add_argument('-D', '--draw',
+                            dest='draw',
+                            metavar='COORDINATE/RANGE[,...]', action='append',
+                            type=str,
+                            help='figure coordinates')
+        # --coordinate VERTICAL,HORIZONTAL       (deprecated)
         parser.add_argument('-x', '--coordinate',
                             dest='coors',
                             metavar='VERTICAL[,HORIZONTAL]', default=None,
@@ -130,9 +243,16 @@ class Options(ap.Namespace):
                             help='Create figure for each file')
 
         parser.parse_args(argv, namespace=self)
+        self.verbose = self.verbose - self.quiet
 
         self.coors = self.parse_coors(self.coors)
         self.output = self.parse_output(self.output)
+        if self.coors:
+            print(f"deprecated: {self.coors}")
+            self.coors = self.parse_coors(self.coors)
+            self.draw, _ = self.parse_draw(self.draw)
+        else:
+            self.draw, self.coors = self.parse_draw(self.draw)
 
         color = {}
         contour = {}
@@ -159,17 +279,110 @@ class Options(ap.Namespace):
 
         self.tweak()
 
-        self.verbose = self.verbose - self.quiet
-
         self.parser = parser
 
     def parse_coors(self, coors=None):
+        """Parse coordinate(selection) parameters."""
         if coors:
             coors = tuple(zu.toint(c) for c in coors.split(self.lsep))
             if len(coors) == 1:
                 coors = coors + ('', )
         # print(f"{coors=}")
         return coors
+
+    def parse_draw(self, draw=None):
+        """Parse draw(view) parameters.
+        --dimension=[COORDINATE[/SELECTION]][,[COORDINATE[/SELECTION]][,[...]]]
+        COORAINATE can be either index or (long-)name.
+        SELECTION can be RANGE, POINT, or empty.
+
+        --dimension=-3          Set dims[-3] as y-coordinate.
+        --dimension=,-2         Set dims[-2] as x-coordinate.
+        --dimension=-1/10       Set dims[-1] anchor as index 10.
+                                Plot will be with other effective coordinates.
+        --dimension=-1/10 --dimension=-3
+        --dimension=-1/10,-3    Set dims[-1] anchor as index 10,
+                                and set dims[-3] as y-coordinate.
+        --dimension=-1/10,,-2   Set dims[-1] anchor as index 10,
+                                and set dims[-2] as x-coordinate.
+        --dimension=-3/10:      Set dims[-3] as y-coordinate,
+                                with initial view of index 10 to the end
+                                (== 10 to -1)
+        --dimension=-3/:20      Set dims[-3] as y-coordinate,
+                                with initial view of index 0 to 20 (== 0 to 19)
+        --dimension=-3/10:20    Set dims[-3] as y-coordinate,
+                                with initial view of index 10:20  (== 10 to 19)
+        --dimension=-3/10:20.   Set dims[-3] as y-coordinate,
+                                with initial view from index 10 to point 20.0
+                                (inclusive)
+        --dimension=-3/10.:20.  Set dims[-3] as y-coordinate,
+                                with initial view range from point 10.0 to 20.0
+                                (inclusive)
+        --dimension=time        Set dimension to match with `time'
+                                as y-coordinate.
+        """
+        draw = draw or {}
+        if draw:
+            _draw = {}
+            for od in self.chain_split(draw, self.lsep):
+                d = od.split(self.isep)
+                if len(d) == 0:
+                    pass
+                elif len(d) == 1:
+                    c = zu.toint(d[0])
+                    _draw[c] = None
+                elif len(d) == 2:
+                    c = zu.toint(d[0])
+                    d[1] = d[1] or self.nsep
+                    s = [None if j == '' else zu.tonumber(j)
+                         for j in d[1].split(self.nsep)]
+                    if len(s) == 2:
+                        _draw[c] = slice(s[0], s[1], None)
+                    elif len(s) == 1:
+                        _draw[c] = s[0]
+                    else:
+                        raise ValueError(f'Need valid range {od}')
+                else:
+                    raise ValueError(f'invalid draw {od}')
+            # for od in draw or []:
+            #     for od in od.split(self.lsep):
+            #         d = od.split(self.isep)
+            #         if len(d) == 0:
+            #             pass
+            #         elif len(d) == 1:
+            #             c = zu.toint(d[0])
+            #             _draw[c] = None
+            #         elif len(d) == 2:
+            #             c = zu.toint(d[0])
+            #             d[1] = d[1] or self.nsep
+            #             s = [None if j == '' else zu.tonumber(j)
+            #                  for j in d[1].split(self.nsep)]
+            #             if len(s) == 2:
+            #                 _draw[c] = slice(s[0], s[1], None)
+            #             elif len(s) == 1:
+            #                 _draw[c] = s[0]
+            #             else:
+            #                 raise ValueError(f'Need valid range {od}')
+            #         else:
+            #             raise ValueError(f'invalid draw {od}')
+            draw = _draw
+        coors = []
+        for d, s in draw.items():
+            if isinstance(s, slice) or s is None:
+                coors.append(d)
+        coors = tuple(coors + ['', '', ])[:2]
+        # coors = list(draw.keys()) + ['', '']
+        # coors = tuple(coors[:2])
+        if self.debug > 0:
+            print(f"{draw=} {coors=}")
+
+        return draw, coors
+
+    def chain_split(self, args, sep=None):
+        """Iterator to split all the list items."""
+        for a in args or []:
+            a = a or ''
+            yield from a.split(sep)
 
     def parse_output(self, output=None):
         if output:
@@ -275,15 +488,18 @@ class Options(ap.Namespace):
         dim = {}
         self.dim = self.dim or []
         for d in self.dim:
-            dd = d.split(',')
+            dd = d.split(self.isep)
             if len(dd) != 2:
-                raise ValueError(f"Invalid dim filter: {d}.")
+                dd = d.split(self.lsep)
+                if len(dd) != 2:
+                    raise ValueError(f"Invalid dim filter: {d}.")
+                else:
+                    print(f"Deprecated.  Use --dim/LOW:HIGH format.")
+
             dn = dd[0]
-            dj = [None if j == '' else int(j) for j in dd[1].split(':')]
-            try:
-                dn = int(dn)
-            except ValueError:
-                pass
+            dj = [None if j == '' else zu.tonumber(j)
+                  for j in dd[1].split(':')]
+            dn = zu.toint(dn)
             if len(dj) == 1:
                 # dim[dn] = slice(dj[0], dj[0]+1, None)
                 dim[dn] = dj[0]
@@ -326,47 +542,12 @@ class Options(ap.Namespace):
         # --projection=PROJ[<+->lon[<+->lat]][,Y,X]
         #   +NUM > +NUM    +-NUM > -NUM   ++NUM > +NUM
         #   -NUM > -NUM    -+NUM > +NUM   --NUM > -NUM
+        self.proj = None
         if isinstance(projection, str):
-            projection = projection.split(self.lsep)
-            proj = projection.pop(0)
-            coor = projection
+            # projection = Projection(projection)
+            self.proj = Projection(projection)
+            projection = self.proj()
 
-            pm = re.compile(r'(\w+)((?:[-+]{1,2}\w+)*)')
-            m = pm.match(proj)
-            proj = m.group(1)
-            pm = re.compile(r'[-+]{1,2}\w+')
-            params = pm.findall(m.group(2)) + [None] * 3
-
-            clon = self.parse_float(params[0]) or 0
-            clat = self.parse_float(params[1]) or 0
-            height = self.parse_float(params[2]) or None
-
-            if proj in ['m', 'mercator', ]:
-                projection = ccrs.Mercator(central_longitude=clon)
-            elif proj in ['w', 'mo', 'mollweide', ]:
-                projection = ccrs.Mollweide(central_longitude=clon)
-            elif proj in ['nps', 'northpolarstereo', ]:
-                projection = ccrs.NorthPolarStereo(central_longitude=clon)
-            elif proj in ['sps', 'southpolarstereo', ]:
-                projection = ccrs.SouthPolarStereo(central_longitude=clon)
-            elif proj in ['np', 'nearsideperspective', ]:
-                kw = {}
-                if height is not None:
-                    kw['satellite_height'] = height
-                projection = ccrs.NearsidePerspective(central_longitude=clon,
-                                                      central_latitude=clat,
-                                                      **kw,)
-            elif proj in ['g', 'orthographic', ]:
-                projection = ccrs.Orthographic(central_longitude=clon,
-                                               central_latitude=clat, )
-            elif proj in ['h', 'hammer', ]:
-                projection = ccrs.Hammer(central_longitude=clon)
-            elif proj in ['', 'pc', 'platecarree', ]:
-                projection = ccrs.PlateCarree(central_longitude=clon)
-            else:
-                raise ValueError(f"Invalid feature {proj}")
-            # print(projection)
-            # print(f"{maps=}")
         if bool(projection):
             maps = maps or [None]
         if bool(maps):
@@ -387,13 +568,6 @@ class Options(ap.Namespace):
         coors = (-2, -1)
 
         return {coors: styles}
-
-    def parse_float(self, text):
-        if text:
-            if text[1] in ['+', '-']:
-                text = text[1:]
-            return float(text)
-        return None
 
     def print_help(self, *args, **kwds):
         self.parser.print_help(*args, **kwds)
@@ -437,26 +611,45 @@ def parse_keymap(opts, config, group=None):
             opts[c] = (f, ) + group
 
 class Output:
-    def __init__(self, name, method=None):
+    def __init__(self, name, force=None, method=None):
         method = method or 'serial'
         self._method = getattr(self, method, None)
         if self._method is None:
             raise ValueError(f"Unknown output method {method}")
         self.name = plib.Path(name)
         self.num = 0
+        self.force = zu.set_default(force, False)
 
-    def __call__(self, *args):
-        return self._method(*args)
+    def __call__(self, *args, **kwds):
+        return self._method(*args, **kwds)
 
-    def format(self, num):
-        return f"-{num}"
+    def format(self, num, ref=None, pad=None, sep=None,
+               **kwds):
+        if ref:
+            if ref <= 1:
+                pad = pad or False
+            else:
+                pad = pad or len(str(ref))
 
-    def serial(self, *args):
-        rev = self.format(self.num)
+        if pad is False:
+            return ''
+
+        if pad:
+            num = f"{num:>0{pad}}"
+        else:
+            num = str(num)
+
+        if sep is None:
+            sep = '-'
+        return sep + num
+
+    def serial(self, *args, **kwds):
+        rev = self.format(self.num, **kwds)
         base = self.name.stem + rev + self.name.suffix
         path = self.name.parent / base
         if path.exists():
-            raise ValueError(f"Exists {path}")
+            if not self.force:
+                raise RuntimeError(f"Exists {path}")
         self.num = self.num + 1
         return path
 
@@ -487,41 +680,66 @@ def main(argv, cmd=None):
         opts.print_usage()
         sys.exit(0)
 
+    fopts = dict(decode_coords=opts.decode_coords)
+
+    viter = ft.partial(zctl.VariableIter,
+                       dim=opts.dim, coors=opts.coors,
+                       anchors=opts.draw, debug=opts.debug)
+
     if opts.window > 0:
         Iter = []
         for f in opts.files:
             Array = zctl.ArrayIter()
-            Var = zctl.VariableIter(child=Array, dim=opts.dim,
-                                    coors=opts.coors)
+            Var = viter(child=Array)
+            # Var = zctl.VariableIter(child=Array, dim=opts.dim,
+            #                         coors=opts.coors)
             Iter.append(zctl.FileIter([f], child=Var,
-                                      variables=opts.variable))
+                                      variables=opts.variable, opts=fopts))
     else:
         Array = zctl.ArrayIter()
-        Var = zctl.VariableIter(child=Array, dim=opts.dim, coors=opts.coors)
+        # Var = zctl.VariableIter(child=Array, dim=opts.dim, coors=opts.coors)
+        Var = viter(child=Array)
         Iter = zctl.FileIter(opts.files, child=Var,
-                             variables=opts.variable)
+                             variables=opts.variable, opts=fopts)
 
     Layout = zplt.LayoutLegacy3
+    Layout.config(cfg, verbose=True)
+    if opts.debug > 0:
+        Layout.diag(strip=False)
 
-    Plot = zplt.ContourPlot(contour=opts.contour, color=opts.color)
+    Plot = zplt.ContourPlot
+    Plot.config(cfg, verbose=True)
+    if opts.debug > 0:
+        Plot.diag(strip=False)
 
-    Figs = zctl.FigureControl(Plot, Iter,
-                              interactive=opts.interactive,
-                              layout=Layout,
-                              styles=opts.styles,
-                              config=cfg.get(cstem), params=plt.rcParams)
+    Cmap = zctl.CmapIter()
+    if opts.color.get('cmap') is None:
+        opts.color['cmap'] = Cmap.value
 
+    Pic = zplt.Picture
+    plot = Plot(contour=opts.contour, color=opts.color)
+    # pic = zplt.Picture(Layout)
+    # Plot = zplt.ContourPlot(contour=opts.contour, color=opts.color)
+
+    Ctl = zctl.FigureControl(Pic, plot, Iter,
+                             interactive=opts.interactive,
+                             cmap=Cmap,
+                             layout=Layout,
+                             styles=opts.styles,
+                             draw=opts.draw,
+                             config=cfg.get(cstem), params=plt.rcParams)
     output = opts.output
     try:
         if output and output.suffix == '.pdf':
             if output and output.exists():
-                raise ValueError(f"Exists {output}")
+                if not opts.force:
+                    raise RuntimeError(f"Exists {output}")
             with mppdf.PdfPages(output) as output:
-                Figs(output)
+                Ctl(output)
         else:
             if output:
-                output = Output(name=output)
-            Figs(output)
+                output = Output(name=output, force=opts.force)
+            Ctl(output)
     except StopIteration as err:
         print(err)
         sys.exit(1)
