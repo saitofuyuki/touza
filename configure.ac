@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/10/17 13:09:13 fuyuki configure.ac>
+# Time-stamp: <2024/10/25 14:05:34 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -11,7 +11,7 @@ MT_INIT()
 AC_INIT([touza],MT_VERSION,[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
-Copyright (C) 2020-2024 Japan Agency for Marine-Earth Science and Technology
+Copyright (C) 2020-2025 Japan Agency for Marine-Earth Science and Technology
 
 This is TOUZA, a collection of MIROC base infrastructure.
 
@@ -221,7 +221,7 @@ AM_CONDITIONAL([enable_module_dependencies], [
   && test x"$ax_f90_modext" != xunknown])
 
 AS_IF([test "x$enable_sub_zbt" != xno],
-[AM_PATH_PYTHON([3.9], ,
+[AM_PATH_PYTHON([3.11], ,
                 [AC_MSG_ERROR([cannot enable zbt.  check python environemnt])])
 AX_PYTHON()
 AX_PYTHON_MODULE([ctypes], [FATAL], [python3])

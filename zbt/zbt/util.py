@@ -12,19 +12,53 @@ Common helper utilities for TOUZA/zbt
 :Created:    Jul 16 2024
 """
 
+import sys
 import ctypes as CT
 import collections.abc as cabc
 import numbers as nums
 import numpy as np
+import logging
 # import traceback
 # import collections as cols
 import pprint as ppr
 # import pynput.keyboard as PK
 # import termios
 
-__all__ = ['WrapCDLL', 'AutoString', 'NameMap', 'tostr', 'toint',
+__all__ = ['LocalAdapter',
+           'WrapCDLL', 'AutoString', 'NameMap', 'tostr', 'toint',
+           'tonumber',
            'expand', 'flatten', 'map_recursive', 'join_attrs',
-           'set_default', 'update_config', ]
+           'set_default', 'logger', ]
+
+# library logging
+logger = logging.getLogger(name='zbt')
+handler = logging.StreamHandler()
+fmt = '{name}[{levelname}] {message}'
+formatter = logging.Formatter(fmt, style='{')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+_logger = logger                # alias
+
+class LocalAdapter(logging.LoggerAdapter):
+    def __init__(self, module, logger=None, extra=None):
+        extra = {'module': module} | (extra or {})
+        logger = logger or _logger
+        super().__init__(logger, extra)
+
+    def process(self, msg, kwargs):
+        tags = [self.extra[k]
+                for k in ['module', 'class_', 'func', 'aux', ]
+                if k in self.extra]
+        tag = ':'.join(tags)
+
+        return '<%s> %s' % (tag, msg), kwargs
+
+    def is_debug(self):
+        return self.isEnabledFor(logging.DEBUG)
+
+    def is_info(self):
+        return self.isEnabledFor(logging.INFO)
 
 
 # pylint: disable=too-few-public-methods
@@ -410,6 +444,21 @@ def toint(s):
         return s
 
 
+def tonumber(s):
+    """Integer or float conversion if possible."""
+    try:
+        n = int(s)
+        return n
+    except ValueError:
+        pass
+    try:
+        n = float(s)
+        return n
+    except ValueError:
+        pass
+    return s
+
+
 def expand(array, mask, default=None):
     """Expand array to mask length accorinding to mask boolean."""
     r = []
@@ -474,56 +523,6 @@ def set_default(var, default, null=None):
         return default
     return var
 
-
-def update_config(ref, cfg=None, pfx=None, parent=None, verbose=None):
-    """Recursive update of config dict."""
-    parent = parent or []
-    cfg = cfg or {}
-    pfx = pfx or ''
-    def error(msg, key):
-        key = '.'.join(key)
-        raise ValueError(f"{pfx}[{key}] {msg}")
-
-    for ck, cv in cfg.items():
-        # print(parent, ck, cv)
-        if cv == '':
-            continue
-        par = parent + [ck]
-        if isinstance(ref, dict):
-            attr = False
-            if ck in ref:
-                rv = ref[ck]
-            else:
-                error("Invalid configuration key", par)
-        else:
-            attr = hasattr(ref, ck)
-            if attr:
-                rv = getattr(ref, ck)
-            else:
-                error("Invalid configuration key", par)
-        if isinstance(rv, dict):
-            if not isinstance(cv, dict):
-                error("Inconsistent type", par)
-            cv = update_config(rv, cfg[ck], pfx=pfx,
-                               parent=par, verbose=verbose)
-        else:
-            if isinstance(rv, nums.Number):
-                if not isinstance(cv, nums.Number):
-                    error("Inconsistent type", par)
-            elif isinstance(rv, tuple):
-                if not isinstance(cv, list):
-                    error("Inconsistent type", par)
-                if len(rv) != len(cv):
-                    error("Inconsistent length", par)
-            cv = type(rv)(cv)
-            if verbose:
-                key = '.'.join(par)
-                verbose.write(f"{pfx}[{key}] {rv} > {cv}\n")
-        if attr:
-            setattr(ref, ck, cv)
-        else:
-            ref[ck] = cv
-    return ref
 
 def main(argv):
     """Test driver."""
