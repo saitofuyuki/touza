@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/10 17:49:55 fuyuki zbcont.py>
+# Time-stamp: <2025/01/18 22:07:10 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -7,6 +7,7 @@ import argparse as ap
 import pathlib as plib
 import tomllib as toml
 import re
+import glob
 import functools as ft
 import logging
 # import cProfile
@@ -29,8 +30,14 @@ import xarray as xr
 import zbt.util as zu
 import zbt.control as zctl
 import zbt.plot as zplt
+import zbt.config as zcfg
 
 locallog = zu.LocalAdapter('zbcont')
+
+_ConfigType = zcfg.ConfigRigid
+
+
+# print(zctl.nc_time_axis)
 
 class ParserUtils():
     """Common parameters and methods for parser."""
@@ -161,8 +168,8 @@ class Projection(ParserUtils):
 class Options(ParserUtils, ap.Namespace):
     """Namespace to hold options"""
 
-    method_table = {'f': 'contourf', 'c': 'contour',
-                    'p': 'pcolormesh', }
+    method_table = {'p': 'pcolormesh',
+                    'f': 'contourf', 'c': 'contour', }
 
     # reserved:  {'i': 'imshow'}
     # reserved:  {'s': 'surface'}
@@ -171,15 +178,24 @@ class Options(ParserUtils, ap.Namespace):
         """Wrap argument parser."""
         epilog = """contour spec
  * contour specification
-   INTERVAL[/....]      contour intervals (e.g., -C10/20)
-   LEVEL,[...]          explicit contour levels (e.g., -C133,)
-   NUMBER:[STEP]        number of contour levels (e.g., -C16:)
+   INTERVAL[/....]      contour intervals (e.g., -c10/20)
+   NUMBER:[...]         number of contour levels (e.g., -c16:)
+   LEVEL,[...]          explicit contour levels (e.g., -c133,)
 
  * color specification
    INTERVAL
-   LEVEL,[...]
    NUMBER:
+   LEVEL,[...]
+
+ * color norms
+   {linear(li) sym (sy) log(lo) symlog(sl) asinh (as) twoslope(ts)}
+
+ * color methods
+   {contour(c) contourf(f) pcolormesh(p)}
+
+ * colormaps
 """
+        epilog = epilog + zctl.CmapLink.show(stream=False, indent=3)
 
         parser = ap.ArgumentParser(prog=plib.Path(cmd).name,
                                    epilog=epilog,
@@ -225,15 +241,13 @@ class Options(ParserUtils, ap.Namespace):
                             metavar='SPEC', default=None, type=str,
                             help='color intervals or levels specification.')
         parser.add_argument('-M', '--color-method',
-                            metavar='METHOD/CMAP[/CMAP..]',
+                            metavar='[[METHOD]/][CMAP[/CMAP..]][+ALPHA]',
                             default=None, type=str,
-                            help='coloring method and map'
-                            ' {contour(c) contourf(f) pcolormesh(p)}')
+                            help='coloring method and colormap')
         parser.add_argument('-N', '--color-norm',
                             metavar='NORM',
                             default=None, type=str,
-                            help='norm for coloring'
-                            ' {linear(li) log(lo) symlog(sl) twoslope(ts)}')
+                            help='norm for coloring')
         ### 'imshow(i)'
         parser.add_argument('-r', '--range',
                             metavar='[LOW][:[HIGH]]', dest='limit', type=str,
@@ -254,16 +268,23 @@ class Options(ParserUtils, ap.Namespace):
                             metavar='COORDINATE[/SELECTION][,...]',
                             action='append',
                             type=str,
+                            help='figure coordinate clipping')
+        # --plot [COORDINATE][,[COORDINATE]]
+        parser.add_argument('-p', '--plot',
+                            dest='coords',
+                            metavar='COORDINATE[,...]',
+                            action='append',
+                            type=str,
                             help='figure coordinates')
-        # # --coordinate VERTICAL,HORIZONTAL       (deprecated)
-        # parser.add_argument('-x', '--coordinates',
-        #                     dest='coors',
-        #                     metavar='VERTICAL[,HORIZONTAL]', default=None,
-        #                     type=str,
-        #                     help='figure coordinates')
         parser.add_argument('-o', '--output',
                             metavar='FILE', type=str,
                             help='output filename')
+        parser.add_argument('--multi-pdf',
+                            dest='multi_pdf',
+                            action='store_const', const=True, default=None)
+        parser.add_argument('--no-multi-pdf',
+                            dest='multi_pdf',
+                            action='store_const', const=False, default=None)
         parser.add_argument('-i', '--interactive',
                             action='store_const', const=True, default=None,
                             help='interactive mode')
@@ -272,7 +293,7 @@ class Options(ParserUtils, ap.Namespace):
                             default=None,
                             # nargs='?', default=None, const=True,
                             help='map overlay')
-        parser.add_argument('-p', '--projection',
+        parser.add_argument('-P', '--projection',
                             metavar='PROJECTION', type=str,
                             default=None,
                             help='map projection')
@@ -280,10 +301,20 @@ class Options(ParserUtils, ap.Namespace):
                             dest='window',
                             action='store_const', default=0, const=1,
                             help='Create figure for each file')
+        parser.add_argument('-L', '--layout',
+                            metavar='LAYOUT[/OPTIONS...]',
+                            default=None, type=str,
+                            help='figure layout (reserved)')
         parser.add_argument('-g', '--geometry',
                             dest='geometry',
                             metavar='[W][,[H]]', default=None, type=str,
-                            help='figure geometry')
+                            help='figure geometry (reserved)')
+        parser.add_argument('--calendar',
+                            metavar='FLAGS[,...]', default=None, type=str,
+                            help='calendar options')
+        parser.add_argument('-F', '--fortran',
+                            action='store_const', const=True, default=None,
+                            help='turn-on fortran style indexing (reserved)')
 
         parser.parse_args(argv, namespace=self)
 
@@ -302,7 +333,7 @@ class Options(ParserUtils, ap.Namespace):
         #     self.draw, _ = self.parse_draw(self.draw)
         # else:
         self.draw = self.parse_draw(self.draw)
-        self.coords = self.extract_view(self.draw)
+        self.coords = self.extract_view(self.coords)
 
         color = {}
         contour = {}
@@ -332,6 +363,7 @@ class Options(ParserUtils, ap.Namespace):
 
         self.variables = self.parse_variables(self.variables)
         self.dims = self.parse_draw(self.dims)
+        self.calendar = self.parse_calendar(self.calendar)
 
         self.parser = parser
 
@@ -350,14 +382,20 @@ class Options(ParserUtils, ap.Namespace):
         return logger
 
     def extract_view(self, draw=None):
-        """Extract view coordinates."""
-        draw = draw or {}
+        """Extract view coordinates.
+        --plot=-3          Set dims[-3] as y-coordinate.
+        --plot=,-2         Set dims[-2] as x-coordinate.
+        --plot=time        Set dimension to match with `time'
+                           as y-coordinate.
+        """
+        if isinstance(draw, str):
+            draw = [draw.split(self.lsep)]
+        else:
+            draw = draw or []
         coords = []
-        for d, s in draw.items():
-            if isinstance(s, slice) or s is None:
-                coords.append(d)
+        for d in draw:
+            coords.extend(d.split(self.lsep))
         coords = tuple(coords + ['', '', ])[:2]
-        # print(f"{coords=}")
         return coords
 
     def parse_draw(self, draw=None):
@@ -366,30 +404,16 @@ class Options(ParserUtils, ap.Namespace):
         COORAINATE can be either index or (long-)name.
         SELECTION can be RANGE, POINT, or empty.
 
-        --draw=-3          Set dims[-3] as y-coordinate.
-        --draw=,-2         Set dims[-2] as x-coordinate.
         --draw=-1/10       Set dims[-1] anchor as index 10.
                            Plot will be with other effective coordinates.
-        --draw=-1/10 --draw=-3
-        --draw=-1/10,-3    Set dims[-1] anchor as index 10,
-                           and set dims[-3] as y-coordinate.
-        --draw=-1/10,,-2   Set dims[-1] anchor as index 10,
-                           and set dims[-2] as x-coordinate.
-        --draw=-3/10:      Set dims[-3] as y-coordinate,
-                           with initial view of index 10 to the end
+        --draw=-3/10:      Set dims[-3] initial view as index 10 to the end
                            (== 10 to -1)
-        --draw=-3/:20      Set dims[-3] as y-coordinate,
-                           with initial view of index 0 to 20 (== 0 to 19)
-        --draw=-3/10:20    Set dims[-3] as y-coordinate,
-                           with initial view of index 10:20  (== 10 to 19)
-        --draw=-3/10:20.   Set dims[-3] as y-coordinate,
-                           with initial view from index 10 to point 20.0
+        --draw=-3/:20      initial view of index 0 to 20 (== 0 to 19)
+        --draw=-3/10:20    initial view of index 10:20  (== 10 to 19)
+        --draw=-3/10:20.   initial view from index 10 to point 20.0
                            (inclusive)
-        --draw=-3/10.:20.  Set dims[-3] as y-coordinate,
-                           with initial view range from point 10.0 to 20.0
+        --draw=-3/10.:20.  initial view range from point 10.0 to 20.0
                            (inclusive)
-        --draw=time        Set dimension to match with `time'
-                           as y-coordinate.
         """
         draw = draw or {}
         _draw = {}
@@ -438,7 +462,7 @@ class Options(ParserUtils, ap.Namespace):
         cmap = method[1:]
         method = method[0]
         method = self.method_table.get(method, method)
-        method = method or 'contourf'
+        method = method or 'pcolormesh'
         if method in self.method_table.values():
             pass
         else:
@@ -467,6 +491,8 @@ class Options(ParserUtils, ap.Namespace):
                     norms.append('linear')
                 elif a[0] in ['log', 'lo', ]:
                     norms.append('log')
+                elif a[0] in ['asinh', 'as', ]:
+                    norms.append('asinh')
                 elif a[0] in ['symlog', 'sl', ]:
                     ap = a[1:]
                     num = -1
@@ -491,6 +517,14 @@ class Options(ParserUtils, ap.Namespace):
                     if not org:
                         org = 0.0
                     norms.append(('twoslope', org) )
+                elif a[0] in ['sym', 'sy', ]:
+                    ap = a[1:]
+                    org = None
+                    if len(ap) >= 1:
+                        org = zu.tonumber(ap[0])
+                    if not org:
+                        org = 0.0
+                    norms.append(('sym', org) )
                 else:
                     raise ValueError(f"invalid color norm {a}.")
         # print(f"{norms=}")
@@ -499,15 +533,28 @@ class Options(ParserUtils, ap.Namespace):
 
     def parse_levels(self, text, single=False):
         """Parse contour/color levels."""
-        # --contours=0              no contour
-        # --contours=INT[/INT...]   contour intervals
-        # --contours=LEV,[LEV,...]  explicit contour levels
-        # --contours=NUM:[NUM,...]  total number of contour lines
+        # --contours=<spec>[[/:]<spec>....]
+        # <spec>
+        #    0                 no contour
+        #    <number>          contour intervals
+        #    <number>:         (roughly) total number of contour levels
+        #    <level>,[...]     explicit contour levels
+        # If separator after number is : colon, then it is regarded as
+        # total number instead of intervals.
+        #
+        # example
+        #   --contours=0/10/20:100,200
+        #       (0)       no contour with option set 0
+        #       (10)      contour intervals of 10 with option set 1
+        #       (20:)     totally 20 contours option set 2
+        #       (100,200) draw contour lines at 100, 200 with option set 3
+        #
+        # --colors=<spec>[/<spec>....]
+        #    0                 no fill
+        #    <number>          (discrete) color intervals
+        #    <level>,[...]     explicit contour levels
+        #    <division>:       (roughly) total number of colors
 
-        # --colors=0                 no fill
-        # --colors=INT               intervals
-        # --colors=LEV,[LEV,...]     explicit levels
-        # --colors=NUM:              total number of colors
         if text is False:
             pat = [False]
         elif text is True:
@@ -516,15 +563,25 @@ class Options(ParserUtils, ap.Namespace):
             text = text or ''
             pat = []
             for item in text.split(self.isep):
-                if self.lsep in item:
+                if self.nsep in item:
+                    for item in item.split(self.nsep):
+                        if self.lsep in item:
+                            pat.append([float(jj)
+                                        for jj in item.split(self.lsep) if jj])
+                        elif item:
+                            n = zu.toint(item)
+                            try:
+                                if n > 0:
+                                    loc = mtc.MaxNLocator(n + 1)
+                                    pat.append(loc.tick_values)
+                                else:
+                                    pat.append(False)
+                            except TypeError as err:
+                                locallog.error(f"invalid parameter {item}")
+                                raise err
+                elif self.lsep in item:
                     pat.append([float(jj)
                                 for jj in item.split(self.lsep) if jj])
-                elif self.nsep in item:
-                    for n in [int(jj)
-                              for jj in item.split(self.nsep) if jj]:
-                        # loc = mtc.MaxNLocator(n + 1)
-                        # pat.append(loc.tick_values)
-                        pat.append(n + 1)
                 elif item:
                     item = float(item)
                     if item > 0:
@@ -643,6 +700,35 @@ class Options(ParserUtils, ap.Namespace):
 
         return st
 
+    def parse_calendar(self, param=None):
+        """Parse calendar flag."""
+        npt = 'numpy'
+        if param is None:
+            param = True
+        elif isinstance(param, str):
+            pu = param.upper()
+            if pu in ['FALSE', 'F', 'NO', 'N']:
+                param = False
+            elif pu in ['TRUE', 'T', 'YES', 'Y', 'AUTO']:
+                param = True
+            else:
+                # param = lsep.split(param)
+                param = param.split(self.lsep)
+        if param is True:
+            param = []
+
+        if param is False:
+            pass
+        else:
+            if not isinstance(param, (list, tuple)):
+                param = [param]
+            if zctl.nc_time_axis is None:
+                locallog.warning("numpy date type enabled"
+                                 " (no nc_time_axis module).")
+                if npt not in param:
+                    param.append(npt)
+        return param
+
     def print_help(self, *args, **kwds):
         """Wrap print_help()."""
         self.parser.print_help(*args, **kwds)
@@ -689,21 +775,79 @@ def load_config(opts, *files, cmd=None, base=None):
 #         elif c != '':
 #             opts[c] = (f, ) + group
 
-class Output:
-    def __init__(self, name, force=None, method=None):
+class Output(_ConfigType):
+    names = ('output', )
+    name_ = 'zbtFigure.png'
+    gsep_ = r'-'
+    nsep_ = r'_'
+    multi_pdf_ = False
+    pad_ = 0
+
+    def __init__(self, path, *, force=None, method=None):
         method = method or 'serial'
         self._method = getattr(self, method, None)
         if self._method is None:
             raise ValueError(f"Unknown output method {method}")
-        self.name = plib.Path(name)
-        self.num = 0
+        if path:
+            self.path = plib.Path(path)
+            self.num = None
+        else:
+            name = plib.Path(self.prop('name'))
+            gsep = self.prop('gsep', '')
+            nsep = self.prop('nsep', '_')
+            g = 0
+            while True:
+                stem = name.stem
+                if gsep:
+                    stem = stem + gsep + str(g)
+                pat = stem + nsep + '*' + name.suffix
+                for xx in glob.iglob(pat):
+                    # print(pat, xx)
+                    g = g + 1
+                    break
+                else:
+                    # print(pat)
+                    break
+                continue
+            self.path = plib.Path(stem + name.suffix)
+            locallog.info(f"automatic output template: {self.path}")
+
+            self.num = 0
+
         self.force = zu.set_default(force, False)
 
     def __call__(self, *args, **kwds):
         return self._method(*args, **kwds)
 
+    def __bool__(self):
+        return True
+
+    @property
+    def suffix(self):
+        return self.path.suffix
+
+    def is_pdfpages(self, default=None):
+        if default is None:
+            default = self.prop('multi_pdf', False)
+        else:
+            default = bool(default)
+        if self.suffix == '.pdf':
+            b = default
+            return not b
+        return False
+
+    def exists(self):
+        if self.path.exists():
+            if self.force:
+                locallog.warning(f"Force overwrite {self.path}.")
+            else:
+                raise RuntimeError(f"Exists {self.path}.")
+        return False
+
     def format(self, num, ref=None, pad=None, sep=None,
                **kwds):
+        if pad is None:
+            pad = self.prop('pad', 0)
         if ref:
             if ref <= 1:
                 pad = pad or False
@@ -719,18 +863,30 @@ class Output:
             num = str(num)
 
         if sep is None:
+            sep = self.prop('nsep')
+        if sep is None:
             sep = '-'
         return sep + num
 
-    def serial(self, *args, **kwds):
-        rev = self.format(self.num, **kwds)
-        base = self.name.stem + rev + self.name.suffix
-        path = self.name.parent / base
+    def serial(self, *args, ref=None, **kwds):
+        if ref:
+            if self.num is None:
+                self.num = 0
+        if self.num is None:
+            path = self.path
+        else:
+            rev = self.format(self.num, ref=ref, **kwds)
+            base = self.path.stem + rev + self.path.suffix
+            path = self.path.parent / base
         if path.exists():
             if not self.force:
                 raise RuntimeError(f"Exists {path}")
-        self.num = self.num + 1
+        if self.num is None:
+            self.num = 0
+        else:
+            self.num = self.num + 1
         return path
+
 
 def main(argv, cmd=None):
     """Contour plot with TOUZA/Zbt."""
@@ -758,12 +914,14 @@ def main(argv, cmd=None):
             locallog.debug(f"{m}")
 
     cfg = load_config(opts, *files, cmd=cstem)
+    xcfg = cfg.get(cstem)
 
     if len(opts.files) == 0:
         opts.print_usage()
         sys.exit(0)
 
-    fopts = dict(decode_coords=opts.decode_coords)
+    fopts = dict(decode_coords=opts.decode_coords,
+                 calendar=opts.calendar)
 
     fiter = ft.partial(zctl.FileIter,
                        variables=opts.variables, opts=fopts)
@@ -795,12 +953,16 @@ def main(argv, cmd=None):
     NormP = ft.partial(zctl.NormLink, **opts.cnorm)
     CmapP = ft.partial(zctl.CmapLink, chain=NormP, **opts.color)
     AxisP = ft.partial(zctl.AxisScaleLink)
+    CintP = ft.partial(zctl.ContourParams, **opts.contour)
     Params = zctl.PlotParams()
     Params.reg_entry('color', CmapP)
     Params.reg_entry('axis', AxisP)
+    Params.reg_entry('contour', CintP)
 
     Pic = zplt.Picture
-    plot = Plot(contour=opts.contour)
+    # plot = Plot(contour=opts.contour)
+    plot = Plot()
+
 
     Ctl = zctl.FigureControl(Pic, plot, Iter,
                              interactive=opts.interactive,
@@ -808,18 +970,21 @@ def main(argv, cmd=None):
                              layout=Layout,
                              styles=opts.styles,
                              draw=opts.draw,
-                             config=cfg.get(cstem), rc=plt.rcParams)
-    output = opts.output
+                             config=xcfg, rc=plt.rcParams)
+
+    Output.config(xcfg)
+    if locallog.is_debug():
+        Output.diag(strip=False)
+
+    output = Output(opts.output, force=opts.force)
     try:
-        if output and output.suffix == '.pdf':
-            if output and output.exists():
-                if not opts.force:
-                    raise RuntimeError(f"Exists {output}")
-            with mppdf.PdfPages(output) as output:
-                Ctl(output)
+        if output.is_pdfpages(opts.multi_pdf):
+            # if output and output.suffix == '.pdf':
+            # if False:
+            _ = output.exists()
+            with mppdf.PdfPages(output.path) as opdf:
+                Ctl(opdf, path=output.path)
         else:
-            if output:
-                output = Output(name=output, force=opts.force)
             Ctl(output)
     except StopIteration as err:
         print(err)

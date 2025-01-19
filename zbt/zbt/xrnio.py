@@ -55,27 +55,35 @@ class xrNioDataArray(xr.DataArray):
                 else:
                     # xs = v.coords[c].sel({c: xs}, method='nearest')
                     rsel = crec.get_loc(rsel)
-        va = self._tweak(va, indexers, rsel=rsel)
+        va = self._tweak(va, indexers, rsel=rsel, **indexers_kwargs)
         return va
 
     def isel(self, indexers=None, drop=False,
              missing_dims='raise', **indexers_kwargs):
         va = super().isel(indexers, drop, missing_dims, **indexers_kwargs)
-        va = self._tweak(va, indexers)
+        va = self._tweak(va, indexers, **indexers_kwargs)
         return va
 
-    def _tweak(self, va, indexers=None, rsel=None):
+    def _tweak(self, va, indexers=None, rsel=None, **indexers_kwargs):
         """Attribute tweaking."""
+        indexers = indexers or indexers_kwargs or None
+
         if indexers is None:
             return va
 
         recdim = va.attrs.get(_RECDIM_ATTR, None)
+        # print(f"{recdim=}")
         if recdim:
             rsel = zu.set_default(rsel, indexers.get(recdim, None))
+            # print(f"{rsel=}")
             if rsel is not None:
                 for k, v in va.attrs.items():
                     if isinstance(v, tuple):
-                        va.attrs[k] = v[rsel]
+                        if isinstance(rsel, (list, tuple)):
+                            va.attrs[k] = tuple(v[r] for r in rsel)
+                        else:
+                            va.attrs[k] = v[rsel]
+        # print(va.attrs)
         for co, sel in indexers.items():
             oco = self.coords[co]
             nco = va.coords.get(co, None)
@@ -175,13 +183,14 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
     description = "Use TOUZA/Nio(gtool-3.5 extension) files in Xarray"
     url = "https://github.com/saitofuyuki/touza"
 
+    xrnio_parameters = ["calendar",
+                        "touza_nio_option"]
+
     open_dataset_parameters = ["filename_or_obj",
                                "drop_variables",
                                "decode_times",
                                "decode_timedelta",
-                               "decode_coords",
-                               "calendar",
-                               "touza_nio_option"]
+                               "decode_coords", ] + xrnio_parameters
 
     lib = libtouza.LibTouzaNio(name=None)
 
@@ -196,13 +205,11 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
 
         if decode_coords:
             dscls = dsnio.TouzaNioCoDataset
-            if decode_times:
-                if calendar is None:
-                    calendar = 'auto'
+            dtt, cal = self.parse_calendar(calendar, decode_times)
+            kwds['calendar'] = cal
         else:
+            dtt = False
             dscls = dsnio.TouzaNioDataset
-
-        kwds['calendar'] = calendar
         # print(kwds)
         ds = dscls(filename_or_obj,
                    cls_var=xrNioBackendArray,
@@ -250,7 +257,11 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
             variables[zu.tostr(vn)] = var
 
         dset = xrNioDataset(variables)
-        if calendar:
+        if dtt == 'numpy':
+            dtt = np.datetime64
+        else:
+            dtt = None
+        if dtt:
             for cn in dset.coords:
                 co = dset[cn]
                 c0 = co.values[0]
@@ -258,7 +269,8 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
                     # print(cn, co.dtype, type(c0))
                     ntime = []
                     for t in co.values:
-                        ndt = np.datetime64(t)
+                        ndt = dtt(t)
+                        # ndt = np.datetime64(t)
                         ntime.append(ndt)
                     try:
                         nda = xr.DataArray(ntime, dims=(cn, ),
@@ -266,13 +278,41 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
                         dset[cn] = nda
                     except ValueError as err:
                         locallog.warning(err)
-
+                        msg = f"Failed at calendar conversion to {dtt}."
+                        raise RuntimeError(msg) from None
         return dset
 
     def guess_can_open(self, filename_or_obj):
         if isinstance(filename_or_obj, str):
             return self.lib.tnb_file_is_nio(filename_or_obj)
         return False
+
+    def parse_calendar(self, cal, decode_times):
+        """Parse calendar argument complex and return tuple.of
+        type, [calendars]"""
+
+        dtype = False
+        if cal is None:
+            cal = bool(decode_times)
+        if cal is False:
+            pass
+        else:
+            if cal is True:
+                cal = []
+            elif isinstance(cal, str):
+                cal = [cal]
+            if isinstance(cal, (tuple, list)):
+                tmp = []
+                for k in cal:
+                    if k in ['numpy', ]:
+                        dtype = 'numpy'
+                    elif k == 'auto':
+                        tmp = []
+                    elif k in dsnio.calendar_epoch:
+                        tmp.append(k)
+                cal = tmp
+
+        return dtype, cal
 
 
 def open_dataset(filename_or_obj, *args, engine=None, **kwargs):
@@ -285,6 +325,11 @@ def open_dataset(filename_or_obj, *args, engine=None, **kwargs):
         elif engine == 'zbt':
             raise ValueError(f'Not zbt file: {filename_or_obj}.')
     if xds is None:
+        for k in xrNioBackendEntrypoint.xrnio_parameters:
+            if k in kwargs:
+                locallog.warning(f"{k} argument removed"
+                                 " to call open_dataset().")
+                del kwargs[k]
         xds = xr.open_dataset(filename_or_obj, *args, engine=engine, **kwargs)
 
     return xds

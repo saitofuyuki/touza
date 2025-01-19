@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/10 18:11:52 fuyuki plot.py>
+# Time-stamp: <2025/01/18 22:19:51 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -14,6 +14,7 @@ Plotter collections.
 
 import sys
 import collections.abc as cabc
+import functools as ft
 import numbers as nums
 import pprint as ppr
 import logging
@@ -54,52 +55,52 @@ def is_xr(obj):
     return isinstance(obj, xr.DataArray)
 
 
-class VarLevelsCore():
-    """Base layer of cmap/contour-levels control."""
+# class VarLevelsCore():
+#     """Base layer of cmap/contour-levels control."""
 
-    nimsg = r"VarLevelsCore.{}() not implemented."
+#     nimsg = r"VarLevelsCore.{}() not implemented."
 
-    def _raise(self, name):
-        msg = f"VarLevelsCore.{name}() not implemented."
-        raise NotImplementedError(msg)
+#     def _raise(self, name):
+#         msg = f"VarLevelsCore.{name}() not implemented."
+#         raise NotImplementedError(msg)
 
-    def get_cmap(self, *args, **kwds):
-        """Dummy method to retrieve current cmap"""
-        self._raise('get_cmap')
+#     def get_cmap(self, *args, **kwds):
+#         """Dummy method to retrieve current cmap"""
+#         self._raise('get_cmap')
 
-    def put_cmap(self, *args, **kwds):
-        """Dummy method to register current cmap"""
-        self._raise('put_cmap')
+#     def put_cmap(self, *args, **kwds):
+#         """Dummy method to register current cmap"""
+#         self._raise('put_cmap')
 
-    def get_contour(self, *args, **kwds):
-        """Dummy method to retrieve current contour levels"""
-        self._raise('get_contour')
+#     def get_contour(self, *args, **kwds):
+#         """Dummy method to retrieve current contour levels"""
+#         self._raise('get_contour')
 
-    def put_contour(self, *args, **kwds):
-        """Dummy method to register current contour levels"""
-        self._raise('put_contour')
+#     def put_contour(self, *args, **kwds):
+#         """Dummy method to register current contour levels"""
+#         self._raise('put_contour')
 
 
-class VarLevelsMinimum(VarLevelsCore):
-    """Minimum Cmap Controler to get a constant map."""
+# class VarLevelsMinimum(VarLevelsCore):
+#     """Minimum Cmap Controler to get a constant map."""
 
-    def __init__(self, cmap=None, contour=None):
-        self.cmap = cmap
-        self.contour = contour
+#     def __init__(self, cmap=None, contour=None):
+#         self.cmap = cmap
+#         self.contour = contour
 
-    def put_cmap(self, *args, **kwds):
-        pass
+#     def put_cmap(self, *args, **kwds):
+#         pass
 
-    def put_contour(self, *args, **kwds):
-        pass
+#     def put_contour(self, *args, **kwds):
+#         pass
 
-    def get_cmap(self, *args, **kwds):
-        if isinstance(self.cmap, cabc.Callable):
-            return self.cmap()
-        return self.cmap
+#     def get_cmap(self, *args, **kwds):
+#         if isinstance(self.cmap, cabc.Callable):
+#             return self.cmap()
+#         return self.cmap
 
-    def get_contour(self, *args, **kwds):
-        return self.contour
+#     def get_contour(self, *args, **kwds):
+#         return self.contour
 
 
 # ### Picture
@@ -188,6 +189,24 @@ class FigureCore(mplib.figure.Figure):
             for j, s in enumerate(pp):
                 s = ' '.join(f"[{k}]={v}" for k, v in s.items())
                 print(f"<{ax}> stack[{j}]: {s}")
+
+    def show_info(self, props=None, **kwds):
+        if props is None:
+            props = True
+        if props in [True, False]:
+            def check(k):
+                return props
+        else:
+            if not isinstance(props, (list, tuple)):
+                props = [props]
+            def check(k):
+                return k in props
+
+        if check('size'):
+            print(f'figure size: {self.get_size_inches()}')
+        if check('dpi'):
+            print(f'figure dpi: {self.get_dpi()}')
+        return
 
 # # ### Axes
 # class EmptyAxes(mplib.axes.Axes):
@@ -393,6 +412,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
     """Base layer of figure/axes manipulation."""
     names = ('layout', )
     _axes_keys = ()
+    _category = {}
     geometry = None
     gunit = 0.0
 
@@ -678,10 +698,12 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             g = [None] * 2
             for w in which:
                 if w == 'x':
-                    at = ax.axvline(x=0, **kwds)
+                    # at = ax.axvline(x=0, **kwds)
+                    at, _ = self.guide_hvline(ax, x=0, **kwds)
                     g[0] = at
                 else:
-                    at = ax.axhline(y=0, **kwds)
+                    # at = ax.axhline(y=0, **kwds)
+                    _, at = self.guide_hvline(ax, y=0, **kwds)
                     g[1] = at
                 at.set_visible(bool(visible))
             self.guides[ax] = g
@@ -753,7 +775,8 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         return xlim, ylim, cxy
 
     def contour(self, data, *args,
-                ax=None, artists=None, clabel=None, gid=None, **kwds):
+                ax=None, artists=None, clabel=None, gid=None,
+                **kwds):
         """matplotlib contour wrapper."""
         ax = self._get_axes(ax)
         artists = artists or []
@@ -1087,10 +1110,12 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                                    ('spine', gid, k), zorder=-2)
             if sax:
                 if which == 'x':
-                    at = sax.axvline(x=0, **gprop)
+                    # at = sax.axvline(x=0, **gprop)
+                    at, _ = self.guide_hvline(sax, x=0, **gprop)
                     self.guides[sax] = (at, None)
                 else:
-                    at = sax.axhline(y=0, **gprop)
+                    # at = sax.axhline(y=0, **gprop)
+                    _, at = self.guide_hvline(sax, y=0, **gprop)
                     self.guides[sax] = (None, at)
                 at.set_visible(False)
 
@@ -1100,6 +1125,15 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 # locallog.debug(f"{lab}/{which} <{k}> {xlabel=}")
                 self.register_bg(fig, xlabel, wlabel, which,
                                  ('axis', gid, k), zorder=-1)
+
+    def guide_hvline(self, ax, x=None, y=None, **kwds):
+        atx = None
+        aty = None
+        if x is not None:
+            atx = ax.vlines(x, ymin=0, ymax=1, transform=ax.transAxes, **kwds)
+        if y is not None:
+            aty = ax.hlines(y, xmin=0, xmax=1, transform=ax.transAxes, **kwds)
+        return atx, aty
 
     def register_bg(self, fig, bbw, bbo, which, key, gid=None, **kwds):
         if gid is None:
@@ -1118,8 +1152,13 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             ax.add_artist(ax.patch)
             ax.set_gid(gid)
             ax.set(**kwds)
-            bg = fig.canvas.copy_from_bbox(ax.bbox)
-            self.bg[ax] = bg
+            bb = ax.bbox
+            # print(bb.xmin, bb.xmax, bb.ymin, bb.ymax)
+            # print(f"{bb.extents=}")
+            bg, bb = self.copy_from_bbox(fig, bb)
+            # bg = fig.canvas.copy_from_bbox(bb)
+            # print(f"register_bg: {ax.bbox} {bg=}")
+            self.bg[ax] = bg, bb
         else:
             ax = None
         return ax
@@ -1185,8 +1224,11 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             if g:
                 g.set_visible(False)
         if bg:
+            bg, bb = bg
             fig.canvas.restore_region(bg)
-            fig.canvas.blit(ax.bbox)
+            # fig.canvas.blit(ax.bbox)
+            # fig.canvas.blit(bb)
+            fig.canvas.blit()
 
     def draw_guide(self, fig, ax, x=None, y=None, pos=None, **kwds):
         ax = self._get_axes(ax)
@@ -1199,16 +1241,28 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             xg, yg = at
             bg = self.bg.get(ax)
             if bg:
+                bg, bb = bg
                 fig.canvas.restore_region(bg)
+                # print(f"{bb.extents=}")
+            else:
+                bb = None
             if xg and x is not None:
-                xg.set_xdata([x])
+                # print(xg.get_segments())
+                # xg.set_xdata([x])
+                xg.set_segments([np.array([[x, 0], [x, 1]])])
                 xg.set_visible(True)
                 ax.draw_artist(xg)
             if yg and y is not None:
-                yg.set_ydata([y])
+                # print(yg.get_segments())
+                yg.set_segments([np.array([[0, y], [1, y]])])
+                # yg.set_ydata([y])
                 yg.set_visible(True)
                 ax.draw_artist(yg)
-            fig.canvas.blit(ax.bbox)
+
+            # fig.canvas.blit(ax.bbox)
+            # if bb:
+            #     fig.canvas.blit(bb)
+            fig.canvas.blit()
 
     def add_titles(self, *args,
                    ax=None, artists=None, **kwds):
@@ -1276,14 +1330,52 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         ax = self._get_axes(ax)
         return fig.pop_patch(ax=ax, pos=pos)
 
+    def copy_from_bbox(self, fig, bb):
+        """call copy_from_bbox() with bb rounded."""
+        ibb = ((math.floor(bb.xmin), math.floor(bb.ymin)),
+               (math.ceil(bb.xmax), math.ceil(bb.ymax)))
+        ibb = mplib.transforms.Bbox(ibb)
+        bg = fig.canvas.copy_from_bbox(ibb)
+        return bg, ibb
+        # print(bb.xmin, bb.xmax, bb.ymin, bb.ymax)
 
-class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
-    """Emulate GTOOL3/gtcont layout 3."""
+    def show_info(self, ax=None, props=None, **kwds):
+        if props is None:
+            props = True
+        if props in [True, False]:
+            def check(k):
+                return props
+        else:
+            if not isinstance(props, (list, tuple)):
+                props = [props]
+            def check(k):
+                return k in props
+        if ax:
+            for k, f in [('xlim', ax.get_xlim),
+                         ('xbound', ax.get_xbound),
+                         ('xlabel', ax.get_xlabel),
+                         ('xscale', ax.get_xscale),
+                         ('ylim', ax.get_ylim),
+                         ('ybound', ax.get_ybound),
+                         ('ylabel', ax.get_ylabel),
+                         ('yscale', ax.get_yscale),
+                         ('title', ax.get_title),
+                         ('aspect', ax.get_aspect),
+                         ('box_aspect', ax.get_box_aspect),
+                         ('adjustable', ax.get_adjustable),
+                         ]:
+                if check(k):
+                    print(f'{k}: ', f())
+        return
+
+
+class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
+    """Emulate GTOOL3/gtcont layout (common part)."""
 
     _config = False
 
     # names = ('Legacy3', ) + LayoutBase.names
-    names = ('Legacy3', )   # no dependency
+    names = ('Legacy', )   # no dependency
 
     geometry = (10.45, 7.39)
     gunit = 1.0 / 128
@@ -1329,6 +1421,9 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
 
     _axes_keys = LayoutBase._axes_keys + ('graph', 'text', )
 
+    _category = {'body': ['body', ],
+                 'colorbar': ['colorbar', ], }
+
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
         self.bg = {}
@@ -1356,6 +1451,11 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
                         axis.set_tick_params(which=m, **a)
                     axis.set_gid(gid)
                 self.add_guides(ax, 'xy', **gprop)
+                props = {}
+                for k in ['aspect', ]:
+                    if k in attr:
+                        props[k] = attr[k]
+                ax.set(**props)
             elif lab == 'colorbar':
                 for m in ['major', 'minor']:
                     ax.tick_params(which=m, **(attr.get(m) or {}))
@@ -1469,9 +1569,18 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
             sv = aux.get(sk) or []
             if sk == 'contour' and len(sv) > 0:
                 fmt = sopts.get('format', '')
-                dc = sv[0].levels[1:] - sv[0].levels[:-1]
+                full = []
+                for item in sv:
+                    try:
+                        full = full + list(item.levels)
+                    except AttributeError:
+                        pass
+                full = np.array(sorted(set(full)))
+                locallog.debug(f"full contours: {full}")
+                # dc = sv[0].levels[1:] - sv[0].levels[:-1]
+                dc = full[1:] - full[:-1]
                 if len(dc) == 0:
-                    text.append(f'CONTOUR = {sv[0].levels[0]}')
+                    text.append(f'CONTOUR = {full[0]}')
                 else:
                     mi, ma = min(dc), max(dc)
                     if mi == ma:
@@ -1575,8 +1684,12 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
             if lab in self.prop('graph'):
                 self.add_aux_axes(fig, lab, 'x', **kwds)
                 self.add_aux_axes(fig, lab, 'y', **kwds)
-                bg = fig.canvas.copy_from_bbox(ax.bbox)
-                self.bg[ax] = bg
+
+                bb = ax.bbox
+                bg, bb = self.copy_from_bbox(fig, bb)
+                # bg = fig.canvas.copy_from_bbox(bb)
+                # print(f"on_draw: {bg=}")
+                self.bg[ax] = bg, bb
 
     def monitor(self, fig, text, *args,
                 ax=None, **kwds):
@@ -1587,15 +1700,40 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
         if ax:
             bg = self.bg.get(ax)
             if not bg:
-                bg = fig.canvas.copy_from_bbox(ax.bbox)
-                self.bg[ax] = bg
+                bb = ax.bbox
+                bg, bb = self.copy_from_bbox(fig, bb)
+                # bg = fig.canvas.copy_from_bbox(bb)
+                # print(f"monitor: {bg=}")
+                self.bg[ax] = bg, bb
+            else:
+                bg, bb = bg
             at = ax.texts[0]
             at.set_visible(True)
             # at.set_visible(False)
             at.set_text(text, **kwds)
             fig.canvas.restore_region(bg)
+            # print(fig.canvas.restore_region)
+            # fig.canvas.restore_region(bg)
             ax.draw_artist(at)
-            fig.canvas.blit(ax.bbox)
+            # fig.canvas.blit(ax.bbox)
+            # fig.canvas.blit(bb)
+            fig.canvas.blit()
+        return
+
+    def show_info(self, ax=None, props=None, **kwds):
+        if ax is None:
+            ax = True
+        if ax is True:
+            axs = self.graph.keys()
+        elif not isinstance(ax, (list, tuple)):
+            axs = [ax]
+        else:
+            axs = ax
+
+        for ax in axs:
+            ax = self._get_axes(ax)
+            if ax:
+                super().show_info(ax, props=props, **kwds)
         return
 
     # def retrieve_event(self, event, tol=None):
@@ -1604,6 +1742,16 @@ class LayoutLegacy3(LayoutBase, LegacyParser, _ConfigType):
     #         tol = axp.get('tol')
     #     lab = super().retrieve_event(event, tol=tol)
     #     return lab
+
+
+class LayoutLegacy3(LayoutLegacyBase, LegacyParser, _ConfigType):
+    """Emulate GTOOL3/gtcont layout 3."""
+
+    _config = False
+
+    # names = ('Legacy3', ) + LayoutBase.names
+    names = ('Legacy3', ) + LayoutLegacyBase.names
+
 
 
 # ## Plot ############################################################
@@ -1619,7 +1767,10 @@ class ContourPlot(PlotBase, _ConfigType):
     _opts = {'add_labels': False, }
 
     color_ = {'method': 'pcolormesh', } | _opts
-    contour_ = {'colors': 'black', } | _opts
+    contour_ = {'colors': 'black',
+                'linewidths': 1.5,
+                # [1.0, 2.0, 4.0, 8.0]
+                } | _opts
 
     def __init__(self, contour=None, color=None):
         self._contour = self.prop('contour') | (contour or {})
@@ -1642,8 +1793,8 @@ class ContourPlot(PlotBase, _ConfigType):
         xco = coords[cj[1]]
         yco = coords[cj[0]]
 
-        contour = self._contour | (kwds.get('contour') or {})
         color = self._color | (kwds.get('color') or {})
+        # locallog.debug(f"{contour=}")
         # locallog.debug(f"{color=}")
 
         axisp = kwds.get('axis') or {}
@@ -1665,10 +1816,24 @@ class ContourPlot(PlotBase, _ConfigType):
             transf = None
 
         if transf:
-            contour.setdefault('transform', transf)
+            # contour.setdefault('transform', transf)
             color.setdefault('transform', transf)
 
-        con = self.contour(axs, data, **contour)
+        cset = kwds.get('contour') or {}
+        if isinstance(cset, dict):
+            contour = self._contour | cset
+            if transf:
+                contour.setdefault('transform', transf)
+            con = self.contour(axs, data, **contour)
+        else:
+            con = []
+            for contour in cset:
+                contour = self._contour | contour
+                if transf:
+                    contour.setdefault('transform', transf)
+                # print(f"{contour=}")
+                c = self.contour(axs, data, **contour)
+                con.extend(c)
         col = self.color(axs, data, **color)
         bar, cax, = self.colorbar(fig, axs, con, col,
                                   contour=contour, color=color)
@@ -1744,34 +1909,51 @@ class ContourPlot(PlotBase, _ConfigType):
 
     def contour(self, axs, data,
                 levels=None, clabel=None, key=None,
-                artists=None, **kwds):
+                artists=None, bind=None, **kwds):
         """matplotlib contour wrapper."""
         artists = artists or []
-        levels = self.nml_levels(levels)
-        clabel = self.annotation(clabel, levels)
+        # levels = self.nml_levels(levels)
+        # clabel = self.annotation(clabel, levels)
 
-        def run(**rkw):
-            cp = axs.contour(data, ax=key,
-                             clabel=False, **rkw, **kwds)
-            return cp
+        # print(f"{levels=}")
+        run = ft.partial(axs.contour, data, ax=key,
+                         clabel=False, **kwds)
+        # def run(**rkw):
+        #     cp = axs.contour(data, ax=key,
+        #                      clabel=False, **rkw, **kwds)
+        #     return cp
 
         alab = []
-        for j, lev in enumerate(levels):
-            if lev is True:
-                c = run()
-            elif lev is False:
-                continue
-            elif isinstance(lev, list):
-                c = run(levels=lev)
-            elif isinstance(lev, cabc.Callable):
-                vmin, vmax = self.get_range(data, **kwds)
-                c = run(levels=lev(vmin, vmax))
-            else:
-                raise TypeError(f"invalid level specifier {c}.")
-            artists.extend(c)
-            if clabel(j):
-                alab = axs.clabel(*c, ax=key, artists=alab, gid='clabel')
-        return artists + alab
+        if levels is True:
+            c = run()
+        elif levels is False:
+            c = []
+        else:
+            c = run(levels=levels)
+        artists.extend(c)
+        if clabel and c:
+            alab = axs.clabel(*c, ax=key, artists=alab, gid='clabel')
+
+        # for j, lev in enumerate(levels):
+        #     locallog.debug(f"{j}: {lev}")
+        #     if lev is True:
+        #         c = run()
+        #     elif lev is False:
+        #         continue
+        #     elif isinstance(lev, list):
+        #         c = run(levels=lev)
+        #     elif isinstance(lev, cabc.Callable):
+        #         vmin, vmax = self.get_range(data, **kwds)
+        #         c = run(levels=lev(vmin, vmax))
+        #     else:
+        #         raise TypeError(f"invalid level specifier {c}.")
+        #     artists.extend(c)
+        #     if clabel(j):
+        #         alab = axs.clabel(*c, ax=key, artists=alab, gid='clabel')
+        ret = artists + alab
+        if isinstance(bind, cabc.Callable):
+            bind(artist=ret)
+        return ret
 
     def check_method(self, axs, data, method, key=None):
         """Detect color method."""
@@ -1793,6 +1975,8 @@ class ContourPlot(PlotBase, _ConfigType):
             ax = axs.which('color', key)
             func = getattr(ax, method, None)
         if func:
+            if method == 'pcolormesh':
+                func = ft.partial(func, edgecolor='face')
             return func
         else:
             raise ValueError(f"invalid method {method}.")
@@ -1922,7 +2106,14 @@ class ContourPlot(PlotBase, _ConfigType):
         for cs in cons:
             if isinstance(cs, mcnt.QuadContourSet):
                 if bar:
-                    bar.add_lines(cs, erase=False)
+                    try:
+                        bar.add_lines(cs, erase=False)
+                    except ValueError as err:
+                        # soft-landing for (possibly) empty array
+                        # : zero-size array to reduction operation
+                        # : maximum which has no identity
+                        locallog.warning(err)
+                        locallog.warning(f"levels = {cs.levels}")
                 else:
                     m = len(ticks)
                     if m == 0 or m > len(cs.levels):
@@ -1957,9 +2148,11 @@ class ContourPlot(PlotBase, _ConfigType):
         return vmin, vmax
 
 
-def main(*args):
+def main(args):
     """Test driver."""
     import tomllib as toml
+    import zbt.xrnio as zxr
+    import matplotlib.animation as animation
 
     config = {}
 
@@ -1981,23 +2174,63 @@ def main(*args):
     # lay = LayoutTest(fig)
 
     Pic = Picture(LayoutClass=LayoutTest)
-    fig1, lay1 = Pic(reset=True)
-    fig2, lay2 = Pic(reset=True)
+    # fig1, lay1 = Pic(reset=True)
+    # fig2, lay2 = Pic(reset=True)
 
     # print(fig1, lay1)
     # print(lay1['body'])
     # lay1.reset(fig1)
     # lay2.reset(fig2)
 
-    lay1['body'].plot([0, 1, 2, 3], [3, 2, 1, 0])
-    lay2['body'].plot([0, 1, 2, 3], [0, 3, 1, 2])
+    ### layout demo
+    if False:
+        lay1['body'].plot([0, 1, 2, 3], [3, 2, 1, 0])
+        lay2['body'].plot([0, 1, 2, 3], [0, 3, 1, 2])
+        plt.show()
 
     ContourPlot.config(config, groups=('zbcont', 'test', ))
 
     ContourPlot.diag(strip=False)
 
-    plt.show()
+    plot = ContourPlot()
+    print(args)
+    for a in args:
+        print(f"open: {a}")
+        ds = zxr.open_dataset(a)
+        for vk in ds.data_vars:
+            vv = ds[vk]
+            print(f"var: {vk} {vv.shape}")
+            nz = vv.shape[-3]
+            AA = []
+            for z in range(min(3, nz)):
+                fig, axs = Pic(reset=True)
+                frames = []
+                z = 0
+                vmin = vv[:,z,...].min()
+                vmax = vv[:,z,...].max()
 
+                for r in range(vv.shape[0]):
+                    zz = vv[r,z,...]
+                    print(f"rec: {z} {r} {zz.shape}")
+                    axs.reset(fig)
+                    # axs.cla(fig)
+                    aa = plot(fig, axs, zz, vmin=vmin, vmax=vmax)
+                    frames.append(aa)
+                    # print(aa)
+                ani = animation.ArtistAnimation(
+                    fig,
+                    frames,
+                    interval=30,
+                    blit=False,  # blitting can't be used with Figure artists
+                    repeat_delay=10,
+                )
+                AA.append(ani)
+            # r = 0
+            # zz = vv[r,z,...]
+            # plot(fig, axs, zz, vmin=vmin, vmax=vmax)
+            # fig.canvas.draw()
+
+            plt.show()
     pass
 
 __debug_artist = {}

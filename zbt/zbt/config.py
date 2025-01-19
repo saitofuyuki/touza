@@ -32,6 +32,9 @@ class ConfigBase():
     def prop(self, key, default=None):
         raise NotImplementedError(f"No {type(self)}.prop() method.")
 
+    def dict_recursive(self, strip=None):
+        return self._dict_recursive(type(self), strip=strip)
+
     @staticmethod
     def _dict_recursive(cls, strip=None):
         dd = {}
@@ -167,7 +170,7 @@ class ConfigBase():
 
     @classmethod
     def diag(cls, *args, strip=None, **kwds):
-        """Diagnose configurable Layout properties.
+        """Diagnose configurable class properties.
         Arguments are passed to pprint.pp()."""
         strip = zu.set_default(strip, True)
         cfg = {}

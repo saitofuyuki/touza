@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/11/23 15:36:56 fuyuki libtouza.py>
+# Time-stamp: <2025/01/14 15:30:49 fuyuki libtouza.py>
 
 __doc__ = \
     """
@@ -62,15 +62,18 @@ class LibTouzaCore(zu.WrapCDLL):
                 if p.exists():
                     name = p
                     break
-        if not name:
+        if name is False:
+            # locallog.warning(f"Disable touza library {name}.")
+            raise UserWarning(f"Disable touza library.")
+        elif not name:
             name = CTU.find_library(TOUZA_NAME)
 
-        try:
-            super().__init__(name, *args, **kwds)
-        except OSError:
-            locallog.error("Cannot load touza library {name}.  "
-                           f"Setting {ENV_TOUZA_LIB} environment may help.")
-            raise
+            try:
+                super().__init__(name, *args, **kwds)
+            except OSError:
+                locallog.error("Cannot load touza library {name}.  "
+                               f"Setting {ENV_TOUZA_LIB} environment may help.")
+                raise
         self._touza = touza or {}
 
     def __del__(self, *args, **kwds):
@@ -82,7 +85,11 @@ class LibTouzaNio(LibTouzaCore, zp.ParamTouzaNio):
 
     def __init__(self, *args, **kwds):
         """Initialize CDLL after TOUZA."""
-        super().__init__(*args, **kwds)
+        try:
+            super().__init__(*args, **kwds)
+        except UserWarning as err:
+            locallog.warning(err)
+            return
 
         # self.len_item = CT.c_int.in_dll(self, 'len_item')
         # extern int tnb_init(const int levv, const int mode);

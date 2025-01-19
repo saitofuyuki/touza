@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/10 18:13:17 fuyuki control.py>
+# Time-stamp: <2025/01/18 23:27:52 fuyuki control.py>
 
 __doc__ = \
     """
@@ -594,7 +594,7 @@ class ArrayIter(LinkedArray):
         # debug("return (no base)")
         return super().refresh(base=base, **kwds)
 
-    def permute_draw(self, switch, skip_single=True):
+    def permute_draw(self, switch, skip_single=True, req=None):
         """Draw coordinates permutation."""
         debug = ft.partial(self.debug, func='permute_draw')
         mask = self.mask
@@ -621,6 +621,14 @@ class ArrayIter(LinkedArray):
         pat.append(mshp)
         fskip.append(0)
 
+        if req is None:
+            chk = -1
+        else:
+            chk = mshp - req - 1
+            if chk < 0 or chk > mshp:
+                raise ValueError(f"invalid request dimension {req}")
+        # print(f"{chk=} {req=} {mshp=} {pat=}")
+
         for _ in range(math.comb(mshp, mpat)):
             pos = 0
             while pos < mpat:
@@ -632,7 +640,15 @@ class ArrayIter(LinkedArray):
                 pat[pos] = pos
                 pos = pos + 1
             if mskip == ntgt:
-                break
+                if not chk in pat:
+                    break
+                # print(pat)
+        else:
+            locallog.info("draw coordinate reverted.")
+            return
+            # raise ValueError(f"Panic in permute_draw {req}")
+        # print(f"{req=} {mshp=} {pat=} done")
+
         y, n = slice(None, None, None), False
         if reverse:
             y, n = n, y
@@ -673,7 +689,7 @@ class ArrayIter(LinkedArray):
             return
 
         tgt = dims.index(coord)
-        if step > 0:
+        if step < 0:
             tgt = tgt - len(dims)
             d = 1
         else:
@@ -746,6 +762,78 @@ class ArrayIter(LinkedArray):
                 # del anchors[d]
                 anchors[d] = False
         return anchors
+
+    def turn_or_switch(self, target, switch, skip_single=True):
+        """Set target dimension as iterate or anchor coordinate.
+        If already, then turn slice according to switch."""
+        debug = ft.partial(self.debug, func='turn_or_switch')
+        # debug = locallog.info
+        debug(f"{target=} {switch=}")
+        base = self.base
+        debug(f"{base.dims=}")
+        try:
+            target = parse_coord(self.src, target)
+        except UserWarning as err:
+            locallog.warning(err)
+            return
+        if not target in base.dims:
+            locallog.warning(f"Non-selectable coordinate {target}")
+            return
+        dtgt = base.dims.index(target)
+        # debug(f"{dtgt=} {target=}")
+        dstt = self.mask[dtgt]
+        # debug(f"{dstt=}")
+        if dstt in [True, False]:
+            # turn-mode
+            ret = self.turn_slice(switch, target=dtgt)
+        else:
+            # permute mode
+            self.permute_draw(+1, skip_single, req=dtgt)
+            ret = None
+        return ret
+
+    def turn_slice(self, step, target):
+        """Turn slice along target only."""
+        sav = self.mask
+        mask = [True if isinstance(m, bool) else m
+                for m in self.mask]
+        mask[target] = False
+        mask = tuple(mask)
+        # print(target, mask, self.mask)
+        self.switch(step=step, mask=mask)
+        return sav
+
+    def post_turn(self, state):
+        self.switch(step=0, mask=state)
+
+    def rewind(self, anchor=None, draw=None):
+        """Rewind iterate and other coordinates."""
+        debug = ft.partial(self.debug, func='rewind')
+        # debug = locallog.info
+
+        base = self.base
+        mask = self.mask
+        shape = self.shape
+        cidx = self.l2i()
+
+        # debug(f"{base.dims=}")
+        # debug(f"{mask=}")
+        # debug(f"{shape=}")
+        # debug(f"{cidx=}")
+
+        ini = 0
+
+        cue = []
+        for m, c in zip(mask, cidx):
+            if m is False:
+                cue.append(ini)
+            elif m is True:
+                cue.append(ini if bool(anchor) else c)
+            else:
+                cue.append(ini if bool(draw) else c)
+        cue = tuple(cue)
+        self.data = None
+        self.switch(init=cue)
 
     def point_selection(self, sel, anchor=None, skip_single=True):
         """Point selection."""
@@ -1215,6 +1303,21 @@ class DataTree():
         except AttributeError:
             pass
 
+    def turn_or_switch(self, target, switch=None):
+        """Call turn_or_switch() on array-link."""
+        try:
+            return self._alink.turn_or_switch(target, switch)
+        except AttributeError:
+            pass
+
+    def post_turn(self, state):
+        """Call post_turn() on array-link."""
+        try:
+            return self._alink.post_turn(state)
+        except AttributeError:
+            pass
+
+
     def transpose(self, switch=None):
         """Call transpose() on array-link."""
         try:
@@ -1226,6 +1329,13 @@ class DataTree():
         # locallog.debug(f"datatree {sel=}")
         try:
             self._alink.point_selection(sel, anchor=anchor)
+        except AttributeError as exc:
+            locallog.debug(f"{exc}")
+
+    def rewind(self, anchor=None):
+        # locallog.debug(f"datatree {sel=}")
+        try:
+            self._alink.rewind(anchor=anchor)
         except AttributeError as exc:
             locallog.debug(f"{exc}")
 
@@ -1351,10 +1461,8 @@ class PlotParams():
             disp = self.get_disp(a, default=None, **kwds)
             if disp is None:
                 disp = self.reg_disp(a, **kwds)
-            params[a] = {}
             dp = disp.params(**kwds)
-            if dp:
-                params[a].update(dp)
+            params[a] = dp
         return params
 
     def get_disp(self, arg, /, default=None, **kwds):
@@ -1384,6 +1492,9 @@ class PlotParams():
 class ParamsDispatcher():
     def params(self, **kwds):
         raise NotImplementedError
+
+    # def bind(self, *args, **kwds):
+    #     raise NotImplementedError
 
 
 class CmapStatus():
@@ -1465,64 +1576,15 @@ class AxisScaleLink(LinkedArray, ParamsDispatcher):
         return self.advance(-1)
 
 
-class NormLink(LinkedArray, ParamsDispatcher):
-    _serial = 0
-    norms_ = ['', 'log',
-              ('symlog', 4, 'max'), ('symlog', 4, 'min'), ('symlog', 4),
-              ('symlog', 8, 'max'), ('symlog', 8, 'min'), ('symlog', 8),
-              'asinh',
-              ('twoslope', 0), ]
-
-    def __init__(self, norms=None, levels=None, vmin=None, vmax=None,
-                 **kw):
-        if not norms:
-            norms = self.norms_
-        if not isinstance(norms, (tuple, list)):
-            norms = [norms]
-        # locallog.debug(f"{norms=}")
-
-        name = f"NORM-{self._serial}"
-        self._serial = self._serial + 1
-        super().__init__(base=norms[:], name=name, **kw)
-
-        self.levels = levels
-
-        self._loop = None
+class LimitParams():
+    def __init__(self, vmin=None, vmax=None, **kwds):
         self._lock = False
+        self._array = None
         self._lims = (vmin, vmax) # user-defined range
         self.lims = (None, None)  # run-time (possibly locked) range
-        self.cache = {}
-        self._array = None
-        self._to_adjust = None
-
-    def loop(self):
-        self._loop = iter(self.items())
-        _ = next(self._loop)
-
-    def params(self, array=None, **kwds):
-        locallog.debug(f"norm:params: {kwds.keys()}")
-        locallog.debug(f"norm:params:array: {self._array is array}")
-
-        p = {}
-
-        if not self._loop:
-            self.loop()
-        norm = self.value()
-        upd, lims = self.update_lims(array)
-        locallog.debug(f"norm:params:norm: {norm}")
-        locallog.debug(f"norm:params:lims: {lims}")
-
-        k = self.l2p(None)
-        saved = self.cache.get(k)
-        if saved is not None:
-            saved = saved.norm
-        locallog.debug(f"norm:value: {norm} {lims} {self.lims} {saved}")
-        if upd or self._to_adjust:
-            p['norm'] = self.adjust_norm(norm, saved, lims, **kwds)
-        else:
-            p['norm'] = saved
-        self._to_adjust = False
-        return p
+        self.refs = (None, None)  # run-time reference range
+                                  # (to check whether changed)
+        super().__init__(**kwds)
 
     def update_lims(self, array):
         vmin, vmax = self.lims
@@ -1554,11 +1616,93 @@ class NormLink(LinkedArray, ParamsDispatcher):
                 vmax = self._lims[1]
             if vmin == vmax:
                 locallog.info(f"Constant field ({vmin})")
-
+        else:
+            upd = False
         # update current target array
         self.lims = vmin, vmax
         self._array = array
         return upd, self.lims
+
+    def toggle_lock(self, switch=None):
+        if switch is not None:
+            self._lock = bool(switch)
+        else:
+            self._lock = not self._lock
+        return self._lock
+
+
+class NormLink(LimitParams, LinkedArray, ParamsDispatcher):
+    """Norm parameter dispatcher."""
+    debug = locallog.debug
+    # debug = locallog.info
+
+    _serial = 0
+    norms_ = ['',
+              ('sym', 0.0),
+              'log',
+              ('symlog', 4, 'max'), ('symlog', 4, 'min'), ('symlog', 4),
+              ('symlog', 8, 'max'), ('symlog', 8, 'min'), ('symlog', 8),
+              'asinh',
+              ('twoslope', 0.0), ]
+
+    def __init__(self, norms=None, levels=None, **kw):
+        # vmin=None, vmax=None,
+        if not norms:
+            norms = self.norms_
+        if not isinstance(norms, (tuple, list)):
+            norms = [norms]
+        # locallog.debug(f"{norms=}")
+
+        name = f"NORM-{self._serial}"
+        self._serial = self._serial + 1
+        super().__init__(base=norms[:], name=name, **kw)
+
+        self.levels = levels
+
+        self._loop = None
+        # self._lock = False
+        # self._lims = (vmin, vmax) # user-defined range
+        # self.lims = (None, None)  # run-time (possibly locked) range
+        # self._array = None
+        self.cache = {}
+        self._to_adjust = None
+
+    def loop(self):
+        self._loop = iter(self.items())
+        _ = next(self._loop)
+
+    def params(self, array=None, **kwds):
+        self.debug(f"norm:params: {kwds.keys()=}")
+        self.debug(f"norm:params: {self._array is array=}")
+
+        p = {}
+
+        if not self._loop:
+            self.loop()
+        norm = self.value()
+        self.debug(f"norm:params: {self.lims=}")
+        upd, lims = self.update_lims(array)
+        self.debug(f"norm:params: {norm=}")
+        self.debug(f"norm:params: {lims=}")
+
+        k = self.l2p(None)
+        saved = self.cache.get(k)
+        if saved is not None:
+            saved = saved.norm
+        self.debug(f"norm:value: {norm} {lims} {self.lims} {saved}")
+        if upd or self._to_adjust:
+            p['norm'] = self.adjust_norm(norm, saved, lims, **kwds)
+        else:
+            p['norm'] = saved
+        self._to_adjust = False
+        norm = p['norm']
+        if norm is not None:
+            self.refs = norm.vmin, norm.vmax
+        self.debug(f"norm:params: {norm=}")
+        self.debug(f"norm:params: {self.refs=}")
+        self.debug(f"norm:params: {self.lims=}")
+        self.debug(f"norm:params: return={p}")
+        return p
 
     def adjust_norm(self, norm, saved, lims, **kwds):
         norm = norm or ''
@@ -1568,6 +1712,7 @@ class NormLink(LinkedArray, ParamsDispatcher):
                 norm.autoscale(lims)
             else:
                 norm = mplib.colors.Normalize(vmin=lims[0], vmax=lims[1])
+            self.debug(f"{norm=} {norm.vmin=} {norm.vmax=}")
         elif norm == 'log':
             norm = self.LogNorm(lims)
         elif norm == 'asinh':
@@ -1575,12 +1720,21 @@ class NormLink(LinkedArray, ParamsDispatcher):
         elif norm[0] == 'symlog':
             sym = None if len(norm) <= 2 else norm[2]
             norm = self.SymLogNorm(lims, width=norm[1], sym=sym)
+        elif norm[0] in 'sym':
+            org = norm[1] or 0.0
+            vmax = max(abs(lims[0] - org), (lims[1] - org))
+            vmin = - vmax + org
+            vmax = + vmax + org
+            norm = mplib.colors.Normalize(vmin=vmin, vmax=vmax)
         elif norm[0] == 'twoslope':
+            self.debug(f"adjust_norm: {lims=}")
             norm = self.TwoSlopeNorm(lims, vcenter=norm[1])
+            self.debug(f"{norm=} {norm.vmin=} {norm.vmax=}")
+            self.debug(f"{norm=} {norm._vmin=} {norm._vmax=}")
         elif isinstance(norm, str):
             if norm == 'symlog':
                 raise ValueError(f"{norm} norm requires one parameter.")
-            if norm == 'twoslope':
+            if norm in ['sym', 'twoslope']:
                 raise ValueError(f"{norm} norm requires one parameter.")
             raise ValueError(f"Unknown colormap norm {norm}")
         elif isinstance(norm, mplib.colors.Normalize):
@@ -1640,27 +1794,26 @@ class NormLink(LinkedArray, ParamsDispatcher):
                 vmin, vmax = -am, +am
         return vmin, vmax
 
-    def TwoSlopeNorm(self, lims, vcenter=None):
+    def TwoSlopeNorm(self, lims, vcenter=None, fac=None):
         vmin, vmax = lims
         vcenter = vcenter or 0
-        if vmax <= vcenter:
-            if vmin <= vcenter:
-                vmin, vmax = None, None
-            else:
-                vmax = None
-        elif vmin >= vcenter:
-            if vmax >= vcenter:
-                vmin, vmax = None, None
-            else:
-                vmin = None
+        fac = fac or 0
+        fac = fac or 0.01
+        if vmin == vmax:
+            vmin, vmax = None, None
+        elif vmax < vcenter:
+            vmax = vcenter - (vmin - vcenter) * fac
+        elif vmin > vcenter:
+            vmin = vcenter - (vmax - vcenter) * fac
         return mplib.colors.TwoSlopeNorm(vcenter, vmin=vmin, vmax=vmax)
 
     def toggle_lock(self, fig, switch=None):
         p = self._lock
-        if switch is not None:
-            self._lock = bool(switch)
-        else:
-            self._lock = not self._lock
+        b = super().toggle_lock(switch)
+        # if switch is not None:
+        #     self._lock = bool(switch)
+        # else:
+        #     self._lock = not self._lock
 
         # if self._lock:
         #     if not p:
@@ -1668,14 +1821,14 @@ class NormLink(LinkedArray, ParamsDispatcher):
         # else:
         #     if p:
         #         fig.pop_patch()
-        if self._lock:
+        if b:
             key = self._current
             k = self.l2p(key)
             v = self.cache.get(k)
             if v is not None:
                 self.lims = v.norm.vmin, v.norm.vmax
 
-        return self._lock
+        return b
 
     def record(self, key=None):
         if key is None:
@@ -1683,38 +1836,42 @@ class NormLink(LinkedArray, ParamsDispatcher):
         k = self.l2p(key)
         v = self.cache.get(k)
         n = self.value()
+        self.debug(f"norm:record: {self.refs=}")
         lmin, lmax = self.lims
         if lmin == lmax:
             locallog.warning("Dynamic range is not propagated"
                              " when constant field.")
         elif v is not None:
             vmin, vmax = v.norm.vmin, v.norm.vmax
-            locallog.debug(f"norm:record: [{k}] {lmin}:{lmax} {vmin}:{vmax}")
-            # Range is not propagated when symlog:max symlog:min
-            if not isinstance(n, tuple):
-                n = (n, None, None)
+            upd = not (self.refs == (vmin, vmax))
+            self.debug(f"norm:record: [{k}] {upd} {lmin}:{lmax} {vmin}:{vmax}")
+            if not upd:
+                locallog.info("Untouched dynamic range is not propagated.")
             else:
-                n = n + (None, None)
-            if n[0] == 'symlog':
-                amin, amax = abs(lmin), abs(lmax)
-                amp = None
-                if n[2] == 'max':
-                    amp = max(amin, amax)
-                elif n[2] == 'min':
-                    amp = min(amin, amax)
-                if amp is not None:
-                    if vmin != -amp or vmax != +amp:
-                        locallog.warning("Dynamic range is not propagated"
-                                         " when max/min symlog mode.")
-                    vmin, vmax = lmin, lmax
-            elif n[0] == 'log':
-                if lmin < 0:
-                    locallog.warning("Dynamic range minimum is not propagated"
-                                     " when log mode with negatives.")
-                    vmin = lmin
-            self.lims = (vmin, vmax)
+                if not isinstance(n, tuple):
+                    n = (n, None, None)
+                else:
+                    n = n + (None, None)
+                if n[0] == 'symlog':
+                    amin, amax = abs(lmin), abs(lmax)
+                    amp = None
+                    if n[2] == 'max':
+                        amp = max(amin, amax)
+                    elif n[2] == 'min':
+                        amp = min(amin, amax)
+                    if amp is not None:
+                        if vmin != -amp or vmax != +amp:
+                            locallog.warning("Dynamic range is not propagated"
+                                             " when max/min symlog mode.")
+                        vmin, vmax = lmin, lmax
+                elif n[0] == 'log':
+                    if lmin < 0:
+                        locallog.warning("Dynamic range minimum is not propagated"
+                                         " when log mode with negatives.")
+                        vmin = lmin
+                self.lims = (vmin, vmax)
             # self.lims = v.get_clim()
-        locallog.debug(f"norm:record: [{k}]={v} {n} {self.lims}")
+        self.debug(f"norm:record: [{k}]={v} {n} {self.lims}")
 
     def advance(self, step):
         # locallog.info(f"norm:advance: {self._current=}")
@@ -1976,6 +2133,139 @@ class CmapLink(LinkedArray, ParamsDispatcher, _ConfigType):
     def bwd(self, lev=None):
         return self.advance(-1, lev=lev)
 
+    @classmethod
+    def show(self, stream=None, div=None, indent=None):
+        lines = []
+        if div is None:
+            div = 10
+        indent = ' ' * (indent or 0)
+        for g in self.cmaps_:
+            grp = g or 'default'
+            nc = len(self.cmaps_[g])
+            if div == 0:
+                cc = ' '.join(c for c in self.cmaps_[g])
+                lines.append(f"{indent}{grp}: {cc}")
+            else:
+                pfx = f"{indent}{grp}: "
+                for j in range(0, nc, div):
+                    cc = ' '.join(c for c in self.cmaps_[g][j:j+div])
+                    lines.append(f"{pfx}{cc}")
+                    pfx = ' ' * len(pfx)
+
+        lines = '\n'.join(lines)
+        if stream is False:
+            return lines
+        if stream is None:
+            stream = sys.stdout
+        return stream.write(lines + '\n')
+
+
+class ContourParams(LimitParams, ParamsDispatcher, _ConfigType):
+    """Contour parameter dispatcher."""
+    # debug = locallog.info
+    debug = locallog.debug
+
+    colors_ = 'black'
+    linewidths_ = [1.0, 2.0, 3.0, 4.0]
+    clabels_ = -1               # contour annotation level
+
+    def __init__(self, levels=None, **kwds):
+        if not levels:
+            if levels is not False:
+                levels = True
+        self.levels = levels
+        self.debug(f"contour:levels: {levels}")
+        super().__init__(**kwds)
+
+    def params(self, array=None, **kwds):
+        self.debug(f"{array.dims=}")
+        p = {}
+
+        upd, lims = self.update_lims(array)
+        self.debug(f"contour:params:lims: {lims}")
+
+        levels = []
+        idxs = {}
+
+        p['bind'] = self.bind
+
+        if self.levels is False:
+            p['levels'] = False
+            ret = p
+        elif self.levels is True:
+            opts = self.get_opts(0, 1)
+            p['levels'] = None
+            p.update(opts)
+            ret = p
+        else:
+            ret = []
+            for j, lev in enumerate(self.levels):
+                self.debug(f"{j}: {lev}")
+                pp = p.copy()
+                if lev in [True, False]:
+                    lev = lev
+                elif isinstance(lev, list):
+                    lev = lev
+                elif isinstance(lev, cabc.Callable):
+                    lev = lev(*lims)
+                else:
+                    raise TypeError(f"invalid level specifier {lev}.")
+                if isinstance(lev, cabc.Iterable):
+                    lev = list(lev)
+                    # if j == 0 and len(lev) > 1:
+                    #     dc = [lev[j+1] - lev[j] for j in range(len(lev) - 1)]
+                    #     mi, ma = min(dc), max(dc)
+                    #     if (ma - mi) < max(abs(ma), abs(mi)) * 1.e-3:
+                    #         pp['_info'] = (ma + mi) / 2
+                    #     else:
+                    #         pp['_info'] = lev
+                    for prev in ret:
+                        ladj = prev['levels']
+                        if not isinstance(ladj, cabc.Iterable):
+                            continue
+                        for x in lev:
+                            if x in ladj:
+                                ladj.remove(x)
+                        # print(f'{ladj=}')
+                    # print(f'iterable: {lev}')
+                pp['levels'] = lev
+                opts = self.get_opts(j, len(self.levels))
+                pp.update(opts)
+                ret.append(pp)
+            # self.debug(f"params={ret}")
+            # ret = []
+        self.debug(f"params={ret}")
+        return ret
+
+    def get_opts(self, idx, size):
+        ignores = ['names', 'clabels', ]
+        kw = {}
+        for k in self.dict_recursive():
+            if k in ignores:
+                continue
+            v = self.prop(k)
+            if v is None:
+                pass
+            if isinstance(v, str):
+                kw[k] = [v]
+            elif isinstance(v, cabc.Iterable):
+                if len(v) > idx:
+                    kw[k] = v[idx]
+                else:
+                    kw[k] = v[-1]
+            else:
+                kw[k] = [v]
+        clab = self.prop('clabels', 0)
+        if clab < 0:
+            clab = size + clab
+        kw['clabel'] = (clab == idx)
+
+        return kw
+
+    def bind(self, *, key=None, artist=None, **kwds):
+        self.debug(f"{artist=}")
+        pass
+
 
 class FigureInteractive(zplt.FigureCore, DataTree):
     """Matplotlib figure class with interactive methods."""
@@ -1998,8 +2288,11 @@ class FigureInteractive(zplt.FigureCore, DataTree):
 
         self.coll = None
         self.hooks = []
+        self._hooks = True
 
         self.params = None      # plot parameter complex
+
+        self.turn_dir = +1
 
     def connect(self, **handlers):
         for k, h in handlers.items():
@@ -2010,10 +2303,17 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         self.connect(draw_event=self.run_hooks)
         self.hooks.extend(args)
 
+    def toggle_hooks(self, switch=None):
+        if switch is None:
+            self._hooks = not self._hooks
+        else:
+            self._hooks = bool(switch)
+
     def run_hooks(self, event):
-        for h in self.hooks:
-            # locallog.info(f'run_hooks: {h}')
-            h(event)
+        if self._hooks:
+            for h in self.hooks:
+                # locallog.info(f'run_hooks: {h}')
+                h(event)
 
     def add_draw_hooks(self, *args):
         self.hooks.extend(args)
@@ -2062,7 +2362,53 @@ class FigureInteractive(zplt.FigureCore, DataTree):
             txt = txt + ' *'
         if msg:
             txt = txt + f' -- {msg}'
-        print(txt)
+        if msg is not False:
+            print(txt)
+
+    def message(self, msg=None, *, pfx=None, sel=None,
+                cr=None, end=None, stream=None, flush=None):
+        """Show message on steram."""
+        if msg is False:
+            return
+        if stream is None:
+            stream = sys.stdout
+
+        if pfx is None:
+            pfx = True
+        if pfx is True:
+            jfig = self.number
+            pfx = f"({jfig}) "
+
+        # cr = False
+        if cr is None:
+            cr = True
+        cr = '\r' if cr else ''
+
+        if end is None:
+            end = True
+        if end is True:
+            end = '\n'
+
+        if sel is None:
+            sel = self.sel
+
+        txt = cr + pfx
+        if sel:
+            txt = txt + sel
+        if self._lock:
+            txt = txt + ' *'
+        if msg:
+            txt = txt + f' -- {msg}'
+        if end:
+            txt = txt + end
+        stream.write(txt)
+        if bool(flush):
+            stream.flush()
+
+    def sync_message(self, *args, **kwds):
+        """Message after sync."""
+        self.sync()
+        self.message(*args, **kwds)
 
     def sync(self):
         """Synchronize current status"""
@@ -2203,13 +2549,13 @@ class FigureControl():
             be = mplib.get_backend()
             locallog.warning(f"{be} may not work as expected at window resizing.")
 
-    def __call__(self, output=None, **kwds):
+    def __call__(self, output=None, path=None, **kwds):
         self.output = output or None
+        self.opath = path
         if self._interactive:
             sub = self.interactive
-            # sub = self._animate
+            # sub = self.animate
         else:
-            # sub = self._animate
             sub = self.batch
 
         for base in self.root:
@@ -2234,8 +2580,8 @@ class FigureControl():
                         scroll_event=mpfunc,
                         button_release_event=mrfunc,
                         motion_notify_event=mmfunc, )
-        # pick_event=mofunc
-        fig.set_draw_hooks(self.prompt, odfunc)
+            # pick_event=mofunc
+            fig.set_draw_hooks(self.prompt, odfunc)
 
         eafunc = ft.partial(self.enter_axes, fig=fig, axs=axs)
         lafunc = ft.partial(self.leave_axes, fig=fig, axs=axs)
@@ -2260,14 +2606,14 @@ class FigureControl():
         try:
             trees, stat = fig.loop(step)
         except StopIteration:
-            print(f"\r({jfig}) no more data.")
+            fig.message("no more data.")
             try:
                 trees, stat = fig.loop(step)
             except StopIteration:
                 raise StopIteration(f"\r({jfig}) no effective data.") from None
 
         try:
-            print(f'\r({jfig}) drawing...', end='', flush=True)
+            fig.message("drawing...", end='', sel=False, flush=True)
             artists = self.invoke(trees, stat, fig, axs, prev)
             # for a in artists:
             #     gid = a.get_gid()
@@ -2280,9 +2626,9 @@ class FigureControl():
             #         # fm.set_size(20.5)
             #         # print(gid, a, a.get_size(), fm.get_size())
             # print(artists)      #
-            fig.info(pfx=f'\r({jfig}) ', msg=msg)
+            fig.message(msg)
         except UserWarning as err:
-            fig.info(pfx=f'\r({jfig}) ', msg=err)
+            fig.message(err)
         fig.canvas.draw()
 
     def batch(self, fig):
@@ -2296,44 +2642,44 @@ class FigureControl():
             except StopIteration:
                 break
 
-    # def _animate(self, jfig):
-    #     fig, axs = self.figs[jfig]
-    #     frames = []
-    #     while True:
-    #         try:
-    #             trees, stat = fig.loop()
-    #             data = stat[-1]
-    #             p = self.invoke(data, fig, axs)
-    #             frames.append([p])
-    #             # self._savefig(jfig)
-    #         except StopIteration:
-    #             break
-    #     def anim(p):
-    #         print(p)
-    #         return [p]
-    #     print(frames)
-    #     print(fig)
-    #     # ani = animation.FuncAnimation(
-    #     #     fig,
-    #     #     anim,
-    #     #     interval=50,
-    #     #     blit=False,
-    #     #     frames=frames,
-    #     #     repeat_delay=100, )
-    #     ani = animation.ArtistAnimation(
-    #         fig,
-    #         frames,
-    #         interval=50,
-    #         blit=False,  # blitting can't be used with Figure artists
-    #         repeat_delay=100,
-    #     )
-    #     fig.draw_artist(frames[0][0])
-    #     fig.canvas.draw()
+    def animate(self, fig):
+        # nfig, axs = self.new_control(figsize=fig, )
+        # ref = fig.base.copy(init=True, recurse=True)
+        # nfig.bind(ref, base=fig.base)
+        # fig = nfig
+        nfig, axs = self.pic(figsize=fig, )
+        # axs = self.figs[fig]
+        frames = []
+        # fig.disconnect('key_press_event')
+        # fig.canvas.stop_event_loop()
+        # axs.cla(fig)
+        while True:
+            try:
+                trees, stat = fig.loop(step=True)
+                artists = self.invoke(trees, stat, fig, axs, cla=False)
+                # frames.append([artists[0]])
+                frames.append(artists)
+                # print(trees)
+            except StopIteration:
+                break
+        ani = animation.ArtistAnimation(
+            nfig,
+            frames,
+            interval=50,
+            blit=False,  # blitting can't be used with Figure artists
+            repeat_delay=10,
+        )
 
-    #     ani.save("movie.mp4")
-    #     plt.show()
+        nfig.draw_artist(frames[0][0])
+        nfig.canvas.draw()
 
-    def invoke(self, trees, stat, fig, axs, view=None):
+        # nfig.canvas.manager.show()
+
+        # ani.save("movie.mp4")
+        plt.show()
+        return
+
+    def invoke(self, trees, stat, fig, axs, view=None, cla=None):
         """Draw core."""
         arr = stat[-1]
         src = fig.source_data()
@@ -2341,8 +2687,10 @@ class FigureControl():
         layout = {k: style.get(k) for k in ['projection', ]}
         fig.cache_view(view)
         view = fig.parse_view(arr, src, self.draw, **style)
-        axs.reset(fig, body=layout)
-        axs.cla(fig)
+        cla = True if cla is None else bool(cla)
+        if cla:
+            axs.reset(fig, body=layout)
+            axs.cla(fig)
         # if locallog.is_debug():
         #     for ch in fig.get_children():
         #         gid = ch.get_gid()
@@ -2419,18 +2767,242 @@ class FigureControl():
     #     fig, _ = self.figs[jfig]
     #     return fig.is_locked()
 
-    def switch(self, fig, *args, step=None, **kwds):
+    def event_handler(self, event):
+        """Event handler"""
+        kev = event.key
+
+        fig = event.canvas.figure
+        hseq = self.kmap.get(kev)
+        clstab = {'variable': VariableIter,
+                  'file': FileIter,
+                  None: ArrayIter,
+                  }
+        if hseq:
+            cmd, hseq = hseq[0], hseq[1:]
+            sub = hseq[0] if hseq else None
+            cls = clstab.get(sub)
+            if cmd == 'quit':
+                if hseq:
+                    plt.close(fig)
+                    del self.figs[fig]
+                    fig.disconnect('key_press_event')
+                    fig.message("closed", sel=False)
+                    self.prompt(event=None)
+                else:
+                    for fig in self.figs:
+                        plt.close(fig)
+                    self.figs = []
+                if not self.figs:
+                    print("quit.")
+
+            elif cmd == 'animate':
+                locallog.warning("not yet implemetend.")
+                self.prompt(event=None)
+                # self.animate_mode(fig, cls=cls, step=+1)
+                pass
+            elif cmd == 'rewind':
+                self.map_figures(self.rewind, fig)
+            elif cmd.startswith('next_inner_'):
+                target = cmd.removeprefix('next_inner_')
+                target = -1 - zu.toint(target)
+                self.map_figures(self.turn_or_switch, fig, target, +1)
+            elif cmd.startswith('next_outer_'):
+                target = cmd.removeprefix('next_outer_')
+                target = zu.toint(target)
+                self.map_figures(self.turn_or_switch, fig, target, +1)
+            elif cmd.startswith('turn_inner_'):
+                target = cmd.removeprefix('turn_inner_')
+                target = -1 - zu.toint(target)
+                self.map_figures(self.turn_or_switch, fig, target)
+            elif cmd.startswith('turn_outer_'):
+                target = cmd.removeprefix('turn_outer_')
+                target = zu.toint(target)
+                self.map_figures(self.turn_or_switch, fig, target)
+            elif cmd.startswith('toggle_turn'):
+                self.map_figures(self.toggle_turn, fig)
+            elif cmd == 'next_cyclic':
+                if sub == 'coordinate':
+                    self.map_figures(self.permute_draw, fig, +1)
+                elif sub == 'anchor':
+                    self.map_figures(self.permute_anchor, fig, +1)
+                else:
+                    self.iterate_slice(fig, cls=cls, step=+1)
+            elif cmd == 'prev_cyclic':
+                if sub == 'coordinate':
+                    self.map_figures(self.permute_draw, fig, -1)
+                elif sub == 'anchor':
+                    self.map_figures(self.permute_anchor, fig, -1)
+                else:
+                    self.iterate_slice(fig, cls=cls, step=-1)
+            elif cmd == 'next':
+                if sub == 'coordinate':
+                    self.map_figures(self.permute_draw, fig, +1)
+                else:
+                    self.iterate_slice(fig, cls=(True, cls), step=+1)
+            elif cmd == 'prev':
+                if sub == 'coordinate':
+                    self.map_figures(self.permute_draw, fig, -1)
+                else:
+                    self.iterate_slice(fig, cls=(True, cls), step=-1)
+            elif cmd == 'clear':
+                if sub == 'anchor':
+                    self.map_figures(self.permute_anchor, fig, 0)
+            elif cmd == 'info':
+                figs = [fig] if hseq else self.figs
+                for f in figs:
+                    self.show_info(f)
+            elif cmd == 'info_detail':
+                figs = [fig] if hseq else self.figs
+                for f in figs:
+                    self.show_info(f, props=True)
+            elif cmd == 'mark':
+                if hseq:
+                    self.toggle_mark(fig)
+                else:
+                    for fig in self.figs:
+                        self.toggle_mark(fig)
+            elif cmd == 'unmark':
+                for fig in self.figs:
+                    self.toggle_mark(fig, force=False)
+            elif cmd == 'transpose':
+                self.map_figures(self.transpose, fig)
+            elif cmd == 'enlarge':
+                self.map_figures(self.resize, fig, +self.opts['resize_step'])
+            elif cmd == 'shrink':
+                self.map_figures(self.resize, fig, -self.opts['resize_step'])
+            elif cmd == 'sync_geometry':
+                self.map_figures(self.resize, fig, fig)
+            elif cmd == 'reset_geometry':
+                self.map_figures(self.resize, fig, True, ref=False)
+            elif cmd == 'print':
+                self.map_figures(self.savefig, fig)
+            elif cmd == 'turn_cmap':
+                self.map_figures(self.turn_cmap, fig, step=+1)
+            elif cmd == 'turn_norm':
+                self.map_figures(self.turn_norm, fig, step=+1)
+            elif cmd == 'reverse_horizontal':
+                self.map_figures(self.toggle_axis, fig, 'h')
+            elif cmd == 'reverse_vertical':
+                self.map_figures(self.toggle_axis, fig, 'v')
+            elif cmd == 'redraw':
+                self.map_figures(self.redraw, fig)
+            elif cmd == 'toggle_visible':
+                self.map_figures(self._toggle_visible, fig)
+            elif cmd == 'entire_view':
+                self.map_figures(self.entire_view, fig)
+            elif hasattr(self, cmd):
+                cmd = getattr(self, cmd)
+                cmd(fig)
+            # else:
+            #     print(f"Not yet implemented command={cmd}.")
+
+    def mouse_handler(self, event, fig, axs, lab, cmd, aux=None, step=None):
+        """Mouse event handler core."""
+        wlock = fig.canvas.widgetlock.locked()
+        locallog.debug(f"[{wlock}] {lab=} {cmd=} {aux=}")
+        cmd = cmd or ''
+
+        clstab = {'variable': VariableIter,
+                  'file': FileIter,
+                  None: ArrayIter, }
+
+        if cmd == 'select' and not wlock:
+            if lab == 'body':
+                self.spine_selection(fig, axs, lab, aux, event)
+        elif cmd == 'anchor' and not wlock:
+            if lab == 'body':
+                self.spine_selection(fig, axs, lab, aux, event,
+                                     anchor=True)
+        elif cmd.startswith('select_') and not wlock:
+            sub = cmd.index('_')
+            sub = (cmd[sub+1:], )
+            if lab == 'body':
+                self.point_selection(fig, axs, lab, sub, event)
+        elif cmd.startswith('anchor_') and not wlock:
+            sub = cmd.index('_')
+            sub = (cmd[sub+1:], )
+            if lab == 'body':
+                self.point_selection(fig, axs, lab, sub, event, anchor=True)
+        elif cmd == 'next_cyclic':
+            if lab == 'body':
+                if aux:
+                    self.switch_draw(fig, aux, +1)
+                elif step != 0:
+                    self.iterate_slice(fig, cls=clstab[None], step=step)
+            elif lab == 'colorbar' and not wlock:
+                self.map_figures(self.turn_cmap, fig, step=+1)
+        elif cmd == 'prev_cyclic':
+            if lab == 'body':
+                if aux:
+                    self.switch_draw(fig, aux, -1)
+                elif step != 0:
+                    self.iterate_slice(fig, cls=clstab[None], step=step)
+            elif lab == 'colorbar'  and not wlock:
+                self.map_figures(self.turn_cmap, fig, step=-1)
+        elif cmd == 'next_group':
+            if lab == 'colorbar'  and not wlock:
+                self.map_figures(self.turn_cmap, fig, lev=0, step=+1)
+        elif cmd == 'prev_group':
+            if lab == 'colorbar'  and not wlock:
+                self.map_figures(self.turn_cmap, fig, lev=0, step=-1)
+        elif cmd == 'reverse':
+            if lab == 'body' and aux:
+                self.map_figures(self.toggle_axis, fig,
+                                 ax=lab, which=aux[0])
+            elif lab == 'colorbar':
+                self.map_figures(self.toggle_axis, fig,
+                                 ax=lab, which=None)
+        elif cmd == 'transpose':
+            if lab == 'body' and aux:
+                self.map_figures(self.transpose, fig)
+        elif cmd == 'next_norm':
+            if lab == 'colorbar' and not wlock:
+                self.map_figures(self.turn_norm, fig, step=+1)
+            elif lab == 'body' and not wlock:
+                self.map_figures(self.turn_axis_scale, fig,
+                                 which=aux[0], step=+1)
+        elif cmd == 'lock':
+            if lab == 'colorbar':
+                self.map_figures(self.lock_cmap_range, fig, ax=lab)
+            elif lab == 'info':
+                self.map_figures(self.lock_contour_range, fig, ax=lab)
+
+        # print()
+        # ax = event.inaxes
+        # if ax:
+        #     gid = ax.get_gid()
+        #     print(f"mouse_press[{gid}] {axs} {event.button} {event.dblclick} {event.step}"
+        #           f" ({event.x}, {event.y})"
+        #           f" ({event.xdata}, {event.ydata})")
+        # if ax:
+        # event.inaxes.patch.set_facecolor('yellow')
+        # event.canvas.draw()
+
+    def animate_mode(self, fig, *args, step=None, **kwds):
         if fig.is_locked():
             targets = [f for f in self.figs if f.is_locked()]
         else:
             targets = [fig]
-        for fig in targets:
-            axs = self.figs[fig]
-            prev = fig.restore_view(axs)
-            child = fig.trees
+        for ff in targets:
+            child = ff.trees
             child.switch(*args, step=0)
             child.switch(*args, step=step, **kwds)
-            self.interactive(fig, prev=prev)
+            self.animate(ff)
+        return
+
+    def iterate_slice(self, fig, *args, step=None, **kwds):
+        if fig.is_locked():
+            targets = [f for f in self.figs if f.is_locked()]
+        else:
+            targets = [fig]
+
+        for ff in targets:
+            axs = self.figs[ff]
+            prev = ff.restore_view(axs)
+            child = ff.trees
+            child.switch(*args, step=0)
+            child.switch(*args, step=step, **kwds)
+            self.interactive(ff, prev=prev)
 
     def map_figures(self, func, fig, *args, **kw):
         if fig.is_locked():
@@ -2445,27 +3017,42 @@ class FigureControl():
             func(ff, *args, **kw)
 
     def savefig(self, fig, ref=None):
-        jfig = fig.number
         axs = self.figs[fig]
         output = self.output
         if isinstance(output, cabc.Callable):
             output = self.output(fig, axs, ref=ref)
         if output:
             # fig.diag_patches()
-            axs.toggle_guides(fig, False)
-            fig.switch_patch(0)
-            text = axs.pop_monitor()
+            if self._interactive:
+                axs.toggle_guides(fig, False)
+                fig.switch_patch(0)
+                text = axs.pop_monitor()
             # locallog.info('before savefig')
+            fig.toggle_hooks(False)
+            canvas = fig.canvas
+
             if hasattr(output, 'savefig'):
                 output.savefig(fig)
             else:
                 fig.savefig(output)
+
+            fig.toggle_hooks(True)
+            fig.canvas = canvas
             # locallog.info('after savefig')
-            axs.toggle_guides(fig, True)
-            fig.pop_patch()
-            fig.info(pfx=f'\r({jfig}) ', msg=f"Saved: {output}")
+            if self._interactive:
+                axs.toggle_guides(fig, True)
+                fig.pop_patch()
+                axs.monitor(fig, text)
+
+            path = self.opath or output
+            try:
+                pc = output.get_pagecount()
+                saved = f'{path}[{pc}]'
+            except AttributeError:
+                saved = path
+            fig.message(f"Saved: {saved}")
+            self.prompt(event=None)
             # locallog.info('before monitor')
-            axs.monitor(fig, text)
             # locallog.info('after monitor')
         else:
             locallog.warning(f"No output defined.")
@@ -2479,10 +3066,9 @@ class FigureControl():
 
     def permute_anchor(self, fig, step):
         """Entry for anchor-coordinate permutation."""
-        jfig = fig.number
         fig.permute_anchor(step)
         msg = 'anchor permuted.' if step else 'anchor cleared.'
-        fig.info(pfx=f'\r({jfig}) ', msg=msg, sync=True)
+        fig.sync_message(msg)
         self.prompt(event=None)
 
     def permute_draw(self, fig, step):
@@ -2498,6 +3084,32 @@ class FigureControl():
         prev = fig.restore_view(axs)
         fig.switch_draw(coord, step)
         self.interactive(fig, step=False, msg='switched', prev=prev)
+
+    def turn_or_switch(self, fig, target, step=None):
+        """Entry for draw-coordinate switching or turning."""
+        axs = self.figs[fig]
+        prev = fig.restore_view(axs)
+        if step is None:
+            step = fig.turn_dir
+        rcv = fig.turn_or_switch(target, step)
+        if rcv is None:
+            self.interactive(fig, step=False, msg='permuted', prev=prev)
+        else:
+            self.interactive(fig, msg=False, prev=prev)
+            fig.post_turn(rcv)
+            fig.sync_message('turned')
+            self.prompt(event=None)
+
+    def toggle_turn(self, fig, turn=None):
+        """Entry for toggle to turn direction."""
+        cur = fig.turn_dir
+        if turn is None:
+            turn = - fig.turn_dir
+        fig.turn_dir = turn
+        if cur != fig.turn_dir:
+            msg = f'toggle turn to {turn}'
+            fig.message(msg)
+            self.prompt(event=None)
 
     def transpose(self, fig):
         """Entry for draw-coordinate transposition."""
@@ -2588,6 +3200,16 @@ class FigureControl():
             b = 'locked' if b else 'unlocked'
             self.interactive(fig, step=False, msg=f'colormap range: {b}')
 
+    def lock_contour_range(self, fig, ax=None, switch=None):
+        axs = self.figs[fig]
+        disp = self.get_disp('contour', fig)
+        if disp:
+            b = disp.toggle_lock(switch)
+            wh = 'locked' if b else 'unlocked'
+            msg = f'contour range: {wh}'
+            fig.message(msg)
+            self.prompt(event=None)
+
     def _toggle_visible(self, fig):
         axs = self.figs[fig]
         axs.toggle_visible(ax='colorbar')
@@ -2612,6 +3234,12 @@ class FigureControl():
         prev = prev.fromkeys(prev)
         self.interactive(fig, step=False, msg='entire', prev=prev)
 
+    def rewind(self, fig, anchor=None):
+        axs = self.figs[fig]
+        prev = fig.restore_view(axs)
+        fig.rewind(anchor=anchor)
+        self.interactive(fig, step=False, msg='rewind', prev=prev)
+
     def duplicate(self, fig):
         """Duplicate figure."""
         axs = self.figs[fig]
@@ -2622,12 +3250,13 @@ class FigureControl():
     def refresh(self, fig):
         """New fresh figure, close old."""
         nfig = self.duplicate(fig)
-        jfig = fig.number
         jnew = nfig.number
         plt.close(fig)
         del self.figs[fig]
         fig.disconnect('key_press_event')
-        print(f"\r({jfig}) regenerated > ({jnew})")
+        fig.message(f"regenerated > ({jnew})")
+        self.prompt(event=None)
+        # print(f"\r({jfig}) regenerated > ({jnew})")
 
     def new(self, fig):
         """New fresh figure."""
@@ -2654,203 +3283,19 @@ class FigureControl():
         for ch in sorted(CH):
             locallog.debug(ch)
 
-    def show_info(self, fig):
-        jfig = fig.number
-        fig.info(pfx=f'\r({jfig}) info: ')
+    def show_info(self, fig, **kwds):
+        fig.message('info')
+        if kwds:
+            fig.show_info(**kwds)
+            axs = self.figs[fig]
+            axs.show_info(**kwds)
         # if locallog.is_debug():
         #     self.diag_childlen(fig)
         #     axs = self.figs[fig]
         #     for ax, bg in axs.bg.items():
         #         gid = ax.get_gid() or ax
         #         print(f"bg[{gid}]={bg}")
-
-    def mouse_handler(self, event, fig, axs, lab, cmd, aux=None):
-        """Mouse event handler core."""
-        wlock = fig.canvas.widgetlock.locked()
-        locallog.debug(f"[{wlock}] {lab=} {cmd=} {aux=}")
-        cmd = cmd or ''
-        if cmd == 'select' and not wlock:
-            if lab == 'body':
-                self.spine_selection(fig, axs, lab, aux, event)
-        elif cmd == 'anchor' and not wlock:
-            if lab == 'body':
-                self.spine_selection(fig, axs, lab, aux, event,
-                                     anchor=True)
-        elif cmd.startswith('select_') and not wlock:
-            sub = cmd.index('_')
-            sub = (cmd[sub+1:], )
-            if lab == 'body':
-                self.point_selection(fig, axs, lab, sub, event)
-        elif cmd.startswith('anchor_') and not wlock:
-            sub = cmd.index('_')
-            sub = (cmd[sub+1:], )
-            if lab == 'body':
-                self.point_selection(fig, axs, lab, sub, event, anchor=True)
-        elif cmd == 'next_cyclic':
-            if lab == 'body' and aux:
-                self.switch_draw(fig, aux, +1)
-            elif lab == 'colorbar' and not wlock:
-                self.map_figures(self.turn_cmap, fig, step=+1)
-        elif cmd == 'prev_cyclic':
-            if lab == 'body' and aux:
-                self.switch_draw(fig, aux, -1)
-            elif lab == 'colorbar'  and not wlock:
-                self.map_figures(self.turn_cmap, fig, step=-1)
-        elif cmd == 'next_group':
-            if lab == 'colorbar'  and not wlock:
-                self.map_figures(self.turn_cmap, fig, lev=0, step=+1)
-        elif cmd == 'prev_group':
-            if lab == 'colorbar'  and not wlock:
-                self.map_figures(self.turn_cmap, fig, lev=0, step=-1)
-        elif cmd == 'reverse':
-            if lab == 'body' and aux:
-                self.map_figures(self.toggle_axis, fig,
-                                 ax=lab, which=aux[0])
-            elif lab == 'colorbar':
-                self.map_figures(self.toggle_axis, fig,
-                                 ax=lab, which=None)
-        elif cmd == 'transpose':
-            if lab == 'body' and aux:
-                self.map_figures(self.transpose, fig)
-        elif cmd == 'next_norm':
-            if lab == 'colorbar' and not wlock:
-                self.map_figures(self.turn_norm, fig, step=+1)
-            elif lab == 'body' and not wlock:
-                self.map_figures(self.turn_axis_scale, fig,
-                                 which=aux[0], step=+1)
-        elif cmd == 'lock':
-            if lab == 'colorbar':
-                self.map_figures(self.lock_cmap_range, fig, ax=lab)
-
-        # print()
-        # ax = event.inaxes
-        # if ax:
-        #     gid = ax.get_gid()
-        #     print(f"mouse_press[{gid}] {axs} {event.button} {event.dblclick} {event.step}"
-        #           f" ({event.x}, {event.y})"
-        #           f" ({event.xdata}, {event.ydata})")
-        # if ax:
-        # event.inaxes.patch.set_facecolor('yellow')
-        # event.canvas.draw()
-
-    def event_handler(self, event):
-        """Event handler"""
-        kev = event.key
-
-        fig = event.canvas.figure
-        hseq = self.kmap.get(kev)
-        clstab = {'variable': VariableIter,
-                  'file': FileIter,
-                  None: ArrayIter,
-                  }
-        if hseq:
-            cmd, hseq = hseq[0], hseq[1:]
-            sub = hseq[0] if hseq else None
-            cls = clstab.get(sub)
-            if cmd == 'quit':
-                if hseq:
-                    plt.close(fig)
-                    del self.figs[fig]
-                    fig.disconnect('key_press_event')
-                    jfig = fig.number
-                    print(f"\r({jfig}) closed")
-                else:
-                    for fig in self.figs:
-                        plt.close(fig)
-            elif cmd == 'next_cyclic':
-                if sub == 'coordinate':
-                    self.map_figures(self.permute_draw, fig, +1)
-                elif sub == 'anchor':
-                    self.map_figures(self.permute_anchor, fig, +1)
-                else:
-                    self.switch(fig, cls=cls, step=+1)
-            elif cmd == 'prev_cyclic':
-                if sub == 'coordinate':
-                    self.map_figures(self.permute_draw, fig, -1)
-                elif sub == 'anchor':
-                    self.map_figures(self.permute_anchor, fig, -1)
-                else:
-                    self.switch(fig, cls=cls, step=-1)
-            elif cmd == 'next':
-                if sub == 'coordinate':
-                    self.map_figures(self.permute_draw, fig, +1)
-                else:
-                    self.switch(fig, cls=(True, cls), step=+1)
-            elif cmd == 'prev':
-                if sub == 'coordinate':
-                    self.map_figures(self.permute_draw, fig, -1)
-                else:
-                    self.switch(fig, cls=(True, cls), step=-1)
-            elif cmd == 'clear':
-                if sub == 'anchor':
-                    self.map_figures(self.permute_anchor, fig, 0)
-            elif cmd == 'info':
-                if hseq:
-                    self.show_info(fig)
-                    # jfig = fig.number
-                    # fig.info(pfx=f'\r({jfig}) info: ')
-                else:
-                    for fig in self.figs:
-                        self.show_info(fig)
-                        # jfig = fig.number
-                        # fig.info(pfx=f'\r({jfig}) info: ')
-            elif cmd == 'mark':
-                if hseq:
-                    self.toggle_mark(fig)
-                else:
-                    for fig in self.figs:
-                        self.toggle_mark(fig)
-            elif cmd == 'unmark':
-                for fig in self.figs:
-                    self.toggle_mark(fig, force=False)
-            elif cmd == 'transpose':
-                self.map_figures(self.transpose, fig)
-            elif cmd == 'enlarge':
-                self.map_figures(self.resize, fig, +self.opts['resize_step'])
-            elif cmd == 'shrink':
-                self.map_figures(self.resize, fig, -self.opts['resize_step'])
-            elif cmd == 'sync_geometry':
-                self.map_figures(self.resize, fig, fig)
-            elif cmd == 'reset_geometry':
-                self.map_figures(self.resize, fig, True, ref=False)
-            elif cmd == 'print':
-                self.map_figures(self.savefig, fig)
-            elif cmd == 'turn_cmap':
-                self.map_figures(self.turn_cmap, fig, step=+1)
-            elif cmd == 'turn_norm':
-                self.map_figures(self.turn_norm, fig, step=+1)
-            elif cmd == 'reverse_horizontal':
-                self.map_figures(self.toggle_axis, fig, 'h')
-            elif cmd == 'reverse_vertical':
-                self.map_figures(self.toggle_axis, fig, 'v')
-            elif cmd == 'redraw':
-                self.map_figures(self.redraw, fig)
-            elif cmd == 'toggle_visible':
-                self.map_figures(self._toggle_visible, fig)
-            elif cmd == 'entire_view':
-                self.map_figures(self.entire_view, fig)
-            elif hasattr(self, cmd):
-                cmd = getattr(self, cmd)
-                cmd(fig)
-            # else:
-            #     print(f"Not yet implemented command={cmd}.")
-
-    def normalize_mouse(self, event):
-        """Normalize mouse event to string."""
-        mm = []
-        if event.key:
-            mm.append(event.key)
-        if event.dblclick:
-            mm.append('double')
-        if event.button == mbb.MouseButton.LEFT:
-            mm.append('left')
-        elif event.button == mbb.MouseButton.RIGHT:
-            mm.append('right')
-        elif event.button == mbb.MouseButton.MIDDLE:
-            mm.append('middle')
-        else:
-            mm.append(str(event.button))
-        return '+'.join(mm)
+        self.prompt(event=None)
 
     def mouse_release(self, event, fig, axs):
         if fig.canvas.widgetlock.locked():
@@ -2879,14 +3324,19 @@ class FigureControl():
         gid = ax.get_gid() or ax
         gid = gid if isinstance(gid, tuple) else (gid, )
         # print(f'enter_axes {gid} {bg}')
+        # if False:
         if bg:
+            bg, bb = bg
             if gid[0] in ['spine', 'axis']:
             # at = ax.text(0, 0, 'yellow')
-                at = m1i.BboxPatch(ax.bbox, facecolor='gray', alpha=0.2)
+                # at = m1i.BboxPatch(ax.bbox, facecolor='gray', alpha=0.2)
+                at = m1i.BboxPatch(bb, facecolor='gray', alpha=0.2)
                 # at.set_visible(True)
                 fig.canvas.restore_region(bg)
                 ax.draw_artist(at)
-                fig.canvas.blit(ax.bbox)
+                # fig.canvas.blit(ax.bbox)
+                # fig.canvas.blit(bb)
+                fig.canvas.blit()
         # event.inaxes.patch.set_facecolor('yellow')
         # event.canvas.draw()
 
@@ -2895,6 +3345,7 @@ class FigureControl():
         axs.clear_guide(fig, ax)
         gid = ax.get_gid() or ax
         gid = gid if isinstance(gid, tuple) else (gid, )
+        # print(f'leave {gid=}')
         if len(gid) > 1:
             axs.clear_guide(fig, gid[1])
         # bg = axs.bg.get(ax)
@@ -2968,12 +3419,15 @@ class FigureControl():
         dpos = axs.position_transform(event.x, event.y, ax=body, crs=False)
         mpos = axs.position_transform(event.x, event.y, ax=body)
         axs.draw_guide(fig, event.inaxes, event.xdata, event.ydata, pos=dpos)
+
         fmt = r'{:.2f}'
         if lab[2] in ['left', 'right']:
-            axs.draw_guide(fig, body, None, dpos[1])
+            # axs.draw_guide(fig, body, None, dpos[1])
+            axs.draw_guide(fig, body, None, event.ydata)
             text = 'y=' + (fmt.format(mpos[1]))
         else:
-            axs.draw_guide(fig, body, dpos[0], None)
+            # axs.draw_guide(fig, body, dpos[0], None)
+            axs.draw_guide(fig, body, event.xdata, None)
             text = 'x=' + (fmt.format(mpos[0]))
         axs.monitor(fig, text)
 
@@ -3038,24 +3492,24 @@ class FigureControl():
         #             except AttributeError:
         #                 pass
 
-    def mouse_pick(self, event, fig, axs):
-        """Mouse pick actions on artists."""
-        debug = ft.partial(self.debug, func='mouse_pick')
-        this = event.artist
-        mouse = event.mouseevent
+    # def mouse_pick(self, event, fig, axs):
+    #     """Mouse pick actions on artists."""
+    #     debug = ft.partial(self.debug, func='mouse_pick')
+    #     this = event.artist
+    #     mouse = event.mouseevent
 
-        gid = this.get_gid()
-        aux = gid.split(':')
-        lab = aux.pop(0)
+    #     gid = this.get_gid()
+    #     aux = gid.split(':')
+    #     lab = aux.pop(0)
 
-        nm = self.normalize_mouse(mouse)
-        mseq = self.mmap.get(nm) or {}
-        cmds = mseq.get(lab) or ()
-        # debug(f"{mouse=} {mseq=} {lab=} {cmds=}")
-        cmds = cmds or (None, )
+    #     nm = self.normalize_mouse(mouse)
+    #     mseq = self.mmap.get(nm) or {}
+    #     cmds = mseq.get(lab) or ()
+    #     # debug(f"{mouse=} {mseq=} {lab=} {cmds=}")
+    #     cmds = cmds or (None, )
 
-        if False:
-            self.mouse_handler(event, fig, axs, lab, cmds[0], cmds[1:], aux)
+    #     if False:
+    #         self.mouse_handler(event, fig, axs, lab, cmds[0], cmds[1:], aux)
 
     def mouse_press(self, event, fig, axs):
         """Mouse button actions on axes."""
@@ -3065,11 +3519,11 @@ class FigureControl():
         if fig.canvas.widgetlock.locked():
             self._cache_events.append(event)
 
-        mouse = self.normalize_mouse(event)
+        mouse, step = self.normalize_mouse(event)
         mseq = self.mmap.get(mouse) or {}
 
         debug(f"{lab=}")
-        debug(f"{mseq=}")
+        debug(f"{mseq=} {step=}")
         if isinstance(lab, tuple):
             k = lab
             aux = lab[2:]
@@ -3085,7 +3539,56 @@ class FigureControl():
         else:
             cmds = mseq.get(lab) or ()
             aux = None
-        self.mouse_handler(event, fig, axs, lab, cmds, aux=aux)
+        self.mouse_handler(event, fig, axs, lab, cmds, aux=aux, step=step)
+
+    def normalize_mouse(self, event):
+        """Normalize mouse event to string."""
+        # locallog.debug(f"normalize_mouse: {event.button}")
+        mm = []
+        step = None
+        if event.key:
+            if event.key == 'alt':
+                if self.opts.get('ignore_alt') is not False:
+                    locallog.warning('alt-key press is ignored.')
+                else:
+                    mm.append(event.key)
+            else:
+                mm.append(event.key)
+        if event.dblclick:
+            mm.append('double')
+        if event.button == mbb.MouseButton.LEFT:
+            mm.append('left')
+        elif event.button == mbb.MouseButton.RIGHT:
+            mm.append('right')
+        elif event.button == mbb.MouseButton.MIDDLE:
+            mm.append('middle')
+        elif event.button == mbb.MouseButton.FORWARD:
+            mm.append('fwd')
+            step = event.step
+        elif event.button == mbb.MouseButton.BACK:
+            mm.append('bwd')
+            step = event.step
+        elif event.button == 'up':
+            mm.append('fwd')
+            step = event.step
+        elif event.button == 'down':
+            mm.append('bwd')
+            step = event.step
+        else:
+            mm.append(str(event.button))
+        if step is not None:
+            u = self.opts.get('scroll_unit') or 0.0
+            if u == 0.0:
+                if step > 0:
+                    step = +1
+                elif step < 0:
+                    step = -1
+                else:
+                    step = 0
+            else:
+                step = int(step / u)
+        mm = '+'.join(mm)
+        return mm, step
 
     def parse_config(self, config, rcparams):
         config = config or {}
@@ -3323,6 +3826,7 @@ def draw_coords(data, src, dims, coords, default,
         ntargets.insert(0, c)
     ntargets = type(coords)(ntargets)
     if len(set(ntargets)) != len(coords):
+        locallog.error(f"data shape: {data.dims} = {data.shape}")
         raise ValueError(f"Invalid target coordinates {coords} >> {ntargets}")
     # locallog.debug(f"result: {ntargets=}")
     return ntargets
@@ -3420,7 +3924,7 @@ def parse_coord(data, name):
     md = len(data.dims)
     if isinstance(name, int):
         if name >= md or name + md < 0:
-            raise UserWarning
+            raise UserWarning(f"coordinate index {name} out of range.")
         name = data.dims[name]
     elif name in data.dims:
         pass
