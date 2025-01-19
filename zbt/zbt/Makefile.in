@@ -17,7 +17,7 @@
 # touza/zbt/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/10/17 13:05:37 fuyuki Makefile.am>
+# Time-stamp: <2024/10/31 16:50:27 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -171,7 +171,7 @@ am__py_compile = PYTHON=$(PYTHON) $(SHELL) $(py_compile)
 am__pep3147_tweak = \
   sed -e 's|\.py$$||' -e 's|[^/]*$$|__pycache__/&.*.pyc __pycache__/&.*.pyo|'
 am__pkgpython_PYTHON_DIST = __init__.py util.py libtouza.py dsnio.py \
-	xrnio.py plot.py control.py zbcont.py
+	xrnio.py config.py plot.py control.py zbcont.py
 py_compile = $(top_srcdir)/build-aux/py-compile
 DATA = $(pkgpython_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
@@ -397,19 +397,19 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-BUILT_SOURCE = $(am__append_1) param.py config.py
+BUILT_SOURCE = $(am__append_1) env.py param.py
 EXTRA_DIST = zbcont.in
 @ZBT_BUILD_ONLY_FALSE@pkgpython_PYTHON = __init__.py util.py \
-@ZBT_BUILD_ONLY_FALSE@	libtouza.py dsnio.py xrnio.py plot.py \
-@ZBT_BUILD_ONLY_FALSE@	control.py zbcont.py
+@ZBT_BUILD_ONLY_FALSE@	libtouza.py dsnio.py xrnio.py config.py \
+@ZBT_BUILD_ONLY_FALSE@	plot.py control.py zbcont.py
 
 # pkgpython_PYTHON += param.py
-@ZBT_BUILD_ONLY_FALSE@nodist_pkgpython_PYTHON = config.py param.py
+@ZBT_BUILD_ONLY_FALSE@nodist_pkgpython_PYTHON = env.py param.py
 @ZBT_BUILD_ONLY_FALSE@pkgpython_DATA = zbtrc.toml
 @ZBT_BUILD_ONLY_FALSE@bin_SCRIPTS = zbcont
 copy_sources = __init__.py util.py libtouza.py dsnio.py xrnio.py \
-	zbcont.py plot.py control.py zbtrc.toml
-EXTRA_PYTHON = $(copy_sources) config.py param.py
+	config.py plot.py control.py zbcont.py zbtrc.toml
+EXTRA_PYTHON = $(copy_sources) env.py param.py
 CLEANFILES = $(BUILT_SOURCE)
 GENPARAM = $(srcdir)/../param.sh
 @zbt_embed_libdir_FALSE@zbt_libtouza_dir = 
@@ -771,7 +771,7 @@ uninstall-mod:
 param.py: $(top_srcdir)/nio/touza_nio_param.h
 	$(SHELL) $(GENPARAM) -o $@ ParamTouzaNio $(top_srcdir)/nio/touza_nio_param.h || rm -f $@
 
-config.py:
+env.py:
 	echo "TOUZA_NAME = '$(TOUZA_NAME)'" >> $@
 	echo "LIBRARY_DIR = '$(zbt_libtouza_dir)'" >> $@
 
