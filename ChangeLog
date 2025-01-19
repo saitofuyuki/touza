@@ -1,3 +1,19 @@
+Release-1.13.2 / 2024-10-23
+===========================
+
+  * Fix bugs in zbcont.
+  * zbt: (zbcont) correct map/projection adjustment when not set.
+  * zbt: (control) [FATAL] figure reset inserted at batch drawing
+  * zbt: (plot) [CRITICAL] Coordinate check for projection
+
+Release-1.13.1 / 2024-10-23
+===========================
+
+  * doc: (zbt) zbcont experimental features.
+  * zbt: (zbcont) (experimental) map overlay and projection.
+  * zbt: (control) permutation improved.
+  * zbt: (plot, etc) introduce cartopy features.
+
 Release-1.13.0 / 2024-10-17
 ===========================
 
