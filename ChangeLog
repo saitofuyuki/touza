@@ -1,3 +1,24 @@
+Release-1.14.0 / 2025-01-19
+===========================
+
+  * zbt zbcont beta release.
+  * zbt: datetime coordinate introduced.
+  * zbt: [FATAL] require python 3.11 or later for tomllib.
+  * zbt: (pyproject) add cftime, nc-time-axis dependencies.
+  * zbt: (zbcont) new arguments.
+  * zbt: (zbcont) coloring norm method arguments.
+  * zbt: (xrnio) [CRITICAL] fix isel() design, etc.
+  * zbt: (config) dict_recursive() method introduced.
+  * zbt: (plot,control,zbcont) methods around guides, colormap etc.
+  * zbt: (libtouza) option to disable library loading.
+  * zbt: (control) point/spine selection with guides by mouse.
+  * zbt: (plot) methods for point selections.
+  * zbt: (xrnio, control) xarray related functions transferred.
+  * zbt: (xrnio) [CRTICAL] fix bug around coodinate parsers.
+  * zbt: (dsnio) [severe] data parser improved.
+  * zbt: [SEVERE] allow failure to load libtouza.
+  * zbt: (pyproject) [FATAL] fix dependencies
+
 Release-1.13.2 / 2024-10-23
 ===========================
 

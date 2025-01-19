@@ -11,7 +11,7 @@ MT_INIT()
 AC_INIT([touza],MT_VERSION,[saitofuyuki@jamstec.go.jp])
 
 AC_COPYRIGHT([dnl
-Copyright (C) 2020-2024 Japan Agency for Marine-Earth Science and Technology
+Copyright (C) 2020-2025 Japan Agency for Marine-Earth Science and Technology
 
 This is TOUZA, a collection of MIROC base infrastructure.
 
