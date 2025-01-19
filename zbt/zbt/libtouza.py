@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/14 15:30:49 fuyuki libtouza.py>
+# Time-stamp: <2025/01/19 20:35:35 fuyuki libtouza.py>
 
 __doc__ = \
     """
@@ -67,13 +67,12 @@ class LibTouzaCore(zu.WrapCDLL):
             raise UserWarning(f"Disable touza library.")
         elif not name:
             name = CTU.find_library(TOUZA_NAME)
-
-            try:
-                super().__init__(name, *args, **kwds)
-            except OSError:
-                locallog.error("Cannot load touza library {name}.  "
-                               f"Setting {ENV_TOUZA_LIB} environment may help.")
-                raise
+        try:
+            super().__init__(name, *args, **kwds)
+        except OSError:
+            locallog.error("Cannot load touza library {name}.  "
+                           f"Setting {ENV_TOUZA_LIB} environment may help.")
+            raise
         self._touza = touza or {}
 
     def __del__(self, *args, **kwds):
@@ -85,12 +84,21 @@ class LibTouzaNio(LibTouzaCore, zp.ParamTouzaNio):
 
     def __init__(self, *args, **kwds):
         """Initialize CDLL after TOUZA."""
+        self._load = False
         try:
             super().__init__(*args, **kwds)
         except UserWarning as err:
             locallog.warning(err)
             return
+        try:
+            self._register_all()
+        except AttributeError as err:
+            locallog.warning(err)
+            raise UserWarning from None
+        else:
+            self._load = True
 
+    def _register_all(self):
         # self.len_item = CT.c_int.in_dll(self, 'len_item')
         # extern int tnb_init(const int levv, const int mode);
         self.register_function("tnb_init",
@@ -388,9 +396,11 @@ class LibTouzaNio(LibTouzaCore, zp.ParamTouzaNio):
 
     def __del__(self, *args, **kwds):
         """Destructor."""
-        lev = self._touza.get('lev', 0)
-        mode = self._touza.get('mode', 0)
-        self.tnb_finalize(lev, mode)
+        if self._load:
+            lev = self._touza.get('lev', 0)
+            mode = self._touza.get('mode', 0)
+            self.tnb_finalize(lev, mode)
+
         super().__del__(*args, **kwds)
 
     def group_co_range(self, handle, cid, raw=False):

@@ -56,7 +56,10 @@ class _TouzaNio(param.ParamTouzaNio):
     """Common procedures among TouzaNio classes."""
     __slots__ = ('sub', 'sep', )
 
-    lib = libtouza.LibTouzaNio(name=load_touza)
+    try:
+        lib = libtouza.LibTouzaNio(name=load_touza)
+    except UserWarning:
+        lib = None
 
     def __init__(self, sub=None, sep=None):
         """Bind TOUZA/Nio properties from file."""
@@ -67,13 +70,18 @@ class _TouzaNio(param.ParamTouzaNio):
     def is_nio_file(cls, path):
         """Check if path is TOUZA/Nio format file."""
         if isinstance(path, str):
-            return cls.lib.tnb_file_is_nio(path)
+            if cls.lib:
+                return cls.lib.tnb_file_is_nio(path)
         return False
 
     @classmethod
     def debug(cls):
         """Show debug properties."""
         locallog.debug(f"{cls}: {cls.lib}")
+
+    @classmethod
+    def is_loaded(cls):
+        return not cls.lib is None
 
 
 # pylint: disable=too-many-ancestors
