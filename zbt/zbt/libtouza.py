@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/18 08:50:05 fuyuki libtouza.py>
+# Time-stamp: <2025/01/14 15:30:49 fuyuki libtouza.py>
 
 __doc__ = \
     """
@@ -14,15 +14,18 @@ Python interface on TOUZA library
 
 import os
 import sys
+import logging
 import pathlib as plib
 import ctypes as CT
 import ctypes.util as CTU
 
-from . import util
-from . import param
+import zbt.util as zu
+import zbt.param as zp
+
+locallog = zu.LocalAdapter('libtouza')
 
 try:
-    from .config import *
+    from .env import *
 except:
     TOUZA_NAME = 'touza'
     LIBRARY_DIR = '.'
@@ -33,7 +36,7 @@ class LibTouzaException(Exception):
     """Base exception for TOUZA library."""
 
 
-class LibTouzaCore(util.WrapCDLL):
+class LibTouzaCore(zu.WrapCDLL):
     """Low-level class for TOUZA library"""
 
     def __init__(self, name, *args, path=None, touza=None, **kwds):
@@ -59,28 +62,34 @@ class LibTouzaCore(util.WrapCDLL):
                 if p.exists():
                     name = p
                     break
-        if not name:
+        if name is False:
+            # locallog.warning(f"Disable touza library {name}.")
+            raise UserWarning(f"Disable touza library.")
+        elif not name:
             name = CTU.find_library(TOUZA_NAME)
 
-        try:
-            super().__init__(name, *args, **kwds)
-        except OSError:
-            sys.stderr.write("Cannot load touza library {name}.  "
-                             f"Setting {ENV_TOUZA_LIB} environment may help."
-                             "\n")
-            raise
+            try:
+                super().__init__(name, *args, **kwds)
+            except OSError:
+                locallog.error("Cannot load touza library {name}.  "
+                               f"Setting {ENV_TOUZA_LIB} environment may help.")
+                raise
         self._touza = touza or {}
 
     def __del__(self, *args, **kwds):
         """Destructor."""
 
 
-class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
+class LibTouzaNio(LibTouzaCore, zp.ParamTouzaNio):
     """TOUZA/Nio friendly interfaces."""
 
     def __init__(self, *args, **kwds):
         """Initialize CDLL after TOUZA."""
-        super().__init__(*args, **kwds)
+        try:
+            super().__init__(*args, **kwds)
+        except UserWarning as err:
+            locallog.warning(err)
+            return
 
         # self.len_item = CT.c_int.in_dll(self, 'len_item')
         # extern int tnb_init(const int levv, const int mode);
@@ -104,19 +113,19 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         # extern int tnb_file_is_nio(const char *path);
         self.register_function("tnb_file_is_nio",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'path',),
+                               (zu.AutoString, self.intent_in, 'path',),
                                err=self.errcheck_format)
         # extern int tnb_file_open(const char *path, const int flag);
         self.register_function("tnb_file_open",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'path',),
+                               (zu.AutoString, self.intent_in, 'path',),
                                (CT.c_int, self.intent_in, 'flag',
                                 self.NIO_CACHE_COLL_DEFAULT, ),
                                err=self.errcheck_handle)
         # extern int tnb_file_open(const char *path, const int flag);
         self.register_function("tnb_file_is_opened",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'path',),
+                               (zu.AutoString, self.intent_in, 'path',),
                                err=None)
         # extern int tnb_file_diag(const int handle, const int lev);
         self.register_function("tnb_file_diag",
@@ -143,7 +152,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         #                              const int handle, const int cid);
         self.register_function("tnb_group_co_name",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'name',),
+                               (zu.AutoString, self.intent_in, 'name',),
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'cid',),
                                err=self.errcheck_strict)
@@ -173,20 +182,20 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         self.register_function("tnb_search_group",
                                CT.c_int,
                                (CT.c_int, self.intent_in, 'handle',),
-                               (util.AutoString, self.intent_in, 'name',),
+                               (zu.AutoString, self.intent_in, 'name',),
                                (CT.c_int, self.intent_in, 'refh',),
                                err=self.errcheck_handle)
         # extern int tnb_group_name(const char *name, const int handle);
         self.register_function("tnb_group_name",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'name',),
+                               (zu.AutoString, self.intent_in, 'name',),
                                (CT.c_int, self.intent_in, 'handle',),
                                err=self.errcheck_handle)
         # extern int tnb_var_name(const char *name,
         #                         const int handle, const int vid);
         self.register_function("tnb_var_name",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'name',),
+                               (zu.AutoString, self.intent_in, 'name',),
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'vid',),
                                err=self.errcheck_strict)
@@ -194,7 +203,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         self.register_function("tnb_search_var",
                                CT.c_int,
                                (CT.c_int, self.intent_in, 'handle',),
-                               (util.AutoString, self.intent_in, 'name',),
+                               (zu.AutoString, self.intent_in, 'name',),
                                err=self.errcheck_handle)
         # extern int tnb_var_recs(const int handle, const int vid);
         self.register_function("tnb_var_recs",
@@ -226,14 +235,14 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                                CT.c_int,
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'vid',),
-                               (util.AutoString, self.intent_in, 'name',),
+                               (zu.AutoString, self.intent_in, 'name',),
                                err=self.errcheck_handle)
         # extern int tnb_co_name(char * const name,
         #                        const int handle, const int vid,
         #                        const int cid);
         self.register_function("tnb_co_name",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'name',),
+                               (zu.AutoString, self.intent_in, 'name',),
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'vid',),
                                (CT.c_int, self.intent_in, 'cid',),
@@ -250,7 +259,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         #                         const int rec);
         self.register_function("tnb_attr_len",
                                CT.c_int,
-                               (util.AutoString,
+                               (zu.AutoString,
                                 self.intent_in, 'attr'),
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'vid', -1),
@@ -260,7 +269,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         #                           const int rec);
         self.register_function("tnb_get_header",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'head',),
+                               (zu.AutoString, self.intent_in, 'head',),
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'vid', -1),
                                (CT.c_int, self.intent_in, 'rec', -1),
@@ -271,8 +280,8 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         #                         const int rec);
         self.register_function("tnb_get_attr",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'attr',),
-                               (util.AutoString, self.intent_in, 'item',),
+                               (zu.AutoString, self.intent_in, 'attr',),
+                               (zu.AutoString, self.intent_in, 'item',),
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'vid', -1),
                                (CT.c_int, self.intent_in, 'rec', -1),
@@ -284,7 +293,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                                CT.c_int,
                                (CT.POINTER(CT.c_float),
                                 self.intent_in, 'attr',),
-                               (util.AutoString, self.intent_in, 'item',),
+                               (zu.AutoString, self.intent_in, 'item',),
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'vid',),
                                (CT.c_int, self.intent_in, 'rec',),
@@ -294,7 +303,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         #                              const int rec);
         self.register_function("tnb_get_attr_byid",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'attr',),
+                               (zu.AutoString, self.intent_in, 'attr',),
                                (CT.c_int, self.intent_in, 'item',),
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'vid',),
@@ -303,7 +312,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         # extern int tnb_get_attr_name(char * const attr, const int item);
         self.register_function("tnb_get_attr_name",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'attr',),
+                               (zu.AutoString, self.intent_in, 'attr',),
                                (CT.c_int, self.intent_in, 'item',),
                                err=self.errcheck_strict)
         # extern int tnb_rec_time(char * const time,
@@ -311,7 +320,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         #                         const int rec);
         self.register_function("tnb_rec_time",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'time',),
+                               (zu.AutoString, self.intent_in, 'time',),
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'vid', ),
                                (CT.c_int, self.intent_in, 'rec',),
@@ -321,7 +330,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         #                         const int rec);
         self.register_function("tnb_rec_date",
                                CT.c_int,
-                               (util.AutoString, self.intent_in, 'date',),
+                               (zu.AutoString, self.intent_in, 'date',),
                                (CT.c_int, self.intent_in, 'handle',),
                                (CT.c_int, self.intent_in, 'vid', ),
                                (CT.c_int, self.intent_in, 'rec',),
@@ -334,9 +343,9 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                                CT.c_int,
                                (CT.POINTER(CT.c_int), self.intent_in, 'd',),
                                (CT.c_size_t, self.intent_in, "rec"),
-                               (util.AutoArray(CT.c_size_t),
+                               (zu.AutoArray(CT.c_size_t),
                                 self.intent_in, "start"),
-                               (util.AutoArray(CT.c_size_t),
+                               (zu.AutoArray(CT.c_size_t),
                                 self.intent_in, "count"),
                                (CT.c_int, self.intent_in, 'handle'),
                                (CT.c_int, self.intent_in, 'vid'),
@@ -349,9 +358,9 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                                CT.c_int,
                                (CT.POINTER(CT.c_float), self.intent_in, 'd',),
                                (CT.c_size_t, self.intent_in, "rec"),
-                               (util.AutoArray(CT.c_size_t),
+                               (zu.AutoArray(CT.c_size_t),
                                 self.intent_in, "start"),
-                               (util.AutoArray(CT.c_size_t),
+                               (zu.AutoArray(CT.c_size_t),
                                 self.intent_in, "count"),
                                (CT.c_int, self.intent_in, 'handle'),
                                (CT.c_int, self.intent_in, 'vid'),
@@ -364,9 +373,9 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                                CT.c_int,
                                (CT.POINTER(CT.c_double), self.intent_in, 'd',),
                                (CT.c_size_t, self.intent_in, "rec"),
-                               (util.AutoArray(CT.c_size_t),
+                               (zu.AutoArray(CT.c_size_t),
                                 self.intent_in, "start"),
-                               (util.AutoArray(CT.c_size_t),
+                               (zu.AutoArray(CT.c_size_t),
                                 self.intent_in, "count"),
                                (CT.c_int, self.intent_in, 'handle'),
                                (CT.c_int, self.intent_in, 'vid'),
@@ -402,9 +411,7 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
         na = self.tnb_attr_size(handle, vid, rec)
         buf = CT.create_string_buffer(na * la + 1)
 
-        # print(la, na, buf)
         self.tnb_get_header(buf, handle, vid, rec)
-        # print(buf)
         if conv is True:
             buf = buf.value.decode()
         hd = [buf[j:j+la] for j in range(0, la * na, la)]
@@ -444,7 +451,6 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
                      (self.tnb_var_read_float, CT.c_float),
                      (self.tnb_var_read_double, CT.c_double),]:
             if isinstance(d, CT.POINTER(t)):
-                # print('read: ', handle, vid, rec, start[:], count[:])
                 return f(d, rec, start, count, handle, vid)
         raise TypeError
 
@@ -459,7 +465,6 @@ class LibTouzaNio(LibTouzaCore, param.ParamTouzaNio):
     @staticmethod
     def errcheck_format(result, _func, _args):
         """Result checker for format."""
-        # print(f'format: {result} {_args}')
         return result >= 0
 
     @staticmethod

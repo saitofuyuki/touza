@@ -1,7 +1,7 @@
 # touza/zbt/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/10/17 13:05:37 fuyuki Makefile.am>
+# Time-stamp: <2024/10/31 16:50:27 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -16,12 +16,12 @@ if ZBT_BUILD_ONLY
 else
 pkgpython_PYTHON = __init__.py
 pkgpython_PYTHON += util.py libtouza.py dsnio.py
-pkgpython_PYTHON += xrnio.py
+pkgpython_PYTHON += xrnio.py config.py
 pkgpython_PYTHON += plot.py control.py
 pkgpython_PYTHON += zbcont.py
 
 # pkgpython_PYTHON += param.py
-nodist_pkgpython_PYTHON = config.py param.py
+nodist_pkgpython_PYTHON = env.py param.py
 pkgpython_DATA = zbtrc.toml
 
 bin_SCRIPTS = zbcont
@@ -31,17 +31,17 @@ EXTRA_DIST += zbcont.in
 
 copy_sources = __init__.py
 copy_sources += util.py libtouza.py dsnio.py
-copy_sources += xrnio.py zbcont.py
+copy_sources += xrnio.py config.py
 copy_sources += plot.py control.py
-copy_sources += zbtrc.toml
+copy_sources += zbcont.py zbtrc.toml
 
 EXTRA_PYTHON =
 EXTRA_PYTHON += $(copy_sources)
-EXTRA_PYTHON += config.py param.py
+EXTRA_PYTHON += env.py param.py
 
 pkgpythondir = $(pythondir)/zbt
 
-BUILT_SOURCE += param.py config.py
+BUILT_SOURCE += env.py param.py
 
 CLEANFILES = $(BUILT_SOURCE)
 
@@ -63,7 +63,7 @@ uninstall-mod:
 param.py: $(top_srcdir)/nio/touza_nio_param.h
 	$(SHELL) $(GENPARAM) -o $@ ParamTouzaNio $(top_srcdir)/nio/touza_nio_param.h || rm -f $@
 
-config.py:
+env.py:
 	echo "TOUZA_NAME = '$(TOUZA_NAME)'" >> $@
 	echo "LIBRARY_DIR = '$(zbt_libtouza_dir)'" >> $@
 
