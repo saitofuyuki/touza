@@ -565,11 +565,11 @@ the slice one index forward and backward, respectively:
 
 A left/right click on the coordinate label changes the plot coordinate
 with skipping the other coordinate (a gray rectangle is shown when the
-pointer is on the label). In the above case, left clicking turn the
+pointer is on the label). In the above case, left clicking turns the
 coordinate as:
-: GGLA128 -> GLON256 -> record -> CMIP6P38 -> GGLA128
-while right clicking turn reversed:
-: GGLA128 <- GLON256 <- record <- CMIP6P38 <- GGLA128
+: record <- CMIP6P38 <- GGLA128 <- GLON256
+while right clicking turns it reversed:
+: record -> CMIP6P38 -> GGLA128 -> GLON256
 A middle click on either the coordinate transpose the coordinate.  In
 other words, =[GGLA128, GLON256]= plot is changed into =[GLON256,
 GGLA128]= plot.
@@ -1051,11 +1051,11 @@ colormaps with using, e.g., PowerNorm(1.0).
 
 cf: [[https://matplotlib.org/stable/gallery/images_contours_and_fields/colormap_interactive_adjustment.html][matplotlib example]]
 * Acknowledgements
-TOUZA/Zbt has been developped after much trials of GTOOL3 python
+TOUZA/Zbt has been developed after much trials of GTOOL3 python
 implementation by three great predecessors: Ogochi Koji san, Suzuki
 Tatsuo san, Komuro Yoshiki san.  It is coded from scratch, however,
-most ideas adopted and/or abondoned on TOUZA/Zbt are definitely
-originated from their trials.  The maintainer really appriciates them
+most ideas adopted and/or abandoned on TOUZA/Zbt are definitely
+originated from their trials.  The maintainer really appreciates them
 who share their own developments.
 
 * Copyright and license
@@ -1088,3 +1088,4 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  Wistia afmhot BrBG PuOr RdGy RdYlBu RdYlGn coolwarm
 #  LocalWords:  bwr hsv qual gnuplot CMRmap cubehelix brg nipy ncar
 #  LocalWords:  cmap sym asinh arcsinh eps png jpg zbtFigure nd th
+#  LocalWords:  Ogochi Koji san Tatsuo Komuro Yoshiki

@@ -192,8 +192,6 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
                                "decode_timedelta",
                                "decode_coords", ] + xrnio_parameters
 
-    lib = libtouza.LibTouzaNio(name=None)
-
     def open_dataset(self, filename_or_obj, *,
                      drop_variables=None,
                      decode_times=True,
@@ -284,7 +282,7 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
 
     def guess_can_open(self, filename_or_obj):
         if isinstance(filename_or_obj, str):
-            return self.lib.tnb_file_is_nio(filename_or_obj)
+            return dsnio._TouzaNio.is_nio_file(filename_or_obj)
         return False
 
     def parse_calendar(self, cal, decode_times):
@@ -330,6 +328,13 @@ def open_dataset(filename_or_obj, *args, engine=None, **kwargs):
                 locallog.warning(f"{k} argument removed"
                                  " to call open_dataset().")
                 del kwargs[k]
-        xds = xr.open_dataset(filename_or_obj, *args, engine=engine, **kwargs)
-
+        try:
+            xds = xr.open_dataset(filename_or_obj, *args,
+                                  engine=engine, **kwargs)
+        except ValueError as err:
+            locallog.error("open_dataset() fails.")
+            if not dsnio._TouzaNio.is_loaded():
+                locallog.error("touza library seems not be loaded.")
+            # locallog.error(err)
+            raise ValueError(err) from None
     return xds
