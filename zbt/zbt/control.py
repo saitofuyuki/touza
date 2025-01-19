@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/24 15:06:49 fuyuki control.py>
+# Time-stamp: <2024/11/05 14:54:41 fuyuki control.py>
 
 __doc__ = \
     """
@@ -12,6 +12,7 @@ Figure traverse controller.
 :Created:    Oct 9 2024
 """
 
+import pprint as ppr
 import collections.abc as cabc
 import pathlib as plib
 import math
@@ -19,12 +20,18 @@ import copy
 import time
 import inspect
 
+import numpy as np
 import xarray as xr
-import matplotlib as mpl
+import matplotlib as mplib
 import matplotlib.pyplot as plt
+import matplotlib.artist as mart
+import matplotlib.animation as animation
+
+import cartopy.util as cutil
 
 import zbt.plot as zplt
 import zbt.xrnio as zxr
+import zbt.util as zu
 
 
 class LinkedArray:
@@ -160,6 +167,7 @@ class LinkedArray:
                array=None, key=None, mask=None, step=None, lev=None):
         """Recursive switcher of attributes."""
         # print(f"<{self.name}:switch> {cls=} {step=} {key=}", end='')
+        # print(f"<{self.name}:switch> {mask=}")
         lev = lev or 0
         cls, do_this, do_next = self._class_range(cls, lev)
         # print(f" >> {do_this} {do_next}")
@@ -291,9 +299,36 @@ class LinkedArray:
             ret = ret + self.child.current
         return ret
 
+    def __bool__(self):
+        return True
+
+    def __len__(self):
+        n = 0
+        ret = self.reset()
+
+        if self.child and self.recurse:
+            while ret is not None:
+                self.update(ret)
+                self._current = ret
+                ret = self._mask(ret, self.mask)
+                n = n + len(self.child)
+                if self.step == 0:
+                    break
+                ret = self._next()
+            self._current = None
+        else:
+            n = 1
+            for j in self._mask(self.shape, self.mask):
+                if isinstance(j, int):
+                    n = n * j
+        return n
+
     def __iter__(self):
+        # print(f"<{self.name}:__iter__> enter {self.mask=}")
         ret = self.reset()
         # print(f"<{self.name}:__iter__> {self.init=} {ret=} {self.shape=}")
+        # print(f"<{self.name}:__iter__> reset {self.mask=}")
+
         while ret is not None:
             # ret = self._mask(ret, self.mask)
 
@@ -301,6 +336,7 @@ class LinkedArray:
             self._current = ret
 
             ret = self._mask(ret, self.mask)
+            # print(ret, self.mask)
             if self.child and self.recurse:
                 for c in self.child:
                     yield (ret, ) + c
@@ -311,13 +347,20 @@ class LinkedArray:
                 break
             ret = self._next()
         else:
-            self._current = None
+            if self.mask is False:
+                self._current = None
+            else:
+                self._current = tuple(c if m is True else True
+                                      for c, m in zip(self._current,
+                                                      self.mask))
+            # print(self._current, self.mask)
 
     def _mask(self, val, mask):
         ret = ()
         mask = mask or (False, ) * len(val)
         for v, m in zip(val, mask):
-            if m is False:
+            # if m is False:
+            if m in [False, True, ]:
                 ret = ret + (v, )
             elif m is None:
                 pass
@@ -379,7 +422,10 @@ class LinkedArray:
             init = self.init
             if init:   # natural or prescribed initial
                 if init is True:
-                    init = (True, ) * len(self.shape)
+                    if self._current:
+                        init = self._current
+                    else:
+                        init = (True, ) * len(self.shape)
                 if self.step > 0:
                     init = tuple(0 if j is True else j
                                  for j in init)
@@ -394,10 +440,12 @@ class LinkedArray:
                     init = self._current
                 else:
                     init = (0, ) * len(self.shape)
+        # print(f"{init=}")
         return init
 
     def cue(self, init):
         """Cueing."""
+        # print(f"cue: {init}")
         if init is True:
             self._current = None
             self.init = True
@@ -427,34 +475,66 @@ class LinkedArray:
 class ArrayIter(LinkedArray):
     """Array level iterator."""
 
-    __slot__ = ["_transpose", "_sel", ]
+    __slot__ = ["_transpose", "_nsel", "_xsel", "_dims", ]
 
     def __init__(self, **kw):
         super().__init__(array=None, name='ARRAY', **kw)
         self._transpose = False
-        self._sel = None
+        self._nsel = None      # normalized selection (defined only)
+        self._xsel = None      # source selection (whole coordinates)
+        self._dims = None      # data dimension (possibly squeezed)
+
+    @staticmethod
+    def is_isel(s):
+        """Check if s is integer-only slice"""
+        if isinstance(s, slice):
+            b = isinstance(s.start, int) or s.start is None
+            e = isinstance(s.stop, int) or s.stop is None
+            return b and e
+        return False
 
     def status(self, fmt=True, recurse=False, dims=None):
-        dlim = self._sel or {}
-        sel = []
-        dims = dims or []
-        for c, x in enumerate(self.l2p()):
-            if c >= len(dims):
-                c = None
-            else:
-                c = dims[c]
-            lim = dlim.get(c, slice(None, None, None))
-            if isinstance(lim, int):
-                lim = slice(lim, lim, 1)
-
-            if isinstance(x, slice):
-                b, e, s = x.start, x.stop, x.step
+        """Generate current status."""
+        data = super()._value()
+        # print(f'data: {data.dims}')
+        # # print(f'indexes: {list(data.indexes)}')
+        # print(f'coords: {list(data.coords.keys())}')
+        # print(f'pkey: {self.l2p()}')
+        # print(f'dims: {self._dims}')
+        # print(f'nsel: {self._nsel}')
+        # print(f'xsel: {self._xsel}')
+        stt = []
+        pkey = self.l2p()
+        mask = self.mask
+        # print(pkey, mask)
+        for xk, xs in self._xsel.items():
+            anc = 0
+            if xk in self._dims:
+                jk = self._dims.index(xk)
+                pk = pkey[jk]
+                xs = zu.set_default(xs, slice(None, None, None))
+                if mask[jk] is True:
+                    anc = 1
+                if isinstance(pk, slice):
+                    # stt.append(xs)
+                    pass
+                elif self.is_isel(xs):
+                    xs = (xs.start or 0) + pk
+                    # stt.append((xs.start or 0) + pk)
+                else:
+                    xs = data.coords[xk].item()
+                    # stt.append(data.coords[xk].item())
+            else:               # squeezed
+                anc = 2
+                if isinstance(xs, int):
+                    pass
+                    # stt.append(xs)
+                else:
+                    xs = self._nsel.get(xk, xs)
+                    # stt.append(self._nsel.get(xk, xs))
+            if isinstance(xs, slice):
+                b, e, s = xs.start, xs.stop, xs.step
                 p = ''
-                if lim.start is not None:
-                    b = (b or 0) + lim.start
-                if lim.stop is not None:
-                    if e is None:
-                        e = lim.stop
                 p = p + ('' if b is None else str(b))
                 p = p + ':'
                 p = p + ('' if e is None else str(e))
@@ -462,16 +542,20 @@ class ArrayIter(LinkedArray):
                     pass
                 else:
                     p = p + ':' + str(s)
+                xs = p
             else:
-                p = str(x + (lim.start or 0))
-            sel.append(p)
-        txt = ','.join(sel)
+                xs = str(xs)
+                if anc == 1:
+                    xs = '(' + xs + ')'
+                elif anc == 2:
+                    xs = '[' + xs + ']'
+            stt.append(xs)
+        txt = ', '.join(stt)
         txt = f'[{txt}]'
         if recurse and self.child:
             ch = self.child.status(fmt=fmt, recurse=recurse)
             if ch:
                 txt = txt + ' ' + ch
-        # return f"{id(self)}: {txt}"
         return txt
 
     def update(self, key):
@@ -479,8 +563,11 @@ class ArrayIter(LinkedArray):
         # print(v.dims)
         pass
 
-    def offset(self, sel=None):
-        self._sel = sel
+    def offset(self, nsel, xsel, dims):
+        """Store selections."""
+        self._nsel = nsel
+        self._xsel = xsel
+        self._dims = dims
 
     def transpose(self, switch=None):
         if isinstance(switch, tuple):
@@ -505,143 +592,279 @@ class ArrayIter(LinkedArray):
                     data = data.T
             else:
                 data = data.transpose(*self._transpose)
+        for cn in data.coords:
+            if cn not in data.dims:
+                continue
+            ck = data.dims.index(cn)
+            co = data[cn]
+            cc = co.attrs.get('cyclic_coordinate')
+            if not cc:
+                continue
+            w, org, dup = cc
+            if len(co) == w - 1 and co[0] == org and co[-1] != dup:
+                cd, cx = cutil.add_cyclic(data, co, axis=ck,
+                                          cyclic=dup-org)
+                nco = dict(data.coords.items())
+                # print(co.dims)
+                # print(cx.shape)
+                nco[cn] = xr.DataArray(cx, dims=co.dims, attrs=co.attrs)
+                data = xr.DataArray(cd, coords=nco,
+                                    dims=data.dims, attrs=data.attrs)
         return data
 
     def __getitem__(self, key):
         return super().__getitem__(key)
 
+    def l2p(self, key=None):
+        """Logical to physical element-key conversion."""
+        r = super().l2p(key)
+        # print(f"l2p:a: {r}")
+        return r
+
 
 class VariableIter(LinkedArray):
     """Variable level iterator."""
 
-    def __init__(self, coors=None, dim=None, **kw):
+    def __init__(self, coors=None, dim=None, anchors=None, **kw):
         super().__init__(array=None, name='VAR', **kw)
+        self.anchors = anchors or ()
+        # coors = coors or ('', '')
+        # self.coors = ()
+        # jc = -1
+        # for c in reversed(coors):
+        #     if c is '':
+        #         c = None
+        #     if c is None:
+        #         while jc in coors:
         self.coors = coors or (-2, -1)
+        # print(f"init: {self.coors=}")
         self.dim = dim
-        self.sel = None
+        self.nsel = None
+        self.xsel = None
 
     def update(self, key):
+        """Update current and child status."""
         k = self.l2p(key)
-        v = self.array.get(k)
+        ov = self.array.get(k)
+        v = ov
         # print(f"<{self.name}:update> {self.current} {self.child.current}"
         #       f"> {key} {k} {v.shape}")
         if v is None:
             self.switch(cls=ArrayIter, array=None, key=0, )
+            return
+
+        # if self.dim:
+        self.xsel, self.nsel = self.extract_sels(self.dim, v)
+        # print(self.dim, self.xsel, self.nsel)
+
+        if not self.nsel:
+            pass
+        elif any(isinstance(j, slice) for j in self.nsel.values()):
+            for c in self.nsel.keys():
+                # workaround for NotImplementedError in xarray
+                xs = self.xsel[c]
+                if not isinstance(xs, (slice, int)):
+                    xs = v.coords[c].sel({c: xs}, method='nearest')
+                    self.nsel[c] = xs.item()
+            v = v.sel(self.nsel)
         else:
-            cue = False
-            cidx = self.child.l2i()
-            if self.dim:
-                sel = {}
-                w = len(v.dims)
-                for c, s in self.dim.items():
-                    try:
-                        if isinstance(c, int):
-                            if c >= w or c + w < 0:
-                                raise UserWarning
-                            sel[v.dims[c]] = s
-                        else:
-                            if c in v.dims:
-                                sel[c] = s
-                            else:
-                                raise UserWarning
-                    except UserWarning:
-                        print(f"no coordinate to select: {c}")
-                v = v.isel(sel)
-                self.sel = sel
-            else:
-                pass
+            v = v.sel(self.nsel, method='nearest')
 
-            shape = v.shape
-            if cidx is None:
-                cue = True
-            elif len(cidx) != len(shape):
-                cue = True
-            else:
-                init = ()
-                for c, w in zip(cidx, shape):
-                    if c >= w:
-                        cue = True
-                        init = init + (w - 1, )
-                    else:
-                        init = init + (c, )
-                if cue:
-                    cue = init
+        shape = v.shape
+        cue = self.adjust_cue(shape)
 
-            opts = self.opts or {}
+        opts = self.opts or {}
 
-            csel = self.set_coors(self.coors, v.dims)
-            mask = self.c2mask(csel, shape, v.dims)
-            self.child.transpose(csel)
-            self.child.offset(self.sel)
-            self.switch(cls=ArrayIter,
-                        array=v, key=shape, mask=mask)
+        # csel = self.set_coors(self.coors, ov)
+        # asel = self.set_anchors(self.anchors, ov)
+        # mask = self.c2mask(csel, asel, shape, ov.dims)
+        csel = self.set_coors(self.coors, v)
+        asel = self.set_anchors(self.anchors, v)
+        mask = self.c2mask(csel, asel, shape, v.dims)
+        # print(f"{csel=} {asel=} {mask=}")
+        self.child.transpose(csel)
+        self.child.offset(self.nsel, self.xsel, v.dims)
+        self.switch(cls=ArrayIter,
+                    array=v, key=shape, mask=mask)
+        if cue:
+            self.child.cue(cue)
+
+    def extract_sels(self, sel, data, strict=None):
+        """Extract effective and normalized selections for data."""
+        esel = dict.fromkeys(data.dims)  # extracted selection
+        nsel = {}                        # normalized selection
+        md = len(data.dims)
+        sel = sel or {}
+        for co, sp in sel.items():
+            try:
+                co = self.parse_coord(data, co)
+                esel[co] = sp
+                if isinstance(sp, slice):
+                    start, stop = sp.start, sp.stop
+                    if isinstance(start, int):
+                        start = data.coords[co][start].item()
+                    if isinstance(stop, int):
+                        stop = data.coords[co][stop].item()
+                    sp = slice(start, stop, sp.step)
+                elif isinstance(sp, int):
+                    sp = data.coords[co][sp].item()
+                nsel[co] = sp
+            except UserWarning as exc:
+                msg = f"no coordinate to select: {co}"
+                if strict is True:
+                    raise UserWarning(msg) from exc
+                print(msg)
+        return esel, nsel
+
+    def parse_coord(self, data, name):
+        """Cooridnate either by index or name."""
+        md = len(data.dims)
+        if isinstance(name, int):
+            if name >= md or name + md < 0:
+                raise UserWarning
+            name = data.dims[name]
+        elif name in data.dims:
+            pass
+        else:
+            try:
+                name = zxr.search_coordinate(data, name)
+            except KeyError as exc:
+                raise UserWarning from exc
+        return name
+
+    def adjust_cue(self, shape):
+        """Update child cue."""
+        cue = False
+        cidx = self.child.l2i()
+        if cidx is None:
+            cue = True
+        elif len(cidx) != len(shape):
+            cue = True
+        else:
+            init = ()
+            for c, w in zip(cidx, shape):
+                if c >= w:
+                    cue = True
+                    init = init + (w - 1, )
+                else:
+                    init = init + (c, )
             if cue:
-                self.child.cue(cue)
+                cue = init
+        return cue
 
     def transpose(self, switch=None, key=None):
+        """Update transpose of child array."""
         k = self.l2p(key)
         v = self.array.get(k)
+        # print(k, v)
+
+        # mask = self.inquire(prop='mask', cls=ArrayIter, single=True)
+        # shape = self.inquire(prop='shape', cls=ArrayIter, single=True)
+        arr = self.inquire(prop='self', cls=ArrayIter, single=True)
+        arr = arr.array
+        # print(mask, shape, k, v.dims, arr.array.dims)
+
         if isinstance(switch, tuple):
             self.coors = switch
         elif switch is not None:
-            order = sorted(list(self.set_coors(self.coors, v.dims)))
+            # order = sorted(list(self.set_coors(self.coors, v)))
+            order = sorted(list(self.set_coors(self.coors, arr)))
             if not switch:
                 order = reversed(order)
             self.coors = tuple(order)
         else:
-            self.coors = self.coors[1:] + self.coors[:1]
+            # csel = self.set_coors(self.coors, v)
+            csel = self.set_coors(self.coors, arr)
+            # self.coors = self.coors[1:] + self.coors[:1]
+            self.coors = csel[1:] + csel[:1]
+            # print(f" >> {switch=} {self.coors=} {csel=} {v.dims=} {v.coords}")
 
-        switch = self.set_coors(self.coors, v.dims)
+        # switch = self.set_coors(self.coors, v)
+        switch = self.set_coors(self.coors, arr)
+        # print(f" >> {switch=} {self.coors=} {v.dims=} {v.coords}")
         return self.child.transpose(switch)
 
-    def set_coors(self, coors, dims, prop=None):
+    def set_anchors(self, anchors, data):
+        """Set lock coordinates."""
+        clist = []
+        for c in anchors:
+            try:
+                c = self.parse_coord(data, c)
+                clist.append(c)
+            except UserWarning:
+                print(f"no coordinate to anchor {c}.")
+        return clist
+
+    def set_coors(self, coors, data, prop=None):
         """Set coordinate tuple."""
         clist = []
-        w = len(dims)
         for c in coors:
             try:
-                if isinstance(c, int):
-                    if c >= w or c + w < 0:
-                        raise UserWarning
-                    if c < 0:
-                        c = c + w
-                elif c == '':
-                    pass
-                else:
-                    try:
-                        c = dims.index(c)
-                    except ValueError:
-                        raise UserWarning
+                c = self.parse_coord(data, c)
+                clist.append(data.dims.index(c))
             except UserWarning:
-                print(f"no coordinate to plot {c}.  Available={dims}")
-            else:
-                clist.append(c)
+                if c == '':
+                    clist.append(c)
+                else:
+                    print(f"no coordinate to plot {c}.  Available={data.dims}")
+        w = len(data.dims)
+        # print(f"set_coors: {coors=} {w=} {data.dims=}")
+        # shape = self.inquire(prop='shape', cls=ArrayIter, single=True)
         rem = w
         nlist = []
         for c in reversed(clist):
             if c == '':
                 c = rem - 1
+                # print(f"{c=} {shape[c]=}")
                 while c in clist:
                     c = c - 1
                 rem = c
             nlist.insert(0, c)
         if prop is None:
-            return tuple(dims[c] for c in nlist if c >= 0)
+            return tuple(data.dims[c] for c in nlist if c >= 0)
         if prop < 0:
             return tuple(c - w for c in nlist if c >= 0)
-        else:
-            return tuple(c for c in nlist if c >= 0)
+        return tuple(c for c in nlist if c >= 0)
 
-    def c2mask(self, coors, shape, dims):
+    def c2mask(self, coors, anchors, shape, dims):
         w = len(shape)
-        mask = (False, ) * len(shape)
-
+        # print(shape, anchors)
+        # print(coors, dims, anchors)
+        mask = ()
+        for d in dims:
+            d = d in anchors
+            mask = mask + (d, )
+        # mask = (False, ) * w
         colon = slice(None, None, None)
         for c in coors:
             if c in dims:
                 c = dims.index(c)
             mask = mask[:c] + (colon, ) + mask[c+1:]
-        return mask[:w]
+        mask = mask[:w]
+        return mask
+
+    def permute_anchor(self, switch):
+        """Anchor permutation."""
+        mask = self.inquire(prop='mask', cls=ArrayIter, single=True)
+
+        w = len(mask)
+        if switch == 0:
+            npat = [False if m in [True, False] else m
+                    for m in mask]
+        else:
+            reverse = switch > 0
+
+            pat = {j: (m is reverse)
+                   for j, m in enumerate(reversed(mask)) if m in [True, False]}
+            npat = list(mask)
+            for j in pat.keys():
+                npat[w - j - 1] = (not pat[j]) is reverse
+                if not pat[j]:
+                    break
+        self.switch(cls=ArrayIter, mask=tuple(npat))
+        self.anchors = tuple(- w + j
+                             for j, m in enumerate(npat) if m is True)
+        # print(self.anchors)
 
     def permute_axis(self, switch, skip_single=True):
         """Axis permutation."""
@@ -650,9 +873,17 @@ class VariableIter(LinkedArray):
 
         reverse = switch < 0
 
-        pat = [j for j, m in enumerate(reversed(mask)) if bool(m) != reverse]
+        pat = [j for j, m in enumerate(reversed(mask))
+               if isinstance(m, slice) is not reverse]
         if skip_single:
-            fskip = [2 - min(2, max(1, w)) for w in reversed(shape)]
+            fskip = []
+            for w, m in zip(shape, mask):
+                if m is True or w < 2:
+                    fskip = [1] + fskip
+                else:
+                    fskip = [0] + fskip
+            #     print(w, m)
+            # fskip = [2 - min(2, max(1, w)) for w in reversed(shape)]
         else:
             fskip = [0] * len(shape)
         mpat = len(pat)
@@ -662,9 +893,13 @@ class VariableIter(LinkedArray):
 
         pat.append(mshp)
         fskip.append(0)
+        # print(pat)
+        # print(shape)
+        # print(fskip)
 
         for _ in range(math.comb(mshp, mpat)):
             pos = 0
+            # print('permute:', pos, pat)
             while pos < mpat:
                 mskip += - fskip[pat[pos]] + fskip[pat[pos]+1]
                 pat[pos] += 1
@@ -678,19 +913,30 @@ class VariableIter(LinkedArray):
         y, n = slice(None, None, None), False
         if reverse:
             y, n = n, y
-        mask = [n] * mshp
+        nmask = [n] * mshp
         pat = pat[:-1]
         while pat:
             j = - 1 - pat[0]
-            mask[j] = y
+            nmask[j] = y
             pat = pat[1:]
-        self.coors = tuple(- mshp + j for j, m in enumerate(mask) if m)
+        self.coors = tuple(- mshp + j for j, m in enumerate(nmask)
+                           if isinstance(m, slice))
 
-        v = self.value()
-        csel = self.set_coors(self.coors, v.dims)
+        arr = self.inquire(prop='self', cls=ArrayIter, single=True)
+        v = arr.array
+        # print(v.dims)
+        # v = self.value()
+        # print(v.dims)
+        csel = self.set_coors(self.coors, v)
         self.child.transpose(csel)
 
-        self.switch(cls=ArrayIter, mask=mask)
+        ### hardcoded test
+        # if mask[-1] is False:
+        #     mask[-1] = True
+        mask = [m if m is True else n
+                for m, n in zip(mask, nmask)]
+        # print(mask)
+        self.switch(cls=ArrayIter, mask=tuple(mask))
 
     def status(self, fmt=True, recurse=False):
         idx = self.l2i()
@@ -705,6 +951,40 @@ class VariableIter(LinkedArray):
                 txt = txt + ' ' + ch
         return txt
 
+    def l2p(self, key=None):
+        """Logical to physical element-key conversion."""
+        r = super().l2p(key)
+        # print(f"l2p:v: {r}")
+        return r
+
+    def parse_view(self, data, coors, draw=None):
+        """Set figure coordinate."""
+        view = {}
+        draw = draw or {}
+        # print(draw)
+        for c in coors:
+            d = data.dims[c]
+            s = None
+            if isinstance(c, int):
+                for j in [c, len(data.dims) + c, ]:
+                    if j in draw:
+                        s = draw.get(j)
+                        break
+            elif d in draw:
+                s = draw.get(d)
+            if s:
+                mm = {}
+                if isinstance(s.start, int):
+                    mm['dmin'] = data.coords[d][s.start].item()
+                elif s.start is not None:
+                    mm['dmin'] = s.start
+                if isinstance(s.stop, int):
+                    mm['dmax'] = data.coords[d][s.stop].item()
+                elif s.start is not None:
+                    mm['dmax'] = s.stop
+                if mm:
+                    view[d] = mm
+        return view
 
 class FileIter(LinkedArray):
     """File (or dataset) level iterator."""
@@ -758,11 +1038,42 @@ class FileIter(LinkedArray):
         coors = None
         var = self.inquire(prop='self', cls=VariableIter, single=True)
         v = var.value(None)
-        coors = var.set_coors(var.coors, v.dims, prop=-1)
+        coors = var.set_coors(var.coors, v, prop=-1)
         return coors
 
+    def parse_view(self, data, coors, draw):
+        var = self.inquire(prop='self', cls=VariableIter, single=True)
+        v = var.value(None)
+        view = var.parse_view(v, coors, draw)
+        return view
 
-class FigureInteractive(zplt.FigureBase):
+
+class CmapIter(LinkedArray):
+    def __init__(self, **kw):
+        array = [None] + [k for k in mplib.colormaps.keys()
+                          if not k.endswith(r'_r')]
+        super().__init__(array=array[:10], name='CMAP', **kw)
+
+        # cgrp = {}
+        # for k, cm in mplib.colormaps.items():
+        #     if k.endswith(r'_r'):
+        #         continue
+        #     g = type(cm)
+        #     cgrp.setdefault(g, {})
+        #     cgrp[g][k] = cm
+        # ppr.pprint(cgrp)
+
+        self._loop = iter(self.items())
+        _ = next(self._loop)
+
+    def fwd(self):
+        try:
+            next(self._loop)
+        except StopIteration:
+            self._loop = iter(self.items())
+            _ = next(self._loop)
+
+class FigureInteractive(zplt.FigureCore):
     """Matplotlib figure class with interactive methods."""
 
     def __init__(self, *args, **kwds):
@@ -798,6 +1109,11 @@ class FigureInteractive(zplt.FigureBase):
         if base:
             base.permute_axis(switch)
 
+    def permute_anchor(self, switch):
+        base = self.trees.inquire(prop='self', cls=VariableIter, single=True)
+        if base:
+            base.permute_anchor(switch)
+
     def toggle_lock(self, force=None):
         p = self._lock
         if force is not None:
@@ -819,7 +1135,9 @@ class FigureInteractive(zplt.FigureBase):
     def is_locked(self):
         return self._lock
 
-    def info(self, pfx=None, msg=None):
+    def info(self, pfx=None, msg=None, sync=False):
+        if sync:
+            self.sync()
         pfx = pfx or ''
         txt = pfx + self.sel
         if self._lock:
@@ -827,6 +1145,14 @@ class FigureInteractive(zplt.FigureBase):
         if msg:
             txt = txt + f' -- {msg}'
         print(txt)
+
+    def sync(self):
+        """Synchronize current status"""
+        self.sel = self.trees.status(recurse=True)
+
+    def len(self):
+        n = len(self.trees)
+        return n
 
     def loop(self, step=True):
         if self._loop is None:
@@ -852,16 +1178,21 @@ class FigureInteractive(zplt.FigureBase):
 class FigureControl():
     """Figure iteration controller."""
 
-    def __init__(self, plot, root,
+    def __init__(self, pic, plot, root,
                  interactive=True,
-                 styles=None,
-                 layout=None, config=None, params=None):
+                 layout=None, cmap=None,
+                 styles=None, draw=None,
+                 config=None, params=None):
         self.parse_config(config, params)
 
+        self.draw = draw or {}
         self.plot = plot
-        self.layout = layout or zplt.LayoutLegacy3
-        if inspect.isclass(self.layout):
-            self.layout = self.layout(cls=FigureInteractive, config=config)
+        self.pic = pic
+        self.layout = layout
+
+        if inspect.isclass(self.pic):
+            self.pic = self.pic(FigureClass=FigureInteractive,
+                                LayoutClass=self.layout)
 
         self.figs = {}
         if not isinstance(root, (list, tuple, )):
@@ -870,19 +1201,24 @@ class FigureControl():
         self.output = None
         self.interactive = interactive
         self.styles = styles or {}
+        self.cmap = cmap
 
-    def __call__(self, output=None):
+        if self.interactive:
+            self.load()
+
+    def __call__(self, output=None, **kwds):
         self.output = output or None
         if self.interactive:
-            sub = self._draw
+            sub = self._interactive
+            # sub = self._animate
         else:
+            # sub = self._animate
             sub = self._batch
 
         for base in self.root:
-            fx = self._new_control()
-            fig = fx[0]
+            fig, axs = self._new_control(**kwds)
             jfig = fig.number
-            self.figs[jfig] = fx
+            self.figs[jfig] = fig, axs
             trees = base.copy()
             fig.bind(trees, base=base)
             sub(jfig)
@@ -890,9 +1226,107 @@ class FigureControl():
             plt.show()
 
     def _new_control(self, *args, **kwds):
-        fx = self.layout(*args, **kwds)
-        fig = fx[0]
+        fx = self.pic(*args, **kwds)
+        # print(fx)
+        # fig = fx[0]
+        # fig.canvas.mpl_connect('pick_event', self.onpick)
+        # fig.canvas.mpl_connect('button_press_event', self.mouse_press)
+        # fig.canvas.mpl_connect('figure_enter_event', self.enter_figure)
+        # fig.canvas.mpl_connect('figure_leave_event', self.leave_figure)
+        # fig.canvas.mpl_connect('axes_enter_event', self.enter_axes)
+        # fig.canvas.mpl_connect('axes_leave_event', self.leave_axes)
         return fx
+
+    def load(self, backends=None):
+        backends = backends or ['qt5agg', 'qtagg', ]
+        for be in backends:
+            try:
+                mplib.use(be)
+                break
+            except ValueError as exc:
+                pass
+        else:
+            be = mplib.get_backend()
+            print(f"Warning: {be} may not work as expected at window resizing.")
+
+    def mouse_press(self, event):
+        print('mouse_press:', event.button, (event.x, event.y),
+              (event.xdata, event.ydata), event.inaxes)
+        ax = event.inaxes
+        if ax:
+            event.inaxes.patch.set_facecolor('yellow')
+            event.canvas.draw()
+
+    def onpick(self, event):
+        this = event.artist
+        mouse = event.mouseevent
+        x, y = mouse.x, mouse.y
+        # xdata = thisline.get_xdata()
+        # ydata = thisline.get_ydata()
+        # ind = event.ind
+        # points = tuple(zip(xdata[ind], ydata[ind]))
+        gid = this.get_gid()
+        bbox = this.get_tightbbox()
+        extent = this.get_window_extent()
+        cbox = this.get_clip_box()
+        cont = cbox.contains(x, y)
+        print(f'onpick: {this}')
+        print(f'event: {x} {y}')
+        print(f'prop: {gid=} {bbox=} {cont=} {extent=}')
+        a = mart.ArtistInspector(this)
+        ppr.pprint(a.properties())
+
+    # class Cursor:
+    #     """
+    #     A cross hair cursor.
+    #     """
+    #     def __init__(self, ax):
+    #         self.ax = ax
+    #         self.horizontal_line = ax.axhline(color='k', lw=0.8, ls='--')
+    #         self.vertical_line = ax.axvline(color='k', lw=0.8, ls='--')
+    #         # text location in axes coordinates
+    #         self.text = ax.text(0.72, 0.9, '', transform=ax.transAxes)
+
+    #     def set_cross_hair_visible(self, visible):
+    #         need_redraw = self.horizontal_line.get_visible() != visible
+    #         self.horizontal_line.set_visible(visible)
+    #         self.vertical_line.set_visible(visible)
+    #         self.text.set_visible(visible)
+    #         return need_redraw
+
+    #     def on_mouse_move(self, event):
+    #         if not event.inaxes:
+    #             need_redraw = self.set_cross_hair_visible(False)
+    #             if need_redraw:
+    #                 self.ax.figure.canvas.draw()
+    #         else:
+    #             self.set_cross_hair_visible(True)
+    #             x, y = event.xdata, event.ydata
+    #             # update the line positions
+    #             self.horizontal_line.set_ydata([y])
+    #             self.vertical_line.set_xdata([x])
+    #             self.text.set_text(f'x={x:1.2f}, y={y:1.2f}')
+    #             self.ax.figure.canvas.draw()
+
+    # def enter_axes(self, event):
+    #     print('enter_axes', event.inaxes)
+    #     event.inaxes.patch.set_facecolor('yellow')
+    #     event.canvas.draw()
+
+    # def leave_axes(self, event):
+    #     print('leave_axes', event.inaxes)
+    #     event.inaxes.patch.set_facecolor('white')
+    #     event.canvas.draw()
+
+    # def enter_figure(self, event):
+    #     print('enter_figure', event.canvas.figure)
+    #     event.canvas.figure.patch.set_facecolor(('red', 0.2))
+    #     event.canvas.draw()
+
+    # def leave_figure(self, event):
+    #     print('leave_figure', event.canvas.figure)
+    #     event.canvas.figure.patch.set_facecolor(('grey', 0.2))
+    #     event.canvas.draw()
 
     def _prompt(self, event):
         """Event handler"""
@@ -905,7 +1339,7 @@ class FigureControl():
             fig, _ = self.figs[jfig]
             fig.connect(self.event_handler)
 
-    def _draw(self, jfig, step=True, msg=None):
+    def _interactive(self, jfig, step=True, msg=None):
         fig, axs = self.figs[jfig]
         fig.disconnect()
         try:
@@ -918,9 +1352,23 @@ class FigureControl():
                 raise StopIteration(f"\r({jfig}) no effective data.") from None
 
         data = stat[-1]
+        # print(data.indexes)
+        # print(data.dims)
+        # print(data.coords)
         try:
             print(f'\r({jfig}) drawing...', end='', flush=True)
-            self._update(data, fig, axs)
+            artists = self._update(data, fig, axs)
+            # for a in artists:
+            #     gid = a.get_gid()
+            #     print(gid, a)
+            # for a in artists:
+            #     if isinstance(a, mplib.text.Text):
+            #         fm = a.get_fontproperties()
+            #         gid = a.get_gid()
+            #         print(gid, a, a.get_size(), fm.get_size())
+            #         # fm.set_size(20.5)
+            #         # print(gid, a, a.get_size(), fm.get_size())
+            # print(artists)      #
             fig.info(pfx=f'\r({jfig}) ', msg=msg)
         except UserWarning as err:
             fig.info(pfx=f'\r({jfig}) ', msg=err)
@@ -928,24 +1376,70 @@ class FigureControl():
 
     def _batch(self, jfig):
         fig, axs = self.figs[jfig]
+        n = fig.len()
         while True:
             try:
                 trees, stat = fig.loop()
                 data = stat[-1]
-                self._update(data, fig, axs)
-                self._savefig(jfig)
+                artists = self._update(data, fig, axs)
+                self._savefig(jfig, ref=n)
             except StopIteration:
                 break
+
+    # def _animate(self, jfig):
+    #     fig, axs = self.figs[jfig]
+    #     frames = []
+    #     while True:
+    #         try:
+    #             trees, stat = fig.loop()
+    #             data = stat[-1]
+    #             p = self._update(data, fig, axs)
+    #             frames.append([p])
+    #             # self._savefig(jfig)
+    #         except StopIteration:
+    #             break
+    #     def anim(p):
+    #         print(p)
+    #         return [p]
+    #     print(frames)
+    #     print(fig)
+    #     # ani = animation.FuncAnimation(
+    #     #     fig,
+    #     #     anim,
+    #     #     interval=50,
+    #     #     blit=False,
+    #     #     frames=frames,
+    #     #     repeat_delay=100, )
+    #     ani = animation.ArtistAnimation(
+    #         fig,
+    #         frames,
+    #         interval=50,
+    #         blit=False,  # blitting can't be used with Figure artists
+    #         repeat_delay=100,
+    #     )
+    #     fig.draw_artist(frames[0][0])
+    #     fig.canvas.draw()
+
+    #     ani.save("movie.mp4")
+    #     plt.show()
 
     def _update(self, data, fig, axs):
         """Draw core."""
         pco = fig.trees.plot_coordinates(data)
+        view = fig.trees.parse_view(data, pco, self.draw)
+        # print(view)
         body = self.styles.get(pco) or {}
         layout = {k: body.get(k) for k in ['projection', ]}
-        self.layout.reset(fig, axs, body=layout)
+        # axs.reset(fig, body=layout, colorbar=dict(fresh=True))
+        # b = axs['body']
+        # if isinstance(b, mplib.axes.Axes):
+        #     print(b.get_xlim())
+        #     print(b.get_ylim())
+        axs.reset(fig, body=layout)
+        axs.cla()
         fig.set_hook(self._prompt)
-        self.plot(fig=fig, axs=axs, data=data, title=fig.sel,
-                  body=body)
+        return self.plot(fig=fig, axs=axs, data=data, title=fig.sel,
+                         view=view, body=body)
 
     def diag(self, jfig):
         fig, _ = self.figs[jfig]
@@ -966,12 +1460,11 @@ class FigureControl():
         else:
             targets = [jfig]
         for jf in targets:
-            fx = self.figs[jf]
-            fig = fx[0]
+            fig, _ = self.figs[jf]
             child = fig.trees
             child.switch(*args, **kw)
             if draw:
-                self._draw(jf)
+                self._interactive(jf)
 
     def map_figures(self, func, jfig, *args, **kw):
         if self._is_locked(jfig):
@@ -981,13 +1474,12 @@ class FigureControl():
         for jf in targets:
             func(jf, *args, **kw)
 
-    def _savefig(self, jfig):
-        fx = self.figs[jfig]
+    def _savefig(self, jfig, ref=None):
+        fig, axs = self.figs[jfig]
         output = self.output
         if isinstance(output, cabc.Callable):
-            output = self.output(jfig, *fx)
+            output = self.output(jfig, fig, axs, ref=ref)
         if output:
-            fig = fx[0]
             if fig.is_locked():
                 face = fig.fc[-1]
             else:
@@ -1001,23 +1493,48 @@ class FigureControl():
             print(f"No output defined.")
 
     def _permute(self, jfig, step):
-        fx = self.figs[jfig]
-        fig = fx[0]
+        fig, _ = self.figs[jfig]
         fig.permute_axis(step)
-        self._draw(jfig, step=False, msg='permuted')
+        self._interactive(jfig, step=False, msg='permuted')
+
+    def _anchor(self, jfig, step):
+        fig, _ = self.figs[jfig]
+        fig.permute_anchor(step)
+        fig.info(pfx=f'\r({jfig}) ', msg='anchor permuted.', sync=True)
 
     def _transpose(self, jfig):
-        fx = self.figs[jfig]
-        fig = fx[0]
+        fig, _ = self.figs[jfig]
         base = fig.trees.inquire(prop='self', cls=VariableIter, single=True)
         if base:
             base.transpose()
-        self._draw(jfig, step=False, msg='transposed')
+        self._interactive(jfig, step=False, msg='transposed')
 
-    def _resize(self, jfig, rate=None):
-        fx = self.figs[jfig]
-        fig = fx[0]
-        self.layout.resize(fig, rate=rate)
+    def _resize(self, jfig, figsize=None, ref=None):
+        fig, axs = self.figs[jfig]
+        axs.resize(fig, figsize=figsize, ref=ref)
+        # fig.canvas.draw()
+
+    def _toggle_cmap(self, jfig):
+        fig, _ = self.figs[jfig]
+        if self.cmap:
+            self.cmap.fwd()
+            cmap = self.cmap.value()
+            self._interactive(jfig, step=False, msg=f'colormap: {cmap}')
+        # for k, cm in mplib.colormaps.items():
+        #     print(k, cm)
+
+    def _toggle_visible(self, jfig):
+        fig, axs = self.figs[jfig]
+        # print(jfig, 'toggle')
+        axs.toggle_visible(ax='colorbar')
+        fig.canvas.draw()
+
+    def _toggle_axis(self, jfig, which):
+        fig, axs = self.figs[jfig]
+        axs.toggle_axis(which)
+        # self._draw(jfig, step=False, msg=f'toggle: {which}')
+        # ax = axs.atbl['body']
+        fig.canvas.draw()
 
     def event_handler(self, event):
         """Event handler"""
@@ -1044,17 +1561,21 @@ class FigureControl():
                     fig.disconnect()
                     print(f"\r({jfig}) closed")
                 else:
-                    for fx in self.figs.values():
-                        plt.close(fx[0])
+                    for fig, _ in self.figs.values():
+                        plt.close(fig)
             elif cmd == 'next_cyclic':
                 if sub == 'coordinate':
                     self.map_figures(self._permute, jfig, +1)
+                elif sub == 'anchor':
+                    self.map_figures(self._anchor, jfig, +1)
                 else:
                     self.switch(jfig, draw=False, step=0)
                     self.switch(jfig, cls=cls, step=+1)
             elif cmd == 'prev_cyclic':
                 if sub == 'coordinate':
                     self.map_figures(self._permute, jfig, -1)
+                elif sub == 'anchor':
+                    self.map_figures(self._anchor, jfig, -1)
                 else:
                     self.switch(jfig, draw=False, step=0)
                     self.switch(jfig, cls=cls, step=-1)
@@ -1070,20 +1591,27 @@ class FigureControl():
                 else:
                     self.switch(jfig, draw=False, step=0)
                     self.switch(jfig, cls=(True, cls), step=-1)
-            elif cmd in ['duplicate', 'new', ]:
+            elif cmd == 'clear':
+                if sub == 'anchor':
+                    self.map_figures(self._anchor, jfig, 0)
+            elif cmd in ['duplicate', 'new', 'refresh', ]:
                 # fig.disconnect()
-                nfx = self._new_control(figsize=fig)
-                nfig = nfx[0]
+                nfig, nax = self._new_control(figsize=fig, )
                 jnew = nfig.number
-                self.figs[jnew] = nfx
+                self.figs[jnew] = nfig, nax
                 nfig.canvas.manager.show()
                 base = fig.base
-                if cmd == 'duplicate':
+                if cmd in ['duplicate', 'refresh', ]:
                     trees = child.copy(init=False, recurse=True)
                 else:
                     trees = base.copy(init=True, recurse=True)
                 nfig.bind(trees, base=base)
-                self._draw(jnew)
+                self._interactive(jnew)
+                if cmd == 'refresh':
+                    plt.close(fig)
+                    del self.figs[jfig]
+                    fig.disconnect()
+                    print(f"\r({jfig}) regenerated > ({jnew})")
 
             elif cmd == 'info':
                 if hseq:
@@ -1106,10 +1634,20 @@ class FigureControl():
                 self.map_figures(self._resize, jfig, +self.opts['resize_step'])
             elif cmd == 'shrink':
                 self.map_figures(self._resize, jfig, -self.opts['resize_step'])
+            elif cmd == 'sync_geometry':
+                self.map_figures(self._resize, jfig, fig)
             elif cmd == 'reset_geometry':
-                self.map_figures(self._resize, jfig)
+                self.map_figures(self._resize, jfig, True, ref=False)
             elif cmd == 'print':
                 self.map_figures(self._savefig, jfig)
+            elif cmd == 'toggle_cmap':
+                self.map_figures(self._toggle_cmap, jfig)
+            elif cmd == 'toggle_horizontal':
+                self.map_figures(self._toggle_axis, jfig, 'h')
+            elif cmd == 'toggle_vertical':
+                self.map_figures(self._toggle_axis, jfig, 'v')
+            elif cmd == 'toggle_visible':
+                self.map_figures(self._toggle_visible, jfig)
 
     def parse_config(self, config, params):
         config = config or {}
