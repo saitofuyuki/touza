@@ -1,7 +1,7 @@
 include README*
 include tests
 include zbt/*.toml
-
+include samples/*.png
 exclude pyproject.in
 exclude *.m4
 exclude *.sh
