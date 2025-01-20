@@ -1,7 +1,7 @@
 # touza/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2024/09/03 22:27:54 fuyuki Makefile.am>
+# Time-stamp: <2025/01/20 13:34:46 fuyuki Makefile.am>
 
 # Copyright (C) 2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -14,6 +14,7 @@ SUBDIRS = zbt tests
 EXTRA_DIST =
 EXTRA_DIST += README-zbt.org MANIFEST.in pyproject.in setup.py
 EXTRA_DIST += param.sh
+EXTRA_DIST += samples/demo01.png samples/demo02.png
 
 copy_sources = $(EXTRA_DIST)
 # dummy
