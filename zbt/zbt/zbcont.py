@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/18 22:07:10 fuyuki zbcont.py>
+# Time-stamp: <2025/01/20 12:37:10 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -394,7 +394,8 @@ class Options(ParserUtils, ap.Namespace):
             draw = draw or []
         coords = []
         for d in draw:
-            coords.extend(d.split(self.lsep))
+            d = [zu.toint(j) for j in d.split(self.lsep)]
+            coords.extend(d)
         coords = tuple(coords + ['', '', ])[:2]
         return coords
 
