@@ -1,12 +1,12 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/01/19 21:19:17 fuyuki NEWS>
+# Time-stamp: <2025/01/20 13:17:25 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
-* Changes in 1.14.0 from 1.13
+* Changes in 1.14.1 from 1.13
 ** TOUZA/Zbt public release
 - Much efforts are devoted, in particuar, on improvement of sample
   implementation zbcont
