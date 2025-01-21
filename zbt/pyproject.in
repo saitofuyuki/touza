@@ -24,14 +24,14 @@ dependencies = [
     "cftime", "nc-time-axis",
 ]
 
-# [tool.setuptools]
-# packages = ["zbt"]
+[tool.setuptools]
+packages = ["zbt"]
 
-[tool.setuptools.packages.find]
-where = ["zbt"]
+# [tool.setuptools.packages.find]
+# where = ["zbt"]
 
-[tool.setuptools.package-data]
-zbt = ["samples/demo*.png"]
+# [tool.setuptools.package-data]
+# zbt = ["doc/demo*.png"]
 
 # [tool.setuptools.exclude-package-data]
 # zbt = ["tests"]
