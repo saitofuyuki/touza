@@ -1,6 +1,6 @@
-Release-1.14.1 / 2025-01-19
+Release-1.14.2 / 2025-01-21
 ===========================
-
+  * zbt: (build): [severe] restucturing, without setup.py.
   * zbt: (zbcont) [fatal] fix parsing of integer arguments on --plot.
 
 Release-1.14.0 / 2025-01-19

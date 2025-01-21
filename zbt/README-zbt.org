@@ -401,7 +401,7 @@ files.  Therefore, all (or most of) the ~xarray~ methods should work.
 : >>> plt.show()
 #+CAPTION: Plot demonstration 1, using xarray.
 #+NAME:   fig:demo_01
-[[./samples/demo01.png]]
+[[./doc/demo01.png]]
 
 : >>> sel = T2[0,0]  ## need to select a pure 2d-field
 : >>> fig, ax = plt.subplots()
@@ -410,7 +410,7 @@ files.  Therefore, all (or most of) the ~xarray~ methods should work.
 : >>> plt.show()
 #+CAPTION: Plot demonstration 2, using matplotlib.
 #+NAME:   fig:demo_02
-[[./samples/demo02.png]]
+[[./doc/demo02.png]]
 
 See https://docs.xarray.dev/ for ~xarray~ reference.
 See https://matplotlib.org/stable/ for ~matplotlib~  reference.
