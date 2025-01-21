@@ -6,6 +6,10 @@ TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
+* Changes in 1.14.2
+** Struggle for python clean distribution.
+** bug fixes in zbcont.
+
 * Changes in 1.14.1 from 1.13
 ** TOUZA/Zbt public release
 - Much efforts are devoted, in particuar, on improvement of sample
