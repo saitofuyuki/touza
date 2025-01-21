@@ -414,8 +414,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = zbt tests
-EXTRA_DIST = README-zbt.org MANIFEST.in pyproject.in setup.py param.sh \
-	samples/demo01.png samples/demo02.png
+EXTRA_DIST = README-zbt.org MANIFEST.in pyproject.in param.sh \
+	doc/demo01.png doc/demo02.png
 copy_sources = $(EXTRA_DIST)
 COPY_SOURCES_TARGETS = $(copy_sources:%=copy-%)
 all: all-recursive
@@ -783,6 +783,7 @@ $(COPY_SOURCES_TARGETS):
 		echo "exists $${target}."; \
 	else \
 		echo "clone $(srcdir)/$${target}"; \
+		mkdir -p `dirname $(builddir)/$${target}`; \
 		cp $(srcdir)/$${target} $(builddir)/$${target} || exit $$?; \
 	fi
 
