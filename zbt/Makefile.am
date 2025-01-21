@@ -12,9 +12,9 @@
 SUBDIRS = zbt tests
 
 EXTRA_DIST =
-EXTRA_DIST += README-zbt.org MANIFEST.in pyproject.in setup.py
+EXTRA_DIST += README-zbt.org MANIFEST.in pyproject.in
 EXTRA_DIST += param.sh
-EXTRA_DIST += samples/demo01.png samples/demo02.png
+EXTRA_DIST += doc/demo01.png doc/demo02.png
 
 copy_sources = $(EXTRA_DIST)
 # dummy
@@ -69,6 +69,7 @@ $(COPY_SOURCES_TARGETS):
 		echo "exists $${target}."; \
 	else \
 		echo "clone $(srcdir)/$${target}"; \
+		mkdir -p `dirname $(builddir)/$${target}`; \
 		cp $(srcdir)/$${target} $(builddir)/$${target} || exit $$?; \
 	fi
 
