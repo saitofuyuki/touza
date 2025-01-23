@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 # Time-stamp <2024/07/16 13:09:06 fuyuki touza.py>
 
-__doc__ = \
-    """
-zbt.util
-~~~~~~~~
-Common helper utilities for TOUZA/zbt
+"""
+Common helper utilities for TOUZA/Zbt.
 
 :Source:     zbt/util.py
 :Maintainer: SAITO Fuyuki <saitofuyuki@jamstec.go.jp>
@@ -13,51 +10,94 @@ Common helper utilities for TOUZA/zbt
 """
 
 import sys
-import ctypes as CT
-import collections.abc as cabc
-import numbers as nums
-import numpy as np
 import logging
+import collections.abc as cabc
+import ctypes as CT
+import pprint as ppr
+
+from typing import Any, MutableMapping
+
+import numpy
+
+# import numbers as nums
 # import traceback
 # import collections as cols
-import pprint as ppr
 # import pynput.keyboard as PK
 # import termios
 
 __all__ = ['LocalAdapter',
-           'WrapCDLL', 'AutoString', 'NameMap', 'tostr', 'toint',
-           'tonumber',
-           'expand', 'flatten', 'map_recursive', 'join_attrs',
-           'set_default', 'logger', ]
+           'WrapCDLL', 'AutoString', 'NameMap',
+           'tostr', 'toint', 'tonumber',
+           'flatten', 'map_recursive', 'join_attrs',
+           'set_default', 'logger',
+           'diag', ]
 
 # library logging
 logger = logging.getLogger(name='zbt')
 handler = logging.StreamHandler()
-fmt = '{name}[{levelname}] {message}'
-formatter = logging.Formatter(fmt, style='{')
+FMT = '{name}[{levelname}] {message}'
+formatter = logging.Formatter(FMT, style='{')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 _logger = logger                # alias
 
 class LocalAdapter(logging.LoggerAdapter):
-    def __init__(self, module, logger=None, extra=None):
+    """
+    Common logging class for TOUZA/Zbt.
+    """
+
+    def __init__(self,
+                 module: str,
+                 logger: logging.Logger|None = None,
+                 extra: dict|None = None):
+        """
+        Wrap logging.LoggerAdapter instance with some properties.
+
+        Parameters
+        ----------
+        module : str
+           Module tag string used as prefix in log messages.
+        logger : loggin.Logger
+           Pass to parent method.
+        extra : dict
+           Pass to parent method.
+        """
+
         extra = {'module': module} | (extra or {})
         logger = logger or _logger
         super().__init__(logger, extra)
 
-    def process(self, msg, kwargs):
-        tags = [self.extra[k]
+    def process(self,
+                msg: Any,
+                kwargs: MutableMapping[str, Any]) \
+                -> tuple[str, MutableMapping[str, Any]]:
+        """
+        Override parent.process() method.
+
+        Returns:
+        str
+           Formatted message.
+
+        See Also
+        --------
+        logging.LoggerAdapter.process : parent method to override.
+        """
+
+        extra = self.extra or {}
+        tags = [str(extra[k])
                 for k in ['module', 'class_', 'func', 'aux', ]
-                if k in self.extra]
+                if k in extra]
         tag = ':'.join(tags)
+        msg = f"<{tag}> {msg}"
+        return msg, kwargs
 
-        return '<%s> %s' % (tag, msg), kwargs
-
-    def is_debug(self):
+    def is_debug(self) -> bool:
+        """Check if loggin.DEBUG level."""
         return self.isEnabledFor(logging.DEBUG)
 
-    def is_info(self):
+    def is_info(self) -> bool:
+        """Check if loggin.INFO level."""
         return self.isEnabledFor(logging.INFO)
 
 
@@ -73,8 +113,41 @@ class WrapCDLL(CT.CDLL):
         """Initialize CDLL."""
         super().__init__(*args, **kwds)
 
-    def register_function(self, name, res, *args, err=None):
-        """Wrap CFUNCTYPE declarative."""
+    def register_function(self,
+                          name: str,
+                          res,
+                          *args,
+                          err: cabc.Callable|None = None):
+        """
+        Wrap CFUNCTYPE declarative.
+
+        Parameters
+        ----------
+        name : str
+           Name of function to register.  It also defines
+           self.str method.
+        res : any
+           Return type.
+        *args
+          Function arguments definition.
+          Tuple of type, intent, variable name, and optional
+          default value.
+        err : callable
+          Error check method.
+
+        Examples
+        --------
+
+        Create self.tnb_init() method which returns CT.c_int, and require
+        two arguments 'levv' and 'mode'.  Both arguments are optional and
+        default values are 0.
+
+        >>> self.register_function("tnb_init",
+                                   CT.c_int,
+                                   (CT.c_int, self.intent_in, 'levv', 0),
+                                   (CT.c_int, self.intent_in, 'mode', 0),
+                                   err=self.errcheck_strict)
+        """
         p = []
         a = []
         for i in args:
@@ -99,35 +172,71 @@ class AutoString(CT.c_char_p):
             return value.encode()
         return value
 
-_AutoArray = {}
+_AutoArray: dict[type, type] = {}
 
-def AutoArray(type):
-    """Wrapper for ctypes.POINTER() function for automatic conversion."""
-    ncls = _AutoArray.get(type)
+def AutoArray(type_, /):
+    """
+    Wrapper for ctypes.POINTER() function for automatic conversion.
+
+    Once created, it is stored in internal buffer and reused.
+
+    Parameters
+    ----------
+    type_ : type
+       Data type defined in ctypes.
+
+    Returns
+    -------
+    class
+       Subclass of one generated by ctypes.POINTER.
+
+    See Also
+    --------
+    ctypes.POINTER.
+       Reference method.
+
+    ctypes._CData.from_param
+       Reference function.
+    """
+    ncls = _AutoArray.get(type_)
+    # print(type(type_).__mro__)
+    # print(type(ncls).__mro__)
     if ncls:
         return ncls
-    class ncls(CT.POINTER(type)):
-        """POINTER class of {type} with automatic encoding."""
-        @classmethod
-        def from_param(cls, value):
-            """Encoder according to input value."""
-            # print(f"{type}: {value}")
-            return (type * len(value))(*value)
-    _AutoArray[type] = ncls
+
+    _name = f"Pointer_{type_}"
+    _doc = f"""POINTER class of {type_} with automatic encoding."""
+    _module = __name__
+
+    def from_param(_cls, value):
+        """Encoder according to input value."""
+        # print(f"{type_}: {value}")
+        return (type_ * len(value))(*value)
+
+    attr = {'__module__': _module,
+            '__doc__': _doc,
+            'from_param': classmethod(from_param),
+            '__static_attributes__': (), }
+
+    ncls = type(_name,
+                (CT.POINTER(type_), ),
+                attr)
+    _AutoArray[type_] = ncls
     return ncls
 
 
-# class AutoSizeT(CT.POINTER(CT.c_size_t)):
-#     @classmethod
-#     def from_param(cls, value):
-#         """Encoder according to input value."""
-#         return (CT.c_size_t * len(value))(*value)
-
-
 class NameMap(dict):
-    """Dict-like for zbt names."""
+    """
+    Dict-like for zbt names.
 
-    def __init__(self, sep_=None, **kwargs):
+    Keys can be duplicated, which results in generation of list
+    to contain all the values.
+
+    """
+
+    def __init__(self,
+                 sep_: str|None=None,
+                 /, **kwargs):
         """Bypass parent initialization."""
         super().__init__()
         self.sep = sep_
@@ -186,7 +295,7 @@ class NameMap(dict):
             return len(arr) == 1
         return False
 
-    def get(self, key, default=None, single=True):
+    def get(self, key, /, default=None, single=True):
         if isinstance(key, tuple):
             key, idx = self._decompose_key(key)
             if super().__contains__(key):
@@ -330,12 +439,52 @@ class Selection(tuple):
     """Tuple of Slice or index for array elements selection."""
 
     def __new__(cls, elem, dim=None):
+        """
+        Generator method to wrap builtin tuple.
+
+        Parameters
+        ----------
+        elem : tuple or atom
+           Element(s) which may some items.
+        dim : tuple or int
+           Expected tuple shape.
+
+        Returns
+        -------
+        tuple
+           Expanded tuple to fill null-slice.
+
+        Raises
+        ------
+        TypeError
+           If elem contains two or more Ellipsis.
+
+        Examples
+        --------
+        >>> Selection(0, 3)
+        (0, slice(None, None, None), slice(None, None, None))
+        >>> print(Selection(0, 3))
+        0,:,:
+        >>> print(Selection((0, 1), 4))
+        0,1,:,:
+        >>> print(Selection((0, Ellipsis), 4))
+        0,:,:,:
+        >>> print(Selection((0, Ellipsis, 1), 4))
+        0,:,:,1
+        >>> print(Selection((Ellipsis, 1), 4))
+        :,:,:,1
+        >>> Selection((0, Ellipsis, 1, Ellipsis), 4)
+        TypeError: Multiple ellipsis (0, Ellipsis, 1, Ellipsis)
+        """
+
+        fill = slice(None, None, None)
+
         if dim is None:
-            dim = elem
-        elif np.iterable(dim):
+            dim = len(elem)
+        elif numpy.iterable(dim):
             dim = len(dim)
 
-        if np.iterable(elem):
+        if numpy.iterable(elem):
             ne = elem.count(Ellipsis)
             if ne > 1:
                 raise TypeError(f"Multiple ellipsis {elem}")
@@ -347,18 +496,14 @@ class Selection(tuple):
             else:
                 je = 1
                 elem = (elem, Ellipsis, )
-        # ehead = tuple(slice(e, e + 1)
-        #               if isinstance(e, int) else e for e in elem[:je])
-        # etail = tuple(slice(e, e + 1)
-        #               if isinstance(e, int) else e for e in elem[je+1:])
         ehead = elem[:je]
         etail = elem[je+1:]
-        emid = (slice(None, None, None), ) * (dim - len(ehead + etail))
-        # print (ehead, etail, emid)
+        emid = (fill, ) * (dim - len(ehead + etail))
         return super(Selection, cls).__new__(cls, ehead + emid + etail)
 
     def __str__(self):
         ret = []
+        fill = ':'
         for slc in self:
             if isinstance(slc, int):
                 p = str(slc)
@@ -366,59 +511,14 @@ class Selection(tuple):
                 b, e, s = slc.start, slc.stop, slc.step
                 p = ''
                 p = p + ('' if b is None else str(b))
-                p = p + ':'
+                p = p + fill
                 p = p + ('' if e is None else str(e))
                 if s is None or s == 1:
                     pass
                 else:
-                    p = p + ':' + str(s)
+                    p = p + fill + str(s)
             ret.append(p)
         return ','.join(ret)
-
-
-class Shape(tuple):
-    def __new__(cls, *shape):
-        return super(Shape, cls).__new__(cls, shape)
-
-    def step(self, cur, step, cycle=False):
-        ret = ()
-        n = 0
-        mw = min(map(len, [cur, step, self]))
-        for j in reversed(range(mw)):
-            c, s, w = cur[j], step[j], self[j]
-            n, m = divmod(s + n, w)
-            m = m + (c + w if c < 0 else c)
-            r, m = divmod(m, w)
-            n = n + r
-            if c < 0:
-                m = m - w
-            ret = (m, ) + ret
-        ret = ret + cur[mw:]
-        if not cycle:
-            if n > 0:
-                raise OverflowError(f"[{n}] {cur} + {step} > {self}")
-            elif n < 0:
-                raise OverflowError(f"[{n}] {cur} + {step} < 0 [{self}]")
-        return ret
-
-    def __call__(self, step, ini=None):
-        if all(s == 0 for s in step):
-            raise ValueError(f"invalid step {step}")
-        zero = (0, ) * len(self)
-        ini = ini or zero
-        chk = tuple(w + i if i < 0 else i
-                    for i, w in zip(ini, self))
-        if chk < zero or chk >= self:
-            return
-        while True:
-            try:
-                yield ini
-                ini = self.step(ini, step)
-            except OverflowError:
-                break
-
-    def __str__(self):
-        return f"Shape{super().__str__()}"
 
 
 def tostr(s):
@@ -459,20 +559,20 @@ def tonumber(s):
     return s
 
 
-def expand(array, mask, default=None):
-    """Expand array to mask length accorinding to mask boolean."""
-    r = []
-    j = 0
-    for b in mask:
-        if b:
-            if j < len(array):
-                r.append(array[j])
-                j = j + 1
-            else:
-                raise ValueError("Out of bounds.")
-        else:
-            r.append(default)
-    return type(array)(r)
+# def expand(array, mask, default=None):
+#     """Expand array to mask length accorinding to mask boolean."""
+#     r = []
+#     j = 0
+#     for b in mask:
+#         if b:
+#             if j < len(array):
+#                 r.append(array[j])
+#                 j = j + 1
+#             else:
+#                 raise ValueError("Out of bounds.")
+#         else:
+#             r.append(default)
+#     return type(array)(r)
 
 
 def flatten(data):
@@ -485,8 +585,17 @@ def flatten(data):
         yield data
 
 
-def map_recursive(func, data):
-    """Recursive mapping to apply function."""
+def map_recursive(func: cabc.Callable, data: Any) -> list:
+    """
+    Recursive mapping to apply function.
+
+    Parameters
+    ----------
+    func : callable
+       Function of single argument.
+    data : iterable or atom
+       Collection of arguments to call func().
+    """
     # other sequences?
     if isinstance(data, (list, tuple, )):
         return [map_recursive(func, v) for v in data]
@@ -497,7 +606,43 @@ def join_attrs(attrs: dict, head: str,
                strip: bool = False,
                sep: str | None = None,
                sort: cabc.Callable | None = None) -> list | str:
-    """Join all the values of keys as head*."""
+    """
+    Join or extract all the values where key starts with head.
+
+    Parameters
+    ----------
+    attrs : dict
+       Source key-value array.
+    head : str
+       Prefix string to compare with attrs.keys().
+    strip : bool
+       Whether to strip the values.
+    sep : str|None
+       Separator to concatenate into single string.
+       If None, returns list.
+    sort : callable
+       Sort method to iterate keys.
+
+    Returns
+    -------
+    str
+       Concatenation of those values correponding to keys.
+    list
+       Filtered list of values correponding to keys.
+
+    Examples
+    --------
+    >>> src = {'x0': 'X000 ', 'x10': ' X010 ', 'x2': ' X002',
+    ...        'y0': 'Y000 ', 'y10': ' Y010 ', 'y2': ' Y002', }
+    >>> join_attrs(src, 'x')
+    ['X000 ', ' X010 ', ' X002']
+    >>> join_attrs(src, 'x', sep='--')
+    'X000 -- X010 -- X002'
+    >>> join_attrs(src, 'x', sep='--', strip=True)
+    'X000--X010--X002'
+    >>> join_attrs(src, 'x', sep='--', sort=int)
+    'X000 -- X002-- X010'
+    """
     a = {}
     lh = len(head)
     for k, v in attrs.items():
@@ -505,6 +650,7 @@ def join_attrs(attrs: dict, head: str,
             k = k[lh:]
             a[k] = v
     def do_strip(s):
+        """Call strip method of s."""
         return s.strip()
     if strip:
         # ret = [str(a[k]).strip() for k in sorted(a.keys(), key=sort)]
@@ -517,16 +663,37 @@ def join_attrs(attrs: dict, head: str,
     return sep.join(flatten(ret))
 
 
-def set_default(var, default, null=None):
-    """Return default if var is null."""
+def set_default(var: Any, default: Any, null:Any=None):
+    """
+    Return default if var is null.
+
+    Parameters
+    ----------
+    var : Any
+       Object to check.
+    default : Any
+       Default value if object equals to null.
+    null : Any
+       Target object.
+
+    Returns
+    -------
+    object
+      Value either var or default.
+    """
     if var == null:
         return default
     return var
 
 
+def diag():
+    """Diagnose module properties for debug."""
+    locallog = LocalAdapter('util')
+    locallog.info(f"{numpy=}")
+
+
 def main(argv):
     """Test driver."""
-    import pprint as ppr
     X = NameMap()
     k = 'a'
     X[k] = f"{k}/0"
@@ -544,15 +711,15 @@ def main(argv):
 
     print("object")
     for k in X:
-        print(k, X[k])
+        print(f"{k=} {X[k]=}")
 
     print("keys()")
     for k, v in X.items():
-        print(k, v)
+        print(f"{k}: {v}")
 
     print("values()")
     for v in X.values():
-        print(v)
+        print(f"{v=}")
 
     print("items()")
     for kv in X.items():
@@ -590,69 +757,20 @@ def main(argv):
     print(join_attrs(attrs, 'x', sep='--', strip=True))
     print(join_attrs(attrs, 'x', sep='--', sort=int))
 
-    Sh = Shape(3, 4, 5)
-    for step in [(0, 0, 1), (0, 0, 7), (0, 1), ]:
-        off = (0, ) * len(Sh)
-        ini = off
-        while True:
+    for dim in [3, 4, 5]:
+        for src in [0,
+                    (0, ),
+                    (0, 1),
+                    (0, Ellipsis),
+                    (Ellipsis, 1),
+                    (0, Ellipsis, 1),
+                    (0, Ellipsis, 1, Ellipsis)]:
             try:
-                nxt = Sh.step(off, step)
-                print(f"Shape[{Sh}] {off} + {step} = {nxt}")
-                off = nxt
-            except OverflowError as err:
-                print(err)
-                break
-        for cur in Sh(step, ini):
-            print(f"iter{step}:Shape[{Sh}] > {cur}")
-
-    for step in [(0, 0, -1), (0, 0, -7), ]:
-        off = tuple(w - 1 for w in Sh)
-        while True:
-            try:
-                nxt = Sh.step(off, step)
-                print(f"Shape[{Sh}] {off} + {step} = {nxt}")
-                off = nxt
-            except OverflowError as err:
-                print(err)
-                break
-
-    for step in [(0, 0, -1), (0, 0, -7), ]:
-        off = (-1, ) * len(Sh)
-        while True:
-            try:
-                nxt = Sh.step(off, step)
-                print(f"Shape[{Sh}] {off} + {step} = {nxt}")
-                off = nxt
-            except OverflowError as err:
-                print(err)
-                break
-
-    # FI = TupleIterator('figure', None, ['Fig-a', 'Figb', ], )
-    # print(FI)
-
-# def on_press(key):
-#     try:
-#         print('alphanumeric key {0} pressed'.format(
-#             key.char))
-#     except AttributeError:
-#         print('special key {0} pressed'.format(
-#             key))
-
-# def on_release(key):
-#     print('{0} released'.format(
-#         key))
-#     if key == keyboard.Key.esc:
-#         # Stop listener
-#         return False
-
-
-# def wait_press():
-#     # Collect events until released
-#     with PK.Listener(on_press=on_press) as listener:
-#         listener.join()
-#     termios.tcflush(sys.stdin, termios.TCIOFLUSH)
-
+                elem = Selection(src, dim)
+                print(src, dim, elem)
+            except TypeError as err:
+                # raise err
+                print(src, dim, err)
 
 if __name__ == '__main__':
-    import sys
     main(sys.argv[1:])
