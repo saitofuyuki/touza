@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/18 23:27:52 fuyuki control.py>
+# Time-stamp: <2025/01/23 16:39:17 fuyuki control.py>
 
 __doc__ = \
     """
@@ -22,6 +22,7 @@ import time
 import inspect
 import functools as ft
 
+import pandas as pd
 import numpy as np
 import xarray as xr
 import matplotlib as mplib
@@ -2497,6 +2498,7 @@ class FigureInteractive(zplt.FigureCore, DataTree):
                     mm['dmax'] = s.stop
                 if mm:
                     view[co] = mm
+        locallog.debug(f"parse_view: {view=}")
         return view
 
 
@@ -3985,13 +3987,21 @@ def normalize_selection(co, sel, method=None, index=None):
     c0 = co.values[0]
     locallog.debug(f"{c0=} {type(c0)=}")
     if isinstance(c0, np.datetime64):
-        sel = np.datetime64(mplib.dates.num2date(sel))
+        if isinstance(sel, str):
+            sel = pd.Timestamp(sel)
+        else:
+            sel = np.datetime64(mplib.dates.num2date(sel))
         locallog.debug(f"date: {sel=} {type(sel)=} ")
     elif isinstance(c0, cftime.datetime):
         cal = c0.calendar
-        # print(type(c0), cal)
-        ### "days since 2000-01-01",
-        sel = cftime.num2date(sel, units=_nc_epoch, calendar=cal)
+        if isinstance(sel, str):
+            pts = pd.Timestamp(sel)
+            cft = cftime.to_tuple(pts)
+            sel = cftime.datetime(*cft, calendar=cal)
+        else:
+            # print(type(c0), cal)
+            ### "days since 2000-01-01",
+            sel = cftime.num2date(sel, units=_nc_epoch, calendar=cal)
         locallog.debug(f"date: {sel=} {type(sel)=} ")
 
     cc = is_cyclic_coord(co)
