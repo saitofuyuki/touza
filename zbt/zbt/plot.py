@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/18 22:19:51 fuyuki plot.py>
+# Time-stamp: <2025/01/25 14:11:50 fuyuki plot.py>
 
 __doc__ = \
     """
@@ -20,6 +20,7 @@ import pprint as ppr
 import logging
 import copy
 import math
+import datetime
 
 import numpy as np
 
@@ -44,8 +45,17 @@ import cartopy.mpl.ticker as cmtick
 import zbt.util as zu
 import zbt.config as zcfg
 
-locallog = zu.LocalAdapter('plot')
+import cftime
+import pandas
 
+try:
+    import nc_time_axis
+    _nc_epoch = nc_time_axis._TIME_UNITS
+except ModuleNotFoundError:
+    nc_time_axis = None
+    _nc_epoch = None
+
+locallog = zu.LocalAdapter('plot')
 
 _ConfigType = zcfg.ConfigRigid
 
@@ -55,56 +65,7 @@ def is_xr(obj):
     return isinstance(obj, xr.DataArray)
 
 
-# class VarLevelsCore():
-#     """Base layer of cmap/contour-levels control."""
-
-#     nimsg = r"VarLevelsCore.{}() not implemented."
-
-#     def _raise(self, name):
-#         msg = f"VarLevelsCore.{name}() not implemented."
-#         raise NotImplementedError(msg)
-
-#     def get_cmap(self, *args, **kwds):
-#         """Dummy method to retrieve current cmap"""
-#         self._raise('get_cmap')
-
-#     def put_cmap(self, *args, **kwds):
-#         """Dummy method to register current cmap"""
-#         self._raise('put_cmap')
-
-#     def get_contour(self, *args, **kwds):
-#         """Dummy method to retrieve current contour levels"""
-#         self._raise('get_contour')
-
-#     def put_contour(self, *args, **kwds):
-#         """Dummy method to register current contour levels"""
-#         self._raise('put_contour')
-
-
-# class VarLevelsMinimum(VarLevelsCore):
-#     """Minimum Cmap Controler to get a constant map."""
-
-#     def __init__(self, cmap=None, contour=None):
-#         self.cmap = cmap
-#         self.contour = contour
-
-#     def put_cmap(self, *args, **kwds):
-#         pass
-
-#     def put_contour(self, *args, **kwds):
-#         pass
-
-#     def get_cmap(self, *args, **kwds):
-#         if isinstance(self.cmap, cabc.Callable):
-#             return self.cmap()
-#         return self.cmap
-
-#     def get_contour(self, *args, **kwds):
-#         return self.contour
-
-
 # ### Picture
-
 class PictureCore():
     """Abstract base layer of figure/axes creation for zbt."""
 
@@ -774,6 +735,20 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             ylim = None
         return xlim, ylim, cxy
 
+    def plot(self, data, *args,
+             ax=None, artists=None, gid=None,
+             **kwds):
+        ax = self._get_axes(ax)
+        artists = artists or []
+        if ax:
+            if is_xr(data):
+                lp = data.plot.line(ax=ax, *args, **kwds)
+            else:
+                lp = ax.plot(data, *args, **kwds)
+            # lp.set_gid(gid)
+            artists.extend(lp)
+        return artists
+
     def contour(self, data, *args,
                 ax=None, artists=None, clabel=None, gid=None,
                 **kwds):
@@ -890,9 +865,29 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         scale = scale or sc
         dmin = zu.set_default(dmin, cmin)
         dmax = zu.set_default(dmax, cmax)
+
+        # if isinstance(dmin, xr.DataArray):
+        #     vt = dmin.item()
+        # else:
+        #     vt = dmin
+        # print(f"{type(vt)=}")
+        #     print(dmin.dtype)
+        #     dmin = dmin.values
+        # if isinstance(dmax, xr.DataArray):
+        #     dmax = dmax.values
+        c0 = co.values[0]
+        dmin = date_normalize(dmin, c0)
+        dmax = date_normalize(dmax, c0)
+        # print(f"{type(dmin.item())=} {dmin=}")
+        # print(f"{type(dmax.item())=} {dmax=}")
         span = abs(dmax - dmin)
+        # print(f"{co[0]=}")
+        locallog.debug(f"{type(dmin)=} {type(dmax)=}")
+        locallog.debug(f"{span=}")
         vmaj, vmin = self.parse_ticks(co.attrs)
-        if span > vmaj > 0:
+        if isinstance(span, datetime.timedelta):
+            pass
+        elif span > vmaj > 0:
             axis.set_major_locator(mtc.MultipleLocator(vmaj))
         if vmin > 0:
             axis.set_minor_locator(mtc.MultipleLocator(vmin))
@@ -916,7 +911,9 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         if dmin != dmax:
             limf(dmin, dmax)
         if scale == 'log':
-            if dmin <= 0 or dmax <= 0:
+            if isinstance(span, datetime.timedelta):
+                locallog.warning(f"Bypass log-scale check ({dmin}:{dmax}).")
+            elif dmin <= 0.0 or dmax <= 0.0:
                 locallog.warning(f"log-scale axis is ignored ({dmin}:{dmax}).")
                 scale = None
         if scale:
@@ -1489,6 +1486,11 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
         ax = ax or 'body'
         return super().get_extent(ax=ax, **kwds)
 
+    def plot(self, *args, ax=None, **kwds):
+        """Wrapper to call ax.plot()"""
+        ax = ax or 'body'
+        return super().plot(*args, ax=ax, **kwds)
+
     def contour(self, *args, ax=None, **kwds):
         """Wrapper to call ax.contour()"""
         ax = ax or 'body'
@@ -1757,7 +1759,17 @@ class LayoutLegacy3(LayoutLegacyBase, LegacyParser, _ConfigType):
 # ## Plot ############################################################
 class PlotBase(zcfg.ConfigBase):
     names = ('plot', )
-    pass
+
+    def extract_plot_coords(self, data, num):
+        coords = data.coords
+        dims = data.dims
+        xco = [coords[d] for d in dims if coords[d].size > 1]
+
+        if len(xco) != num:
+            raise ValueError(f"Not {num}d shape={xco}")
+        if num == 1:
+            return xco[0]
+        return tuple(xco)
 
 
 class ContourPlot(PlotBase, _ConfigType):
@@ -1785,6 +1797,8 @@ class ContourPlot(PlotBase, _ConfigType):
             raise UserWarning("virtually less than two dimensions")
 
         artists = artists or []
+
+        # to do: data_col data_con 2d check
 
         coords = data.coords
         cj = [d for d in data.dims if coords[d].size > 1]
@@ -1824,17 +1838,25 @@ class ContourPlot(PlotBase, _ConfigType):
             contour = self._contour | cset
             if transf:
                 contour.setdefault('transform', transf)
-            con = self.contour(axs, data, **contour)
+            data_con = contour.pop('data', None)
+            if data_con is None:
+                data_con = data
+            con = self.contour(axs, data_con, **contour)
         else:
             con = []
+            data_con = data
             for contour in cset:
                 contour = self._contour | contour
                 if transf:
                     contour.setdefault('transform', transf)
                 # print(f"{contour=}")
-                c = self.contour(axs, data, **contour)
+                c = self.contour(axs, data_con, **contour)
                 con.extend(c)
-        col = self.color(axs, data, **color)
+        data_col = color.pop('data', None)
+        if data_col is None:
+            data_col = data
+
+        col = self.color(axs, data_col, **color)
         bar, cax, = self.colorbar(fig, axs, con, col,
                                   contour=contour, color=color)
 
@@ -2148,6 +2170,68 @@ class ContourPlot(PlotBase, _ConfigType):
         return vmin, vmax
 
 
+class CurvePlot(PlotBase, _ConfigType):
+    """Line plot."""
+    names = PlotBase.names + ('curve', )
+
+    curve_ = {'colors': 'black',
+              'linewidths': 1.5,
+              }
+
+    def __init__(self, gid=None):
+        gid = gid or 'curve'
+        self._curve = {}
+        self._curve.setdefault('gid', gid)
+
+    def __call__(self,
+                 fig,
+                 axs,
+                 data,
+                 view: dict|None=None,
+                 artists: list|None=None,
+                 **kwds) -> list:
+        """Batch plotter."""
+        artists = artists or []
+        xco = self.extract_plot_coords(data, 1)
+        print(xco)
+
+        line = self.plot(axs, data)
+        artists.extend(line)
+        return artists
+
+    def plot(self, axs, data,
+             artists=None, bind=None, **kwds):
+        """matplotlib plot wrapper."""
+        artists = artists or []
+        lp = axs.plot(data)
+        artists.extend(lp)
+        ret = artists
+        if isinstance(bind, cabc.Callable):
+            bind(artist=ret)
+        return ret
+
+
+def date_normalize(v, ref):
+    if isinstance(v, xr.DataArray):
+        vt = v.item()
+    else:
+        vt = v
+    if isinstance(ref, np.datetime64):
+        if isinstance(vt, str):
+            v = pandas.Timestamp(v)
+        elif not isinstance(vt, numpy.datetime64):
+            v = np.datetime64(mplib.dates.num2date(v))
+    elif isinstance(ref, cftime.datetime):
+        cal = ref.calendar
+        if isinstance(vt, str):
+            pts = pandas.Timestamp(v)
+            cft = cftime.to_tuple(pts)
+            v = cftime.datetime(*cft, calendar=cal)
+        elif not isinstance(vt, cftime.datetime):
+            v = cftime.num2date(v, units=_nc_epoch, calendar=cal)
+    return v
+
+
 def main(args):
     """Test driver."""
     import tomllib as toml
@@ -2193,6 +2277,7 @@ def main(args):
     ContourPlot.diag(strip=False)
 
     plot = ContourPlot()
+    curve = CurvePlot()
     print(args)
     for a in args:
         print(f"open: {a}")
@@ -2200,9 +2285,28 @@ def main(args):
         for vk in ds.data_vars:
             vv = ds[vk]
             print(f"var: {vk} {vv.shape}")
+            fig, axs = Pic(reset=True)
+            artists = None
+            labels = []
+            for y in range(10):
+                x1d = (0, ) * (len(vv.shape) - 2) + (y, )
+                v1d = vv[x1d]
+                zxr.diag(v1d)
+                artists = curve(fig, axs, v1d, artists=artists,
+                                label=f"{y}")
+                labels.append(f"{y}")
+            ppr.pprint(artists)
+            leg = fig.legend(artists, labels, loc='center',
+                             bbox_to_anchor=(0.5, 0.5))
+            print(leg)
+            ppr.pprint(leg.get_lines())
+
+            if len(vv.shape) < 3:
+                continue
             nz = vv.shape[-3]
             AA = []
-            for z in range(min(3, nz)):
+            # for z in range(min(3, nz)):
+            for z in []:
                 fig, axs = Pic(reset=True)
                 frames = []
                 z = 0
