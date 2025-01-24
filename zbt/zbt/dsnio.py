@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 # Time-stamp <2024/07/16 13:09:06 fuyuki touza.py>
 
-__doc__ = \
-    """
-zbt.dsnio
-~~~~~~~~~
-numpy + TOUZA/Nio extension
+"""
+Numpy + TOUZA/Nio extension.
 
 :Source:     zbt/dsnio.py
 :Maintainer: SAITO Fuyuki <saitofuyuki@jamstec.go.jp>
@@ -16,20 +13,22 @@ import sys
 import os
 import pathlib as plib
 import ctypes as CT
-import numpy
 import datetime
 # import pandas as pd
-import cftime
 import warnings
+import typing
+
+import numpy
+import cftime
 
 # from . import util
-import zbt.util as zu
-from . import libtouza
-from . import param
+from . import util as zutl
+from . import libtouza as zlt
+from . import param as zpar
 
-locallog = zu.LocalAdapter('dsnio')
+locallog = zutl.LocalAdapter('dsnio')
 
-load_touza = None
+LOAD_TOUZA = None
 
 # calendar names in cftime and the epoch years
 calendar_epoch = {
@@ -39,39 +38,51 @@ calendar_epoch = {
     'all_leap': 0,
     'julian': -1,
     'gregorian': -1,
-    'standard': -1,}
+    'standard': -1, }
 
 
-def diag_datasets():
-    """Show registered dataset table for debug."""
-    for h, ds in _DataSets.items():
-        print(f"handle: {h}")
-        print(ds)
-        for gn, gg in ds.groups.items():
-            print(gg.short())
-        print()
-
-
-class _TouzaNio(param.ParamTouzaNio):
+class _TouzaNio(zpar.ParamTouzaNio):
     """Common procedures among TouzaNio classes."""
     __slots__ = ('sub', 'sep', )
 
     try:
-        lib = libtouza.LibTouzaNio(name=load_touza)
+        lib = zlt.LibTouzaNio(name=LOAD_TOUZA)
     except UserWarning:
         lib = None
 
     def __init__(self, sub=None, sep=None):
-        """Bind TOUZA/Nio properties from file."""
+        """
+        Bind TOUZA/Nio properties from file.
+
+        Parameters
+        ----------
+        sub : str
+            Separator used when duplicates of the variables.
+        sep : str
+            Separator to represent group hierarchies.
+        """
         self.sub = sub or '~'
         self.sep = sep or '/'
 
     @classmethod
-    def is_nio_file(cls, path):
-        """Check if path is TOUZA/Nio format file."""
-        if isinstance(path, str):
-            if cls.lib:
-                return cls.lib.tnb_file_is_nio(path)
+    def is_nio_file(cls, path: str|os.PathLike) -> bool:
+        """
+        Check if path is TOUZA/Nio format file.
+
+        Parameters
+        ----------
+        path : path-like
+            File to check if TOUZA/Nio format.
+
+        Returns
+        -------
+        bool
+            True if TOUZA/Nio format.
+        """
+
+        path = os.fspath(path)
+        if cls.lib:
+            return cls.lib.tnb_file_is_nio(path)
         return False
 
     @classmethod
@@ -81,370 +92,122 @@ class _TouzaNio(param.ParamTouzaNio):
 
     @classmethod
     def is_loaded(cls):
+        """Check if touza library is loaded."""
         return not cls.lib is None
 
 
-# pylint: disable=too-many-ancestors
-# pylint: disable=too-many-instance-attributes
-class TouzaNioDataset(_TouzaNio):
-    """Abstract layer of xarray.Dataset for TOUZA/Nio."""
+class TouzaNioDimension(_TouzaNio):
+    """Dimension (axis) property"""
 
-    __slots__ = ('handle', 'root', 'parent', 'name',
-                 'groups', 'variables',
-                 'dimensions',
-                 'record', 'recdim', 'cls_var', 'cls_arr',)
+    __slots__ = ('handle', 'name', 'size', 'extent',
+                 'dataset', 'suite', )
 
-    def __init__(self, filename,
-                 record=None,
-                 flatten=True, cls_var=None, cls_arr=None,
+    # pylint: disable=too-many-arguments
+    def __init__(self,
+                 name: str,
+                 size: int|None = None,
+                 handle: int|None = None,
+                 begin: int|None = None,
+                 end: int|None = None,
+                 group=None,
                  **kwds):
-        """Bind TOUZA/Nio properties from file."""
+        """
+        Constructor.
 
-        if not self.lib.tnb_file_is_nio(filename):
-            raise ValueError(f"{filename} is not nio/gtool format.")
+        Parameters
+        ----------
+        name : str
+            Name of dimension.
+        size : int
+            Dimension size.
+        handle :
+            Original Nio-handle object of dimension used in TOUZA.
+        begin, end : int
+            Dimension range.
+        group : TouzaNioDataset
+            Dataset which the dimension belongs to.
+        **kwds :
+            Pass to the parent.
 
-        flag = self.lib.NIO_CACHE_COLL_DEFAULT
-        if flatten:
-            flag = (flag
-                    | self.lib.NIO_CACHE_ALLOW_VAR_DUP
-                    | self.lib.NIO_CACHE_ALLOW_GRP_DUP
-                    | self.lib.NIO_CACHE_ALLOW_COOR_DUP)
+        Raises
+        ------
+        ValueError
+             Raise if invalid argument combination.
+        """
+
+        self.handle = handle
+        self.name = name
+        self.dataset = group
+        if (size is None) == ((begin is None) or (end is None)):
+            raise ValueError
+        if size is not None:
+            self.size = size
+            self.extent = (0, size, )
+        else:
+            self.extent = (begin, end, )
+            self.size = end - begin
 
         super().__init__(**kwds)
 
-        handle = self.lib.tnb_file_open(filename, flag=flag)
-        self.assign_nio(handle, filename, self, None, None,
-                        flatten, cls_var, cls_arr)
-
-    def assign_nio(self, handle, filename,
-                   root=None, parent=None, record=None, flatten=True,
-                   cls_var=None, cls_arr=None):
-        """Bind TOUZA/Nio properties from cache handle"""
-
-        _DataSets[handle] = self
-
-        self.handle = handle
-        self.name = filename
-        self.root = root
-        self.parent = parent
-        self.cls_var = cls_var or TouzaNioVar
-        self.cls_arr = cls_arr or TouzaMemVar
-        self.record = record or 'record'  # name of record dimension
-
-        self.recdim = None
-
-        self.groups = zu.NameMap()
-        self.dimensions = zu.NameMap()
-        # add dimensions first to share among groups
-        self._add_dimensions()
-        self._add_groups()
-        self.variables = zu.NameMap()
-        self._flatten_suites(flatten)
-
-    def close(self):
-        """Close file to free io unit."""
-        self.lib.tnb_file_close(self.handle)
-        self.handle = -1
-
-    def __del__(self, *args, **kwds):
-        """Destructor."""
-        if self.handle >= 0 and self.root is None:
-            self.close()
-
-    # pylint: disable=invalid-name
-    def createGroup(self, groupname,
-                    handle=None):
-        """Construct group instance."""
-        return TouzaNioGroup(groupname, parent=self,
-                             handle=handle)
-
-    # pylint: disable=invalid-name
-    def createVariable(self, varname, datatype, dimensions,
-                       handle=None, recdim=None, cls=None, **kwds):
-        """Construct variable instance."""
-        cls = cls or self.cls_var
-        return cls(self,
-                   varname, datatype, dimensions,
-                   handle=handle, recdim=recdim, **kwds)
-
-    def createArray(self, varname, datatype, dimensions,
-                    handle=None, recdim=None, cls=None, **kwds):
-        """Construct variable instance."""
-        cls = cls or self.cls_arr
-        return cls(self,
-                   varname, datatype, dimensions,
-                   handle=handle, recdim=recdim, **kwds)
-
-    # pylint: disable=invalid-name,too-many-arguments
-    def createDimension(self, dimname, size=None,
-                        handle=None, begin=None, end=None,
-                        group=None):
-        """Construct variable instance."""
-        group = group or self.root
-        return TouzaNioDimension(dimname, size,
-                                 handle=handle, begin=begin, end=end,
-                                 group=group)
-
-    def search_dim(self, ser):
-        """Search parent corresponding to serial"""
-        for d in self.dimensions.values():
-            if d.handle == ser:
-                return d
-        return None
-
-    def datatype_from_dfmt(self, fmt):
-        """NIO/Gtool format to numpy datatype conversion."""
-        fmt = fmt.strip().lower()
-        if fmt[1:3] == 'i4':
-            return 'i4'
-        if fmt[1:3] == 'r4':
-            return 'f4'
-        return 'f8'
-
-    def attrs(self):
-        """Iterator of the attributes."""
-        yield from self._attrs()
-
-    def getattr(self, item, conv=None, **kwds):
-        """Get attribute corresponding to item (number or name)."""
-        return self.lib.header_get_attr(item, self.handle, conv=conv)
-
-    def _add_groups(self):
-        """Bind NIO groups in NIO object"""
-        for gh, gname in self._groups():
-            grp = self.createGroup(gname, gh)
-            gk = zu.tostr(gname)
-            self.groups[gk] = grp
-        return self.groups
-
-    def _add_dimensions(self):
-        nr = self._recs()
-        if nr:
-            cname = self.record
-            self.recdim = self.createDimension(cname, size=nr, handle=-1,
-                                               group=self)
-            ck = zu.tostr(cname)
-            self.dimensions[ck] = self.recdim
-        for ch, cname in self._dimensions():
-            (begin, end) = self.lib.group_co_range(self.handle, ch)
-            dim = None
-            if self.parent:
-                cs = self.lib.tnb_group_co_idx(self.handle, ch)
-                dim = self.parent.search_dim(cs)
-            if not dim:
-                dim = self.createDimension(cname, begin=begin, end=end,
-                                           handle=ch)
-            ck = zu.tostr(cname)
-            self.dimensions[ck] = dim
-        return self.dimensions
-
-    def _flatten_suites(self, flatten):
-        if flatten:
-            for g in self.groups.values():
-                for v in g.variables.values():
-                    vk = zu.tostr(v.name)
-                    self.variables[vk] = v
-                for d in g.dimensions.values():
-                    if d not in self.dimensions.values():
-                        dk = zu.tostr(d.name)
-                        self.dimensions[dk] = d
-
-        return self
-
-    def _add_variables(self, recdim=None):
-        for vh, vname in self._vars():
-            dims = []
-            if recdim:
-                dims.append(recdim)
-            for cj, ch, cname in self._coors(vh):
-                dims.append(self.search_dim(ch))
-            attr = self.lib.header_get_attr('dfmt', self.handle, vid=vh, rec=0)
-            dfmt = self.datatype_from_dfmt(attr)
-            var = self.createVariable(vname, dfmt, tuple(dims),
-                                      handle=vh, recdim=recdim)
-            vk = zu.tostr(vname)
-            self.variables[vk] = var
-        return self.variables
-
-    def _groups(self):
-        """Iterator of group in Nio file."""
-        for g in range(self.lib.tnb_file_groups(self.handle)):
-            gh = self.lib.tnb_group(self.handle, g)
-            gname = CT.create_string_buffer(20)
-            self.lib.tnb_group_name(gname, gh)
-            yield (gh, gname.value)
-
-    def _dimensions(self):
-        """Iterator of dimension in Nio file or group."""
-        for ch in range(self.lib.tnb_group_coors(self.handle)):
-            cname = CT.create_string_buffer(20)
-            self.lib.tnb_group_co_name(cname, self.handle, ch)
-            yield (ch, cname.value)
-
-    def _vars(self):
-        """Iterator of variable in Nio file or group"""
-        for v in range(self.lib.tnb_group_vars(self.handle)):
-            vname = CT.create_string_buffer(20)
-            self.lib.tnb_var_name(vname, self.handle, v)
-            yield (v, vname.value)
-
-    def _attrs(self):
-        """Dummy procedure to return 0 for number of attributes"""
-        yield from ()
-
-    def _coors(self, vh):
-        """Iterator of coordinate in variable"""
-        for c in range(self.lib.tnb_co_size(self.handle, vh)):
-            cname = CT.create_string_buffer(20)
-            ch = self.lib.tnb_co_serial(self.handle, vh, c)
-            self.lib.tnb_co_name(cname, self.handle, vh, c)
-            yield (c, ch, cname.value)
-
-    def _recs(self):
-        """Dummy procedure to return 0 for number of records"""
-        return 0
-
-    def get(self, elem, default=None, sep=None, family=False):
-        """Recursive search of group/variable."""
-        sep = self.sep
-        if isinstance(elem, str):
-            path = elem.split(sep)
-        elif numpy.iterable(elem):
-            path = tuple(elem)
-        else:
-            raise ValueError
-
-        g = self
-        while path:
-            if path[0] in g.groups:
-                g = g.groups.get(path[0])
-                path = path[1:]
-            else:
-                break
-        if path:
-            v = sep.join(path)
-            fam = g.variables.get_family(v, [])
-            if family:
-                return fam or default
-            if len(fam) == 1:
-                return fam[0]
-            return default
-        return g
-
-    def __getitem__(self, elem, sep=None):
-        r = self.get(elem, sep=sep)
-        if r is None:
-            raise IndexError(f"{elem} not found in {self}")
-        return r
-
-    def diag(self):
-        """Call diagnose function in the library"""
-        self.lib.tnb_file_diag(self.handle)
-
-    def short(self):
-        """Retrun short str version."""
-        dump = []
-        return dump
+    def __len__(self):
+        """Dimension size"""
+        return self.size
 
     def __str__(self):
-        """Return str version."""
-        return self._info(attrs=True)
+        """return str"""
+        n = zutl.tostr(self.name)
+        p = [f"name = '{n}'",
+             f"size = {self.size}", ]
+        return f"{repr(type(self))}: " + ', '.join(p)
 
-    def short(self):
-        """Return short str version."""
-        return self._info(attrs=False)
+    def is_record(self) -> bool:
+        """Check if record dimension"""
+        return self.handle < 0
 
-    def _info(self, attrs=None, lev=None):
-        """Return str version."""
-        attrs = True if attrs is None else attrs
-        dump = [repr(type(self))]
-        tab = ' ' * 4
-        if self.parent is None:
-            dump.append("root(suite) group")
-        else:
-            dump.append(f"group: {self.name}")
-        if attrs:
-            for a, ai in self.attrs():
-                av = self.getattr(a).strip()
-                ai = zu.tostr(ai)
-                if av:
-                    dump.append(f"{tab}{ai}: {av}")
-
-        ds = tuple(f"{self.dimensions.format_key(dk, sep=self.sub)}"
-                   f"({len(dd)})"
-                   for dk, dd in self.dimensions.items())
-
-        vs = tuple(f"{str(vv.dtype)}"
-                   f" {self.variables.format_key(vk, sep=self.sub)}"
-                   + "(" + ','.join(vv.format_dims(sep=self.sub,
-                                                   group=self.root)) + ")"
-                   for vk, vv in self.variables.items())
-
-        gs = tuple(self.groups.format_key_all(sep=self.sub))
-
-        dump.append(f"    dimensions(sizes): {', '.join(ds)}")
-        dump.append(f"    variables(dimensions): {', '.join(vs)}")
-        dump.append(f"    groups: {', '.join(gs)}")
-
-        return '\n'.join(dump)
-
-
-class TouzaNioGroup(TouzaNioDataset):
-    """Emulate a hierarchical namespace of dataset."""
-
-    # pylint: disable=super-init-not-called
-    def __init__(self, name, parent, handle):
-        """Constructor."""
-        self.handle = handle
-        self.parent = parent
-        self.root = parent.root
-        self.name = name
-
-        self.record = parent.record
-        self.sub = parent.sub
-        self.cls_var = parent.cls_var
-        self.cls_arr = parent.cls_arr
-
-        self.groups = zu.NameMap()
-        self.dimensions = zu.NameMap()
-
-        self._add_groups()
-        self._add_dimensions()
-
-        recdim = self.dimensions.get(self.record)
-        self.variables = zu.NameMap()
-        self._add_variables(recdim)
-
-    def _attrs(self, vid=None, rec=None):
-        """Iterator of attributes in Nio file or group"""
-        la = self.lib.tnb_attr_len(' ', self.handle, -1)
-        for a in range(self.lib.tnb_attr_size(self.handle, -1, -1)):
-            a = a + 1
-            item = CT.create_string_buffer(la + 1)
-            self.lib.tnb_get_attr_name(item, a)
-            yield (a, item.value)
-
-    def _groups(self):
-        """Iterator of group in Nio group (empty list)."""
-        yield from ()
-
-    def _recs(self):
-        """Return number of records in Nio group."""
-        return self.lib.tnb_group_recs(self.handle)
+    @property
+    def shape(self):
+        """1d dimension shape"""
+        return (self.size, )
 
 
 class _TouzaCoreVar(_TouzaNio):
-    """Variable core property"""
+    """Variable core property."""
 
     __slots__ = ('handle', 'dataset', 'name', 'dimensions', 'recdim',
                  'dtype', 'logical', )
 
-    def __init__(self, group, name, datatype, dimensions,
-                 handle, recdim=None, **kwds):
-        """Constructor."""
+    def __init__(self,
+                 group,
+                 name: str|bytes,
+                 datatype,
+                 dimensions: tuple[TouzaNioDimension],
+                 handle: int,
+                 recdim: TouzaNioDimension|None = None,
+                 **kwds):
+        """
+        Constructor.
+
+        Parameters
+        ----------
+        group :
+            Group which the variable belongs to.
+        name : str|bytes
+            Name of variable.
+        datatype :
+            Object to be converted to a data type object, which is passed to
+            numpy.dtype().
+        dimensions : tuple[TouzaNioDimension]
+            Variable dimensions.
+        handle : int
+            Original Nio-handle object of dimension used in TOUZA.
+        recdim : TouzaNioDimension|None
+            Dimension corresonds to the record.
+        **kwds :
+            Pass to parent.
+        """
         self.handle = handle
         self.dataset = group
-        self.logical = group
+        self.logical = group    # Default logical group equals to the dataset.
         self.name = name
         self.dimensions = dimensions
         self.dtype = numpy.dtype(datatype)
@@ -452,16 +215,28 @@ class _TouzaCoreVar(_TouzaNio):
         super().__init__(**kwds)
 
     def copy(self, logical=None):
-        """simple copy."""
+        """Simple copy."""
         return self.__copy__(logical)
 
-    def replace_dim(self, dim):
-        """Replace dimension element."""
+    def replace_dim(self, dim:TouzaNioDimension):
+        """
+        Replace dimension element.
+
+        Parameters
+        ----------
+        dim : TouzaNioDimension
+            Target dimension to replace with corresonding self value.
+
+        Raises
+        ------
+        ValueError
+            Raise if not found.
+        """
         for j, d in enumerate(self.dimensions):
             if dim.name == d.name:
                 break
         else:
-            raise ValueError
+            raise ValueError(f"Not found dimension {dim.name}.")
         self.dimensions = self.dimensions[:j] + (dim, ) + self.dimensions[j+1:]
         return self.dimensions
 
@@ -493,29 +268,30 @@ class _TouzaCoreVar(_TouzaNio):
         yield from self._attrs(rec=rec)
 
     @property
-    def recidx(self):
+    def recidx(self) -> int|None:
         """Record coordinate index or None"""
         if self.recdim:
             return self.dimensions.index(self.recdim)
         return None
 
     @property
-    def shape(self):
+    def shape(self) -> tuple[int]:
         """Array shape"""
-        sh = ()
-        for d in self.dimensions:
-            sh = sh + (d.size, )
-        return sh
+        return tuple(d.size for d in self.dimensions)
+        # sh = ()
+        # for d in self.dimensions:
+        #     sh = sh + (d.size, )
+        # return sh
 
-    def dimensions_suite(self, group=None):
+    def dimensions_suite(self, group=None) -> tuple:
         """Canonicalized dimension tuple"""
         group = group or self.dataset.root
         return tuple(self.format_dims(group=group))
 
     @property
-    def dimensions_names(self):
+    def dimensions_names(self) -> tuple[str]:
         """Normalize dimension names"""
-        return tuple(zu.tostr(d.name) for d in self.dimensions)
+        return tuple(zutl.tostr(d.name) for d in self.dimensions)
 
     @property
     def dimensions_map(self):
@@ -559,12 +335,12 @@ class _TouzaCoreVar(_TouzaNio):
         """return str"""
         return self._info(attrs=True)
 
-    def _info(self, attrs=None):
+    def _info(self, attrs=None) -> str:
         """return str"""
         attrs = True if attrs is None else attrs
         dump = [repr(type(self))]
         tab = ' ' * 4
-        vt = zu.tostr(self.dtype)
+        vt = zutl.tostr(self.dtype)
         vn = self.format_name()
         ds = ', '.join(self.format_dims())
         dump.append(f"{vt} {vn}({ds})")
@@ -573,7 +349,7 @@ class _TouzaCoreVar(_TouzaNio):
                 av = self.getattr(a)
                 if isinstance(av, str):
                     av = av.strip()
-                ai = zu.tostr(ai)
+                ai = zutl.tostr(ai)
                 if av:
                     dump.append(f"{tab}{ai}: {av}")
         dump.append(f"shape = {self.shape}")
@@ -646,7 +422,7 @@ class TouzaNioVar(_TouzaCoreVar):
 
     def _getitem_(self, elem):
         """__getitem__() core to call original function."""
-        elem = zu.Selection(elem, self.dimensions)
+        elem = zutl.Selection(elem, self.dimensions)
         start = ()
         count = ()
         shape = ()
@@ -710,6 +486,8 @@ class TouzaNioVar(_TouzaCoreVar):
             r = recs[0] + j
             p = CT.byref(cbuf, step * j)
             p = CT.cast(p, CT.POINTER(ct))
+            # print(f"read {self.handle} {r} {start} {count}")
+            # locallog.debug(f"read {self.handle} {r} {start} {count}")
             ds.lib.tnb_var_read(p, r, start, count,
                                 ds.handle, self.handle)
         buf = numpy.ctypeslib.as_array(cbuf)
@@ -817,51 +595,404 @@ class TouzaNioVar(_TouzaCoreVar):
             yield (a, a)
 
 
-class TouzaNioDimension(_TouzaNio):
-    """Dimension (axis) property"""
+# pylint: disable=too-many-ancestors
+# pylint: disable=too-many-instance-attributes
+class TouzaNioDataset(_TouzaNio):
+    """Abstract layer of xarray.Dataset for TOUZA/Nio."""
 
-    __slots__ = ('handle', 'name', 'size', 'extent',
-                 'dataset', 'suite', )
+    __slots__ = ('handle', 'root', 'parent', 'name',
+                 'groups', 'variables',
+                 'dimensions',
+                 'record', 'recdim', 'cls_var', 'cls_arr',)
 
-    # pylint: disable=too-many-arguments
-    def __init__(self, name, size=None,
-                 handle=None, begin=None, end=None, group=None,
+    def __init__(self,
+                 filename: str|os.PathLike,
+                 record=None,
+                 flatten: bool=True,
+                 cls_var: type[_TouzaCoreVar]|None=None,
+                 cls_arr: type[_TouzaCoreVar]|None=None,
                  **kwds):
-        """Constructor."""
+        """
+        Bind TOUZA/Nio properties from file.
 
-        self.handle = handle
-        self.name = name
-        self.dataset = group
-        if (size is None) == ((begin is None) or (end is None)):
-            raise ValueError
-        if size is not None:
-            self.size = size
-            self.extent = (0, size, )
-        else:
-            self.extent = (begin, end, )
-            self.size = end - begin
+        Parameters
+        ----------
+        filename : PathLike
+            File to open as TOUZA/Nio format.
+        record : Any
+            Dummy.
+        flatten : bool
+            Whether or not to flatten the group hierarchies.
+        cls_var : _TouzaCoreVar
+            Class of variable.
+        cls_arr : _TouzaCoreVar
+            Class of array.
+        **kwds :
+            Pass to the parent.
+
+        Raises
+        ------
+        ValueError
+            Raise if filename is not TOUZA/Nio format.
+        """
+        if not self.lib.tnb_file_is_nio(filename):
+            raise ValueError(f"{filename} is not nio/gtool format.")
+
+        flag = self.lib.NIO_CACHE_COLL_DEFAULT
+        if flatten:
+            flag = (flag
+                    | self.lib.NIO_CACHE_ALLOW_VAR_DUP
+                    | self.lib.NIO_CACHE_ALLOW_GRP_DUP
+                    | self.lib.NIO_CACHE_ALLOW_COOR_DUP)
 
         super().__init__(**kwds)
 
-    def __len__(self):
-        """Dimension size"""
-        return self.size
+        handle = self.lib.tnb_file_open(filename, flag=flag)
+        self.assign_nio(handle, filename, self, None, None,
+                        flatten, cls_var, cls_arr)
+
+    def assign_nio(self,
+                   handle: int,
+                   filename: str|os.PathLike,
+                   root: typing.Self|None = None,
+                   parent: typing.Self|None = None,
+                   record=None,
+                   flatten: bool = True,
+                   cls_var: type[_TouzaCoreVar]|None = None,
+                   cls_arr: type[_TouzaCoreVar]|None = None):
+        """
+        Bind TOUZA/Nio properties from cache handle.
+
+        Parameters
+        ----------
+        handle : int
+            Original Nio-handle object used in TOUZA.
+        filename : str|os.PathLike
+            File to open as TOUZA/Nio format.
+        root : Self
+            Root dataset instance.
+        parent : Self
+            Parent dataset instance.
+        record : Any
+            Dummy.
+        flatten : bool
+            Whether or not to flatten the group hierarchies.
+        cls_var : _TouzaCoreVar
+            Class of variable.
+        cls_arr : _TouzaCoreVar
+            Class of array.
+        """
+
+        _DataSets[handle] = self
+
+        self.handle = handle
+        self.name = filename
+        self.root = root
+        self.parent = parent
+        self.cls_var = cls_var or TouzaNioVar
+        self.cls_arr = cls_arr or TouzaMemVar
+        self.record = record or 'record'  # name of record dimension
+
+        self.recdim = None
+
+        self.groups = zutl.NameMap()
+        self.dimensions = zutl.NameMap()
+        # add dimensions first to share among groups
+        self._add_dimensions()
+        self._add_groups()
+        self.variables = zutl.NameMap()
+        self._flatten_suites(flatten)
+
+    def close(self):
+        """Close file to free io unit."""
+        self.lib.tnb_file_close(self.handle)
+        self.handle = -1
+
+    def __del__(self, *args, **kwds):
+        """Destructor."""
+        if self.handle >= 0 and self.root is None:
+            self.close()
+
+    # pylint: disable=invalid-name
+    def createGroup(self, groupname,
+                    handle=None):
+        """Construct group instance."""
+        return TouzaNioGroup(groupname, parent=self,
+                             handle=handle)
+
+    # pylint: disable=invalid-name
+    def createVariable(self, varname, datatype, dimensions,
+                       handle=None, recdim=None, cls=None, **kwds):
+        """Construct variable instance."""
+        cls = cls or self.cls_var
+        return cls(self,
+                   varname, datatype, dimensions,
+                   handle=handle, recdim=recdim, **kwds)
+
+    def createArray(self, varname, datatype, dimensions,
+                    handle=None, recdim=None, cls=None, **kwds):
+        """Construct variable instance."""
+        cls = cls or self.cls_arr
+        return cls(self,
+                   varname, datatype, dimensions,
+                   handle=handle, recdim=recdim, **kwds)
+
+    # pylint: disable=invalid-name,too-many-arguments
+    def createDimension(self, dimname, size=None,
+                        handle=None, begin=None, end=None,
+                        group=None):
+        """Construct variable instance."""
+        group = group or self.root
+        return TouzaNioDimension(dimname, size,
+                                 handle=handle, begin=begin, end=end,
+                                 group=group)
+
+    def search_dim(self, ser):
+        """Search parent corresponding to serial"""
+        for d in self.dimensions.values():
+            if d.handle == ser:
+                return d
+        return None
+
+    def datatype_from_dfmt(self, fmt):
+        """NIO/Gtool format to numpy datatype conversion."""
+        fmt = fmt.strip().lower()
+        if fmt[1:3] == 'i4':
+            return 'i4'
+        if fmt[1:3] == 'r4':
+            return 'f4'
+        return 'f8'
+
+    def attrs(self):
+        """Iterator of the attributes."""
+        yield from self._attrs()
+
+    def getattr(self, item, conv=None, **kwds):
+        """Get attribute corresponding to item (number or name)."""
+        return self.lib.header_get_attr(item, self.handle, conv=conv)
+
+    def _add_groups(self):
+        """Bind NIO groups in NIO object"""
+        for gh, gname in self._groups():
+            grp = self.createGroup(gname, gh)
+            gk = zutl.tostr(gname)
+            self.groups[gk] = grp
+        return self.groups
+
+    def _add_dimensions(self):
+        nr = self._recs()
+        if nr:
+            cname = self.record
+            self.recdim = self.createDimension(cname, size=nr, handle=-1,
+                                               group=self)
+            ck = zutl.tostr(cname)
+            self.dimensions[ck] = self.recdim
+        for ch, cname in self._dimensions():
+            (begin, end) = self.lib.group_co_range(self.handle, ch)
+            dim = None
+            if self.parent:
+                cs = self.lib.tnb_group_co_idx(self.handle, ch)
+                dim = self.parent.search_dim(cs)
+            if not dim:
+                dim = self.createDimension(cname, begin=begin, end=end,
+                                           handle=ch)
+            ck = zutl.tostr(cname)
+            self.dimensions[ck] = dim
+        return self.dimensions
+
+    def _flatten_suites(self, flatten):
+        if flatten:
+            for g in self.groups.values():
+                for v in g.variables.values():
+                    vk = zutl.tostr(v.name)
+                    self.variables[vk] = v
+                for d in g.dimensions.values():
+                    if d not in self.dimensions.values():
+                        dk = zutl.tostr(d.name)
+                        self.dimensions[dk] = d
+
+        return self
+
+    def _add_variables(self, recdim=None):
+        for vh, vname in self._vars():
+            dims = []
+            if recdim:
+                dims.append(recdim)
+            for cj, ch, cname in self._coors(vh):
+                dims.append(self.search_dim(ch))
+            attr = self.lib.header_get_attr('dfmt', self.handle, vid=vh, rec=0)
+            dfmt = self.datatype_from_dfmt(attr)
+            var = self.createVariable(vname, dfmt, tuple(dims),
+                                      handle=vh, recdim=recdim)
+            vk = zutl.tostr(vname)
+            self.variables[vk] = var
+        return self.variables
+
+    def _groups(self):
+        """Iterator of group in Nio file."""
+        for g in range(self.lib.tnb_file_groups(self.handle)):
+            gh = self.lib.tnb_group(self.handle, g)
+            gname = CT.create_string_buffer(20)
+            self.lib.tnb_group_name(gname, gh)
+            yield (gh, gname.value)
+
+    def _dimensions(self):
+        """Iterator of dimension in Nio file or group."""
+        for ch in range(self.lib.tnb_group_coors(self.handle)):
+            cname = CT.create_string_buffer(20)
+            self.lib.tnb_group_co_name(cname, self.handle, ch)
+            yield (ch, cname.value)
+
+    def _vars(self):
+        """Iterator of variable in Nio file or group"""
+        for v in range(self.lib.tnb_group_vars(self.handle)):
+            vname = CT.create_string_buffer(20)
+            self.lib.tnb_var_name(vname, self.handle, v)
+            yield (v, vname.value)
+
+    def _attrs(self):
+        """Dummy procedure to return 0 for number of attributes"""
+        yield from ()
+
+    def _coors(self, vh):
+        """Iterator of coordinate in variable"""
+        for c in range(self.lib.tnb_co_size(self.handle, vh)):
+            cname = CT.create_string_buffer(20)
+            ch = self.lib.tnb_co_serial(self.handle, vh, c)
+            self.lib.tnb_co_name(cname, self.handle, vh, c)
+            yield (c, ch, cname.value)
+
+    def _recs(self):
+        """Dummy procedure to return 0 for number of records"""
+        return 0
+
+    def get(self, elem, default=None, sep=None, family=False):
+        """Recursive search of group/variable."""
+        sep = self.sep
+        if isinstance(elem, str):
+            path = elem.split(sep)
+        elif numpy.iterable(elem):
+            path = tuple(elem)
+        else:
+            raise ValueError
+
+        g = self
+        while path:
+            if path[0] in g.groups:
+                g = g.groups.get(path[0])
+                path = path[1:]
+            else:
+                break
+        if path:
+            v = sep.join(path)
+            fam = g.variables.get_family(v, [])
+            if family:
+                return fam or default
+            if len(fam) == 1:
+                return fam[0]
+            return default
+        return g
+
+    def __getitem__(self, elem, sep=None):
+        r = self.get(elem, sep=sep)
+        if r is None:
+            raise IndexError(f"{elem} not found in {self}")
+        return r
+
+    def diag(self):
+        """Call diagnose function in the library"""
+        self.lib.tnb_file_diag(self.handle)
+
+    def short(self):
+        """Retrun short str version."""
+        dump = []
+        return dump
 
     def __str__(self):
-        """return str"""
-        n = zu.tostr(self.name)
-        p = [f"name = '{n}'",
-             f"size = {self.size}", ]
-        return f"{repr(type(self))}: " + ', '.join(p)
+        """Return str version."""
+        return self._info(attrs=True)
 
-    def is_record(self):
-        """Check if record dimension"""
-        return self.handle < 0
+    def short(self):
+        """Return short str version."""
+        return self._info(attrs=False)
 
-    @property
-    def shape(self):
-        """1d dimension shape"""
-        return (self.size, )
+    def _info(self, attrs=None, lev=None):
+        """Return str version."""
+        attrs = True if attrs is None else attrs
+        dump = [repr(type(self))]
+        tab = ' ' * 4
+        if self.parent is None:
+            dump.append("root(suite) group")
+        else:
+            dump.append(f"group: {self.name}")
+        if attrs:
+            for a, ai in self.attrs():
+                av = self.getattr(a).strip()
+                ai = zutl.tostr(ai)
+                if av:
+                    dump.append(f"{tab}{ai}: {av}")
+
+        ds = tuple(f"{self.dimensions.format_key(dk, sep=self.sub)}"
+                   f"({len(dd)})"
+                   for dk, dd in self.dimensions.items())
+
+        vs = tuple(f"{str(vv.dtype)}"
+                   f" {self.variables.format_key(vk, sep=self.sub)}"
+                   + "(" + ','.join(vv.format_dims(sep=self.sub,
+                                                   group=self.root)) + ")"
+                   for vk, vv in self.variables.items())
+
+        gs = tuple(self.groups.format_key_all(sep=self.sub))
+
+        dump.append(f"    dimensions(sizes): {', '.join(ds)}")
+        dump.append(f"    variables(dimensions): {', '.join(vs)}")
+        dump.append(f"    groups: {', '.join(gs)}")
+
+        return '\n'.join(dump)
+
+
+class TouzaNioGroup(TouzaNioDataset):
+    """Emulate a hierarchical namespace of dataset."""
+
+    # pylint: disable=super-init-not-called
+    def __init__(self, name, parent, handle):
+        """Constructor."""
+        self.handle = handle
+        self.parent = parent
+        self.root = parent.root
+        self.name = name
+
+        self.record = parent.record
+        self.sub = parent.sub
+        self.cls_var = parent.cls_var
+        self.cls_arr = parent.cls_arr
+
+        self.groups = zutl.NameMap()
+        self.dimensions = zutl.NameMap()
+
+        self._add_groups()
+        self._add_dimensions()
+
+        recdim = self.dimensions.get(self.record)
+        self.variables = zutl.NameMap()
+        self._add_variables(recdim)
+
+    def _attrs(self, vid=None, rec=None):
+        """Iterator of attributes in Nio file or group"""
+        la = self.lib.tnb_attr_len(' ', self.handle, -1)
+        for a in range(self.lib.tnb_attr_size(self.handle, -1, -1)):
+            a = a + 1
+            item = CT.create_string_buffer(la + 1)
+            self.lib.tnb_get_attr_name(item, a)
+            yield (a, item.value)
+
+    def _groups(self):
+        """Iterator of group in Nio group (empty list)."""
+        yield from ()
+
+    def _recs(self):
+        """Return number of records in Nio group."""
+        return self.lib.tnb_group_recs(self.handle)
 
 
 class TouzaNioCoDataset(TouzaNioDataset):
@@ -986,7 +1117,9 @@ class TouzaNioCoDataset(TouzaNioDataset):
             cal = cals[0]
             time = [dt[cal] for dt in date]
             # print(time)
-            c = self.createArray(d.name, type(time[0]), (d, ), -1, None,
+            tt = type(time[0])
+            # tt = time[0]
+            c = self.createArray(d.name, tt, (d, ), -1, None,
                                  array=time)
         c.setattr('TITL1', 'time')
 
@@ -1004,7 +1137,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
 
     def get_coordinate(self, dim, paths, kind=None):
         """Get physical coordinate Nio-handle."""
-        item = zu.tostr(dim.name)
+        item = zutl.tostr(dim.name)
         kind = kind or 'loc'
         if kind == 'loc':
             pfx = 'GTAXLOC.'
@@ -1130,8 +1263,8 @@ def auto_calendar(unit, time, date, checks=None, first=None):
         raise UserWarning(f"cannot parse {date} as date.")
     try:
         dt = tuple(int(d) if d else 0 for d in dt)
-    except ValueError:
-        raise UserWarning(f"cannot parse {date} as date.")
+    except ValueError as err:
+        raise UserWarning(f"cannot parse {date} as date.") from err
 
     first = False if first is None else bool(first)
 
@@ -1155,3 +1288,14 @@ if sys.version_info[:2] > (3, 9):
     _DataSets: dict[int, TouzaNioDataset] = {}
 else:
     _DataSets = {}
+
+
+def diag_datasets():
+    """Show registered dataset table for debug."""
+    for h, ds in _DataSets.items():
+        print(f"handle: {h}")
+        print(ds)
+        for gn, gg in ds.groups.items():
+            print(f"group: {gn}")
+            print(gg.short())
+        print()
