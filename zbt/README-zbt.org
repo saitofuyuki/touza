@@ -159,12 +159,12 @@ If installation succeeded, =zbt= backend is appended in the xarray engines:
 
 For some reason, registration of ~zbt~ may be failed.
 In this case try below workaround and
-use =zbt.xrnio.open_dataset()= instead of =xarray.open_dataset()=
+use ~zbt.xrnio.open_dataset()~ instead of ~xarray.open_dataset()~
 for dataset creation (explained soon).
 : >>> import zbt.xrnio as zxr
 
 *** Create ~xarray.Dataset~ object with GTOOL3 file
-To create ~Dataset~ instance, just call =open_dataset()= method as
+To create ~Dataset~ instance, just call ~open_dataset()~ method as
 other data formats.
 : >>> xds0 = xr.open_dataset("T2")         # a file-name argument
 : >>> ##  xds0 = zxr.open_dataset("T2")    # when zbt engine do not appears
@@ -256,7 +256,7 @@ cannot be represented, thus dataset generation fails.
 In order to read such files, you need to either install nc-time-axis
 package or edit TIME, DATE, etc attributes with ~ngtick~.
 
-You can control calendar property at open_dataset(), with special
+You can control calendar property at ~open_dataset()~, with special
 argument ~calendar~.
 
 : ### Force numpy.datetime64 instance if valid.
@@ -426,7 +426,6 @@ works, press alt-key once and retry mouse.
 
 **** Cyclic coordinate
 **** Longitude coordinate (experimental ~cartopy~ feature)
-**** Time coordinate on GTOOL3/Nio format files
 *** help
 : zbcont [OPTIONS...] FILE [FILE...]
 
@@ -436,11 +435,12 @@ Usage is shown by =zbcont --help=:
 : usage: zbcont [-h] [--verbose] [--quiet] [--debug] [--log-level LEVEL]
 :               [--log-file FILE] [--force] [--no-decode_coords] [-c SPEC]
 :               [-C SPEC] [-M [[METHOD]/][CMAP[/CMAP..]][+ALPHA]] [-N NORM]
-:               [-r [LOW][:[HIGH]]] [-v VAR[,VAR...]] [-d DIM/SELECTION[,...]]
-:               [-D COORDINATE[/SELECTION][,...]] [-p COORDINATE[,...]]
-:               [-o FILE] [--multi-pdf] [--no-multi-pdf] [-i] [-m MAP-SPECS]
-:               [-P PROJECTION] [-W] [-L LAYOUT[/OPTIONS...]] [-g [W][,[H]]]
-:               [--calendar FLAGS[,...]] [-F]
+:               [-r [LOW][:[HIGH]]] [-v VAR[,VAR...]]
+:               [-d DIM/SELECTION[,...]] [-D COORDINATE[/SELECTION][,...]]
+:               [-p COORDINATE[,...]] [-o FILE] [--multi-pdf]
+:               [--no-multi-pdf] [-i] [-m MAP-SPECS] [-P PROJECTION] [-W]
+:               [-L LAYOUT[/OPTIONS...]] [-g [W][,[H]]]
+:               [--aspect NUMBER|equal|auto] [--calendar FLAGS[,...]] [-F]
 :               [FILE[/SPEC] ...]
 :
 : positional arguments:
@@ -455,38 +455,36 @@ Usage is shown by =zbcont --help=:
 :   --log-file FILE       file for logging
 :   --force               overwrite outputs
 :   --no-decode_coords    skip auto coordinate inclusion
-:   -c SPEC, --contours SPEC
-:                         contour intervals or levels specification
-:   -C SPEC, --colors SPEC
-:                         color intervals or levels specification.
-:   -M [[METHOD]/][CMAP[/CMAP..]][+ALPHA], --color-method [[METHOD]/][CMAP[/CMAP..]][+ALPHA]
+:   -c, --contours SPEC   contour intervals or levels specification
+:   -C, --colors SPEC     color intervals or levels specification.
+:   -M, --color-method [[METHOD]/][CMAP[/CMAP..]][+ALPHA]
 :                         coloring method and colormap
-:   -N NORM, --color-norm NORM
+:   -N, --color-norm NORM
 :                         norm for coloring
-:   -r [LOW][:[HIGH]], --range [LOW][:[HIGH]]
+:   -r, --range [LOW][:[HIGH]]
 :                         data range to draw
-:   -v VAR[,VAR...], --variables VAR[,VAR...]
+:   -v, --variables VAR[,VAR...]
 :                         variable filter
-:   -d DIM/SELECTION[,...], --dimensions DIM/SELECTION[,...]
+:   -d, --dimensions DIM/SELECTION[,...]
 :                         coordinate clipping
-:   -D COORDINATE[/SELECTION][,...], --draw COORDINATE[/SELECTION][,...]
+:   -D, --draw COORDINATE[/SELECTION][,...]
 :                         figure coordinate clipping
-:   -p COORDINATE[,...], --plot COORDINATE[,...]
+:   -p, --plot COORDINATE[,...]
 :                         figure coordinates
-:   -o FILE, --output FILE
-:                         output filename
+:   -o, --output FILE     output filename
 :   --multi-pdf
 :   --no-multi-pdf
 :   -i, --interactive     interactive mode
-:   -m MAP-SPECS, --map MAP-SPECS
-:                         map overlay
-:   -P PROJECTION, --projection PROJECTION
+:   -m, --map MAP-SPECS   map overlay
+:   -P, --projection PROJECTION
 :                         map projection
 :   -W, --each-file       Create figure for each file
-:   -L LAYOUT[/OPTIONS...], --layout LAYOUT[/OPTIONS...]
+:   -L, --layout LAYOUT[/OPTIONS...]
 :                         figure layout (reserved)
-:   -g [W][,[H]], --geometry [W][,[H]]
-:                         figure geometry (reserved)
+:   -g, --geometry [W][,[H]]
+:                         figure geometry
+:   --aspect NUMBER|equal|auto
+:                         aspect ratio of figure scaling
 :   --calendar FLAGS[,...]
 :                         calendar options
 :   -F, --fortran         turn-on fortran style indexing (reserved)
@@ -555,10 +553,10 @@ the slice one index forward and backward, respectively:
 : :
 : (1) 0:q <0:Q> [0, 37, :, :]
 : (1) 0:q <0:Q> [1, 0, :, :]
-: (1) 0:q <0:Q> [2, 0, :, :]
+: (1) 0:q <0:Q> [1, 1, :, :]
 :
 : # pressing backspace-key backward one step
-: (1) 0:q <0:Q> [2, 0, :, :]
+: (1) 0:q <0:Q> [1, 1, :, :]
 : (1) 0:q <0:Q> [1, 0, :, :]
 : (1) 0:q <0:Q> [0, 37, :, :]
 : :
@@ -571,8 +569,7 @@ coordinate as:
 while right clicking turns it reversed:
 : record -> CMIP6P38 -> GGLA128 -> GLON256
 A middle click on either the coordinate transpose the coordinate.  In
-other words, =[GGLA128, GLON256]= plot is changed into =[GLON256,
-GGLA128]= plot.
+other words, =[GGLA128, GLON256]= plot is changed into =[GLON256, GGLA128]= plot.
 
 If the mouse pointer is on a region between a figure spine and tick
 labels (which is referred to as merely `spine' hereafter), a red guide
@@ -597,8 +594,7 @@ sequential and diverging field, respectively.
 interactively.  Left clicking on colorbar turn the colormap with a
 current group, while right clicking on colorbar turn the colormap
 group.
-Visit https://matplotlib.org/stable/users/explain/colors/colormaps.html
-for colormaps grouping.
+Visit [[https://matplotlib.org/stable/users/explain/colors/colormaps.html][Choosing Colormaps in Matplotlib]] for colormaps grouping.
 A middle on the colorbar reverses the color direction.
 
 A range of colorbar is automatically chosen to cover the plotting
@@ -645,10 +641,10 @@ interpretation, so in order to plot single explicit contour,
 it must be set as =CONTOUR,= (the final comma).
 
 Separator, either colon or slash is significant to interpreted the
-meaning of single number.  If separator after number is colon, the
-number is interpreted as number of maximum bins to divide the range.
-Otherwise, i.e., if the separator after number is slash or none,
-it is interpreted as fixed contour interval (More precisely, the
+meaning of single number.  If separator between items or one after
+an item is colon, the number is interpreted as number of maximum bins
+to divide the range. Otherwise, i.e., if the separator is slash or
+none, it is interpreted as fixed contour interval (More precisely, the
 former adopts ~matplotlib.ticker.MaxNLocator~ while the latter
 does ~matplotlib.ticker.MultipleLocator~).  Similar to comma, colon is
 mandatory for correct interpretation, such that it must be set as
@@ -823,9 +819,63 @@ List of =<var>= to draw, the others are ignored.
 | g orthographic         | Orthographic        | central longitude, latitude         |
 | h hammer               | Hammer              | central longitude                   |
 | pc platecarree         | PlateCarree         | central longitude                   |
-
 ***** examples
 : % zbcont -ppc+135 FILE    # central longitude on 135E.
+
+***** Known problems, tips and tricks
+****** =PlateCarree=
+Longitude locator may fail to put the label beyond the longitue span
+of original data-array.  For example, when the span of a data array is
+-300.0:60.0, the labels beyond 60 degree are not shown with default parameters.
+Shifting of the central longitude may help to recover the labels:
+: % zbcont -Ppc+1 datafile     # Works as expected
+: % zbcont -Ppc-1 datafile     # Works as expected
+: % zbcont -Ppc datafile       # Strange
+: % zbcont -Ppc+0.9 datafile   # Strange
+: % zbcont -Ppc-0.9 datafile   # Strange
+Need some trials to detect the least amount of shift.
+
+This problem is one of the next targets to fix.
+****** =NorthPolarStereo= =SouthPolarStereo=
+Strange domain may be chosen to plot without manual limiting of plot region.
+Anyway polar stereographic projections are special method to show only
+the polar regions, limiting of latitude range is generally a good idea.
+: % zbcont -Pnps datafile      # Strange plot domain influenced by original array
+: % zbcont -Psps datafile      # Strange
+: % zbcont -Pnps -Dlatitude/30.0:90.0 datafile     # Works as expected
+: % zbcont -Psps -Dlatitude/-90.0:-30.0 datafile   # Works as expected
+Of course a valid coordinate name should be used (=latitude=, in this case).
+****** =Orthographic=
+Strange domain may be chosen to plot without manual limiting of plot region.
+Longitude span to work depends on the central longitude
+of the projection.  As far as tried, at least 90 degree spaces are
+required from the central longitude for both limits.
+: % zbcont -Pg datafile                                 # Strange
+: % zbcont -Pg -Dlongitude/-180.0:180.0 datafile
+: % zbcont -Pg+90 -Dlongitude/-180.0:180.0 datafile
+: % zbcont -Pg+100 -Dlongitude/-180.0:180.0 datafile    # Strange (insufficent spaces)
+: % zbcont -Pg+100 -Dlongitude/0.0:360.0 datafile
+****** =NearsidePerspective=
+Strange domain may be chosen to plot (sometimes even the program
+aborts with an error) when the central *latitude* is specified.
+: % zbcont -Pnp datafile        # Works
+: % zbcont -Pnp+0+30 datafile   # Strange
+: % zbcont -Pnp+0+30 -Dlongitude/-180.0:180.0 -Dlatitude/-90.0:90.0 datafile  # Works
+: % zbcont -Pnp+90+10 datafile  # Aborts
+: :
+: shapely.errors.GEOSException: IllegalArgumentException: point array must contain 0 or >1 elements:
+****** =Mercator=
+Strange domain may be chosen to plot.  Need manual adjustment of
+the longitude range *and* the central longitude accordingly.
+Longtude span should be slightly larger than 180 degree at both side
+for the global view.
+: % zbcont -Pm datafile                                 # Strange
+: % zbcont -Pm -Dlongitude/-180.0:180.0 datafile        # Still strange
+: % zbcont -Pm -Dlongitude/-180.1:180.1 datafile        # Works
+: % zbcont -Pm+30 -Dlongitude/-150.1:210.1 datafile     # Works
+****** =Mollweide=, =Hammer=
+Strange domain may be chosen to plot, and any workaround solution to
+recover the domain have not yet been found.
 
 **** output (=--output=, =-o=)
 : --output=<filename>
@@ -866,7 +916,7 @@ other formats except for png.
 
 If =<filename>= or its variation of integer suffix already exists,
 then =zbcont= would aborts.  You can force to overwrite the existing
-files using ==-force= argument.
+files using =-force= argument.
 
 **** (pdf output only) =--multi-pdf=, =--no-multi-pdf=
 **** interactive (=--interactive=, =-i=)
@@ -1009,8 +1059,7 @@ GTOOL3 (TOUZA/Nio) format file, based on ~zbt.libtouza~ module.
 - Only file reading is implemented (file writing is reserved for
   future development).
 - Only c-style array indexing is implemented.  It means that the time
-  series of a 3 dimension variable is represented as =V[0:NT, 0:NZ,
-  0:NY, 0:NX]=.
+  series of a 3 dimension variable is represented as =V[0:NT, 0:NZ, 0:NY, 0:NX]=.
 - Due to much freedom originating from the GTOOL3 format policy,
   automatic conversion to a dataset might be different from what the
   user expects.
