@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/25 14:11:50 fuyuki plot.py>
+# Time-stamp: <2025/02/13 09:05:06 fuyuki plot.py>
 
-__doc__ = \
-    """
-zbt.plot
-~~~~~~~~
+"""
 Plotter collections.
 
 :Source:     zbt/plot.py
@@ -219,7 +216,11 @@ class LegacyParser(ParserBase):
                         continue
                     ds = f"{dt}={c.values}"
                 else:
-                    ds = f"{dt}={c.values:.4f}"
+                    try:
+                        ds = f"{dt}={c.values:.4f}"
+                    except ValueError as err:
+                        locallog.warning(err)
+                        ds = f"{dt}={c.values}"
                 if du:
                     ds = ds + f'[{du}]'
                 sel.append(ds)
@@ -303,6 +304,7 @@ class LegacyParser(ParserBase):
         sc = ''
         if abs(styp) == 2:
             sc = 'log'
+        print(f"parse_coor: {dmin=} {dmax=}")
         if dmax and dmin:
             dmax = float(dmax)
             dmin = float(dmin)
@@ -315,8 +317,10 @@ class LegacyParser(ParserBase):
                 dmin, dmax = dmax, dmin
         else:
             vmin, vmax, _ = super().parse_coor(coor, item=item)
+            print(f"parse_coor: {vmin=} {vmax=}")
             dmax = float(dmax) if dmax else vmax
             dmin = float(dmin) if dmin else vmin
+        print(f"parse_coor/final: {dmin=} {dmax=}")
         return dmin, dmax, sc
 
     def parse_calendar(self, attrs, default=None):
@@ -851,14 +855,27 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         """Draw axis."""
         if which == 'x':
             axis, limf, scf = ax.xaxis, ax.set_xlim, ax.set_xscale
+            getf = ax.get_xlim
         else:
             axis, limf, scf = ax.yaxis, ax.set_ylim, ax.set_yscale
+            getf = ax.get_ylim
 
         cmin, cmax, sc = self.parse_coor(co)
+        print(f"{cmax=} {type(cmax)}")
+        print(f"{cmin=} {type(cmin)}")
         scale = scale or sc
         dmin = zu.set_default(dmin, cmin)
         dmax = zu.set_default(dmax, cmax)
+        print(f"default {dmax=} {type(dmax)}")
+        print(f"default {dmin=} {type(dmin)}")
 
+        # print(f"{dmax=} {type(dmax)} {adapt_type(dmax, co)}")
+        # print(f"{dmin=} {type(dmin)} {adapt_type(dmin, co)}")
+        dmin = adapt_values(dmin, co)
+        dmax = adapt_values(dmax, co)
+        print(f"{dmax=} {type(dmax)}")
+        print(f"{dmin=} {type(dmin)}")
+        print(f"drange: {dmax-dmin}")
         # if isinstance(dmin, xr.DataArray):
         #     vt = dmin.item()
         # else:
@@ -869,8 +886,11 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         # if isinstance(dmax, xr.DataArray):
         #     dmax = dmax.values
         c0 = co.values[0]
-        dmin = date_normalize(dmin, c0)
-        dmax = date_normalize(dmax, c0)
+        print(f"{dmin=}")
+        print(f"{c0=}")
+        # dmin = date_normalize(dmin, c0)
+        # dmax = date_normalize(dmax, c0)
+        # print(f"normalized: {dmin=}")
         # print(f"{type(dmin.item())=} {dmin=}")
         # print(f"{type(dmax.item())=} {dmax=}")
         span = abs(dmax - dmin)
@@ -897,12 +917,18 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         axis.set_tick_params(which='major', **(major or {}))
         axis.set_tick_params(which='minor', **(minor or {}))
         # print(f"dmin/dmax: {co.name} {type(dmin)} {type(dmax)}")
+        print(f"before limf: {dmin=} {dmax=}")
         if isinstance(dmin, xr.DataArray):
             dmin = dmin.values
         if isinstance(dmax, xr.DataArray):
             dmax = dmax.values
         if dmin != dmax:
             limf(dmin, dmax)
+        gf = getf()
+        print(f"after limf: {dmin=} {dmax=}")
+        print(f"getf: {gf}")
+        print(f"fmt: {axis.get_major_formatter()}")
+        print(mplib.dates.num2date(gf[0]))
         if scale == 'log':
             if isinstance(span, datetime.timedelta):
                 locallog.warning(f"Bypass log-scale check ({dmin}:{dmax}).")
@@ -1636,7 +1662,8 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
         title = zu.set_default(title, True)
         if title is True:
             dset = self.parse_dataset(data.attrs, default='')
-            cal = self.parse_calendar(data.attrs, default='')
+            # cal = self.parse_calendar(data.attrs, default='')
+            cal = self.parse_calendar(data.nio, default='')
             title = (dset, cal, '')
         if isinstance(title, (list, tuple)):
             title = '\n'.join(str(s) for s in title)
@@ -1789,11 +1816,19 @@ class ContourPlot(PlotBase, _ConfigType):
         if any(w <= 1 for w in data.shape):
             raise UserWarning("virtually less than two dimensions")
 
+        if np.issubdtype(data, np.datetime64):
+            locallog.warning(f"Cannot plot {data.dtype} array {data.name}")
+            return
+
         artists = artists or []
 
         # to do: data_col data_con 2d check
 
         coords = data.coords
+        # print(view)
+        # print(data.dims)
+        # print(list(coords.keys()))
+
         cj = [d for d in data.dims if coords[d].size > 1]
         if len(cj) != 2:
             raise ValueError(f"Not 2d shape={cj}")
@@ -1991,7 +2026,8 @@ class ContourPlot(PlotBase, _ConfigType):
             func = getattr(ax, method, None)
         if func:
             if method == 'pcolormesh':
-                func = ft.partial(func, edgecolor='face')
+                # func = ft.partial(func, edgecolor='face')
+                func = ft.partial(func, edgecolor='none')
             return func
         else:
             raise ValueError(f"invalid method {method}.")
@@ -2204,15 +2240,67 @@ class CurvePlot(PlotBase, _ConfigType):
         return ret
 
 
+def adapt_values(src, ref):
+    """Convert data type corresponds to ones of array."""
+    print(f"{type(src)=} {type(ref)=}")
+    try:
+        dtsrc = src.dtype
+        print(f"{src.dtype=}")
+    except AttributeError:
+        dtsrc = False
+        print("no src.dtype")
+    try:
+        dtref = ref.dtype
+        print(f"{ref.dtype=}")
+    except AttributeError:
+        dtref = False
+        print("no ref.dtype")
+    if dtref:
+        if dtsrc:
+            v = src.astype(dtref)
+            print(f"{type(v)=}")
+            # return v
+            if isinstance(v, xr.DataArray):
+                print(mplib.dates.date2num(v.values))
+                print(v.values, type(v.values), v.item())
+                return v.values
+            else:
+                return v
+        elif np.issubdtype(dtref, np.datetime64):
+            return pandas.to_datetime(src)
+            # return pandas.Timestamp(src)
+    # dt = array.dtype
+    # print(f"{dt=} {type(dt)}")
+    # if np.issubdtype(dt, np.datetime64):
+    #     return pandas.Timestamp(v)
+    # ref = array.values.flat[0]
+    # print(type(v), v)
+    # print(type(ref), ref, isinstance(ref, cftime.datetime))
+    # if isinstance(ref, cftime.datetime):
+    #     print(f"{v=} {type(v)}")
+    #     cal = ref.calendar
+    #     if isinstance(v, str):
+    #         pts = pandas.Timestamp(v)
+    #         cft = cftime.to_tuple(pts)
+    #         v = cftime.datetime(*cft, calendar=cal)
+    #     elif not isinstance(v, cftime.datetime):
+    #         v = cftime.num2date(v, units=zu.NC_EPOCH, calendar=cal)
+    return src
+
 def date_normalize(v, ref):
     if isinstance(v, xr.DataArray):
-        vt = v.item()
+        # print(v.dtype, np.issubdtype(v.dtype, np.datetime64))
+        if not np.issubdtype(v.dtype, np.datetime64):
+            vt = v.item()
+        else:
+            return v
     else:
         vt = v
+    # print(f"{type(vt)=} {vt=} {v}")
     if isinstance(ref, np.datetime64):
         if isinstance(vt, str):
             v = pandas.Timestamp(v)
-        elif not isinstance(vt, numpy.datetime64):
+        elif not isinstance(vt, np.datetime64):
             v = np.datetime64(mplib.dates.num2date(v))
     elif isinstance(ref, cftime.datetime):
         cal = ref.calendar
