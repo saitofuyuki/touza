@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-# Time-stamp <2024/07/16 13:09:06 fuyuki touza.py>
+# Time-stamp: <2025/02/19 09:06:41 fuyuki dsnio.py>
+#
+# Copyright (C) 2024, 2025
+#           Japan Agency for Marine-Earth Science and Technology
+#
+# Licensed under the Apache License, Version 2.0
+#   (https://www.apache.org/licenses/LICENSE-2.0)
 
 """
 Numpy + TOUZA/Nio extension.
@@ -218,13 +224,13 @@ class _TouzaCoreVar(_TouzaNio):
         """Simple copy."""
         return self.__copy__(logical)
 
-    def replace_dim(self, dim:TouzaNioDimension):
+    def replace_dim(self, dims:list[TouzaNioDimension]):
         """
         Replace dimension element.
 
         Parameters
         ----------
-        dim : TouzaNioDimension
+        dim : List[TouzaNioDimension]
             Target dimension to replace with corresonding self value.
 
         Raises
@@ -232,12 +238,21 @@ class _TouzaCoreVar(_TouzaNio):
         ValueError
             Raise if not found.
         """
-        for j, d in enumerate(self.dimensions):
-            if dim.name == d.name:
-                break
-        else:
-            raise ValueError(f"Not found dimension {dim.name}.")
-        self.dimensions = self.dimensions[:j] + (dim, ) + self.dimensions[j+1:]
+        ndim = []
+        for cd in self.dimensions:
+            for dd in dims:
+                if cd.name == dd.name:
+                    ndim.append(dd)
+                    break
+            else:
+                ndim.append(cd)
+        self.dimensions = tuple(ndim)
+        # for j, d in enumerate(self.dimensions):
+        #     if dim.name == d.name:
+        #         break
+        # else:
+        #     raise ValueError(f"Not found dimension {dim.name}.")
+        # self.dimensions = self.dimensions[:j] + (dim, ) + self.dimensions[j+1:]
         return self.dimensions
 
     def squeeze(self):
@@ -487,7 +502,8 @@ class TouzaNioVar(_TouzaCoreVar):
             p = CT.byref(cbuf, step * j)
             p = CT.cast(p, CT.POINTER(ct))
             # print(f"read {self.handle} {r} {start} {count}")
-            # locallog.debug(f"read {self.handle} {r} {start} {count}")
+            locallog.debug(f"read <{ds.handle}/{self.handle}>"
+                           f"[{r}] {start[:]} {count[:]}")
             ds.lib.tnb_var_read(p, r, start, count,
                                 ds.handle, self.handle)
         buf = numpy.ctypeslib.as_array(cbuf)
@@ -1047,12 +1063,13 @@ class TouzaNioCoDataset(TouzaNioDataset):
     def bind_coordinates(self):
         """Bind coordinates as additional variables"""
         paths = self.coordinate_paths()
+        dims = list(self.dimensions.values())
 
-        for d in self.dimensions.values():
+        for d in dims:
             if d.is_record():
                 self.bind_time_coordinate(d)
                 continue
-            c = self.get_coordinate(d, paths, kind='loc')
+            c = self.get_coordinate(d, dims, paths, kind='loc')
             if c:
                 okey = self.dimensions.rev_map(d)
                 locallog.debug(f"found {okey}, {c.name}")
@@ -1101,7 +1118,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
         if cals is False:
             date = None
         else:
-            if len(cals) == 0:
+            if len(cals or []) == 0:
                 locallog.warning("failed to detect calendar.")
                 date = None
 
@@ -1135,9 +1152,13 @@ class TouzaNioCoDataset(TouzaNioDataset):
             paths.insert(0, self._embedded)
         return paths
 
-    def get_coordinate(self, dim, paths, kind=None):
+    def get_coordinate(self, dtgt, dims, paths, kind=None):
         """Get physical coordinate Nio-handle."""
-        item = zutl.tostr(dim.name)
+        # debug = locallog.info
+        debug = locallog.debug
+        dexts = {d.name:d.extent for d in dims}
+
+        item = zutl.tostr(dtgt.name)
         kind = kind or 'loc'
         if kind == 'loc':
             pfx = 'GTAXLOC.'
@@ -1154,11 +1175,30 @@ class TouzaNioCoDataset(TouzaNioDataset):
                 c = self.check_coordinate_external(xgrp, item, pfx, p)
             if not c:
                 continue
+            debug(f"{c.name=} {c.dimensions} {c.shape} {p}")
+            for cc in c.dimensions:
+                # print(f"{cc.name=} {dsizes}")
+                if cc.size > 1:
+                    if cc.name not in dexts:
+                        debug(f"{cc.size=} {cc.name=}")
+                        break
+                    dx = dexts[cc.name]
+                    if dx[0] < cc.extent[0] or dx[1] > cc.extent[1]:
+                        debug(f"{dx=} {cc.extent=}")
+                        break
+            else:
+                # print(f"Match: {c.dimensions} {dexts}")
+                c = c.copy(logical=self)
+                c.squeeze()
+                c.replace_dim(dims)
+                return c
+
             for cc in c.dimensions:
                 ## check first coordinate with the same name
-                if cc.name == dim.name:
-                    if dim.extent[0] < cc.extent[0] \
-                       or dim.extent[1] > cc.extent[1]:
+                # print(cc.name, cc.extent, cc.size, dtgt.name, dtgt.extent)
+                if cc.name == dtgt.name:
+                    if dtgt.extent[0] < cc.extent[0] \
+                       or dtgt.extent[1] > cc.extent[1]:
                         break
                 elif cc.size > 1:
                     ## break if the first coordinate is non scalar.
@@ -1171,12 +1211,12 @@ class TouzaNioCoDataset(TouzaNioDataset):
                     cyclic = (c.shape[0],
                               c._getitem_(0).item(), c._getitem_(-1).item())
                     c.setattr(self.attr_cyclic, cyclic)
-                c.replace_dim(dim)
+                c.replace_dim(dims)
                 return c
 
         if self.co_int:
-            c = self.createArray(dim.name, 'f8', (dim, ), -1, None,
-                                 array=list(range(dim.size)))
+            c = self.createArray(dtgt.name, 'f8', (dtgt, ), -1, None,
+                                 array=list(range(dtgt.size)))
             return c
         return None
 
