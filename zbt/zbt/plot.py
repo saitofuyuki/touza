@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/13 11:44:00 fuyuki plot.py>
+# Time-stamp: <2025/02/20 16:09:47 fuyuki plot.py>
+#
+# Copyright (C) 2024, 2025
+#           Japan Agency for Marine-Earth Science and Technology
+#
+# Licensed under the Apache License, Version 2.0
+#   (https://www.apache.org/licenses/LICENSE-2.0)
 
 """
 Plotter collections.
 
 :Source:     zbt/plot.py
-:Maintainer: SAITO Fuyuki <saitofuyuki@jamstec.go.jp>
+:Maintainer: SAITO Fuyuki
 :Created:    Oct 9 2024
 """
 
@@ -69,8 +75,14 @@ class PictureCore():
         self.figkw = kwds
         self.figkw['layout'] = layout or 'none'
 
-        if not issubclass(self.lcls, LayoutBase):
-            raise ValueError(f"Invalid LayoutClass {self.lcls}.")
+        try:
+            if not issubclass(self.lcls, LayoutBase):
+                raise ValueError(f"Invalid LayoutClass {self.lcls}.")
+        except TypeError as err:
+            if isinstance(self.lcls, cabc.Callable):
+                pass
+            else:
+                raise err(f"Invalid LayoutClass {self.lcls}.") from None
 
     def __call__(self, **kwds):
         fig = plt.figure(FigureClass=self.fcls, **self.figkw)
@@ -176,8 +188,12 @@ class ParserBase():
 
     def parse_coor(self, coor, item=False):
         """Fallback coordinate limit and scale parser"""
-        dmax = coor[-1]
-        dmin = coor[0]
+        if len(coor.shape) > 1:
+            dmax = max(coor.values.flat)
+            dmin = min(coor.values.flat)
+        else:
+            dmax = coor[-1]
+            dmin = coor[0]
         scale = ''
         if item:
             dmax = dmax.item()
@@ -730,6 +746,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         else:
             xlim = None
             ylim = None
+        # print(f"{xlim=} {ylim=} {cxy=}")
         return xlim, ylim, cxy
 
     def plot(self, data, *args,
@@ -753,10 +770,12 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         ax = self._get_axes(ax)
         artists = artists or []
         if ax:
+            # if False:
             if is_xr(data):
-                cp = data.plot.contour(ax=ax, *args, **kwds)
+                # print(f"{args=}")
+                cp = data.plot.contour(*args, ax=ax, **kwds)
             else:
-                cp = ax.contour(data, *args, **kwds)
+                cp = ax.contour(*args, data, **kwds)
             cp.set_gid(gid)
             artists.append(cp)
             if clabel:
@@ -780,11 +799,11 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         artists = artists or []
         # print(type(ax.transData))
         if ax:
-            locallog.debug(f"{args=} {kwds=}")
+            # locallog.debug(f"{args=} {kwds=}")
             if is_xr(data):
                 cp = method(ax=ax, *args, **kwds)
             else:
-                cp = method(data, *args, **kwds)
+                cp = method(*args, data, **kwds)
             cp.set_gid(gid)
             artists.append(cp)
         return artists
@@ -834,6 +853,10 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             xc = data.coords[x]
             yc = data.coords[y]
 
+            ar = axisp.get('aspect')
+            if ar:
+                ax.set_aspect(ar)
+            # print(axisp)
             ap = axisp.get(x) or {}
             # ap = ap | (kwds.get(x) or {})
             self.set_tick(xc, ax, 'x', **(ap or {}))
@@ -940,7 +963,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
 
     def set_geo_view(self, data, ax=None, artists=None,
                      x=None, y=None,
-                     crs=None, extent=None, axisp=None):
+                     crs=None, axisp=None):
         # print(f"{extent=}")
         axisp = axisp or {}
         artists = artists or []
@@ -965,7 +988,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 self.set_lon_view(ax, xc, crs, **view_x)
                 self.set_lat_view(ax, yc, crs, **view_y)
             except RuntimeError as err:
-                print(err)
+                locallog.debug(err)
                 gl = ax.gridlines(draw_labels=True)
                 gl.top_labels = False
                 gl.right_labels = False
@@ -983,10 +1006,14 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         y0 = zu.set_default(view_y.get('dmin'), y0)
         y1 = zu.set_default(view_y.get('dmax'), y1)
 
+        extent = axisp.get('extent')
         try:
             if extent:
+                # print(f"{extent=}")
                 proj = getattr(ax, 'projection', None)
-                ax.set_extent(extent, crs=proj)
+                # ax.set_extent(extent, crs=proj)
+                ax.set_xlim(extent[:2])
+                ax.set_ylim(extent[2:])
             else:
                 if abs(x1 - x0) > 359 and abs(y1 - y0) > 179:
                     raise ValueError('')
@@ -1384,6 +1411,9 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                     print(f'{k}: ', f())
         return
 
+    def set_aspect(self, aspect, ax=None):
+        ax = self._get_axes(ax)
+        return ax.set_aspect(aspect)
 
 class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
     """Emulate GTOOL3/gtcont layout (common part)."""
@@ -1440,8 +1470,15 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
     _category = {'body': ['body', ],
                  'colorbar': ['colorbar', ], }
 
-    def __init__(self, *args, **kwds):
-        super().__init__(*args, **kwds)
+    def __init__(self, *args,
+                 aspect=None, box_aspect=None, body=None,
+                 **kwds):
+        body = body or {}
+        if aspect is not None:
+            body['aspect'] = aspect
+        if box_aspect is not None:
+            body['box_aspect'] = box_aspect
+        super().__init__(*args, body=body, **kwds)
         self.bg = {}
 
     def tweak_axes(self, ax, lab, attr=None):
@@ -1513,6 +1550,7 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
     def contour(self, *args, ax=None, **kwds):
         """Wrapper to call ax.contour()"""
         ax = ax or 'body'
+        # print(args[1:])
         return super().contour(*args, ax=ax, **kwds)
 
     def clabel(self, *args, ax=None, **kwds):
@@ -1548,6 +1586,10 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
     def set_view(self, *args, ax=None, **kwds):
         ax = ax or 'body'
         return super().set_view(*args, ax=ax, **kwds)
+
+    def set_aspect(self, *args, ax=None, **kwds):
+        ax = ax or 'body'
+        return super().set_aspect(*args, ax=ax, **kwds)
 
     def add_features(self, /, *args, ax=None, **kwds):
         ax = ax or 'body'
@@ -1816,30 +1858,33 @@ class ContourPlot(PlotBase, _ConfigType):
         if any(w <= 1 for w in data.shape):
             raise UserWarning("virtually less than two dimensions")
 
-        if np.issubdtype(data, np.datetime64):
-            locallog.warning(f"Cannot plot {data.dtype} array {data.name}")
-            return
-
         artists = artists or []
+        view = view or {}
 
         # to do: data_col data_con 2d check
+        axisp = kwds.get('axis') or {}
+        coords = view.pop("coords", None)
+        if coords:
+            yco, xco = coords
+            xy = dict(x=xco, y=yco)
+        else:
+            xy = {}
+            coords = data.coords
+            # print(view)
+            # print(data.dims)
+            # print(list(coords.keys()))
 
-        coords = data.coords
-        # print(view)
-        # print(data.dims)
-        # print(list(coords.keys()))
-
-        cj = [d for d in data.dims if coords[d].size > 1]
-        if len(cj) != 2:
-            raise ValueError(f"Not 2d shape={cj}")
-        xco = coords[cj[1]]
-        yco = coords[cj[0]]
+            cj = [d for d in data.dims if coords[d].size > 1]
+            if len(cj) != 2:
+                raise ValueError(f"Not 2d shape={cj}")
+            xco = coords[cj[1]]
+            yco = coords[cj[0]]
+            coords = ()
 
         color = self._color | (kwds.get('color') or {})
         # locallog.debug(f"{contour=}")
         # locallog.debug(f"{color=}")
 
-        axisp = kwds.get('axis') or {}
         # locallog.debug(f"{axisp=}")
 
         # if isinstance(ax, cmgeo.GeoAxes):
@@ -1869,22 +1914,26 @@ class ContourPlot(PlotBase, _ConfigType):
             data_con = contour.pop('data', None)
             if data_con is None:
                 data_con = data
-            con = self.contour(axs, data_con, **contour)
+            zargs = self.data_transform(data_con, *coords)
+            # print(f"{len(zargs)=}")
+            con = self.contour(axs, *zargs, **contour)
         else:
             con = []
             data_con = data
+            zargs = self.data_transform(data_con, *coords)
             for contour in cset:
                 contour = self._contour | contour
                 if transf:
                     contour.setdefault('transform', transf)
                 # print(f"{contour=}")
-                c = self.contour(axs, data_con, **contour)
+                c = self.contour(axs, *zargs, **contour)
                 con.extend(c)
         data_col = color.pop('data', None)
         if data_col is None:
             data_col = data
+        zargs = self.data_transform(data_col, *coords)
 
-        col = self.color(axs, data_col, **color)
+        col = self.color(axs, *zargs, **color)
         bar, cax, = self.colorbar(fig, axs, con, col,
                                   contour=contour, color=color)
 
@@ -1902,19 +1951,28 @@ class ContourPlot(PlotBase, _ConfigType):
         artists.extend(ttl)
 
         vopts = {}
-        view = view or {}
-        # print(view)
         vopts.update(**view)
+        # print(f"{vopts=}")
         for k, v in axisp.items():
             vopts.setdefault(k, {})
             vopts[k].update(v)
         artists = self.set_view(axs, data, artists=artists,
-                                crs=crs, axisp=vopts)
+                                **xy, crs=crs, axisp=vopts)
 
         fts = body.get('features') or []
         fts = axs.add_features(*fts)
 
         return artists
+
+    def data_transform(self, data, *coords):
+        if np.issubdtype(data, np.datetime64):
+            locallog.warning(f"Cannot plot {data.dtype} array {data.name}")
+            data = data.astype('float')
+        args = [data]
+        if coords:
+            # print(coords, data.coords)
+            args.extend(list(reversed(coords)))
+        return args
 
     def annotation(self, clabel, levels):
         """Create helper function to decide whether contours
@@ -1957,7 +2015,7 @@ class ContourPlot(PlotBase, _ConfigType):
         artists.extend(vx or [])
         return artists
 
-    def contour(self, axs, data,
+    def contour(self, axs, *data,
                 levels=None, clabel=None, key=None,
                 artists=None, bind=None, **kwds):
         """matplotlib contour wrapper."""
@@ -1966,8 +2024,8 @@ class ContourPlot(PlotBase, _ConfigType):
         # clabel = self.annotation(clabel, levels)
 
         # print(f"{levels=}")
-        run = ft.partial(axs.contour, data, ax=key,
-                         clabel=False, **kwds)
+        run = ft.partial(axs.contour, *data,
+                         ax=key, clabel=False, **kwds)
         # def run(**rkw):
         #     cp = axs.contour(data, ax=key,
         #                      clabel=False, **rkw, **kwds)
@@ -2032,7 +2090,7 @@ class ContourPlot(PlotBase, _ConfigType):
         else:
             raise ValueError(f"invalid method {method}.")
 
-    def color(self, axs, data,
+    def color(self, axs, data, *args,
               method=None, cmap=None, norm=None, levels=None,
               key=None, artists=None, bind=None, **kwds):
         """matplotlib contour wrapper."""
@@ -2119,7 +2177,8 @@ class ContourPlot(PlotBase, _ConfigType):
                     # locallog.debug(f'colors: {cm.get_clim()=}')
                     cm = cm.get_cmap()
                 ckw = {'cmap': cm, 'norm': norm, }
-                col = axs.color(data, ax=key,
+                col = axs.color(data, *args,
+                                ax=key,
                                 method=method,
                                 add_colorbar=False,
                                 levels=levels,
@@ -2222,7 +2281,7 @@ class CurvePlot(PlotBase, _ConfigType):
         """Batch plotter."""
         artists = artists or []
         xco = self.extract_plot_coords(data, 1)
-        print(xco)
+        # print(xco)
 
         line = self.plot(axs, data)
         artists.extend(line)
@@ -2370,7 +2429,7 @@ def main(args):
 
     plot = ContourPlot()
     curve = CurvePlot()
-    print(args)
+    # print(args)
     for a in args:
         print(f"open: {a}")
         ds = zxr.open_dataset(a)
