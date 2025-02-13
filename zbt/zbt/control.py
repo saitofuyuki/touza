@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/23 16:39:17 fuyuki control.py>
+# Time-stamp: <2025/02/13 09:38:35 fuyuki control.py>
 
 __doc__ = \
     """
@@ -1089,6 +1089,8 @@ class ArrayIter(LinkedArray):
                 # nco[cn][-1] = nco[cn][-1] + 360
                 data = xr.DataArray(cd, coords=nco,
                                     dims=data.dims, attrs=data.attrs)
+                # need to activate nio accessor
+                _ = data.nio
                 # data = data.roll(**{cn: j}, roll_coords=True)
                 # print(cn, j)
                 # print(data)
@@ -2452,14 +2454,32 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         if pdata and ext:
             parr = pdata[-1]
             y, x, c = ext
+            # print(f"restore_view: {parr.coords}")
+            # print(f"restore_view: {parr.dims} {x=} {y=}")
             # dict order must be guaranteed (python >= 3.9)
-            prev = {parr.dims[0]: slice(x[0], x[1], None),
-                    parr.dims[-1]: slice(y[0], y[1], None), }
+            # print(self.restore_clims(parr, parr.dims[0], x[0], x[1]))
+            # print(self.restore_clims(parr, parr.dims[1], y[0], y[1]))
+            prev = self.restore_clims(parr, parr.dims[0], x[0], x[1])
+            prev = self.restore_clims(parr, parr.dims[1], y[0], y[1],
+                                      view=prev)
+            # prev[parr.dims[0]] = self.restore_clims(parr, parr.dims[0], x[0], x[1])
+            # prev = {parr.dims[0]: slice(x[0], x[1], None),
+            #         parr.dims[-1]: slice(y[0], y[1], None), }
             if c:
                 prev[c[0]] = c[1]
         else:
             prev = {}
         return prev
+
+    def restore_clims(self, arr, dim, low, high, step=None, view=None):
+        view = view or {}
+        co = arr[dim]
+        if np.issubdtype(co.dtype, np.datetime64):
+            low = mplib.dates.num2date(low)
+            high = mplib.dates.num2date(high)
+        view[dim] = slice(low, high, step)
+        return view
+
 
     def cache_view(self, prev=None):
         """Update cache of view properties."""
@@ -2471,7 +2491,7 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         view = {}
         draw = draw or {}
         dims = src.dims
-
+        # print(f"parse_view: {self.view=}")
         if crs:
             view['extent'] = self.view.get(crs)
 
@@ -2480,6 +2500,7 @@ class FigureInteractive(zplt.FigureCore, DataTree):
                 s = coord_prop(co, arr, dims, self.view, draw)
             except KeyError:
                 continue
+            # print(f"parse_view/coord_prop:{co}: {s}")
             if isinstance(s, slice):
                 mm = {}
                 if isinstance(s.start, int):
@@ -2697,6 +2718,7 @@ class FigureControl():
         params = self.view_params(fig, True, 'axis', src=src, array=arr)
         # print(params)
         axis = self.axis_params(fig, array=arr)
+        # print(f"{axis=}")
         # print(params.params())
         # locallog.info("invoke: before plot")
         # print(view, style)
@@ -3979,7 +4001,7 @@ def normalize_selection(co, sel, method=None, index=None):
     method = method or 'nearest'
     locallog.debug(f"[{co.name}] {sel=}")
     c0 = co.values[0]
-    locallog.debug(f"{c0=} {type(c0)=}")
+    locallog.debug(f"{c0=} {type(c0)=} {co.dtype=}")
     if isinstance(c0, np.datetime64):
         if isinstance(sel, str):
             sel = pd.Timestamp(sel)
