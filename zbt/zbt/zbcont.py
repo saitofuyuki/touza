@@ -32,12 +32,10 @@ import zbt.control as zctl
 import zbt.plot as zplt
 import zbt.config as zcfg
 
-locallog = zu.LocalAdapter('zbcont')
+locallog = zu.LocalAdapter(__name__)
 
 _ConfigType = zcfg.ConfigRigid
 
-
-# print(zctl.nc_time_axis)
 
 class ParserUtils():
     """Common parameters and methods for parser."""

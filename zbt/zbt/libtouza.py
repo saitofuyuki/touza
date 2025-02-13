@@ -20,7 +20,7 @@ import collections.abc as cabc
 from . import util as zutl
 from . import param as zpar
 
-locallog = zutl.LocalAdapter('libtouza')
+locallog = zutl.LocalAdapter(__name__)
 
 try:
     import zbt.env as zenv

@@ -50,7 +50,7 @@ except ModuleNotFoundError:
 import zbt.util as zu
 import zbt.config as zcfg
 
-locallog = zu.LocalAdapter('control')
+locallog = zu.LocalAdapter(__name__)
 
 _ConfigType = zcfg.ConfigRigid
 

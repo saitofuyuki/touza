@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp <2024/07/16 13:09:06 fuyuki touza.py>
+# Time-stamp: <2025/02/13 09:24:38 fuyuki config.py>
 
 __doc__ = \
     """
@@ -20,7 +20,7 @@ import zbt.util as zu
 
 __all__ = ['ConfigBase', 'ConfigRigid', 'ConfigFlex', ]
 
-locallog = zu.LocalAdapter('config')
+locallog = zu.LocalAdapter(__name__)
 
 
 # ### Config

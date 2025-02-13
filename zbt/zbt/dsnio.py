@@ -26,7 +26,7 @@ from . import util as zutl
 from . import libtouza as zlt
 from . import param as zpar
 
-locallog = zutl.LocalAdapter('dsnio')
+locallog = zutl.LocalAdapter(__name__)
 
 LOAD_TOUZA = None
 

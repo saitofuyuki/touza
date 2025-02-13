@@ -23,7 +23,7 @@ from . import util as zu
 from . import libtouza
 from . import dsnio
 
-locallog = zu.LocalAdapter('xrnio')
+locallog = zu.LocalAdapter(__name__)
 
 _RECDIM_ATTR = '_nio_recdim'
 
