@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/20 12:37:10 fuyuki zbcont.py>
+# Time-stamp: <2025/02/12 08:09:44 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -721,7 +721,7 @@ class Options(ParserUtils, ap.Namespace):
         else:
             if not isinstance(param, (list, tuple)):
                 param = [param]
-            if zctl.nc_time_axis is None:
+            if zu.NC_EPOCH is None:
                 locallog.warning("numpy date type enabled"
                                  " (no nc_time_axis module).")
                 if npt not in param:

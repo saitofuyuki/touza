@@ -32,12 +32,6 @@ import matplotlib.animation as animation
 import matplotlib.backend_bases as mbb
 import mpl_toolkits.axes_grid1.inset_locator as m1i
 import cftime
-try:
-    import nc_time_axis
-except ModuleNotFoundError:
-    nc_time_axis = None
-
-_nc_epoch = nc_time_axis._TIME_UNITS if nc_time_axis else None
 
 import cartopy.util as cutil
 
@@ -4001,7 +3995,7 @@ def normalize_selection(co, sel, method=None, index=None):
         else:
             # print(type(c0), cal)
             ### "days since 2000-01-01",
-            sel = cftime.num2date(sel, units=_nc_epoch, calendar=cal)
+            sel = cftime.num2date(sel, units=zu.NC_EPOCH, calendar=cal)
         locallog.debug(f"date: {sel=} {type(sel)=} ")
 
     cc = is_cyclic_coord(co)

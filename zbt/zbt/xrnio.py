@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/05 10:04:50 fuyuki xrnio.py>
+# Time-stamp: <2025/02/12 08:08:10 fuyuki xrnio.py>
 
 __doc__ = \
     """
@@ -114,7 +114,7 @@ class TouzaNioAccessor:
         if recco.shape:
             rr = []
             for item in recco:
-                print(f"{item=}")
+                # print(f"{item=}")
                 # item = item.item()
                 idx = index(recs, item)
                 # print(f"[{idx}]{item.item()=}")

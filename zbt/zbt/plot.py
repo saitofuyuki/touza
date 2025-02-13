@@ -42,25 +42,18 @@ import cartopy.util as cutil
 import cartopy.mpl.geoaxes as cmgeo
 import cartopy.mpl.ticker as cmtick
 
-import zbt.util as zu
-import zbt.config as zcfg
-
 import cftime
 import pandas
 
-try:
-    import nc_time_axis
-    _nc_epoch = nc_time_axis._TIME_UNITS
-except ModuleNotFoundError:
-    nc_time_axis = None
-    _nc_epoch = None
+import zbt.util as zu
+import zbt.config as zcfg
 
-locallog = zu.LocalAdapter('plot')
+locallog = zu.LocalAdapter(__name__)
 
 _ConfigType = zcfg.ConfigRigid
 
 # ### helper functions
-def is_xr(obj):
+def is_xr(obj) -> bool:
     """Check if obj is DataArray instance"""
     return isinstance(obj, xr.DataArray)
 
@@ -2228,7 +2221,7 @@ def date_normalize(v, ref):
             cft = cftime.to_tuple(pts)
             v = cftime.datetime(*cft, calendar=cal)
         elif not isinstance(vt, cftime.datetime):
-            v = cftime.num2date(v, units=_nc_epoch, calendar=cal)
+            v = cftime.num2date(v, units=zu.NC_EPOCH, calendar=cal)
     return v
 
 

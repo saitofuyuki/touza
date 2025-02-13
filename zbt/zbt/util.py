@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp <2024/07/16 13:09:06 fuyuki touza.py>
+# Time-stamp: <2025/02/13 09:27:15 fuyuki util.py>
 
 """
 Common helper utilities for TOUZA/Zbt.
@@ -25,15 +25,23 @@ import numpy
 # import pynput.keyboard as PK
 # import termios
 
-__all__ = ['LocalAdapter',
+__all__ = ['NC_EPOCH',
+           'LocalAdapter',
            'WrapCDLL', 'AutoString', 'NameMap',
            'tostr', 'toint', 'tonumber',
            'flatten', 'map_recursive', 'join_attrs',
            'set_default', 'logger',
            'diag', ]
 
+# nc_time_axis wrapper
+try:
+    import nc_time_axis
+    NC_EPOCH = nc_time_axis._TIME_UNITS
+except ModuleNotFoundError:
+    NC_EPOCH = None
+
 # library logging
-logger = logging.getLogger(name='zbt')
+logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
 FMT = '{name}[{levelname}] {message}'
 formatter = logging.Formatter(FMT, style='{')
@@ -746,9 +754,9 @@ def main(argv):
         chk = k in X
         try:
             print(f"name-only[{k}]: {X[k]} / {chk}")
-        except Exception as e:
+        except IndexError as e:
             print(f"name-only[{k}] failed / {chk}")
-            print(f"{type(e)}{e}")
+            print(f"error={e}")
 
     attrs = {'x0': 'X000 ', 'x10': ' X010 ', 'x2': ' X002',
              'y0': 'Y000 ', 'y10': ' Y010 ', 'y2': ' Y002', }
