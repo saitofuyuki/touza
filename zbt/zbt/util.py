@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/13 09:27:15 fuyuki util.py>
+# Time-stamp: <2025/02/17 10:50:32 fuyuki util.py>
+#
+# Copyright (C) 2024, 2025
+#           Japan Agency for Marine-Earth Science and Technology
+#
+# Licensed under the Apache License, Version 2.0
+#   (https://www.apache.org/licenses/LICENSE-2.0)
 
 """
 Common helper utilities for TOUZA/Zbt.
 
 :Source:     zbt/util.py
-:Maintainer: SAITO Fuyuki <saitofuyuki@jamstec.go.jp>
+:Maintainer: SAITO Fuyuki
 :Created:    Jul 16 2024
 """
 
@@ -43,7 +49,7 @@ except ModuleNotFoundError:
 # library logging
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
-FMT = '{name}[{levelname}] {message}'
+FMT = '[{levelname}] {message}'
 formatter = logging.Formatter(FMT, style='{')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
@@ -397,12 +403,13 @@ class NameMap(dict):
         # print('val:', repr(val))
         # print('items:', super().items())
         for pfx, arr in super().items():
+            # print(pfx, arr)
             try:
                 idx = arr.index(val)
                 return self.format_key((pfx, idx), sep=sep)
             except ValueError:
                 pass
-        raise ValueError
+        raise ValueError(f"{val}")
 
     def _ensure_base(self, key):
         """Initialize base mapping as empty list if key is not set"""
