@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/11 20:45:01 fuyuki test_xrnio.py>
+# Time-stamp: <2025/02/05 09:13:47 fuyuki test_xrnio.py>
 
 import sys
 import xarray as xr
 import itertools
 import pathlib as plib
-import numpy
+import numpy as np
+import pandas as pd
+import cftime
 
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
@@ -13,6 +15,11 @@ import cartopy.crs as ccrs
 sys.path.insert(0, str(plib.Path(__file__).parents[1]))
 
 import zbt.xrnio as zxr
+
+# @xr.register_dataarray_accessor("nio")
+# class NioAccessor:
+#     def __init__(self, xarray_obj):
+#         print(f"accessor: {xarray_obj}")
 
 
 def main(argv):
@@ -22,6 +29,8 @@ def main(argv):
     proj = None
     check_record = None
     calendar = None
+    # xr.set_options(enable_cftimeindex=True)
+
     while argv:
         if argv[0][0] != '-':
             break
@@ -39,19 +48,83 @@ def main(argv):
                 calendar = False
             elif sub == 'c':
                 calendar = 'cftime'
+            elif sub == 'n':
+                calendar = 'numpy'
         argv = argv[1:]
 
     for a in argv:
         print(f'##### file: {a}')
-        xds = xr.open_dataset(a, decode_coords=decode_coords,
-                              calendar=calendar)
+        try:
+            xds = xr.open_dataset(a, decode_coords=decode_coords,
+                                  calendar=calendar)
+        except TypeError as err:
+            print(err)
+            print("reopen without calendar.")
+            xds = xr.open_dataset(a, decode_coords=decode_coords)
         print('### dataset')
         print(xds)
         for g in [xds]:
             for vn, vv in g.data_vars.items():
                 print(f"# var:{vn} {vv.shape} {type(vv)}")
-                # print(vv)
-                print(vv.attrs)
+                print(vv)
+                print(f"{vv.attrs=}")
+                # print(f"{vv.nio.recco=}")
+                # need activate nio attributes by vv.nio access.
+                # _ = vv.nio
+                # print(f"{vv.nio=}")
+                # print(f"{vv.attrs=}")
+                # print(g[vn].attrs)
+                print(f"{type(vv[0])=}")
+                print(f"{vv[0].attrs=}")
+                print(f"{vv.attrs=}")
+                # vv.nio._recidx = True
+                # print(f"{vv.nio._recidx=}")
+                # dt1 = vv.nio.get('DATE1')
+                dt1 = vv.nio.get('DATE1')
+                print(f"{dt1=}")
+                dset = vv.nio.get('DSET')
+                print(f"{dset=}")
+                for cn, co in vv.coords.items():
+                    print(f"coord[{cn}]: {type(co)=}")
+                    print(f"coord[{cn}]: {type(co.data)=}")
+                    print(f"coord[{cn}]: {co.dtype=}")
+                    print(f"coord[{cn}]: {repr(co.item(0))=}")
+                    print(f"coord[{cn}]: {repr(co[0])=}")
+                    print(f"coord[{cn}]: {np.issubdtype(co.dtype, np.datetime64)=}")
+                    has_dt = hasattr(co, 'dt')
+                    print(f"coord[{cn}]: {has_dt=}")
+                    # print(f"coord[{cn}]: {co.nio=}")
+                    if hasattr(co, 'dt'):
+                        print(co.dt.strftime("%Y%m%d"))
+                        print(f"{co.dt.calendar=}")
+                        dt = '2000-05'
+                        vsel = None
+                        try:
+                            print(f"co[{dt}]")
+                            print(co.sel({cn: dt}, method='nearest'))
+                        except (TypeError, KeyError) as err:
+                            print(f"Retry: {err}")
+                            dt = pd.Timestamp(dt)
+                            dt = cftime.to_tuple(dt)
+                            dt = cftime.datetime(*dt, calendar=co.dt.calendar)
+                            print(f"Retry: {dt=}")
+                            print(f"co[{dt}]")
+                            print(co.sel({cn: dt}, method='nearest'))
+                        try:
+                            print(f"vv[{dt}]")
+                            vsel = vv.sel({cn: dt}, method='nearest')
+                            print(vsel)
+                            # print(f"{vsel.nio._recidx=}")
+                            dt1 = vsel.nio.get('DATE1')
+                            print(f"{dt1=}")
+                            dset = vsel.nio.get('DSET')
+                            print(f"{dset=}")
+                            # nac = vsel.nio
+                            # print(f"{vsel.nio.recco=}")
+                            print(vsel.attrs)
+                        except (TypeError, KeyError) as err:
+                            print(f"Error: {err}")
+
                 # if check_record:
                 #     print(vv.coords)
                 #     try:
