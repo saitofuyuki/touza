@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp <2024/07/16 13:09:06 fuyuki touza.py>
+# Time-stamp: <2025/02/19 17:06:48 fuyuki config.py>
 
 __doc__ = \
     """
@@ -20,7 +20,7 @@ import zbt.util as zu
 
 __all__ = ['ConfigBase', 'ConfigRigid', 'ConfigFlex', ]
 
-locallog = zu.LocalAdapter('config')
+locallog = zu.LocalAdapter(__name__)
 
 
 # ### Config
@@ -137,9 +137,10 @@ class ConfigBase():
                         error(f"Inconsistent length {len(cv)}"
                               f" >> {len(rv)}", par)
                 cv = type(rv)(cv)
-                if locallog.is_info():
+                if locallog.is_info() and cv != rv:
                     key = '.'.join(par)
                     locallog.info(f"{pfx}[{key}] {rv} > {cv}")
+
             if attr:
                 setattr(ref, ak, cv)
             else:

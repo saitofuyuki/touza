@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2024/10/18 10:32:14 fuyuki test_libtouza.py>
+# Time-stamp: <2025/01/24 09:10:00 fuyuki test_libtouza.py>
 
 import sys
 import functools as ft
@@ -12,6 +12,90 @@ sys.path.insert(0, str(plib.Path(__file__).parents[1]))
 
 from zbt import libtouza as zlt
 from zbt import util as zu
+
+
+class Shape(tuple):
+    def __new__(cls, *shape):
+        return super(Shape, cls).__new__(cls, shape)
+
+    def step(self, cur, step, cycle=False):
+        ret = ()
+        n = 0
+        mw = min(map(len, [cur, step, self]))
+        for j in reversed(range(mw)):
+            c, s, w = cur[j], step[j], self[j]
+            n, m = divmod(s + n, w)
+            m = m + (c + w if c < 0 else c)
+            r, m = divmod(m, w)
+            n = n + r
+            if c < 0:
+                m = m - w
+            ret = (m, ) + ret
+        ret = ret + cur[mw:]
+        if not cycle:
+            if n > 0:
+                raise OverflowError(f"[{n}] {cur} + {step} > {self}")
+            if n < 0:
+                raise OverflowError(f"[{n}] {cur} + {step} < 0 [{self}]")
+        return ret
+
+    def __call__(self, step, ini=None):
+        if all(s == 0 for s in step):
+            raise ValueError(f"invalid step {step}")
+        zero = (0, ) * len(self)
+        ini = ini or zero
+        chk = tuple(w + i if i < 0 else i
+                    for i, w in zip(ini, self))
+        if chk < zero or chk >= self:
+            return
+        while True:
+            try:
+                yield ini
+                ini = self.step(ini, step)
+            except OverflowError:
+                break
+
+    def __str__(self):
+       return f"Shape{super().__str__()}"
+
+
+def TestShape():
+    Sh = Shape(3, 4, 5)
+    for step in [(0, 0, 1), (0, 0, 7), (0, 1), ]:
+        off = (0, ) * len(Sh)
+        ini = off
+        while True:
+            try:
+                nxt = Sh.step(off, step)
+                print(f"Shape[{Sh}] {off} + {step} = {nxt}")
+                off = nxt
+            except OverflowError as err:
+                print(err)
+                break
+        for cur in Sh(step, ini):
+            print(f"iter{step}:Shape[{Sh}] > {cur}")
+
+    for step in [(0, 0, -1), (0, 0, -7), ]:
+        off = tuple(w - 1 for w in Sh)
+        while True:
+            try:
+                nxt = Sh.step(off, step)
+                print(f"Shape[{Sh}] {off} + {step} = {nxt}")
+                off = nxt
+            except OverflowError as err:
+                print(err)
+                break
+
+    for step in [(0, 0, -1), (0, 0, -7), ]:
+        off = (-1, ) * len(Sh)
+        while True:
+            try:
+                nxt = Sh.step(off, step)
+                print(f"Shape[{Sh}] {off} + {step} = {nxt}")
+                off = nxt
+            except OverflowError as err:
+                print(err)
+                break
 
 
 def main(argv):
@@ -125,8 +209,8 @@ def main(argv):
         nco = lib.tnb_co_size(hgrp, vidx)
         nrecs = lib.tnb_var_recs(hgrp, vidx)
         start = (0, ) * nco
-        shape = zu.Shape(*tuple(lib.tnb_co_len(hgrp, vidx, c)
-                                for c in range(nco)))
+        shape = Shape(*tuple(lib.tnb_co_len(hgrp, vidx, c)
+                             for c in range(nco)))
         count = (1, ) * (nco - 1) + shape[-1:]
         step  = (0, ) * (nco - 2) + (1, )
         full = ft.reduce(op.mul, count, 1)
