@@ -1,10 +1,21 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/01/20 13:17:25 fuyuki NEWS>
+# Time-stamp: <2025/02/21 14:54:19 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.14.3
+** Plotting with multiple-dimension coordinates introduced.
+Plotting using so-called non-dimension coordinates are enabled.
+If applicable, the target coordinates to plot is controlled by
+=--plot= arguments of =zbcont=, to select either dimension or
+non-dimension coordinates.
+See =zbt/README-zbt.org= for detail.
+** Document in python sources partially improved.
+** More command-line arguments are added to =zbcont=.
+** bug fixes in zbt, nio.
 
 * Changes in 1.14.2
 ** Struggle for python clean distribution.
