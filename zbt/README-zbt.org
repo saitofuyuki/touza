@@ -415,6 +415,65 @@ files.  Therefore, all (or most of) the ~xarray~ methods should work.
 See https://docs.xarray.dev/ for ~xarray~ reference.
 See https://matplotlib.org/stable/ for ~matplotlib~  reference.
 
+** Support of non-dimension coordinates (experimental)
+*The features below are experimental, which is subject to be
+redesigned in later releases.*
+
+Typically, a tripolar field has been processed with dummy GTOOL3 axis
+files on the longitude and latitude.  Now zbt accepts an extension of
+GTOOL3 axis files of multiple dimension.
+
+The extended axis files are named as same as traditional ones.
+:   1 OCLONTPT360        0S     0   UR8 00000101 000000 OCLONTPT360,OCLATTPT256,
+: % ngtls -n somewhere/GTAXLOC.OCLONTPT360
+:   1 OCLONTPT360        0S     0   UR8 00000101 000000  1:360    1:256    1:1
+: % ngtls somewhere/GTAXLOC.OCLATTPT256
+:   1 OCLATTPT256        0S     0   UR8 00000101 000000 OCLONTPT360,OCLATTPT256,
+: % ngtls -n somewhere/GTAXLOC.OCLATTPT256
+:   1 OCLATTPT256        0S     0   UR8 00000101 000000  1:360    1:256    1:1
+They are both simple two dimension files to store corresponding
+longitude/latitude for each gridpoint.
+
+When extended axis files are searchable, dataset is parsed as follows:
+: >>> import xarray as xr
+: >>> xds = xr.open_dataset('samples/tripolar_field')
+: >>> xds
+: <xarray.xrNioDataset> Size: 6MB
+: Dimensions:      (record: 12, OCDEPT63: 1, OCLATTPT256: 256, OCLONTPT360: 360)
+: Coordinates:
+:     OCLONTPT360  (OCLATTPT256, OCLONTPT360) float64 737kB ...
+:     OCLATTPT256  (OCLATTPT256, OCLONTPT360) float64 737kB ...
+:   * OCDEPT63     (OCDEPT63) float64 8B 0.0
+:   * record       (record) object 96B 2001-01-16 12:00:00 ... 2001-12-16 12:00:00
+: Data variables:
+:     TO           (record, OCDEPT63, OCLATTPT256, OCLONTPT360) float32 4MB ...
+
+If traditional single-dimension axis files (the identical basenames)
+are found earlier, then they are adopted instead:
+: >>> xds
+: <xarray.xrNioDataset> Size: 4MB
+: Dimensions:      (record: 12, OCDEPT63: 1, OCLATTPT256: 256, OCLONTPT360: 360)
+: Coordinates:
+:   * OCLONTPT360  (OCLONTPT360) float32 1kB -299.5 -298.5 -297.5 ... 58.5 59.5
+:   * OCLATTPT256  (OCLATTPT256) float32 1kB -88.0 -85.75 -85.25 ... 89.24 89.58
+:   * OCDEPT63     (OCDEPT63) float32 4B 1.0
+:   * record       (record) object 96B 2001-01-16 12:00:00 ... 2001-12-16 12:00:00
+: Data variables:
+:     TO           (record, OCDEPT63, OCLATTPT256, OCLONTPT360) float32 4MB ...
+
+Thanks to ~xarray~ and ~matplotlib~, these coordinates are used
+automatically.
+: >>> xds['TO'][0,0].plot()
+: >>> plt.show()
+
+#+CAPTION: Demonstration of a tri-polar field plot, with non-dimension coordinates
+#+NAME:   fig:demo_tp0.png
+[[./doc/demo_tp0.png]]
+
+#+CAPTION: Demonstration of a tri-polar field plot, with traditional axis files
+#+NAME:   fig:demo_tp1.png
+[[./doc/demo_tp1.png]]
+
 * Description of TOUZA/Zbt commands
 ** ~zbcont~ - a (sample) command of contour plot
 *** Deficiencies
@@ -791,6 +850,75 @@ List of =<var>= to draw, the others are ignored.
 : % zbcont --plot ,record   # change the horizontal coordinate as record
 : % zbcont --plot 0,-1      # change the vertical and horizontal coordinate
 :                           # as the first and the last, respectively
+***** (experimental) Plot with non-dimension coordinates
+It is possible an data array to have non-dimension coordinates in
+addition to dimension coordinates.  For example, the following variable =tas=
+is originally defined on rotated longitude/latitude (=rlon=/=rlat=) as
+array dimension:
+: >>> :
+: >>> tas
+: <xarray.DataArray 'tas' (time: 120, height: 1, rlat: 327, rlon: 326)> Size: 51MB
+: [12792240 values with dtype=float32]
+: Coordinates:
+:   * time     (time) datetime64[ns] 960B 2006-01-16 ... 2015-12-16
+:   * rlon     (rlon) float64 3kB -17.65 -17.55 -17.45 ... 14.65 14.75 14.85
+:   * rlat     (rlat) float64 3kB -15.8 -15.7 -15.6 -15.5 ... 16.5 16.6 16.7 16.8
+:     lon      (rlat, rlon) float64 853kB ...
+:     lat      (rlat, rlon) float64 853kB ...
+In addition, there are two non-dimension coordinates, =lon=/=lat=,
+which are /logical/[fn:: Please do not confuse by the usage of terms
+/physical/ and /logical/.  The former corresponds to how the elements
+are stored in memory, while the latter does to how we interpret them
+on the real-world placements] geographical coordinates as functions of =rlon=
+and =rlat=.  By default, plotting are performed using the dimension
+coordinate =rlon=/=rlat=.  Figure coordinate argument =--plot= can
+control this feature, by:
+: % zbcont --plot lat,lon datafile
+The plot may not always succeed:  too much irregular distribution of
+the logical coordinates (=lon=, =lat=) over the /physical/ coordinates
+(=rlon=, =rlat=) may damage the plot.  This is because =zbcont= relies
+on the feature of ~matplotlib~ ~contour~ method.  It is expected that
+using ~tricontour~ method instead would resolve the problem, which is
+reserved for future developments.
+
+It is also possible than an data array have only non-dimension
+coordinates corresponding to its dimension.  This may happen when
+a MIROC tripolar field is opened:
+: >>> :
+: >>> TO
+: <xarray.DataArray 'TO' (record: 12, OCDEPT63: 1, OCLATTPT256: 256,
+:                         OCLONTPT360: 360)> Size: 4MB
+: [1105920 values with dtype=float32]
+: Coordinates:
+:     OCLONTPT360  (OCLATTPT256, OCLONTPT360) float64 737kB ...
+:     OCLATTPT256  (OCLATTPT256, OCLONTPT360) float64 737kB ...
+:   * OCDEPT63     (OCDEPT63) float64 8B 0.0
+:   * record       (record) object 96B 2001-01-16 12:00:00 ... 2001-12-16 12:00:00
+In the above case, the coordinates =OCLONTPT360=, =OCLATTPT256= have
+the same names as array's dimensions, and there are no 1-d
+coordinates corresponding to both dimensions.
+Plotting are automatically performed with non-dimension coordinates
+even without =--plot= arguments.
+In order to plot using the array dimension, you need to run =zbcont=
+with =--no-decode_coords= arguments.
+
+There is a deficiency around non-dimension coordinate plotting.
+The number of dimensions to alternate must match with that of the
+original dimensions.  In other words, a data array with following
+shape cannot be plotted:
+: >>> bad_array
+: <xarray.DataArray 'bad_array' (serial:100)> Size: 1kB
+: Coordinates:
+:     lon      (serial) float64 1kB ...
+:     lat      (serial) float64 1kB ...
+Physically bad_array is one dimension (=serial=) array, but
+two-dimension coordinates are assigned for each gridpoints, which
+forms logically a two-dimension field.  Their number of dimensions do
+not matches, thus =zbcont= cannot handle this array.
+
+Improving this feature is definitely a next target of development for
+a coming release.
+
 **** (experimental) map overlay (=--map=, =-m=)
 : % zbcont -m LETTERS
 : % zbcont -m FEATURE[,FEATURE...]
@@ -824,7 +952,7 @@ List of =<var>= to draw, the others are ignored.
 
 ***** Known problems, tips and tricks
 ****** =PlateCarree=
-Longitude locator may fail to put the label beyond the longitue span
+Longitude locator may fail to put the label beyond the longitude span
 of original data-array.  For example, when the span of a data array is
 -300.0:60.0, the labels beyond 60 degree are not shown with default parameters.
 Shifting of the central longitude may help to recover the labels:
@@ -834,6 +962,15 @@ Shifting of the central longitude may help to recover the labels:
 : % zbcont -Ppc+0.9 datafile   # Strange
 : % zbcont -Ppc-0.9 datafile   # Strange
 Need some trials to detect the least amount of shift.
+#+CAPTION: Demonstration of PlateCarree (=zbcont -Ppc+1 datafile=).
+#+NAME:   fig:demo_PlateCarree-1.png
+[[./doc/demo_PlateCarree-1.png]]
+#+CAPTION: Demonstration of PlateCarree (=zbcont -Ppc datafile=).
+#+NAME:   fig:demo_PlateCarree-0.png
+[[./doc/demo_PlateCarree-0.png]]
+#+CAPTION: Demonstration of PlateCarree (=zbcont -Ppc+0.9 datafile=).
+#+NAME:   fig:demo_PlateCarree-2.png
+[[./doc/demo_PlateCarree-2.png]]
 
 This problem is one of the next targets to fix.
 ****** =NorthPolarStereo= =SouthPolarStereo=
@@ -844,7 +981,24 @@ the polar regions, limiting of latitude range is generally a good idea.
 : % zbcont -Psps datafile      # Strange
 : % zbcont -Pnps -Dlatitude/30.0:90.0 datafile     # Works as expected
 : % zbcont -Psps -Dlatitude/-90.0:-30.0 datafile   # Works as expected
-Of course a valid coordinate name should be used (=latitude=, in this case).
+Of course a valid coordinate name should be used (=latitude=, in this
+case).
+#+CAPTION: Demonstration of NorthPolarStereo (=zbcont -Pnps datafile=).
+#+NAME:   fig:demo_NorthPolarStereo-0.png
+[[./doc/demo_NorthPolarStereo-0.png]]
+
+#+CAPTION: Demonstration of NorthPolarStereo (=zbcont -Pnps -Dlatitude/30.0:90.0 datafile=).
+#+NAME:   fig:demo_NorthPolarStereo-1.png
+[[./doc/demo_NorthPolarStereo-1.png]]
+
+#+CAPTION: Demonstration of SouthPolarStereo (=zbcont -Psps datafile=).
+#+NAME:   fig:demo_SouthPolarStereo-0.png
+[[./doc/demo_SouthPolarStereo-0.png]]
+
+#+CAPTION: Demonstration of SouthPolarStereo (=zbcont -Psps -Dlatitude/-90.0:-30.0 datafile=).
+#+NAME:   fig:demo_SouthPolarStereo-1.png
+[[./doc/demo_SouthPolarStereo-1.png]]
+
 ****** =Orthographic=
 Strange domain may be chosen to plot without manual limiting of plot region.
 Longitude span to work depends on the central longitude
@@ -853,8 +1007,28 @@ required from the central longitude for both limits.
 : % zbcont -Pg datafile                                 # Strange
 : % zbcont -Pg -Dlongitude/-180.0:180.0 datafile
 : % zbcont -Pg+90 -Dlongitude/-180.0:180.0 datafile
-: % zbcont -Pg+100 -Dlongitude/-180.0:180.0 datafile    # Strange (insufficent spaces)
+: % zbcont -Pg+100 -Dlongitude/-180.0:180.0 datafile    # Strange (insufficient spaces)
 : % zbcont -Pg+100 -Dlongitude/0.0:360.0 datafile
+#+CAPTION: Demonstration of Orthographic (=zbcont -Pg datafile=).
+#+NAME:   fig:demo_Orthographic-0.png
+[[./doc/demo_Orthographic-0.png]]
+
+#+CAPTION: Demonstration of Orthographic (=zbcont -Pg -Dlongitude/-180.0:180.0 datafile=).
+#+NAME:   fig:demo_Orthographic-1.png
+[[./doc/demo_Orthographic-1.png]]
+
+#+CAPTION: Demonstration of Orthographic (=zbcont -Pg+90 -Dlongitude/-180.0:180.0 datafile=).
+#+NAME:   fig:demo_Orthographic-2.png
+[[./doc/demo_Orthographic-2.png]]
+
+#+CAPTION: Demonstration of Orthographic (=zbcont -Pg+100 -Dlongitude/-180.0:180.0 datafile=).
+#+NAME:   fig:demo_Orthographic-3.png
+[[./doc/demo_Orthographic-3.png]]
+
+#+CAPTION: Demonstration of Orthographic (=zbcont -Pg+100 -Dlongitude/0.0:360.0 datafile=).
+#+NAME:   fig:demo_Orthographic-4.png
+[[./doc/demo_Orthographic-4.png]]
+
 ****** =NearsidePerspective=
 Strange domain may be chosen to plot (sometimes even the program
 aborts with an error) when the central *latitude* is specified.
@@ -864,15 +1038,41 @@ aborts with an error) when the central *latitude* is specified.
 : % zbcont -Pnp+90+10 datafile  # Aborts
 : :
 : shapely.errors.GEOSException: IllegalArgumentException: point array must contain 0 or >1 elements:
+
+#+CAPTION: Demonstration of NearsidePerspective (=zbcont -Pnp datafile=).
+#+NAME:   fig:demo_NearsidePerspective-0.png
+[[./doc/demo_NearsidePerspective-0.png]]
+
+#+CAPTION: Demonstration of NearsidePerspective (=zbcont -Pnp+0+30 datafile=).
+#+NAME:   fig:demo_NearsidePerspective-1.png
+[[./doc/demo_NearsidePerspective-1.png]]
+
+#+CAPTION: Demonstration of NearsidePerspective (=zbcont -Pnp+0+30 -Dlongitude/-180.0:180.0 -Dlatitude/-90.0:90.0 datafile=).
+#+NAME:   fig:demo_NearsidePerspective-2.png
+[[./doc/demo_NearsidePerspective-3.png]]
+
 ****** =Mercator=
 Strange domain may be chosen to plot.  Need manual adjustment of
 the longitude range *and* the central longitude accordingly.
-Longtude span should be slightly larger than 180 degree at both side
+Longitude span should be slightly larger than 180 degree at both side
 for the global view.
 : % zbcont -Pm datafile                                 # Strange
 : % zbcont -Pm -Dlongitude/-180.0:180.0 datafile        # Still strange
 : % zbcont -Pm -Dlongitude/-180.1:180.1 datafile        # Works
 : % zbcont -Pm+30 -Dlongitude/-150.1:210.1 datafile     # Works
+
+#+CAPTION: Demonstration of Mercator (=zbcont -Pm datafile=).
+#+NAME:   fig:demo_Mercator-0.png
+[[./doc/demo_Mercator-0.png]]
+
+#+CAPTION: Demonstration of Mercator (=zbcont -Pm -Dlongitude/-180.0:180.0 datafile=).
+#+NAME:   fig:demo_Mercator-1.png
+[[./doc/demo_Mercator-1.png]]
+
+#+CAPTION: Demonstration of Mercator (=zbcont -Pm -Dlongitude/-180.1:180.1 datafile=).
+#+NAME:   fig:demo_Mercator-2.png
+[[./doc/demo_Mercator-2.png]]
+
 ****** =Mollweide=, =Hammer=
 Strange domain may be chosen to plot, and any workaround solution to
 recover the domain have not yet been found.
@@ -1078,7 +1278,6 @@ GTOOL3 (TOUZA/Nio) format file, based on ~zbt.libtouza~ module.
   : v = ds['var']     # file reading is not performed
   : print(v[2:5:2] )  # read file and set v slice, which will fail.
 - =TouzaNioCoDataset= class does not parse time coordinate.
-
 ** ~zbt.xrnio~ - ~xarray~ backends of zbt.dsnio module
 ** ~zbt.plot~ - Plot and layout methods
 ** ~zbt.control~ - Iteration control on xarray-like data structure
@@ -1136,5 +1335,9 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  RdPu BuPu GnBu PuBu YlGnBu PuBuGn BuGn YlGn yarg PRGn
 #  LocalWords:  Wistia afmhot BrBG PuOr RdGy RdYlBu RdYlGn coolwarm
 #  LocalWords:  bwr hsv qual gnuplot CMRmap cubehelix brg nipy ncar
-#  LocalWords:  cmap sym asinh arcsinh eps png jpg zbtFigure nd th
-#  LocalWords:  Ogochi Koji san Tatsuo Komuro Yoshiki
+#  LocalWords:  cmap sym asinh arcsinh eps png jpg zbtFigure nd th fn
+#  LocalWords:  Ogochi Koji san Tatsuo Komuro Yoshiki tripolar OCDEPT
+#  LocalWords:  OCLONTPT OCLATTPT gridpoint basenames tri tas rlon
+#  LocalWords:  rlat lon datafile tricontour stereographic Pnps Psps
+#  LocalWords:  Dlatitude Dlongitude Pnp IllegalArgumentException
+#  LocalWords:  gridpoints
