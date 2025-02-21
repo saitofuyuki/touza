@@ -1,9 +1,9 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2024/06/28 07:32:08 fuyuki Makefile.am>
+# Time-stamp: <2025/02/14 18:08:54 fuyuki Makefile.am>
 
-# Copyright (C) 2021,2022,2023,2024
+# Copyright (C) 2021,2022,2023,2024,2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -56,6 +56,13 @@ qoxi_SOURCES =
 qoxi_SOURCES += $(QOXI).F90 jmz.h
 qoxi_to_include =
 EXTRA_qoxi_DEPENDENCIES = $(TOUZA_LIBRARY)
+
+GENTPCO = gentpco
+bin_PROGRAMS += $(GENTPCO)
+gentpco_SOURCES =
+gentpco_SOURCES += $(GENTPCO).F90 jmz.h
+gentpco_to_include =
+EXTRA_gentpco_DEPENDENCIES = $(TOUZA_LIBRARY)
 
 noinst_SCRIPTS += demo-chak.sh demo-convoy.sh
 EXTRA_DIST += demo-chak.sh.in demo-convoy.sh.in

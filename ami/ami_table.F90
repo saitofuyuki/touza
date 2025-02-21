@@ -1,7 +1,7 @@
 !!!_! ami_table.F90 - TOUZA/Ami/table amida-coupler table procedures
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2024/07/14 23:01:08 fuyuki ami_table.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/02/14 08:36:58 fuyuki ami_table.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024
@@ -7105,7 +7105,6 @@ program test_ami_table
   stop
 contains
   subroutine batch_test_nidx(ierr)
-    use TOUZA_Ami_legacy,only: open_geofile_tripolar, read_geofile_tripolar
     use TOUZA_Emu, only: degree_modulo, get_longitude, mid_longitude
     implicit none
     integer,parameter :: KTGT = KDBL
@@ -7586,7 +7585,7 @@ contains
 
   subroutine batch_test_xlat(ierr)
     use TOUZA_Ami_std,only: join_list
-    use TOUZA_Ami_legacy,only: open_geofile_tripolar, read_geofile_tripolar
+    ! use TOUZA_Ami_legacy,only: open_geofile_tripolar, read_geofile_tripolar
     use TOUZA_Emu, only: degree_modulo, get_longitude, mid_longitude, deg2ang
     use TOUZA_Emu, only: gauss_latitude, mid_latitude, rad2ang, round_degree
     implicit none

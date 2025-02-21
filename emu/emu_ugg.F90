@@ -1,10 +1,10 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2024/07/25 15:52:19 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/02/15 21:49:16 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023, 2024
+! Copyright (C) 2022, 2023, 2024, 2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -162,21 +162,36 @@ module TOUZA_Emu_ugg
   interface stp_geogr_zproj
      module procedure stp_geogr_zproj_tr_d
   end interface stp_geogr_zproj
+  interface stp_wsphere_wproj_tr
+     module procedure stp_wsphere_wproj_tr_d
+  end interface stp_wsphere_wproj_tr
   interface stp_z2wproj_atr
      module procedure stp_z2wproj_atr_d
   end interface stp_z2wproj_atr
+  interface stp_w2zproj_atr
+     module procedure stp_w2zproj_atr_d
+  end interface stp_w2zproj_atr
   interface stp_wsphere_lat_tr
      module procedure stp_wsphere_lat_tr_d
   end interface stp_wsphere_lat_tr
   interface stp_wsphere_lon_tr
      module procedure stp_wsphere_lon_tr_d
   end interface stp_wsphere_lon_tr
+  interface stp_geogr_lat_tr
+     module procedure stp_geogr_lat_tr_d
+  end interface stp_geogr_lat_tr
+  interface stp_geogr_lon_tr
+     module procedure stp_geogr_lon_tr_d
+  end interface stp_geogr_lon_tr
   interface is_stp_wsphere_tr
      module procedure is_stp_wsphere_tr_d
   end interface is_stp_wsphere_tr
   interface stp_fwd_tr
      module procedure stp_fwd_tr_d
   end interface stp_fwd_tr
+  interface stp_bwd_tr
+     module procedure stp_bwd_tr_d
+  end interface stp_bwd_tr
   interface stp_set
      module procedure stp_set_d
   end interface stp_set
@@ -577,9 +592,9 @@ module TOUZA_Emu_ugg
      module procedure cosd_canonical_d
   end interface cosd_canonical
 
-  interface angle_modulo
-     module procedure angle_modulo_d
-  end interface angle_modulo
+  interface radian_modulo
+     module procedure radian_modulo_d
+  end interface radian_modulo
 
   interface degree_modulo
      module procedure degree_modulo_d
@@ -684,7 +699,7 @@ module TOUZA_Emu_ugg
   public round_choice, span_longitude,   span_latitude
 
   public :: stp_set
-  public :: stp_fwd_tr
+  public :: stp_fwd_tr, stp_bwd_tr
   public :: stp_geogr_zproj, stp_z2wproj_atr, stp_wsphere_lon_tr, stp_wsphere_lat_tr
   public :: is_stp_wsphere_tr
 
@@ -714,7 +729,7 @@ module TOUZA_Emu_ugg
 
   public set_dlongi
   public degree_modulo, setd_sincos, sind_canonical, cosd_canonical
-  public angle_modulo,  set_sincos,  sin_canonical,  cos_canonical
+  public radian_modulo,  set_sincos,  sin_canonical,  cos_canonical
   public reduced_latitude, azimuth_node, alon_auxsph_ph
 
   public agmpc_table_size, agmpc_gen_table, agmpc_area_core
@@ -4897,12 +4912,53 @@ contains
     wacs = stp_z2wproj_atr(zacs, csco)
     wlo = stp_wsphere_lon_tr(wacs)
     wla = stp_wsphere_lat_tr(wacs)
+    wla(JSIN) = wla(JSIN) * SIGN(1.0_KTGT, - lon(JCOS))
+    if (lon(JCOS).eq.0.0_KTGT) wla(JSIN) = 0.0_KTGT
+    wlo(JSIN) = wlo(JSIN) * SIGN(1.0_KTGT, lon(JSIN))
 
     loro = csco(icache_stp_loround)
     laro = csco(icache_stp_laround)
     wg(JLONGI) = rad2ang(phase(wlo), loro)
     wg(JLATI) = rad2ang(phase(wla), laro)
   end function stp_fwd_tr_d
+
+!!!_  & stp_bwd() - transform from w-sphere to geographic coordinate
+  ! PURE &
+  function stp_bwd_tr_d &
+       & (lon, lat, csco) &
+       & result (zg)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lon(NTRIG)   ! geological coordinates
+    real(kind=KTGT),intent(in) :: lat(NTRIG)
+    real(kind=KTGT),intent(in) :: csco(*)
+    real(kind=KTGT) :: zg(NGEOG)
+
+    real(kind=KTGT) :: zacs(NATRI), wacs(NATRI)
+    real(kind=KTGT) :: zlo(NTRIG), zla(NTRIG)
+
+    real(kind=KTGT) :: loro, laro
+
+    wacs = stp_wsphere_wproj_tr(lon, lat, csco)
+    zacs = stp_w2zproj_atr(wacs, csco)
+
+    if (zacs(JAMP).eq.0.0_KTGT) then
+       zlo(JCOS) = 1.0_KTGT
+       zlo(JSIN) = 0.0_KTGT
+       zla(JCOS) = 0.0_KTGT
+       zla(JSIN) = - csco(icache_stp_solat)
+    else
+       zlo = stp_geogr_lon_tr(zacs)
+       zla = stp_geogr_lat_tr(zacs)
+       zlo(JCOS) = zlo(JCOS) * SIGN(1.0_KTGT, -lat(JSIN))
+       zlo(JSIN) = zlo(JSIN) * SIGN(1.0_KTGT, +lon(JSIN))
+       zla(JSIN) = zla(JSIN) * (- csco(icache_stp_solat))
+    endif
+    loro = csco(icache_stp_loround)
+    laro = csco(icache_stp_laround)
+    zg(JLONGI) = rad2ang(phase(zlo), loro)
+    zg(JLATI) = rad2ang(phase(zla), laro)
+  end function stp_bwd_tr_d
 
 !!!_  & is_stp_wsphere() - check if on the w-sphere
   PURE &
@@ -4934,10 +4990,29 @@ contains
 
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT),parameter :: ZERO = 1.0_KTGT
-    zacs(JCOS) = lon(JCOS)
-    zacs(JSIN) = lon(JSIN)
+    zacs(JCOS) = ABS(lon(JCOS))
+    zacs(JSIN) = ABS(lon(JSIN))
     zacs(JAMP) = lat(JCOS) / (ONE - lat(JSIN) * csco(icache_stp_solat))
   end function stp_geogr_zproj_tr_d
+
+!!!_  & stp_wsphere_wproj() - transform from w-sphere to w-plane projection
+  PURE &
+  function stp_wsphere_wproj_tr_d &
+       & (lon, lat, csco) &
+       & result (wacs)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: lon(NTRIG)   ! geological coordinates
+    real(kind=KTGT),intent(in) :: lat(NTRIG)
+    real(kind=KTGT),intent(in) :: csco(*)
+    real(kind=KTGT) :: wacs(NATRI)
+
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT),parameter :: ZERO = 1.0_KTGT
+    wacs(JCOS) = lon(JCOS)
+    wacs(JSIN) = ABS(lon(JSIN))
+    wacs(JAMP) = lat(JCOS) / (ONE + ABS(lat(JSIN)))
+  end function stp_wsphere_wproj_tr_d
 
 !!!_  & stp_z2wproj() - transform from z-plane to w-plane projection
   PURE &
@@ -4975,6 +5050,43 @@ contains
     wacs(JAMP) = ABS(wh / wd)
 
   end function stp_z2wproj_atr_d
+
+!!!_  & stp_w2zproj() - transform from w-plane to z-plane projection
+  PURE &
+  function stp_w2zproj_atr_d &
+       & (wacs, csco) &
+       & result (zacs)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: wacs(NATRI)
+    real(kind=KTGT),intent(in) :: csco(*)
+    real(kind=KTGT) :: zacs(NATRI)
+
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+    real(kind=KTGT),parameter :: ZERO = 1.0_KTGT
+    real(kind=KTGT),parameter :: TWO = 2.0_KTGT
+
+    real(kind=KTGT) :: wp
+    real(kind=KTGT) :: wd, wr, wi, wh
+
+    ! wacs(JCOS) = lon(JCOS)
+    ! wacs(JSIN) = lon(JSIN)
+    ! wacs(JAMP) = lat(JCOS) / (ONE + lat(JSIN))
+
+    wp = csco(icache_stp_wnpr)
+
+    wd = - ((wacs(JAMP) ** 2 + ONE) &
+         &  + (TWO * wacs(JAMP) * wacs(JCOS)))
+
+    wr = (wacs(JAMP) + ONE) * (wacs(JAMP) - ONE)
+    wi = TWO * wacs(JAMP) * wacs(JSIN)
+    wh = HYPOT(wr, wi)
+
+    zacs(JCOS) = wr * SIGN(ONE, wd)
+    zacs(JSIN) = wi * SIGN(ONE, wd)
+    zacs(JAMP) = ABS(wh * wp / wd)
+
+  end function stp_w2zproj_atr_d
 
 !!!_  & stp_wsphere_lat() - transform w-plane projection to latitude (on w sphere)
   PURE &
@@ -5014,6 +5126,45 @@ contains
 
     lon(1:NTRIG) = nml_sincos(s, c)
   end function stp_wsphere_lon_tr_d
+
+!!!_  & stp_geogr_lat() - transform z-plane projection to latitude
+  PURE &
+  function stp_geogr_lat_tr_d &
+       & (zacs) &
+       & result (lat)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: zacs(NATRI)
+    real(kind=KTGT) :: lat(NTRIG)
+
+    real(kind=KTGT),parameter :: TWO = 2.0_KTGT
+    real(kind=KTGT),parameter :: ONE = 1.0_KTGT
+
+    real(kind=KTGT) :: s, c
+
+    c = TWO * zacs(JAMP)
+    s = (ONE + zacs(JAMP)) * (ONE - zacs(JAMP))
+
+    lat(1:NTRIG) = nml_sincos(s, c)
+  end function stp_geogr_lat_tr_d
+
+!!!_  & stp_geogr_lon() - transform z-plane projection to longitude
+  PURE &
+  function stp_geogr_lon_tr_d &
+       & (zacs) &
+       & result (lon)
+    use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(in) :: zacs(NATRI)
+    real(kind=KTGT) :: lon(NTRIG)
+
+    real(kind=KTGT) :: s, c
+
+    s = zacs(JSIN)
+    c = zacs(JCOS)
+
+    lon(1:NTRIG) = nml_sincos(s, c)
+  end function stp_geogr_lon_tr_d
 
 !!!_ + trigonometric function
 !!!_  & phase() - (atan2() wrapper)
@@ -5086,16 +5237,16 @@ contains
   end function phased_2_q
 #endif
 
-!!!_  & angle_modulo()
+!!!_  & radian_modulo()
   ELEMENTAL &
-  real(kind=KTGT) function angle_modulo_d (angl) result(v)
+  real(kind=KTGT) function radian_modulo_d (angl) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT) c
     c = pi_(angl) * 2.0_KTGT
     v = modulo(angl, c)
-  end function angle_modulo_d
+  end function radian_modulo_d
 
 !!!_  & degree_modulo()
   ELEMENTAL &
@@ -7098,7 +7249,7 @@ contains
     real(kind=KTGT),intent(in) :: a1, a2
     real(kind=KTGT),parameter :: tol = 1.0e-13_KTGT
 
-    b = ABS(angle_modulo(a1) - angle_modulo(a2)) .lt. tol
+    b = ABS(radian_modulo(a1) - radian_modulo(a2)) .lt. tol
   end function is_same_angle
 
 !!!_ + is_same_coor
@@ -8546,7 +8697,7 @@ contains
     integer,intent(out) :: ierr
     integer,intent(in)  :: stp
     real(kind=KTGT) :: plon, plat, olat
-    real(kind=KTGT) :: dlo,  dla
+    real(kind=KTGT) :: dlo,  dla,  dxlon
     real(kind=KTGT) :: targ(NGEOG)
     real(kind=KTGT),parameter :: CSPAN = 360.0_KTGT
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
@@ -8557,12 +8708,13 @@ contains
     real(kind=KTGT) :: lattr(NTRIG), lontr(NTRIG)
 
     real(kind=KTGT) :: csco(ncache_stp_co)
-    real(kind=KTGT) :: wg(NGEOG)
+    real(kind=KTGT) :: wg(NGEOG), zg(NGEOG)
 
     integer pole
     integer narg, jarg
     integer j
     integer nla, nlo, jla, jlo
+    integer nxlo, nxla
 
     ierr = 0
     narg = get_nparam()
@@ -8580,12 +8732,14 @@ contains
     endif
     if (ierr.eq.0) call get_option(ierr, dlo, 'dlo', ZERO)
     if (ierr.eq.0) call get_option(ierr, dla, 'dla', ZERO)
+    if (ierr.eq.0) call get_option(ierr, dxlon, 'dxlo', ZERO)
     if (ierr.eq.0) then
        if (dlo.eq.ZERO) dlo = 5.0_KTGT
        if (dla.eq.ZERO) dla = 5.0_KTGT
+       if (dxlon.eq.ZERO) dxlon = 10.0_KTGT
        dla = SIGN(dla, olat)
     endif
-    write(*, *) olat, plon, plat, dlo, dla
+    write(*, *) olat, plon, plat, dlo, dla, dxlon
     if (ierr.eq.0) then
        if (olat.le.0) then
           pole = +1
@@ -8608,6 +8762,22 @@ contains
              lontr(:) = setd_sincos(lond)
              wg(:) = stp_fwd_tr(lontr, lattr, csco)
              write(*, *) 'ZW:', lonp, latd, wg(JLONGI), wg(JLATI)
+          enddo
+       enddo
+    endif
+    if (ierr.eq.0) then
+       nxlo = FLOOR(CSPAN / (dxlon * 2.0_KTGT))
+       nxla = nlo / 2
+       do jlo = 0, nxlo
+          lond = -90.0_KTGT + dxlon * (real(jlo, kind=KTGT) + 0.0_KTGT)
+          lontr(:) = setd_sincos(lond)
+          do jla = 0, nxla
+             latd = -90.0_KTGT + dlo * (real(jla, kind=KTGT) + 0.0_KTGT)
+             lattr(:) = setd_sincos(latd)
+             zg(:) = stp_bwd_tr(lontr, lattr, csco)
+             ! lonp = modulo(zg(JLONGI) + plon, CSPAN)
+             lonp = zg(JLONGI)
+             write(*, *) 'WZ:', lond, latd, lonp, zg(JLATI)
           enddo
        enddo
     endif

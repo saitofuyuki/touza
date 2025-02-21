@@ -1,10 +1,10 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2024/10/07 09:23:54 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/02/14 22:38:31 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022,2023,2024
+! Copyright (C) 2022,2023,2024,2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -3056,7 +3056,7 @@ contains
     do jco = 0, lcoor - 1
        xh = v%xh(jco)
        if (xh.ge.0) then
-          mem(jco) = c%jend(xh) - c%jend(xh)
+          mem(jco) = c%jend(xh) - c%jbgn(xh)
        else
           mem(jco) = 0
        endif
@@ -3948,6 +3948,7 @@ program test_nio_cache
                  xstart(0:nco-1) = jz
                  call cache_var_read(ierr, d, uh, jvar, 0, xstart, xcount)
                  write(*, 114) jz, ierr
+                 ! write(*, *) jz, d
               enddo
               deallocate(d, STAT=ierr)
            enddo
