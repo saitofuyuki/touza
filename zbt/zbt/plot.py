@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/18 22:19:51 fuyuki plot.py>
+# Time-stamp: <2025/02/20 16:09:47 fuyuki plot.py>
+#
+# Copyright (C) 2024, 2025
+#           Japan Agency for Marine-Earth Science and Technology
+#
+# Licensed under the Apache License, Version 2.0
+#   (https://www.apache.org/licenses/LICENSE-2.0)
 
-__doc__ = \
-    """
-zbt.plot
-~~~~~~~~
+"""
 Plotter collections.
 
 :Source:     zbt/plot.py
-:Maintainer: SAITO Fuyuki <saitofuyuki@jamstec.go.jp>
+:Maintainer: SAITO Fuyuki
 :Created:    Oct 9 2024
 """
 
@@ -20,6 +23,7 @@ import pprint as ppr
 import logging
 import copy
 import math
+import datetime
 
 import numpy as np
 
@@ -41,70 +45,23 @@ import cartopy.util as cutil
 import cartopy.mpl.geoaxes as cmgeo
 import cartopy.mpl.ticker as cmtick
 
+import cftime
+import pandas
+
 import zbt.util as zu
 import zbt.config as zcfg
 
-locallog = zu.LocalAdapter('plot')
-
+locallog = zu.LocalAdapter(__name__)
 
 _ConfigType = zcfg.ConfigRigid
 
 # ### helper functions
-def is_xr(obj):
+def is_xr(obj) -> bool:
     """Check if obj is DataArray instance"""
     return isinstance(obj, xr.DataArray)
 
 
-# class VarLevelsCore():
-#     """Base layer of cmap/contour-levels control."""
-
-#     nimsg = r"VarLevelsCore.{}() not implemented."
-
-#     def _raise(self, name):
-#         msg = f"VarLevelsCore.{name}() not implemented."
-#         raise NotImplementedError(msg)
-
-#     def get_cmap(self, *args, **kwds):
-#         """Dummy method to retrieve current cmap"""
-#         self._raise('get_cmap')
-
-#     def put_cmap(self, *args, **kwds):
-#         """Dummy method to register current cmap"""
-#         self._raise('put_cmap')
-
-#     def get_contour(self, *args, **kwds):
-#         """Dummy method to retrieve current contour levels"""
-#         self._raise('get_contour')
-
-#     def put_contour(self, *args, **kwds):
-#         """Dummy method to register current contour levels"""
-#         self._raise('put_contour')
-
-
-# class VarLevelsMinimum(VarLevelsCore):
-#     """Minimum Cmap Controler to get a constant map."""
-
-#     def __init__(self, cmap=None, contour=None):
-#         self.cmap = cmap
-#         self.contour = contour
-
-#     def put_cmap(self, *args, **kwds):
-#         pass
-
-#     def put_contour(self, *args, **kwds):
-#         pass
-
-#     def get_cmap(self, *args, **kwds):
-#         if isinstance(self.cmap, cabc.Callable):
-#             return self.cmap()
-#         return self.cmap
-
-#     def get_contour(self, *args, **kwds):
-#         return self.contour
-
-
 # ### Picture
-
 class PictureCore():
     """Abstract base layer of figure/axes creation for zbt."""
 
@@ -118,8 +75,14 @@ class PictureCore():
         self.figkw = kwds
         self.figkw['layout'] = layout or 'none'
 
-        if not issubclass(self.lcls, LayoutBase):
-            raise ValueError(f"Invalid LayoutClass {self.lcls}.")
+        try:
+            if not issubclass(self.lcls, LayoutBase):
+                raise ValueError(f"Invalid LayoutClass {self.lcls}.")
+        except TypeError as err:
+            if isinstance(self.lcls, cabc.Callable):
+                pass
+            else:
+                raise err(f"Invalid LayoutClass {self.lcls}.") from None
 
     def __call__(self, **kwds):
         fig = plt.figure(FigureClass=self.fcls, **self.figkw)
@@ -225,8 +188,12 @@ class ParserBase():
 
     def parse_coor(self, coor, item=False):
         """Fallback coordinate limit and scale parser"""
-        dmax = coor[-1]
-        dmin = coor[0]
+        if len(coor.shape) > 1:
+            dmax = max(coor.values.flat)
+            dmin = min(coor.values.flat)
+        else:
+            dmax = coor[-1]
+            dmin = coor[0]
         scale = ''
         if item:
             dmax = dmax.item()
@@ -265,7 +232,11 @@ class LegacyParser(ParserBase):
                         continue
                     ds = f"{dt}={c.values}"
                 else:
-                    ds = f"{dt}={c.values:.4f}"
+                    try:
+                        ds = f"{dt}={c.values:.4f}"
+                    except ValueError as err:
+                        locallog.warning(err)
+                        ds = f"{dt}={c.values}"
                 if du:
                     ds = ds + f'[{du}]'
                 sel.append(ds)
@@ -349,6 +320,7 @@ class LegacyParser(ParserBase):
         sc = ''
         if abs(styp) == 2:
             sc = 'log'
+        # print(f"parse_coor: {dmin=} {dmax=}")
         if dmax and dmin:
             dmax = float(dmax)
             dmin = float(dmin)
@@ -361,8 +333,10 @@ class LegacyParser(ParserBase):
                 dmin, dmax = dmax, dmin
         else:
             vmin, vmax, _ = super().parse_coor(coor, item=item)
+            # print(f"parse_coor: {vmin=} {vmax=}")
             dmax = float(dmax) if dmax else vmax
             dmin = float(dmin) if dmin else vmin
+        # print(f"parse_coor/final: {dmin=} {dmax=}")
         return dmin, dmax, sc
 
     def parse_calendar(self, attrs, default=None):
@@ -772,7 +746,22 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         else:
             xlim = None
             ylim = None
+        # print(f"{xlim=} {ylim=} {cxy=}")
         return xlim, ylim, cxy
+
+    def plot(self, data, *args,
+             ax=None, artists=None, gid=None,
+             **kwds):
+        ax = self._get_axes(ax)
+        artists = artists or []
+        if ax:
+            if is_xr(data):
+                lp = data.plot.line(ax=ax, *args, **kwds)
+            else:
+                lp = ax.plot(data, *args, **kwds)
+            # lp.set_gid(gid)
+            artists.extend(lp)
+        return artists
 
     def contour(self, data, *args,
                 ax=None, artists=None, clabel=None, gid=None,
@@ -781,10 +770,12 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         ax = self._get_axes(ax)
         artists = artists or []
         if ax:
+            # if False:
             if is_xr(data):
-                cp = data.plot.contour(ax=ax, *args, **kwds)
+                # print(f"{args=}")
+                cp = data.plot.contour(*args, ax=ax, **kwds)
             else:
-                cp = ax.contour(data, *args, **kwds)
+                cp = ax.contour(*args, data, **kwds)
             cp.set_gid(gid)
             artists.append(cp)
             if clabel:
@@ -808,11 +799,11 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         artists = artists or []
         # print(type(ax.transData))
         if ax:
-            locallog.debug(f"{args=} {kwds=}")
+            # locallog.debug(f"{args=} {kwds=}")
             if is_xr(data):
                 cp = method(ax=ax, *args, **kwds)
             else:
-                cp = method(data, *args, **kwds)
+                cp = method(*args, data, **kwds)
             cp.set_gid(gid)
             artists.append(cp)
         return artists
@@ -862,6 +853,10 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             xc = data.coords[x]
             yc = data.coords[y]
 
+            ar = axisp.get('aspect')
+            if ar:
+                ax.set_aspect(ar)
+            # print(axisp)
             ap = axisp.get(x) or {}
             # ap = ap | (kwds.get(x) or {})
             self.set_tick(xc, ax, 'x', **(ap or {}))
@@ -883,16 +878,52 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         """Draw axis."""
         if which == 'x':
             axis, limf, scf = ax.xaxis, ax.set_xlim, ax.set_xscale
+            getf = ax.get_xlim
         else:
             axis, limf, scf = ax.yaxis, ax.set_ylim, ax.set_yscale
+            getf = ax.get_ylim
 
         cmin, cmax, sc = self.parse_coor(co)
+        # print(f"{cmax=} {type(cmax)}")
+        # print(f"{cmin=} {type(cmin)}")
         scale = scale or sc
         dmin = zu.set_default(dmin, cmin)
         dmax = zu.set_default(dmax, cmax)
+        # print(f"default {dmax=} {type(dmax)}")
+        # print(f"default {dmin=} {type(dmin)}")
+
+        # print(f"{dmax=} {type(dmax)} {adapt_type(dmax, co)}")
+        # print(f"{dmin=} {type(dmin)} {adapt_type(dmin, co)}")
+        dmin = adapt_values(dmin, co)
+        dmax = adapt_values(dmax, co)
+        # print(f"{dmax=} {type(dmax)}")
+        # print(f"{dmin=} {type(dmin)}")
+        # print(f"drange: {dmax-dmin}")
+        # if isinstance(dmin, xr.DataArray):
+        #     vt = dmin.item()
+        # else:
+        #     vt = dmin
+        # print(f"{type(vt)=}")
+        #     print(dmin.dtype)
+        #     dmin = dmin.values
+        # if isinstance(dmax, xr.DataArray):
+        #     dmax = dmax.values
+        # c0 = co.values[0]
+        # print(f"{dmin=}")
+        # print(f"{c0=}")
+        # dmin = date_normalize(dmin, c0)
+        # dmax = date_normalize(dmax, c0)
+        # print(f"normalized: {dmin=}")
+        # print(f"{type(dmin.item())=} {dmin=}")
+        # print(f"{type(dmax.item())=} {dmax=}")
         span = abs(dmax - dmin)
+        # print(f"{co[0]=}")
+        locallog.debug(f"{type(dmin)=} {type(dmax)=}")
+        locallog.debug(f"{span=}")
         vmaj, vmin = self.parse_ticks(co.attrs)
-        if span > vmaj > 0:
+        if isinstance(span, datetime.timedelta):
+            pass
+        elif span > vmaj > 0:
             axis.set_major_locator(mtc.MultipleLocator(vmaj))
         if vmin > 0:
             axis.set_minor_locator(mtc.MultipleLocator(vmin))
@@ -909,14 +940,22 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         axis.set_tick_params(which='major', **(major or {}))
         axis.set_tick_params(which='minor', **(minor or {}))
         # print(f"dmin/dmax: {co.name} {type(dmin)} {type(dmax)}")
+        # print(f"before limf: {dmin=} {dmax=}")
         if isinstance(dmin, xr.DataArray):
             dmin = dmin.values
         if isinstance(dmax, xr.DataArray):
             dmax = dmax.values
         if dmin != dmax:
             limf(dmin, dmax)
+        gf = getf()
+        # print(f"after limf: {dmin=} {dmax=}")
+        # print(f"getf: {gf}")
+        # print(f"fmt: {axis.get_major_formatter()}")
+        # print(mplib.dates.num2date(gf[0]))
         if scale == 'log':
-            if dmin <= 0 or dmax <= 0:
+            if isinstance(span, datetime.timedelta):
+                locallog.warning(f"Bypass log-scale check ({dmin}:{dmax}).")
+            elif dmin <= 0.0 or dmax <= 0.0:
                 locallog.warning(f"log-scale axis is ignored ({dmin}:{dmax}).")
                 scale = None
         if scale:
@@ -924,7 +963,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
 
     def set_geo_view(self, data, ax=None, artists=None,
                      x=None, y=None,
-                     crs=None, extent=None, axisp=None):
+                     crs=None, axisp=None):
         # print(f"{extent=}")
         axisp = axisp or {}
         artists = artists or []
@@ -949,7 +988,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 self.set_lon_view(ax, xc, crs, **view_x)
                 self.set_lat_view(ax, yc, crs, **view_y)
             except RuntimeError as err:
-                print(err)
+                locallog.debug(err)
                 gl = ax.gridlines(draw_labels=True)
                 gl.top_labels = False
                 gl.right_labels = False
@@ -967,10 +1006,14 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         y0 = zu.set_default(view_y.get('dmin'), y0)
         y1 = zu.set_default(view_y.get('dmax'), y1)
 
+        extent = axisp.get('extent')
         try:
             if extent:
+                # print(f"{extent=}")
                 proj = getattr(ax, 'projection', None)
-                ax.set_extent(extent, crs=proj)
+                # ax.set_extent(extent, crs=proj)
+                ax.set_xlim(extent[:2])
+                ax.set_ylim(extent[2:])
             else:
                 if abs(x1 - x0) > 359 and abs(y1 - y0) > 179:
                     raise ValueError('')
@@ -1368,6 +1411,9 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                     print(f'{k}: ', f())
         return
 
+    def set_aspect(self, aspect, ax=None):
+        ax = self._get_axes(ax)
+        return ax.set_aspect(aspect)
 
 class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
     """Emulate GTOOL3/gtcont layout (common part)."""
@@ -1424,8 +1470,15 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
     _category = {'body': ['body', ],
                  'colorbar': ['colorbar', ], }
 
-    def __init__(self, *args, **kwds):
-        super().__init__(*args, **kwds)
+    def __init__(self, *args,
+                 aspect=None, box_aspect=None, body=None,
+                 **kwds):
+        body = body or {}
+        if aspect is not None:
+            body['aspect'] = aspect
+        if box_aspect is not None:
+            body['box_aspect'] = box_aspect
+        super().__init__(*args, body=body, **kwds)
         self.bg = {}
 
     def tweak_axes(self, ax, lab, attr=None):
@@ -1489,9 +1542,15 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
         ax = ax or 'body'
         return super().get_extent(ax=ax, **kwds)
 
+    def plot(self, *args, ax=None, **kwds):
+        """Wrapper to call ax.plot()"""
+        ax = ax or 'body'
+        return super().plot(*args, ax=ax, **kwds)
+
     def contour(self, *args, ax=None, **kwds):
         """Wrapper to call ax.contour()"""
         ax = ax or 'body'
+        # print(args[1:])
         return super().contour(*args, ax=ax, **kwds)
 
     def clabel(self, *args, ax=None, **kwds):
@@ -1527,6 +1586,10 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
     def set_view(self, *args, ax=None, **kwds):
         ax = ax or 'body'
         return super().set_view(*args, ax=ax, **kwds)
+
+    def set_aspect(self, *args, ax=None, **kwds):
+        ax = ax or 'body'
+        return super().set_aspect(*args, ax=ax, **kwds)
 
     def add_features(self, /, *args, ax=None, **kwds):
         ax = ax or 'body'
@@ -1641,7 +1704,8 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
         title = zu.set_default(title, True)
         if title is True:
             dset = self.parse_dataset(data.attrs, default='')
-            cal = self.parse_calendar(data.attrs, default='')
+            # cal = self.parse_calendar(data.attrs, default='')
+            cal = self.parse_calendar(data.nio, default='')
             title = (dset, cal, '')
         if isinstance(title, (list, tuple)):
             title = '\n'.join(str(s) for s in title)
@@ -1757,7 +1821,17 @@ class LayoutLegacy3(LayoutLegacyBase, LegacyParser, _ConfigType):
 # ## Plot ############################################################
 class PlotBase(zcfg.ConfigBase):
     names = ('plot', )
-    pass
+
+    def extract_plot_coords(self, data, num):
+        coords = data.coords
+        dims = data.dims
+        xco = [coords[d] for d in dims if coords[d].size > 1]
+
+        if len(xco) != num:
+            raise ValueError(f"Not {num}d shape={xco}")
+        if num == 1:
+            return xco[0]
+        return tuple(xco)
 
 
 class ContourPlot(PlotBase, _ConfigType):
@@ -1785,19 +1859,32 @@ class ContourPlot(PlotBase, _ConfigType):
             raise UserWarning("virtually less than two dimensions")
 
         artists = artists or []
+        view = view or {}
 
-        coords = data.coords
-        cj = [d for d in data.dims if coords[d].size > 1]
-        if len(cj) != 2:
-            raise ValueError(f"Not 2d shape={cj}")
-        xco = coords[cj[1]]
-        yco = coords[cj[0]]
+        # to do: data_col data_con 2d check
+        axisp = kwds.get('axis') or {}
+        coords = view.pop("coords", None)
+        if coords:
+            yco, xco = coords
+            xy = dict(x=xco, y=yco)
+        else:
+            xy = {}
+            coords = data.coords
+            # print(view)
+            # print(data.dims)
+            # print(list(coords.keys()))
+
+            cj = [d for d in data.dims if coords[d].size > 1]
+            if len(cj) != 2:
+                raise ValueError(f"Not 2d shape={cj}")
+            xco = coords[cj[1]]
+            yco = coords[cj[0]]
+            coords = ()
 
         color = self._color | (kwds.get('color') or {})
         # locallog.debug(f"{contour=}")
         # locallog.debug(f"{color=}")
 
-        axisp = kwds.get('axis') or {}
         # locallog.debug(f"{axisp=}")
 
         # if isinstance(ax, cmgeo.GeoAxes):
@@ -1824,17 +1911,29 @@ class ContourPlot(PlotBase, _ConfigType):
             contour = self._contour | cset
             if transf:
                 contour.setdefault('transform', transf)
-            con = self.contour(axs, data, **contour)
+            data_con = contour.pop('data', None)
+            if data_con is None:
+                data_con = data
+            zargs = self.data_transform(data_con, *coords)
+            # print(f"{len(zargs)=}")
+            con = self.contour(axs, *zargs, **contour)
         else:
             con = []
+            data_con = data
+            zargs = self.data_transform(data_con, *coords)
             for contour in cset:
                 contour = self._contour | contour
                 if transf:
                     contour.setdefault('transform', transf)
                 # print(f"{contour=}")
-                c = self.contour(axs, data, **contour)
+                c = self.contour(axs, *zargs, **contour)
                 con.extend(c)
-        col = self.color(axs, data, **color)
+        data_col = color.pop('data', None)
+        if data_col is None:
+            data_col = data
+        zargs = self.data_transform(data_col, *coords)
+
+        col = self.color(axs, *zargs, **color)
         bar, cax, = self.colorbar(fig, axs, con, col,
                                   contour=contour, color=color)
 
@@ -1852,19 +1951,28 @@ class ContourPlot(PlotBase, _ConfigType):
         artists.extend(ttl)
 
         vopts = {}
-        view = view or {}
-        # print(view)
         vopts.update(**view)
+        # print(f"{vopts=}")
         for k, v in axisp.items():
             vopts.setdefault(k, {})
             vopts[k].update(v)
         artists = self.set_view(axs, data, artists=artists,
-                                crs=crs, axisp=vopts)
+                                **xy, crs=crs, axisp=vopts)
 
         fts = body.get('features') or []
         fts = axs.add_features(*fts)
 
         return artists
+
+    def data_transform(self, data, *coords):
+        if np.issubdtype(data, np.datetime64):
+            locallog.warning(f"Cannot plot {data.dtype} array {data.name}")
+            data = data.astype('float')
+        args = [data]
+        if coords:
+            # print(coords, data.coords)
+            args.extend(list(reversed(coords)))
+        return args
 
     def annotation(self, clabel, levels):
         """Create helper function to decide whether contours
@@ -1907,7 +2015,7 @@ class ContourPlot(PlotBase, _ConfigType):
         artists.extend(vx or [])
         return artists
 
-    def contour(self, axs, data,
+    def contour(self, axs, *data,
                 levels=None, clabel=None, key=None,
                 artists=None, bind=None, **kwds):
         """matplotlib contour wrapper."""
@@ -1916,8 +2024,8 @@ class ContourPlot(PlotBase, _ConfigType):
         # clabel = self.annotation(clabel, levels)
 
         # print(f"{levels=}")
-        run = ft.partial(axs.contour, data, ax=key,
-                         clabel=False, **kwds)
+        run = ft.partial(axs.contour, *data,
+                         ax=key, clabel=False, **kwds)
         # def run(**rkw):
         #     cp = axs.contour(data, ax=key,
         #                      clabel=False, **rkw, **kwds)
@@ -1976,12 +2084,13 @@ class ContourPlot(PlotBase, _ConfigType):
             func = getattr(ax, method, None)
         if func:
             if method == 'pcolormesh':
-                func = ft.partial(func, edgecolor='face')
+                # func = ft.partial(func, edgecolor='face')
+                func = ft.partial(func, edgecolor='none')
             return func
         else:
             raise ValueError(f"invalid method {method}.")
 
-    def color(self, axs, data,
+    def color(self, axs, data, *args,
               method=None, cmap=None, norm=None, levels=None,
               key=None, artists=None, bind=None, **kwds):
         """matplotlib contour wrapper."""
@@ -2068,7 +2177,8 @@ class ContourPlot(PlotBase, _ConfigType):
                     # locallog.debug(f'colors: {cm.get_clim()=}')
                     cm = cm.get_cmap()
                 ckw = {'cmap': cm, 'norm': norm, }
-                col = axs.color(data, ax=key,
+                col = axs.color(data, *args,
+                                ax=key,
                                 method=method,
                                 add_colorbar=False,
                                 levels=levels,
@@ -2148,6 +2258,131 @@ class ContourPlot(PlotBase, _ConfigType):
         return vmin, vmax
 
 
+class CurvePlot(PlotBase, _ConfigType):
+    """Line plot."""
+    names = PlotBase.names + ('curve', )
+
+    curve_ = {'colors': 'black',
+              'linewidths': 1.5,
+              }
+
+    def __init__(self, gid=None):
+        gid = gid or 'curve'
+        self._curve = {}
+        self._curve.setdefault('gid', gid)
+
+    def __call__(self,
+                 fig,
+                 axs,
+                 data,
+                 view: dict|None=None,
+                 artists: list|None=None,
+                 **kwds) -> list:
+        """Batch plotter."""
+        artists = artists or []
+        xco = self.extract_plot_coords(data, 1)
+        # print(xco)
+
+        line = self.plot(axs, data)
+        artists.extend(line)
+        return artists
+
+    def plot(self, axs, data,
+             artists=None, bind=None, **kwds):
+        """matplotlib plot wrapper."""
+        artists = artists or []
+        lp = axs.plot(data)
+        artists.extend(lp)
+        ret = artists
+        if isinstance(bind, cabc.Callable):
+            bind(artist=ret)
+        return ret
+
+
+def adapt_values(src, ref):
+    """Convert data type corresponds to ones of array."""
+    # print(f"{type(src)=} {type(ref)=}")
+    try:
+        dtsrc = src.dtype
+        # print(f"{src.dtype=}")
+    except AttributeError:
+        dtsrc = False
+        # print("no src.dtype")
+    try:
+        dtref = ref.dtype
+        # print(f"{ref.dtype=}")
+    except AttributeError:
+        dtref = False
+        # print("no ref.dtype")
+    if dtref:
+        if dtsrc:
+            v = src.astype(dtref)
+            # print(f"{type(v)=}")
+            # return v
+            if isinstance(v, xr.DataArray):
+                # print(mplib.dates.date2num(v.values))
+                # print(v.values, type(v.values), v.item())
+                return v.values
+            else:
+                return v
+        elif np.issubdtype(dtref, np.datetime64):
+            return pandas.to_datetime(src)
+        else:
+            dtref = ref.values.flat[0]
+            if isinstance(dtref, cftime.datetime):
+                cal = dtref.calendar
+                if isinstance(src, str):
+                    src = pandas.Timestamp(src)
+                    src = cftime.to_tuple(src)
+                    return cftime.datetime(*src, calendar=cal)
+                elif not isinstance(src, cftime.datetime):
+                    return cftime.num2date(src, units=zu.NC_EPOCH,
+                                           calendar=cal)
+            # return pandas.Timestamp(src)
+    # dt = array.dtype
+    # print(f"{dt=} {type(dt)}")
+    # if np.issubdtype(dt, np.datetime64):
+    #     return pandas.Timestamp(v)
+    # ref = array.values.flat[0]
+    # print(type(v), v)
+    # print(type(ref), ref, isinstance(ref, cftime.datetime))
+    # if isinstance(ref, cftime.datetime):
+    #     print(f"{v=} {type(v)}")
+    #     cal = ref.calendar
+    #     if isinstance(v, str):
+    #         pts = pandas.Timestamp(v)
+    #         cft = cftime.to_tuple(pts)
+    #         v = cftime.datetime(*cft, calendar=cal)
+    #     elif not isinstance(v, cftime.datetime):
+    #         v = cftime.num2date(v, units=zu.NC_EPOCH, calendar=cal)
+    return src
+
+def date_normalize(v, ref):
+    if isinstance(v, xr.DataArray):
+        # print(v.dtype, np.issubdtype(v.dtype, np.datetime64))
+        if not np.issubdtype(v.dtype, np.datetime64):
+            vt = v.item()
+        else:
+            return v
+    else:
+        vt = v
+    # print(f"{type(vt)=} {vt=} {v}")
+    if isinstance(ref, np.datetime64):
+        if isinstance(vt, str):
+            v = pandas.Timestamp(v)
+        elif not isinstance(vt, np.datetime64):
+            v = np.datetime64(mplib.dates.num2date(v))
+    elif isinstance(ref, cftime.datetime):
+        cal = ref.calendar
+        if isinstance(vt, str):
+            pts = pandas.Timestamp(v)
+            cft = cftime.to_tuple(pts)
+            v = cftime.datetime(*cft, calendar=cal)
+        elif not isinstance(vt, cftime.datetime):
+            v = cftime.num2date(v, units=zu.NC_EPOCH, calendar=cal)
+    return v
+
+
 def main(args):
     """Test driver."""
     import tomllib as toml
@@ -2193,16 +2428,36 @@ def main(args):
     ContourPlot.diag(strip=False)
 
     plot = ContourPlot()
-    print(args)
+    curve = CurvePlot()
+    # print(args)
     for a in args:
         print(f"open: {a}")
         ds = zxr.open_dataset(a)
         for vk in ds.data_vars:
             vv = ds[vk]
             print(f"var: {vk} {vv.shape}")
+            fig, axs = Pic(reset=True)
+            artists = None
+            labels = []
+            for y in range(10):
+                x1d = (0, ) * (len(vv.shape) - 2) + (y, )
+                v1d = vv[x1d]
+                zxr.diag(v1d)
+                artists = curve(fig, axs, v1d, artists=artists,
+                                label=f"{y}")
+                labels.append(f"{y}")
+            ppr.pprint(artists)
+            leg = fig.legend(artists, labels, loc='center',
+                             bbox_to_anchor=(0.5, 0.5))
+            print(leg)
+            ppr.pprint(leg.get_lines())
+
+            if len(vv.shape) < 3:
+                continue
             nz = vv.shape[-3]
             AA = []
-            for z in range(min(3, nz)):
+            # for z in range(min(3, nz)):
+            for z in []:
                 fig, axs = Pic(reset=True)
                 frames = []
                 z = 0

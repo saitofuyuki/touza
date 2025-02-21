@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/18 23:27:52 fuyuki control.py>
+# Time-stamp: <2025/02/20 16:09:21 fuyuki control.py>
+#
+# Copyright (C) 2024, 2025
+#           Japan Agency for Marine-Earth Science and Technology
+#
+# Licensed under the Apache License, Version 2.0
+#   (https://www.apache.org/licenses/LICENSE-2.0)
 
 __doc__ = \
     """
@@ -22,6 +28,7 @@ import time
 import inspect
 import functools as ft
 
+import pandas as pd
 import numpy as np
 import xarray as xr
 import matplotlib as mplib
@@ -31,12 +38,6 @@ import matplotlib.animation as animation
 import matplotlib.backend_bases as mbb
 import mpl_toolkits.axes_grid1.inset_locator as m1i
 import cftime
-try:
-    import nc_time_axis
-except ModuleNotFoundError:
-    nc_time_axis = None
-
-_nc_epoch = nc_time_axis._TIME_UNITS if nc_time_axis else None
 
 import cartopy.util as cutil
 
@@ -49,7 +50,7 @@ except ModuleNotFoundError:
 import zbt.util as zu
 import zbt.config as zcfg
 
-locallog = zu.LocalAdapter('control')
+locallog = zu.LocalAdapter(__name__)
 
 _ConfigType = zcfg.ConfigRigid
 
@@ -838,6 +839,7 @@ class ArrayIter(LinkedArray):
     def point_selection(self, sel, anchor=None, skip_single=True):
         """Point selection."""
         debug = ft.partial(self.debug, func='point_selection')
+        # debug = ft.partial(self.info, func='point_selection')
         # debug(f"{type(self)=}")
 
         debug(f"{sel=}")
@@ -850,7 +852,14 @@ class ArrayIter(LinkedArray):
         # debug(f"{shape=}")
 
         arr = self.value()
-        # debug(f"{arr.dims=} {arr.shape=}")
+
+        for d in arr.dims:
+            if len(arr.coords[d].shape) > 1:
+                locallog.warning("Cannot handle multi-dimension coordinate"
+                                 f" {d}")
+                return
+
+        # debug(f"{arr.dims=} {arr.shape=} {arr.coords.keys()=}")
         nco = len(arr.dims)
 
         asel = filter_coords(base, self.src.dims, self.anchors)
@@ -895,9 +904,11 @@ class ArrayIter(LinkedArray):
         if anchor:
             asel.update(sel)
         mask = gen_mask(base, csel, asel)
-        # debug(f"{mask=}")
+        # debug(f"{asel=} {sel=}")
         cue = self.adjust_cue(base, asel, cue=sel) or None
         debug(f"{cue=}")
+        if None in cue:
+            return None
 
         # debug("return")
         self.draw = tuple(csel)
@@ -1094,6 +1105,8 @@ class ArrayIter(LinkedArray):
                 # nco[cn][-1] = nco[cn][-1] + 360
                 data = xr.DataArray(cd, coords=nco,
                                     dims=data.dims, attrs=data.attrs)
+                # need to activate nio accessor
+                _ = data.nio
                 # data = data.roll(**{cn: j}, roll_coords=True)
                 # print(cn, j)
                 # print(data)
@@ -1439,6 +1452,8 @@ class PlotParams():
         self.root[arg] = entry
         if nml is None:
             nml = self._nml
+        if not isinstance(nml, (tuple, list)):
+            nml = (nml, )
         self.nml[arg] = nml
         self.cache[arg] = {}
 
@@ -1478,15 +1493,27 @@ class PlotParams():
         return disps
 
     def normalize(self, arg, fig=None, src=None, array=None, name=None,
-                  **kwds):
-        if name is None:
-            name = ''
-            if array is not None:
-                name = array.name
-            if not name:
-                if src is not None:
-                    name = src.name
-        return fig, name
+                  coords=None, **kwds):
+        nkeys = self.nml[arg]
+        # print(f"{arg=} {}")
+        nk = (fig, )
+        if 'variable' in nkeys:
+            if name is None:
+                name = ''
+                if array is not None:
+                    name = array.name
+                if not name:
+                    if src is not None:
+                        name = src.name
+            nk = nk + (name, )
+        if 'coords' in nkeys:
+            if coords:
+                pass
+            elif array is not None:
+                coords = array.dims
+            if coords is not None:
+                nk = nk + (coords, )
+        return nk
 
 
 class ParamsDispatcher():
@@ -1531,34 +1558,14 @@ class CmapStatus():
         return cm
 
 
-class AxisScaleLink(LinkedArray, ParamsDispatcher):
-    # to do: 'index'
-    scales_ = ['', 'linear', 'log', ]
-
-    def __init__(self, scales=None, **kw):
-        if scales is None:
-            scales = self.scales_
-        if not isinstance(scales, (tuple, list)):
-            scales = [scales]
-
-        name = "SCALE"
-        super().__init__(base=scales[:], name=name, **kw)
-
+class SimpleLink(LinkedArray):
+    def __init__(self, *args, **kwds):
+        super().__init__(*args, **kwds)
         self._loop = None
 
     def loop(self):
         self._loop = iter(self.items())
         _ = next(self._loop)
-
-    def params(self, **kwds):
-        p = {}
-
-        if not self._loop:
-            self.loop()
-        scale = self.value()
-
-        p['scale'] = scale
-        return p
 
     def advance(self, step):
         self.switch(step=step)
@@ -1574,6 +1581,78 @@ class AxisScaleLink(LinkedArray, ParamsDispatcher):
 
     def bwd(self):
         return self.advance(-1)
+
+
+class AxisScaleLink(SimpleLink, ParamsDispatcher):
+    # to do: 'index'
+    scales_ = ['', 'linear', 'log', ]
+
+    def __init__(self, scales=None, **kw):
+        if scales is None:
+            scales = self.scales_
+        if not isinstance(scales, (tuple, list)):
+            scales = [scales]
+
+        name = "SCALE"
+        super().__init__(base=scales[:], name=name, **kw)
+        # self._loop = None
+
+    def params(self, **kwds):
+        p = {}
+
+        if not self._loop:
+            self.loop()
+        scale = self.value()
+
+        p['scale'] = scale
+        return p
+
+    # def loop(self):
+    #     self._loop = iter(self.items())
+    #     _ = next(self._loop)
+
+    # def advance(self, step):
+    #     self.switch(step=step)
+    #     try:
+    #         _ = next(self._loop)
+    #     except StopIteration:
+    #         self._loop = iter(self.items())
+    #         _ = next(self._loop)
+    #     return self.value()
+
+    # def fwd(self):
+    #     return self.advance(+1)
+
+    # def bwd(self):
+    #     return self.advance(-1)
+
+
+class AspectRatioLink(SimpleLink, ParamsDispatcher):
+    # to do: 'index'
+    def __init__(self, ratio=None, **kw):
+        self.ratios = ['auto', 'equal']
+        if ratio is None:
+            pass
+        elif not isinstance(ratio, (tuple, list)):
+            self.ratios.insert(0, ratio)
+        else:
+            ar = list(ratio)
+            for a in self.ratios:
+                if a not in ar:
+                    ar.append(a)
+            self.ratios = ar
+        name = "ARATIO"
+        super().__init__(base=self.ratios[:], name=name, **kw)
+
+    def params(self, **kwds):
+        p = {}
+
+        if not self._loop:
+            self.loop()
+        ar = self.value()
+
+        p['aspect'] = ar
+        return p
 
 
 class LimitParams():
@@ -2293,6 +2372,7 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         self.params = None      # plot parameter complex
 
         self.turn_dir = +1
+        self.coords = None
 
     def connect(self, **handlers):
         for k, h in handlers.items():
@@ -2457,34 +2537,95 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         if pdata and ext:
             parr = pdata[-1]
             y, x, c = ext
+            # print(f"restore_view: {parr.coords}")
+            if self.coords:
+                dims = self.coords
+            else:
+                dims = parr.dims
+            # print(f"restore_view: {self.coords} {parr.dims} {x=} {y=}")
             # dict order must be guaranteed (python >= 3.9)
-            prev = {parr.dims[0]: slice(x[0], x[1], None),
-                    parr.dims[-1]: slice(y[0], y[1], None), }
+            # print(self.restore_clims(parr, parr.dims[0], x[0], x[1]))
+            # print(self.restore_clims(parr, parr.dims[1], y[0], y[1]))
+            prev = self.restore_clims(parr, dims[0], x[0], x[1])
+            prev = self.restore_clims(parr, dims[1], y[0], y[1], view=prev)
+            # prev[parr.dims[0]] = self.restore_clims(parr, parr.dims[0], x[0], x[1])
+            # prev = {parr.dims[0]: slice(x[0], x[1], None),
+            #         parr.dims[-1]: slice(y[0], y[1], None), }
             if c:
                 prev[c[0]] = c[1]
         else:
             prev = {}
+        # locallog.info(f"{prev}")
         return prev
+
+    def restore_clims(self, arr, dim, low, high, step=None, view=None):
+        view = view or {}
+        co = arr[dim]
+        if np.issubdtype(co.dtype, np.datetime64):
+            low = mplib.dates.num2date(low)
+            high = mplib.dates.num2date(high)
+        view[dim] = slice(low, high, step)
+        return view
 
     def cache_view(self, prev=None):
         """Update cache of view properties."""
         self.view.update(prev or {})
         return self.view
 
+    def set_coords(self, arr, coords=None):
+        """Set figure coordinate."""
+        coords = coords or ()
+        # print(f"{arr.dims=} {coords=}")
+        odims = list(arr.dims)
+        for c in coords:
+            if c not in arr.coords:
+                break
+            if any(d not in arr.dims for d in arr[c].dims):
+                break
+            for d in arr[c].dims:
+                if d in odims:
+                    odims.remove(d)
+        else:
+            if not odims:
+                self.coords = tuple(coords)
+                return
+        self.coords = ()
+
     def parse_view(self, arr, src, draw=None, crs=None, **kwds):
         """Set figure coordinate."""
+        # debug = locallog.info
+        debug = locallog.debug
+        # coords = coords or ()
         view = {}
+        if self.coords:
+            # print(f"{self.coords=}")
+            view['coords'] = tuple(self.coords)
+        # for c in coords:
+        #     if c not in arr.coords:
+        #         break
+        #     if any(d not in arr.dims for d in arr[c].dims):
+        #         break
+        # else:
+        #     view['coords'] = tuple(coords)
+        # if all(c in arr.coords for c in coords):
+        #     # view['coords'] = [arr[c] for c in coords]
+        # debug(f"{draw=} {coords=}")
+        # debug(f"{arr.dims=}")
+        # print(arr.coords)
         draw = draw or {}
         dims = src.dims
-
+        # print(f"parse_view: {self.view=}")
         if crs:
             view['extent'] = self.view.get(crs)
 
-        for co in arr.dims:
+        # for co in arr.coords.keys():
+        #     print(co)
+        for co in arr.dims + (self.coords or ()):
             try:
                 s = coord_prop(co, arr, dims, self.view, draw)
             except KeyError:
                 continue
+            # print(f"parse_view/coord_prop:{co}: {s}")
             if isinstance(s, slice):
                 mm = {}
                 if isinstance(s.start, int):
@@ -2497,6 +2638,7 @@ class FigureInteractive(zplt.FigureCore, DataTree):
                     mm['dmax'] = s.stop
                 if mm:
                     view[co] = mm
+        locallog.debug(f"parse_view: {view=}")
         return view
 
 
@@ -2507,11 +2649,12 @@ class FigureControl():
                  interactive=True,
                  figure=None, layout=None,
                  params=None,
-                 styles=None, draw=None,
+                 styles=None, draw=None, coords=None,
                  config=None, rc=None):
         self.parse_config(config, rc)
 
         self.draw = draw or {}
+        self.coords = coords or ()
         self.plot = plot
         self.pic = pic
         self.layout = layout
@@ -2529,8 +2672,9 @@ class FigureControl():
         self._interactive = interactive
         self.styles = styles or {}
         self.params = params
-
+        # print(f"{self.coords=}")
         self._cache_events = []
+        self.view = None
 
         if self._interactive:
             self.load()
@@ -2629,7 +2773,9 @@ class FigureControl():
             fig.message(msg)
         except UserWarning as err:
             fig.message(err)
-        fig.canvas.draw()
+
+        if artists:
+            fig.canvas.draw()
 
     def batch(self, fig):
         axs = self.figs[fig]
@@ -2681,12 +2827,16 @@ class FigureControl():
 
     def invoke(self, trees, stat, fig, axs, view=None, cla=None):
         """Draw core."""
-        arr = stat[-1]
+        arr = stat[-1].load()
         src = fig.source_data()
         style = self.view_style(arr, src) or {}
         layout = {k: style.get(k) for k in ['projection', ]}
         fig.cache_view(view)
+        fig.set_coords(arr, self.coords)
         view = fig.parse_view(arr, src, self.draw, **style)
+        self.view = view.get('coords')
+        # print(f"{self.view=}")
+        # print(f"{view=}")
         cla = True if cla is None else bool(cla)
         if cla:
             axs.reset(fig, body=layout)
@@ -2699,8 +2849,12 @@ class FigureControl():
         # params = self.params.get_link(key=trees, fig=fig, array=arr)
         # exclude axis
         params = self.view_params(fig, True, 'axis', src=src, array=arr)
-        # print(params)
+        vv = self.view_params(fig, 'axes', src=src, array=arr)
+        view = view | (vv.get('axes') or {})
+        # print(f"{vv=}")
+        # print(f"{view=}")
         axis = self.axis_params(fig, array=arr)
+        # print(f"{axis=}")
         # print(params.params())
         # locallog.info("invoke: before plot")
         # print(view, style)
@@ -2710,11 +2864,16 @@ class FigureControl():
         # locallog.info(f"invoke: after plot")
         return r
 
-    def view_params(self, fig, *args, src=None, array=None, **kwds):
+    def view_params(self, fig, *args, src=None, array=None,
+                    coords=None, params=None, **kwds):
         src = fig.source_data() if src is None else src
         array = fig.draw_data() if array is None else array
-        params = self.params(*args, fig=fig, src=src, array=array, **kwds)
-        return params
+        coords = coords or self.view
+        pp = self.params(*args, fig=fig, src=src, array=array,
+                         coords=coords, **kwds)
+        if params:
+            pp = params | pp
+        return pp
 
     def axis_params(self, fig, array=None, **kwds):
         arg = 'axis'
@@ -2726,10 +2885,13 @@ class FigureControl():
         params = {arg: params}
         return params
 
-    def get_disp(self, arg, fig, src=None, array=None, default=None, **kwds):
+    def get_disp(self, arg, fig, src=None, array=None,
+                 coords=None, default=None, **kwds):
         src = fig.source_data() if src is None else src
         array = fig.draw_data() if array is None else array
+        coords = coords or self.view
         disp = self.params.get_disp(arg, fig=fig, src=src, array=array,
+                                    coords=coords,
                                     default=default, **kwds)
         return disp
 
@@ -2820,6 +2982,8 @@ class FigureControl():
                 self.map_figures(self.turn_or_switch, fig, target)
             elif cmd.startswith('toggle_turn'):
                 self.map_figures(self.toggle_turn, fig)
+            elif cmd == 'next_aspect_ratio':
+                self.map_figures(self.turn_aratio, fig)
             elif cmd == 'next_cyclic':
                 if sub == 'coordinate':
                     self.map_figures(self.permute_draw, fig, +1)
@@ -3210,6 +3374,20 @@ class FigureControl():
             fig.message(msg)
             self.prompt(event=None)
 
+    def turn_aratio(self, fig, step=None):
+        step = step or +1
+        disp = self.get_disp('axes', fig)
+        # locallog.info(f"turn_norm: {step} {disp=}")
+        if disp:
+            if step > 0:
+                ar = disp.fwd()
+            else:
+                ar = disp.bwd()
+            self.interactive(fig, step=False, msg=f'aspect ratio: {ar}.')
+        axs = self.figs[fig]
+        axs.set_aspect(ar)
+        fig.canvas.draw()
+
     def _toggle_visible(self, fig):
         axs = self.figs[fig]
         axs.toggle_visible(ax='colorbar')
@@ -3283,8 +3461,42 @@ class FigureControl():
         for ch in sorted(CH):
             locallog.debug(ch)
 
+    def info_data(self, fig):
+        src = fig.source_data()
+        array = fig.draw_data()
+
+        txt = f"<{src.name}>"
+        name = src.attrs.get('long_name')
+        units = src.attrs.get('units')
+        if name:
+            txt = txt + f" {name}"
+        if units:
+            txt = txt + f" [{units}]"
+        print(txt)
+        print("Dimensions:")
+        for d, s in zip(src.dims, src.shape):
+            print(f"  {d}: {s}")
+        print("Coordinates:")
+        for cn in reversed(list(src.coords.keys())):
+            co = src[cn]
+            dims = ','.join(d for d in co.dims)
+            txt = f"{cn}[{dims}]"
+            name = co.attrs.get('long_name')
+            units = co.attrs.get('units')
+            if name:
+                txt = txt + f" - {name}"
+            if units:
+                txt = txt + f" [{units}]"
+            ca = array[cn]
+            if ca.shape == ():
+                txt = txt + f" {ca.item()}"
+            print(f"  {txt}")
+        # print(src.coords.xindexes)
+        # print(src.coords)
+
     def show_info(self, fig, **kwds):
         fig.message('info')
+        self.info_data(fig)
         if kwds:
             fig.show_info(**kwds)
             axs = self.figs[fig]
@@ -3766,18 +3978,38 @@ def draw_coords(data, src, dims, coords, default,
     Number of coordinates to return is the same as that of argument default.
     Input data should be source data for most cases."""
 
+    # debug = locallog.info
+    debug = locallog.debug
+
     coords = coords or default
     if not isinstance(coords, (tuple, list)):
         coords = tuple(coords)
 
-    # locallog.debug(f"{coords} << {src.dims}")
-    # locallog.debug(f"   {anchors=}")
-    # locallog.debug(f"   {data.shape}")
-    # locallog.debug(f"   {data.dims}")
+    debug(f"{coords} << {src.dims}")
+    debug(f"   {anchors=}")
+    debug(f"   {data.shape}")
+    debug(f"   {data.dims}")
+
+    xco = []
+    for c in coords:
+        if c in src.coords and not c in src.dims:
+            co = src.coords[c]
+            for d in co.dims:
+                if d not in xco:
+                    xco.append(d)
+            cdims = ','.join(d for d in co.dims)
+            locallog.info(f"Non-dimension coordinate {c}[{cdims}].")
+        else:
+            xco.append(c)
+    xco = type(coords)(xco)
+    if xco != coords:
+        xco = type(coords)(d for d in xco if d)
+        # locallog.info(xco)
 
     anchors = anchors or {}
     targets = []
-    for c in coords:
+    # for c in coords:
+    for c in xco:
         try:
             c = parse_coord(src, c)
             cj = src.dims.index(c)
@@ -3790,7 +4022,7 @@ def draw_coords(data, src, dims, coords, default,
             else:
                 targets.append('')
             if c != '':
-                 locallog.warning(f"no coordinate to plot {c}.")
+                locallog.warning(f"no coordinate to plot {c}.")
     # locallog.debug(f"first try: {targets=}")
     rem = len(src.dims)
     ntargets = []
@@ -3828,7 +4060,8 @@ def draw_coords(data, src, dims, coords, default,
     if len(set(ntargets)) != len(coords):
         locallog.error(f"data shape: {data.dims} = {data.shape}")
         raise ValueError(f"Invalid target coordinates {coords} >> {ntargets}")
-    # locallog.debug(f"result: {ntargets=}")
+
+    debug(f"result: {ntargets=}")
     return ntargets
 
 
@@ -3853,12 +4086,18 @@ def coord_prop(co, arr, dims, *args):
             return v
         except KeyError:
             continue
-    co = dims.index(co)
-    for kw in args:
-        for j in [co, co - len(dims)]:
-            if j in kw:
-                v = kw[j]
-                return v
+    if co in dims:
+        co = dims.index(co)
+        for kw in args:
+            for j in [co, co - len(dims)]:
+                if j in kw:
+                    v = kw[j]
+                    return v
+    elif co in arr.coords:
+        for kw in args:
+            if co in kw:
+                return kw[co]
+        return None
     raise KeyError(f"No match to coordinate {co}")
 
 
@@ -3981,17 +4220,30 @@ def is_cyclic_coord(co):
 def normalize_selection(co, sel, method=None, index=None):
     """Return index or normalized coordinate corresponding to sel."""
     method = method or 'nearest'
-    locallog.debug(f"[{co.name}] {sel=}")
+    locallog.debug(f"[{co.name}]{co.shape} {sel=}")
+    if len(co.shape) > 1:
+        locallog.warning("Cannot handle multi-dimension coordinate"
+                         f" {co.name}")
+        return None
+
     c0 = co.values[0]
-    locallog.debug(f"{c0=} {type(c0)=}")
+    locallog.debug(f"{c0=} {type(c0)=} {co.dtype=}")
     if isinstance(c0, np.datetime64):
-        sel = np.datetime64(mplib.dates.num2date(sel))
+        if isinstance(sel, str):
+            sel = pd.Timestamp(sel)
+        else:
+            sel = np.datetime64(mplib.dates.num2date(sel))
         locallog.debug(f"date: {sel=} {type(sel)=} ")
     elif isinstance(c0, cftime.datetime):
         cal = c0.calendar
-        # print(type(c0), cal)
-        ### "days since 2000-01-01",
-        sel = cftime.num2date(sel, units=_nc_epoch, calendar=cal)
+        if isinstance(sel, str):
+            pts = pd.Timestamp(sel)
+            cft = cftime.to_tuple(pts)
+            sel = cftime.datetime(*cft, calendar=cal)
+        else:
+            # print(type(c0), cal)
+            ### "days since 2000-01-01",
+            sel = cftime.num2date(sel, units=zu.NC_EPOCH, calendar=cal)
         locallog.debug(f"date: {sel=} {type(sel)=} ")
 
     cc = is_cyclic_coord(co)

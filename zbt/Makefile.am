@@ -1,9 +1,9 @@
 # touza/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2025/01/20 13:34:46 fuyuki Makefile.am>
+# Time-stamp: <2025/01/22 12:07:28 fuyuki Makefile.am>
 
-# Copyright (C) 2024
+# Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
@@ -11,12 +11,17 @@
 
 SUBDIRS = zbt tests
 
-EXTRA_DIST =
-EXTRA_DIST += README-zbt.org MANIFEST.in pyproject.in
-EXTRA_DIST += param.sh
-EXTRA_DIST += doc/demo01.png doc/demo02.png
+extra_sources =
+extra_sources += README-zbt.org MANIFEST.in pyproject.in
+extra_sources += param.sh
 
-copy_sources = $(EXTRA_DIST)
+copy_sources = $(extra_sources)
+copy_sources += doc/demo01.png doc/demo02.png
+
+EXTRA_DIST = $(copy_sources)
+
+link_sources = $(extra_sources)
+link_sources += doc
 # dummy
 all:
 
@@ -40,15 +45,14 @@ clean-link-sources: clean-link-sources-am
 		do ( cd $$d; $(MAKE) clean-link-sources ); done
 
 link-sources-am:
-	@for target in $(COPY_SOURCES_TARGETS); do \
-		target=`echo "$$target" | sed -e 's/^copy-//'`; \
+	@for target in $(link_sources); do \
 		if test -e $(builddir)/$${target}; then \
 			echo "exists $${target}."; \
-		else \
-			echo "symbolic link $(srcdir)/$${target}"; \
-			$(LN_S) $(srcdir)/$${target} $(builddir)/$${target} || exit $$?; \
-		fi; \
-	done
+	 	else \
+	 		echo "symbolic link $(srcdir)/$${target}"; \
+	 		$(LN_S) $(srcdir)/$${target} $(builddir)/$${target} || exit $$?; \
+	 	fi; \
+	 done
 
 clean-link-sources-am:
 	@for target in $(COPY_SOURCES_TARGETS); do \
@@ -69,7 +73,8 @@ $(COPY_SOURCES_TARGETS):
 		echo "exists $${target}."; \
 	else \
 		echo "clone $(srcdir)/$${target}"; \
-		mkdir -p `dirname $(builddir)/$${target}`; \
+		dir=`dirname $(builddir)/$${target}`; \
+		$(MKDIR_P) $$dir; \
 		cp $(srcdir)/$${target} $(builddir)/$${target} || exit $$?; \
 	fi
 

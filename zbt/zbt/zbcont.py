@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/01/20 12:37:10 fuyuki zbcont.py>
+# Time-stamp: <2025/02/20 15:45:30 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -32,12 +32,10 @@ import zbt.control as zctl
 import zbt.plot as zplt
 import zbt.config as zcfg
 
-locallog = zu.LocalAdapter('zbcont')
+locallog = zu.LocalAdapter(__name__)
 
 _ConfigType = zcfg.ConfigRigid
 
-
-# print(zctl.nc_time_axis)
 
 class ParserUtils():
     """Common parameters and methods for parser."""
@@ -306,9 +304,13 @@ class Options(ParserUtils, ap.Namespace):
                             default=None, type=str,
                             help='figure layout (reserved)')
         parser.add_argument('-g', '--geometry',
-                            dest='geometry',
+                            dest='figsize',
                             metavar='[W][,[H]]', default=None, type=str,
-                            help='figure geometry (reserved)')
+                            help='figure geometry')
+        parser.add_argument('--aspect',
+                            dest='aspect',
+                            metavar='NUMBER|equal|auto', default=None, type=str,
+                            help='aspect ratio of figure scaling')
         parser.add_argument('--calendar',
                             metavar='FLAGS[,...]', default=None, type=str,
                             help='calendar options')
@@ -326,6 +328,34 @@ class Options(ParserUtils, ap.Namespace):
 
         self.output = self.parse_output(self.output)
 
+
+        self.geometry = {}
+        if self.figsize:
+            geo = []
+            for g in self.figsize.split(','):
+                g = zu.tonumber(g)
+                if isinstance(g, (int, float)):
+                    g = float(g)
+                else:
+                    g = None
+                geo.append(g)
+            self.geometry['figsize'] = tuple(geo)
+        if self.aspect:
+            aa = []
+            for ar in self.aspect.split(self.lsep):
+                ar = zu.tonumber(ar)
+                if isinstance(ar, (int, float)):
+                    ar = float(ar)
+                else:
+                    for ch in ['equal', 'auto', ]:
+                        if ch.startswith(ar):
+                            ar = ch
+                            break
+                    else:
+                        raise ValueError(f"Invalid aspect spec {ar}")
+                aa.append(ar)
+            self.aspect = aa
+            # self.geometry['aspect'] = aa[0]
         # self.coors = self.parse_coors(self.coors)
         # if self.coors:
         #     print(f"deprecated: {self.coors}")
@@ -723,7 +753,7 @@ class Options(ParserUtils, ap.Namespace):
         else:
             if not isinstance(param, (list, tuple)):
                 param = [param]
-            if zctl.nc_time_axis is None:
+            if zu.NC_EPOCH is None:
                 locallog.warning("numpy date type enabled"
                                  " (no nc_time_axis module).")
                 if npt not in param:
@@ -945,6 +975,7 @@ def main(argv, cmd=None):
     Layout.config(cfg)
     if locallog.is_debug():
         Layout.diag(strip=False)
+    Layout = ft.partial(Layout, **opts.geometry)
 
     Plot = zplt.ContourPlot
     Plot.config(cfg)
@@ -954,16 +985,17 @@ def main(argv, cmd=None):
     NormP = ft.partial(zctl.NormLink, **opts.cnorm)
     CmapP = ft.partial(zctl.CmapLink, chain=NormP, **opts.color)
     AxisP = ft.partial(zctl.AxisScaleLink)
+    AratP = ft.partial(zctl.AspectRatioLink, opts.aspect)
     CintP = ft.partial(zctl.ContourParams, **opts.contour)
     Params = zctl.PlotParams()
     Params.reg_entry('color', CmapP)
     Params.reg_entry('axis', AxisP)
+    Params.reg_entry('axes', AratP, ("coords", ))
     Params.reg_entry('contour', CintP)
 
     Pic = zplt.Picture
     # plot = Plot(contour=opts.contour)
     plot = Plot()
-
 
     Ctl = zctl.FigureControl(Pic, plot, Iter,
                              interactive=opts.interactive,
@@ -971,6 +1003,7 @@ def main(argv, cmd=None):
                              layout=Layout,
                              styles=opts.styles,
                              draw=opts.draw,
+                             coords=opts.coords,
                              config=xcfg, rc=plt.rcParams)
 
     Output.config(xcfg)
