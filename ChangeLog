@@ -1,3 +1,12 @@
+Release-1.14.4 / 2025-02-26
+===========================
+
+  * doc: (zbt) [critical] updated to latest features.
+  * zbt: (zbcont) feature argument with optional parameters.
+  * zbt: (control) WAIT cursor introduced.
+  * zbt: (plot) change add_features arguments
+  * zbt: (dsnio) axis paths set by caller.
+
 Release-1.14.3 / 2025-02-21
 ===========================
 
