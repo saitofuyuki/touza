@@ -39,9 +39,9 @@ python-build~ under =zbt= directory:
 : % cd zbt
 : % make python-build   ## need to be on line due to pip requirement
 : % ls dist
-: touza_zbt-1.14.0-py3-none-any.whl  touza_zbt-1.14.0.tar.gz
+: touza_zbt-1.14.3-py3-none-any.whl  touza_zbt-1.14.3.tar.gz
 : % . SOMEWHERE/bin/activate # switch to virtual env
-: (python3) % python3 -m pip install dist/touza_zbt-1.14.0-py3-none-any.whl
+: (python3) % python3 -m pip install dist/touza_zbt-1.14.3-py3-none-any.whl
 
 ** Installation with deb
 Unfortunately, a python package nc-time-axis is not be prepared as
@@ -323,14 +323,14 @@ DataArray objects.
 :     CDATE:        ('20240621 143312', '20240621 145543', '20240621 152044', '...
 :     MSIGN:        MIROC
 :     SIZE:                    32768
-
 Attributes are defined according to the GTOOL3 file headers.
 Three special attributes are defined: =units=, =long_name=, and
 =_nio_recdim=.  The first two attributes are used in ~xarray~ and the
 last one is used in ~zbt.xrnio~ internally.
 Attributes of GTOOL3 headers from all the corresponding records are
 collected.  Unique values are defined as single one, otherwise as
-tuple.  In the above example, the value corresponding to CDATE is a tuple.
+tuple.  In the above example, the value corresponding to CDATE is a
+tuple of number of the records.
 
 *** Slicing and indexing
 Slicing and indexing can be examined:
@@ -351,13 +351,17 @@ Slicing and indexing can be examined:
 :     DSET:         ms11sw_dbg
 :     ITEM:         T2
 :     ...           ...
-:     CDATE:        20240621 145543
+:     CDATE:        ('20240621 143312', '20240621 145543', '20240621 152044', '...
+:     MSIGN:        MIROC
+:     SIZE:                    32768
 : >>> sel.shape
 : (1, 128, 256)
 Slice with stride does not work, which is reserved for a future development.
 
-Note that the attributes are also sliced according to record
-coordinate (see =CDATA= attributes in above examples).
+*Caution*: important change from version 1.14.3.
+The feature of attribute slicing accoring to record slicing are
+deleted.  Instead, =nio= accessor is introduced to deal with attribute
+slicing.  To be documented.
 
 The Ellipsis literal (=...=) can be used for slicing (only once),
 which is regarded as full spanning over all the omitted dimensions.
@@ -866,16 +870,21 @@ array dimension:
 :     lon      (rlat, rlon) float64 853kB ...
 :     lat      (rlat, rlon) float64 853kB ...
 In addition, there are two non-dimension coordinates, =lon=/=lat=,
-which are /logical/[fn:: Please do not confuse by the usage of terms
+which are /physical/ coordinate in ~xarray~ terminology[fn:: Please do
+not be confused by the usage of terms
 /physical/ and /logical/.  The former corresponds to how the elements
-are stored in memory, while the latter does to how we interpret them
-on the real-world placements] geographical coordinates as functions of =rlon=
+are interpreted in the real-world placements,
+while the latter does to how we stored in memory, under the ~xarray~
+terminology.  It is different from the style when we represent, e.g.,
+a physical or logical record of storage.
+Please see [[https://docs.xarray.dev/en/stable/examples/multidimensional-coords.html][Working with Multidimensional Coordinates]] for detail.]
+geographical coordinates as functions of =rlon=
 and =rlat=.  By default, plotting are performed using the dimension
 coordinate =rlon=/=rlat=.  Figure coordinate argument =--plot= can
 control this feature, by:
 : % zbcont --plot lat,lon datafile
 The plot may not always succeed:  too much irregular distribution of
-the logical coordinates (=lon=, =lat=) over the /physical/ coordinates
+the physical coordinates (=lon=, =lat=) over the /logical/ coordinates
 (=rlon=, =rlat=) may damage the plot.  This is because =zbcont= relies
 on the feature of ~matplotlib~ ~contour~ method.  It is expected that
 using ~tricontour~ method instead would resolve the problem, which is
@@ -911,17 +920,19 @@ shape cannot be plotted:
 : Coordinates:
 :     lon      (serial) float64 1kB ...
 :     lat      (serial) float64 1kB ...
-Physically bad_array is one dimension (=serial=) array, but
+Logically bad_array is one dimension (=serial=) array, but
 two-dimension coordinates are assigned for each gridpoints, which
-forms logically a two-dimension field.  Their number of dimensions do
+forms physically a two-dimension field.  Their number of dimensions do
 not matches, thus =zbcont= cannot handle this array.
 
 Improving this feature is definitely a next target of development for
 a coming release.
 
 **** (experimental) map overlay (=--map=, =-m=)
-: % zbcont -m LETTERS
-: % zbcont -m FEATURE[,FEATURE...]
+: % zbcont -m [LAT,LON,]LETTERS
+: % zbcont -m [LAT,LON,]LETTERS
+: % zbcont -m [LAT,LON,]FEATURE[,FEATURE...]
+: % zbcont -m [LAT,LON,]FEATURE[/COLOR][+ALPHA][,FEATURE....]
 | letter | string | feature                               |
 |--------+--------+---------------------------------------|
 | c      | coast  | add coastline                         |
@@ -930,13 +941,19 @@ a coming release.
 | b      | border | add borders                           |
 | r      | river  | add rivers                            |
 | L      | lake   | add lakes                             |
-| -      | (null) | dummy, to activate cartopy projection |
 ***** examples
-: % zbcont -m c  FILE            # add coastline
-: % zbcont -m ol FILE            # fill ocean and land
-: % zbcont -m river,lake FILE    # add rivers and lakes
-**** (experimental) projection (=--projection=, =-p=)
-: % zbcont -p PROJECTION[+LON[+LAT[+HEIGHT]]]
+: % zbcont -m c  .....           # add coastline
+: % zbcont -m ol                 # fill ocean and land
+: % zbcont -m river,lake         # add rivers and lakes
+: % zbcont -m l+0.3              # land, filled with default color and alpha=0.3
+: % zbcont -m l/brown            # land, filled with brown
+: % zbcont -m l/brown+0.3        # land, filled with brown and alpha=0.3
+: % zbcont -m l/brown+0.3,o/blue+0.3 # land, filled with brown and alpha=0.3
+:                                    # ocean, filled with blue and alpha=0.3
+: % zbcont -m -3,-1,land         # set latitude/longitude coordinates as (-3,-1)
+
+**** (experimental) projection (=--projection=, =-P=)
+: % zbcont -P PROJECTION[+LON[+LAT[+HEIGHT]]]
 | string                 | projection          | parameters                          |
 |------------------------+---------------------+-------------------------------------|
 | m mercator             | Mercator            | central longitude                   |
@@ -948,7 +965,7 @@ a coming release.
 | h hammer               | Hammer              | central longitude                   |
 | pc platecarree         | PlateCarree         | central longitude                   |
 ***** examples
-: % zbcont -ppc+135 FILE    # central longitude on 135E.
+: % zbcont -Ppc+135 FILE    # central longitude on 135E.
 
 ***** Known problems, tips and tricks
 ****** =PlateCarree=
@@ -998,6 +1015,14 @@ case).
 #+CAPTION: Demonstration of SouthPolarStereo (=zbcont -Psps -Dlatitude/-90.0:-30.0 datafile=).
 #+NAME:   fig:demo_SouthPolarStereo-1.png
 [[./doc/demo_SouthPolarStereo-1.png]]
+
+Color option for the feature OCEAN may not work as expected for
+=NorthPolarStereo=: the color is filled globally, not only over the ocean.
+A workaround to avoid this is to add the feature LAND *after* OCEAN
+option (the order is significant)
+: % zbcont -Pnps -mocean+blue,land datafile     # Works.
+: % zbcont -Pnps -mland,ocean+blue datafile     # Not works
+
 
 ****** =Orthographic=
 Strange domain may be chosen to plot without manual limiting of plot region.
@@ -1238,7 +1263,7 @@ Need document.
 * Description of TOUZA/Zbt package
 ** ~zbt.libtouza~ - low-level interface on TOUZA(/Nio) library
 *** Requirement
-A shared library of TOUZA (version 1.14 or later) must be
+A shared library of TOUZA (version 1.14.3 or later) must be
 installed somewhere the module can find.
 If you encounter something like following message, it means that the
 module fails to find the library.
@@ -1340,4 +1365,4 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  OCLONTPT OCLATTPT gridpoint basenames tri tas rlon
 #  LocalWords:  rlat lon datafile tricontour stereographic Pnps Psps
 #  LocalWords:  Dlatitude Dlongitude Pnp IllegalArgumentException
-#  LocalWords:  gridpoints
+#  LocalWords:  gridpoints mocean mland
