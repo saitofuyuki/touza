@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/20 16:09:21 fuyuki control.py>
+# Time-stamp: <2025/02/22 21:27:28 fuyuki control.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -36,6 +36,7 @@ import matplotlib.pyplot as plt
 import matplotlib.artist as mart
 import matplotlib.animation as animation
 import matplotlib.backend_bases as mbb
+import matplotlib.backend_tools as mbt
 import mpl_toolkits.axes_grid1.inset_locator as m1i
 import cftime
 
@@ -2746,6 +2747,7 @@ class FigureControl():
         axs = self.figs[fig]
         jfig = fig.number
         fig.disconnect('key_press_event')
+        fig.canvas.set_cursor(mbt.Cursors.WAIT)
         prev = prev or fig.restore_view(axs)
         try:
             trees, stat = fig.loop(step)
@@ -2907,6 +2909,7 @@ class FigureControl():
             event.canvas.flush_events()
             fig = event.canvas.figure
             fig.connect(key_press_event=self.event_handler)
+            fig.canvas.set_cursor(mbt.Cursors.POINTER)
 
     def view_style(self, arr, src, default=None):
         """Get style properties corresponding coordinate combination

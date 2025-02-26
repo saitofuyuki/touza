@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/19 09:06:41 fuyuki dsnio.py>
+# Time-stamp: <2025/02/21 12:44:42 fuyuki dsnio.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -35,6 +35,8 @@ from . import param as zpar
 locallog = zutl.LocalAdapter(__name__)
 
 LOAD_TOUZA = None
+
+GTAX_PATH = 'GTAX_PATH'
 
 # calendar names in cftime and the epoch years
 calendar_epoch = {
@@ -1014,7 +1016,9 @@ class TouzaNioGroup(TouzaNioDataset):
 class TouzaNioCoDataset(TouzaNioDataset):
     """TOUZA/Nio dataset accompanied by coordinate variables."""
 
-    gtax_env = 'GTAX_PATH'
+    _paths = os.environ.get(GTAX_PATH, '.:')
+    _paths = _paths.split(':')
+
     _embedded = ''
 
     attr_cyclic = 'cyclic_coordinate'
@@ -1143,11 +1147,24 @@ class TouzaNioCoDataset(TouzaNioDataset):
         okey = self.dimensions.rev_map(d)
         self.variables[okey] = c
 
-    def coordinate_paths(self, env=None):
+    @classmethod
+    def set_paths(cls, paths):
+        cls._paths = paths or []
+
+    @classmethod
+    def get_paths(cls):
+        return cls._paths
+
+    def coordinate_paths(self, paths=None):
         """Parse axis file paths"""
-        env = env or self.gtax_env
-        paths = os.environ.get(env, '.:')
-        paths = paths.split(':')
+        # env = env or self.gtax_env
+        # paths = os.environ.get(env, '.:')
+        # paths = paths.split(':')
+        if paths in [True, None, ]:
+            paths = self._paths
+        elif paths is False:
+            paths = []
+
         if self._embedded not in paths:
             paths.insert(0, self._embedded)
         return paths
