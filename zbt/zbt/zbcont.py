@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/20 15:45:30 fuyuki zbcont.py>
+# Time-stamp: <2025/02/26 11:03:45 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -668,34 +668,7 @@ class Options(ParserUtils, ap.Namespace):
                      crs=None, transform=None):
         """Parse map and projection styles."""
         styles = {}
-        # print(maps, type(maps))
-        if isinstance(maps, str):
-            f = []
-            if self.lsep in maps:
-                maps = maps.split(self.lsep)
-            for c in maps:
-                if c in ['c', 'coast', ]:
-                    f.append('COASTLINE')
-                elif c in ['l', 'land', ]:
-                    f.append('LAND')
-                elif c in ['o', 'ocean', ]:
-                    f.append('OCEAN')
-                elif c in ['b', 'border', ]:
-                    f.append('BORDERS')
-                elif c in ['r', 'river', ]:
-                    f.append('RIVERS')
-                elif c in ['L', 'lake', ]:
-                    f.append('LAKES')
-                elif c in ['-', '', ]:
-                    f.append(None)
-                else:
-                    raise ValueError(f"Invalid feature {c}")
-            maps = f or [None]
-        elif isinstance(maps, list):
-            pass
-        elif maps is not None:
-            maps = [maps or None]
-        # else:
+        features, coords = self.parse_features(maps)
 
         # --projection=PROJ[<+->lon[<+->lat]][,Y,X]
         #   +NUM > +NUM    +-NUM > -NUM   ++NUM > +NUM
@@ -706,9 +679,9 @@ class Options(ParserUtils, ap.Namespace):
             self.proj = Projection(projection)
             projection = self.proj()
 
-        if bool(projection):
-            maps = maps or [None]
-        if bool(maps):
+        # if bool(projection):
+        #     maps = maps or [None]
+        if bool(features):
             if not transform:
                 transform = ccrs.PlateCarree()
             if not crs:
@@ -716,20 +689,69 @@ class Options(ParserUtils, ap.Namespace):
             if not projection:
                 projection = transform
 
-        styles['features'] = maps
+        styles['features'] = features
         styles['projection'] = projection
         styles['crs'] = crs
         styles['transform'] = transform
 
         # print(f"{styles=}")
 
-        coords = (-2, -1)
-
+        coords = coords or (-2, -1)
         st = {}
         st[coords] = styles
         # st[coords[-1]] = {'transform': transform}
 
         return st
+
+    def parse_features(self, params=None):
+        pfx=fr"[{self.isep}{self.psep}]"
+        pat = re.compile(r'(' + pfx + r'?[\w.]+)')
+
+        features = {}
+        if isinstance(params, str):
+            if self.lsep in params:
+                params = params.split(self.lsep)
+            elif self.isep in params or self.psep in params:
+                params = [params]
+        elif isinstance(params, list):
+            pass
+        elif params is not None:
+            params = [params or None]
+
+        co = []
+        for p in params or []:
+            opts = {}
+            f = p
+            for j in pat.split(p):
+                if j == '':
+                    continue
+                if j.startswith(self.psep):
+                    opts['alpha'] = float(j[1:])
+                elif j.startswith(self.isep):
+                    opts['color'] = j[1:]
+                else:
+                    f = j
+            for key, candi in [('COASTLINE', ['c', 'coast', ]),
+                               ('LAND', ['l', 'land', ]),
+                               ('OCEAN', ['o', 'ocean', ]),
+                               ('BORDERS', ['b', 'border', ]),
+                               ('RIVERS', ['r', 'river', ]),
+                               ('LAKES', ['L', 'lake', ])]:
+                if f in candi:
+                    if key in ['COASTLINE', 'BORDERS']:
+                        if 'color' in opts:
+                            opts['edgecolor'] = opts.pop('color')
+                    features[key] = opts
+                    break
+            else:
+                co.append(p)
+        if len(co) == 2:
+            co = tuple(zu.toint(c) for c in co)
+            locallog.warning(f"Set {co} as feature coordinates")
+        elif len(co) > 0:
+            raise ValueError(f"Invalid feature {co}")
+
+        return features, (co or None)
 
     def parse_calendar(self, param=None):
         """Parse calendar flag."""

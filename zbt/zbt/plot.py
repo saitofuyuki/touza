@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/20 16:09:47 fuyuki plot.py>
+# Time-stamp: <2025/02/26 11:04:54 fuyuki plot.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -1086,17 +1086,17 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         ax.yaxis.set_tick_params(which='major', **(major or {}))
         ax.yaxis.set_tick_params(which='minor', **(minor or {}))
 
-    def add_features(self, /, *features,
+    def add_features(self, *, features=None,
                      ax=None, artists=None, gid=None, **kwds):
         """Set GeoAxes extent and tick labels."""
         ax = self._get_axes(ax)
         artists = artists or []
         if ax:
-            for ft in features:
+            for ft, opts in features.items():
                 if isinstance(ft, str):
                     ft = getattr(cfeature, ft)
                 if ft:
-                    artists.append(ax.add_feature(ft))
+                    artists.append(ax.add_feature(ft, **opts))
         return artists
 
     def add_aux_axes(self, fig, ax, which, tol=None, **kwds):
@@ -1591,9 +1591,9 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
         ax = ax or 'body'
         return super().set_aspect(*args, ax=ax, **kwds)
 
-    def add_features(self, /, *args, ax=None, **kwds):
+    def add_features(self, features, /, ax=None, **kwds):
         ax = ax or 'body'
-        return super().add_features(*args, ax=ax, **kwds)
+        return super().add_features(ax=ax, features=features, **kwds)
 
     def add_titles(self, data, aux=None,
                    artists=None,
@@ -1639,6 +1639,7 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
                     except AttributeError:
                         pass
                 full = np.array(sorted(set(full)))
+                # print(full)
                 locallog.debug(f"full contours: {full}")
                 # dc = sv[0].levels[1:] - sv[0].levels[:-1]
                 dc = full[1:] - full[:-1]
@@ -1959,8 +1960,8 @@ class ContourPlot(PlotBase, _ConfigType):
         artists = self.set_view(axs, data, artists=artists,
                                 **xy, crs=crs, axisp=vopts)
 
-        fts = body.get('features') or []
-        fts = axs.add_features(*fts)
+        fts = body.get('features') or {}
+        fts = axs.add_features(fts)
 
         return artists
 
@@ -2085,6 +2086,8 @@ class ContourPlot(PlotBase, _ConfigType):
         if func:
             if method == 'pcolormesh':
                 # func = ft.partial(func, edgecolor='face')
+                # func = ft.partial(func, edgecolor='none', linewidth=0,
+                #                   rasterized=True)
                 func = ft.partial(func, edgecolor='none')
             return func
         else:

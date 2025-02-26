@@ -1,10 +1,15 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/02/21 14:54:19 fuyuki NEWS>
+# Time-stamp: <2025/02/26 11:58:34 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.14.4
+** Minor improvements in zbcont
+Color and alpha parameters of the cartopy features can be controled by
+command-line.
 
 * Changes in 1.14.3
 ** Plotting with multiple-dimension coordinates introduced.
