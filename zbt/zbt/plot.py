@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/26 11:04:54 fuyuki plot.py>
+# Time-stamp: <2025/02/27 18:03:14 fuyuki plot.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -2204,6 +2204,7 @@ class ContourPlot(PlotBase, _ConfigType):
         method = color.get('method')
 
         bar = None
+        cax = None
         ticks = []
         alpha = color.get('alpha')
         # print(f"{alpha=} {cols[0]=}")
