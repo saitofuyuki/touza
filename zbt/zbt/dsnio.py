@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/21 12:44:42 fuyuki dsnio.py>
+# Time-stamp: <2025/02/27 12:51:57 fuyuki dsnio.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -154,6 +154,7 @@ class TouzaNioDimension(_TouzaNio):
         else:
             self.extent = (begin, end, )
             self.size = end - begin
+        # print(f"{self.name=} {self.size=} {begin} {end}")
 
         super().__init__(**kwds)
 
@@ -182,7 +183,7 @@ class _TouzaCoreVar(_TouzaNio):
     """Variable core property."""
 
     __slots__ = ('handle', 'dataset', 'name', 'dimensions', 'recdim',
-                 'dtype', 'logical', )
+                 'dtype', 'logical', 'pdims', )
 
     def __init__(self,
                  group,
@@ -218,6 +219,7 @@ class _TouzaCoreVar(_TouzaNio):
         self.logical = group    # Default logical group equals to the dataset.
         self.name = name
         self.dimensions = dimensions
+        self.pdims = tuple(d.extent for d in self.dimensions)
         self.dtype = numpy.dtype(datatype)
         self.recdim = recdim
         super().__init__(**kwds)
@@ -241,7 +243,9 @@ class _TouzaCoreVar(_TouzaNio):
             Raise if not found.
         """
         ndim = []
+        # print(f"pdims: {self.pdims}")
         for cd in self.dimensions:
+            # print(f"ndim/o: {cd} {cd.name} {cd.extent} {cd.size}")
             for dd in dims:
                 if cd.name == dd.name:
                     ndim.append(dd)
@@ -249,6 +253,8 @@ class _TouzaCoreVar(_TouzaNio):
             else:
                 ndim.append(cd)
         self.dimensions = tuple(ndim)
+        # for d in ndim:
+        #     print(f"ndim: {d} {d.name} {d.extent} {d.size}")
         # for j, d in enumerate(self.dimensions):
         #     if dim.name == d.name:
         #         break
@@ -259,14 +265,24 @@ class _TouzaCoreVar(_TouzaNio):
 
     def squeeze(self):
         """Squeeze along record dimension."""
-        # to do: non-record dimension
+        # if self.recdim:
+        #     if self.recdim.size <= 1:
+        #         j = self.dimensions.index(self.recdim)
+        #         self.dimensions = self.dimensions[:j] + self.dimensions[j+1:]
+        #         self.pdims = self.pdims[:j] + self.pdims[j+1:]
+        #         self.recdim = None
         if self.recdim:
             if self.recdim.size <= 1:
-                j = self.dimensions.index(self.recdim)
-                self.dimensions = self.dimensions[:j] + self.dimensions[j+1:]
                 self.recdim = None
-
-        self.dimensions = tuple(filter(lambda d: d.size > 1, self.dimensions))
+        ndims = []
+        pdims = []
+        for d, p in zip(self.dimensions, self.pdims):
+            if d.size > 1:
+                ndims.append(d)
+                pdims.append(p)
+        self.dimensions = tuple(ndims)
+        self.pdims = tuple(pdims)
+        # self.dimensions = tuple(filter(lambda d: d.size > 1, self.dimensions))
 
     def __copy__(self, *args, **kwds):
         """Placeholder."""
@@ -360,7 +376,9 @@ class _TouzaCoreVar(_TouzaNio):
         vt = zutl.tostr(self.dtype)
         vn = self.format_name()
         ds = ', '.join(self.format_dims())
-        dump.append(f"{vt} {vn}({ds})")
+        ps = ', '.join(f"{r[0]}:{r[1]}" for r in self.pdims)
+        ls = ', '.join(f"{d.extent}" for d in self.dimensions)
+        dump.append(f"{vt} {vn}({ds})[{ps}][{ls}]")
         if attrs:
             for a, ai in self.attrs():
                 av = self.getattr(a)
@@ -443,11 +461,14 @@ class TouzaNioVar(_TouzaCoreVar):
         start = ()
         count = ()
         shape = ()
+        for e, d, p in zip(elem, self.dimensions, self.pdims):
+            locallog.debug(f"<{self.name}> {e=} {d.name} {d.size} {d.extent} {p}")
         # slicing follows numpy design:
         #    An integer, i, returns the same values as i:i+1
         #    except the dimensionality of the returned object is reduced by 1.
-        for e, d in zip(elem, self.dimensions):
-            o = d.extent[0]
+        for e, d, p in zip(elem, self.dimensions, self.pdims):
+            # o = max(0, d.extent[0])
+            o = max(0, d.extent[0]) - max(0, p[0])
             if isinstance(e, slice):
                 if e.step is not None and e.step != 1:
                     raise ValueError("Only value 1 "
@@ -460,9 +481,13 @@ class TouzaNioVar(_TouzaCoreVar):
                 en = st + 1
             co = en - st
             start = start + (st + o, )
+            # start = start + (st - o, )
+            # start = start + (st, )
             count = count + (co, )
             if isinstance(e, slice):
                 shape = shape + (co, )
+            locallog.debug(f"  {e}: {d.name} {shape=} {start=} {count=}")
+
         if self.recdim:
             jrec = self.dimensions.index(self.recdim)
             recs = (start[jrec], count[jrec])
@@ -838,6 +863,7 @@ class TouzaNioDataset(_TouzaNio):
                 dims.append(recdim)
             for cj, ch, cname in self._coors(vh):
                 dims.append(self.search_dim(ch))
+                # print(f"{vname=} {dims[-1].extent}")
             attr = self.lib.header_get_attr('dfmt', self.handle, vid=vh, rec=0)
             dfmt = self.datatype_from_dfmt(attr)
             var = self.createVariable(vname, dfmt, tuple(dims),
@@ -1192,7 +1218,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
                 c = self.check_coordinate_external(xgrp, item, pfx, p)
             if not c:
                 continue
-            debug(f"{c.name=} {c.dimensions} {c.shape} {p}")
+            # debug(f"get: {c.name=} {c.dimensions} {c.shape} {p}")
             for cc in c.dimensions:
                 # print(f"{cc.name=} {dsizes}")
                 if cc.size > 1:
@@ -1267,6 +1293,7 @@ class TouzaNioCoDataset(TouzaNioDataset):
                             return cc[0]
                     else:
                         c = ds.get((g, item,))
+                        # print(c)
                         if c is not None:
                             return c
         return None

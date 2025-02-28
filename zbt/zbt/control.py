@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/22 21:27:28 fuyuki control.py>
+# Time-stamp: <2025/02/28 15:29:37 fuyuki control.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -54,6 +54,10 @@ import zbt.config as zcfg
 locallog = zu.LocalAdapter(__name__)
 
 _ConfigType = zcfg.ConfigRigid
+
+# SFX_BEFORE = '-'
+# SFX_AFTER = '+'
+# SFX_NEAREST = ''
 
 class LinkedArray:
     """Helper class of recursive iteration."""
@@ -2543,15 +2547,8 @@ class FigureInteractive(zplt.FigureCore, DataTree):
                 dims = self.coords
             else:
                 dims = parr.dims
-            # print(f"restore_view: {self.coords} {parr.dims} {x=} {y=}")
-            # dict order must be guaranteed (python >= 3.9)
-            # print(self.restore_clims(parr, parr.dims[0], x[0], x[1]))
-            # print(self.restore_clims(parr, parr.dims[1], y[0], y[1]))
             prev = self.restore_clims(parr, dims[0], x[0], x[1])
             prev = self.restore_clims(parr, dims[1], y[0], y[1], view=prev)
-            # prev[parr.dims[0]] = self.restore_clims(parr, parr.dims[0], x[0], x[1])
-            # prev = {parr.dims[0]: slice(x[0], x[1], None),
-            #         parr.dims[-1]: slice(y[0], y[1], None), }
             if c:
                 prev[c[0]] = c[1]
         else:
@@ -2565,6 +2562,8 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         if np.issubdtype(co.dtype, np.datetime64):
             low = mplib.dates.num2date(low)
             high = mplib.dates.num2date(high)
+        # if low > high:
+        #     low, high = high, low
         view[dim] = slice(low, high, step)
         return view
 
@@ -2596,50 +2595,41 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         """Set figure coordinate."""
         # debug = locallog.info
         debug = locallog.debug
-        # coords = coords or ()
         view = {}
         if self.coords:
-            # print(f"{self.coords=}")
             view['coords'] = tuple(self.coords)
-        # for c in coords:
-        #     if c not in arr.coords:
-        #         break
-        #     if any(d not in arr.dims for d in arr[c].dims):
-        #         break
-        # else:
-        #     view['coords'] = tuple(coords)
-        # if all(c in arr.coords for c in coords):
-        #     # view['coords'] = [arr[c] for c in coords]
-        # debug(f"{draw=} {coords=}")
-        # debug(f"{arr.dims=}")
-        # print(arr.coords)
         draw = draw or {}
         dims = src.dims
-        # print(f"parse_view: {self.view=}")
         if crs:
             view['extent'] = self.view.get(crs)
 
-        # for co in arr.coords.keys():
-        #     print(co)
         for co in arr.dims + (self.coords or ()):
             try:
                 s = coord_prop(co, arr, dims, self.view, draw)
             except KeyError:
                 continue
             # print(f"parse_view/coord_prop:{co}: {s}")
+            # print(self.view.get(co))
+            mm = {}
+            if co in self.view:
+                mm['direction'] = True
             if isinstance(s, slice):
-                mm = {}
+                cv = src.coords[co]
+                if len(cv.shape) > 1 and (isinstance(s.start, int)
+                                          or isinstance(s.stop, int)):
+                    raise ValueError("Index cannot be used"
+                                     f" for multi-dimension coordinate {co}")
                 if isinstance(s.start, int):
-                    mm['dmin'] = src.coords[co][s.start].item()
+                    mm['dmin'] = cv[s.start].item()
                 elif s.start is not None:
                     mm['dmin'] = s.start
                 if isinstance(s.stop, int):
-                    mm['dmax'] = src.coords[co][s.stop-1].item()
+                    mm['dmax'] = cv[s.stop-1].item()
                 elif s.start is not None:
                     mm['dmax'] = s.stop
-                if mm:
-                    view[co] = mm
-        locallog.debug(f"parse_view: {view=}")
+            if mm:
+                view[co] = mm
+        debug(f"parse_view: {view=}")
         return view
 
 
@@ -3871,6 +3861,8 @@ def extract_sels(sel, data, strict=None):
     esel = dict.fromkeys(data.dims)  # extracted selection
     nsel = {}                        # normalized selection
     sel = sel or {}
+    # print(data.dims)
+    # print(data.coords)
     for co, sp in sel.items():
         try:
             co = parse_coord(data, co)
@@ -3878,6 +3870,7 @@ def extract_sels(sel, data, strict=None):
             assert (co in data.coords), f"{co} is non-coordinate dimension."
             cv = data.coords[co]
             cw = len(cv)
+            is_dim = (len(cv.shape) > 1)
             if isinstance(sp, slice):
                 start, stop = sp.start, sp.stop
                 bstart = isinstance(start, int)
@@ -3885,22 +3878,29 @@ def extract_sels(sel, data, strict=None):
                 if bstart:
                     if start < 0:
                         start = start + cw
-                    start = cv[start].item()
+                    if not is_dim:
+                        start = cv[start].item()
                 if bstop:
                     if stop < 0:
                         stop = stop + cw
-                    stop = cv[stop-1].item()
+                    if not is_dim:
+                        stop = cv[stop-1].item()
                 # elif stop is not None:
                 #     # start = float(start)
                 #     stop = math.ceil(stop - 1)
                 if not (bstart and bstop):
-                    if cv[0].item() > cv[-1].item():
+                    if is_dim:
+                        pass
+                    elif cv[0].item() > cv[-1].item():
                         start, stop = stop, start
                         locallog.info(f"Exchange {co} limit range as"
                                       f"({start}, {stop}).")
                 sp = slice(start, stop, sp.step)
             elif isinstance(sp, int):
-                sp = cv[sp].item()
+                if is_dim:
+                    pass
+                else:
+                    sp = cv[sp].item()
             else:
                 sp = normalize_selection(cv, sp)
             nsel[co] = sp
@@ -3924,35 +3924,54 @@ def extract_sels(sel, data, strict=None):
                                                xs, index=False)
                 # xs = data.coords[co].sel({co: xs}, method='nearest')
                 # nsel[co] = xs.item()
+    # locallog.info(f"{esel=}")
+    # locallog.info(f"{nsel=}")
     return esel, nsel
 
 
 def extract_base_array(data, nsel, xsel):
     """Extract base array according to normalized selection."""
     base = data
-    if not nsel:
-        pass
-    elif any(isinstance(j, slice) for j in nsel.values()):
-        base = base.sel(nsel)
-    else:
-        isel = {}
-        fsel = {}
-        for co, sp in nsel.items():
-            # print(co, sp)
-            if co not in data.coords:
-                if isinstance(sp, float):
-                    msg = f"{co} has no associated coordinate {sp}."
-                    raise ValueError(msg)
-                isel[co] = sp
-            else:
-                fsel[co] = sp
-        if isel:
-            base = base.isel(isel)
-        if fsel:
-            base = base.sel(fsel, method='nearest')
-            # print(nsel)
-    # print(base.shape)
-    # print(base)
+    try:
+        if not nsel:
+            pass
+        elif any(isinstance(j, slice) for j in nsel.values()):
+            isel = {}
+            fsel = {}
+            for co, sp in nsel.items():
+                cv = data.coords.get(co)
+                if cv is not None and len(cv.shape) > 1:
+                    isel[co] = sp
+                else:
+                    fsel[co] = sp
+            if isel:
+                base = base.isel(isel)
+            if fsel:
+                base = base.sel(fsel)
+        else:
+            isel = {}
+            fsel = {}
+            for co, sp in nsel.items():
+                cv = data.coords.get(co)
+                if cv is None:
+                    if isinstance(sp, float):
+                        msg = f"{co} has no associated coordinate {sp}."
+                        raise ValueError(msg)
+                    isel[co] = sp
+                elif len(cv.shape) > 1:
+                    isel[co] = sp
+                else:
+                    fsel[co] = sp
+            if isel:
+                base = base.isel(isel)
+            if fsel:
+                base = base.sel(fsel, method='nearest')
+                # print(nsel)
+    except TypeError as err:
+        locallog.error(err)
+        msg = ("Possibly clipping by value on"
+               " multi-dimension coordinates.")
+        raise ValueError(msg) from None
     return base
 
 
