@@ -1,7 +1,7 @@
 !!!_! gentpco.F90 - Generate tripolar coordinate axis files
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 14 2025
-#define TIME_STAMP 'Time-stamp: <2025/02/19 23:29:09 fuyuki gentpco.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/02/28 12:39:04 fuyuki gentpco.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2025
@@ -15,6 +15,7 @@
 #endif
 #include "jmz.h"
 !!!_* macros
+#define _BASENAME 'gentpco'
 #define _PFX 'gentpco: '
 !!!_@ TOUZA/Jmz/gentpco - Generate tripolar coordinate axis files
 program gentpco
@@ -34,10 +35,12 @@ program gentpco
   integer,parameter :: llev = 2
   integer,parameter :: lev_ini = 1
   integer,parameter :: lev_max = 2
+!!!_  - parameters
+  character(len=*), parameter :: basename = _BASENAME
 !!!_ + Driver
   ierr = 0
 
-  if (ierr.eq.0) call base_init(ierr, basename='gentpco')
+  if (ierr.eq.0) call base_init(ierr, basename=basename)
   if (ierr.eq.0) call parse_global(ierr, jpos, npos)
 
   if (ierr.eq.0) then
@@ -81,6 +84,17 @@ contains
     utmp = choice(ulog, u)
     lv = choice(0, levv)
 
+101 format(A, ' - Tripolar coordinate helper [impromptu]')
+102 format(2x, 'with ', A, 1x, A, '; ', A, 1x, A)
+201 format('Usage:')
+202 format(3x, A, ' LON-FILE LATFILE PLON PLAT [OUTPUT-DIR] [OPTIONS...]')
+
+    write(utmp, 101) trim(basename)
+    write(utmp, 102) PACKAGE_NAME, PACKAGE_VERSION, &
+         & TOUZA_NAME, TOUZA_VERSION
+    write(utmp, 201)
+    write(utmp, 202) trim(basename)
+
   end subroutine show_usage
 !!!_  & tripolar_coordinate
   subroutine tripolar_coordinate &
@@ -100,7 +114,6 @@ contains
     real(kind=KTGT),parameter :: def = -HUGE(ZERO)
     integer nwlat
     real(kind=KTGT) :: plon, plat, olat, ofswla
-    real(kind=KTGT) :: targ(NGEOG)
     real(kind=KTGT) :: tol
     character(len=litem) :: DFMT
 
@@ -127,7 +140,6 @@ contains
     if (ierr.eq.0) then
        if (olat.eq.def) olat = -90.0_KTGT
     endif
-    if (ierr.eq.0) call get_option(ierr, targ(1:NGEOG), 'wp', def)
     if (ierr.eq.0) plat = - SIGN(plat, olat)
     if (ierr.eq.0) call get_option(ierr, ofswla, 'wo', def)
     if (ierr.eq.0) then
@@ -222,7 +234,7 @@ contains
     if (ierr.eq.0) then
        mlonc = mlon
        if (attr(1:1).eq.'C') mlonc = mlonc - 1
-       write(*, *) mlon, mlonc
+       ! write(*, *) mlon, mlonc
     endif
     if (ierr.eq.0) allocate(llongi(0:mlon), STAT=ierr)
     if (ierr.eq.0) then
@@ -233,20 +245,20 @@ contains
        jvarla = 0
        mlat = cache_var_len(hlat, jvarla)
        ierr = min(0, mlat)
-       write(*, *) mlat
+       ! write(*, *) mlat
     endif
     if (ierr.eq.0) allocate(llati(0:mlat-1), STAT=ierr)
     if (ierr.eq.0) then
        call cache_var_read(ierr, llati, hlat, jvarla, jrecla)
     endif
-    if (ierr.eq.0) then
-       do jlo = 0, mlonc - 1
-          write(*, *) 'LON:', jlo, llongi(jlo)
-       enddo
-       do jla = 0, mlat - 1
-          write(*, *) 'LAT:', jla, llati(jla)
-       enddo
-    endif
+    ! if (ierr.eq.0) then
+    !    do jlo = 0, mlonc - 1
+    !       write(*, *) 'LON:', jlo, llongi(jlo)
+    !    enddo
+    !    do jla = 0, mlat - 1
+    !       write(*, *) 'LAT:', jla, llati(jla)
+    !    enddo
+    ! endif
     if (ierr.eq.0) then
        dir_lon = check_monotonic(llongi, mlonc)
        if (dir_lon.ne.1.and.dir_lon.ne.-1) ierr = ERR_PANIC
@@ -277,8 +289,8 @@ contains
        if (ierr.ne.0) then
           write(*, *) 'Not implemented yet.', dir_lat, olat
        endif
-       write(*, *) dir_lat, olat, latb, latm, late, late - latm
-       write(*, *) llati(latm-1:latm)
+       ! write(*, *) dir_lat, olat, latb, latm, late, late - latm
+       ! write(*, *) llati(latm-1:latm)
     endif
     if (ierr.eq.0) then
        ldest = mlonc * late
@@ -291,7 +303,7 @@ contains
           pole = -1
        endif
        call stp_set(ierr, csco, plat, plon, pole, loround=CSPAN, laround=CSPAN)
-       write(*, *) 'CSCO = ', csco
+       ! write(*, *) 'CSCO = ', csco
     endif
     if (ierr.eq.0) then
        loround = span_longitude(CSPAN)
@@ -326,8 +338,8 @@ contains
              if (jlo.gt.0.and.phlongi(jg).lt.phlongi(jg-1)) then
                 phlongi(jg) = modulo(zg(JLONGI), CSPAN) + plon
              endif
-             write(*, *) 'w:', jlo, jla, &
-                  & wlon, wlat, phlongi(jg), phlati(jg), zg(JLONGI)
+             ! write(*, *) 'w:', jlo, jla, &
+             !      & wlon, wlat, phlongi(jg), phlati(jg), zg(JLONGI)
           enddo
        enddo
     endif
@@ -348,7 +360,6 @@ contains
                    phlati(jg) = plat
                 endif
              endif
-             write(*, *) 'PHY:', jlo, jla, phlongi(jg), phlati(jg)
           enddo
        enddo
     endif
@@ -360,7 +371,7 @@ contains
 
        krect = REC_BIG
 
-       if (ierr.eq.0) call gen_filename(ierr, ofile, odir, lofile, sep_dir)
+       if (ierr.eq.0) call gen_filename(ierr, ofile, odir, lofile, 'lon', sep_dir)
        if (ierr.eq.0) call sus_open(ierr, ufile, ofile, ACTION='W', STATUS='R')
 
        if (ierr.eq.0) call get_coname(ierr, colo, hlon, jvarlo)
@@ -382,7 +393,7 @@ contains
        if (ierr.eq.0) call nio_write_data(ierr, phlongi, ldest, head, krect, ufile)
        if (ierr.eq.0) call sus_close(ierr, ufile, ofile)
 
-       if (ierr.eq.0) call gen_filename(ierr, ofile, odir, lafile, sep_dir)
+       if (ierr.eq.0) call gen_filename(ierr, ofile, odir, lafile, 'lat', sep_dir)
        if (ierr.eq.0) call sus_open(ierr, ufile, ofile, ACTION='W', STATUS='R')
 
        if (ierr.eq.0) call cache_read_header(ierr, head, hlat, jvarla, jrecla)
@@ -396,16 +407,27 @@ contains
        if (ierr.eq.0) call nio_write_header(ierr, head, krect, ufile)
        if (ierr.eq.0) call nio_write_data(ierr, phlati, ldest, head, krect, ufile)
        if (ierr.eq.0) call sus_close(ierr, ufile, ofile)
+    else
+1001   format('New coordinates: ', I0, 1x, I0)
+       write(*, 1001) mlonc, late
+       do jla = 0, late - 1
+          do jlo = 0, mlonc - 1
+             jg = jla * mlonc + jlo
+1002         format(I0, 1x, I0, 1x, 2E24.14)
+             write(*, 1002) jlo, jla, phlongi(jg), phlati(jg)
+          enddo
+       enddo
     endif
   end subroutine batch_generate
 
   subroutine gen_filename &
        & (ierr, file, &
-       &  dir,  ref,  sep_dir)
+       &  dir,  ref,  tag, sep_dir)
     implicit none
     integer,intent(out) :: ierr
     character(len=*),intent(out) :: file
     character(len=*),intent(in) :: dir, ref
+    character(len=*),intent(in) :: tag
     character(len=*),intent(in) :: sep_dir
     integer :: jbase
 
@@ -429,6 +451,9 @@ contains
 101       format('Error: exists ', A)
           write(*, 101) trim(file)
           ierr = ERR_INVALID_PARAMETER
+       else
+102       format('generate[', A, '] ', A)
+          write(*, 102) trim(tag), trim(file)
        endif
     endif
   end subroutine gen_filename
