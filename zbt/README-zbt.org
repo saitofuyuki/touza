@@ -39,9 +39,9 @@ python-build~ under =zbt= directory:
 : % cd zbt
 : % make python-build   ## need to be on line due to pip requirement
 : % ls dist
-: touza_zbt-1.14.3-py3-none-any.whl  touza_zbt-1.14.3.tar.gz
+: touza_zbt-1.14.n-py3-none-any.whl  touza_zbt-1.14.n.tar.gz
 : % . SOMEWHERE/bin/activate # switch to virtual env
-: (python3) % python3 -m pip install dist/touza_zbt-1.14.3-py3-none-any.whl
+: (python3) % python3 -m pip install dist/touza_zbt-1.14.n-py3-none-any.whl
 
 ** Installation with deb
 Unfortunately, a python package nc-time-axis is not be prepared as
