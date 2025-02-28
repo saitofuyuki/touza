@@ -1,8 +1,8 @@
 /* touza_nio_interface.h - TOUZA/Nio c interfaces */
 /* Maintainer: SAITO Fuyuki */
 /* Created: Feb 16 2023 */
-/* Time-stamp: <2024/09/30 15:01:29 fuyuki touza_nio_interface.h> */
-/* Copyright (C) 2023, 2024 */
+/* Time-stamp: <2025/02/27 10:28:39 fuyuki touza_nio_interface.h> */
+/* Copyright (C) 2023, 2024, 2025 */
 /*           Japan Agency for Marine-Earth Science and Technology */
 /* Licensed under the Apache License, Version 2.0 */
 /*   (https://www.apache.org/licenses/LICENSE-2.0) */
@@ -84,5 +84,15 @@ extern int tnb_var_read_float(float * const d,
 extern int tnb_var_read_double(double * const d,
                                const size_t rec, const size_t *start, const size_t *count,
                                const int handle, const int vid);
+
+extern int tnb_var_lread_int(int * const d,
+                             const size_t rec, const size_t *start, const size_t *count,
+                             const int handle, const int vid);
+extern int tnb_var_lread_float(float * const d,
+                               const size_t rec, const size_t *start, const size_t *count,
+                               const int handle, const int vid);
+extern int tnb_var_lread_double(double * const d,
+                                const size_t rec, const size_t *start, const size_t *count,
+                                const int handle, const int vid);
 
 #endif /* not _TOUZA_NIO_INTERFACE_H */

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/17 10:50:32 fuyuki util.py>
+# Time-stamp: <2025/02/28 09:17:56 fuyuki util.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -561,16 +561,17 @@ def toint(s):
 
 def tonumber(s):
     """Integer or float conversion if possible."""
-    try:
-        n = int(s)
-        return n
-    except ValueError:
-        pass
-    try:
-        n = float(s)
-        return n
-    except ValueError:
-        pass
+    if isinstance(s, str):
+        try:
+            n = int(s)
+            return n
+        except ValueError:
+            pass
+        try:
+            n = float(s)
+            return n
+        except ValueError:
+            pass
     return s
 
 
