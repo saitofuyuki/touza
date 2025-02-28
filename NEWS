@@ -1,14 +1,42 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/02/26 11:58:34 fuyuki NEWS>
+# Time-stamp: <2025/02/28 16:41:44 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
+* Changes in 1.14.5
+** Bug fixes around zbt and related
+*** [FATAL] Fix plotting of sliced array-files.
+Arrays of GTOOL3/Nio format with partial slices (clipping along axis n
+using header attributes of ISTRn, IENDn) do not work as expected.
+
+Indeed, there is confusion in the implementation before 1.14.5
+whether or not the argument start is relative to ISTRn.
+New property _TouzaCoreVar.pdims is introduced, which corresponds to
+/physical/ extents in the file to deal with this confusion.  Argument
+start is now defined as relative value to the ISTRn position.
+
+Thus, dimension clipping by index now corresponds to the shape of
+input data-file, not to the original span of axis-files.
+It is under consideration whether to implement clipping by index in
+terms of the original span.
+*** [CRITICAL] pre post arguments to be optional everywhere.
+Fix declaration of argument pre and post in sus functions, to be
+optional.
+*** [severe] Fix parser of transform/projection/crs.
+Geographic projection without map features now works again.
+*** [severe] Fix colormap parser.
+** Improvement of array clipping on zbcont.
+Clipping by index for multiple-dimension coordinate now works.
+** gentpco, impromptu
+See =zbt/README-zbt.org= (not =jmz/README-jmz.org=) for brief
+description how to run.
+
 * Changes in 1.14.4
 ** Minor improvements in zbcont
-Color and alpha parameters of the cartopy features can be controled by
+Color and alpha parameters of the cartopy features can be controlled by
 command-line.
 
 * Changes in 1.14.3
@@ -28,12 +56,12 @@ See =zbt/README-zbt.org= for detail.
 
 * Changes in 1.14.1 from 1.13
 ** TOUZA/Zbt public release
-- Much efforts are devoted, in particuar, on improvement of sample
+- Much efforts are devoted, in particular, on improvement of sample
   implementation zbcont
 - Indeed, zbcont is now no more sample command but (hopefully) a
   useful entry tool for beginners and experts.
-- Many mouse controls are now achived on zbcont.
-- Datetime coordinate is introuduced using python cftime package
+- Many mouse controls are now achieved on zbcont.
+- Datetime coordinate is introduced using python cftime package
   and/or numpy.datetime64 class.
 - Non-linear coordinates can be chosen.
 - Non-linear color map plotting can be chosen.
@@ -113,7 +141,7 @@ this feature.
 * Changes in 1.12.1 from 1.12
 ** Bug fixes
 - (jmz/chak) Fix operator GEU computation
-- (jmz/chak) Fix operator ZSIGN compuration
+- (jmz/chak) Fix operator ZSIGN computation
 - (jmz/chak) Fix DUP after MARK operation.
 - (jmz/chak) Reject invalid index coordinates
 ** Other changes
@@ -336,5 +364,12 @@ this feature.
 #  LocalWords:  subdirectory nio nctcdf NetCDF nng htb MIROC ppp URT
 #  LocalWords:  xmcomm xmking miroc gtool trp trapiche pkgconf init
 #  LocalWords:  ILS MATSIRO inim env iso fortran formatter ucaln CCC
-#  LocalWords:  pre diag autoconf args arg submodule Subpackages
-#  LocalWords:  touza pkgincludedir includedir
+#  LocalWords:  pre diag autoconf args arg submodule Subpackages zbt
+#  LocalWords:  touza pkgincludedir includedir ISTRn IENDn pdims sus
+#  LocalWords:  TouzaCoreVar colormap zbcont gentpco cartopy Datetime
+#  LocalWords:  cftime numpy datetime libtouza gtcont xrnio py dsnio
+#  LocalWords:  tnb gcc ugg stereographic Ami coupler AO PTx ConvOy
+#  LocalWords:  qoxi fmt subrecord GEU ZSIGN DUP DSET FLUSHing WSUM
+#  LocalWords:  WMV MUL EXCH ITER IFELSE INRANGE ITERated DUPed URY
+#  LocalWords:  EXCHanged CLONEd COPYed Nnview GFORTRAN Bn urt ulast
+#  LocalWords:  tatebe san changs MRT URTa Cn

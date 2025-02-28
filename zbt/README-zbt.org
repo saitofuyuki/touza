@@ -39,9 +39,9 @@ python-build~ under =zbt= directory:
 : % cd zbt
 : % make python-build   ## need to be on line due to pip requirement
 : % ls dist
-: touza_zbt-1.14.3-py3-none-any.whl  touza_zbt-1.14.3.tar.gz
+: touza_zbt-1.14.n-py3-none-any.whl  touza_zbt-1.14.n.tar.gz
 : % . SOMEWHERE/bin/activate # switch to virtual env
-: (python3) % python3 -m pip install dist/touza_zbt-1.14.3-py3-none-any.whl
+: (python3) % python3 -m pip install dist/touza_zbt-1.14.n-py3-none-any.whl
 
 ** Installation with deb
 Unfortunately, a python package nc-time-axis is not be prepared as
@@ -359,7 +359,7 @@ Slicing and indexing can be examined:
 Slice with stride does not work, which is reserved for a future development.
 
 *Caution*: important change from version 1.14.3.
-The feature of attribute slicing accoring to record slicing are
+The feature of attribute slicing according to record slicing are
 deleted.  Instead, =nio= accessor is introduced to deal with attribute
 slicing.  To be documented.
 
@@ -828,7 +828,8 @@ plot contour, and is clipped for colormap.
 :  --dim <dim>/[<low>][:[<high>]]
 Extract single =<element>= along =<dim>= or clip along dimension
 =<dim>= with the index range of =<low>:<high>=.
-The dimension name =<dim>= should be a coordinate name or index.
+The dimension name =<dim>= should be a coordinate name or index (in
+pythonic way, 0 is outermost, -1 is innermost).
 
 : % zbcont --dim  record/10:20   # limit the record dimension as 10:20
 : % zbcont --dim  GLON128/5      # extract section along index 5 of GLON128
@@ -840,15 +841,81 @@ The dimension name =<dim>= should be a coordinate name or index.
 Dimension clipping is performed at file reading.  The elements outside
 cannot be accessed during execution, which is different from the
 behavior of =--draw= argument.
+
+When =<low>= and/or =<high>= is integer, it is regarded as clipping by
+dimension index.  The notation follows the python way: =<low>= is
+inclusive while =<high>= is exclusive.
+
+It is also possible to apply clipping not by index but by coordinate
+values.  In order to enable clipping by value =<low>= =<high>= must be
+formatted which cannot be interpreted as integer, such as floats with
+decimal point or date-like strings.
+: % zbcont --dim GLON128/30.:180.   # limit 30.0 to 180.0 along GLON128
+: % zbcont --dim record/2001-08     # extract section along record near date 2001-08
+At the moment, clipping or extracting by value only works with
+so-called /nearest/ method.  Sometimes user must take care which
+position near the parameter is chosen, in particular for date-like
+coordinates.  For example, if the record coordinate is located on
+15-th day every month, such asymmetric selection probably occurs:
+: % zbcont --dim record/2001-08   # select 2001-08-15
+: % zbcont --dim record/2001-07   # select 2001-06-15 (closer than 2001-7-15)
+
+Index and value can be used at the same time.
+
+Dimension clipping by coordinate values works only single-dimension
+coordinate.
+: % zbcont --dim longitude/30.0:180.0
+: :
+: ValueError: Possibly clipping by value on multi-dimension coordinate
+
 **** draw range (=--draw=, =-D=)
 Similar to clipping by =--dimensions=, except for the clipping is
 interpreted as initial view range.  The elements outside may be
 accessed during execution.
+In addition, draw clipping neither *by index range* nor *by single
+value* can be applied on multiple-dimension coordinate.
+Following are example when =longitude= is multiple-dimension:
+: % zbcont --draw longitude/30.0:180.0   # works
+: % zbcont --draw longitude/5            # works
+
+: % zbcont --draw longitude/30.0         # fails
+: % zbcont --draw longitude/5:10         # fails
+: :
+: ValueError: Index cannot be used for multi-dimension coordinate longitude
+
+Inverted direction on a plot coordinate can be set by =--draw=
+argument, with exchanging =<low>= and =<high>=:
+
+: % zbcont --draw levels/1.0:100.0     #  Normal direction
+: % zbcont --draw levels/100.0:1.0     #  Inverted direction
+
+A GTOOL/Nio axis file may contain =DMIN= and =DMAX= properties, which
+are prepared for default coordinate range to plot.  These properties
+are adopted default if draw range is not specified.
+This behaviour is also adopted when data file is defined on limited
+region, which results in effective plot is displayed with surrounding
+blank area.  In order to ignore =DMIN= =DMAX= properties,
+explicitly set of effective range on =--draw= parameter is a solution.
+In addition, there are two special symbols, =max=, =min= to choose
+actual maximum and minimum, respectively along the coordinate value.
+
+: % zbcont --draw levels/3.0:max      #  3.0 to maximum end
+: % zbcont --draw levels/max:3.0      #  3.0 to maximum end, inverted.
+: % zbcont --draw levels/min:1000.0   #  maximum end to 1000.0
+
+Both symbols can be abbreviated as =mi= or =ma=.
+Single word abbreviation is also possible.  In this case, =m= for
+=<low>= part is interpreted as =min=, while for =<high>= as =max=,
+respectively.
+
+: % zbcont --draw levels/m:m     #  minimum to maximum end (i.g., ignore DMIN and DMAX)
+: % zbcont --draw levels/ma:mi   #  minimum to maximum end, inverted
+
 **** variable filter (=--variables=, =-v=)
 :  --variables <var>[,....]
 List of =<var>= to draw, the others are ignored.
 **** figure coordinate (=--plot=, =-p=)
-:  --plot [VERTICAL][,[HORIZONTAL]]
+:  --plot <vertical>[,][<horizontal>]
 
 : % zbcont --plot record    # change the vertical coordinate as record
 : % zbcont --plot ,record   # change the horizontal coordinate as record
@@ -927,6 +994,53 @@ not matches, thus =zbcont= cannot handle this array.
 
 Improving this feature is definitely a next target of development for
 a coming release.
+***** (experimental, to be redesigned) Tripolar axis-file helper
+~TOUZA/Jmz~ includes ~gentpco~ command, which helps to create 2d
+tripolar GTOOL axis-files from 1d legacy GTOOL axis-files.
+This function will be integrated into ~ConvOy~, a conversion versatile
+tool, in the future release, while ~gentpco~ does provide the
+particular function as a workaround before the implementation.
+
+Following are a typical usage:
+: % mkdir axis2d
+: % gentpco axis1d/GTAXLOC.OCLONTPV360 axis1d/GTAXLOC.OCLATTPV256 60.0000000000000 63.333700283430097 axis2d
+: % :
+: % ls axis2d
+: GTAXLOC.OCLONTPV360 GTAXLOC.OCLATTPV256
+: % ngtls axis2d/GTAXLOC.OCLONTPV360 GTAXLOC.OCLATTPV256
+:   1 OCLONTPV360        0S     0   UR4 00000101 000000 OCLONTPV360,OCLATTPV256,
+:   1 OCLATTPV256        0S     0   UR4 00000101 000000 OCLONTPV360,OCLATTPV256,
+:
+
+For T-grids, it is needed to offset latitude starting point by 0.5
+(relative value, i.e., one normalized by the unit cell length) with
+~wo=OFFSET~ parameter:
+: % gentpco axis1d/GTAXLOC.OCLONTPT360 axis1d/GTAXLOC.OCLATTPT256 60.0000000000000 63.333700283430097 axis2d wo=0.5
+: :
+
+Command line syntax is as follows:
+: gentpco <lon-file> <lat-file> <plon> <plat> [<output-dir>] [options....]
+
+The first two arguments are source (1d legacy) longitude latitude axis files.
+Two numbers follow them which are characteristic longitude and latitude
+of tripolar coordinate systems (geographic coordinates of a pole on
+the w-sphere).
+
+If =<output-dir>= is specified, two new axis-files of the same names are
+written under the directory.  Existing files are never overwritten
+(abort if exist).  So you need to specify the directory different from
+the input axis files.
+
+If =<output-dir>= is not specified, a simple table of coordinates are
+shown in the standard output.
+
+The optional parameter =wo=<offset>= controls the relative shift of
+coordinate starting point, which is typically either 0 (V-grid) or 0.5
+(T-grid).
+
+Also, GTOOL output format can be set by =dfmt=<format>=, such as
+=dfmt=UR8=.
+
 
 **** (experimental) map overlay (=--map=, =-m=)
 : % zbcont -m [LAT,LON,]LETTERS
@@ -982,12 +1096,12 @@ Need some trials to detect the least amount of shift.
 #+CAPTION: Demonstration of PlateCarree (=zbcont -Ppc+1 datafile=).
 #+NAME:   fig:demo_PlateCarree-1.png
 [[./doc/demo_PlateCarree-1.png]]
-#+CAPTION: Demonstration of PlateCarree (=zbcont -Ppc datafile=).
-#+NAME:   fig:demo_PlateCarree-0.png
-[[./doc/demo_PlateCarree-0.png]]
-#+CAPTION: Demonstration of PlateCarree (=zbcont -Ppc+0.9 datafile=).
-#+NAME:   fig:demo_PlateCarree-2.png
-[[./doc/demo_PlateCarree-2.png]]
+# #+CAPTION: Demonstration of PlateCarree (=zbcont -Ppc datafile=).
+# #+NAME:   fig:demo_PlateCarree-0.png
+# [[./doc/demo_PlateCarree-0.png]]
+# #+CAPTION: Demonstration of PlateCarree (=zbcont -Ppc+0.9 datafile=).
+# #+NAME:   fig:demo_PlateCarree-2.png
+# [[./doc/demo_PlateCarree-2.png]]
 
 This problem is one of the next targets to fix.
 ****** =NorthPolarStereo= =SouthPolarStereo=
@@ -1000,18 +1114,15 @@ the polar regions, limiting of latitude range is generally a good idea.
 : % zbcont -Psps -Dlatitude/-90.0:-30.0 datafile   # Works as expected
 Of course a valid coordinate name should be used (=latitude=, in this
 case).
-#+CAPTION: Demonstration of NorthPolarStereo (=zbcont -Pnps datafile=).
-#+NAME:   fig:demo_NorthPolarStereo-0.png
-[[./doc/demo_NorthPolarStereo-0.png]]
-
+# #+CAPTION: Demonstration of NorthPolarStereo (=zbcont -Pnps datafile=).
+# #+NAME:   fig:demo_NorthPolarStereo-0.png
+# [[./doc/demo_NorthPolarStereo-0.png]]
 #+CAPTION: Demonstration of NorthPolarStereo (=zbcont -Pnps -Dlatitude/30.0:90.0 datafile=).
 #+NAME:   fig:demo_NorthPolarStereo-1.png
 [[./doc/demo_NorthPolarStereo-1.png]]
-
-#+CAPTION: Demonstration of SouthPolarStereo (=zbcont -Psps datafile=).
-#+NAME:   fig:demo_SouthPolarStereo-0.png
-[[./doc/demo_SouthPolarStereo-0.png]]
-
+# #+CAPTION: Demonstration of SouthPolarStereo (=zbcont -Psps datafile=).
+# #+NAME:   fig:demo_SouthPolarStereo-0.png
+# [[./doc/demo_SouthPolarStereo-0.png]]
 #+CAPTION: Demonstration of SouthPolarStereo (=zbcont -Psps -Dlatitude/-90.0:-30.0 datafile=).
 #+NAME:   fig:demo_SouthPolarStereo-1.png
 [[./doc/demo_SouthPolarStereo-1.png]]
@@ -1023,7 +1134,6 @@ option (the order is significant)
 : % zbcont -Pnps -mocean+blue,land datafile     # Works.
 : % zbcont -Pnps -mland,ocean+blue datafile     # Not works
 
-
 ****** =Orthographic=
 Strange domain may be chosen to plot without manual limiting of plot region.
 Longitude span to work depends on the central longitude
@@ -1034,22 +1144,18 @@ required from the central longitude for both limits.
 : % zbcont -Pg+90 -Dlongitude/-180.0:180.0 datafile
 : % zbcont -Pg+100 -Dlongitude/-180.0:180.0 datafile    # Strange (insufficient spaces)
 : % zbcont -Pg+100 -Dlongitude/0.0:360.0 datafile
-#+CAPTION: Demonstration of Orthographic (=zbcont -Pg datafile=).
-#+NAME:   fig:demo_Orthographic-0.png
-[[./doc/demo_Orthographic-0.png]]
-
+# #+CAPTION: Demonstration of Orthographic (=zbcont -Pg datafile=).
+# #+NAME:   fig:demo_Orthographic-0.png
+# [[./doc/demo_Orthographic-0.png]]
 #+CAPTION: Demonstration of Orthographic (=zbcont -Pg -Dlongitude/-180.0:180.0 datafile=).
 #+NAME:   fig:demo_Orthographic-1.png
 [[./doc/demo_Orthographic-1.png]]
-
-#+CAPTION: Demonstration of Orthographic (=zbcont -Pg+90 -Dlongitude/-180.0:180.0 datafile=).
-#+NAME:   fig:demo_Orthographic-2.png
-[[./doc/demo_Orthographic-2.png]]
-
-#+CAPTION: Demonstration of Orthographic (=zbcont -Pg+100 -Dlongitude/-180.0:180.0 datafile=).
-#+NAME:   fig:demo_Orthographic-3.png
-[[./doc/demo_Orthographic-3.png]]
-
+# #+CAPTION: Demonstration of Orthographic (=zbcont -Pg+90 -Dlongitude/-180.0:180.0 datafile=).
+# #+NAME:   fig:demo_Orthographic-2.png
+# [[./doc/demo_Orthographic-2.png]]
+# #+CAPTION: Demonstration of Orthographic (=zbcont -Pg+100 -Dlongitude/-180.0:180.0 datafile=).
+# #+NAME:   fig:demo_Orthographic-3.png
+# [[./doc/demo_Orthographic-3.png]]
 #+CAPTION: Demonstration of Orthographic (=zbcont -Pg+100 -Dlongitude/0.0:360.0 datafile=).
 #+NAME:   fig:demo_Orthographic-4.png
 [[./doc/demo_Orthographic-4.png]]
@@ -1067,11 +1173,9 @@ aborts with an error) when the central *latitude* is specified.
 #+CAPTION: Demonstration of NearsidePerspective (=zbcont -Pnp datafile=).
 #+NAME:   fig:demo_NearsidePerspective-0.png
 [[./doc/demo_NearsidePerspective-0.png]]
-
-#+CAPTION: Demonstration of NearsidePerspective (=zbcont -Pnp+0+30 datafile=).
-#+NAME:   fig:demo_NearsidePerspective-1.png
-[[./doc/demo_NearsidePerspective-1.png]]
-
+# #+CAPTION: Demonstration of NearsidePerspective (=zbcont -Pnp+0+30 datafile=).
+# #+NAME:   fig:demo_NearsidePerspective-1.png
+# [[./doc/demo_NearsidePerspective-1.png]]
 #+CAPTION: Demonstration of NearsidePerspective (=zbcont -Pnp+0+30 -Dlongitude/-180.0:180.0 -Dlatitude/-90.0:90.0 datafile=).
 #+NAME:   fig:demo_NearsidePerspective-2.png
 [[./doc/demo_NearsidePerspective-3.png]]
@@ -1086,14 +1190,12 @@ for the global view.
 : % zbcont -Pm -Dlongitude/-180.1:180.1 datafile        # Works
 : % zbcont -Pm+30 -Dlongitude/-150.1:210.1 datafile     # Works
 
-#+CAPTION: Demonstration of Mercator (=zbcont -Pm datafile=).
-#+NAME:   fig:demo_Mercator-0.png
-[[./doc/demo_Mercator-0.png]]
-
-#+CAPTION: Demonstration of Mercator (=zbcont -Pm -Dlongitude/-180.0:180.0 datafile=).
-#+NAME:   fig:demo_Mercator-1.png
-[[./doc/demo_Mercator-1.png]]
-
+# #+CAPTION: Demonstration of Mercator (=zbcont -Pm datafile=).
+# #+NAME:   fig:demo_Mercator-0.png
+# [[./doc/demo_Mercator-0.png]]
+# #+CAPTION: Demonstration of Mercator (=zbcont -Pm -Dlongitude/-180.0:180.0 datafile=).
+# #+NAME:   fig:demo_Mercator-1.png
+# [[./doc/demo_Mercator-1.png]]
 #+CAPTION: Demonstration of Mercator (=zbcont -Pm -Dlongitude/-180.1:180.1 datafile=).
 #+NAME:   fig:demo_Mercator-2.png
 [[./doc/demo_Mercator-2.png]]
@@ -1362,7 +1464,9 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  bwr hsv qual gnuplot CMRmap cubehelix brg nipy ncar
 #  LocalWords:  cmap sym asinh arcsinh eps png jpg zbtFigure nd th fn
 #  LocalWords:  Ogochi Koji san Tatsuo Komuro Yoshiki tripolar OCDEPT
-#  LocalWords:  OCLONTPT OCLATTPT gridpoint basenames tri tas rlon
+#  LocalWords:  OCLONTPT OCLATTPT gridpoint basenames tri tas rlon wo
 #  LocalWords:  rlat lon datafile tricontour stereographic Pnps Psps
-#  LocalWords:  Dlatitude Dlongitude Pnp IllegalArgumentException
-#  LocalWords:  gridpoints mocean mland
+#  LocalWords:  Dlatitude Dlongitude Pnp IllegalArgumentException dir
+#  LocalWords:  gridpoints mocean mland accessor gentpco ConvOy mkdir
+#  LocalWords:  OCLONTPV OCLATTPV PLON dfmt pythonic ValueError DMIN
+#  LocalWords:  DMAX plon

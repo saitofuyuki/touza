@@ -1,3 +1,18 @@
+Release-1.14.5 / 2025-02-28
+===========================
+
+  * Import zbt bug-fixes and updates.
+  * doc: (zbt) document around clipping, gentpco.
+  * jmz: (gentpco) cleaned, reduce run-time messages.
+  * zbt: (zbcont) [severe] Fix around transform and colormap parser.
+  * zbt: (control) improved clipping on multiple-dimension coordinates.
+  * zbt: (plot) improve coordinate range parser.
+  * zbt: (plot) [FATAL] Fix binding of sliced array-file.
+  * zbt: (util) [severe] change tonumber() targets to only str.
+  * std: (sus) [CRITICAL] pre post arguments to be optional everywhere.
+  * nio: (bindc) tnb_var_lread_* variation introduced.
+  * nio: (cache) [FATAL] introduced logical-shape reading.
+
 Release-1.14.4 / 2025-02-26
 ===========================
 

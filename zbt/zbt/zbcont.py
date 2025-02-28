@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/26 11:03:45 fuyuki zbcont.py>
+# Time-stamp: <2025/02/28 15:34:59 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -498,6 +498,7 @@ class Options(ParserUtils, ap.Namespace):
             pass
         else:
             cmap = [method] + cmap
+            method = None
 
         if method == 'contour':
             if contour is None:
@@ -506,7 +507,6 @@ class Options(ParserUtils, ap.Namespace):
         color['cmap'] = cmap
         if params:
             color['alpha'] = float(params)
-        # print(f"{color=}")
         return color, contour
 
     def parse_cnorm(self, param, cnorm=None):
@@ -681,7 +681,7 @@ class Options(ParserUtils, ap.Namespace):
 
         # if bool(projection):
         #     maps = maps or [None]
-        if bool(features):
+        if bool(features) or bool(projection):
             if not transform:
                 transform = ccrs.PlateCarree()
             if not crs:

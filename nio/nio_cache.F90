@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2025/02/14 22:38:31 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/02/27 10:16:31 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023,2024,2025
@@ -2912,7 +2912,7 @@ contains
 !!!_  & cache_read_data
 !!!_  & cache_var_read
   subroutine cache_var_read_i &
-       & (ierr, d, handle, vid, rec, start, count)
+       & (ierr, d, handle, vid, rec, start, count, blog)
     use TOUZA_Nio_std,only: KIOFS, WHENCE_BEGIN
     use TOUZA_Nio_record,only: nio_read_data
     integer,intent(out)         :: ierr
@@ -2920,6 +2920,7 @@ contains
     integer,intent(in)          :: handle, vid
     integer,intent(in)          :: rec
     integer,intent(in),optional :: start(0:*), count(0:*)
+    logical,intent(in),optional :: blog
     integer jc, vser
     type(group_t),pointer :: g
     type(var_t),pointer :: v
@@ -2946,7 +2947,7 @@ contains
     endif
     if (ierr.eq.0) then
        v => ctables(jc)%v(vser)
-       call cache_var_slice(ofs, mem, lcoor, v, ctables(jc), start, count)
+       call cache_var_slice(ofs, mem, lcoor, v, ctables(jc), start, count, blog)
        n = -1
        call nio_read_data &
             & (ierr, d, n, head, krect, ufile, start=ofs(0:v%neff-1), count=mem(0:v%neff-1))
@@ -2954,7 +2955,7 @@ contains
     call trace_err(ierr, 'cache_var_read')
   end subroutine cache_var_read_i
   subroutine cache_var_read_f &
-       & (ierr, d, handle, vid, rec, start, count)
+       & (ierr, d, handle, vid, rec, start, count, blog)
     use TOUZA_Nio_std,only: KTGT=>KFLT, KIOFS, WHENCE_BEGIN
     use TOUZA_Nio_record,only: nio_read_data
     integer,        intent(out)         :: ierr
@@ -2962,6 +2963,7 @@ contains
     integer,        intent(in)          :: handle, vid
     integer,        intent(in)          :: rec
     integer,        intent(in),optional :: start(0:*), count(0:*)
+    logical,        intent(in),optional :: blog
     integer jc, vser
     type(group_t),pointer :: g
     type(var_t),pointer :: v
@@ -2988,7 +2990,7 @@ contains
     endif
     if (ierr.eq.0) then
        v => ctables(jc)%v(vser)
-       call cache_var_slice(ofs, mem, lcoor, v, ctables(jc), start, count)
+       call cache_var_slice(ofs, mem, lcoor, v, ctables(jc), start, count, blog)
        n = -1
        call nio_read_data &
             & (ierr, d, n, head, krect, ufile, start=ofs(0:v%neff-1), count=mem(0:v%neff-1))
@@ -2997,7 +2999,7 @@ contains
     call trace_err(ierr, 'cache_var_read')
   end subroutine cache_var_read_f
   subroutine cache_var_read_d &
-       & (ierr, d, handle, vid, rec, start, count)
+       & (ierr, d, handle, vid, rec, start, count, blog)
     use TOUZA_Nio_std,only: KTGT=>KDBL, KIOFS, WHENCE_BEGIN
     use TOUZA_Nio_record,only: nio_read_data
     integer,        intent(out)         :: ierr
@@ -3005,6 +3007,7 @@ contains
     integer,        intent(in)          :: handle, vid
     integer,        intent(in)          :: rec
     integer,        intent(in),optional :: start(0:*), count(0:*)
+    logical,        intent(in),optional :: blog
     integer jc, vser
     type(group_t),pointer :: g
     type(var_t),pointer :: v
@@ -3031,7 +3034,7 @@ contains
     endif
     if (ierr.eq.0) then
        v => ctables(jc)%v(vser)
-       call cache_var_slice(ofs, mem, lcoor, v, ctables(jc), start, count)
+       call cache_var_slice(ofs, mem, lcoor, v, ctables(jc), start, count, blog)
        n = -1
        call nio_read_data &
             & (ierr, d, n, head, krect, ufile, start=ofs(0:v%neff-1), count=mem(0:v%neff-1))
@@ -3041,7 +3044,8 @@ contains
 
 !!!_  & cache_var_slice
   subroutine cache_var_slice &
-       & (ofs, mem, lcoor, v, c, start, count)
+       & (ofs, mem, lcoor, v, c, start, count, blog)
+    use TOUZA_Nio_std,only: choice
     implicit none
     integer,      intent(out)         :: ofs(0:*)
     integer,      intent(out)         :: mem(0:*)
@@ -3049,7 +3053,12 @@ contains
     type(var_t),  intent(in)          :: v
     type(cache_t),intent(in)          :: c
     integer,      intent(in),optional :: start(0:*), count(0:*)
+    logical,      intent(in),optional :: blog   ! whether or not to shift offset
+                                                ! according to file slice (default FALSE)
     integer jeff, jco, xh
+    logical swsh
+
+    swsh = choice(.FALSE., blog)
 
     ofs(0:lcoor-1) = 0
     ! mem(0:lcoor-1) = v%jend(0:lcoor-1) - v%jbgn(0:lcoor-1)
@@ -3073,6 +3082,17 @@ contains
              jco = v%ceff(jeff)
              ofs(jco) = start(jeff)
              mem(jco) = 1
+          enddo
+       endif
+       if (swsh) then
+          do jeff = 0, v%neff - 1
+             jco = v%ceff(jeff)
+             xh = v%xh(jco)
+             if (xh.ge.0) then
+                ofs(jco) = ofs(jco) - c%jbgn(xh)
+             else
+                ofs(jco) = 0
+             endif
           enddo
        endif
     else if (present(count)) then

@@ -2,10 +2,10 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2024/07/29 17:12:26 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/02/27 16:22:28 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022,2023,2024
+! Copyright (C) 2021,2022,2023,2024,2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -5306,8 +5306,8 @@ contains
     integer(KIND=KARG), intent(in)          :: V(*)      ! data array
     integer,            intent(in)          :: n         ! size of V (no check)
     integer(kind=KISEP),intent(in)          :: isep      ! 32-bit separator
-    logical,            intent(in)          :: pre, post ! continuation flag
-    logical,            intent(in)          :: swap      ! byte-order switch
+    logical,            intent(in),optional :: pre, post ! continuation flag
+    logical,            intent(in),optional :: swap      ! byte-order switch
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
@@ -5328,8 +5328,8 @@ contains
     integer(KIND=KARG), intent(in)          :: V(*)
     integer,            intent(in)          :: n
     integer(kind=KISEP),intent(in)          :: isep
-    logical,            intent(in)          :: pre, post
-    logical,            intent(in)          :: swap
+    logical,            intent(in),optional :: pre, post
+    logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
@@ -5350,8 +5350,8 @@ contains
     real(KIND=KARG),    intent(in)          :: V(*)
     integer,            intent(in)          :: n
     integer(kind=KISEP),intent(in)          :: isep
-    logical,            intent(in)          :: pre, post
-    logical,            intent(in)          :: swap
+    logical,            intent(in),optional :: pre, post
+    logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
@@ -5372,8 +5372,8 @@ contains
     real(KIND=KARG),    intent(in)          :: V(*)
     integer,            intent(in)          :: n
     integer(kind=KISEP),intent(in)          :: isep
-    logical,            intent(in)          :: pre, post
-    logical,            intent(in)          :: swap
+    logical,            intent(in),optional :: pre, post
+    logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
@@ -5394,8 +5394,8 @@ contains
     character(len=*),   intent(in)          :: V(*)
     integer,            intent(in)          :: n
     integer(kind=KISEP),intent(in)          :: isep
-    logical,            intent(in)          :: pre, post
-    logical,            intent(in)          :: swap
+    logical,            intent(in),optional :: pre, post
+    logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
@@ -5418,8 +5418,8 @@ contains
     integer(KIND=KARG), intent(in)          :: V
     integer,            intent(in)          :: n
     integer(kind=KISEP),intent(in)          :: isep
-    logical,            intent(in)          :: pre, post
-    logical,            intent(in)          :: swap
+    logical,            intent(in),optional :: pre, post
+    logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
@@ -5440,8 +5440,8 @@ contains
     integer(KIND=KARG), intent(in)          :: V
     integer,            intent(in)          :: n
     integer(kind=KISEP),intent(in)          :: isep
-    logical,            intent(in)          :: pre, post
-    logical,            intent(in)          :: swap
+    logical,            intent(in),optional :: pre, post
+    logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
@@ -5462,8 +5462,8 @@ contains
     real(KIND=KARG),    intent(in)          :: V
     integer,            intent(in)          :: n
     integer(kind=KISEP),intent(in)          :: isep
-    logical,            intent(in)          :: pre, post
-    logical,            intent(in)          :: swap
+    logical,            intent(in),optional :: pre, post
+    logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
@@ -5484,8 +5484,8 @@ contains
     real(KIND=KARG),    intent(in)          :: V
     integer,            intent(in)          :: n
     integer(kind=KISEP),intent(in)          :: isep
-    logical,            intent(in)          :: pre, post
-    logical,            intent(in)          :: swap
+    logical,            intent(in),optional :: pre, post
+    logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
@@ -5506,8 +5506,8 @@ contains
     character(len=*),   intent(in)          :: V
     integer,            intent(in)          :: n
     integer(kind=KISEP),intent(in)          :: isep
-    logical,            intent(in)          :: pre, post
-    logical,            intent(in)          :: swap
+    logical,            intent(in),optional :: pre, post
+    logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     ierr = 0
@@ -5528,8 +5528,8 @@ contains
     integer,            intent(in)          :: u
     integer(kind=KIOFS),intent(in)          :: skip
     integer(kind=KISEP),intent(in)          :: isep
-    logical,            intent(in)          :: pre, post
-    logical,            intent(in)          :: swap
+    logical,            intent(in),optional :: pre, post
+    logical,            intent(in),optional :: swap
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     integer(kind=KIOFS) :: jposf
@@ -5545,37 +5545,41 @@ contains
 !!!_  & sus_write_null_iset
   subroutine sus_write_null_iset &
        & (ierr, u, pre, post, swap, jpos, whence)
+    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,parameter :: KISEP=KI32, KARG=KI32
     integer,            intent(out)         :: ierr
     integer,            intent(in)          :: u         ! file unit
-    logical,            intent(in)          :: pre, post ! continuation flag
-    logical,            intent(in)          :: swap      ! byte-order switch
+    logical,            intent(in),optional :: pre, post ! continuation flag
+    logical,            intent(in),optional :: swap      ! byte-order switch
     integer(kind=KIOFS),intent(in),optional :: jpos      ! position in stream unit
     integer,            intent(in),optional :: whence
     integer(kind=KISEP) :: isep
     integer,parameter :: n = 1
     character(len=1),parameter :: cnull(n) = CHAR(0)
+    logical bpre, bpost
     ierr = 0
-    if (pre.eqv.post) then
-       if (pre) then
-          ! medium null subrecord
-          continue
-       else
-          ! independent null (sub)record
-          isep = 0
-          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
-          if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
-       endif
+
+    bpre  = choice(.FALSE., pre)
+    bpost = choice(.FALSE., post)
+
+    ! medium null subrecord
+    if (bpre.and.bpost) return
+
+    if (bpre.eqv.bpost) then
+       ! independent null (sub)record
+       isep = 0
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, bpost, swap, jpos, whence)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, bpre, swap)
        return
     endif
-    if (pre) then
+    if (bpre) then
        ! final null subrecord.  Dummy single-byte sub-record is written.
        isep = n
-       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, post, swap, jpos, whence)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, bpost, swap, jpos, whence)
        if (ierr.eq.0) call sus_write(ierr, u, cnull, n, swap)
-       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, pre, swap)
+       if (ierr.eq.0) call sus_write_isep(ierr, u, isep, bpre, swap)
        return
     endif
 

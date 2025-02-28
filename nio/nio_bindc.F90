@@ -1,10 +1,10 @@
 !!!_! nio_bindc.F90 - TOUZA/Nio bind(c) interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2023
-#define TIME_STAMP 'Time-stamp: <2024/09/30 15:58:56 fuyuki nio_bindc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/02/27 10:27:18 fuyuki nio_bindc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2023, 2024
+! Copyright (C) 2023, 2024, 2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -59,8 +59,9 @@ module TOUZA_Nio_bindc
   public :: tnb_attr_size,     tnb_attr_len
   public :: tnb_get_attr,      tnb_get_header
   public :: tnb_get_attr_byid, tnb_get_attr_name
-  public :: tnb_get_attr_int,  tnb_get_attr_float, tnb_get_attr_double
-  public :: tnb_var_read_int,  tnb_var_read_float, tnb_var_read_double
+  public :: tnb_get_attr_int,  tnb_get_attr_float,  tnb_get_attr_double
+  public :: tnb_var_read_int,  tnb_var_read_float,  tnb_var_read_double
+  public :: tnb_var_lread_int, tnb_var_lread_float, tnb_var_lread_double
   public :: init,              diag,           finalize
 !!!_  - public shared
 contains
@@ -848,6 +849,97 @@ contains
     endif
     ierr = jerr
   end function tnb_var_read_double
+
+!!!_  - tnb_var_lread_int() - read logical shape (i.e., start is adjusted corresponding to data range)
+  integer(kind=C_INT) function tnb_var_lread_int &
+       & (d, rec, start, count, handle, vid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_var_read, cache_co_size
+    implicit none
+    integer(kind=C_INT),   intent(out)      :: d(*)
+    integer(kind=C_SIZE_T),intent(in),value :: rec
+    integer(kind=C_SIZE_T),intent(in)       :: start(0:*), count(0:*)
+    integer(kind=C_INT),   intent(in),value :: handle
+    integer(kind=C_INT),   intent(in),value :: vid
+    integer nco, jco, jeff
+    integer jerr
+    integer st(0:lax-1), co(0:lax-1)
+
+    nco = cache_co_size(int(handle), int(vid))
+    jerr = min(0, nco)
+    do jeff = 0, nco - 1
+       jco = nco - 1 - jeff
+       st(jco) = int(start(jeff))
+       co(jco) = int(count(jeff))
+    enddo
+
+    if (jerr.eq.0) then
+       call cache_var_read &
+            & (jerr,        d,           &
+            &  int(handle), int(vid),    &
+            &  int(rec),    st(0:nco-1), co(0:nco-1), .TRUE.)
+    endif
+    ierr = jerr
+  end function tnb_var_lread_int
+!!!_  - tnb_var_lread_float()
+  integer(kind=C_INT) function tnb_var_lread_float &
+       & (d, rec, start, count, handle, vid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_var_read, cache_co_size
+    implicit none
+    real(kind=C_FLOAT),    intent(out)      :: d(*)
+    integer(kind=C_SIZE_T),intent(in),value :: rec
+    integer(kind=C_SIZE_T),intent(in)       :: start(0:*), count(0:*)
+    integer(kind=C_INT),   intent(in),value :: handle
+    integer(kind=C_INT),   intent(in),value :: vid
+    integer nco, jco, jeff
+    integer jerr
+    integer st(0:lax-1), co(0:lax-1)
+
+    nco = cache_co_size(int(handle), int(vid))
+    jerr = min(0, nco)
+    do jeff = 0, nco - 1
+       jco = nco - 1 - jeff
+       st(jco) = int(start(jeff))
+       co(jco) = int(count(jeff))
+    enddo
+
+    if (jerr.eq.0) then
+       call cache_var_read &
+            & (jerr,        d,           &
+            &  int(handle), int(vid),    &
+            &  int(rec),    st(0:nco-1), co(0:nco-1), .TRUE.)
+    endif
+    ierr = jerr
+  end function tnb_var_lread_float
+!!!_  - tnb_var_lread_double()
+  integer(kind=C_INT) function tnb_var_lread_double &
+       & (d, rec, start, count, handle, vid) BIND(C) result(ierr)
+    use TOUZA_Nio_cache,only: cache_var_read, cache_co_size
+    implicit none
+    real(kind=C_DOUBLE),   intent(out)      :: d(*)
+    integer(kind=C_SIZE_T),intent(in),value :: rec
+    integer(kind=C_SIZE_T),intent(in)       :: start(0:*), count(0:*)
+    integer(kind=C_INT),   intent(in),value :: handle
+    integer(kind=C_INT),   intent(in),value :: vid
+    integer nco, jco, jeff
+    integer jerr
+    integer st(0:lax-1), co(0:lax-1)
+
+    nco = cache_co_size(int(handle), int(vid))
+    jerr = min(0, nco)
+    do jeff = 0, nco - 1
+       jco = nco - 1 - jeff
+       st(jco) = int(start(jeff))
+       co(jco) = int(count(jeff))
+    enddo
+
+    if (jerr.eq.0) then
+       call cache_var_read &
+            & (jerr,        d,           &
+            &  int(handle), int(vid),    &
+            &  int(rec),    st(0:nco-1), co(0:nco-1), .TRUE.)
+    endif
+    ierr = jerr
+  end function tnb_var_lread_double
 
 !!!_ + common interfaces
 !!!_  & init

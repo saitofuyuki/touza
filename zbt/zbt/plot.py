@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/26 11:04:54 fuyuki plot.py>
+# Time-stamp: <2025/02/28 10:45:19 fuyuki plot.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -198,6 +198,8 @@ class ParserBase():
         if item:
             dmax = dmax.item()
             dmin = dmin.item()
+        if dmin > dmax:
+            dmin, dmax = dmax, dmin
         return (dmin, dmax, scale)
 
     def parse_ticks(self, attrs, default=0):
@@ -302,41 +304,59 @@ class LegacyParser(ParserBase):
         minor = subst(minor)
         return (major, minor)
 
-    def parse_coor(self, coor, item=False):
+    def parse_coor(self, coor, dmin=None, dmax=None,
+                   direction=None, item=False):
         """Parse axis limit."""
+        locallog.debug(f"parse_coor: {dmin} {dmax}")
+        ATTR = r'attr'
+        MAX, MIN = r'max', r'min'
         miss = coor.attrs.get('MISS', '').strip()
-
-        def parse_sub(key):
-            ikey = f'_ignore_{key}'
-            if coor.attrs.get(ikey, None):
-                d = ''
-            else:
+        def parse_sub(key, arg, *special):
+            arg = ATTR if arg is None else arg
+            if isinstance(arg, str) and ATTR.startswith(arg):
                 d = coor.attrs.get(key, '').strip()
-                d = '' if d == miss else d
+                d = None if d == miss else d
+            else:
+                d = arg
+            if isinstance(d, str):
+                for s in special:
+                    if s.startswith(d):
+                        d = s
+                        break
+            elif d is None and special:
+                d = special[0]
             return d
-        dmax = parse_sub('DMAX')
-        dmin = parse_sub('DMIN')
-        styp = int(parse_sub('STYP') or 0)
+        dmax = zu.tonumber(parse_sub('DMAX', dmax, MAX, MIN))
+        dmin = zu.tonumber(parse_sub('DMIN', dmin, MIN, MAX))
+        locallog.debug(f"parse_coor:1: {dmin} {dmax}")
+
+        styp = int(parse_sub('STYP', None) or 0)
         sc = ''
         if abs(styp) == 2:
             sc = 'log'
-        # print(f"parse_coor: {dmin=} {dmax=}")
-        if dmax and dmin:
+        locallog.debug(f"parse_coor: {styp=}")
+        def get_special(v, vmin, vmax):
+            if v == MAX:
+                return vmax
+            if v == MIN:
+                return vmin
+            return v
+
+        if any(v in [MAX, MIN] for v in [dmax, dmin]):
+            vmin, vmax, _ = super().parse_coor(coor, item=item)
+            dmin = get_special(dmin, vmin, vmax)
+            dmax = get_special(dmax, vmin, vmax)
+
+        if all(isinstance(v, (int, float)) for v in [dmax,  dmin]):
             dmax = float(dmax)
             dmin = float(dmin)
-            if dmin > dmax:
-                dmin, dmax = dmax, dmin
-            if sc == 'log' and dmin <= 0:
-                vmin, vmax, _ = super().parse_coor(coor, item=item)
-                dmin = min(vmin, vmax)
-            if styp < 0:
-                dmin, dmax = dmax, dmin
-        else:
-            vmin, vmax, _ = super().parse_coor(coor, item=item)
-            # print(f"parse_coor: {vmin=} {vmax=}")
-            dmax = float(dmax) if dmax else vmax
-            dmin = float(dmin) if dmin else vmin
-        # print(f"parse_coor/final: {dmin=} {dmax=}")
+
+        ## to do: set direction by sign.
+        if direction is True:
+            pass
+        elif styp < 0:
+            dmin, dmax = dmax, dmin
+        locallog.debug(f"parse_coor:final: {dmin=} {dmax=}")
         return dmin, dmax, sc
 
     def parse_calendar(self, attrs, default=None):
@@ -623,7 +643,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 fig.delaxes(ax)
                 self.fragiles.remove(ax)
 
-
     # def cla_guides(self, axs=None):
     #     # if axs is None:
     #     #     self.guides = {}
@@ -858,11 +877,13 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 ax.set_aspect(ar)
             # print(axisp)
             ap = axisp.get(x) or {}
+            locallog.debug(f'set_view:x: {ap=}')
             # ap = ap | (kwds.get(x) or {})
             self.set_tick(xc, ax, 'x', **(ap or {}))
 
             ap = axisp.get(y) or {}
             # ap = ap | (kwds.get(y) or {})
+            locallog.debug(f'set_view:y: {ap=}')
             self.set_tick(yc, ax, 'y', **(ap or {}))
 
             artists.extend([ax.xaxis, ax.yaxis,
@@ -874,50 +895,24 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
 
     def set_tick(self, co, ax, which,
                  major=None, minor=None, dmin=None, dmax=None,
-                 scale=None, **kwds):
+                 scale=None, direction=None, **kwds):
         """Draw axis."""
         if which == 'x':
             axis, limf, scf = ax.xaxis, ax.set_xlim, ax.set_xscale
-            getf = ax.get_xlim
+            # getf = ax.get_xlim
         else:
             axis, limf, scf = ax.yaxis, ax.set_ylim, ax.set_yscale
-            getf = ax.get_ylim
+            # getf = ax.get_ylim
 
-        cmin, cmax, sc = self.parse_coor(co)
-        # print(f"{cmax=} {type(cmax)}")
-        # print(f"{cmin=} {type(cmin)}")
+        dmin, dmax, sc = self.parse_coor(co, dmin=dmin, dmax=dmax,
+                                         direction=direction)
         scale = scale or sc
-        dmin = zu.set_default(dmin, cmin)
-        dmax = zu.set_default(dmax, cmax)
-        # print(f"default {dmax=} {type(dmax)}")
-        # print(f"default {dmin=} {type(dmin)}")
 
-        # print(f"{dmax=} {type(dmax)} {adapt_type(dmax, co)}")
-        # print(f"{dmin=} {type(dmin)} {adapt_type(dmin, co)}")
         dmin = adapt_values(dmin, co)
         dmax = adapt_values(dmax, co)
-        # print(f"{dmax=} {type(dmax)}")
-        # print(f"{dmin=} {type(dmin)}")
-        # print(f"drange: {dmax-dmin}")
-        # if isinstance(dmin, xr.DataArray):
-        #     vt = dmin.item()
-        # else:
-        #     vt = dmin
-        # print(f"{type(vt)=}")
-        #     print(dmin.dtype)
-        #     dmin = dmin.values
-        # if isinstance(dmax, xr.DataArray):
-        #     dmax = dmax.values
-        # c0 = co.values[0]
-        # print(f"{dmin=}")
-        # print(f"{c0=}")
-        # dmin = date_normalize(dmin, c0)
-        # dmax = date_normalize(dmax, c0)
-        # print(f"normalized: {dmin=}")
-        # print(f"{type(dmin.item())=} {dmin=}")
-        # print(f"{type(dmax.item())=} {dmax=}")
+
         span = abs(dmax - dmin)
-        # print(f"{co[0]=}")
+
         locallog.debug(f"{type(dmin)=} {type(dmax)=}")
         locallog.debug(f"{span=}")
         vmaj, vmin = self.parse_ticks(co.attrs)
@@ -936,6 +931,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         axis.set_picker(True)
         # axis.set_picker(self.axis_picker)
         # axis.set_gid(f"tick:{co.name}")
+
         axis.set_gid(f"tick:{which}")
         axis.set_tick_params(which='major', **(major or {}))
         axis.set_tick_params(which='minor', **(minor or {}))
@@ -947,11 +943,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             dmax = dmax.values
         if dmin != dmax:
             limf(dmin, dmax)
-        gf = getf()
-        # print(f"after limf: {dmin=} {dmax=}")
-        # print(f"getf: {gf}")
-        # print(f"fmt: {axis.get_major_formatter()}")
-        # print(mplib.dates.num2date(gf[0]))
+
         if scale == 'log':
             if isinstance(span, datetime.timedelta):
                 locallog.warning(f"Bypass log-scale check ({dmin}:{dmax}).")
@@ -997,14 +989,15 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         else:
             raise ValueError("Physical coordinate not defined:"
                              f"{x} {y}")
+        def wrap_parse_coor(co, **opts):
+            kw = {}
+            for k in ['dmin', 'dmax', 'direction']:
+                if k in opts:
+                    kw[k] = opts[k]
+            return self.parse_coor(co, **kw)
 
-        x0, x1, sx = self.parse_coor(xc)
-        y0, y1, sy = self.parse_coor(yc)
-
-        x0 = zu.set_default(view_x.get('dmin'), x0)
-        x1 = zu.set_default(view_x.get('dmax'), x1)
-        y0 = zu.set_default(view_y.get('dmin'), y0)
-        y1 = zu.set_default(view_y.get('dmax'), y1)
+        x0, x1, sx = wrap_parse_coor(xc, **view_x)
+        y0, y1, sy = wrap_parse_coor(yc, **view_y)
 
         extent = axisp.get('extent')
         try:
@@ -2024,14 +2017,8 @@ class ContourPlot(PlotBase, _ConfigType):
         # levels = self.nml_levels(levels)
         # clabel = self.annotation(clabel, levels)
 
-        # print(f"{levels=}")
         run = ft.partial(axs.contour, *data,
                          ax=key, clabel=False, **kwds)
-        # def run(**rkw):
-        #     cp = axs.contour(data, ax=key,
-        #                      clabel=False, **rkw, **kwds)
-        #     return cp
-
         alab = []
         if levels is True:
             c = run()
@@ -2043,22 +2030,6 @@ class ContourPlot(PlotBase, _ConfigType):
         if clabel and c:
             alab = axs.clabel(*c, ax=key, artists=alab, gid='clabel')
 
-        # for j, lev in enumerate(levels):
-        #     locallog.debug(f"{j}: {lev}")
-        #     if lev is True:
-        #         c = run()
-        #     elif lev is False:
-        #         continue
-        #     elif isinstance(lev, list):
-        #         c = run(levels=lev)
-        #     elif isinstance(lev, cabc.Callable):
-        #         vmin, vmax = self.get_range(data, **kwds)
-        #         c = run(levels=lev(vmin, vmax))
-        #     else:
-        #         raise TypeError(f"invalid level specifier {c}.")
-        #     artists.extend(c)
-        #     if clabel(j):
-        #         alab = axs.clabel(*c, ax=key, artists=alab, gid='clabel')
         ret = artists + alab
         if isinstance(bind, cabc.Callable):
             bind(artist=ret)
@@ -2204,6 +2175,7 @@ class ContourPlot(PlotBase, _ConfigType):
         method = color.get('method')
 
         bar = None
+        cax = None
         ticks = []
         alpha = color.get('alpha')
         # print(f"{alpha=} {cols[0]=}")
@@ -2341,23 +2313,6 @@ def adapt_values(src, ref):
                 elif not isinstance(src, cftime.datetime):
                     return cftime.num2date(src, units=zu.NC_EPOCH,
                                            calendar=cal)
-            # return pandas.Timestamp(src)
-    # dt = array.dtype
-    # print(f"{dt=} {type(dt)}")
-    # if np.issubdtype(dt, np.datetime64):
-    #     return pandas.Timestamp(v)
-    # ref = array.values.flat[0]
-    # print(type(v), v)
-    # print(type(ref), ref, isinstance(ref, cftime.datetime))
-    # if isinstance(ref, cftime.datetime):
-    #     print(f"{v=} {type(v)}")
-    #     cal = ref.calendar
-    #     if isinstance(v, str):
-    #         pts = pandas.Timestamp(v)
-    #         cft = cftime.to_tuple(pts)
-    #         v = cftime.datetime(*cft, calendar=cal)
-    #     elif not isinstance(v, cftime.datetime):
-    #         v = cftime.num2date(v, units=zu.NC_EPOCH, calendar=cal)
     return src
 
 def date_normalize(v, ref):
