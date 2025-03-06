@@ -1,11 +1,24 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/02/28 16:41:44 fuyuki NEWS>
+# Time-stamp: <2025/03/07 08:05:25 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
+* Changes in 1.14.6
+** Bug fixes around zbt for newer matploblib (maybe 3.10 or later)
+From matplotlib 3.10 (or 3.9), Normalize.autoscale() in adjust_norm()
+method does not work well at slice turning, which raises
+NotImplementedError('cannot remove artist').  It seems that
+Normalize.autoscale is examined for deleted instance, which can be
+avoided by giving up of reuse of the instance.  This workaround can
+be used for 3.8, so introduced as standard.
+** Figure resizing improved.
+At some situation, zbcont hungs at drawing of a large geometry figure,
+due to unknown reason.  It is suspected to be related to Qt5 backend.
+Instead of a solution, figure resizing is improved to implement
+auto-scaling of fonts, linewidths, etc.
 * Changes in 1.14.5
 ** Bug fixes around zbt and related
 *** [FATAL] Fix plotting of sliced array-files.
