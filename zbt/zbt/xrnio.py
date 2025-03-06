@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/12 08:08:10 fuyuki xrnio.py>
+# Time-stamp: <2025/02/28 19:44:58 fuyuki xrnio.py>
 
-__doc__ = \
-    """
-zbt.xrnio
-~~~~~~~~~
-numpy xarray + TOUZA/Nio extension
+"""
+Xarray + TOUZA/Nio extension.
 
 :Source:     zbt/xrnio.py
 :Maintainer: SAITO Fuyuki <saitofuyuki@jamstec.go.jp>
@@ -14,16 +11,17 @@ numpy xarray + TOUZA/Nio extension
 
 import collections.abc as cabc
 
+import typing
 import xarray as xr
 import numpy as np
 import cftime
 
-# import zbt.util as zu
-from . import util as zu
+# import zbt.util as zutl
+from . import util as zutl
 from . import libtouza
 from . import dsnio
 
-locallog = zu.LocalAdapter(__name__)
+locallog = zutl.LocalAdapter(__name__)
 
 _RECDIM_ATTR = '_nio_recdim'
 
@@ -36,8 +34,9 @@ class TouzaNioAccessor:
     """
     Accessor/container class to inquire record-each attributes.
     """
+    __slots__ = ['_array', '_attrs', '_recidx', ]
 
-    def __init__(self, arr):
+    def __init__(self, arr: xr.DataArray):
         """
         Constructor used in DataArray.
 
@@ -48,7 +47,7 @@ class TouzaNioAccessor:
         """
 
         self._array = arr
-        self._attrs = {}
+        self._attrs: dict[cabc.Hashable, typing.Any] = {}
         self._recidx = None
 
     def __setitem__(self, key, value):
@@ -75,13 +74,28 @@ class TouzaNioAccessor:
 
         return self._attrs[key]
 
-    def get(self, key, default=None):
+    def get(self, key:cabc.Hashable, default:typing.Any = None):
+        """
+        Return attribute corresonding to key if found, otherwise default.
+
+        Parameters
+        ----------
+        key : Hashable
+            Key of xarray DataArray attributes.
+        default : Any
+            Default value to be return if not found.
+
+        Returns
+        -------
+        Any
+            Attributes value.
+        """
         try:
             return self[key]
         except KeyError:
             return default
 
-    def parse_recs(self, src: xr.DataArray) -> list[int]|int|bool:
+    def parse_recs(self, src:xr.DataArray) -> list[int]|int|bool:
         """
         Parse record coordinate to extract corresponding record index.
 
@@ -151,7 +165,7 @@ class xrNioBackendArray(xr.backends.BackendArray, dsnio.TouzaNioVar):
         super().__init__(*args, **kwds)
         self.dims = []
         for d in self.dimensions:
-            self.dims.append(zu.tostr(d.name))
+            self.dims.append(zutl.tostr(d.name))
 
     def __getitem__(self,
                     key: xr.core.indexing.ExplicitIndexer) \
@@ -178,7 +192,7 @@ class xrMemBackendArray(xr.backends.BackendArray, dsnio.TouzaMemVar):
         super().__init__(*args, **kwds)
         self.dims = []
         for d in self.dimensions:
-            self.dims.append(zu.tostr(d.name))
+            self.dims.append(zutl.tostr(d.name))
 
     def __getitem__(self,
                     key: xr.core.indexing.ExplicitIndexer) \
@@ -264,14 +278,14 @@ class xrNioBackendEntrypoint(xr.backends.BackendEntrypoint):
                     for a, ai in v.attrs():
                         av = v.getattr(a, rec=slice(None, None),
                                        strip=True, uniq=True)
-                        dst = zu.tostr(ai)
+                        dst = zutl.tostr(ai)
                         attrs[dst] = av
                 except AttributeError:
                     attrs = {}
 
             data = xr.core.indexing.LazilyIndexedArray(v)
             var = xrNioVariable(dims, data, attrs=attrs)
-            variables[zu.tostr(vn)] = var
+            variables[zutl.tostr(vn)] = var
 
         dset = xrNioDataset(variables)
         if dtt == 'numpy':
@@ -366,7 +380,7 @@ def diag(obj=None,
     """
     show = locallog.info
     if obj is None:
-        show(f"{zu=}")
+        show(f"{zutl=}")
         show(f"{libtouza=}")
         show(f"{dsnio=}")
         return

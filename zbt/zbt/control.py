@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/28 15:29:37 fuyuki control.py>
+# Time-stamp: <2025/03/06 17:27:56 fuyuki control.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -1670,7 +1670,7 @@ class LimitParams():
                                   # (to check whether changed)
         super().__init__(**kwds)
 
-    def update_lims(self, array):
+    def update_lims(self, array, src):
         vmin, vmax = self.lims
         if self._lock:
             upd = False
@@ -1682,6 +1682,8 @@ class LimitParams():
             #     vmin = self._lims[0]
             # if vmax is None:
             #     vmax = self._lims[1]
+            # print(f"{src.dims} {src.shape=}")
+            # print(f"{array.dims} {array.shape=}")
             if self._lims[0] is None:
                 amin = array.min().item()
                 if vmin is not None:
@@ -1755,7 +1757,7 @@ class NormLink(LimitParams, LinkedArray, ParamsDispatcher):
         self._loop = iter(self.items())
         _ = next(self._loop)
 
-    def params(self, array=None, **kwds):
+    def params(self, array=None, src=None, **kwds):
         self.debug(f"norm:params: {kwds.keys()=}")
         self.debug(f"norm:params: {self._array is array=}")
 
@@ -1765,7 +1767,7 @@ class NormLink(LimitParams, LinkedArray, ParamsDispatcher):
             self.loop()
         norm = self.value()
         self.debug(f"norm:params: {self.lims=}")
-        upd, lims = self.update_lims(array)
+        upd, lims = self.update_lims(array, src)
         self.debug(f"norm:params: {norm=}")
         self.debug(f"norm:params: {lims=}")
 
@@ -1791,11 +1793,12 @@ class NormLink(LimitParams, LinkedArray, ParamsDispatcher):
     def adjust_norm(self, norm, saved, lims, **kwds):
         norm = norm or ''
         if norm in ['', 'linear', ]:
-            if saved:
-                norm = saved
-                norm.autoscale(lims)
-            else:
-                norm = mplib.colors.Normalize(vmin=lims[0], vmax=lims[1])
+            # if saved:
+            #     norm = saved
+            #     norm.autoscale(lims)
+            # else:
+            #     norm = mplib.colors.Normalize(vmin=lims[0], vmax=lims[1])
+            norm = mplib.colors.Normalize(vmin=lims[0], vmax=lims[1])
             self.debug(f"{norm=} {norm.vmin=} {norm.vmax=}")
         elif norm == 'log':
             norm = self.LogNorm(lims)
@@ -2261,11 +2264,11 @@ class ContourParams(LimitParams, ParamsDispatcher, _ConfigType):
         self.debug(f"contour:levels: {levels}")
         super().__init__(**kwds)
 
-    def params(self, array=None, **kwds):
+    def params(self, array=None, src=None, **kwds):
         self.debug(f"{array.dims=}")
         p = {}
 
-        upd, lims = self.update_lims(array)
+        upd, lims = self.update_lims(array, src)
         self.debug(f"contour:params:lims: {lims}")
 
         levels = []
@@ -2797,6 +2800,7 @@ class FigureControl():
                 artists = self.invoke(trees, stat, fig, axs, cla=False)
                 # frames.append([artists[0]])
                 frames.append(artists)
+                fig.message()
                 # print(trees)
             except StopIteration:
                 break
@@ -3279,6 +3283,7 @@ class FigureControl():
         axs = self.figs[fig]
         axs.toggle_guides(fig, False)
         axs.resize(fig, figsize=figsize, ref=ref)
+        # self.interactive(fig, step=False, msg='resize')
         # fig.canvas.draw()
 
     def redraw(self, fig):
