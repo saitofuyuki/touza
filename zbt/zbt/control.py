@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/03/04 15:12:46 fuyuki control.py>
+# Time-stamp: <2025/03/06 17:27:56 fuyuki control.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -3283,6 +3283,7 @@ class FigureControl():
         axs = self.figs[fig]
         axs.toggle_guides(fig, False)
         axs.resize(fig, figsize=figsize, ref=ref)
+        # self.interactive(fig, step=False, msg='resize')
         # fig.canvas.draw()
 
     def redraw(self, fig):
