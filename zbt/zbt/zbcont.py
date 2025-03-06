@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/28 15:34:59 fuyuki zbcont.py>
+# Time-stamp: <2025/03/06 23:32:07 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -44,6 +44,7 @@ class ParserUtils():
     lsep = ','
     nsep = ':'
     psep = '+'
+    msep = '-'
 
     def parse_float(self, text):
         if text:
@@ -704,7 +705,7 @@ class Options(ParserUtils, ap.Namespace):
         return st
 
     def parse_features(self, params=None):
-        pfx=fr"[{self.isep}{self.psep}]"
+        pfx=fr"[{self.msep}{self.isep}{self.psep}]"
         pat = re.compile(r'(' + pfx + r'?[\w.]+)')
 
         features = {}
@@ -722,11 +723,21 @@ class Options(ParserUtils, ap.Namespace):
         for p in params or []:
             opts = {}
             f = p
+            nop = 0
             for j in pat.split(p):
                 if j == '':
                     continue
                 if j.startswith(self.psep):
-                    opts['alpha'] = float(j[1:])
+                    if nop == 0:
+                        opts['alpha'] = float(j[1:])
+                    else:
+                        opts['zorder'] = float(j[1:])
+                    nop = nop + 1
+                elif j.startswith(self.msep):
+                    if j[1] in ['+', '-']:
+                        opts['zorder'] = float(j[1:])
+                    else:
+                        opts['zorder'] = - float(j[1:])
                 elif j.startswith(self.isep):
                     opts['color'] = j[1:]
                 else:

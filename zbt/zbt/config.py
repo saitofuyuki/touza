@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/19 17:06:48 fuyuki config.py>
+# Time-stamp: <2025/03/06 14:52:53 fuyuki config.py>
 
 __doc__ = \
     """
@@ -211,6 +211,21 @@ class ConfigRigid(ConfigBase):
         if ret is None:
             ret = default
         return ret
+
+    def update(self, key, props):
+        cls = type(self)
+        key = key + cls._strip
+        for _ in range(len(cls._strip)):
+            if hasattr(cls, key):
+                tgt = getattr(cls, key)
+                break
+            key = key[:-1]
+        else:
+            if hasattr(cls, key):
+                tgt = getattr(cls, key)
+            else:
+                raise ValueError(f"No property {cls}.{key}")
+        return tgt.update(props)
 
     @classmethod
     def config(cls, config=None, groups=None):
