@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/03/06 23:32:07 fuyuki zbcont.py>
+# Time-stamp: <2025/03/07 09:09:22 fuyuki zbcont.py>
 
 import sys
 # import math
@@ -92,11 +92,11 @@ class Projection(ParserUtils):
     ppr = re.compile(r'(\w+)((?:[-+]{1,2}\w+)*)')
     ppo = re.compile(r'[-+]{1,2}\w+')
 
-    # --projection=PROJ[<+->lon[<+->lat]][,Y,X]
+    # --projection=PROJ[<+->lon[<+->lat][+<height>]][,Y,X][/extent]
     #   +NUM > +NUM    +-NUM > -NUM   ++NUM > +NUM
     #   -NUM > -NUM    -+NUM > +NUM   --NUM > -NUM
-
     def __init__(self, param, allow_abbrev=None):
+        param, _, extent = param.partition(self.isep)
         param = param.split(self.lsep)
         proj = param.pop(0)
         allow_abbrev = True if allow_abbrev is None else allow_abbrev
@@ -125,6 +125,10 @@ class Projection(ParserUtils):
                     msg = f"Invalid projection {proj}"
                 raise ValueError(msg)
         self.proj = proj
+
+        if extent:
+            extent = tuple(float(x) for x in extent.split(self.lsep))
+        self.extent = extent
 
         self.cache = {}
 
@@ -356,19 +360,12 @@ class Options(ParserUtils, ap.Namespace):
                         raise ValueError(f"Invalid aspect spec {ar}")
                 aa.append(ar)
             self.aspect = aa
-            # self.geometry['aspect'] = aa[0]
-        # self.coors = self.parse_coors(self.coors)
-        # if self.coors:
-        #     print(f"deprecated: {self.coors}")
-        #     self.coors = self.parse_coors(self.coors)
-        #     self.draw, _ = self.parse_draw(self.draw)
-        # else:
+
         self.draw = self.parse_draw(self.draw)
         self.coords = self.extract_view(self.coords)
 
         color = {}
         contour = {}
-        # method, cmap, clevs =
         color, clevs = \
             self.parse_method(self.color_method, self.contour, color=color)
 
@@ -671,17 +668,13 @@ class Options(ParserUtils, ap.Namespace):
         styles = {}
         features, coords = self.parse_features(maps)
 
-        # --projection=PROJ[<+->lon[<+->lat]][,Y,X]
-        #   +NUM > +NUM    +-NUM > -NUM   ++NUM > +NUM
-        #   -NUM > -NUM    -+NUM > +NUM   --NUM > -NUM
+        extent = None
         self.proj = None
         if isinstance(projection, str):
-            # projection = Projection(projection)
             self.proj = Projection(projection)
             projection = self.proj()
+            extent = self.proj.extent
 
-        # if bool(projection):
-        #     maps = maps or [None]
         if bool(features) or bool(projection):
             if not transform:
                 transform = ccrs.PlateCarree()
@@ -694,13 +687,13 @@ class Options(ParserUtils, ap.Namespace):
         styles['projection'] = projection
         styles['crs'] = crs
         styles['transform'] = transform
+        styles['extent'] = extent
 
         # print(f"{styles=}")
 
         coords = coords or (-2, -1)
         st = {}
         st[coords] = styles
-        # st[coords[-1]] = {'transform': transform}
 
         return st
 
@@ -827,17 +820,6 @@ def load_config(opts, *files, cmd=None, base=None):
             config[cmd][attr] = param
     return config
 
-
-# def parse_keymap(opts, config, group=None):
-#     group = group or ()
-#     for f, c in config.items():
-#         if isinstance(c, dict):
-#             parse_keymap(opts, c, group + (f, ))
-#         elif isinstance(c, list):
-#             for k in c:
-#                 opts[k] = (f, ) + group
-#         elif c != '':
-#             opts[c] = (f, ) + group
 
 class Output(_ConfigType):
     names = ('output', )

@@ -39,9 +39,9 @@ python-build~ under =zbt= directory:
 : % cd zbt
 : % make python-build   ## need to be on line due to pip requirement
 : % ls dist
-: touza_zbt-1.14.n-py3-none-any.whl  touza_zbt-1.14.n.tar.gz
+: touza_zbt-1.15.n-py3-none-any.whl  touza_zbt-1.15.n.tar.gz
 : % . SOMEWHERE/bin/activate # switch to virtual env
-: (python3) % python3 -m pip install dist/touza_zbt-1.14.n-py3-none-any.whl
+: (python3) % python3 -m pip install dist/touza_zbt-1.15.n-py3-none-any.whl
 
 ** Installation with deb
 Unfortunately, a python package nc-time-axis is not be prepared as
@@ -1064,6 +1064,10 @@ The separator =+= can be used twice: the first and second are
 interpreted as alpha and zorder, respectively, which means that the
 alpha parameter must be set in order to set positive zorder.
 
+Dimension pair to overlay the map is =(-2, -1)=, the last 2 dimension,
+as default.  You can set other pair such as =(-3, -1)=, but this
+feature is still buggy and may not work as expected.
+
 ***** examples
 : % zbcont -m c  .....           # add coastline
 : % zbcont -m ol                 # fill ocean and land
@@ -1078,7 +1082,7 @@ alpha parameter must be set in order to set positive zorder.
 : % zbcont -m -3,-1,land         # set latitude/longitude coordinates as (-3,-1)
 
 **** (experimental) projection (=--projection=, =-P=)
-: % zbcont -P PROJECTION[+LON[+LAT[+HEIGHT]]]
+: % zbcont -P <projection>[+<lon>[+<lat>[+<height>]]][/<extent>]
 | string                 | projection          | parameters                          |
 |------------------------+---------------------+-------------------------------------|
 | m mercator             | Mercator            | central longitude                   |
@@ -1091,6 +1095,23 @@ alpha parameter must be set in order to set positive zorder.
 | pc platecarree         | PlateCarree         | central longitude                   |
 ***** examples
 : % zbcont -Ppc+135 FILE    # central longitude on 135E.
+
+Normally figure extent is set by =--draw= argument, which is not
+suitable for the case of projection.   The extent in /transformed/
+coordinates can be set by =--projection=, appended as the format as =/<xlow>,<xhigh>,<ylow>,<yhigh>=:
+
+: % zbcont -Pnps+45/-1901879.,2189097.,-4005705.,24150.
+
+In order to compute the figure extent, key press of =I= helps to show
+the current extent.
+After manual selection of figure clipping using matplotlib zoom-tool,
+you can get corresponding clippng extent as follows:
+: <axes: body>
+:   :
+:   xlim:  (-1901879., 2189097.)
+:   :
+:   ylim:  (-4005705., 24150.)
+:   :
 
 ***** Known problems, tips and tricks
 ****** =PlateCarree=

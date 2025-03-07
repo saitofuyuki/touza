@@ -1,3 +1,12 @@
+Release-1.15 / 2025-03-06
+=========================
+
+  * zbt: (zbcont) clipping on projection hacked.
+  * zbt: (zbcont) zorder parameter introduced to map arguments.
+  * zbt: (plot,control) resizing improved, in particular on font sizes
+  * zbt: (config) update method introduced.
+  * zbt: (control) [FATAL] remove reuse of Normalize.
+
 Release-1.14.5 / 2025-02-28
 ===========================
 
