@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/02/28 10:45:19 fuyuki plot.py>
+# Time-stamp: <2025/03/07 09:23:22 fuyuki plot.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -423,8 +423,11 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             axkw = kwds.get(lab) or {}
             self._axes[lab] = (dict(rect=rect, label=lab,) | axkw)
         # side effects (to set figure size)
+        # self.scales = None
+        # self.cur_size = None
         self.resize(fig, figsize=figsize, ref=self.geometry)
-        self.orig_size = fig.get_size_inches()
+        self._orig_size = self._cur_size
+        # self.orig_size = fig.get_size_inches()
         # self.crs = {}
         self.projp = {}   # projection properites == (crs, transform)
         self.bg = {}
@@ -492,51 +495,239 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         """Return key if Axes, otherwise lookup internal dict."""
         return self._get_axes(key, default)
 
+    def index(self, ax, default=None):
+        for k, v in self._axes.items():
+            if v is ax:
+                return k
+        return default
+
     # figure methods
-    def _resize_calc(self, base, rate):
+    def _resize_calc(self, rate, base):
         if rate >= 0:
             return base * (1.0 + rate)
         return base / (1.0 - rate)
 
-    def _resize_prop(self, org, cur, rate):
-        if rate is None:
-            return 0
-        cur = self._resize_calc(cur, rate)
-        r = cur / org
-        if r >= 1.0:
-            return r - 1.0
-        return 1.0 - org / cur
+    # def _resize_prop(self, org, cur, rate):
+    #     if rate is None:
+    #         return 0
+    #     cur = self._resize_calc(cur, rate)
+    #     r = cur / org
+    #     if r >= 1.0:
+    #         return r - 1.0
+    #     return 1.0 - org / cur
 
-    def resize(self, fig, figsize=None, ref=None):
-        """Resize figure."""
+    def resize_by_rate(self,
+                       rate: nums.Number|bool|None,
+                       ref: tuple[nums.Number, nums.Number]) \
+                       -> tuple[nums.Number, nums.Number]|None:
+        try:
+            if rate is True:
+                figsize = ref[0:2]
+            elif rate in [None, False]:
+                figsize = None
+            else:
+                figsize = tuple(self._resize_calc(rate, b)
+                                for b in ref)
+        except:
+            pass
+        return figsize
+
+    def resize_by_tuple(self,
+                        figsize:tuple[nums.Number|bool|None,...],
+                        ref: tuple[nums.Number, nums.Number]|None) \
+                        -> tuple[nums.Number, nums.Number]:
+        """
+        Resize figure.
+
+        Parameters
+        ----------
+        figsize : tuple[nums.Number|bool|None,...]
+            Horizontal and vertical sizes.
+            If an element is False, None, or negative, corresponding reference
+            size is applied.
+            If an element is True or 0, the size to keep the aspect ratio
+            is applied.
+
+        ref : tuple
+            Reference size.
+
+        Returns
+        -------
+        tuple[number, number]
+            New figure size.
+
+        Raises
+        ------
+        ValueError
+            Raise if geometry property to refer is not set.
+        """
+        if len(figsize) > 2:
+            raise ValueError(f"Invalid argument {figsize=}.")
+        elif len(figsize) < 2:
+            figsize = (figsize + (None, None, ))[:2]
+        figsize = tuple(True if f == 0
+                        else False if not f or f < 0
+                        else f for f in figsize)
+
+        try:
+            if all(isinstance(f, bool) for f in figsize):
+                figsize = ref[:2]
+            elif figsize[0] is False:
+                figsize = (ref[0], figsize[1])
+            elif figsize[1] is False:
+                figsize = (figsize[0], ref[1])
+            elif figsize[0] is True:
+                figsize = (figsize[1] * (ref[0] / ref[1]), figsize[1])
+            elif figsize[1] is True:
+                figsize = (figsize[0], figsize[0] * (ref[1] / ref[0]))
+            else:
+                pass
+        except TypeError as err:
+            if not isinstance(ref, tuple):
+                raise ValueError(f"geometry not set for {self}.") from None
+            else:
+                raise err
+        return figsize
+
+    def _get_fig_scale(self):
+        scales = [c / g for c, g in zip(self._cur_size, self.geometry)]
+        sc = min(scales)
+        return sc
+
+    def normalize_size_params(self, props, sc=None, copy=None):
+        if sc is None:
+            sc = self._get_fig_scale()
+        if bool(copy):
+            params = props.copy()
+        else:
+            params = {}
+        for k in ['labelsize', 'length', 'pad', 'width',
+                  'fontsize', ]:
+            cu = props.get(k)
+            if cu:
+                params[k] = cu * sc
+        return params
+
+    def update_size(self, fig, size=None, forward=None, **kwds):
+        if forward is None:
+            forward = True
+        if size is not None:
+            fig.set_size_inches(*size, forward=forward, **kwds)
+        self._cur_size = fig.get_size_inches()
+
+    def resize_scale(self, fig, sc=None):
+        sc = sc or self._get_fig_scale()
+        for o in fig.findobj(mplib.axis.Axis):
+            gid = o.get_gid()
+            if not gid:
+                continue
+            ref = gid
+            if ref in self._axes:
+                prop = self.prop(ref)
+                for m in ['major', 'minor']:
+                    mp = prop.get(m) or {}
+                    params = self.normalize_size_params(mp, sc)
+                    if params:
+                        o.set_tick_params(which=m, **params)
+            label = o.label
+            ref = label.get_gid()
+            if ref in self._axes:
+                prop = self.prop(ref)
+                ap = prop.get('axis') or {}
+                ap = self.normalize_size_params(ap, sc)
+                label.set(**ap)
+
+        for o in fig.findobj(mplib.text.Text):
+            gid = o.get_gid()
+            if gid is None:
+                continue
+            if gid in self._axes:
+                prop = self.prop(gid)
+                ap = self.normalize_size_params(prop, sc)
+                o.set(**ap)
+            try:
+                gid, ref = gid[0:2]
+            except (TypeError, ValueError):
+                continue
+            if ref in self._axes:
+                prop = self.prop(ref)
+                prop = prop.get(gid) or {}
+                prop = self.normalize_size_params(prop, sc)
+                o.set(**prop)
+
+        def match(artist: mplib.artist.Artist) -> bool:
+            return isinstance(artist,
+                              (mplib.collections.QuadMesh,
+                               mplib.collections.LineCollection,
+                               mplib.contour.QuadContourSet))
+
+        for o in fig.findobj(match):
+            gid = o.get_gid()
+            try:
+                gid, ref, w = gid
+            except (TypeError, ValueError):
+                # print(gid)
+                continue
+            prop = self.prop(ref)
+            prop = prop.get(gid) or {}
+            u = prop.get('unitwidth') or 0.0
+            u = u * sc
+            u = u * w
+            if u:
+                lw = o.get_linewidth()
+                o.set_linewidth([u] * len(lw))
+
+    def resize(self,
+               fig: mplib.figure.Figure|None,
+               figsize: mplib.figure.Figure|nums.Number|bool|cabc.Iterable|None,
+               ref: mplib.figure.Figure|bool|cabc.Iterable|None = None):
+        """
+        Resize figure.
+
+        Parameters
+        ----------
+        fig : Figure
+            Target figure.
+        figsize : nums.Number|bool|tuple|None
+            New figure size.
+            If True or None, import reference figure size.
+            If False, skip resizing.
+            If Number, it is passed to _resize_calc method.
+            If tuple, it is passed to resize_by_tuple method.
+
+        ref : Figure|tuple|None
+            Reference figure.
+            If ref is None, the current size of fig is adopted.
+            If ref is True, the original size is adopted.
+            If ref is False, the initial size, which may be set
+            by command-line, is adopted.
+            Otherwise ref must be tuple of geometry.
+        """
+        debug = locallog.debug
+        # debug = locallog.info
+
         if ref is None:
             ref = fig.get_size_inches()
         elif ref is False:
-            ref = self.orig_size
+            ref = self._orig_size
         elif ref is True:
             ref = self.geometry
 
         figsize = zu.set_default(figsize, True)
-        if figsize is True:
-            figsize = ref
-        elif not figsize:
-            figsize = None
-        elif isinstance(figsize, nums.Number):
-            if ref is None:
-                raise ValueError(f"geometry not set for {self}.")
-            figsize = (self._resize_calc(ref[0], figsize),
-                       self._resize_calc(ref[1], figsize), )
-        elif isinstance(figsize, tuple):
-            if ref is None:
-                raise ValueError(f"geometry not set for {self}.")
-            if len(figsize) == 1:
-                figsize = figsize + (None, )
-            figsize = (figsize[0] or ref[0],
-                       figsize[1] or ref[1], )
-        elif hasattr(figsize, 'get_size_inches'):
+        debug(f"{ref=} {figsize=}")
+        if hasattr(figsize, 'get_size_inches'):
             figsize = figsize.get_size_inches()
+        elif isinstance(figsize, cabc.Iterable):
+            figsize = self.resize_by_tuple(figsize, ref)
+        else:
+            figsize = self.resize_by_rate(figsize, ref)
+        self.update_size(fig, figsize)
+        self.resize_scale(fig)
+        # if figsize is not None:
+        #     fig.set_size_inches(*figsize, forward=True)
 
-        fig.set_size_inches(*figsize, forward=True)
+    def get_scales(self, size):
+        pass
 
     # plot methods
     def reset(self, fig, default=None, **kwds):
@@ -783,11 +974,19 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         return artists
 
     def contour(self, data, *args,
-                ax=None, artists=None, clabel=None, gid=None,
-                **kwds):
+                ax=None, artists=None, clabel=None,
+                unitwidth=None, **kwds):
         """matplotlib contour wrapper."""
+        lw = kwds.get('linewidths', 0)
+        gid = ("contour", f"{ax}", lw)
+
         ax = self._get_axes(ax)
         artists = artists or []
+        unitwidth = unitwidth or 0.0
+        lw = lw * unitwidth * self._get_fig_scale()
+        if lw:
+            kwds['linewidths'] = lw
+        # print(kwds)
         if ax:
             # if False:
             if is_xr(data):
@@ -798,10 +997,12 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             cp.set_gid(gid)
             artists.append(cp)
             if clabel:
-                artists.extend(ax.clabel(cp))
+                clabel = ax.clabel(cp)
+                artists.extend(clabel)
         return artists
 
-    def clabel(self, contour, ax=None, artists=None, gid=None, **kwds):
+    def clabel(self, contour, ax=None, artists=None, **kwds):
+        gid = ("contour", f"{ax}")
         ax = self._get_axes(ax)
         artists = artists or []
         if ax:
@@ -812,8 +1013,9 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
 
     def color(self, data, *args,
               ax=None, artists=None,
-              method=None, gid=None, **kwds):
+              method=None, **kwds):
         """matplotlib contour wrapper."""
+        gid = ("color", f"{ax}")
         ax = self._get_axes(ax)
         artists = artists or []
         # print(type(ax.transData))
@@ -832,23 +1034,13 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         """Wrap figure.colorbar()"""
         cax = self._get_axes(cax)
         artists = artists or []
-        # debug_artist(cax, 'colorbar:before')
-        # cax.cla()
 
         # need refresh axes_locator to avoid
         # undesired inheritance of colormap bounding box
         cax.set_axes_locator(None)
-        # if 'outline' in cax.spines:
-        #     del(cax.spines['outline'])
-        # for ch in cax.get_children():
-        #     if isinstance(ch, mplib.colorbar._ColorbarSpine):
-        #         del(ch)
-
-        # debug_artist(cax, 'colorbar:cla')
-        # bar = fig.colorbar(*args, cax=copy.copy(cax), **kwds)
         bar = fig.colorbar(*args, cax=cax, **kwds)
-        # debug_artist(cax, 'colorbar:after')
         artists.extend([bar, cax, ])
+
         return artists
 
     def set_view(self, data, ax=None, artists=None,
@@ -859,7 +1051,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         if isinstance(ax, cmgeo.GeoAxes):
             artists = self.set_geo_view(data, ax=ax, artists=artists,
                                         x=x, y=y, crs=crs, axisp=axisp)
-            # self.crs[ax] = crs
             self.projp[ax] = crs
         elif ax:
             co = [d for d in data.dims if data.coords[d].size > 1]
@@ -868,29 +1059,23 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             x = x or co[-1]
             y = y or co[0]
 
-            # print(x, y)
             xc = data.coords[x]
             yc = data.coords[y]
 
             ar = axisp.get('aspect')
             if ar:
                 ax.set_aspect(ar)
-            # print(axisp)
             ap = axisp.get(x) or {}
             locallog.debug(f'set_view:x: {ap=}')
-            # ap = ap | (kwds.get(x) or {})
             self.set_tick(xc, ax, 'x', **(ap or {}))
 
             ap = axisp.get(y) or {}
-            # ap = ap | (kwds.get(y) or {})
             locallog.debug(f'set_view:y: {ap=}')
             self.set_tick(yc, ax, 'y', **(ap or {}))
 
             artists.extend([ax.xaxis, ax.yaxis,
                             ax.xaxis.get_offset_text(),
                             ax.yaxis.get_offset_text()])
-            # ax.xaxis.get_offset_text().set_fontsize(24)
-            # ax.yaxis.get_offset_text().set_fontsize(24)
             return artists
 
     def set_tick(self, co, ax, which,
@@ -903,7 +1088,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         else:
             axis, limf, scf = ax.yaxis, ax.set_ylim, ax.set_yscale
             # getf = ax.get_ylim
-
         dmin, dmax, sc = self.parse_coor(co, dmin=dmin, dmax=dmax,
                                          direction=direction)
         scale = scale or sc
@@ -924,19 +1108,13 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             axis.set_minor_locator(mtc.MultipleLocator(vmin))
 
         txt = xrpu.label_from_attrs(co)
-        ltx = axis.set_label_text(txt, fontsize=13)
+        ltx = axis.set_label_text(txt)
         ltx.set_picker(True)
-        # ltx.set_gid(f"axis:{co.name}")
-        ltx.set_gid(f"axis:{which}")
         axis.set_picker(True)
         # axis.set_picker(self.axis_picker)
-        # axis.set_gid(f"tick:{co.name}")
-
-        axis.set_gid(f"tick:{which}")
+        gid = ax.get_gid()
         axis.set_tick_params(which='major', **(major or {}))
         axis.set_tick_params(which='minor', **(minor or {}))
-        # print(f"dmin/dmax: {co.name} {type(dmin)} {type(dmax)}")
-        # print(f"before limf: {dmin=} {dmax=}")
         if isinstance(dmin, xr.DataArray):
             dmin = dmin.values
         if isinstance(dmax, xr.DataArray):
@@ -956,7 +1134,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
     def set_geo_view(self, data, ax=None, artists=None,
                      x=None, y=None,
                      crs=None, axisp=None):
-        # print(f"{extent=}")
         axisp = axisp or {}
         artists = artists or []
         if not ax:
@@ -974,7 +1151,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         view_x = axisp.get(x) or {}
         view_y = axisp.get(y) or {}
 
-        # print(f"{view_x=} {view_y=}")
         if x in data.coords and y in data.coords:
             try:
                 self.set_lon_view(ax, xc, crs, **view_x)
@@ -984,8 +1160,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 gl = ax.gridlines(draw_labels=True)
                 gl.top_labels = False
                 gl.right_labels = False
-                # gl.xlabel_style = dict(size=20)
-                # gl.ylabel_style = dict(size=20)
         else:
             raise ValueError("Physical coordinate not defined:"
                              f"{x} {y}")
@@ -1189,11 +1363,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             ax.set_gid(gid)
             ax.set(**kwds)
             bb = ax.bbox
-            # print(bb.xmin, bb.xmax, bb.ymin, bb.ymax)
-            # print(f"{bb.extents=}")
             bg, bb = self.copy_from_bbox(fig, bb)
-            # bg = fig.canvas.copy_from_bbox(bb)
-            # print(f"register_bg: {ax.bbox} {bg=}")
             self.bg[ax] = bg, bb
         else:
             ax = None
@@ -1271,33 +1441,22 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         at = self.guides.get(ax)
 
         # locallog.debug(f"{ax=} {at=}")
-        # print(x, y)
-        # print(ax.get_lines())
         if at:
             xg, yg = at
             bg = self.bg.get(ax)
             if bg:
                 bg, bb = bg
                 fig.canvas.restore_region(bg)
-                # print(f"{bb.extents=}")
             else:
                 bb = None
             if xg and x is not None:
-                # print(xg.get_segments())
-                # xg.set_xdata([x])
                 xg.set_segments([np.array([[x, 0], [x, 1]])])
                 xg.set_visible(True)
                 ax.draw_artist(xg)
             if yg and y is not None:
-                # print(yg.get_segments())
                 yg.set_segments([np.array([[0, y], [1, y]])])
-                # yg.set_ydata([y])
                 yg.set_visible(True)
                 ax.draw_artist(yg)
-
-            # fig.canvas.blit(ax.bbox)
-            # if bb:
-            #     fig.canvas.blit(bb)
             fig.canvas.blit()
 
     def add_titles(self, *args,
@@ -1373,7 +1532,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         ibb = mplib.transforms.Bbox(ibb)
         bg = fig.canvas.copy_from_bbox(ibb)
         return bg, ibb
-        # print(bb.xmin, bb.xmax, bb.ymin, bb.ymax)
 
     def show_info(self, ax=None, props=None, **kwds):
         if props is None:
@@ -1386,22 +1544,32 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 props = [props]
             def check(k):
                 return k in props
+
+        def float_array(fu, *args):
+            v = fu(*args)
+            if isinstance(v, cabc.Iterable):
+                return type(v)(float(j) for j in v)
+            return v
+
         if ax:
-            for k, f in [('xlim', ax.get_xlim),
-                         ('xbound', ax.get_xbound),
-                         ('xlabel', ax.get_xlabel),
-                         ('xscale', ax.get_xscale),
-                         ('ylim', ax.get_ylim),
-                         ('ybound', ax.get_ybound),
-                         ('ylabel', ax.get_ylabel),
-                         ('yscale', ax.get_yscale),
-                         ('title', ax.get_title),
-                         ('aspect', ax.get_aspect),
-                         ('box_aspect', ax.get_box_aspect),
-                         ('adjustable', ax.get_adjustable),
-                         ]:
+            lab = self.index(ax) or ax.get_gid()
+            print(f"<axes: {lab}>")
+            for kf in [('xlim', float_array, ax.get_xlim),
+                       ('xbound', float_array, ax.get_xbound),
+                       ('xlabel', ax.get_xlabel),
+                       ('xscale', ax.get_xscale),
+                       ('ylim', float_array, ax.get_ylim),
+                       ('ybound', float_array, ax.get_ybound),
+                       ('ylabel', ax.get_ylabel),
+                       ('yscale', ax.get_yscale),
+                       ('title', ax.get_title),
+                       ('aspect', ax.get_aspect),
+                       ('box_aspect', ax.get_box_aspect),
+                       ('adjustable', ax.get_adjustable),
+                       ]:
+                k, f, a = kf[0], kf[1], kf[2:]
                 if check(k):
-                    print(f'{k}: ', f())
+                    print(f'  {k}: ', f(*a))
         return
 
     def set_aspect(self, aspect, ax=None):
@@ -1427,8 +1595,10 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
     _major.update(_pos)
     _minor.update(_pos)
 
-    body = {'major': _major, 'minor': _minor, }
-    axis_text = {'fontsize': 14.0, }
+    # body = {'major': _major, 'minor': _minor, }
+    _label = {'fontsize': 14.0, }
+    body = {'major': _major, 'minor': _minor, 'axis': _label, }
+    axis_text = {}
 
     colorbar_ = {'major': {'bottom': True, 'length': 10.8,
                            'width': 1.0, 'pad': 5.8, 'labelsize': 14.0, },
@@ -1488,25 +1658,44 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
                 ax.set(zorder=-3)
         gprop = self.prop('guide') or {}
         if lab in self.prop('graph'):
+            for axis in [ax.xaxis, ax.yaxis]:
+                axis.set_gid(gid)
+                axis.label.set_gid(gid)
+                # axis.label.set(**self.prop('axis_text', {}))
+                a = attr.get('axis', {})
+                a = self.normalize_size_params(a, copy=True)
+                axis.label.set(**a)
+                for m in ['major', 'minor']:
+                    a = attr.get(m) or {}
+                    a = self.normalize_size_params(a, copy=True)
+                    axis.set_tick_params(which=m, **a)
             if lab == 'body':
-                for axis in [ax.xaxis, ax.yaxis]:
-                    axis.label.set_gid(gid)
-                    axis.label.set(**self.prop('axis_text', {}))
-                    for m in ['major', 'minor']:
-                        a = attr.get(m) or {}
-                        axis.set_tick_params(which=m, **a)
-                    axis.set_gid(gid)
+                # for axis in [ax.xaxis, ax.yaxis]:
+                #     axis.label.set_gid(gid)
+                #     # axis.label.set(**self.prop('axis_text', {}))
+                #     a = attr.get('axis', {})
+                #     a = self.normalize_size_params(a)
+                #     axis.label.set(**a)
+                #     for m in ['major', 'minor']:
+                #         a = attr.get(m) or {}
+                #         a = self.normalize_size_params(a)
+                #         axis.set_tick_params(which=m, **a)
+                #     axis.set_gid(gid)
                 self.add_guides(ax, 'xy', **gprop)
                 props = {}
                 for k in ['aspect', ]:
                     if k in attr:
                         props[k] = attr[k]
                 ax.set(**props)
-            elif lab == 'colorbar':
-                for m in ['major', 'minor']:
-                    ax.tick_params(which=m, **(attr.get(m) or {}))
+            # elif lab == 'colorbar':
+            #     for axis in [ax.xaxis, ax.yaxis]:
+            #         axis.label.set_gid(gid)
+            #         axis.set_gid(gid)
+            #     for m in ['major', 'minor']:
+            #         ax.tick_params(which=m, **(attr.get(m) or {}))
         if lab in ['monitor']:
             kwds = self.prop(lab, {})
+            kwds = self.normalize_size_params(kwds, copy=True)
             ax.text(0, 0.98, '',
                     transform=ax.transAxes,
                     animated=True,
@@ -1655,6 +1844,7 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
             text = '\n'.join(str(s) for s in text)
             ha = zu.set_default(horizontalalignment, 'center')
             va = zu.set_default(verticalalignment, 'top')
+            kwds = self.normalize_size_params(kwds, copy=True)
             a = super().add_titles(0.5, 1.0, text, ax=ax,
                                    horizontalalignment=ha,
                                    verticalalignment=va, **kwds)
@@ -1679,6 +1869,7 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
         if title:
             ha = zu.set_default(horizontalalignment, 'left')
             va = zu.set_default(verticalalignment, 'top')
+            kwds = self.normalize_size_params(kwds, copy=True)
             a = super().add_titles(0, 1.0, title, ax=ax,
                                    horizontalalignment=ha,
                                    verticalalignment=va, **kwds)
@@ -1706,6 +1897,7 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
         if title:
             ha = zu.set_default(horizontalalignment, 'right')
             va = zu.set_default(verticalalignment, 'top')
+            kwds = self.normalize_size_params(kwds, copy=True)
             a = super().add_titles(1.0, 1.0, title, ax=ax,
                                    horizontalalignment=ha,
                                    verticalalignment=va, **kwds)
@@ -1726,6 +1918,13 @@ class LayoutLegacyBase(LayoutBase, LegacyParser, _ConfigType):
     def on_draw(self, fig, ax=None, **kwds):
         self.bg = {}
         self.cla_fragiles(fig)
+        osc = self._get_fig_scale()
+        self.update_size(fig)
+        sc = self._get_fig_scale()
+        if osc != sc:
+            self.resize_scale(fig, sc=sc)
+            # fig.canvas.draw()
+            locallog.warning("Figure resize detected.  Please refresh.")
         # locallog.info(f'on_draw')
         # if self.skip_fragiles:
         #     self.skip_fragiles = False
@@ -1836,15 +2035,14 @@ class ContourPlot(PlotBase, _ConfigType):
 
     color_ = {'method': 'pcolormesh', } | _opts
     contour_ = {'colors': 'black',
-                'linewidths': 1.5,
-                # [1.0, 2.0, 4.0, 8.0]
+                # 'unitwidth': 0.8,
+                'unitwidth': 1.0,
+                'fontsize': 11.0,
                 } | _opts
 
     def __init__(self, contour=None, color=None):
         self._contour = self.prop('contour') | (contour or {})
         self._color = self.prop('color') | (color or {})
-        self._contour.setdefault('gid', 'contour')
-        self._color.setdefault('gid', 'color')
 
     def __call__(self, fig, axs, data, view=None,
                  artists=None, **kwds):
@@ -1864,9 +2062,6 @@ class ContourPlot(PlotBase, _ConfigType):
         else:
             xy = {}
             coords = data.coords
-            # print(view)
-            # print(data.dims)
-            # print(list(coords.keys()))
 
             cj = [d for d in data.dims if coords[d].size > 1]
             if len(cj) != 2:
@@ -1876,11 +2071,6 @@ class ContourPlot(PlotBase, _ConfigType):
             coords = ()
 
         color = self._color | (kwds.get('color') or {})
-        # locallog.debug(f"{contour=}")
-        # locallog.debug(f"{color=}")
-
-        # locallog.debug(f"{axisp=}")
-
         # if isinstance(ax, cmgeo.GeoAxes):
         body = kwds.get('body') or {}
         transf = body.get('transform')
@@ -1901,6 +2091,7 @@ class ContourPlot(PlotBase, _ConfigType):
             color.setdefault('transform', transf)
 
         cset = kwds.get('contour') or {}
+        axs.update('body', {'contour': self._contour})
         if isinstance(cset, dict):
             contour = self._contour | cset
             if transf:
@@ -1910,6 +2101,7 @@ class ContourPlot(PlotBase, _ConfigType):
                 data_con = data
             zargs = self.data_transform(data_con, *coords)
             # print(f"{len(zargs)=}")
+            contour = axs.normalize_size_params(contour, copy=True)
             con = self.contour(axs, *zargs, **contour)
         else:
             con = []
@@ -1920,6 +2112,7 @@ class ContourPlot(PlotBase, _ConfigType):
                 if transf:
                     contour.setdefault('transform', transf)
                 # print(f"{contour=}")
+                contour = axs.normalize_size_params(contour, copy=True)
                 c = self.contour(axs, *zargs, **contour)
                 con.extend(c)
         data_col = color.pop('data', None)
@@ -2011,12 +2204,11 @@ class ContourPlot(PlotBase, _ConfigType):
 
     def contour(self, axs, *data,
                 levels=None, clabel=None, key=None,
-                artists=None, bind=None, **kwds):
+                artists=None, bind=None, fontsize=None, **kwds):
         """matplotlib contour wrapper."""
         artists = artists or []
         # levels = self.nml_levels(levels)
         # clabel = self.annotation(clabel, levels)
-
         run = ft.partial(axs.contour, *data,
                          ax=key, clabel=False, **kwds)
         alab = []
@@ -2028,7 +2220,8 @@ class ContourPlot(PlotBase, _ConfigType):
             c = run(levels=levels)
         artists.extend(c)
         if clabel and c:
-            alab = axs.clabel(*c, ax=key, artists=alab, gid='clabel')
+            # alab = axs.clabel(*c, ax=key, artists=alab, gid='clabel')
+            alab = axs.clabel(*c, ax=key, artists=alab, fontsize=fontsize)
 
         ret = artists + alab
         if isinstance(bind, cabc.Callable):
@@ -2193,6 +2386,8 @@ class ContourPlot(PlotBase, _ConfigType):
                 if bar:
                     try:
                         bar.add_lines(cs, erase=False)
+                        cid = cs.get_gid()
+                        bar.lines[-1].set_gid(cid)
                     except ValueError as err:
                         # soft-landing for (possibly) empty array
                         # : zero-size array to reduction operation
@@ -2214,6 +2409,8 @@ class ContourPlot(PlotBase, _ConfigType):
                    and len(cs.levels) > 1:
                     if bar:
                         bar.add_lines(cs, erase=False)
+                        cid = cs.get_gid()
+                        bar.lines[-1].set_gid(cid)
                     else:
                         bar, cax, = axs.colorbar(fig, cs)
         artists.extend([bar, cax, ])

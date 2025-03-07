@@ -1,10 +1,55 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/02/28 16:41:44 fuyuki NEWS>
+# Time-stamp: <2025/03/07 10:08:45 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Release of 1.15 --- final revision before touza-zbt separation
+This is the final revision which bundles touza-zbt, python interface
+of TOUZA library.  From next revision (1.16 or later), touza-zbt will
+be developped/packaged/released independently from TOUZA library,
+because it is no longer a package only for TOUZA/Nio formats, but for
+general file formats using xarray.  Bug fixes will be backported from
+new touza-zbt package, but new development relating to python
+interfaces on TOUZA package is frozen.
+New release of touza-zbt is under construction.  Detail will be
+announced.
+
+* Changes in 1.15
+** Bug fixes around zbt for newer matploblib (maybe 3.10 or later)
+From matplotlib 3.10 (or 3.9), Normalize.autoscale() in adjust_norm()
+method does not work well at slice turning, which raises
+NotImplementedError('cannot remove artist').  It seems that
+Normalize.autoscale is examined for deleted instance, which can be
+avoided by giving up of reuse of the instance.  This workaround can
+be used for 3.8, so introduced as standard.
+** Figure resizing improved.
+At some situation, zbcont hangs at drawing of a large geometry figure,
+due to unknown reason.  It is suspected to be related to Qt5 backend.
+Instead of a solution, figure resizing is improved to implement
+auto-scaling of fonts, linewidths, etc.
+** Clipping argument is introduced into zbcont =--projection PROJECTION=.
+This feature is experimental, which may be improved or redesigned in
+the future release.  Explicit map clipping can be specified by
+=PROJECTION=.  Clipping coordinates are not geological, but those
+transformed.  You can first try manual clipping with matplotlib
+zoom-tool.  Press =I= when you are satisfied, and clipping coordinates
+are shown in the terminal, such as:
+: <axes: body>
+:   :
+:   xlim:  (-1901879., 2189097.)
+:   :
+:   ylim:  (-4005705., 24150.)
+:   :
+At next run of =zbcont=, clipping is recovered with additional
+parameters into =--projection=, such as:
+
+: % zbcont --projection=nps+45/-1901879.,2189097.,-4005705.,24150.
+
+where the clipping range is specified by appending
+=/<xlow>,<xhigh>,<ylow>,<yhigh>=.
 
 * Changes in 1.14.5
 ** Bug fixes around zbt and related
@@ -372,4 +417,6 @@ this feature.
 #  LocalWords:  qoxi fmt subrecord GEU ZSIGN DUP DSET FLUSHing WSUM
 #  LocalWords:  WMV MUL EXCH ITER IFELSE INRANGE ITERated DUPed URY
 #  LocalWords:  EXCHanged CLONEd COPYed Nnview GFORTRAN Bn urt ulast
-#  LocalWords:  tatebe san changs MRT URTa Cn
+#  LocalWords:  tatebe san changs MRT URTa Cn matploblib matplotlib
+#  LocalWords:  autoscale NotImplementedError backend linewidths xlim
+#  LocalWords:  ylim xlow xhigh ylow yhigh

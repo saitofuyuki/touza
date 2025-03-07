@@ -39,9 +39,9 @@ python-build~ under =zbt= directory:
 : % cd zbt
 : % make python-build   ## need to be on line due to pip requirement
 : % ls dist
-: touza_zbt-1.14.n-py3-none-any.whl  touza_zbt-1.14.n.tar.gz
+: touza_zbt-1.15.n-py3-none-any.whl  touza_zbt-1.15.n.tar.gz
 : % . SOMEWHERE/bin/activate # switch to virtual env
-: (python3) % python3 -m pip install dist/touza_zbt-1.14.n-py3-none-any.whl
+: (python3) % python3 -m pip install dist/touza_zbt-1.15.n-py3-none-any.whl
 
 ** Installation with deb
 Unfortunately, a python package nc-time-axis is not be prepared as
@@ -1043,10 +1043,10 @@ Also, GTOOL output format can be set by =dfmt=<format>=, such as
 
 
 **** (experimental) map overlay (=--map=, =-m=)
-: % zbcont -m [LAT,LON,]LETTERS
-: % zbcont -m [LAT,LON,]LETTERS
-: % zbcont -m [LAT,LON,]FEATURE[,FEATURE...]
-: % zbcont -m [LAT,LON,]FEATURE[/COLOR][+ALPHA][,FEATURE....]
+: % zbcont -m [<lat>,<lon>,]<letters>
+: % zbcont -m [<lat>,<lon>,]<letters>
+: % zbcont -m [<lat>,<lon>,]<feature>[,<feature>...]
+: % zbcont -m [<lat>,<lon>,]<feature>[/<color>][+<alpha>][[+-]<zorder>][,<feature>....]
 | letter | string | feature                               |
 |--------+--------+---------------------------------------|
 | c      | coast  | add coastline                         |
@@ -1055,6 +1055,19 @@ Also, GTOOL output format can be set by =dfmt=<format>=, such as
 | b      | border | add borders                           |
 | r      | river  | add rivers                            |
 | L      | lake   | add lakes                             |
+
+Each feature may be set with maximum three optional parameters,
+=<color>=, =<alpha>=, and =<zorder>=, separated by either =/=, =+= or =-=.
+If the prefix of parameter is =/= then it is interpreted as color.
+If the prefix is =-= then as zorder, negative value.
+The separator =+= can be used twice: the first and second are
+interpreted as alpha and zorder, respectively, which means that the
+alpha parameter must be set in order to set positive zorder.
+
+Dimension pair to overlay the map is =(-2, -1)=, the last 2 dimension,
+as default.  You can set other pair such as =(-3, -1)=, but this
+feature is still buggy and may not work as expected.
+
 ***** examples
 : % zbcont -m c  .....           # add coastline
 : % zbcont -m ol                 # fill ocean and land
@@ -1062,12 +1075,14 @@ Also, GTOOL output format can be set by =dfmt=<format>=, such as
 : % zbcont -m l+0.3              # land, filled with default color and alpha=0.3
 : % zbcont -m l/brown            # land, filled with brown
 : % zbcont -m l/brown+0.3        # land, filled with brown and alpha=0.3
+: % zbcont -m l/brown+1+2        # land, filled with brown and alpha=1, zorder=2
+: % zbcont -m l/brown-2          # land, filled with brown and zorder=-2
 : % zbcont -m l/brown+0.3,o/blue+0.3 # land, filled with brown and alpha=0.3
 :                                    # ocean, filled with blue and alpha=0.3
 : % zbcont -m -3,-1,land         # set latitude/longitude coordinates as (-3,-1)
 
 **** (experimental) projection (=--projection=, =-P=)
-: % zbcont -P PROJECTION[+LON[+LAT[+HEIGHT]]]
+: % zbcont -P <projection>[+<lon>[+<lat>[+<height>]]][/<extent>]
 | string                 | projection          | parameters                          |
 |------------------------+---------------------+-------------------------------------|
 | m mercator             | Mercator            | central longitude                   |
@@ -1080,6 +1095,23 @@ Also, GTOOL output format can be set by =dfmt=<format>=, such as
 | pc platecarree         | PlateCarree         | central longitude                   |
 ***** examples
 : % zbcont -Ppc+135 FILE    # central longitude on 135E.
+
+Normally figure extent is set by =--draw= argument, which is not
+suitable for the case of projection.   The extent in /transformed/
+coordinates can be set by =--projection=, appended as the format as =/<xlow>,<xhigh>,<ylow>,<yhigh>=:
+
+: % zbcont -Pnps+45/-1901879.,2189097.,-4005705.,24150.
+
+In order to compute the figure extent, key press of =I= helps to show
+the current extent.
+After manual selection of figure clipping using matplotlib zoom-tool,
+you can get corresponding clippng extent as follows:
+: <axes: body>
+:   :
+:   xlim:  (-1901879., 2189097.)
+:   :
+:   ylim:  (-4005705., 24150.)
+:   :
 
 ***** Known problems, tips and tricks
 ****** =PlateCarree=
@@ -1469,4 +1501,4 @@ Licensed under the Apache License, Version 2.0
 #  LocalWords:  Dlatitude Dlongitude Pnp IllegalArgumentException dir
 #  LocalWords:  gridpoints mocean mland accessor gentpco ConvOy mkdir
 #  LocalWords:  OCLONTPV OCLATTPV PLON dfmt pythonic ValueError DMIN
-#  LocalWords:  DMAX plon
+#  LocalWords:  DMAX plon zorder
