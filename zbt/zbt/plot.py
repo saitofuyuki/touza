@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/03/06 23:09:24 fuyuki plot.py>
+# Time-stamp: <2025/03/07 09:23:22 fuyuki plot.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -495,6 +495,12 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         """Return key if Axes, otherwise lookup internal dict."""
         return self._get_axes(key, default)
 
+    def index(self, ax, default=None):
+        for k, v in self._axes.items():
+            if v is ax:
+                return k
+        return default
+
     # figure methods
     def _resize_calc(self, rate, base):
         if rate >= 0:
@@ -602,31 +608,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 params[k] = cu * sc
         return params
 
-    # def _normalize_axis_params(self, props, sc=None, copy=None):
-    #     if sc is None:
-    #         sc = self._get_fig_scale()
-    #     if bool(copy):
-    #         params = props.copy()
-    #     else:
-    #         params = {}
-    #     for k in ['labelsize', 'length', 'pad', 'width', ]:
-    #         cu = props.get(k)
-    #         if cu:
-    #             params[k] = cu * sc
-    #     return params
-
-    # def _normalize_text_params(self, props, sc=None, copy=None):
-    #     if sc is None:
-    #         sc = self._get_fig_scale()
-    #     if bool(copy):
-    #         params = props.copy()
-    #     else:
-    #         params = {}
-    #     for k in ['fontsize', ]:
-    #         cu = props.get(k)
-    #         if cu:
-    #             params[k] = cu * sc
-    #     return params
     def update_size(self, fig, size=None, forward=None, **kwds):
         if forward is None:
             forward = True
@@ -674,16 +655,11 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 prop = self.normalize_size_params(prop, sc)
                 o.set(**prop)
 
-        # mplib.colorbar.Colorbar
         def match(artist: mplib.artist.Artist) -> bool:
             return isinstance(artist,
                               (mplib.collections.QuadMesh,
                                mplib.collections.LineCollection,
                                mplib.contour.QuadContourSet))
-        # for o in fig.findobj(mplib.collections.QuadMesh):
-        #     # print(o, type(o))
-        #     gid = o.get_gid()
-        #     print(o, gid)
 
         for o in fig.findobj(match):
             gid = o.get_gid()
@@ -1058,33 +1034,11 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         """Wrap figure.colorbar()"""
         cax = self._get_axes(cax)
         artists = artists or []
-        # debug_artist(cax, 'colorbar:before')
-        # cax.cla()
 
         # need refresh axes_locator to avoid
         # undesired inheritance of colormap bounding box
         cax.set_axes_locator(None)
-        # if 'outline' in cax.spines:
-        #     del(cax.spines['outline'])
-        # for ch in cax.get_children():
-        #     if isinstance(ch, mplib.colorbar._ColorbarSpine):
-        #         del(ch)
-
-        # debug_artist(cax, 'colorbar:cla')
-        # bar = fig.colorbar(*args, cax=copy.copy(cax), **kwds)
         bar = fig.colorbar(*args, cax=cax, **kwds)
-        # debug_artist(cax, 'colorbar:after')
-        # print(bar, type(bar))
-        # print(bar.lines)
-        # for o in fig.findobj():
-        #     # print(o.get_gid(), type(o), o)
-        #     if isinstance(o, mplib.collections.LineCollection):
-        #         pass
-        #         # debug_artist(o, 'collection')
-        #     elif isinstance(o, mplib.lines.Line2D):
-        #         print(o.get_gid(), o.get_linewidth())
-        #         # debug_artist(o, 'line')
-
         artists.extend([bar, cax, ])
 
         return artists
@@ -1097,7 +1051,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         if isinstance(ax, cmgeo.GeoAxes):
             artists = self.set_geo_view(data, ax=ax, artists=artists,
                                         x=x, y=y, crs=crs, axisp=axisp)
-            # self.crs[ax] = crs
             self.projp[ax] = crs
         elif ax:
             co = [d for d in data.dims if data.coords[d].size > 1]
@@ -1106,29 +1059,23 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             x = x or co[-1]
             y = y or co[0]
 
-            # print(x, y)
             xc = data.coords[x]
             yc = data.coords[y]
 
             ar = axisp.get('aspect')
             if ar:
                 ax.set_aspect(ar)
-            # print(axisp)
             ap = axisp.get(x) or {}
             locallog.debug(f'set_view:x: {ap=}')
-            # ap = ap | (kwds.get(x) or {})
             self.set_tick(xc, ax, 'x', **(ap or {}))
 
             ap = axisp.get(y) or {}
-            # ap = ap | (kwds.get(y) or {})
             locallog.debug(f'set_view:y: {ap=}')
             self.set_tick(yc, ax, 'y', **(ap or {}))
 
             artists.extend([ax.xaxis, ax.yaxis,
                             ax.xaxis.get_offset_text(),
                             ax.yaxis.get_offset_text()])
-            # ax.xaxis.get_offset_text().set_fontsize(24)
-            # ax.yaxis.get_offset_text().set_fontsize(24)
             return artists
 
     def set_tick(self, co, ax, which,
@@ -1161,20 +1108,13 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             axis.set_minor_locator(mtc.MultipleLocator(vmin))
 
         txt = xrpu.label_from_attrs(co)
-        # ltx = axis.set_label_text(txt, fontsize=13)
         ltx = axis.set_label_text(txt)
         ltx.set_picker(True)
-        # ltx.set_gid(f"axis:{co.name}")
-        # ltx.set_gid(f"axis:{which}")
         axis.set_picker(True)
         # axis.set_picker(self.axis_picker)
-        # axis.set_gid(f"tick:{co.name}")
         gid = ax.get_gid()
-        # axis.set_gid(f"tick:{gid}:{which}")
         axis.set_tick_params(which='major', **(major or {}))
         axis.set_tick_params(which='minor', **(minor or {}))
-        # print(f"dmin/dmax: {co.name} {type(dmin)} {type(dmax)}")
-        # print(f"before limf: {dmin=} {dmax=}")
         if isinstance(dmin, xr.DataArray):
             dmin = dmin.values
         if isinstance(dmax, xr.DataArray):
@@ -1194,7 +1134,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
     def set_geo_view(self, data, ax=None, artists=None,
                      x=None, y=None,
                      crs=None, axisp=None):
-        # print(f"{extent=}")
         axisp = axisp or {}
         artists = artists or []
         if not ax:
@@ -1212,7 +1151,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         view_x = axisp.get(x) or {}
         view_y = axisp.get(y) or {}
 
-        # print(f"{view_x=} {view_y=}")
         if x in data.coords and y in data.coords:
             try:
                 self.set_lon_view(ax, xc, crs, **view_x)
@@ -1222,8 +1160,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 gl = ax.gridlines(draw_labels=True)
                 gl.top_labels = False
                 gl.right_labels = False
-                # gl.xlabel_style = dict(size=20)
-                # gl.ylabel_style = dict(size=20)
         else:
             raise ValueError("Physical coordinate not defined:"
                              f"{x} {y}")
@@ -1427,11 +1363,7 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
             ax.set_gid(gid)
             ax.set(**kwds)
             bb = ax.bbox
-            # print(bb.xmin, bb.xmax, bb.ymin, bb.ymax)
-            # print(f"{bb.extents=}")
             bg, bb = self.copy_from_bbox(fig, bb)
-            # bg = fig.canvas.copy_from_bbox(bb)
-            # print(f"register_bg: {ax.bbox} {bg=}")
             self.bg[ax] = bg, bb
         else:
             ax = None
@@ -1509,33 +1441,22 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         at = self.guides.get(ax)
 
         # locallog.debug(f"{ax=} {at=}")
-        # print(x, y)
-        # print(ax.get_lines())
         if at:
             xg, yg = at
             bg = self.bg.get(ax)
             if bg:
                 bg, bb = bg
                 fig.canvas.restore_region(bg)
-                # print(f"{bb.extents=}")
             else:
                 bb = None
             if xg and x is not None:
-                # print(xg.get_segments())
-                # xg.set_xdata([x])
                 xg.set_segments([np.array([[x, 0], [x, 1]])])
                 xg.set_visible(True)
                 ax.draw_artist(xg)
             if yg and y is not None:
-                # print(yg.get_segments())
                 yg.set_segments([np.array([[0, y], [1, y]])])
-                # yg.set_ydata([y])
                 yg.set_visible(True)
                 ax.draw_artist(yg)
-
-            # fig.canvas.blit(ax.bbox)
-            # if bb:
-            #     fig.canvas.blit(bb)
             fig.canvas.blit()
 
     def add_titles(self, *args,
@@ -1611,7 +1532,6 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
         ibb = mplib.transforms.Bbox(ibb)
         bg = fig.canvas.copy_from_bbox(ibb)
         return bg, ibb
-        # print(bb.xmin, bb.xmax, bb.ymin, bb.ymax)
 
     def show_info(self, ax=None, props=None, **kwds):
         if props is None:
@@ -1624,22 +1544,32 @@ class LayoutBase(ParserBase, zcfg.ConfigBase):
                 props = [props]
             def check(k):
                 return k in props
+
+        def float_array(fu, *args):
+            v = fu(*args)
+            if isinstance(v, cabc.Iterable):
+                return type(v)(float(j) for j in v)
+            return v
+
         if ax:
-            for k, f in [('xlim', ax.get_xlim),
-                         ('xbound', ax.get_xbound),
-                         ('xlabel', ax.get_xlabel),
-                         ('xscale', ax.get_xscale),
-                         ('ylim', ax.get_ylim),
-                         ('ybound', ax.get_ybound),
-                         ('ylabel', ax.get_ylabel),
-                         ('yscale', ax.get_yscale),
-                         ('title', ax.get_title),
-                         ('aspect', ax.get_aspect),
-                         ('box_aspect', ax.get_box_aspect),
-                         ('adjustable', ax.get_adjustable),
-                         ]:
+            lab = self.index(ax) or ax.get_gid()
+            print(f"<axes: {lab}>")
+            for kf in [('xlim', float_array, ax.get_xlim),
+                       ('xbound', float_array, ax.get_xbound),
+                       ('xlabel', ax.get_xlabel),
+                       ('xscale', ax.get_xscale),
+                       ('ylim', float_array, ax.get_ylim),
+                       ('ybound', float_array, ax.get_ybound),
+                       ('ylabel', ax.get_ylabel),
+                       ('yscale', ax.get_yscale),
+                       ('title', ax.get_title),
+                       ('aspect', ax.get_aspect),
+                       ('box_aspect', ax.get_box_aspect),
+                       ('adjustable', ax.get_adjustable),
+                       ]:
+                k, f, a = kf[0], kf[1], kf[2:]
                 if check(k):
-                    print(f'{k}: ', f())
+                    print(f'  {k}: ', f(*a))
         return
 
     def set_aspect(self, aspect, ax=None):
@@ -2113,8 +2043,6 @@ class ContourPlot(PlotBase, _ConfigType):
     def __init__(self, contour=None, color=None):
         self._contour = self.prop('contour') | (contour or {})
         self._color = self.prop('color') | (color or {})
-        # self._contour.setdefault('gid', 'contour')
-        # self._color.setdefault('gid', 'color')
 
     def __call__(self, fig, axs, data, view=None,
                  artists=None, **kwds):
@@ -2134,9 +2062,6 @@ class ContourPlot(PlotBase, _ConfigType):
         else:
             xy = {}
             coords = data.coords
-            # print(view)
-            # print(data.dims)
-            # print(list(coords.keys()))
 
             cj = [d for d in data.dims if coords[d].size > 1]
             if len(cj) != 2:
@@ -2146,11 +2071,6 @@ class ContourPlot(PlotBase, _ConfigType):
             coords = ()
 
         color = self._color | (kwds.get('color') or {})
-        # locallog.debug(f"{contour=}")
-        # locallog.debug(f"{color=}")
-
-        # locallog.debug(f"{axisp=}")
-
         # if isinstance(ax, cmgeo.GeoAxes):
         body = kwds.get('body') or {}
         transf = body.get('transform')

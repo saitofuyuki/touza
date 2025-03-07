@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Time-stamp: <2025/03/06 17:27:56 fuyuki control.py>
+# Time-stamp: <2025/03/07 09:23:05 fuyuki control.py>
 #
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -1092,36 +1092,18 @@ class ArrayIter(LinkedArray):
                 continue
             w, org, dup = cc
             if len(co) == w - 1 and co[0] == org and co[-1] != dup:
-                # for j, p in enumerate(co):
-                #     if p >= 180:
-                #         break
-                # print(j, p.item())
-                # data = data.roll(**{co.name: j}, roll_coords=True)
-                # co = data[co.name]
                 cd, cx = cutil.add_cyclic(data, co, axis=ck,
                                           cyclic=dup-org)
                 nco = dict(data.coords.items())
                 nco[cn] = xr.DataArray(cx, dims=co.dims, attrs=co.attrs)
-                # for j, p in enumerate(nco[cn]):
-                #     if p >= 180:
-                #         break
-                # print(j, p.item())
-                # nco[cn] = (nco[cn] + 180) % 360 - 180
-                # nco[cn][-1] = nco[cn][-1] + 360
                 data = xr.DataArray(cd, coords=nco,
                                     dims=data.dims, attrs=data.attrs)
                 # need to activate nio accessor
                 _ = data.nio
-                # data = data.roll(**{cn: j}, roll_coords=True)
-                # print(cn, j)
-                # print(data)
-                # print(cn, nco[cn])
+
         if not data is odata:
             data.name = odata.name
             data.assign_attrs(**odata.attrs)
-        # debug('cyclic out')
-        # debug(f"{data.name=} {data.shape=}")
-        # store cache
         self.data = data
         return data
 
@@ -1148,7 +1130,6 @@ class VariableIter(LinkedArray):
         src = self.get(key)
         psrc = self.get()
         pdim = psrc.dims if psrc is not None else ()
-        # debug(f"{pdim} to {src.dims}")
 
         alink = self.linked(ArrayIter)
 
@@ -1157,18 +1138,14 @@ class VariableIter(LinkedArray):
             return
 
         src = self.assign_coord(src)
-        # debug(f"source='{src.name}'{src.dims}{src.shape}")
 
         try:
             xsel, nsel = extract_sels(self.lims, src)
-            # debug(f"{nsel=}")
-            # debug(f"{xsel=}")
         except UserWarning:
             alink.refresh(base=None, )
             return
 
         base = extract_base_array(src, nsel, xsel)
-        # debug(f"base='{base.name}'{base.dims}{base.shape}")
 
         alink.refresh(base=base, src=src, nsel=nsel, xsel=xsel)
 
@@ -1452,8 +1429,6 @@ class PlotParams():
         self.nml = {}
 
     def reg_entry(self, arg, entry, nml=None):
-        # if not isinstance(entry, (tuple, list)):
-        #     entry = [entry]
         self.root[arg] = entry
         if nml is None:
             nml = self._nml
@@ -1612,25 +1587,6 @@ class AxisScaleLink(SimpleLink, ParamsDispatcher):
         p['scale'] = scale
         return p
 
-    # def loop(self):
-    #     self._loop = iter(self.items())
-    #     _ = next(self._loop)
-
-    # def advance(self, step):
-    #     self.switch(step=step)
-    #     try:
-    #         _ = next(self._loop)
-    #     except StopIteration:
-    #         self._loop = iter(self.items())
-    #         _ = next(self._loop)
-    #     return self.value()
-
-    # def fwd(self):
-    #     return self.advance(+1)
-
-    # def bwd(self):
-    #     return self.advance(-1)
-
 
 class AspectRatioLink(SimpleLink, ParamsDispatcher):
     # to do: 'index'
@@ -1678,12 +1634,6 @@ class LimitParams():
             upd = False
         elif array is not None:
             upd = True
-            # if vmin is None:
-            #     vmin = self._lims[0]
-            # if vmax is None:
-            #     vmax = self._lims[1]
-            # print(f"{src.dims} {src.shape=}")
-            # print(f"{array.dims} {array.shape=}")
             if self._lims[0] is None:
                 amin = array.min().item()
                 if vmin is not None:
@@ -1793,11 +1743,6 @@ class NormLink(LimitParams, LinkedArray, ParamsDispatcher):
     def adjust_norm(self, norm, saved, lims, **kwds):
         norm = norm or ''
         if norm in ['', 'linear', ]:
-            # if saved:
-            #     norm = saved
-            #     norm.autoscale(lims)
-            # else:
-            #     norm = mplib.colors.Normalize(vmin=lims[0], vmax=lims[1])
             norm = mplib.colors.Normalize(vmin=lims[0], vmax=lims[1])
             self.debug(f"{norm=} {norm.vmin=} {norm.vmax=}")
         elif norm == 'log':
@@ -1827,10 +1772,6 @@ class NormLink(LimitParams, LinkedArray, ParamsDispatcher):
         elif isinstance(norm, mplib.colors.Normalize):
             sc = [v for v in lims if v is not None]
             norm.autoscale(sc or [0])
-        # print(f"{self._norm=}")
-        # locallog.debug(f"norm:adjust: {saved=}")
-        # locallog.debug(f"norm:adjust: {norm=}")
-        # locallog.debug(f"norm:range: {norm.vmin}:{norm.vmax}")
 
         return norm
 
@@ -1868,7 +1809,6 @@ class NormLink(LimitParams, LinkedArray, ParamsDispatcher):
             else:
                 linthresh = math.pow(10, math.floor(math.log(am, 10)) - width)
         n = mplib.colors.SymLogNorm(linthresh, vmin=vmin, vmax=vmax)
-        # print(linthresh, lims, vmin, vmax, n.vmin, n.vmax)
         return n
 
     def adjust_norm_range(self, vmin, vmax, sym):
@@ -1897,17 +1837,7 @@ class NormLink(LimitParams, LinkedArray, ParamsDispatcher):
     def toggle_lock(self, fig, switch=None):
         p = self._lock
         b = super().toggle_lock(switch)
-        # if switch is not None:
-        #     self._lock = bool(switch)
-        # else:
-        #     self._lock = not self._lock
 
-        # if self._lock:
-        #     if not p:
-        #         fig.push_patch(**self.mark)
-        # else:
-        #     if p:
-        #         fig.pop_patch()
         if b:
             key = self._current
             k = self.l2p(key)
@@ -2594,7 +2524,7 @@ class FigureInteractive(zplt.FigureCore, DataTree):
                 return
         self.coords = ()
 
-    def parse_view(self, arr, src, draw=None, crs=None, **kwds):
+    def parse_view(self, arr, src, draw=None, crs=None, extent=None, **kwds):
         """Set figure coordinate."""
         # debug = locallog.info
         debug = locallog.debug
@@ -2604,15 +2534,14 @@ class FigureInteractive(zplt.FigureCore, DataTree):
         draw = draw or {}
         dims = src.dims
         if crs:
-            view['extent'] = self.view.get(crs)
+            extent = self.view.get(crs) or extent
+            view['extent'] = extent
 
         for co in arr.dims + (self.coords or ()):
             try:
                 s = coord_prop(co, arr, dims, self.view, draw)
             except KeyError:
                 continue
-            # print(f"parse_view/coord_prop:{co}: {s}")
-            # print(self.view.get(co))
             mm = {}
             if co in self.view:
                 mm['direction'] = True
@@ -2727,13 +2656,6 @@ class FigureControl():
         fig.connect(axes_enter_event=eafunc,
                     axes_leave_event=lafunc, )
 
-        # button_release_event=self.test_release
-        # print(fx)
-        # fig = fx[0]
-        # fig.canvas.mpl_connect('pick_event', self.onpick)
-        # fig.canvas.mpl_connect('button_press_event', self.mouse_press)
-        # fig.canvas.mpl_connect('figure_enter_event', self.enter_figure)
-        # fig.canvas.mpl_connect('figure_leave_event', self.leave_figure)
         return fig, axs
 
     def interactive(self, fig, step=True, msg=None, prev=None):
@@ -2823,6 +2745,8 @@ class FigureControl():
 
     def invoke(self, trees, stat, fig, axs, view=None, cla=None):
         """Draw core."""
+        debug = locallog.info
+
         arr = stat[-1].load()
         src = fig.source_data()
         style = self.view_style(arr, src) or {}
@@ -2831,30 +2755,18 @@ class FigureControl():
         fig.set_coords(arr, self.coords)
         view = fig.parse_view(arr, src, self.draw, **style)
         self.view = view.get('coords')
-        # print(f"{self.view=}")
-        # print(f"{view=}")
+
         cla = True if cla is None else bool(cla)
         if cla:
             axs.reset(fig, body=layout)
             axs.cla(fig)
-        # if locallog.is_debug():
-        #     for ch in fig.get_children():
-        #         gid = ch.get_gid()
-        #         locallog.debug(f"[{gid}]={ch}")
-        # fig.set_hook(self.prompt)
-        # params = self.params.get_link(key=trees, fig=fig, array=arr)
+
         # exclude axis
         params = self.view_params(fig, True, 'axis', src=src, array=arr)
         vv = self.view_params(fig, 'axes', src=src, array=arr)
         view = view | (vv.get('axes') or {})
-        # print(f"{vv=}")
-        # print(f"{view=}")
+
         axis = self.axis_params(fig, array=arr)
-        # print(f"{axis=}")
-        # print(params.params())
-        # locallog.info("invoke: before plot")
-        # print(view, style)
-        # print(f"{arr.shape=} {view=}")
         r = self.plot(fig=fig, axs=axs, data=arr,
                       view=view, body=style, **params, **axis)
         # locallog.info(f"invoke: after plot")
@@ -3170,10 +3082,7 @@ class FigureControl():
             targets = [f for f in self.figs if f.is_locked()]
         else:
             targets = [fig]
-        # if self._is_locked(jfig):
-        #     targets = filter(self._is_locked, self.figs.keys())
-        # else:
-        #     targets = [jfig]
+
         for ff in targets:
             func(ff, *args, **kw)
 
@@ -3345,20 +3254,6 @@ class FigureControl():
         disp = self.get_disp('color', fig)
         if disp:
             b = disp.toggle_lock(fig, switch, lev='norm')
-            # if b:
-            #     fig.group_push_patch(facecolor='gray', ax=(ax, 'spine'))
-            # else:
-            #     fig.group_pop_patch(ax=(ax, 'spine'))
-            # ax = axs.get_axes(ax)
-            # bg = axs.bg.get(ax)
-            # if bg:
-            #     fig.canvas.restore_region(bg)
-            #     if switch != b:
-            #         if b:
-            #             at = m1i.BboxPatch(ax.bbox,
-            #                                edgecolor='cyan', linewidth=10.0)
-            #             ax.draw_artist(at)
-            #             fig.canvas.blit(ax.bbox)
             b = 'locked' if b else 'unlocked'
             self.interactive(fig, step=False, msg=f'colormap range: {b}')
 
@@ -3499,12 +3394,6 @@ class FigureControl():
             fig.show_info(**kwds)
             axs = self.figs[fig]
             axs.show_info(**kwds)
-        # if locallog.is_debug():
-        #     self.diag_childlen(fig)
-        #     axs = self.figs[fig]
-        #     for ax, bg in axs.bg.items():
-        #         gid = ax.get_gid() or ax
-        #         print(f"bg[{gid}]={bg}")
         self.prompt(event=None)
 
     def mouse_release(self, event, fig, axs):
@@ -3533,22 +3422,13 @@ class FigureControl():
         bg = axs.bg.get(ax)
         gid = ax.get_gid() or ax
         gid = gid if isinstance(gid, tuple) else (gid, )
-        # print(f'enter_axes {gid} {bg}')
-        # if False:
         if bg:
             bg, bb = bg
             if gid[0] in ['spine', 'axis']:
-            # at = ax.text(0, 0, 'yellow')
-                # at = m1i.BboxPatch(ax.bbox, facecolor='gray', alpha=0.2)
                 at = m1i.BboxPatch(bb, facecolor='gray', alpha=0.2)
-                # at.set_visible(True)
                 fig.canvas.restore_region(bg)
                 ax.draw_artist(at)
-                # fig.canvas.blit(ax.bbox)
-                # fig.canvas.blit(bb)
                 fig.canvas.blit()
-        # event.inaxes.patch.set_facecolor('yellow')
-        # event.canvas.draw()
 
     def leave_axes(self, event, fig, axs):
         ax = event.inaxes
@@ -3558,18 +3438,6 @@ class FigureControl():
         # print(f'leave {gid=}')
         if len(gid) > 1:
             axs.clear_guide(fig, gid[1])
-        # bg = axs.bg.get(ax)
-        # gid = ax.get_gid() or ax
-        # gid = gid if isinstance(gid, tuple) else (gid, )
-        # # gid = ax.get_gid() or ax
-        # # print(f'leave_axes {gid} {bg}')
-        # if bg:
-        #     if gid[0] in ['spine', 'axis']:
-        #         fig.canvas.restore_region(bg)
-        #         fig.canvas.blit(ax.bbox)
-        # print('leave_axes', event.inaxes)
-        # event.inaxes.patch.set_facecolor('white')
-        # event.canvas.draw()
 
     # def enter_figure(self, event):
     #     print('enter_figure', event.canvas.figure)
@@ -3632,11 +3500,9 @@ class FigureControl():
 
         fmt = r'{:.2f}'
         if lab[2] in ['left', 'right']:
-            # axs.draw_guide(fig, body, None, dpos[1])
             axs.draw_guide(fig, body, None, event.ydata)
             text = 'y=' + (fmt.format(mpos[1]))
         else:
-            # axs.draw_guide(fig, body, dpos[0], None)
             axs.draw_guide(fig, body, event.xdata, None)
             text = 'x=' + (fmt.format(mpos[0]))
         axs.monitor(fig, text)
@@ -3681,26 +3547,8 @@ class FigureControl():
         axs.monitor(fig, text)
 
     def on_draw(self, event, fig, axs):
-        # print('-' * 20)
-        # for st in inspect.stack():
-        #     stf = plib.Path(st.filename)
-        #     stf = '/'.join(stf.parts[-2:])
-        #     print(f"{stf}:{st.lineno}:{st.function}: {st.code_context[0]}", end='')
-        # print('-' * 20)
-        # locallog.info(f'on_draw {event}')
-
-        # self.diag_childlen(fig)
         axs.on_draw(fig)
         # self.diag_childlen(fig)
-
-        # for ax in fig.get_children():
-        #     gid = ax.get_gid()
-        #     if gid == 'body':
-        #         for ch in ax.get_children():
-        #             try:
-        #                 print(ch, ch.get_cmap())
-        #             except AttributeError:
-        #                 pass
 
     # def mouse_pick(self, event, fig, axs):
     #     """Mouse pick actions on artists."""
@@ -3805,10 +3653,6 @@ class FigureControl():
         verbose = config.get('verbose', 0)
         self.kmap = self.parse_keymap({}, config.get('keymap', {}))
         self.mmap = self.parse_mousemap({}, config.get('mouse', {}))
-        # locallog.debug(self.mmap)
-        # ppr.pprint(config.get('mouse'))
-        # ppr.pprint(self.kmap)
-        # ppr.pprint(self.mmap)
         self.opts = config.get('option', {})
         self.opts['resize_step'] = self.opts.get('resize_step') or 0.25
 
@@ -4161,10 +4005,6 @@ def view_prop(arr, dims, *args):
     else:
         for ck, cv in prop.items():
             prop[ck] = tuple(cv)
-            # print(ck, tuple(type(t) for t in cv))
-            # for t in cv:
-            #     if t:
-            #         print(t.transform_point(359, 100, t))
         return prop
 
 
@@ -4268,7 +4108,6 @@ def normalize_selection(co, sel, method=None, index=None):
             cft = cftime.to_tuple(pts)
             sel = cftime.datetime(*cft, calendar=cal)
         else:
-            # print(type(c0), cal)
             ### "days since 2000-01-01",
             sel = cftime.num2date(sel, units=zu.NC_EPOCH, calendar=cal)
         locallog.debug(f"date: {sel=} {type(sel)=} ")
@@ -4292,22 +4131,14 @@ def normalize_selection(co, sel, method=None, index=None):
         if bool(index):
             for j, v in enumerate(co.values):
                 if v == sel:
-                    # print(f"found: {j} {sel}")
                     sel = j
                     break
             else:
-                # print(f"not found")
                 sel = None
         return sel
-        # cp = co.to_numpy()
-        # print(cp)
-        # print([np.where(cp == sel)])
     else:
         sel = sel.item()
-    # print(f"sel.item {sel=} {type(sel)}")
     if bool(index):
-        # print(type(co), co)
         co = co.to_index()
-        # print(type(co), co)
         sel = co.get_loc(sel)
     return sel
