@@ -1,10 +1,10 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2024/07/14 21:22:04 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/03/20 10:15:02 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2024
+! Copyright (C) 2020-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -49,11 +49,6 @@ module TOUZA_Std_utl
      module procedure choice_i,  choice_l,  choice_b,  choice_f,  choice_d
      module procedure choice_ia, choice_la, choice_ba, choice_fa, choice_da
   end interface choice
-#if OPT_REAL_QUADRUPLE_DIGITS > 0
-  interface choice
-     module procedure choice_q,  choice_qa
-  end interface choice
-#endif
 
   interface set_if_present
      module procedure set_if_present_i, set_if_present_l
@@ -130,6 +125,15 @@ module TOUZA_Std_utl
   interface is_symbol
      module procedure is_symbol_set, is_symbol_def
   end interface is_symbol
+
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  interface choice
+     module procedure choice_q,  choice_qa
+  end interface choice
+  interface parse_number
+     module procedure parse_number_q
+  end interface parse_number
+#endif
 !!!_  - public
   public init, diag, finalize
   public choice, choice_a
@@ -1245,6 +1249,33 @@ contains
        num = buf
     endif
   end subroutine parse_number_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  subroutine parse_number_q (ierr, num, str, def)
+    use TOUZA_Std_prc,only: KTGT=>KQPL
+    implicit none
+    integer,         intent(out)         :: ierr
+    real(kind=KTGT), intent(inout)       :: num
+    character(len=*),intent(in)          :: str
+    real(kind=KTGT), intent(in),optional :: def
+    real(kind=KTGT) buf
+    if (str.eq.' ') then
+       if (present(def)) then
+          ierr = 0
+          num = def
+       else
+          ierr = _ERROR(ERR_INVALID_ITEM)
+       endif
+       return
+    endif
+    ierr = check_number_string(str)
+    if (ierr.eq.0) read(str, *, IOSTAT=ierr) buf
+    if (ierr.ne.0) then
+       ierr = _ERROR(ERR_STRING_IO)
+    else
+       num = buf
+    endif
+  end subroutine parse_number_q
+#endif
 !!!_    & check_number_string()
   integer function check_number_string(str) result (n)
     implicit none

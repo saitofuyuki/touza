@@ -1,16 +1,16 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/09/03 22:36:32 fuyuki Makefile.am>
+# Time-stamp: <2025/05/09 15:42:22 fuyuki Makefile.am>
 
-# Copyright (C) 2020-2024
+# Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 ACLOCAL_AMFLAGS	=	-I m4c
-EXTRA_DIST	=	autogen.sh README-touza.org LICENSE NOTICE
+EXTRA_DIST	=	bootstrap README-touza.org LICENSE NOTICE
 include $(top_srcdir)/aminclude_static.am
 
 include_HEADERS		= touza.h $(CONFIG_HEADER)
@@ -21,10 +21,10 @@ lib@TOUZA_NAME@_la_LDFLAGS += $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 
 lib@TOUZA_NAME@_version =
 
-noinst_SCRIPTS 	= makeshift
 CLEANFILES += $(noinst_bin_SCRIPTS)
 
 SUBDIRS 				  = std
+DIST_SUBDIRS			  = std
 lib@TOUZA_NAME@_la_LIBADD = std/$(local_name)
 AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_std)
 
@@ -33,16 +33,19 @@ SUBDIRS 				  += emu
 lib@TOUZA_NAME@_la_LIBADD += emu/$(local_name)
 AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_emu)
 endif
+DIST_SUBDIRS			  += emu
 
 if BUILD_cal
 SUBDIRS 				  += cal
 lib@TOUZA_NAME@_la_LIBADD += cal/$(local_name)
 AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_cal)
 endif
+DIST_SUBDIRS			  += cal
 
 # if BUILD_div
 # if BUILD_WITH_MPI
 # SUBDIRS 				  += div
+# DIST_SUBDIRS			  += div
 # lib@TOUZA_NAME@_la_LIBADD += div/$(local_name)
 # AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_div)
 # endif
@@ -53,21 +56,25 @@ SUBDIRS 				  += trp
 lib@TOUZA_NAME@_la_LIBADD += trp/$(local_name)
 AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_trp)
 endif
+DIST_SUBDIRS			  += trp
 
 if BUILD_nio
 SUBDIRS 				  += nio
 lib@TOUZA_NAME@_la_LIBADD += nio/$(local_name)
 AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_nio)
 endif
+DIST_SUBDIRS			  += nio
 
 if BUILD_ppp
 SUBDIRS 				  += ppp
 lib@TOUZA_NAME@_la_LIBADD += ppp/$(local_name)
 AM_FCFLAGS_MODULE         += $(FC_MODULE_touza_ppp)
 endif
+DIST_SUBDIRS			  += ppp
 
 if BUILD_ami
 SUBDIRS 				  += ami
+DIST_SUBDIRS			  += ami
 lib@TOUZA_NAME@_la_LIBADD += ami/$(local_name)
 AM_FCFLAGS_MODULE         += $(FC_MODULE_touza_ami)
 endif
@@ -75,13 +82,16 @@ endif
 if BUILD_zbt
 SUBDIRS += zbt
 endif
+DIST_SUBDIRS+= zbt
 
 pkgconfigdir	=	$(libdir)/pkgconfig
 pkgconfig_DATA	=	@TOUZA_NAME@.pc
 
 SUBDIRS	+=	m4c
+DIST_SUBDIRS+=	m4c
 
 SUBDIRS	+=	. $(subdirs_extra)
+DIST_SUBDIRS+=	. $(subdirs_extra)
 
 local_name			= libtouza_local.la
 

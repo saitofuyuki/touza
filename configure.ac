@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/10/25 14:05:34 fuyuki configure.ac>
+# Time-stamp: <2025/05/15 07:14:59 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -89,7 +89,7 @@ m4_define([TOUZA_config],
 AC_CONFIG_HEADERS(m4_expand(TOUZA_config))
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([m4c/Makefile])
-AC_CONFIG_FILES([makeshift], [chmod +x makeshift])
+dnl AC_CONFIG_FILES([makeshift], [chmod +x makeshift])
 
 AC_MSG_CHECKING([if enable elemental function])
 AC_ARG_ENABLE([elemental],
@@ -129,7 +129,7 @@ AM_CONDITIONAL([BUILD_div], [false])
 dnl MT_SUB_PACKAGE([nio], [],     [std emu trp div])
 MT_SUB_PACKAGE([nio], [],     [std emu trp])
 MT_SUB_PACKAGE([ami], [],     [std emu nio trp])
-MT_SUB_PACKAGE([zbt], [build],[std nio])
+MT_SUB_PACKAGE([zbt], [no],   [std nio])
 
 AC_ARG_ENABLE([nctcdf],
 [AS_HELP_STRING([--enable-nctcdf], [enable nio/n*c*tcdf features@<:@default=no@:>@])],
@@ -219,6 +219,9 @@ AC_ARG_ENABLE([mod-dependencies],
 AM_CONDITIONAL([enable_module_dependencies], [
   test "x$use_mod_dependencies" != xno \
   && test x"$ax_f90_modext" != xunknown])
+
+AS_IF([test "x$enable_sub_zbt" != xno],
+[AC_MSG_WARN([TOUZA/Zbt will be deleted from TOUZA.  This package still contains it for compatibility.])])
 
 AS_IF([test "x$enable_sub_zbt" != xno],
 [AM_PATH_PYTHON([3.11], ,

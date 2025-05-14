@@ -1,10 +1,10 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2024/08/13 20:03:26 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/04/26 22:57:54 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2024
+! Copyright (C) 2020-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -69,6 +69,7 @@ module TOUZA_Std_mwe
   public get_wni,  get_wni_safe
   public get_gni
   public is_mpi_activated
+  public safe_mpi_init, safe_mpi_finalize
   public show_mpi_type
   public MPI_COMM_WORLD, MPI_COMM_SELF, MPI_COMM_NULL
   public MPI_DATATYPE_NULL, MPI_GROUP_NULL, MPI_UNDEFINED
@@ -267,7 +268,6 @@ contains
           endif
        endif
        if (ierr.eq.0) then
-          ic = MPI_COMM_WORLD
           call MPI_Comm_rank(ic, ir, ierr)
           if (ierr.ne.MPI_SUCCESS) then
              if (VCHECK_FATAL(lv)) then
@@ -507,6 +507,26 @@ contains
 #endif
     return
   end function is_mpi_activated
+!!!_  & safe_mpi_init
+  subroutine safe_mpi_init(ierr)
+    implicit none
+    integer,intent(out) :: ierr
+    logical b
+    call MPI_Initialized(b, ierr)
+    if (ierr.eq.0) then
+       if (.not.b) call MPI_Init(ierr)
+    endif
+  end subroutine safe_mpi_init
+!!!_  & safe_mpi_finalize
+  subroutine safe_mpi_finalize(ierr)
+    implicit none
+    integer,intent(out) :: ierr
+    logical b
+    call MPI_Finalized(b, ierr)
+    if (ierr.eq.0) then
+       if (.not.b) call MPI_Finalize(ierr)
+    endif
+  end subroutine safe_mpi_finalize
 !!!_  & show_mpi_type - check properties of mpi-type
   subroutine show_mpi_type &
        & (ierr, mt, tag, u)
@@ -644,13 +664,60 @@ end module TOUZA_Std_mwe
 #ifdef TEST_STD_MWE
 program test_std_mwe
   use TOUZA_Std_mwe
+  use TOUZA_Std_utl,only: parse_number
   implicit none
   integer ierr
+  integer jarg
+  character(len=128) :: arg
+  integer ktest
+  integer ibase
+  integer icomm, ir, nr, icol
 
-  call init(ierr)
-  ! call init(ierr, disable=.TRUE.)
-  if (ierr.eq.0) call diag(ierr, levv=+10)
-  if (ierr.eq.0) call finalize(ierr, levv=+10)
+  jarg = 1
+  call get_command_argument(jarg, arg, status=ierr)
+  if (ierr.ne.0) arg = '0'
+  call parse_number(ierr, ktest, arg)
+  if (ierr.ne.0) ktest = 0
+  ierr = 0
+  write(*, *) 'test = ', ktest
+
+  icol = 0
+
+  if (ktest.eq.0) then
+     icomm = MPI_COMM_WORLD
+  else if (ktest.lt.0) then
+     icomm = MPI_COMM_NULL
+  else
+     call MPI_Init(ierr)
+     ibase = MPI_COMM_WORLD
+     if (ierr.eq.0) call MPI_Comm_size(ibase, nr, ierr)
+     if (ierr.eq.0) call MPI_Comm_rank(ibase, ir, ierr)
+     if (ierr.eq.0) then
+        if (ktest.eq.1) then
+           if (ir .ge. nr / 2) icol = MPI_UNDEFINED
+        else
+           if (ir .lt. nr / 2) icol = MPI_UNDEFINED
+        endif
+     endif
+     if (ierr.eq.0) call MPI_Comm_split(ibase, icol, ir, icomm, ierr)
+  endif
+
+  if (icol.ne.MPI_UNDEFINED) then
+     ! call init(ierr, disable=.TRUE.)
+     if (icomm.eq.MPI_COMM_WORLD) then
+        call init(ierr)
+     else
+        call init(ierr, icomm=icomm)
+     endif
+     if (ierr.eq.0) call diag(ierr, levv=+10)
+     if (ierr.eq.0) call finalize(ierr, levv=+10)
+  else
+     write(*, *) 'SKIPPED'
+     ierr = 0
+  endif
+
+  call safe_mpi_finalize(ierr)
+
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop

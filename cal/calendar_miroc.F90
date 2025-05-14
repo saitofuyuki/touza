@@ -1,10 +1,10 @@
 !!!_! calendar_miroc.F90 - touza/calendar: miroc compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2022/04/25 11:28:04 fuyuki calendar_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/11 20:57:03 fuyuki calendar_miroc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2011-2022
+! Copyright (C) 2011-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
