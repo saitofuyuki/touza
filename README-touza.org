@@ -15,19 +15,19 @@ Latest *TOUZA* can be obtained at [[https://github.com/saitofuyuki/touza]].
 Unless the package contains configuration file such as =configure=,
 =Makefile.in=, etc, you need to generate these files first.  This
 is a typical case when you are using a git version of the source.
-=autogen.sh= in this package can help you generate them.
+=bootstrap= in this package can help you generate them.
 
-: % sh ./autogen.sh -h       ## show help
-: ./autogen.sh: batch to generate auto-files
+: % sh ./bootstrap -h       ## show help
+: ./bootstrap: batch to generate auto-files
 : :
 : :
-: % sh ./autogen.sh          ## dry-run
-: ./autogen.sh: dry-run
-: If you are sure, run as ./autogen.sh -y
+: % sh ./bootstrap -n          ## dry-run
+: ./bootstrap: dry-run
+: If you are sure, run as ./bootstrap -y
 : :
-: % sh ./autogen.sh -y       ## wet-run
-: % sh ./autogen.sh -y -c    ## wet-run; clear old files
-: % sh ./autogen.sh -y -c -m ## wet-run; clear old files; copy missing files
+: % sh ./bootstrap -y       ## wet-run
+: % sh ./bootstrap -y -c    ## wet-run; clear old files
+: % sh ./bootstrap -y -c -m ## wet-run; clear old files; copy missing files
 
 You need following tools to generate the autotool scripts.  Older
 versions of these tools may work as expected, though not checked.

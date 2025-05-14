@@ -1,9 +1,9 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
 # Created: Jun 7 2020
-# Time-stamp: <2022/11/02 08:02:02 fuyuki autogen.sh>
+# Time-stamp: <2025/05/09 15:47:18 fuyuki bootstrap>
 
-# Copyright (C) 2020-2023
+# Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
@@ -11,21 +11,26 @@
 
 set -u
 
-DRY=T
+DRY=
 OPTS=''
 CLEAR=''
 VERBOSE=''
 copy_missing=''
 help=
 err=0
-args="$*"
+args=''
 while test $# -gt 0
 do
+  case $1 in
+  -n);;
+  -*) args="$args $1";;
+  esac
   case $1 in
   -v) VERBOSE=-v;;
   -c) CLEAR=T;;
   -m) copy_missing=-c;;
-  -y) DRY=;;
+  -n) DRY=n;;
+  -y) DRY=y;;
   -I) OPTS="$OPTS $1 $2"; shift || exit $?;;
   -h) help=T;;
   *)  break;;
@@ -33,20 +38,28 @@ do
   shift
 done
 
+if test x"$DRY$help" = x; then
+  echo "$0: batch to generate auto-files"
+  echo "Need at least one argument to run."
+  echo "Try \`$0 -h' to show help"
+  exit 1
+fi
+
 if test x"$help" != x; then
   echo "$0: batch to generate auto-files"
   echo ""
   echo "Usage: $0 [OPTIONS] [SEARCH PATH...]"
   echo "   -h      show this help"
+  echo "   -n      dry-run"
+  echo "   -y      wet-run"
   echo "   -v      verbose"
   echo "   -c      clear old files"
   echo "   -m      copy missing files"
-  echo "   -y      wet-run"
   echo "   -I DIR  pass as aclocal arguments (multiple)"
   echo ""
   echo "Examples:"
-  echo "  $0 -c -m     # typical case. dry-run"
-  echo "  $0 -c -m -y  # typical case. wet-run"
+  echo "  $0 -n -c -m  # typical case. dry-run"
+  echo "  $0 -y -c -m  # typical case. wet-run"
   exit 0
 fi
 
@@ -59,14 +72,15 @@ test $err -gt 0 && exit 1
 thisd="$(dirname "$0")"
 thisd="$(realpath $thisd)" || exit $?
 
-if test x"$DRY" != x; then
+if test x"$DRY" = xn; then
+  test $# -gt 0 && args="$args $*"
   echo "$0: dry-run"
-  echo "If you are sure, run as $0 -y $args"
+  echo "If you are sure, run as \`$0 -y$args'"
 fi
 
 run ()
 {
-  if test x"$DRY" = x; then
+  if test x"$DRY" = xy; then
     echo ": $*"
     "$@"; err=$?
   else

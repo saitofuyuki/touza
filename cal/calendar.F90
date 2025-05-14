@@ -1,10 +1,10 @@
 !!!_! calendar.F90 - TOUZA/Cal manager
 ! Maintainer: SAITO Fuyuki
 ! Created: May 31 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:24:46 fuyuki calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/12 08:31:56 fuyuki calendar.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2023
+! Copyright (C) 2020-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -74,6 +74,14 @@ module TOUZA_Cal
      module procedure inq_nsec_hour_t, inq_nsec_ahour
   end interface inq_nsec_hour
 
+  interface inq_nyear_period
+     module procedure inq_nyear_period_t
+  end interface inq_nyear_period
+
+  interface inq_nday_period
+     module procedure inq_nday_period_t
+  end interface inq_nday_period
+
   interface conv_cdaysec_csec
      module procedure conv_cdaysec_csec_c, conv_cdaysec_csec_i
      module procedure conv_adaysec_csec_c, conv_adaysec_csec_i
@@ -135,6 +143,7 @@ module TOUZA_Cal
   public :: get_perpetual_date,     set_perpetual_switch
   public :: inq_nday_month,         inq_nday_year,      inq_nmonth_year
   public :: inq_nsec_day,           inq_nsec_minute,    inq_nsec_hour
+  public :: inq_nyear_period,       inq_nday_period
   public :: conv_cdaysec_csec,      conv_time_tsec,     conv_date_cday
   public :: conv_date_dayy,         conv_date_dayy_compat
   public :: conv_calendar_csec,     conv_duration_sec,  conv_csec_string_ppt_off
@@ -584,6 +593,32 @@ contains
     r = inq_nsec_hour_t(cal_date_t(0, 0, 0), jcalh)
     return
   end function inq_nsec_ahour
+
+!!!_  & inq_nyear_period ()
+  integer function inq_nyear_period_t &
+       & (jcalh) &
+       & result (r)
+    use TOUZA_Cal_core,only: inq_nyear_period_core => inq_nyear_period
+    implicit none
+    integer,intent(in),optional :: jcalh
+    integer jc
+    jc = check_id(jcalh)
+    r = inq_nyear_period_core(CALH(jc))
+    return
+  end function inq_nyear_period_t
+
+!!!_  & inq_nday_period ()
+  integer function inq_nday_period_t &
+       & (jcalh) &
+       & result (r)
+    use TOUZA_Cal_core,only: inq_nday_period_core => inq_nday_period
+    implicit none
+    integer,intent(in),optional :: jcalh
+    integer jc
+    jc = check_id(jcalh)
+    r = inq_nday_period_core(CALH(jc))
+    return
+  end function inq_nday_period_t
 
 !!!_  & conv_csec_cdaysec() - calendar[sec] to calendar[day+sec]
   type(cal_daysec_t) function conv_csec_cdaysec &

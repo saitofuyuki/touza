@@ -1,10 +1,10 @@
 !!!_! calendar_core.F90 - TOUZA/Cal core
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:27:04 fuyuki calendar_core.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/12 08:24:35 fuyuki calendar_core.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2011-2023
+! Copyright (C) 2011-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -46,6 +46,7 @@ module TOUZA_Cal_core
   public :: set_perpetual_date,   get_perpetual_date,   set_perpetual_switch
   public :: inq_nday_month,       inq_nday_year,        inq_nmonth_year
   public :: inq_nsec_day,         inq_nsec_minute,      inq_nsec_hour
+  public :: inq_nday_period,      inq_nyear_period
   public :: conv_cdaysec_csec,    conv_csec_cdaysec
   public :: conv_time_tsec,       conv_tsec_time
   public :: conv_cday_date,       conv_date_cday
@@ -500,6 +501,30 @@ contains
     r = primitive_inq_nminute_hour (self % mode, cd)
     return
   end function inq_nminute_hour
+
+!!!_  & inq_nday_period()
+  integer function inq_nday_period &
+       & (self) &
+       & result (r)
+    use TOUZA_Cal_primitive,only: &
+         & primitive_inq_nday_period => inq_nday_period
+    implicit none
+    type(cal_attr_t),intent(in)          :: self
+    r = primitive_inq_nday_period (self % mode)
+    return
+  end function inq_nday_period
+
+!!!_  & inq_nyear_period()
+  integer function inq_nyear_period &
+       & (self) &
+       & result (r)
+    use TOUZA_Cal_primitive,only: &
+         & primitive_inq_nyear_period => inq_nyear_period
+    implicit none
+    type(cal_attr_t),intent(in)          :: self
+    r = primitive_inq_nyear_period (self % mode)
+    return
+  end function inq_nyear_period
 
 !!!_  & conv_csec_cdaysec()
   type(cal_daysec_t) function conv_csec_cdaysec_c &

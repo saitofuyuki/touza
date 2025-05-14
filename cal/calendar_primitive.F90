@@ -1,10 +1,10 @@
 !!!_! calendar_primitive.F90 - TOUZA/Cal primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 22 2011
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:26:13 fuyuki calendar_primitive.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/12 08:24:50 fuyuki calendar_primitive.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2011-2023
+! Copyright (C) 2011-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -76,6 +76,8 @@ module TOUZA_Cal_primitive
      integer :: nsec_hour = 0
      integer :: nmin_hour = 0
      integer :: nsec_min  = 0
+     integer :: nyear_period = 0    !!   number of years within a leap cycle (400 years for Gregorian)
+     integer :: nday_period = 0     !!   number of days within a leap cycle  (146097 days for Gregorian)
   end type cal_prop_t
 !!!_   + notes
 !!       nday_mon (0) > 0 if constant else 0
@@ -101,6 +103,7 @@ module TOUZA_Cal_primitive
 
   public :: inq_nday_month,    inq_nday_year,   inq_nmonth_year
   public :: inq_nsec_day,      inq_nsec_minute, inq_nsec_hour, inq_nminute_hour
+  public :: inq_nday_period,   inq_nyear_period
   public :: get_nday_months
   public :: conv_cdaysec_csec_i, conv_cdaysec_csec_c
   public :: conv_csec_cdaysec_i, conv_csec_cdaysec_c
@@ -264,6 +267,7 @@ contains
     type(cal_prop_t),intent(out) :: prop
     integer,         intent(in)  :: mode
     integer m, l
+    integer nt
 
     prop%nsec_min  = 60
     prop%nmin_hour = 60
@@ -275,10 +279,14 @@ contains
        ! nmon_year is valid
        prop%nmon_year = 12
        prop%nday_year = (prop%nday_mon(0, 1) * prop%nmon_year)
+       prop%nyear_period = 1
+       prop%nday_period = prop%nday_year(1)
     else if (mode .eq. p_ideal) then
        prop%nday_mon(:,:)  = 30
        prop%nmon_year = 12
        prop%nday_year = (prop%nday_mon(0, 1) * prop%nmon_year)
+       prop%nyear_period = 1
+       prop%nday_period = prop%nday_year(1)
     else if ((mode .eq. p_grego_i) .or. (mode .eq. p_grego_l)) then
        prop%nday_mon(0:12, 1) = (/0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/)
        prop%nday_mon(:,    2) = prop%nday_mon(:, 1)
@@ -288,6 +296,16 @@ contains
        prop%nmon_year = 12
        prop%nday_year(1) = sum(prop%nday_mon(1:12, 1))
        prop%nday_year(2) = sum(prop%nday_mon(1:12, 2))
+
+       if (mode .eq. p_grego_l) then
+          prop%nyear_period = 400
+          nt = (prop%nyear_period / 4) - (prop%nyear_period / 100) + (prop%nyear_period / 400)
+          prop%nday_period = prop%nday_year(1) * (prop%nyear_period - nt) &
+               &           + prop%nday_year(2) * nt
+       else
+          prop%nyear_period = 1
+          prop%nday_period = prop%nday_year(1)
+       endif
     else
 !     insert here user definition of calendar
     endif
@@ -307,6 +325,7 @@ contains
       write(DEBUG, '(I4, 2x, 12I4)')  prop%nday_mon (:, 2)
       write(DEBUG, '(I4, 2x, 12I4)')  prop%cum_day_mon (:, 1)
       write(DEBUG, '(I4, 2x, 12I4)')  prop%cum_day_mon (:, 2)
+      write(DEBUG, '(I0, 1x, I0)')    prop%nday_period, prop%nyear_period
 #   endif /* DEBUG */
   end subroutine init_prop
 
@@ -345,6 +364,26 @@ contains
 !     ! enddo
 
 !   end subroutine set_angular_months
+
+!!!_ & inq_nday_period () - return number of days in a leap-cycle period
+  _ELEMENTAL integer function inq_nday_period &
+       & (mode) &
+       & result (r)
+    implicit none
+    integer,intent(in) :: mode
+    r  = props(mode) % nday_period
+    return
+  end function inq_nday_period
+
+!!!_ & inq_nyear_period () - return number of years in a leap-cycle period
+  _ELEMENTAL integer function inq_nyear_period &
+       & (mode) &
+       & result (r)
+    implicit none
+    integer,intent(in) :: mode
+    r  = props(mode) % nyear_period
+    return
+  end function inq_nyear_period
 
 !!!_ & inq_nday_month () - return number of days in the month of the date
   _ELEMENTAL integer function inq_nday_month &
