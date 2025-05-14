@@ -1,3 +1,14 @@
+Release-1.16 / 2025-05-15
+=========================
+
+  * Cleaned package structure.
+  * Import developments for miroc7+ils coupling.
+  * cal: introduced inq_nday_period, inq_nday_period.
+  * ppp: [IMPORTANT] introduced base communicator argument.
+  * emu: SETBCM introduced to set base communicator.
+  * std: (mwe) [FATAL] invalid communicator substitution.
+  * std: (utl) some binary128 variations.
+
 Release-1.15 / 2025-03-06
 =========================
 

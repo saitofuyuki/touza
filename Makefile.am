@@ -30,17 +30,17 @@ AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_std)
 
 if BUILD_emu
 SUBDIRS 				  += emu
-DIST_SUBDIRS			  += emu
 lib@TOUZA_NAME@_la_LIBADD += emu/$(local_name)
 AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_emu)
 endif
+DIST_SUBDIRS			  += emu
 
 if BUILD_cal
 SUBDIRS 				  += cal
-DIST_SUBDIRS			  += cal
 lib@TOUZA_NAME@_la_LIBADD += cal/$(local_name)
 AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_cal)
 endif
+DIST_SUBDIRS			  += cal
 
 # if BUILD_div
 # if BUILD_WITH_MPI
@@ -53,24 +53,24 @@ endif
 
 if BUILD_trp
 SUBDIRS 				  += trp
-DIST_SUBDIRS			  += trp
 lib@TOUZA_NAME@_la_LIBADD += trp/$(local_name)
 AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_trp)
 endif
+DIST_SUBDIRS			  += trp
 
 if BUILD_nio
 SUBDIRS 				  += nio
-DIST_SUBDIRS			  += nio
 lib@TOUZA_NAME@_la_LIBADD += nio/$(local_name)
 AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_nio)
 endif
+DIST_SUBDIRS			  += nio
 
 if BUILD_ppp
 SUBDIRS 				  += ppp
-DIST_SUBDIRS			  += ppp
 lib@TOUZA_NAME@_la_LIBADD += ppp/$(local_name)
 AM_FCFLAGS_MODULE         += $(FC_MODULE_touza_ppp)
 endif
+DIST_SUBDIRS			  += ppp
 
 if BUILD_ami
 SUBDIRS 				  += ami
@@ -81,8 +81,8 @@ endif
 
 if BUILD_zbt
 SUBDIRS += zbt
-DIST_SUBDIRS+= zbt
 endif
+DIST_SUBDIRS+= zbt
 
 pkgconfigdir	=	$(libdir)/pkgconfig
 pkgconfig_DATA	=	@TOUZA_NAME@.pc

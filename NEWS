@@ -6,6 +6,14 @@ TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
+* Changes in 1.16
+** Developments for miroc7+ils coupling
+*** Improved and fixed base-communicator argument management.
+Agents control in ppp can be based on bootstrap MPI communicator
+other than MPI_COMM_WORLD.  This design was already implemented,
+however there is a bug to disturb the feature.
+*** Functions for leap-cycle introduced.
+*** Zbt is still included in the pacakge but disabled by default.
 * Release of 1.15 --- final revision before touza-zbt separation
 This is the final revision which bundles touza-zbt, python interface
 of TOUZA library.  From next revision (1.16 or later), touza-zbt will
