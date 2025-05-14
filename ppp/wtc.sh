@@ -1,6 +1,6 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2023/03/16 20:22:22 fuyuki wtc.sh>
+# Time-stamp: <2025/05/10 15:10:54 fuyuki wtc.sh>
 
 # Copyright (C) 2022
 #           Japan Agency for Marine-Earth Science and Technology
@@ -10,6 +10,7 @@
 this=$0
 base=$(basename $this)
 root=${base%.*}
+mpirun=
 
 main ()
 {
@@ -22,6 +23,7 @@ main ()
     (-r) rainbow=$2; shift;;
     (-t) exp=$2; shift;;
     (-d) testd=$2; shift;;
+    (-M) mpirun=$2; shift;;
     (-*) echo "unknown argument $1" >&2; return 1;;
     (*)  break
     esac
@@ -30,6 +32,7 @@ main ()
   # parameters (executables)
   test x${testd-} = x && testd=out$root.$$
   mkdir -p $testd
+  test x${mpirun:-} = x && mpirun=mpirun
 
   ntotal=0
   app=$testd/app
@@ -109,7 +112,7 @@ run ()
        fi;;
     esac
 
-  mpirun --oversubscribe --tag-output --app $afile > log.out 2> log.err
+  $mpirun --oversubscribe --tag-output --app $afile > log.out 2> log.err
   cd $oldpwd
   return 0
 }

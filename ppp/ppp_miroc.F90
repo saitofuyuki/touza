@@ -1,10 +1,10 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:48:23 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/10 23:05:22 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -63,15 +63,17 @@ module TOUZA_Ppp_miroc
   end interface terminate
 !!!_  - interfaces (external)
   interface
-     subroutine XCKINI(AFFILS, N, GREETING)
+     subroutine XCKINI(AFFILS, N, GREETING, ICROOT)
        implicit none
        character(len=*),intent(in) :: AFFILS(*) ! array of agents I belong to.
        integer,         intent(in) :: N
+       integer,optional,intent(in) :: ICROOT
        external :: greeting
      end subroutine XCKINI
-     subroutine XCKINI_legacy(HDRVR, GREETING)
+     subroutine XCKINI_legacy(HDRVR, GREETING, ICROOT)
        implicit none
        character(len=*),intent(in) :: HDRVR         ! sequence of <CI> I belong to.
+       integer,optional,intent(in) :: ICROOT
        external :: greeting
      end subroutine XCKINI_legacy
      subroutine MMGetColor(ICLR, NCLR)
@@ -123,8 +125,9 @@ module TOUZA_Ppp_miroc
      subroutine XMabort0()
        implicit none
      end subroutine XMabort0
-     subroutine XMFinal()
+     subroutine XMFinal(OBARR)
        implicit none
+       logical,optional,intent(in) :: OBARR  ! final barrier switch
      end subroutine XMFinal
   end interface
 !!!_  - private
@@ -200,7 +203,7 @@ contains
           if (ierr.eq.0) call ppp_init(ierr, u, levv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
        if (present(affils)) then
-          if (ierr.eq.0) call init_batch(ierr, affils(:), greeting)
+          if (ierr.eq.0) call init_batch(ierr, affils(:), greeting, icomm=icomm)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -290,11 +293,12 @@ contains
 !!!_ + init subcontracts
 !!!_  & init_batch - XCKINI compatible procedure
   subroutine init_batch &
-       & (ierr, affils, greeting)
+       & (ierr, affils, greeting, icomm)
     use TOUZA_Std,only: set_defu
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: affils(:)
+    integer,optional,intent(in)  :: icomm
     optional :: greeting
     interface
        subroutine greeting(jfpar)
@@ -320,8 +324,10 @@ contains
          & call init_rainbow(ierr, ncolor, icolor, nrank, irank, ifpar, jfpar)
     if (ierr.eq.0) &
          call init_sysi_colored(ierr, ifpar, jfpar, ncolor, icolor)
-    if (ierr.eq.0) &
-         call init_comms(ierr, affils(:), ncolor, icolor, nrank, irank, ifpar, jfpar)
+    if (ierr.eq.0) then
+       call init_comms &
+            & (ierr, affils(:), ncolor, icolor, nrank, irank, ifpar, jfpar, icomm)
+    endif
     if (ierr.eq.0) &
          call init_king(ierr, ifpar, jfpar)
 
@@ -364,12 +370,18 @@ contains
     integer,intent(out) :: ierr
     integer,intent(out) :: ifpar, jfpar
     integer,intent(in)  :: nrank, irank
+    integer jerri, jerro
 
     ierr = 0
+
     call update_ranks(nr=nrank, ir=irank)
-    if (ierr.eq.0) call open_sysin(ierr)
-    if (ierr.eq.0) call open_sysout(ierr)
-    if (ierr.eq.0) call REWNML(ifpar, jfpar)
+    call open_sysin(jerri)
+    call open_sysout(jerro)
+    call REWNML(ifpar, jfpar)
+
+    if (jerro.ne.0) ierr = jerro
+    if (jerri.ne.0) ierr = jerri
+
     return
   end subroutine init_sysio
 
@@ -441,7 +453,7 @@ contains
        &  ncolor, icolor, &
        &  nrank,  irank,  ifpar,  jfpar, icomm)
     use MPI,only: MPI_COMM_WORLD
-    use TOUZA_Std,only: choice
+    use TOUZA_Std,only: choice, get_comm
     use TOUZA_Ppp,only: lagent, &
          & new_agent_color, new_agent_derived, &
          & new_agent_family, new_agent_root
@@ -457,7 +469,12 @@ contains
 
     ierr = 0
 
-    ic = choice(MPI_COMM_WORLD, icomm)
+    if (present(icomm)) then
+       ic = icomm
+    else
+       call get_comm(ierr, ic)
+    endif
+
     if (ierr.eq.0) call new_agent_root(ierr, ic)
     if (ierr.eq.0) call new_agent_color(ierr, icolor, 'X')
     if (ierr.eq.0) call new_agent_family(ierr, affils(:))
@@ -704,7 +721,11 @@ contains
     integer jfpar
     if (present(msg)) then
        call get_sysu(syso=jfpar)
-       write(jfpar, *) trim(msg)
+       if (jfpar.ge.0) then
+          write(jfpar, *) trim(msg)
+       else
+          write(*, *) trim(msg)
+       endif
     endif
     if (nproc_quit .le. 0) then ! serial run
        call MSGBOX('Abort Serial Execution.')
@@ -744,23 +765,27 @@ end module TOUZA_Ppp_Miroc
 !!!_* /nonmodule/ interfaces
 !!!_ + xmcomm
 !!!_  & XCKINI
-subroutine XCKINI(AFFILS, N, GREETING)
+subroutine XCKINI(AFFILS, N, GREETING, ICROOT)
   use TOUZA_Ppp_miroc,only: init, diag
   implicit none
   character(len=*),intent(in) :: AFFILS(*) ! array of agents I belong to.
   integer,         intent(in) :: N
+  integer,optional,intent(in) :: ICROOT
   external :: greeting
   integer jerr
-  call init(jerr, levv=+9, stdv=+9, affils=AFFILS(1:N), greeting=greeting)
+  call init &
+       & (jerr, levv=+9, stdv=+9, &
+       &  icomm=ICROOT, affils=AFFILS(1:N), greeting=greeting)
   call diag(jerr, levv=+2)
   return
 end subroutine XCKINI
 !!!_  & XCKINI_legacy
-subroutine XCKINI_legacy(HDRVR, GREETING)
+subroutine XCKINI_legacy(HDRVR, GREETING, ICROOT)
   use TOUZA_Ppp_miroc,only: init, diag, affils_legacy, terminate
   use TOUZA_Ppp_amng, only: lagent
   implicit none
   character(len=*),intent(in) :: HDRVR         ! sequence of <CI> I belong to.
+  integer,optional,intent(in) :: ICROOT
   external :: greeting
   integer jerr
   integer na
@@ -774,7 +799,9 @@ subroutine XCKINI_legacy(HDRVR, GREETING)
      return
   endif
 
-  call init(jerr, levv=+9, stdv=+9, affils=affils(1:na), greeting=greeting)
+  call init &
+       & (jerr, levv=+9, stdv=+9, &
+       &  icomm=ICROOT, affils=affils(1:na), greeting=greeting)
   call diag(jerr, levv=+2)
   return
 end subroutine XCKINI_legacy
@@ -912,12 +939,14 @@ subroutine XMabort0
   call terminate(1)
 end subroutine XMabort0
 !!!_  & XMFinal (XMquit entry)
-subroutine XMFinal()
+subroutine XMFinal(OBARR)
   use MPI,only: MPI_Barrier, MPI_Finalize, MPI_Finalized
   use TOUZA_Ppp_miroc,only: nproc_quit, icomm_quit, finalize
+  use TOUZA_Std,only: choice
   implicit none
+  logical,optional,intent(in) :: OBARR  ! final barrier switch
   integer ierr
-  logical ocheck
+  logical ocheck, bb
 
   ierr = 0
   if (nproc_quit .le. 0) then ! serial run
@@ -927,7 +956,8 @@ subroutine XMFinal()
      call MSGBOX('End Parallel Execution.')
 
      call CLCSTR('Comm.')
-     call MPI_Barrier(icomm_quit, ierr)
+     bb = choice(.TRUE., obarr)
+     if (bb) call MPI_Barrier(icomm_quit, ierr)
 #ifdef OPT_MPE
      CALL MX_Fin_MPI
 #endif
@@ -942,6 +972,7 @@ end subroutine XMFinal
 program test_ppp_miroc
   use TOUZA_Ppp,only: diag_cache
   use TOUZA_Ppp_miroc
+  use MPI
   implicit none
   integer ierr
 # if TEST_PPP_MIROC == 1
@@ -951,42 +982,77 @@ program test_ppp_miroc
 # else
 #   define _DRIVER 'AB0C1OO0O1'
 # endif
+  integer nrw, irw
+
   integer kaa, koo
   integer kaw, kow
   integer jfpar
   integer icomma, nra, ira
   integer icommo, nro, iro
   integer jdmy
+  integer,parameter :: NRLIM = 17
+  integer ibase, icomm, jseq, icol
   external greeting
   ierr = 0
 
-  call XCKINI_legacy(_DRIVER, greeting)
-  call gen_agent_union(jdmy, 'W', (/'A', 'O'/), 2)
-  call gen_agent_union(jdmy, 'H', (/'@'/), 1)
+  call MPI_Init(jdmy)
+  ibase = MPI_COMM_WORLD
+  call MPI_Comm_size(ibase, nrw, jdmy)
+  call MPI_Comm_rank(ibase, irw, jdmy)
+  if (nrw.gt.NRLIM) then
+     jseq = irw - (nrw - nrlim) / 2
+     icol = 0
+     if (jseq.lt.0.or.jseq.ge.NRLIM) icol = MPI_UNDEFINED
+     if (ierr.eq.0) call MPI_Comm_split(ibase, icol, jseq, icomm, jdmy)
+     ibase = icomm
+  endif
 
-  call getjfp(JFPAR)
-  call diag_agent_maps(ierr, JFPAR)
+  if (icol.ne.MPI_UNDEFINED) then
+     call XCKINI_legacy(_DRIVER, greeting, icomm)
+     call gen_agent_union(jdmy, 'W', (/'A', 'O'/), 2)
+     call gen_agent_union(jdmy, 'H', (/'@'/), 1)
 
-  call XMGETK('AM', ' ', kaa, 'a root')
-  call XMGETK('AM', 'W', kaw, 'a root')
-  call XMGETK('OM', ' ', koo, 'o root')
-  call XMGETK('OM', 'W', kow, 'o root')
+     call getjfp(JFPAR)
+     call diag_agent_maps(ierr, JFPAR)
 
-  write(jfpar, *) 'king:a/w', kaw
-  write(jfpar, *) 'king:o/@', koo
-  write(jfpar, *) 'king:a/@', kaa
-  write(jfpar, *) 'king:o/w', kow
+     call XMGETK('AM', ' ', kaa, 'a root')
+     call XMGETK('AM', 'W', kaw, 'a root')
+     call XMGETK('OM', ' ', koo, 'o root')
+     call XMGETK('OM', 'W', kow, 'o root')
 
-  call XMIcomm(icomma, 'A')
-  call XMproc(NRA, IRA, 'A')
-  call XMIcomm(icommo, 'O')
-  call XMproc(NRO, IRO, 'O')
+     if (jfpar.ge.0) then
+        write(jfpar, *) 'king:a/w', kaw
+        write(jfpar, *) 'king:o/@', koo
+        write(jfpar, *) 'king:a/@', kaa
+        write(jfpar, *) 'king:o/w', kow
+        call flush(jfpar)
+     else
+        write(*, *) 'king:a/w', kaw
+        write(*, *) 'king:o/@', koo
+        write(*, *) 'king:a/@', kaa
+        write(*, *) 'king:o/w', kow
+     endif
 
-  write(jfpar, *) 'A:', ira, nra, icomma
-  write(jfpar, *) 'O:', iro, nro, icommo
+     call XMIcomm(icomma, 'A')
+     call XMproc(NRA, IRA, 'A')
+     call XMIcomm(icommo, 'O')
+     call XMproc(NRO, IRO, 'O')
 
-  call diag_cache(ierr)
-  call XMfinal()
+     if (jfpar.ge.0) then
+        write(jfpar, *) 'A', NRA, IRA, icomma
+        write(jfpar, *) 'O', NRO, IRO, icommo
+        call flush(jfpar)
+     else
+        write(*, *) 'A', NRA, IRA, icomma
+        write(*, *) 'O', NRO, IRO, icommo
+     endif
+
+     call diag_cache(ierr)
+     call XMfinal(.FALSE.)
+  else
+     call MPI_Finalize(jdmy)
+  endif
+
 
   stop
 end program test_ppp_miroc
@@ -1003,6 +1069,7 @@ end subroutine greeting
 subroutine MSGBOX(A)
   implicit none
   character(len=*),intent(in) :: A
+  write(*, *) 'msgbox:', trim(A)
 end subroutine MSGBOX
 subroutine CLCSTR(A)
   implicit none

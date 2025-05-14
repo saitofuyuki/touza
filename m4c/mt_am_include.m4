@@ -81,7 +81,9 @@ ${AX_DOLLAR}(DIFF_SOURCE_TARGETS):
 ])
 
 MT_ADD_RECURSIVE_AM_MACRO_STATIC([install-mod],
-[if INSTALL_MODULES
+[
+install_sh_MODULE = ${AX_DOLLAR}(install_sh_DATA) -C
+if INSTALL_MODULES
 	@${AX_DOLLAR}(NORMAL_INSTALL)
 	if test -z '${AX_DOLLAR}(moddir)'; then false; \\
 	else \\
@@ -91,7 +93,7 @@ MT_ADD_RECURSIVE_AM_MACRO_STATIC([install-mod],
 		done; \\
 		for modfile in *.${AX_DOLLAR}(FC_MODEXT); \\
 		do test -e ${AX_DOLLAR}${AX_DOLLAR}modfile || continue; \\
-		${AX_DOLLAR}(install_sh_DATA) -t ${AX_DOLLAR}(DESTDIR)${AX_DOLLAR}(moddir) ${AX_DOLLAR}${AX_DOLLAR}modfile; \\
+		${AX_DOLLAR}(install_sh_MODULE) -t ${AX_DOLLAR}(DESTDIR)${AX_DOLLAR}(moddir) ${AX_DOLLAR}${AX_DOLLAR}modfile; \\
 		echo "${AX_DOLLAR}${AX_DOLLAR}modfile" >> ${AX_DOLLAR}(LIST_MODFILES); \\
 		done; \\
 	fi

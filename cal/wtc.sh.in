@@ -1,8 +1,8 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2021/01/26 22:15:56 fuyuki wtc.sh.in>
+# Time-stamp: <2025/05/15 07:03:00 fuyuki wtc.sh.in>
 
-# Copyright (C) 2020, 2021
+# Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -87,7 +87,7 @@ chk_miroc ()
   *.p) CAL="$CAL OPERPT=T, ";;
   esac
 
-  tbgn=1 tend=9
+  tbgn=1 tend=11
 
   test $tstt -eq 0 && tstt=$tbgn
   test $tstp -eq 0 && tstp=$tend
@@ -118,18 +118,22 @@ chk_miroc ()
       echo "not ok $t - $descr"
       continue
     fi
-    time $ocmd < "$sysin" > "$olog" 2>&1
-    if chk old "$olog" "$ores"; then :; else
-      echo "not ok $t - $descr"
-      continue
-    fi
+    if test $t -lt 10; then
+      time $ocmd < "$sysin" > "$olog" 2>&1
+      if chk old "$olog" "$ores"; then :; else
+        echo "not ok $t - $descr"
+        continue
+      fi
 
-    if cmp "$ores" "$nres"; then
-      descr="consistent"
-      echo "ok $t - $descr"
+      if cmp "$ores" "$nres"; then
+        descr="consistent"
+        echo "ok $t - $descr"
+      else
+        descr="inconsistent"
+        echo "not ok $t - $descr"
+      fi
     else
-      descr="inconsistent"
-      echo "not ok $t - $descr"
+      echo "ok $t - $descr"
     fi
   done
   return 0

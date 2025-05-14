@@ -1,10 +1,10 @@
 !!!_! emu_usi.F90 - touza/emu usysio emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2024/02/01 11:12:21 fuyuki emu_usi.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/09 14:40:27 fuyuki emu_usi.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2024
+! Copyright (C) 2020-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -66,6 +66,11 @@ module TOUZA_Emu_usi
        integer,intent(in) :: IFILE, JFILE
      end subroutine SETNML
 
+     subroutine SETBCM(MYCOMM)
+       implicit none
+       integer,intent(in) :: MYCOMM
+     end subroutine SETBCM
+
      subroutine SETCLR(MYCOLR)
        implicit none
        integer,intent(in) :: MYCOLR
@@ -110,7 +115,7 @@ module TOUZA_Emu_usi
   public get_sysu
   public is_locked_rewind, rewind_lock, rewind_unlock
   public show_lock_status
-  public SETNML, SETCLR, SETRNK, SETSIZ
+  public SETNML, SETBCM, SETCLR, SETRNK, SETSIZ
   public OPNNML, REWNML, GETIFP, GETJFP
 contains
 !!!_ + common interfaces
@@ -670,6 +675,16 @@ subroutine GETJFP(JFPAR)
   call get_sysu(syso=JFPAR)
   RETURN
 END subroutine GETJFP
+
+!!!_ + SETBCM - set base communicator
+subroutine SETBCM(MYCOMM)
+  use TOUZA_Emu_usi,only: usi_init=>init
+  implicit none
+  integer,intent(in) :: MYCOMM
+  integer jerr
+  call usi_init(jerr, icomm=MYCOMM)
+  return
+end subroutine SETBCM
 
 !!!_ + SETNML - set SYSIN, SYSOUT logical unit num.
 subroutine SETNML(IFILE, JFILE)
