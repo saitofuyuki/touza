@@ -17,17 +17,16 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2024/09/03 22:36:32 fuyuki Makefile.am>
+# Time-stamp: <2025/05/09 15:42:22 fuyuki Makefile.am>
 
-# Copyright (C) 2020-2024
+# Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Fri Mar  7 10:37:52 JST 2025
-
+# from AX_AM_MACROS_STATIC on Thu May 15 08:12:17 JST 2025
 
 
 
@@ -122,6 +121,7 @@ target_triplet = @target@
 # if BUILD_div
 # if BUILD_WITH_MPI
 # SUBDIRS 				  += div
+# DIST_SUBDIRS			  += div
 # lib@TOUZA_NAME@_la_LIBADD += div/$(local_name)
 # AM_FCFLAGS_MODULE		  += $(FC_MODULE_touza_div)
 # endif
@@ -136,9 +136,10 @@ target_triplet = @target@
 @BUILD_ppp_TRUE@am__append_17 = ppp/$(local_name)
 @BUILD_ppp_TRUE@am__append_18 = $(FC_MODULE_touza_ppp)
 @BUILD_ami_TRUE@am__append_19 = ami
-@BUILD_ami_TRUE@am__append_20 = ami/$(local_name)
-@BUILD_ami_TRUE@am__append_21 = $(FC_MODULE_touza_ami)
-@BUILD_zbt_TRUE@am__append_22 = zbt
+@BUILD_ami_TRUE@am__append_20 = ami
+@BUILD_ami_TRUE@am__append_21 = ami/$(local_name)
+@BUILD_ami_TRUE@am__append_22 = $(FC_MODULE_touza_ami)
+@BUILD_zbt_TRUE@am__append_23 = zbt
 check_PROGRAMS = test_touza$(EXEEXT)
 @NEVER_TRUE@EXTRA_PROGRAMS = dummy_never_built$(EXEEXT)
 subdir = .
@@ -157,7 +158,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = touza_config.h
-CONFIG_CLEAN_FILES = makeshift touza.pc
+CONFIG_CLEAN_FILES = touza.pc
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -190,7 +191,7 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(pkgconfigdir)" \
 LTLIBRARIES = $(lib_LTLIBRARIES)
 lib@TOUZA_NAME@_la_DEPENDENCIES = std/$(local_name) $(am__append_5) \
 	$(am__append_8) $(am__append_11) $(am__append_14) \
-	$(am__append_17) $(am__append_20)
+	$(am__append_17) $(am__append_21)
 am__objects_1 =
 am_lib@TOUZA_NAME@_la_OBJECTS = touza.lo $(am__objects_1)
 lib@TOUZA_NAME@_la_OBJECTS = $(am_lib@TOUZA_NAME@_la_OBJECTS)
@@ -209,7 +210,6 @@ dummy_never_built_LDADD = $(LDADD)
 am_test_touza_OBJECTS = test_touza-touza.$(OBJEXT)
 test_touza_OBJECTS = $(am_test_touza_OBJECTS)
 test_touza_DEPENDENCIES = $(lib_LTLIBRARIES)
-SCRIPTS = $(noinst_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -307,10 +307,9 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-DIST_SUBDIRS = std emu cal trp nio ppp ami zbt m4c . @subdirs_extra@
 am__DIST_COMMON = $(srcdir)/Makedep.inc $(srcdir)/Makefile.in \
-	$(srcdir)/makeshift.in $(srcdir)/touza.pc.in \
-	$(srcdir)/touza_config.h.in $(top_srcdir)/aminclude_static.am \
+	$(srcdir)/touza.pc.in $(srcdir)/touza_config.h.in \
+	$(top_srcdir)/aminclude_static.am \
 	$(top_srcdir)/build-aux/ar-lib $(top_srcdir)/build-aux/compile \
 	$(top_srcdir)/build-aux/config.guess \
 	$(top_srcdir)/build-aux/config.sub \
@@ -592,7 +591,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I m4c
-EXTRA_DIST = autogen.sh README-touza.org LICENSE NOTICE \
+EXTRA_DIST = bootstrap README-touza.org LICENSE NOTICE \
 	$(AUTOREVISION_cache) $(AUTOREVISION_h)
 BUILD_AUX = $(top_srcdir)/build-aux
 CLEANFILES = $(noinst_bin_SCRIPTS)
@@ -605,9 +604,10 @@ AM_CPPFLAGS = -I$(top_srcdir)
 AM_FCFLAGS_DEP = '-MT$@' -MD -MP -MF $*.dep
 AM_FCFLAGS_MODULE = $(FC_MODULE_touza_std) $(am__append_6) \
 	$(am__append_9) $(am__append_12) $(am__append_15) \
-	$(am__append_18) $(am__append_21)
+	$(am__append_18) $(am__append_22)
 COPY_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=copy-%)
 DIFF_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=diff-%)
+install_sh_MODULE = $(install_sh_DATA) -C
 switch_DATA = 
 include_HEADERS = touza.h $(CONFIG_HEADER)
 lib_LTLIBRARIES = lib@TOUZA_NAME@.la
@@ -615,13 +615,14 @@ lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
 lib@TOUZA_NAME@_la_LDFLAGS = $(lib@TOUZA_NAME@_version) \
 	$(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 lib@TOUZA_NAME@_version = 
-noinst_SCRIPTS = makeshift
 SUBDIRS = std $(am__append_4) $(am__append_7) $(am__append_10) \
 	$(am__append_13) $(am__append_16) $(am__append_19) \
-	$(am__append_22) m4c . $(subdirs_extra)
+	$(am__append_23) m4c . $(subdirs_extra)
+DIST_SUBDIRS = std emu cal trp nio ppp $(am__append_20) zbt m4c . \
+	$(subdirs_extra)
 lib@TOUZA_NAME@_la_LIBADD = std/$(local_name) $(am__append_5) \
 	$(am__append_8) $(am__append_11) $(am__append_14) \
-	$(am__append_17) $(am__append_20)
+	$(am__append_17) $(am__append_21)
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = @TOUZA_NAME@.pc
 local_name = libtouza_local.la
@@ -692,8 +693,6 @@ $(srcdir)/touza_config.h.in: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f touza_config.h stamp-h1
-makeshift: $(top_builddir)/config.status $(srcdir)/makeshift.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
 touza.pc: $(top_builddir)/config.status $(srcdir)/touza.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 
@@ -1173,8 +1172,7 @@ check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) check-recursive
-all-am: Makefile $(LTLIBRARIES) $(SCRIPTS) $(DATA) $(HEADERS) \
-		touza_config.h
+all-am: Makefile $(LTLIBRARIES) $(DATA) $(HEADERS) touza_config.h
 install-EXTRAPROGRAMS: install-libLTLIBRARIES
 
 install-checkPROGRAMS: install-libLTLIBRARIES
@@ -1389,7 +1387,7 @@ install-mod-am:
 @INSTALL_MODULES_TRUE@		done; \
 @INSTALL_MODULES_TRUE@		for modfile in *.$(FC_MODEXT); \
 @INSTALL_MODULES_TRUE@		do test -e $$modfile || continue; \
-@INSTALL_MODULES_TRUE@		$(install_sh_DATA) -t $(DESTDIR)$(moddir) $$modfile; \
+@INSTALL_MODULES_TRUE@		$(install_sh_MODULE) -t $(DESTDIR)$(moddir) $$modfile; \
 @INSTALL_MODULES_TRUE@		echo $$modfile >> $(LIST_MODFILES); \
 @INSTALL_MODULES_TRUE@		done; \
 @INSTALL_MODULES_TRUE@	fi

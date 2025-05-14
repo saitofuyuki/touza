@@ -27,7 +27,7 @@
 #
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Fri Mar  7 10:37:52 JST 2025
+# from AX_AM_MACROS_STATIC on Thu May 15 08:12:17 JST 2025
 
 
 
@@ -604,6 +604,7 @@ AM_FCFLAGS_DEP = '-MT$@' -MD -MP -MF $*.dep
 AM_FCFLAGS_MODULE = 
 COPY_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=copy-%)
 DIFF_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=diff-%)
+install_sh_MODULE = $(install_sh_DATA) -C
 switch_DATA = 
 include_HEADERS = touza_std.h
 noinst_LTLIBRARIES = libtouza_local.la
@@ -1361,7 +1362,7 @@ install-mod-am:
 @INSTALL_MODULES_TRUE@		done; \
 @INSTALL_MODULES_TRUE@		for modfile in *.$(FC_MODEXT); \
 @INSTALL_MODULES_TRUE@		do test -e $$modfile || continue; \
-@INSTALL_MODULES_TRUE@		$(install_sh_DATA) -t $(DESTDIR)$(moddir) $$modfile; \
+@INSTALL_MODULES_TRUE@		$(install_sh_MODULE) -t $(DESTDIR)$(moddir) $$modfile; \
 @INSTALL_MODULES_TRUE@		echo $$modfile >> $(LIST_MODFILES); \
 @INSTALL_MODULES_TRUE@		done; \
 @INSTALL_MODULES_TRUE@	fi

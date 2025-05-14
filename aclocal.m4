@@ -12894,7 +12894,7 @@ m4_define([lt_dict_filter],
 
 # ltversion.m4 -- version numbers			-*- Autoconf -*-
 #
-#   Copyright (C) 2004, 2011-2019, 2021-2022 Free Software Foundation,
+#   Copyright (C) 2004, 2011-2019, 2021-2024 Free Software Foundation,
 #   Inc.
 #   Written by Scott James Remnant, 2004
 #
@@ -12904,15 +12904,15 @@ m4_define([lt_dict_filter],
 
 # @configure_input@
 
-# serial 4245 ltversion.m4
+# serial 4441 ltversion.m4
 # This file is part of GNU Libtool
 
-m4_define([LT_PACKAGE_VERSION], [2.4.7])
-m4_define([LT_PACKAGE_REVISION], [2.4.7])
+m4_define([LT_PACKAGE_VERSION], [2.5.4])
+m4_define([LT_PACKAGE_REVISION], [2.5.4])
 
 AC_DEFUN([LTVERSION_VERSION],
-[macro_version='2.4.7'
-macro_revision='2.4.7'
+[macro_version='2.5.4'
+macro_revision='2.5.4'
 _LT_DECL(, macro_version, 0, [Which release of libtool.m4 was used?])
 _LT_DECL(, macro_revision, 0)
 ])
@@ -13100,7 +13100,9 @@ ${AX_DOLLAR}(DIFF_SOURCE_TARGETS):
 ])
 
 MT_ADD_RECURSIVE_AM_MACRO_STATIC([install-mod],
-[if INSTALL_MODULES
+[
+install_sh_MODULE = ${AX_DOLLAR}(install_sh_DATA) -C
+if INSTALL_MODULES
 	@${AX_DOLLAR}(NORMAL_INSTALL)
 	if test -z '${AX_DOLLAR}(moddir)'; then false; \\
 	else \\
@@ -13110,7 +13112,7 @@ MT_ADD_RECURSIVE_AM_MACRO_STATIC([install-mod],
 		done; \\
 		for modfile in *.${AX_DOLLAR}(FC_MODEXT); \\
 		do test -e ${AX_DOLLAR}${AX_DOLLAR}modfile || continue; \\
-		${AX_DOLLAR}(install_sh_DATA) -t ${AX_DOLLAR}(DESTDIR)${AX_DOLLAR}(moddir) ${AX_DOLLAR}${AX_DOLLAR}modfile; \\
+		${AX_DOLLAR}(install_sh_MODULE) -t ${AX_DOLLAR}(DESTDIR)${AX_DOLLAR}(moddir) ${AX_DOLLAR}${AX_DOLLAR}modfile; \\
 		echo "${AX_DOLLAR}${AX_DOLLAR}modfile" >> ${AX_DOLLAR}(LIST_MODFILES); \\
 		done; \\
 	fi

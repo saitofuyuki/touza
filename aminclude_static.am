@@ -1,6 +1,6 @@
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Fri Mar  7 10:37:54 JST 2025
+# from AX_AM_MACROS_STATIC on Thu May 15 08:12:19 JST 2025
 
 BUILD_AUX  =    $(top_srcdir)/build-aux
 CLEANFILES =
@@ -84,6 +84,8 @@ install-mod-recursive:
 install-mod: install-mod-recursive
 
 install-mod-am:
+
+install_sh_MODULE = $(install_sh_DATA) -C
 if INSTALL_MODULES
 	@$(NORMAL_INSTALL)
 	if test -z '$(moddir)'; then false; \
@@ -94,7 +96,7 @@ if INSTALL_MODULES
 		done; \
 		for modfile in *.$(FC_MODEXT); \
 		do test -e $$modfile || continue; \
-		$(install_sh_DATA) -t $(DESTDIR)$(moddir) $$modfile; \
+		$(install_sh_MODULE) -t $(DESTDIR)$(moddir) $$modfile; \
 		echo $$modfile >> $(LIST_MODFILES); \
 		done; \
 	fi
