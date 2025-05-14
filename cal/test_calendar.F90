@@ -1,10 +1,10 @@
 !!!_! test_calendar.F90 - touza/calendar test program
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 28 2012
-#define TIME_STAMP 'Time-stamp: <2021/01/26 20:59:35 fuyuki test_calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/14 17:37:12 fuyuki test_calendar.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021
+! Copyright (C) 2020-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -43,6 +43,13 @@ program test_calendar_suite
   real(kind=KRC) :: rs_start, rs_end, rs_step
 
   real(kind=KRC) :: dtorgn
+
+#if OPT_USE_BASE_UCALN
+#else
+  integer :: jy_start, jy_end
+  integer :: jd_step
+  integer :: orig(3)
+#endif
 
   integer ierr
   integer KTEST
@@ -154,8 +161,38 @@ program test_calendar_suite
      call test_CXX2SS (50.0e0_KRC,  'YR',   ss_start, ss_end, ss_step, dtorgn, jfpar)
      call test_CXX2SS (100.0e0_KRC, 'YR',   ss_start, ss_end, ss_step, dtorgn, jfpar)
   endif
-  write(jfpar, 109)
+!!!_ + leap-cycle test
+  if (KTEST.eq.0.or.KTEST.eq.10) then
+#if OPT_USE_BASE_UCALN
+     write (*, *) 'SKIP TEST = ', KTEST
+#else  /* not OPT_USE_BASE_UCALN */
+     ! orig = (/0, 3, 21/)
+     orig = (/100, 3, 21/)
+     jy_start = 0
+     jy_end   = 801
+     jd_step  = 1
+     call test_PERIOD &
+          & (jy_start,    jy_end,    jd_step, &
+          &  orig,        jfpar)
+#endif /* not OPT_USE_BASE_UCALN */
+  endif
 
+  if (KTEST.eq.0.or.KTEST.eq.11) then
+#if OPT_USE_BASE_UCALN
+     write (*, *) 'SKIP TEST = ', KTEST
+#else  /* not OPT_USE_BASE_UCALN */
+     orig = (/100, 3, 21/)
+     jy_start = 0
+     jy_end   = 801
+     ss_step  = 86400.0
+     call test_PERIOD_ss &
+          & (jy_start,    jy_end,    ss_step, &
+          &  orig,        jfpar)
+#endif /* not OPT_USE_BASE_UCALN */
+  endif
+
+!!!_ + end
+  write(jfpar, 109)
   stop
 end program test_calendar_suite
 
@@ -473,6 +510,123 @@ subroutine test_CXX2SS &
   enddo
 
 end subroutine test_CXX2SS
+
+!!!_  - (10) test_PERIOD - leap-cycle test
+#if OPT_USE_BASE_UCALN
+#else
+subroutine test_PERIOD &
+     & (iy_start, iy_end, id_step, &
+     &  orig,     jfpar)
+  use TOUZA_Cal_miroc
+  use TOUZA_Cal
+  implicit none
+  integer,intent(in) :: iy_start, iy_end, id_step
+  integer,intent(in) :: orig(*)
+  integer,intent(in) :: jfpar
+
+  integer :: iday
+  integer :: jdnml, iynml
+  integer :: iy, im, id
+
+  integer :: mdper, myper
+  integer :: jday_orig
+  real(kind=KRC) :: apos, acyc
+
+111 format('PERIOD: ', I0, '/', I0, '/', I0, 1x, F16.9)
+101 format('PERIOD ', 3(I0,1x), I0, ' > ', I0, 1x, I0, 1x, F10.3)
+  mdper = inq_nday_period()
+  myper = inq_nyear_period()
+
+  acyc = real(mdper, kind=KRC) / real(myper, kind=KRC)
+
+  call CYM2DD(jday_orig,  orig(1), orig(2), orig(3))
+  call CYM2DD(iday,       iy_start, 1, 1)
+
+  write (jfpar, 111) mdper, myper, jday_orig, acyc
+
+  do
+     call CDD2YM(iy, im,  id, iday)
+     if (iy.gt.iy_end) exit
+     iynml = modulo(iy, myper)
+     jdnml = modulo(iday - jday_orig, mdper)
+     apos = (modulo(real(jdnml, kind=KRC), acyc) / acyc) * 360.0_KRC
+     write(jfpar, 101) iy, im, id, iday, iynml, jdnml, apos
+     iday = iday + id_step
+  enddo
+end subroutine test_PERIOD
+#endif
+
+!!!_  - (11) test_PERIOD_ss - leap-cycle test
+#if OPT_USE_BASE_UCALN
+#else
+subroutine test_PERIOD_ss &
+     & (iy_start, iy_end, ss_step, &
+     &  orig,     jfpar)
+  use TOUZA_Cal_miroc
+  use TOUZA_Cal
+  implicit none
+  integer,intent(in) :: iy_start, iy_end
+  real(kind=KRC),intent(in) :: ss_step
+  integer,intent(in) :: orig(*)
+  integer,intent(in) :: jfpar
+
+  integer :: idate(6)
+  integer :: iday
+  integer :: jdnml, iynml
+  integer :: iy, im, id
+
+  integer :: mdper, myper
+  integer :: nsd
+  integer :: jday_orig
+  real(kind=KRC) :: ss,   sorg
+  real(kind=KRC) :: apos, acyc
+
+  mdper = inq_nday_period()
+  myper = inq_nyear_period()
+
+  call CSECDY(nsd)
+  acyc = (real(mdper, kind=KRC) / real(myper, kind=KRC)) &
+       & * real(nsd, kind=KRC)
+
+111 format('PERIODss: ', I0, '/', I0, 1x, F0.2, 1x, F0.2)
+102 format('PERIODss: ', F0.1, &
+         & 1x, I0, '/', I0, '/', I0, &
+         & 1x, I2.2, ':', I2.2, ':', I2.2, &
+         & 1x, F0.1, 1x, F10.3)
+
+  idate = (/iy_start, 1, 1, 0, 0, 0/)
+  call CYH2SS(ss,idate)
+  idate(1:3) = orig(1:3)
+  idate(4:6) = 0
+  call CYH2SS(sorg, idate)
+
+  write (jfpar, 111) mdper, myper, acyc, sorg
+
+  do
+     call CSS2YH(idate, ss)
+     if (idate(1).gt.iy_end) exit
+
+     apos = (modulo(ss - sorg, acyc) / acyc) * 360.0_KRC
+     write (jfpar, 102) &
+          ss, idate, ss-sorg, apos
+     ss = ss + ss_step
+  enddo
+  ! call CYM2DD(jday_orig,  orig(1), orig(2), orig(3))
+  ! call CYM2DD(iday,       iy_start, 1, 1)
+
+  ! write (jfpar, 111) mdper, myper, jday_orig, acyc
+
+  ! do
+  !    call CDD2YM(iy, im,  id, iday)
+  !    if (iy.gt.iy_end) exit
+  !    iynml = modulo(iy, myper)
+  !    jdnml = modulo(iday - jday_orig, mdper)
+  !    apos = (modulo(real(jdnml, kind=KRC), acyc) / acyc) * 360.0_KRC
+  !    write(jfpar, 101) iy, im, id, iday, iynml, jdnml, apos
+  !    iday = iday + id_step
+  ! enddo
+end subroutine test_PERIOD_ss
+#endif
 
 !!!_* compatible minimum procedures
 #ifdef OPT_USE_BASE_UCALN
