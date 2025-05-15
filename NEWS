@@ -6,7 +6,9 @@ TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
-* Changes in 1.16
+* Changes in 1.16.0
+** Bug fix on 1.16
+- configure fails to skip python checks.
 ** Developments for miroc7+ils coupling
 *** Improved and fixed base-communicator argument management.
 Agents control in ppp can be based on bootstrap MPI communicator

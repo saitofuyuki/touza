@@ -1,7 +1,8 @@
-Release-1.16 / 2025-05-15
-=========================
+Release-1.16.0 / 2025-05-15
+===========================
 
   * Cleaned package structure.
+  * configure: [FATAL] python checks are not fully excluded.
   * Import developments for miroc7+ils coupling.
   * cal: introduced inq_nday_period, inq_nday_period.
   * ppp: [IMPORTANT] introduced base communicator argument.
