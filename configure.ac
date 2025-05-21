@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/05/15 07:14:59 fuyuki configure.ac>
+# Time-stamp: <2025/05/21 14:16:56 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -233,11 +233,12 @@ AX_PYTHON_MODULE([xarray], [FATAL], [python3])
 AX_PYTHON_MODULE([build], [FATAL], [python3])
 AX_PYTHON_MODULE([matplotlib], [FATAL], [python3])
 AX_PYTHON_MODULE([cartopy], [FATAL], [python3])
-AX_PYTHON_MODULE([tomllib], [FATAL], [python3])])
-AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
+AX_PYTHON_MODULE([tomllib], [FATAL], [python3])
 AC_CONFIG_FILES([zbt/pyproject.toml:zbt/pyproject.in])
 AC_CONFIG_FILES([zbt/zbt/Makefile])
-AC_CONFIG_FILES([zbt/tests/Makefile])
+AC_CONFIG_FILES([zbt/tests/Makefile])])
+
+AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
 
 AM_CONDITIONAL([ZBT_BUILD_ONLY], [test "x$enable_sub_zbt" = xbuild])
 

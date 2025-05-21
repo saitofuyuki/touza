@@ -1,9 +1,9 @@
 dnl Filename:   touza/m4c/mt_package.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 7 2020
-dnl Time-stamp: <2024/08/14 13:01:43 fuyuki mt_package.m4>
+dnl Time-stamp: <2025/05/21 14:33:41 fuyuki mt_package.m4>
 
-dnl Copyright: 2020, 2021 JAMSTEC
+dnl Copyright: 2020-2025 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
 dnl   (https://www.apache.org/licenses/LICENSE-2.0)
 
@@ -228,7 +228,8 @@ AC_DEFUN([MT_PACKAGE_CONFIG],
 # _MT_PACKAGE_CONFIG(SUB, VARIABLE, DIRECTORY, PACKAGE)
 # --------------------------------------------
 AC_DEFUN([_MT_PACKAGE_CONFIG],
-[AC_CONFIG_FILES([$3/Makefile])
+[AS_IF([test "x$enable_sub_$1" != xno],
+[AC_CONFIG_FILES([$3/Makefile])])
 AM_CONDITIONAL([BUILD_$1], [test x"@S|@$2" != xno])
 AS_IF([test x"@S|@$2" != xno],
       [AC_DEFINE(AS_TR_CPP(ENABLE_$4_$1), [1], [$1 is enabled])])
