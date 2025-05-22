@@ -1,10 +1,10 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2024/07/11 22:44:04 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/22 21:56:48 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022,2023,2024
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 #ifdef HAVE_CONFIG_H
@@ -329,12 +329,15 @@ contains
   subroutine diag_table &
        & (ierr, u)
     use TOUZA_Ppp_std,only: get_wni_safe, get_ni, get_gni, msg, diag_htable
+    use TOUZA_Ppp_std,only: comp_comms, comp_groups, cc_unequal, cc_both_null
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
 
     integer utmp
-    integer jt
+    integer jt,   jt2
+    integer kctp, jcsrc
+    integer kgtp, jgsrc
     integer irw
     integer ico, irc, nrc
     integer igr, irg, nrg
@@ -352,8 +355,26 @@ contains
        call msg('mpi deactivated.', __MDL__, utmp)
     else
 101    format('comm:', I0, 1x, I0, ':', A, 1x, 2('[', I0, ':', I0, ']'), 1x, I0, 1x, A)
+102    format('comm:', I0, 1x, I0, ':', A, 1x, 2('[', I0, ':', I0, ']'), 1x, I0, 1x, A, &
+            & ' = ', I0, '(', I0, ') ', I0, '(', I0, ')')
        do jt = 0, matbl - 1
           ico = atblp(jt)%comm
+          jcsrc = -1
+          do jt2 = 0, jt - 1
+             kctp = comp_comms(ico, atblp(jt2)%comm)
+             if (kctp.lt.0) cycle
+             if (kctp.ge.cc_both_null) cycle
+             jcsrc = jt2
+             exit
+          enddo
+          jgsrc = -1
+          do jt2 = 0, jt - 1
+             kgtp = comp_groups(ico, atblp(jt2)%mgrp)
+             if (kgtp.lt.0) cycle
+             if (kgtp.ge.cc_both_null) cycle
+             jgsrc = jt2
+             exit
+          enddo
           call get_ni(ierr, nrc, irc, ico)
           igr = atblp(jt)%mgrp
           call get_gni(ierr, igr, nrg, irg)
@@ -362,10 +383,18 @@ contains
           else
              TM = ' '
           endif
-          write(txt, 101) irw, jt, &
-               & trim(atblp(jt)%name), &
-               & irg, nrg, irc, nrg, &
-               & atblp(jt)%isrc, trim(flagch(atblp(jt)%kflg) // TM)
+          if (jcsrc.ge.0) then
+             write(txt, 102) irw, jt, &
+                  & trim(atblp(jt)%name), &
+                  & irg, nrg, irc, nrg, &
+                  & atblp(jt)%isrc, trim(flagch(atblp(jt)%kflg) // TM), &
+                  & jcsrc, kctp, jgsrc, kgtp
+          else
+             write(txt, 101) irw, jt, &
+                  & trim(atblp(jt)%name), &
+                  & irg, nrg, irc, nrg, &
+                  & atblp(jt)%isrc, trim(flagch(atblp(jt)%kflg) // TM)
+          endif
           call msg(txt, __MDL__, utmp)
        enddo
     endif
@@ -2032,6 +2061,7 @@ contains
     integer,optional,intent(out) :: irank, nrank
     integer nr, ir
 
+    ierr = 0
     if (ierr.eq.0) call get_ni(ierr, nr, ir, icomm)
     if (ierr.eq.0) then
        if (present(irank)) then
@@ -2159,7 +2189,7 @@ program test_ppp_amng
   jarg = 0
 
 101 format(A, ' = ', I0)
-  call init(ierr, levv=+9)
+  call init(ierr, levv=+9, stdv=+9)
   write(*, 101) 'INIT', ierr
 
   icw = MPI_COMM_WORLD

@@ -1,10 +1,10 @@
 !!!_! ppp_std.F90 - TOUZA/Ppp utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2024/07/11 22:56:15 fuyuki ppp_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/22 16:13:07 fuyuki ppp_std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023, 2024
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -25,6 +25,7 @@ module TOUZA_Ppp_std
   use TOUZA_Std_log,only: is_msglev_severe, is_msglev_fatal
   use TOUZA_Std_log,only: get_logu,         unit_global,      trace_fine,       trace_control
   use TOUZA_Std_mwe,only: get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
+  use TOUZA_Std_mwe,only: comp_comms, comp_groups, cc_unequal, cc_both_null
   use TOUZA_Std_mwe,only: MPI_COMM_NULL, MPI_GROUP_NULL, MPI_COMM_WORLD, MPI_UNDEFINED
   use TOUZA_Std_mwe,only: MPI_STATUS_SIZE, MPI_GROUP_EMPTY, MPI_INTEGER, MPI_CHARACTER
   use TOUZA_Std_mwe,only: MPI_ANY_TAG,     MPI_ANY_SOURCE
@@ -66,6 +67,7 @@ module TOUZA_Ppp_std
   public is_msglev_severe, is_msglev_fatal
   public get_logu,         unit_global,      trace_fine,       trace_control
   public get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
+  public comp_comms, comp_groups, cc_unequal, cc_both_null
   public is_eof_ss
   public new_htable,  new_entry, settle_entry
   public diag_htable, reg_entry, query_status
