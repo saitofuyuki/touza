@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/22 21:56:48 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 14:56:19 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -368,15 +368,15 @@ contains
              exit
           enddo
           jgsrc = -1
+          igr = atblp(jt)%mgrp
           do jt2 = 0, jt - 1
-             kgtp = comp_groups(ico, atblp(jt2)%mgrp)
+             kgtp = comp_groups(igr, atblp(jt2)%mgrp)
              if (kgtp.lt.0) cycle
              if (kgtp.ge.cc_both_null) cycle
              jgsrc = jt2
              exit
           enddo
           call get_ni(ierr, nrc, irc, ico)
-          igr = atblp(jt)%mgrp
           call get_gni(ierr, igr, nrg, irg)
           if (astack(jstack).eq.jt) then
              TM = '+'
