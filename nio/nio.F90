@@ -1,7 +1,7 @@
 !!!_! nio.F90 - TOUZA/Nio manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 11 2021
-#define TIME_STAMP 'Time-stamp: <2024/06/28 14:14:06 fuyuki nio.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:50:34 fuyuki nio.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023,2024
@@ -51,7 +51,7 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
     integer,intent(in),optional :: icomm
-    integer lv, md, lmd
+    integer lv, md, lmd, chmd
 
     ierr = 0
 
@@ -66,16 +66,17 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
-          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd)
           if (ierr.eq.0) call nr_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call na_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nc_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call np_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nx_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nb_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call na_init(ierr, u=ulog, levv=lv, mode=chmd)
+          if (ierr.eq.0) call nc_init(ierr, u=ulog, levv=lv, mode=chmd)
+          if (ierr.eq.0) call np_init(ierr, u=ulog, levv=lv, mode=chmd)
+          if (ierr.eq.0) call nx_init(ierr, u=ulog, levv=lv, mode=chmd)
+          if (ierr.eq.0) call nb_init(ierr, u=ulog, levv=lv, mode=chmd)
 # if OPT_WITH_NCTCDF
-          if (ierr.eq.0) call nn_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nn_init(ierr, u=ulog, levv=lv, mode=chmd)
 # endif
        endif
        init_counts = init_counts + 1
@@ -91,7 +92,7 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: mode
     integer,intent(in),optional :: levv
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -109,16 +110,17 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nr_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call na_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nc_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call np_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nx_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nb_diag(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call na_diag(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call nc_diag(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call np_diag(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call nx_diag(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call nb_diag(ierr, utmp, levv=lv, mode=chmd)
 # if OPT_WITH_NCTCDF
-          if (ierr.eq.0) call nn_diag(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nn_diag(ierr, utmp, levv=lv, mode=chmd)
 # endif
        endif
        diag_counts = diag_counts + 1
@@ -132,7 +134,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -148,16 +150,17 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
           if (ierr.eq.0) call nr_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call na_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nc_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call np_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nx_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nb_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call na_finalize(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call nc_finalize(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call np_finalize(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call nx_finalize(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call nb_finalize(ierr, utmp, levv=lv, mode=chmd)
 # if OPT_WITH_NCTCDF
-          if (ierr.eq.0) call nn_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nn_finalize(ierr, utmp, levv=lv, mode=chmd)
 # endif
        endif
        fine_counts = fine_counts + 1
@@ -177,9 +180,9 @@ program test_nio
   integer ierr
 
   ierr = 0
-  if (ierr.eq.0) call init(ierr, levv=-1)
+  if (ierr.eq.0) call init(ierr, levv=+9, stdv=+9)
   if (ierr.eq.0) call diag(ierr)
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+9)
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop

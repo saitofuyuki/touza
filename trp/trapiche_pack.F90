@@ -1,10 +1,10 @@
 !!!_! trapiche_pack.F90 - TOUZA/Trapiche integer packing/unpacking
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2024/02/02 09:48:30 fuyuki trapiche_pack.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:18:20 fuyuki trapiche_pack.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022,2023
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -3835,7 +3835,7 @@ program test_trp_pack
   !!   echo "BITS MEMBERS LOOP" | ./test_trapiche_pack_32  ! 32-bit storage
   !!   echo "BITS MEMBERS LOOP" | ./test_trapiche_pack_64  ! 64-bit storage
 !!!_ + init
-  call init(ierr)
+  call init(ierr, stdv=+9)
   if (ierr.eq.0) call diag(ierr)
 !!!_ + zones
   lbits = bit_size(int(0, kind=KITEST))
@@ -3941,9 +3941,7 @@ program test_trp_pack
      call test_batch_dspl(ierr, nbits, verb, 'trn', RELLENO_TRANSPOSE)
   endif
 #endif
-  if (ierr.eq.0) then
-     call finalize(ierr)
-  endif
+  call finalize(ierr, levv=+9)
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop

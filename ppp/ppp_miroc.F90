@@ -1,7 +1,7 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/10 23:05:22 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 13:10:29 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -180,7 +180,7 @@ contains
        end subroutine greeting
     end interface
 
-    integer lv, md, lmd
+    integer lv, md, lmd, chmd
 
     ierr = 0
     md = control_mode(mode, MODE_DEEPEST)
@@ -195,11 +195,13 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
-          if (ierr.eq.0) call mwe_init(ierr, u, stdv, mode=lmd, icomm=icomm)
+          ! chmd = MODE_SURFACE
+          ! if (ierr.eq.0) call mwe_init(ierr, u, stdv, mode=lmd, icomm=icomm)
           if (ierr.eq.0) call usi_init(ierr, u, levv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call bld_init(ierr, u, levv, mode=lmd)
+          chmd = MODE_SURFACE
+          if (ierr.eq.0) call bld_init(ierr, u, levv, mode=chmd)
           if (ierr.eq.0) call ppp_init(ierr, u, levv, mode=lmd, stdv=stdv, icomm=icomm)
        endif
        if (present(affils)) then
@@ -223,7 +225,7 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: mode
     integer,intent(in),optional :: levv
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -239,11 +241,12 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ppp_diag(ierr, u, levv, lmd)
-          if (ierr.eq.0) call bld_diag(ierr, u, levv, lmd)
+          if (ierr.eq.0) call bld_diag(ierr, u, levv, chmd)
        endif
        if (md.ge.MODE_DEEP) then
-          if (ierr.eq.0) call mwe_diag(ierr, u, levv, lmd)
+          ! if (ierr.eq.0) call mwe_diag(ierr, u, levv, lmd)
           if (ierr.eq.0) call usi_diag(ierr, u, levv, lmd)
        endif
        diag_counts = diag_counts + 1
@@ -262,7 +265,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -281,9 +284,10 @@ contains
           if (ierr.eq.0) call ppp_finalize(ierr, u, levv, lmd)
        endif
        if (md.ge.MODE_DEEP) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call usi_finalize(ierr, u, levv, mode=lmd)
-          if (ierr.eq.0) call mwe_finalize(ierr, u, levv, mode=lmd)
-          if (ierr.eq.0) call bld_finalize(ierr, u, levv, mode=lmd)
+          ! if (ierr.eq.0) call mwe_finalize(ierr, u, levv, mode=lmd)
+          if (ierr.eq.0) call bld_finalize(ierr, u, levv, mode=chmd)
        endif
        fine_counts = fine_counts + 1
     endif

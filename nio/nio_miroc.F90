@@ -1,10 +1,10 @@
 !!!_! nio_miroc.F90 - TOUZA/Nio MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/16 12:17:15 fuyuki nio_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:52:02 fuyuki nio_miroc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022,2023
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -1193,9 +1193,9 @@ program test_nio_miroc
   integer ierr
 
   ierr = 0
-  if (ierr.eq.0) call init(ierr, levv=-1)
+  if (ierr.eq.0) call init(ierr, levv=-1, stdv=+9)
   if (ierr.eq.0) call diag(ierr)
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+9)
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop

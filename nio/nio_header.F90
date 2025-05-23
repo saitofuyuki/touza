@@ -1,10 +1,10 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2024/07/25 15:59:08 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:06:05 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022, 2023, 2024
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -1580,7 +1580,7 @@ program test_nio_header
   if (ierr.eq.0) call get_item(ierr, ha, txt, 'TITL1')
 
   if (ierr.eq.0) call show_header(ierr, ha)
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+9)
   write(*, 101) 'FINAL', ierr
   stop
 end program test_nio_header
