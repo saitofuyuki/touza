@@ -1,7 +1,7 @@
 !!!_! emu.F90 - touza/emu interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:31:10 fuyuki emu.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 09:25:48 fuyuki emu.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2023
@@ -143,9 +143,9 @@ program test_emu
   implicit none
   integer ierr
 
-  call init(ierr)
+  call init(ierr, stdv=+9)
   if (ierr.eq.0) call diag(ierr)
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+9)
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop

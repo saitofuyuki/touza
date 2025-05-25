@@ -1,7 +1,7 @@
 !!!_! calendar_primitive.F90 - TOUZA/Cal primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 22 2011
-#define TIME_STAMP 'Time-stamp: <2025/05/12 08:24:50 fuyuki calendar_primitive.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 10:47:03 fuyuki calendar_primitive.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -16,7 +16,10 @@
 #endif
 #include "touza_cal.h"
 !!!_* Macros
-#ifdef TEST_CALENDAR_PRIMITIVE
+#ifndef   TEST_CALENDAR_PRIMITIVE
+#  define TEST_CALENDAR_PRIMITIVE 0
+#endif
+#if TEST_CALENDAR_PRIMITIVE
 #  define DEBUG *
 #endif
 ! #define _ELEMENTAL elemental
@@ -25,14 +28,14 @@
 module TOUZA_Cal_primitive
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Std, only: &
-       & KFLT, KDBL, &
-       & msglev_panic, &
-       & msglev_fatal,   msglev_critical, msglev_severe, &
-       & msglev_warning, msglev_normal,   msglev_info,   &
-       & msglev_detail,  msglev_debug,    &
-       & choice,         control_mode,    control_deep,  is_first_force, &
-       & trace_control,  trace_fine
+  use TOUZA_Std,only: KFLT, KDBL
+  use TOUZA_Std,only: is_msglev,      is_msglev_normal
+  use TOUZA_Std,only: msglev_panic
+  use TOUZA_Std,only: msglev_fatal,   msglev_critical, msglev_severe
+  use TOUZA_Std,only: msglev_warning, msglev_normal,   msglev_info
+  use TOUZA_Std,only: msglev_detail,  msglev_debug
+  use TOUZA_Std,only: choice,         control_mode,    control_deep,  is_first_force
+  use TOUZA_Std,only: trace_control,  trace_fine
 !!!_  - default
   implicit none
   private
@@ -116,13 +119,13 @@ module TOUZA_Cal_primitive
   public :: xreal
 
 !!!_   . inheritance from TOUZA_Std
-  public choice
-  public control_mode,   control_deep
-  public trace_control,  trace_fine,      is_first_force
-  public msglev_panic
-  public msglev_fatal,   msglev_critical, msglev_severe
-  public msglev_warning, msglev_normal,   msglev_info
-  public msglev_detail,  msglev_debug
+  public :: is_msglev,      is_msglev_normal
+  public :: msglev_panic
+  public :: msglev_fatal,   msglev_critical, msglev_severe
+  public :: msglev_warning, msglev_normal,   msglev_info
+  public :: msglev_detail,  msglev_debug
+  public :: choice,         control_mode,    control_deep,  is_first_force
+  public :: trace_control,  trace_fine
 
 contains
 !!!_ & init - initialization
@@ -200,7 +203,7 @@ contains
 
 !!!_ & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std,only: std_finalize=>diag, is_msglev_normal
+    use TOUZA_Std,only: std_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -232,8 +235,7 @@ contains
 !!!_  & msg - message dispatcher
   subroutine msg &
        & (levm, txt, mdl, u)
-    use TOUZA_Std,only: &
-         & choice, gen_tag, std_msg=>msg, is_msglev
+    use TOUZA_Std,only: gen_tag, std_msg=>msg
     implicit none
     integer,         intent(in)          :: levm
     character(len=*),intent(in)          :: txt
@@ -964,6 +966,25 @@ contains
 
 !!!_ + end
 end module TOUZA_Cal_primitive
+!!!_@ test_calendar_primitive - test program
+#if TEST_CALENDAR_PRIMITIVE
+program test_calendar_primitive
+  use TOUZA_Cal_primitive
+  implicit none
+  integer ierr, levv, stdv
+
+  ierr = 0
+
+  levv = +9
+  stdv = +9
+
+  if (ierr.eq.0) call init(ierr, levv=levv, stdv=stdv, mode=MODE_DEEPEST)
+  if (ierr.eq.0) call diag(ierr, levv=levv)
+  if (ierr.eq.0) call finalize(ierr, levv=levv)
+  stop
+end program test_calendar_primitive
+
+#endif /* TEST_CALENDAR_PRIMITIVE */
 !!!_! FOOTER
 !!!_ + Local variables
 ! Local Variables:

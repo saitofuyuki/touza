@@ -1,10 +1,10 @@
 !!!_! std_prc.F90 - TOUZA/Std precision(kind) manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Sep 6 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/26 12:04:57 fuyuki std_prc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 09:02:29 fuyuki std_prc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2023
+! Copyright (C) 2020-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -185,6 +185,7 @@ module TOUZA_Std_prc
   public check_real_mantissa
   public set_defu
 !!!_  - static
+  integer,save :: proc_level  = -1
   integer,save :: init_mode   = 0
   integer,save :: init_counts = 0
   integer,save :: diag_counts = 0
@@ -199,12 +200,13 @@ module TOUZA_Std_prc
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, inf, dnm)
+  subroutine init(ierr, u, levv, mode, inf, dnm, plev)
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
     logical,intent(in),optional :: inf,  dnm    ! boolean to report inifinity, denormalized properties
+    integer,intent(in),optional :: plev         ! procedure call level
     integer md
 
     ierr = ERR_SUCCESS
@@ -212,6 +214,7 @@ contains
     md = idef(mode, MODE_DEFAULT)
     if (md.eq.MODE_DEFAULT) md = MODE_DEEP
     init_mode = md
+    proc_level = idef(plev, proc_level)
 
     if (md.ge.MODE_SURFACE) then
        err_default = ERR_SUCCESS
@@ -227,12 +230,13 @@ contains
   end subroutine init
 
 !!!_  & diag
-  subroutine diag(ierr, u, levv, mode)
+  subroutine diag(ierr, u, levv, mode, plev)
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md
+    integer,intent(in),optional :: plev         ! procedure call level
+    integer utmp, lv, md, lc
 
     ierr = err_default
 
@@ -240,6 +244,7 @@ contains
     if (md.eq.MODE_DEFAULT) md = init_mode
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
+    lc = max(0, idef(plev, proc_level))
 
     if (md.ge.MODE_SURFACE) then
        ! loose mode (reset error at initialization)
@@ -305,12 +310,13 @@ contains
   end subroutine diag
 
 !!!_  & finalize
-  subroutine finalize(ierr, u, levv, mode)
+  subroutine finalize(ierr, u, levv, mode, plev)
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md
+    integer,intent(in),optional :: plev         ! procedure call level
+    integer utmp, lv, md, lc
 
     ierr = err_default
 
@@ -318,11 +324,12 @@ contains
     if (md.eq.MODE_DEFAULT) md = init_mode
     utmp = idef(u, ulog)
     lv = idef(levv, lev_verbose)
+    lc = max(0, idef(plev, proc_level))
 
     if (md.ge.MODE_SURFACE) then
        if (fine_counts.eq.0.or.IAND(md,MODE_FORCE).gt.0) then
           if (VCHECK_DEBUG(lv)) then
-311          format(STD_FORMAT_FUN(__MDL__, 'finalize'), 'fine: ', I0, 1x, I0, 1x, I0, 1x, I0)
+311          format(STD_FORMAT_FUN(__MDL__, 'finalize'), 'fine[', I0, '] ', I0, 1x, I0, 1x, I0)
              if (utmp.ge.0) then
                 write(utmp, 311) ierr, init_counts, diag_counts, fine_counts
              else

@@ -1,10 +1,10 @@
 !!!_! std.F90 - touza/std interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:22:04 fuyuki std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 09:10:54 fuyuki std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021, 2022, 2023
+! Copyright (C) 2020-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -65,6 +65,7 @@ contains
     integer,intent(in),optional :: icomm
 
     integer lv, md, lmd
+    integer chmd
 
     ierr = 0
 
@@ -80,25 +81,26 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call prc_init(ierr, u=ulog, levv=lv, mode=lmd)
 
-          if (ierr.eq.0) call utl_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc
+          if (ierr.eq.0) call utl_init(ierr, u=ulog, levv=lv, mode=chmd) ! prc
 
-          if (ierr.eq.0) call wsh_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc utl
-          if (ierr.eq.0) call log_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc utl
+          if (ierr.eq.0) call wsh_init(ierr, u=ulog, levv=lv, mode=chmd) ! prc utl
+          if (ierr.eq.0) call log_init(ierr, u=ulog, levv=lv, mode=chmd) ! prc utl
 
-          if (ierr.eq.0) call mwe_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE, icomm=icomm) ! utl log
-          if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! utl log
-          if (ierr.eq.0) call htb_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! utl log
+          if (ierr.eq.0) call mwe_init(ierr, u=ulog, levv=lv, mode=chmd, icomm=icomm) ! utl log
+          if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lv, mode=chmd) ! utl log
+          if (ierr.eq.0) call htb_init(ierr, u=ulog, levv=lv, mode=chmd) ! utl log
 
-          if (ierr.eq.0) call ipc_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc utl log
+          if (ierr.eq.0) call ipc_init(ierr, u=ulog, levv=lv, mode=chmd) ! prc utl log
 
-          if (ierr.eq.0) call fun_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! utl log mwe
+          if (ierr.eq.0) call fun_init(ierr, u=ulog, levv=lv, mode=chmd) ! utl log mwe
 
-          if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE, levtry=envtry) ! prc utl log fun mwe
+          if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lv, mode=chmd, levtry=envtry) ! prc utl log fun mwe
 
-          if (ierr.eq.0) call sus_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc utl log fun env
-          if (ierr.eq.0) call arg_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE) ! prc utl log fun env
+          if (ierr.eq.0) call sus_init(ierr, u=ulog, levv=lv, mode=chmd) ! prc utl log fun env
+          if (ierr.eq.0) call arg_init(ierr, u=ulog, levv=lv, mode=chmd) ! prc utl log fun env
        endif
        if (is_first_force(init_counts, mode)) then
           call gen_tag(tagmsg, pkg=PACKAGE_TAG, grp=__GRP__)
@@ -117,6 +119,7 @@ contains
     integer,intent(in),optional :: mode
     integer,intent(in),optional :: u
     integer utmp, lv, md, lmd
+    integer chmd
 
     ierr = err_default
 
@@ -134,18 +137,19 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call prc_diag(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call wsh_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call mwe_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call bld_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call htb_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call ipc_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call fun_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call env_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call sus_diag(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call arg_diag(ierr, utmp, lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call utl_diag(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call wsh_diag(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call log_diag(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call mwe_diag(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call bld_diag(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call htb_diag(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call ipc_diag(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call fun_diag(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call env_diag(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call sus_diag(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call arg_diag(ierr, utmp, lv, mode=chmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -159,6 +163,7 @@ contains
     integer,intent(in),optional :: mode
     integer,intent(in),optional :: u
     integer utmp, lv, md, lmd
+    integer chmd
 
     ierr = err_default
 
@@ -174,18 +179,19 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call prc_finalize(ierr, utmp, lv, mode=lmd)
-          if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call wsh_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call mwe_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call bld_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call htb_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call ipc_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call fun_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call env_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call sus_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
-          if (ierr.eq.0) call arg_finalize(ierr, utmp, lv, mode=MODE_SURFACE)
+          if (ierr.eq.0) call utl_finalize(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call wsh_finalize(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call log_finalize(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call mwe_finalize(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call bld_finalize(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call htb_finalize(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call ipc_finalize(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call fun_finalize(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call env_finalize(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call sus_finalize(ierr, utmp, lv, mode=chmd)
+          if (ierr.eq.0) call arg_finalize(ierr, utmp, lv, mode=chmd)
        endif
        fine_counts = fine_counts + 1
     endif
@@ -198,19 +204,24 @@ end module TOUZA_Std
 program test_std
   use TOUZA_Std
   implicit none
+  character(len=128) :: C
   character(len=128) :: T
   integer ierr, levv
 
+  call get_command(C, STATUS=ierr)
+  if (ierr.ne.0) C = '(unknown)'
   call get_command_argument(1, T, STATUS=ierr)
   if (ierr.eq.0) then
      read(T, *) levv
   else
-     levv = 0
+     levv = -999
   endif
 
+121 format('Usage: ', A, ' [<levv>]')
 111 format('TEST: levv=', I0)
 101 format(A, ' = ', I0)
   ierr = 0
+  write(*, 121) trim(C)
   write(*, 111) levv
   if (ierr.eq.0) call init(ierr, levv=levv)
   write(*, 101) 'init:0', ierr

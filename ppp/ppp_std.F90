@@ -1,10 +1,10 @@
 !!!_! ppp_std.F90 - TOUZA/Ppp utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2024/07/11 22:56:15 fuyuki ppp_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 12:50:58 fuyuki ppp_std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023, 2024
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -18,23 +18,23 @@
 module TOUZA_Ppp_std
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Std_utl,only: choice,       choice_a
-  use TOUZA_Std_utl,only: control_deep, control_mode, is_first_force
-  use TOUZA_Std_log,only: is_msglev
-  use TOUZA_Std_log,only: is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
-  use TOUZA_Std_log,only: is_msglev_severe, is_msglev_fatal
-  use TOUZA_Std_log,only: get_logu,         unit_global,      trace_fine,       trace_control
-  use TOUZA_Std_mwe,only: get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
-  use TOUZA_Std_mwe,only: MPI_COMM_NULL, MPI_GROUP_NULL, MPI_COMM_WORLD, MPI_UNDEFINED
-  use TOUZA_Std_mwe,only: MPI_STATUS_SIZE, MPI_GROUP_EMPTY, MPI_INTEGER, MPI_CHARACTER
-  use TOUZA_Std_mwe,only: MPI_ANY_TAG,     MPI_ANY_SOURCE
-  use TOUZA_Std_mwe,only: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
-  use TOUZA_Std_mwe,only: MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
-  use TOUZA_Std_mwe,only: MPI_WAIT, MPI_BARRIER
-
-  use TOUZA_Std_env,only: is_eof_ss
-  use TOUZA_Std_htb,only: new_htable,  new_entry, settle_entry
-  use TOUZA_Std_htb,only: diag_htable, reg_entry, query_status
+  use TOUZA_Std,only: choice,       choice_a
+  use TOUZA_Std,only: control_deep, control_mode, is_first_force
+  use TOUZA_Std,only: is_msglev
+  use TOUZA_Std,only: is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
+  use TOUZA_Std,only: is_msglev_severe, is_msglev_fatal
+  use TOUZA_Std,only: get_logu,         unit_global,      trace_fine,       trace_control
+  use TOUZA_Std,only: get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
+  use TOUZA_Std,only: comp_comms, comp_groups, cc_unequal, cc_both_null
+  use TOUZA_Std,only: MPI_COMM_NULL, MPI_GROUP_NULL, MPI_COMM_WORLD, MPI_UNDEFINED
+  use TOUZA_Std,only: MPI_STATUS_SIZE, MPI_GROUP_EMPTY, MPI_INTEGER, MPI_CHARACTER
+  use TOUZA_Std,only: MPI_ANY_TAG,     MPI_ANY_SOURCE
+  use TOUZA_Std,only: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  use TOUZA_Std,only: MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
+  use TOUZA_Std,only: MPI_WAIT, MPI_BARRIER
+  use TOUZA_Std,only: is_eof_ss
+  use TOUZA_Std,only: new_htable,  new_entry, settle_entry
+  use TOUZA_Std,only: diag_htable, reg_entry, query_status
 !!!_  - default
   implicit none
   private
@@ -66,6 +66,7 @@ module TOUZA_Ppp_std
   public is_msglev_severe, is_msglev_fatal
   public get_logu,         unit_global,      trace_fine,       trace_control
   public get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
+  public comp_comms, comp_groups, cc_unequal, cc_both_null
   public is_eof_ss
   public new_htable,  new_entry, settle_entry
   public diag_htable, reg_entry, query_status
@@ -81,15 +82,15 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
-    use TOUZA_Std_mwe,only: mwe_init=>init
-    use TOUZA_Std_env,only: env_init=>init
-    use TOUZA_Std_htb,only: htb_init=>init
+    ! use TOUZA_Std,only: mwe_init
+    use TOUZA_Std,only: env_init
+    use TOUZA_Std,only: htb_init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
     integer,intent(in),optional :: icomm
-    integer lv, md, lmd
+    integer lv, md, lmd, tsmd
 
     ierr = 0
 
@@ -106,9 +107,10 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           lev_stdv = choice(lev_stdv, stdv)
-          if (ierr.eq.0) call mwe_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
+          tsmd = MODE_SURFACE
           if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
-          if (ierr.eq.0) call htb_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
+          ! if (ierr.eq.0) call mwe_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
+          if (ierr.eq.0) call htb_init(ierr, u=ulog, levv=lev_stdv, mode=tsmd)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -118,15 +120,15 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std_mwe,only: mwe_diag=>diag
-    use TOUZA_Std_env,only: env_diag=>diag
-    use TOUZA_Std_htb,only: htb_diag=>diag
+    use TOUZA_Std,only: mwe_diag
+    use TOUZA_Std,only: env_diag
+    use TOUZA_Std,only: htb_diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, tsmd
 
     ierr = err_default
 
@@ -144,9 +146,10 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
-          if (ierr.eq.0) call mwe_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
+          tsmd = MODE_SURFACE
           if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
-          if (ierr.eq.0) call htb_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
+          ! if (ierr.eq.0) call mwe_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
+          if (ierr.eq.0) call htb_diag(ierr, utmp, levv=lev_stdv, mode=tsmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -155,14 +158,14 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std_mwe,only: mwe_finalize=>finalize
-    use TOUZA_Std_env,only: env_finalize=>finalize
-    use TOUZA_Std_htb,only: htb_finalize=>finalize
+    ! use TOUZA_Std,only: mwe_finalize
+    use TOUZA_Std,only: env_finalize
+    use TOUZA_Std,only: htb_finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, tsmd
 
     ierr = err_default
 
@@ -178,9 +181,10 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
+          tsmd = MODE_SURFACE
           if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)
-          if (ierr.eq.0) call mwe_finalize(ierr, utmp, lev_stdv, mode=lmd)
-          if (ierr.eq.0) call htb_finalize(ierr, utmp, lev_stdv, mode=lmd)
+          ! if (ierr.eq.0) call mwe_finalize(ierr, utmp, lev_stdv, mode=lmd)
+          if (ierr.eq.0) call htb_finalize(ierr, utmp, lev_stdv, mode=tsmd)
        endif
        fine_counts = fine_counts + 1
     endif
@@ -253,7 +257,7 @@ program test_ppp_std
   if (ierr.eq.0) call diag(ierr)
   write(*, 101) 'DIAG', ierr
 
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+9)
   write(*, 101) 'FINAL', ierr
   stop
 end program test_ppp_std

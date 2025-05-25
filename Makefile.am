@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/05/09 15:42:22 fuyuki Makefile.am>
+# Time-stamp: <2025/05/21 13:36:38 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -82,7 +82,6 @@ endif
 if BUILD_zbt
 SUBDIRS += zbt
 endif
-DIST_SUBDIRS+= zbt
 
 pkgconfigdir	=	$(libdir)/pkgconfig
 pkgconfig_DATA	=	@TOUZA_NAME@.pc

@@ -1,10 +1,10 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2024/02/27 08:45:49 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/22 09:22:49 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2024
+! Copyright (C) 2020-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -625,6 +625,7 @@ contains
     integer lv, ltry
     integer ui, uo, ue
 
+    ierr = 0
     lv = choice(lev_verbose, levv)
     if (ustdi.lt.0.or.ustdo.lt.0.or.ustde.lt.0) then
        ltry = choice(OPT_STD_UNITS_TRY, levtry)

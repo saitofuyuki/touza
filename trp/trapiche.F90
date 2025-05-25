@@ -1,10 +1,10 @@
 !!!_! trapiche.F90 - TOUZA/Trapiche manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:32:48 fuyuki trapiche.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:20:37 fuyuki trapiche.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022,2023
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -41,7 +41,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
-    integer lv, md, lmd
+    integer lv, md, lmd, chmd
 
     ierr = 0
 
@@ -57,10 +57,11 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ts_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
-          if (ierr.eq.0) call tp_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call tf_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call tc_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call tp_init(ierr, u=ulog, levv=lv, mode=chmd)
+          if (ierr.eq.0) call tf_init(ierr, u=ulog, levv=lv, mode=chmd)
+          if (ierr.eq.0) call tc_init(ierr, u=ulog, levv=lv, mode=chmd)
        endif
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
        init_counts = init_counts + 1
@@ -77,7 +78,7 @@ contains
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: mode
 
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -95,10 +96,11 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ts_diag(ierr, utmp, lv, lmd)
-          if (ierr.eq.0) call tp_diag(ierr, utmp, lv, lmd)
-          if (ierr.eq.0) call tf_diag(ierr, utmp, lv, lmd)
-          if (ierr.eq.0) call tc_diag(ierr, utmp, lv, lmd)
+          if (ierr.eq.0) call tp_diag(ierr, utmp, lv, chmd)
+          if (ierr.eq.0) call tf_diag(ierr, utmp, lv, chmd)
+          if (ierr.eq.0) call tc_diag(ierr, utmp, lv, chmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -112,7 +114,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -128,10 +130,11 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ts_finalize(ierr, utmp, lv, lmd)
-          if (ierr.eq.0) call tp_finalize(ierr, utmp, lv, lmd)
-          if (ierr.eq.0) call tf_finalize(ierr, utmp, lv, lmd)
-          if (ierr.eq.0) call tc_finalize(ierr, utmp, lv, lmd)
+          if (ierr.eq.0) call tp_finalize(ierr, utmp, lv, chmd)
+          if (ierr.eq.0) call tf_finalize(ierr, utmp, lv, chmd)
+          if (ierr.eq.0) call tc_finalize(ierr, utmp, lv, chmd)
        endif
        fine_counts = fine_counts + 1
     endif
@@ -149,9 +152,9 @@ program test_trp
   implicit none
   integer ierr
 
-  call init(ierr)
+  call init(ierr, stdv=+9)
   if (ierr.eq.0) call diag(ierr)
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+9)
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop

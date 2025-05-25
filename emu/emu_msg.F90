@@ -1,10 +1,10 @@
 !!!_! emu_msg.F90 - touza/emu usubs::msgs emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 12 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:29:57 fuyuki emu_msg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 09:20:46 fuyuki emu_msg.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -316,9 +316,9 @@ program test_emu_msg
   ierr = 0
 101 format(A, ' = ', I0)
 
-  call init(ierr, u=-1, levv=9, stdv=-1)
+  call init(ierr, u=-1, levv=9, stdv=+9)
   call diag(ierr)
-  call finalize(ierr)
+  call finalize(ierr, levv=+9)
   write(*, 101) 'fine', ierr
   stop
 end program test_emu_msg

@@ -1,9 +1,9 @@
 # touza/calendar Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2022/10/20 10:41:22 fuyuki Makefile.am>
+# Time-stamp: <2025/05/23 10:45:25 fuyuki Makefile.am>
 
-# Copyright (C) 2020, 2021
+# Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -139,6 +139,11 @@ test_calendar_ils_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR_ILS=1
 test_calendar_coco_SOURCES	= $(cal_SOURCES) calendar_coco.F90
 test_calendar_coco_LDADD	= $(TEST_COMMON_LIBS)
 test_calendar_coco_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR_COCO=1 -DOPT_KIND_REAL=8
+
+check_PROGRAMS += test_calendar_primitive
+test_calendar_primitive_SOURCES	= calendar_primitive.F90
+test_calendar_primitive_LDADD	= $(TEST_COMMON_LIBS)
+test_calendar_primitive_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_CALENDAR_PRIMITIVE=1 -DOPT_KIND_REAL=8
 
 include Makedep.inc
 

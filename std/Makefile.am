@@ -1,9 +1,9 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2023/03/24 21:22:08 fuyuki Makefile.am>
+# Time-stamp: <2025/05/23 08:38:09 fuyuki Makefile.am>
 #
-# Copyright (C) 2020-2023
+# Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
@@ -52,6 +52,12 @@ test_std_utl_SOURCES = std_utl.F90
 test_std_utl_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_UTL=1
 test_std_utl_LDADD = $(TEST_COMMON_LIBS)
 EXTRA_test_std_utl_DEPENDENCIES = $(test_std_utl_LDADD)
+
+check_PROGRAMS += test_std_wsh
+test_std_wsh_SOURCES = std_wsh.F90
+test_std_wsh_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_WSH=1
+test_std_wsh_LDADD = $(TEST_COMMON_LIBS)
+EXTRA_test_std_wsh_DEPENDENCIES = $(test_std_wsh_LDADD)
 
 check_PROGRAMS += test_std_log
 test_std_log_SOURCES = std_log.F90

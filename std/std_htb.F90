@@ -1,10 +1,10 @@
 !!!_! std_htb.F90 - touza/std simple hash table manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2024/02/25 22:14:59 fuyuki std_htb.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/22 09:23:15 fuyuki std_htb.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022,2023
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -868,6 +868,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: handle
     integer jk
+    ierr = 0
     if (present(handle)) then
        jk = check_ktable(handle)
        ierr = min(0, jk)
@@ -1002,8 +1003,8 @@ contains
        if (sp.le.0) sp = mem * 2
        kh = new_ktable(' ' // adjustl(name), sp, lkey, nkey, base, awidth, iwidth, test)
        jerr = min(0, kh)
+       if (jerr.eq.0) call bind_ktable(jerr, wh, kh, nstt, def, grow)
     endif
-    if (jerr.eq.0) call bind_ktable(jerr, wh, kh, nstt, def, grow)
     if (jerr.ne.0) wh = jerr
   end function new_wtable
 
