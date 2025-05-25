@@ -20,16 +20,45 @@ Fortran procedures mainly adopted in MIROC.  See *TOUZA* README
 
 * Build and installation
 
+* Agent-based hierarchical MPI communicator control
+** Agent concept
+
 * Brief description of *TOUZA/ppp* modules
 ** summary
 ** =TOUZA_Ppp_amng= - agent manager (mpi communicator control)
+*** =init()=
+#+begin_src f90
+  subroutine init(ierr, u, levv, mode, stdv, icomm, nstack, nagent)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode, stdv
+    integer,intent(in),optional :: icomm    ! base MPI communicator
+    integer,intent(in),optional :: nstack   ! passed to init_stack()
+    integer,intent(in),optional :: nagent   ! passed to init_table()
+#+end_src
+- =icomm= :: The base MPI communicator for TOUZA library, to pass to
+  =TOUZA_Std_mwe= module.
+  The base MPI communicator can be set by either this function, or
+  direct call of =TOUZA_Std= module family before this function.
+  If you want to fine control on the =TOUZA_Std= module, then you may
+  have to pass =icomm= not in this function but to =TOUZA_Std=
+  initialization functions.
+- =nstack= :: Limit number of stacks for agents.  If not present, or
+  if less than 1, then the macro =OPT_AGENTS_STACK= is applied.
+- =nagent= :: Paremeter to create the hash-table of agents.  If not
+  present, the macro =OPT_AGENTS_MAX= times 2 is applied.
+
 *** =query_agent()=
 #+begin_src f90
-  integer function query_agent(name, iagent)
+  integer function query_agent(name, iaref)
     character(len=*),intent(in) :: name
-    integer,optional,intent(in) :: iagent ! current agent if null
+    integer,optional,intent(in) :: iaref ! current agent if null
 #+end_src
 Return agent id corresponding to =NAME=.
+Reference agent id =iaref= may be set, and if set =NAME= is searched
+among those of the same level, that are one to have the same source
+agent.  If not set, the current agent on the top stack is applied.
+
 *** =inquire_agent=
 #+begin_src f90
   subroutine inquire_agent &
@@ -60,14 +89,61 @@ corresponding to a particular id of =IAGENT=.
     integer,intent(out) :: ierr
     integer,intent(in)  :: iagent
 #+end_src
+*** =push_agent=
+#+begin_src f90
+  subroutine push_agent (ierr, iagent)
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: iagent
+  subroutine push_agent (ierr, name, iaref, iagent)
+    integer,intent(out) :: ierr
+    character(len=*),intent(in)  :: name
+    integer,optional,intent(in)  :: iaref
+    integer,optional,intent(out) :: iagent  ! new agent handle
+#+end_src
+Switch the agent to =iagent= (by id) or =name= (by name) and push the
+agent on the top of the stack.  The argument =NAME= and optional
+argument =IAREF=, reference agent id, are passed to =query_agent()=.
+When with by-name call, an optional argument =iagent= may be set to
+extract the corresponding agent-id of =NAME=.
+*** =pop_agent=
+#+begin_src f90
+  subroutine pop_agent (ierr, iagent)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: iagent
+  subroutine pop_agent (ierr, name, iaref)
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: name
+    integer,optional,intent(in)  :: iaref
+#+end_src
+Switch the agent to the one recorded in the stack before the current one.
+If =iagent=, or =name= and =iaref= are set, the current top stack is
+checked whether not they are identical.  When not, the error is
+returned.
+The current top stack is popped and discarded.
+*** =top_agent=
+#+begin_src f90
+  subroutine top_agent_ai (ierr, iagent)
+    integer,intent(out) :: ierr
+    integer,intent(out) :: iagent
+#+end_src
+Returns current agent id on the top of stack.
 *** =new_agent_root=
 #+begin_src f90
   subroutine new_agent_root &
-       & (ierr, icomm, name)
+       & (ierr, icomm, name, switch)
     integer,         intent(out)         :: ierr
     integer,         intent(in),optional :: icomm
     character(len=*),intent(in),optional :: name
+    integer,         intent(in),optional :: switch
 #+end_src
+Register MPI communicator =ICOMM= as an agent identified as =NAME=.
+If =ICOMM= is not set, the base communicator of =TOUZA= library is
+used.  If =NAME= is not set, the name is automatically generated.
+If an optional argument =switch= is set as non-negative integer,
+it is paseed to =switch_agent()= to manipulate the agent stack ---
+if zero the top stack is replaced and if positive the agent is pushed
+on to the top of stack.
+
 *** =new_agent_color=
 #+begin_src f90
   subroutine new_agent_color &
@@ -76,8 +152,16 @@ corresponding to a particular id of =IAGENT=.
     integer,         intent(in)          :: color
     character(len=*),intent(in),optional :: name
     integer,         intent(in),optional :: src
+    integer,         intent(in),optional :: switch
 #+end_src
-Split communicator associated with SRC agent using COLOR.
+Split the MPI communicator associated with =SRC= agent id using
+=COLOR=, with calling =MPI_Comm_split=.
+If =SRC= is not present, the current top agent id on the top stack is
+applied.  If =NAME= is present, it is used to identify the new agent,
+otherwise it is automatically generated.
+If an optional argument =switch= is set as non-negative integer,
+it is paseed to =switch_agent()= to manipulate the agent stack.
+
 *** =new_agent_family=
 #+begin_src f90
   subroutine new_agent_family &
