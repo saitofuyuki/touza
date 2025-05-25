@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2024/07/11 21:34:52 fuyuki mt_local.m4>
+dnl Time-stamp: <2025/05/25 14:04:05 fuyuki mt_local.m4>
 
 dnl Copyright: 2020-2023 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -92,18 +92,26 @@ MT_FORTRAN_BATCH_CHECK_STATEMENT([flush], [unit],[
       flush(unit=1)])
 
 MT_FORTRAN_BATCH_CHECK_STATEMENT([format], [zero_width_real],[
-   102 format(E0.3)
-   write(*, 102) 0.0])
+  102 format(E0.3)
+      write(*, 102) 0.0])
 
 dnl system procedures
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([get_environment_variable], ['A'])
 dnl GNU extensions
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getlog], [T], [
-character T*30])
+      character T*30])
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getenv], ['A', T], [
-character T*30])
+      character T*30])
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([hostnm], [T], [
-character T*30])
+      character T*30])
+
+dnl etime
+dnl ETIME in GNU extension requires real(4) arguments
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([etime], [V, T], [
+      real(8) V(2), T], [ETIME_8])
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([etime], [V, T], [
+      real(4) V(2), T], [ETIME_4])
+
 dnl intel IFPORT module
 MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [getenv])
 MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [getlog])
