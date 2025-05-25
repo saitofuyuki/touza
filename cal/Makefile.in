@@ -17,15 +17,15 @@
 # touza/calendar Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2022/10/20 10:41:22 fuyuki Makefile.am>
+# Time-stamp: <2025/05/23 10:45:25 fuyuki Makefile.am>
 
-# Copyright (C) 2020, 2021
+# Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Thu May 15 11:40:10 JST 2025
+# from AX_AM_MACROS_STATIC on Sun May 25 15:36:06 JST 2025
 
 
 
@@ -115,7 +115,7 @@ target_triplet = @target@
 check_PROGRAMS = test_calendar$(EXEEXT) test_calendar_core$(EXEEXT) \
 	test_calendar_comp$(EXEEXT) $(am__EXEEXT_1) \
 	test_calendar_matsiro$(EXEEXT) test_calendar_ils$(EXEEXT) \
-	test_calendar_coco$(EXEEXT)
+	test_calendar_coco$(EXEEXT) test_calendar_primitive$(EXEEXT)
 @MAINTAINER_MODE_TRUE@am__append_5 = test_calendar_trad
 subdir = cal
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -176,6 +176,11 @@ am_test_calendar_matsiro_OBJECTS =  \
 	test_calendar_matsiro-calendar_matsiro.$(OBJEXT)
 test_calendar_matsiro_OBJECTS = $(am_test_calendar_matsiro_OBJECTS)
 test_calendar_matsiro_DEPENDENCIES = $(am__DEPENDENCIES_2)
+am_test_calendar_primitive_OBJECTS =  \
+	test_calendar_primitive-calendar_primitive.$(OBJEXT)
+test_calendar_primitive_OBJECTS =  \
+	$(am_test_calendar_primitive_OBJECTS)
+test_calendar_primitive_DEPENDENCIES = $(am__DEPENDENCIES_2)
 am__objects_5 = test_calendar_trad-test_calendar.$(OBJEXT) \
 	$(am__objects_1)
 am_test_calendar_trad_OBJECTS = $(am__objects_5)
@@ -255,12 +260,16 @@ am__v_CCLD_1 =
 SOURCES = $(libtouza_local_la_SOURCES) $(test_calendar_SOURCES) \
 	$(test_calendar_coco_SOURCES) $(test_calendar_comp_SOURCES) \
 	$(test_calendar_core_SOURCES) $(test_calendar_ils_SOURCES) \
-	$(test_calendar_matsiro_SOURCES) $(test_calendar_trad_SOURCES) \
+	$(test_calendar_matsiro_SOURCES) \
+	$(test_calendar_primitive_SOURCES) \
+	$(test_calendar_trad_SOURCES) \
 	$(nodist_test_calendar_trad_SOURCES)
 DIST_SOURCES = $(libtouza_local_la_SOURCES) $(test_calendar_SOURCES) \
 	$(test_calendar_coco_SOURCES) $(test_calendar_comp_SOURCES) \
 	$(test_calendar_core_SOURCES) $(test_calendar_ils_SOURCES) \
-	$(test_calendar_matsiro_SOURCES) $(test_calendar_trad_SOURCES)
+	$(test_calendar_matsiro_SOURCES) \
+	$(test_calendar_primitive_SOURCES) \
+	$(test_calendar_trad_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -828,6 +837,9 @@ test_calendar_ils_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_CALENDAR_ILS=1
 test_calendar_coco_SOURCES = $(cal_SOURCES) calendar_coco.F90
 test_calendar_coco_LDADD = $(TEST_COMMON_LIBS)
 test_calendar_coco_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_CALENDAR_COCO=1 -DOPT_KIND_REAL=8
+test_calendar_primitive_SOURCES = calendar_primitive.F90
+test_calendar_primitive_LDADD = $(TEST_COMMON_LIBS)
+test_calendar_primitive_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_CALENDAR_PRIMITIVE=1 -DOPT_KIND_REAL=8
 @enable_module_dependencies_TRUE@calendar_lo_MODULE_DEPS = $(builddir)/touza_cal_primitive.$(FC_MODEXT) $(builddir)/touza_cal_core.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@calendar_o_MODULE_DEPS = $(builddir)/touza_cal_primitive.$(FC_MODEXT) $(builddir)/touza_cal_core.$(FC_MODEXT) $(builddir)/touza_cal.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@calendar_coco_o_MODULE_DEPS = $(builddir)/touza_cal_primitive.$(FC_MODEXT) $(builddir)/touza_cal.$(FC_MODEXT) $(builddir)/touza_cal_coco.$(FC_MODEXT)
@@ -933,6 +945,10 @@ test_calendar_matsiro$(EXEEXT): $(test_calendar_matsiro_OBJECTS) $(test_calendar
 	@rm -f test_calendar_matsiro$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_calendar_matsiro_OBJECTS) $(test_calendar_matsiro_LDADD) $(LIBS)
 
+test_calendar_primitive$(EXEEXT): $(test_calendar_primitive_OBJECTS) $(test_calendar_primitive_DEPENDENCIES) $(EXTRA_test_calendar_primitive_DEPENDENCIES) 
+	@rm -f test_calendar_primitive$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_calendar_primitive_OBJECTS) $(test_calendar_primitive_LDADD) $(LIBS)
+
 test_calendar_trad$(EXEEXT): $(test_calendar_trad_OBJECTS) $(test_calendar_trad_DEPENDENCIES) $(EXTRA_test_calendar_trad_DEPENDENCIES) 
 	@rm -f test_calendar_trad$(EXEEXT)
 	$(AM_V_F77LD)$(F77LINK) $(test_calendar_trad_OBJECTS) $(test_calendar_trad_LDADD) $(LIBS)
@@ -1022,6 +1038,12 @@ test_calendar_matsiro-calendar_matsiro.o: calendar_matsiro.F90
 
 test_calendar_matsiro-calendar_matsiro.obj: calendar_matsiro.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_calendar_matsiro_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_calendar_matsiro-calendar_matsiro.obj `if test -f 'calendar_matsiro.F90'; then $(CYGPATH_W) 'calendar_matsiro.F90'; else $(CYGPATH_W) '$(srcdir)/calendar_matsiro.F90'; fi`
+
+test_calendar_primitive-calendar_primitive.o: calendar_primitive.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_calendar_primitive_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_calendar_primitive-calendar_primitive.o `test -f 'calendar_primitive.F90' || echo '$(srcdir)/'`calendar_primitive.F90
+
+test_calendar_primitive-calendar_primitive.obj: calendar_primitive.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_calendar_primitive_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_calendar_primitive-calendar_primitive.obj `if test -f 'calendar_primitive.F90'; then $(CYGPATH_W) 'calendar_primitive.F90'; else $(CYGPATH_W) '$(srcdir)/calendar_primitive.F90'; fi`
 
 test_calendar_trad-test_calendar.o: test_calendar.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_calendar_trad_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_calendar_trad-test_calendar.o `test -f 'test_calendar.F90' || echo '$(srcdir)/'`test_calendar.F90

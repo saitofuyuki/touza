@@ -17,9 +17,9 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2023/03/24 21:22:08 fuyuki Makefile.am>
+# Time-stamp: <2025/05/23 08:38:09 fuyuki Makefile.am>
 #
-# Copyright (C) 2020-2023
+# Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
 #
 # Licensed under the Apache License, Version 2.0
@@ -27,7 +27,7 @@
 #
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Thu May 15 11:40:10 JST 2025
+# from AX_AM_MACROS_STATIC on Sun May 25 15:36:06 JST 2025
 
 
 
@@ -114,14 +114,14 @@ target_triplet = @target@
 @gcc_dependencies_TRUE@am__append_2 = $(AM_FCFLAGS_DEP)
 @gcc_dependencies_TRUE@am__append_3 = *.dep
 check_PROGRAMS = test_std_prc$(EXEEXT) test_std_utl$(EXEEXT) \
-	test_std_log$(EXEEXT) test_std_fun$(EXEEXT) \
-	test_std_env$(EXEEXT) test_std_sus$(EXEEXT) \
-	test_std_sus1$(EXEEXT) test_std_sus2$(EXEEXT) \
-	test_std_arg$(EXEEXT) test_std_bld$(EXEEXT) \
-	test_std_mwe$(EXEEXT) test_std_htb1$(EXEEXT) \
-	test_std_htb2$(EXEEXT) test_std_htb3$(EXEEXT) \
-	test_std_ipc1$(EXEEXT) test_std_ipc2$(EXEEXT) \
-	test_std$(EXEEXT)
+	test_std_wsh$(EXEEXT) test_std_log$(EXEEXT) \
+	test_std_fun$(EXEEXT) test_std_env$(EXEEXT) \
+	test_std_sus$(EXEEXT) test_std_sus1$(EXEEXT) \
+	test_std_sus2$(EXEEXT) test_std_arg$(EXEEXT) \
+	test_std_bld$(EXEEXT) test_std_mwe$(EXEEXT) \
+	test_std_htb1$(EXEEXT) test_std_htb2$(EXEEXT) \
+	test_std_htb3$(EXEEXT) test_std_ipc1$(EXEEXT) \
+	test_std_ipc2$(EXEEXT) test_std$(EXEEXT)
 subdir = std
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
@@ -204,6 +204,9 @@ test_std_sus2_DEPENDENCIES = $(TEST_COMMON_LIBS)
 am_test_std_utl_OBJECTS = test_std_utl-std_utl.$(OBJEXT)
 test_std_utl_OBJECTS = $(am_test_std_utl_OBJECTS)
 test_std_utl_DEPENDENCIES = $(TEST_COMMON_LIBS)
+am_test_std_wsh_OBJECTS = test_std_wsh-std_wsh.$(OBJEXT)
+test_std_wsh_OBJECTS = $(am_test_std_wsh_OBJECTS)
+test_std_wsh_DEPENDENCIES = $(TEST_COMMON_LIBS)
 SCRIPTS = $(noinst_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -262,7 +265,8 @@ SOURCES = $(libtouza_local_la_SOURCES) $(test_std_SOURCES) \
 	$(test_std_ipc2_SOURCES) $(test_std_log_SOURCES) \
 	$(test_std_mwe_SOURCES) $(test_std_prc_SOURCES) \
 	$(test_std_sus_SOURCES) $(test_std_sus1_SOURCES) \
-	$(test_std_sus2_SOURCES) $(test_std_utl_SOURCES)
+	$(test_std_sus2_SOURCES) $(test_std_utl_SOURCES) \
+	$(test_std_wsh_SOURCES)
 DIST_SOURCES = $(libtouza_local_la_SOURCES) $(test_std_SOURCES) \
 	$(test_std_arg_SOURCES) $(test_std_bld_SOURCES) \
 	$(test_std_env_SOURCES) $(test_std_fun_SOURCES) \
@@ -271,7 +275,8 @@ DIST_SOURCES = $(libtouza_local_la_SOURCES) $(test_std_SOURCES) \
 	$(test_std_ipc2_SOURCES) $(test_std_log_SOURCES) \
 	$(test_std_mwe_SOURCES) $(test_std_prc_SOURCES) \
 	$(test_std_sus_SOURCES) $(test_std_sus1_SOURCES) \
-	$(test_std_sus2_SOURCES) $(test_std_utl_SOURCES)
+	$(test_std_sus2_SOURCES) $(test_std_utl_SOURCES) \
+	$(test_std_wsh_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -625,6 +630,10 @@ test_std_utl_SOURCES = std_utl.F90
 test_std_utl_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_UTL=1
 test_std_utl_LDADD = $(TEST_COMMON_LIBS)
 EXTRA_test_std_utl_DEPENDENCIES = $(test_std_utl_LDADD)
+test_std_wsh_SOURCES = std_wsh.F90
+test_std_wsh_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_WSH=1
+test_std_wsh_LDADD = $(TEST_COMMON_LIBS)
+EXTRA_test_std_wsh_DEPENDENCIES = $(test_std_wsh_LDADD)
 test_std_log_SOURCES = std_log.F90
 test_std_log_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_LOG=1
 test_std_log_LDADD = $(TEST_COMMON_LIBS)
@@ -844,6 +853,10 @@ test_std_utl$(EXEEXT): $(test_std_utl_OBJECTS) $(test_std_utl_DEPENDENCIES) $(EX
 	@rm -f test_std_utl$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_std_utl_OBJECTS) $(test_std_utl_LDADD) $(LIBS)
 
+test_std_wsh$(EXEEXT): $(test_std_wsh_OBJECTS) $(test_std_wsh_DEPENDENCIES) $(EXTRA_test_std_wsh_DEPENDENCIES) 
+	@rm -f test_std_wsh$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_std_wsh_OBJECTS) $(test_std_wsh_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -960,6 +973,12 @@ test_std_utl-std_utl.o: std_utl.F90
 
 test_std_utl-std_utl.obj: std_utl.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_utl_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_utl-std_utl.obj `if test -f 'std_utl.F90'; then $(CYGPATH_W) 'std_utl.F90'; else $(CYGPATH_W) '$(srcdir)/std_utl.F90'; fi`
+
+test_std_wsh-std_wsh.o: std_wsh.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_wsh_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_wsh-std_wsh.o `test -f 'std_wsh.F90' || echo '$(srcdir)/'`std_wsh.F90
+
+test_std_wsh-std_wsh.obj: std_wsh.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_wsh_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_wsh-std_wsh.obj `if test -f 'std_wsh.F90'; then $(CYGPATH_W) 'std_wsh.F90'; else $(CYGPATH_W) '$(srcdir)/std_wsh.F90'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

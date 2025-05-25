@@ -17,15 +17,15 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2024/07/29 17:32:19 fuyuki Makefile.am>
+# Time-stamp: <2025/05/23 10:58:20 fuyuki Makefile.am>
 
-# Copyright (C) 2021, 2022, 2023, 2024
+# Copyright (C) 2021-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Thu May 15 11:40:10 JST 2025
+# from AX_AM_MACROS_STATIC on Sun May 25 15:36:06 JST 2025
 
 
 
@@ -124,7 +124,8 @@ target_triplet = @target@
 check_PROGRAMS = test_nio_header$(EXEEXT) test_nio_record$(EXEEXT) \
 	test_nio_cache$(EXEEXT) test_nio_sparse$(EXEEXT) \
 	$(am__EXEEXT_1) test_nio_control$(EXEEXT) test_nio$(EXEEXT) \
-	test_nio_miroc$(EXEEXT) $(am__EXEEXT_2) $(am__EXEEXT_3)
+	test_nio_miroc$(EXEEXT) $(am__EXEEXT_2) $(am__EXEEXT_3) \
+	test_nio_std$(EXEEXT)
 @BUILD_div_TRUE@am__append_10 = test_nio_division
 @with_nctcdf_TRUE@am__append_11 = test_nio_nctcdf
 @with_nctcdf_TRUE@am__append_12 = $(NETCDF4_FLIBS) $(NETCDF4_LIBS)
@@ -222,6 +223,9 @@ test_nio_record_DEPENDENCIES = $(am__DEPENDENCIES_3)
 am_test_nio_sparse_OBJECTS = test_nio_sparse-nio_sparse.$(OBJEXT)
 test_nio_sparse_OBJECTS = $(am_test_nio_sparse_OBJECTS)
 test_nio_sparse_DEPENDENCIES = $(am__DEPENDENCIES_3)
+am_test_nio_std_OBJECTS = test_nio_std-nio_std.$(OBJEXT)
+test_nio_std_OBJECTS = $(am_test_nio_std_OBJECTS)
+test_nio_std_DEPENDENCIES = $(am__DEPENDENCIES_3)
 SCRIPTS = $(noinst_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -282,7 +286,8 @@ SOURCES = $(libtouza_local_la_SOURCES) \
 	$(test_nio_control_SOURCES) $(test_nio_division_SOURCES) \
 	$(test_nio_header_SOURCES) $(test_nio_miroc_SOURCES) \
 	$(nodist_test_nio_miroc_SOURCES) $(test_nio_nctcdf_SOURCES) \
-	$(test_nio_record_SOURCES) $(test_nio_sparse_SOURCES)
+	$(test_nio_record_SOURCES) $(test_nio_sparse_SOURCES) \
+	$(test_nio_std_SOURCES)
 DIST_SOURCES = $(am__libtouza_local_la_SOURCES_DIST) \
 	$(EXTRA_libtouza_local_la_SOURCES) $(test_nio_SOURCES) \
 	$(test_nio_bindc_SOURCES) $(test_nio_cache_SOURCES) \
@@ -290,7 +295,7 @@ DIST_SOURCES = $(am__libtouza_local_la_SOURCES_DIST) \
 	$(am__test_nio_division_SOURCES_DIST) \
 	$(test_nio_header_SOURCES) $(test_nio_miroc_SOURCES) \
 	$(test_nio_nctcdf_SOURCES) $(test_nio_record_SOURCES) \
-	$(test_nio_sparse_SOURCES)
+	$(test_nio_sparse_SOURCES) $(test_nio_std_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -873,6 +878,9 @@ test_nio_nctcdf_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_NCTCDF=1
 test_nio_nctcdf_FCFLAGS = $(AM_FCFLAGS)
 test_nio_bindc_SOURCES = test_nio_bindc.c touza_nio_interface.h touza_nio_param.h
 test_nio_bindc_LDADD = $(TEST_COMMON_LIBS) $(FCLIBS)
+test_nio_std_SOURCES = $(TEST_COMMON_SOURCES) nio_std.F90
+test_nio_std_LDADD = $(TEST_COMMON_LIBS)
+test_nio_std_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_STD=1
 test_helpd = bin
 @enable_module_dependencies_TRUE@calendar_miroc_o_MODULE_DEPS = $(top_builddir)/cal/touza_cal.$(FC_MODEXT) $(top_builddir)/cal/touza_cal_primitive.$(FC_MODEXT) $(builddir)/touza_cal_miroc.$(FC_MODEXT) $(top_builddir)/cal/touza_cal_core.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@nio_lo_MODULE_DEPS = $(builddir)/touza_nio_std.$(FC_MODEXT) $(builddir)/touza_nio_header.$(FC_MODEXT) $(builddir)/touza_nio_record.$(FC_MODEXT)
@@ -986,6 +994,10 @@ test_nio_sparse$(EXEEXT): $(test_nio_sparse_OBJECTS) $(test_nio_sparse_DEPENDENC
 	@rm -f test_nio_sparse$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_nio_sparse_OBJECTS) $(test_nio_sparse_LDADD) $(LIBS)
 
+test_nio_std$(EXEEXT): $(test_nio_std_OBJECTS) $(test_nio_std_DEPENDENCIES) $(EXTRA_test_nio_std_DEPENDENCIES) 
+	@rm -f test_nio_std$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_nio_std_OBJECTS) $(test_nio_std_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -1068,6 +1080,12 @@ test_nio_sparse-nio_sparse.o: nio_sparse.F90
 
 test_nio_sparse-nio_sparse.obj: nio_sparse.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_nio_sparse_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_nio_sparse-nio_sparse.obj `if test -f 'nio_sparse.F90'; then $(CYGPATH_W) 'nio_sparse.F90'; else $(CYGPATH_W) '$(srcdir)/nio_sparse.F90'; fi`
+
+test_nio_std-nio_std.o: nio_std.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_nio_std_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_nio_std-nio_std.o `test -f 'nio_std.F90' || echo '$(srcdir)/'`nio_std.F90
+
+test_nio_std-nio_std.obj: nio_std.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_nio_std_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_nio_std-nio_std.obj `if test -f 'nio_std.F90'; then $(CYGPATH_W) 'nio_std.F90'; else $(CYGPATH_W) '$(srcdir)/nio_std.F90'; fi`
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

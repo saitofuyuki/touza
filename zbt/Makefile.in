@@ -17,7 +17,7 @@
 # touza/zbt Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jul 24 2024
-# Time-stamp: <2025/01/22 12:07:28 fuyuki Makefile.am>
+# Time-stamp: <2025/05/23 13:13:25 fuyuki Makefile.am>
 
 # Copyright (C) 2024, 2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -744,6 +744,8 @@ all:
 install-mod:
 
 uninstall-mod:
+
+check-bin:
 
 python-build-prepare: copy-sources
 	@for d in $(SUBDIRS); \

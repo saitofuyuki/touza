@@ -17,7 +17,7 @@
 # touza/jmz Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Nov 21 2021
-# Time-stamp: <2025/02/14 18:08:54 fuyuki Makefile.am>
+# Time-stamp: <2025/05/23 13:14:47 fuyuki Makefile.am>
 
 # Copyright (C) 2021,2022,2023,2024,2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -1272,6 +1272,8 @@ rebuild-lib:
 	@if test "$(TOUZA_top_builddir)"; \
 	then cd $(TOUZA_top_builddir) && $(MAKE) clean all; \
 	else echo "Need to set TOUZA_top_builddir" >&2; exit 1; fi
+
+check-bin: $(check_PROGRAMS)
 
 @with_emulates_TRUE@install-exec-hook: install-gtfna-family install-gtfnb-family
 @with_emulates_TRUE@uninstall-hook: uninstall-symlinks

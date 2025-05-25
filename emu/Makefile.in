@@ -17,7 +17,7 @@
 # touza/emu Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 15 2020
-# Time-stamp: <2024/07/04 17:25:51 fuyuki Makefile.am>
+# Time-stamp: <2025/05/23 09:26:20 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -25,7 +25,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Thu May 15 11:40:10 JST 2025
+# from AX_AM_MACROS_STATIC on Sun May 25 15:36:06 JST 2025
 
 
 
@@ -113,7 +113,7 @@ target_triplet = @target@
 @gcc_dependencies_TRUE@am__append_3 = *.dep
 @MAINTAINER_MODE_TRUE@am__append_4 = wrap-ugg.sh demo_stp.sh.in
 check_PROGRAMS = test_emu_msg$(EXEEXT) test_emu_usi$(EXEEXT) \
-	test_emu_ugg$(EXEEXT)
+	test_emu_ugg$(EXEEXT) test_emu$(EXEEXT)
 subdir = emu
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
@@ -140,10 +140,13 @@ AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
-am_test_emu_msg_OBJECTS = test_emu_msg-emu_msg.$(OBJEXT)
-test_emu_msg_OBJECTS = $(am_test_emu_msg_OBJECTS)
+am_test_emu_OBJECTS = test_emu-emu.$(OBJEXT)
+test_emu_OBJECTS = $(am_test_emu_OBJECTS)
 am__DEPENDENCIES_1 =
 am__DEPENDENCIES_2 = $(noinst_LTLIBRARIES) $(am__DEPENDENCIES_1)
+test_emu_DEPENDENCIES = $(am__DEPENDENCIES_2)
+am_test_emu_msg_OBJECTS = test_emu_msg-emu_msg.$(OBJEXT)
+test_emu_msg_OBJECTS = $(am_test_emu_msg_OBJECTS)
 test_emu_msg_DEPENDENCIES = $(am__DEPENDENCIES_2)
 am_test_emu_ugg_OBJECTS = test_emu_ugg-emu_ugg.$(OBJEXT)
 test_emu_ugg_OBJECTS = $(am_test_emu_ugg_OBJECTS)
@@ -202,11 +205,13 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libtouza_local_la_SOURCES) \
-	$(EXTRA_libtouza_local_la_SOURCES) $(test_emu_msg_SOURCES) \
-	$(test_emu_ugg_SOURCES) $(test_emu_usi_SOURCES)
+	$(EXTRA_libtouza_local_la_SOURCES) $(test_emu_SOURCES) \
+	$(test_emu_msg_SOURCES) $(test_emu_ugg_SOURCES) \
+	$(test_emu_usi_SOURCES)
 DIST_SOURCES = $(libtouza_local_la_SOURCES) \
-	$(EXTRA_libtouza_local_la_SOURCES) $(test_emu_msg_SOURCES) \
-	$(test_emu_ugg_SOURCES) $(test_emu_usi_SOURCES)
+	$(EXTRA_libtouza_local_la_SOURCES) $(test_emu_SOURCES) \
+	$(test_emu_msg_SOURCES) $(test_emu_ugg_SOURCES) \
+	$(test_emu_usi_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -557,6 +562,9 @@ test_emu_msg_LDADD = $(TEST_COMMON_LIBS)
 test_emu_ugg_SOURCES = emu_ugg.F90
 test_emu_ugg_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_UGG=1
 test_emu_ugg_LDADD = $(TEST_COMMON_LIBS)
+test_emu_SOURCES = emu.F90
+test_emu_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU=1
+test_emu_LDADD = $(TEST_COMMON_LIBS)
 @enable_module_dependencies_TRUE@emu_lo_MODULE_DEPS = $(builddir)/touza_emu_usi.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@emu_o_MODULE_DEPS = $(builddir)/touza_emu_usi.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@emu_msg_o_MODULE_DEPS = $(top_builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/touza_emu_msg.$(FC_MODEXT)
@@ -618,6 +626,10 @@ clean-noinstLTLIBRARIES:
 libtouza_local.la: $(libtouza_local_la_OBJECTS) $(libtouza_local_la_DEPENDENCIES) $(EXTRA_libtouza_local_la_DEPENDENCIES) 
 	$(AM_V_FCLD)$(FCLINK)  $(libtouza_local_la_OBJECTS) $(libtouza_local_la_LIBADD) $(LIBS)
 
+test_emu$(EXEEXT): $(test_emu_OBJECTS) $(test_emu_DEPENDENCIES) $(EXTRA_test_emu_DEPENDENCIES) 
+	@rm -f test_emu$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_emu_OBJECTS) $(test_emu_LDADD) $(LIBS)
+
 test_emu_msg$(EXEEXT): $(test_emu_msg_OBJECTS) $(test_emu_msg_DEPENDENCIES) $(EXTRA_test_emu_msg_DEPENDENCIES) 
 	@rm -f test_emu_msg$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_emu_msg_OBJECTS) $(test_emu_msg_LDADD) $(LIBS)
@@ -644,6 +656,12 @@ distclean-compile:
 
 .F90.lo:
 	$(AM_V_PPFC)$(LTPPFCCOMPILE) -c -o $@ $<
+
+test_emu-emu.o: emu.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu-emu.o `test -f 'emu.F90' || echo '$(srcdir)/'`emu.F90
+
+test_emu-emu.obj: emu.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu-emu.obj `if test -f 'emu.F90'; then $(CYGPATH_W) 'emu.F90'; else $(CYGPATH_W) '$(srcdir)/emu.F90'; fi`
 
 test_emu_msg-emu_msg.o: emu_msg.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_msg_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_msg-emu_msg.o `test -f 'emu_msg.F90' || echo '$(srcdir)/'`emu_msg.F90

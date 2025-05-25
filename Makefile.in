@@ -17,7 +17,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/05/09 15:42:22 fuyuki Makefile.am>
+# Time-stamp: <2025/05/21 13:36:38 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -26,7 +26,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Thu May 15 11:40:10 JST 2025
+# from AX_AM_MACROS_STATIC on Sun May 25 15:36:06 JST 2025
 
 
 
@@ -618,7 +618,7 @@ lib@TOUZA_NAME@_version =
 SUBDIRS = std $(am__append_4) $(am__append_7) $(am__append_10) \
 	$(am__append_13) $(am__append_16) $(am__append_19) \
 	$(am__append_23) m4c . $(subdirs_extra)
-DIST_SUBDIRS = std emu cal trp nio ppp $(am__append_20) zbt m4c . \
+DIST_SUBDIRS = std emu cal trp nio ppp $(am__append_20) m4c . \
 	$(subdirs_extra)
 lib@TOUZA_NAME@_la_LIBADD = std/$(local_name) $(am__append_5) \
 	$(am__append_8) $(am__append_11) $(am__append_14) \
