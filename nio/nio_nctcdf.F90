@@ -1,10 +1,10 @@
 !!!_! nio_nctcdf.F90 - TOUZA/Nio nanchatte netcdf interface
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 28 2022
-#define TIME_STAMP 'Time-stamp: <2024/02/02 09:48:46 fuyuki nio_nctcdf.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:43:10 fuyuki nio_nctcdf.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -86,7 +86,7 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
     integer,intent(in),optional :: maxf
-    integer lv, md, lmd
+    integer lv, md, lmd, chmd
 
     ierr = 0
 
@@ -102,8 +102,9 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
-          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
+          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=chmd, stdv=stdv)
        endif
        if (md.ge.MODE_DEEP) then
           continue
@@ -126,7 +127,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -144,8 +145,9 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=chmd)
        endif
        if (md.ge.MODE_DEEP) then
           continue
@@ -164,7 +166,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -180,8 +182,9 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=chmd)
        endif
        if (md.ge.MODE_DEEP) then
           continue

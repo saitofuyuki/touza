@@ -1,10 +1,10 @@
 !!!_! nio_axis.F90 - TOUZA/Nio axis record special
 ! Maintainer: SAITO Fuyuki
 ! Created: Apr 4 2024
-#define TIME_STAMP 'Time-stamp: <2024/04/04 17:17:28 fuyuki nio_axis.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:41:24 fuyuki nio_axis.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2024
+! Copyright (C) 2024, 2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -59,14 +59,14 @@ contains
        &  u,    levv, mode, stdv, icomm)
     use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,   only: ns_init=>init, choice
-    use TOUZA_Nio_header,only: nh_init=>init
+    ! use TOUZA_Nio_header,only: nh_init=>init
     use TOUZA_Nio_record,only: nr_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
     integer,intent(in),optional :: icomm
-    integer lv, md, lmd
+    integer lv, md, lmd, chmd
 
     ierr = 0
 
@@ -82,9 +82,10 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
-          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
-          if (ierr.eq.0) call nr_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
+          ! if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=chmd, stdv=stdv)
+          if (ierr.eq.0) call nr_init(ierr, u=ulog, levv=lv, mode=chmd, stdv=stdv)
        endif
        if (init_counts.eq.0) then
        endif
@@ -98,13 +99,13 @@ contains
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Nio_std,only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
-    use TOUZA_Nio_header,only: nh_diag=>diag
+    ! use TOUZA_Nio_header,only: nh_diag=>diag
     use TOUZA_Nio_record,only: nr_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -122,9 +123,10 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nr_diag(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call nr_diag(ierr, utmp, levv=lv, mode=chmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -135,13 +137,13 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Nio_std,only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,only: ns_finalize=>finalize, choice
-    use TOUZA_Nio_header,only: nh_finalize=>finalize
+    ! use TOUZA_Nio_header,only: nh_finalize=>finalize
     use TOUZA_Nio_record,only: nr_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -157,9 +159,10 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nr_finalize(ierr, utmp, levv=lv, mode=lmd)
+          ! if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call nr_finalize(ierr, utmp, levv=lv, mode=chmd)
        endif
        fine_counts = fine_counts + 1
     endif

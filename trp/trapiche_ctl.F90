@@ -1,10 +1,10 @@
 !!!_! trapiche_ctl.F90 - TOUZA/Trapiche control
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 11 2021
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:33:49 fuyuki trapiche_ctl.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:12:49 fuyuki trapiche_ctl.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021-2023
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -171,9 +171,9 @@ program test_trp_ctl
   integer ierr
   integer lbits
 
-  call init(ierr)
+  call init(ierr, stdv=+9)
   if (ierr.eq.0) call diag(ierr)
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+9)
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop

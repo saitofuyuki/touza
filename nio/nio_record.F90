@@ -1,10 +1,10 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2024/07/30 07:35:30 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:25:31 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022, 2023, 2024
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -539,7 +539,7 @@ contains
     character(len=*),intent(in),optional :: utime
     character(len=*),intent(in),optional :: csign, msign
     integer,         intent(in),optional :: icomm
-    integer lv, md, lmd
+    integer lv, md, lmd, ttmd
     character(len=litem) :: hdummy
 
     ierr = 0
@@ -560,7 +560,9 @@ contains
           if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
        endif
        if (md.ge.MODE_DEEP) then
-          if (ierr.eq.0) call trp_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
+          ! ttmd = MODE_SHALLOW
+          ttmd = lmd
+          if (ierr.eq.0) call trp_init(ierr, u=ulog, levv=lv, mode=ttmd, stdv=stdv)
        endif
        if (init_counts.eq.0) then
           nlhead_std = get_size_bytes(hdummy, nitem)
@@ -11736,7 +11738,7 @@ program test_nio_record
   ierr = 0
   jarg = 0
 101 format(A,' = ', I0)
-  call init(ierr, stdv=-9, icomm=MPI_COMM_NULL)
+  call init(ierr, stdv=+9, icomm=MPI_COMM_NULL)
   ! call init(ierr, stdv=-9, icomm=MPI_COMM_NULL, levv=+99)
   ! if (ierr.eq.0) call diag(ierr, u=-1, levv=+99)
   if (ierr.eq.0) call diag(ierr, levv=+9)
@@ -11792,7 +11794,7 @@ program test_nio_record
      end select
   endif
 
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+9)
   write(*, 101) 'FINAL', ierr
   stop
 contains

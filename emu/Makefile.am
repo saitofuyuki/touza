@@ -1,7 +1,7 @@
 # touza/emu Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 15 2020
-# Time-stamp: <2024/07/04 17:25:51 fuyuki Makefile.am>
+# Time-stamp: <2025/05/23 09:26:20 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -47,6 +47,11 @@ test_emu_msg_LDADD    = $(TEST_COMMON_LIBS)
 test_emu_ugg_SOURCES  = emu_ugg.F90
 test_emu_ugg_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_UGG=1
 test_emu_ugg_LDADD    = $(TEST_COMMON_LIBS)
+
+check_PROGRAMS += test_emu
+test_emu_SOURCES  = emu.F90
+test_emu_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU=1
+test_emu_LDADD    = $(TEST_COMMON_LIBS)
 
 CLEANFILES += $(noinst_SCRIPTS)
 

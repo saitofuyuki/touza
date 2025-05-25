@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/04/26 22:57:54 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/22 16:12:39 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -31,6 +31,13 @@ module TOUZA_Std_mwe
   integer,parameter :: switch_enabled  = +1    /* MPI enabled */
   integer,parameter :: switch_disabled = 0     /* MPI included but disabled */
   integer,parameter :: switch_excluded = -1    /* MPI excluded */
+  ! mpi_comm_comp results and more
+  integer,parameter,public :: cc_ident = 0
+  integer,parameter,public :: cc_congruent = 1
+  integer,parameter,public :: cc_similar = 2
+  integer,parameter,public :: cc_both_null = 3
+  integer,parameter,public :: cc_unequal = 4
+  integer,parameter,public :: cc_either_null = 5
 #if OPT_USE_MPI
 #else  /* not OPT_USE_MPI */
   ! dummy parameters
@@ -47,6 +54,10 @@ module TOUZA_Std_mwe
   integer,parameter :: MPI_CHARACTER = 5
   integer,parameter :: MPI_DOUBLE_PRECISION = 17
   integer,parameter :: MPI_STATUS_SIZE = 6
+  integer,parameter :: MPI_IDENT = 0
+  integer,parameter :: MPI_CONGRUENT = 1
+  integer,parameter :: MPI_SIMILAR = 2
+  integer,parameter :: MPI_UNEQUAL = 3
 #endif /* not OPT_USE_MPI */
 !!!_  - static
 #define __MDL__ 'mwe'
@@ -68,6 +79,7 @@ module TOUZA_Std_mwe
   public get_ni,   get_ni_safe
   public get_wni,  get_wni_safe
   public get_gni
+  public comp_comms, comp_groups
   public is_mpi_activated
   public safe_mpi_init, safe_mpi_finalize
   public show_mpi_type
@@ -81,6 +93,8 @@ module TOUZA_Std_mwe
   public MPI_COMM_CREATE,   MPI_COMM_SPLIT, MPI_COMM_GROUP
   public MPI_WAIT, MPI_BARRIER
   public MPI_PROBE, MPI_GET_COUNT
+  public MPI_COMM_COMPARE, MPI_IDENT, MPI_CONGRUENT, MPI_SIMILAR, MPI_UNEQUAL
+  public MPI_GROUP_COMPARE
 
 !!!_  - misc
   character(len=128) tmsg
@@ -507,6 +521,71 @@ contains
 #endif
     return
   end function is_mpi_activated
+
+!!!_  & comp_comms - wrapper for MPI_Comm_compare
+  integer function comp_comms(icomm0, icomm1) result(e)
+    implicit none
+    integer,intent(in) :: icomm0, icomm1
+    integer :: jerr
+    if (icomm0.eq.MPI_COMM_NULL) then
+       if (icomm1.eq.MPI_COMM_NULL) then
+          e = cc_both_null
+       else
+          e = cc_either_null
+       endif
+    else if (icomm1.eq.MPI_COMM_NULL) then
+       e = cc_either_null
+    else
+       call MPI_Comm_compare(icomm0, icomm1, e, jerr)
+       if (jerr.ne.MPI_SUCCESS) then
+          e = _ERROR(ERR_PANIC)
+       else
+          select case (e)
+          case (MPI_IDENT)
+             e = cc_ident
+          case (MPI_CONGRUENT)
+             e = cc_congruent
+          case (MPI_SIMILAR)
+             e = cc_similar
+          case (MPI_UNEQUAL)
+             e = cc_unequal
+          case default
+             e = _ERROR(ERR_INVALID_SWITCH)
+          end select
+       endif
+    endif
+  end function comp_comms
+!!!_  & comp_groups - wrapper for MPI_Group_compare
+  integer function comp_groups(igrp0, igrp1) result(e)
+    implicit none
+    integer,intent(in) :: igrp0, igrp1
+    integer :: jerr
+    if (igrp0.eq.MPI_GROUP_NULL) then
+       if (igrp1.eq.MPI_GROUP_NULL) then
+          e = cc_both_null
+       else
+          e = cc_either_null
+       endif
+    else if (igrp1.eq.MPI_GROUP_NULL) then
+       e = cc_either_null
+    else
+       call MPI_GROUP_compare(igrp0, igrp1, e, jerr)
+       if (jerr.ne.MPI_SUCCESS) then
+          e = _ERROR(ERR_PANIC)
+       else
+          select case (e)
+          case (MPI_IDENT)
+             e = cc_ident
+          case (MPI_SIMILAR)
+             e = cc_similar
+          case (MPI_UNEQUAL)
+             e = cc_unequal
+          case default
+             e = _ERROR(ERR_INVALID_SWITCH)
+          end select
+       endif
+    endif
+  end function comp_groups
 !!!_  & safe_mpi_init
   subroutine safe_mpi_init(ierr)
     implicit none
@@ -645,9 +724,26 @@ contains
 
   subroutine MPI_PROBE &
        & (SOURCE, TAG, COMM, STATUS, IERROR)
+    implicit none
     INTEGER   SOURCE, TAG, COMM, STATUS(*), IERROR
     IERROR = ERR_NOT_IMPLEMENTED
   end subroutine MPI_PROBE
+
+  subroutine MPI_COMM_COMPARE &
+       & (COMM1, COMM2, RESULT, IERROR)
+    implicit none
+    INTEGER COMM1, COMM2, RESULT, IERROR
+    RESULT = MPI_UNEQUAL
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_COMM_COMPARE
+
+  subroutine MPI_GROUP_COMPARE &
+       & (GROUP1, GROUP2, RESULT, IERROR)
+    implicit none
+    INTEGER GROUP1, GROUP2, RESULT, IERROR
+    RESULT = MPI_UNEQUAL
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_GROUP_COMPARE
 
 #endif /* not OPT_USE_MPI */
 #if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS

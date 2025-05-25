@@ -1,10 +1,10 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2024/02/21 23:00:49 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:14:36 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022, 2023, 2024
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -4467,7 +4467,7 @@ program test_trapiche_float
 
 101 format(A, ' = ', I0)
 
-  call init(ierr, levv=-1)
+  call init(ierr, levv=-1, stdv=+9)
   ! write(*, 101) 'init', ierr
   if (ierr.eq.0) call diag(ierr)
   if (ierr.eq.0) call diag_real_props(ierr, mold)
@@ -4497,7 +4497,7 @@ program test_trapiche_float
   if (ierr.eq.0) call get_option(ierr, xran(1:3), 'e', unset=.TRUE.)        ! e=LOWER,UPPER-EXPONENTS
   if (ierr.eq.0) call get_option(ierr, mbits, 'm', 0)                       ! m=MANTISSA-BITS
   if (ierr.eq.0) call get_option(ierr, ccode, 'c', ' ')                     ! c=CODES
-  if (ierr.eq.0) call init(ierr)
+  ! if (ierr.eq.0) call init(ierr)
 
   if (ierr.eq.0) call parse_codes(ierr, kcode, ccode)
 
@@ -4532,7 +4532,7 @@ program test_trapiche_float
      if (ierr.eq.0) call compare_report(ierr, vsrc, vrstu, mem)
   endif
   if (ierr.eq.0) then
-     call finalize(ierr)
+     call finalize(ierr, levv=+9)
   endif
   write(*, 101) 'Fine', ierr
   stop

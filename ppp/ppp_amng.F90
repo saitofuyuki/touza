@@ -1,10 +1,10 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2024/07/11 22:44:04 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/24 20:59:42 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022,2023,2024
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 #ifdef HAVE_CONFIG_H
@@ -88,6 +88,8 @@ module TOUZA_Ppp_amng
      integer               :: mgrp = MPI_GROUP_NULL ! mpi group
      integer               :: isrc = 0              ! source agent index
      integer               :: kflg = flag_none      ! flag
+     integer               :: ir   = -1
+     integer               :: nr   = -1
   end type aprop_t
   type(aprop_t),save :: atblp(-1:latbl)
 !!!_ + static
@@ -329,12 +331,15 @@ contains
   subroutine diag_table &
        & (ierr, u)
     use TOUZA_Ppp_std,only: get_wni_safe, get_ni, get_gni, msg, diag_htable
+    use TOUZA_Ppp_std,only: comp_comms, comp_groups, cc_unequal, cc_both_null
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
 
     integer utmp
-    integer jt
+    integer jt,   jt2
+    integer kctp, jcsrc
+    integer kgtp, jgsrc
     integer irw
     integer ico, irc, nrc
     integer igr, irg, nrg
@@ -352,20 +357,46 @@ contains
        call msg('mpi deactivated.', __MDL__, utmp)
     else
 101    format('comm:', I0, 1x, I0, ':', A, 1x, 2('[', I0, ':', I0, ']'), 1x, I0, 1x, A)
+102    format('comm:', I0, 1x, I0, ':', A, 1x, 2('[', I0, ':', I0, ']'), 1x, I0, 1x, A, &
+            & ' = ', I0, '(', I0, ') ', I0, '(', I0, ')')
        do jt = 0, matbl - 1
           ico = atblp(jt)%comm
-          call get_ni(ierr, nrc, irc, ico)
+          jcsrc = -1
+          do jt2 = 0, jt - 1
+             kctp = comp_comms(ico, atblp(jt2)%comm)
+             if (kctp.lt.0) cycle
+             if (kctp.ge.cc_both_null) cycle
+             jcsrc = jt2
+             exit
+          enddo
+          jgsrc = -1
           igr = atblp(jt)%mgrp
+          do jt2 = 0, jt - 1
+             kgtp = comp_groups(igr, atblp(jt2)%mgrp)
+             if (kgtp.lt.0) cycle
+             if (kgtp.ge.cc_both_null) cycle
+             jgsrc = jt2
+             exit
+          enddo
+          call get_ni(ierr, nrc, irc, ico)
           call get_gni(ierr, igr, nrg, irg)
           if (astack(jstack).eq.jt) then
              TM = '+'
           else
              TM = ' '
           endif
-          write(txt, 101) irw, jt, &
-               & trim(atblp(jt)%name), &
-               & irg, nrg, irc, nrg, &
-               & atblp(jt)%isrc, trim(flagch(atblp(jt)%kflg) // TM)
+          if (jcsrc.ge.0) then
+             write(txt, 102) irw, jt, &
+                  & trim(atblp(jt)%name), &
+                  & irg, nrg, irc, nrg, &
+                  & atblp(jt)%isrc, trim(flagch(atblp(jt)%kflg) // TM), &
+                  & jcsrc, kctp, jgsrc, kgtp
+          else
+             write(txt, 101) irw, jt, &
+                  & trim(atblp(jt)%name), &
+                  & irg, nrg, irc, nrg, &
+                  & atblp(jt)%isrc, trim(flagch(atblp(jt)%kflg) // TM)
+          endif
           call msg(txt, __MDL__, utmp)
        enddo
     endif
@@ -631,6 +662,39 @@ contains
     endif
 
   end subroutine diag_map_string
+!!!_  & show_stack_simple
+  subroutine show_stack_simple(ierr, iagent, dir, levv, u)
+    use TOUZA_Ppp_std,only: choice, msg
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: iagent
+    integer,intent(in)  :: dir
+    integer,intent(in),optional  :: u
+    integer,intent(in),optional  :: levv
+    integer lv, utmp
+    character(len=256) :: buf
+    integer jt
+
+    ierr = 0
+    lv = choice(lev_verbose, levv)
+    utmp = get_logu(u, ulog)
+
+101 format('stack: << ', I0, ':', A)
+102 format('stack: <> ', I0, ':', A)
+103 format('stack: >> ', I0, ':', A)
+    if (dir.lt.0) then
+       jt = astack(jstack + 1)
+       write(buf, 101) jt, trim(atblp(jt)%name)
+    else if (dir.eq.0) then
+       jt = iagent
+       write(buf, 102) jt, trim(atblp(jt)%name)
+    else
+       jt = iagent
+       write(buf, 103) jt, trim(atblp(jt)%name)
+    endif
+    call msg(buf, __MDL__, utmp)
+  end subroutine show_stack_simple
+
 !!!_  & show_stack
   subroutine show_stack(ierr, iagent, dir, levv, u)
     use TOUZA_Ppp_std,only: choice, msg
@@ -743,14 +807,16 @@ contains
 
     if (present(irank)) then
        if (ja.ge.0) then
-          call MPI_Group_rank(ig, irank, ierr)
+          ! call MPI_Group_rank(ig, irank, ierr)
+          irank = atblp(ja)%ir
        else
           irank = -1
        endif
     endif
     if (present(ismem)) then
        if (ja.ge.0) then
-          call MPI_Group_rank(ig, ir, ierr)
+          ! call MPI_Group_rank(ig, ir, ierr)
+          ir = atblp(ja)%ir
        else
           ir = -1
        endif
@@ -758,7 +824,8 @@ contains
     endif
     if (present(nrank)) then
        if (ja.ge.0) then
-          call MPI_Group_size(ig, nrank, ierr)
+          ! call MPI_Group_size(ig, nrank, ierr)
+          nrank = atblp(ja)%nr
        else
           nrank = -1
        endif
@@ -836,7 +903,7 @@ contains
     a = min(+1, max(-1, choice(0, lev)))
     jstack = jstack + a
     if (jstack.lt.0.or.jstack.ge.lstack) ierr = -1
-    if (ierr.eq.0) call show_stack(ierr, iagent, a)
+    if (ierr.eq.0) call show_stack_simple(ierr, iagent, a)
     if (a.ge.0) then
        if (iagent.lt.0.or.iagent.ge.matbl) ierr = -1
        if (ierr.eq.0) astack(jstack) = iagent
@@ -1305,7 +1372,8 @@ contains
        endif
        if (ierr.eq.0) then
           atblp(ja)%comm = icnew
-          atblp(ja)%mgrp = ignew
+          ! atblp(ja)%mgrp = ignew
+          call cache_agent_props(ierr, atblp(ja), ignew)
        endif
     endif
     if (ierr.eq.0) deallocate(ranks, STAT=ierr)
@@ -1505,7 +1573,10 @@ contains
     je = ja + nt - 1
 
     atblp(ja:je)%name = tci(1:nt)
-    atblp(ja:je)%mgrp = tgr(1:nt)
+    ! atblp(ja:je)%mgrp = tgr(1:nt)
+    do jt = 1, nt
+       call cache_agent_props(ierr, atblp(ja+jt-1), tgr(jt))
+    enddo
     ! atblp(ja:je)%isrc = src
     icsrc = atblp(src)%comm
 
@@ -1600,7 +1671,8 @@ contains
        ! atblp(iagent)%isrc = isrc
        call MPI_Comm_group(icomm, jgrp, ierr)
        if (ierr.eq.0) then
-          atblp(iagent)%mgrp = jgrp
+          ! atblp(iagent)%mgrp = jgrp
+          call cache_agent_props(ierr, atblp(iagent), jgrp)
        else
           atblp(iagent)%mgrp = MPI_GROUP_NULL
           ierr = -1
@@ -1611,7 +1683,8 @@ contains
           ierr = -1
        else
           atblp(iagent)%comm = atblp(src)%comm
-          atblp(iagent)%mgrp = atblp(src)%mgrp
+          ! atblp(iagent)%mgrp = atblp(src)%mgrp
+          call cache_agent_props(ierr, atblp(iagent), atblp(src)%mgrp)
        endif
     else
        ierr = -1
@@ -1644,7 +1717,8 @@ contains
     atblp(iagent)%name = name
     atblp(iagent)%kflg = flag
     ! atblp(iagent)%isrc = src
-    atblp(iagent)%mgrp = igroup
+    ! atblp(iagent)%mgrp = igroup
+    call cache_agent_props(ierr, atblp(iagent), igroup)
     icsrc = atblp(src)%comm
 
     call MPI_Comm_create(icsrc, igroup, icnew, ierr)
@@ -1672,8 +1746,9 @@ contains
 
     atblp(iagent)%name = name
     atblp(iagent)%kflg = flag
-    atblp(iagent)%mgrp = atblp(iaref)%mgrp
+    ! atblp(iagent)%mgrp = atblp(iaref)%mgrp
     atblp(iagent)%comm = atblp(iaref)%comm
+    call cache_agent_props(ierr, atblp(iagent), atblp(iaref)%mgrp)
 
     return
   end subroutine add_entry_copy
@@ -2032,6 +2107,7 @@ contains
     integer,optional,intent(out) :: irank, nrank
     integer nr, ir
 
+    ierr = 0
     if (ierr.eq.0) call get_ni(ierr, nr, ir, icomm)
     if (ierr.eq.0) then
        if (present(irank)) then
@@ -2136,6 +2212,24 @@ contains
     if (jerr.ne.0) n = jerr
   end function query_agent_core
 
+!!!_  - cache_agent_props - cache agent properties
+  subroutine cache_agent_props(ierr, tbl, igrp)
+    implicit none
+    integer,      intent(out)   :: ierr
+    type(aprop_t),intent(inout) :: tbl
+    integer,      intent(in)    :: igrp
+    integer ir, nr
+
+    ierr = 0
+    tbl%mgrp = igrp
+
+    if (ierr.eq.0) call MPI_Group_rank(igrp, ir, ierr)
+    if (ierr.eq.0) tbl%ir = ir
+    if (ierr.eq.0) call MPI_Group_size(igrp, nr, ierr)
+    if (ierr.eq.0) tbl%nr = nr
+
+  end subroutine cache_agent_props
+
 !!!_ + end TOUZA_Ppp_amng
 end module TOUZA_Ppp_amng
 !!!_@ test_ppp_amng - test program
@@ -2159,7 +2253,7 @@ program test_ppp_amng
   jarg = 0
 
 101 format(A, ' = ', I0)
-  call init(ierr, levv=+9)
+  call init(ierr, levv=+9, stdv=+9)
   write(*, 101) 'INIT', ierr
 
   icw = MPI_COMM_WORLD
