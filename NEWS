@@ -1,10 +1,20 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/03/07 10:08:45 fuyuki NEWS>
+# Time-stamp: <2025/05/25 15:34:18 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.16.1
+** Improvement for MIROC infrastructure replacement
+- Complex call-trees (init/diag/finalize) simplified.
+- TOUZA_Ppp_amng::show_stack_simple introduced,
+  to replace somewhat heavy monitoring with show_stack.
+** Bug fixes
+- Fixed wrong finalization
+- Fixed non-initialized varibles.
+- Fix DIST_SUBDIRS duplicaton (build).
 
 * Changes in 1.16.0
 ** Bug fix on 1.16
