@@ -1,10 +1,10 @@
 !!!_! trapiche_std.F90 - TOUZA/Trapiche utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 30 2021
-#define TIME_STAMP 'Time-stamp: <2024/08/13 20:09:58 fuyuki trapiche_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:11:54 fuyuki trapiche_std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021-2023
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -117,11 +117,11 @@ contains
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
-       lmd = control_deep(md, mode)
+       lmd = MODE_SURFACE
        if (md.ge.MODE_DEEP) then
           lev_stdv = choice(lev_stdv, stdv)
-          if (ierr.eq.0) call utl_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call prc_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
+          if (ierr.eq.0) call utl_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call log_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call ipc_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
        endif
@@ -168,10 +168,10 @@ contains
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
           endif
        endif
-       lmd = control_deep(md, mode)
+       lmd = MODE_SURFACE
        if (md.ge.MODE_DEEP) then
-          if (ierr.eq.0) call utl_diag(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call prc_diag(ierr, utmp, lev_stdv, mode=lmd)
+          if (ierr.eq.0) call utl_diag(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call log_diag(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call ipc_diag(ierr, utmp, lev_stdv, mode=lmd)
        endif
@@ -202,10 +202,10 @@ contains
                & (ierr, md, init_counts, diag_counts, fine_counts, &
                &  pkg=__PKG__, grp=__GRP__, mdl=__MDL__, fun='finalize', u=utmp, levv=lv)
        endif
-       lmd = control_deep(md, mode)
+       lmd = MODE_SURFACE
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call utl_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call prc_finalize(ierr, utmp, lev_stdv, mode=lmd)
+          if (ierr.eq.0) call utl_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call log_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call ipc_finalize(ierr, utmp, lev_stdv, mode=lmd)
        endif
@@ -558,7 +558,7 @@ program test_trp_std
 
   call init(ierr, levv=+10, stdv=+10)
   if (ierr.eq.0) call diag(ierr)
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+10)
 101 format('FINAL = ', I0)
   write(*, 101) ierr
   stop

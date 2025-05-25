@@ -1,10 +1,10 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2024/08/01 11:27:10 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:04:01 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021, 2022, 2023, 2024
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -129,7 +129,7 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
     integer,intent(in),optional :: icomm
-    integer lv, md, lmd
+    integer lv, md, lmd, tsmd
 
     ierr = 0
 
@@ -146,10 +146,11 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
           lev_stdv = choice(lev_stdv, stdv)
+          tsmd = MODE_SURFACE
           ! if (ierr.eq.0) call env_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm) ! included by TOUZA_Std_sus
-          if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call sus_init(ierr, u=ulog, levv=lev_stdv, mode=lmd, icomm=icomm)
-          if (ierr.eq.0) call htb_init(ierr, u=ulog, levv=lev_stdv, mode=lmd)
+          if (ierr.eq.0) call bld_init(ierr, u=ulog, levv=lev_stdv, mode=tsmd)
+          if (ierr.eq.0) call htb_init(ierr, u=ulog, levv=lev_stdv, mode=tsmd)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -166,7 +167,7 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv
     integer,intent(in),optional :: mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, tsmd
 
     ierr = err_default
 
@@ -184,10 +185,11 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
+          tsmd = MODE_SURFACE
           ! if (ierr.eq.0) call env_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
-          if (ierr.eq.0) call bld_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
           if (ierr.eq.0) call sus_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
-          if (ierr.eq.0) call htb_diag(ierr, utmp, levv=lev_stdv, mode=lmd)
+          if (ierr.eq.0) call bld_diag(ierr, utmp, levv=lev_stdv, mode=tsmd)
+          if (ierr.eq.0) call htb_diag(ierr, utmp, levv=lev_stdv, mode=tsmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -202,7 +204,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, tsmd
 
     ierr = err_default
 
@@ -218,10 +220,11 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
+          tsmd = MODE_SURFACE
           ! if (ierr.eq.0) call env_finalize(ierr, utmp, lev_stdv, mode=lmd)
-          if (ierr.eq.0) call bld_finalize(ierr, utmp, lev_stdv, mode=lmd)
           if (ierr.eq.0) call sus_finalize(ierr, utmp, lev_stdv, mode=lmd)
-          if (ierr.eq.0) call htb_finalize(ierr, utmp, lev_stdv, mode=lmd)
+          if (ierr.eq.0) call bld_finalize(ierr, utmp, lev_stdv, mode=tsmd)
+          if (ierr.eq.0) call htb_finalize(ierr, utmp, lev_stdv, mode=tsmd)
        endif
        fine_counts = fine_counts + 1
     endif
@@ -304,7 +307,7 @@ program test_nio_std
   integer ierr
 
 101 format(A, ' = ', I0)
-  call init(ierr)
+  call init(ierr, levv=+9, stdv=+9)
   write(*, 101) 'INIT', ierr
 
   if (ierr.eq.0) call diag(ierr)

@@ -1,7 +1,7 @@
 !!!_! emu_usi.F90 - touza/emu usysio emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/05/09 14:40:27 fuyuki emu_usi.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 09:36:36 fuyuki emu_usi.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -123,7 +123,7 @@ contains
   subroutine init(ierr, u, levv, mode, stdv, icomm, pos, stdi, stdo)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
     use TOUZA_Std,only: &
-         & msg_grp, choice, mwe_init, arg_init, log_init, env_init, fun_init
+         & msg_grp, choice, mwe_init, arg_init, env_init, fun_init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -133,6 +133,7 @@ contains
     integer,intent(in),optional :: pos
     logical,intent(in),optional :: stdi, stdo
     integer lv, md, lmd
+    integer tsmd
 
     ierr = 0
 
@@ -151,11 +152,12 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
+          tsmd = MODE_SURFACE
           if (ierr.eq.0) call mwe_init(ierr, u=ulog, levv=stdv, mode=lmd, icomm=icomm)
-          if (ierr.eq.0) call env_init(ierr, u=ulog, levv=stdv, mode=lmd, icomm=icomm)
-          if (ierr.eq.0) call fun_init(ierr, u=ulog, levv=stdv, mode=lmd, icomm=icomm)
-          if (ierr.eq.0) call arg_init(ierr, u=ulog, levv=stdv, mode=lmd)
-          if (ierr.eq.0) call log_init(ierr, u=ulog, levv=stdv, mode=lmd)
+          if (ierr.eq.0) call env_init(ierr, u=ulog, levv=stdv, mode=tsmd, icomm=icomm)
+          if (ierr.eq.0) call fun_init(ierr, u=ulog, levv=stdv, mode=tsmd, icomm=icomm)
+          if (ierr.eq.0) call arg_init(ierr, u=ulog, levv=stdv, mode=tsmd)
+          ! if (ierr.eq.0) call log_init(ierr, u=ulog, levv=stdv, mode=lmd)   !! mwe
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -166,12 +168,13 @@ contains
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
     use TOUZA_Std,only: choice, is_msglev_NORMAL, msg_grp, &
-         & arg_diag, mwe_diag, log_diag, env_diag, fun_diag
+         & arg_diag, mwe_diag, env_diag, fun_diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
     integer utmp, lv, md, lmd
+    integer tsmd
     character(len=lpath) :: file
     integer jerr
 
@@ -205,11 +208,12 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
+          tsmd = MODE_SURFACE
           if (ierr.eq.0) call mwe_diag(ierr, u=utmp, mode=lmd)
-          if (ierr.eq.0) call arg_diag(ierr, u=utmp, mode=lmd)
-          if (ierr.eq.0) call log_diag(ierr, u=utmp, mode=lmd)
-          if (ierr.eq.0) call fun_diag(ierr, u=utmp, mode=lmd)
-          if (ierr.eq.0) call env_diag(ierr, u=utmp, mode=lmd)
+          if (ierr.eq.0) call env_diag(ierr, u=utmp, mode=tsmd)
+          if (ierr.eq.0) call fun_diag(ierr, u=utmp, mode=tsmd)
+          if (ierr.eq.0) call arg_diag(ierr, u=utmp, mode=tsmd)
+          ! if (ierr.eq.0) call log_diag(ierr, u=utmp, mode=tsmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -226,6 +230,7 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
     integer utmp, lv, md, lmd
+    integer tsmd
 
     ierr = err_default
 
@@ -241,11 +246,12 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_DEEP) then
+          tsmd = MODE_SURFACE
           if (ierr.eq.0) call mwe_finalize(ierr, u=utmp, mode=lmd)
-          if (ierr.eq.0) call arg_finalize(ierr, u=utmp, mode=lmd)
-          if (ierr.eq.0) call log_finalize(ierr, u=utmp, mode=lmd)
-          if (ierr.eq.0) call fun_finalize(ierr, u=utmp, mode=lmd)
-          if (ierr.eq.0) call env_finalize(ierr, u=utmp, mode=lmd)
+          if (ierr.eq.0) call env_finalize(ierr, u=utmp, mode=tsmd)
+          if (ierr.eq.0) call fun_finalize(ierr, u=utmp, mode=tsmd)
+          if (ierr.eq.0) call arg_finalize(ierr, u=utmp, mode=tsmd)
+          ! if (ierr.eq.0) call log_finalize(ierr, u=utmp, mode=lmd)
        endif
        fine_counts = fine_counts + 1
     endif
@@ -735,7 +741,7 @@ program test_emu_usi
   ierr = 0
 101 format(A, ' = ', I0)
 
-  call init(ierr, u=-1, levv=9, stdv=-1)
+  call init(ierr, u=-1, levv=9, stdv=+9)
   if (ierr.eq.0) call SETNML(98, 99)
 
   if (ierr.eq.0) call open_sysin(ierr)

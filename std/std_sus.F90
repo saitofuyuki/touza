@@ -2,10 +2,10 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2025/02/27 16:22:28 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 09:05:31 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022,2023,2024,2025
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -601,13 +601,53 @@ contains
     if (ierr.ne.0) ierr = ERR_IO_GENERAL
   end subroutine sus_open
 !!!_  & sus_close - close stream
-  subroutine sus_close(ierr, u, file)
+  subroutine sus_close(ierr, u, file, status, iomsg)
+    use TOUZA_Std_log,only: trace_err
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: u
     character(len=*),intent(in)  :: file
+    character(len=*),intent(in),   optional :: status
+    character(len=*),intent(inout),optional :: iomsg
+
+    character(len=16) :: STT
+
     ierr = ERR_SUCCESS
-    close(UNIT=u, IOSTAT=ierr)
+
+    call sus_spec_status_close(STT, ' ', status)
+
+#if HAVE_FORTRAN_OPEN_IOMSG
+    if (present(iomsg)) then
+       if (STT.eq.' ') then
+          close(UNIT=u, IOSTAT=ierr, IOMSG=iomsg)
+       else
+          close(UNIT=u, STATUS=TRIM(STT), IOSTAT=ierr, IOMSG=iomsg)
+       endif
+    else
+       if (STT.eq.' ') then
+          close(UNIT=u, IOSTAT=ierr)
+       else
+          close(UNIT=u, STATUS=TRIM(STT), IOSTAT=ierr)
+       endif
+       if (ierr.ne.0) then
+          call trace_err(ierr, fun='sus_close', asfx=file)
+       endif
+    endif
+#else /* not HAVE_FORTRAN_OPEN_IOMSG */
+    if (STT.eq.' ') then
+       close(UNIT=u, IOSTAT=ierr)
+    else
+       close(UNIT=u, STATUS=trim(STT), IOSTAT=ierr)
+    endif
+    if (ierr.ne.0) then
+       if (present(iomsg)) then
+101       format('sus_close error = ', I0, 1x, A)
+          write(iomsg, 101, IOSTAT=jerr) ierr, trim(file)
+       else
+          call trace_err(ierr, fun='sus_close', asfx=file)
+       endif
+    endif
+#endif /* not HAVE_FORTRAN_OPEN_IOMSG */
   end subroutine sus_close
 !!!_  & sus_spec_form
   subroutine sus_spec_form(form, def, str)
@@ -660,6 +700,23 @@ contains
        status = 'REPLACE'
     endif
   end subroutine sus_spec_status
+!!!_  & sus_spec_status_close
+  subroutine sus_spec_status_close(status, def, str)
+    use TOUZA_Std_utl,only: upcase
+    implicit none
+    character(len=*),intent(out)         :: status
+    character(len=*),intent(in)          :: def
+    character(len=*),intent(in),optional :: str
+    call choice_b(status, def, str)
+    call upcase(status)
+    if (status(1:1).eq.'K') then
+       status = 'KEEP'
+    else if (status(1:1).eq.'D') then
+       status = 'DEFAULT'
+    else
+       status = ' '
+    endif
+  end subroutine sus_spec_status_close
 !!!_  & sus_spec_position
   subroutine sus_spec_position(position, def, str)
     use TOUZA_Std_utl,only: upcase
@@ -7100,7 +7157,7 @@ program test_std_sus
      call test_slice_loop(ierr)
   endif
 
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+9)
   write(*, 101) 'FINAL', ierr
   stop
 contains
@@ -7566,7 +7623,7 @@ program test_std_sus
 
   if (ierr.eq.0) call test_null_iset(ierr, u, file_ni)
 
-  if (ierr.eq.0) call finalize(ierr)
+  if (ierr.eq.0) call finalize(ierr, levv=+9)
   write(*, 101) 'FINAL', ierr
   stop
 contains

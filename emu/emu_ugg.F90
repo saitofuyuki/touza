@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2025/02/15 21:49:16 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 09:50:40 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024, 2025
@@ -6549,7 +6549,7 @@ program test_emu_ugg
   use TOUZA_Emu_ugg
   use TOUZA_Std,only: KFLT, KDBL, KQPL
   use TOUZA_Std,only: KTGT=>KDBL
-  use TOUZA_Std,only: arg_init, arg_diag, parse, get_option
+  use TOUZA_Std,only: arg_init, arg_diag, arg_finalize, parse, get_option
   use TOUZA_Std,only: condop, banner
   implicit none
   integer ierr
@@ -6576,7 +6576,7 @@ program test_emu_ugg
   !   stereo=FLAG       simple north/south polar stereographic projection test,
 
   if (ierr.eq.0) call get_option(ierr, levv, 'v', 0)
-  if (ierr.eq.0) call init(ierr, u=-1, levv=levv, stdv=-1)
+  if (ierr.eq.0) call init(ierr, u=-1, levv=levv, stdv=+9)
   if (ierr.eq.0) call diag(ierr)
 
   if (ierr.eq.0) call get_option(ierr, prec,   'prec', 0)
@@ -6656,7 +6656,8 @@ program test_emu_ugg
      if (stp.gt.0) call batch_test_stp(ierr, stp)
   endif
 
-  call finalize(ierr)
+  call arg_finalize(ierr, levv=+9)
+  call finalize(ierr, levv=+9, mode=MODE_DEEPEST)
   write(*, 101) 'fine', ierr
   stop
 contains

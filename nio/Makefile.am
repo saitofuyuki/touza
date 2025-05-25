@@ -1,9 +1,9 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2024/07/29 17:32:19 fuyuki Makefile.am>
+# Time-stamp: <2025/05/23 10:58:20 fuyuki Makefile.am>
 
-# Copyright (C) 2021, 2022, 2023, 2024
+# Copyright (C) 2021-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -173,6 +173,11 @@ test_nio_nctcdf_FCFLAGS = $(AM_FCFLAGS)
 
 test_nio_bindc_SOURCES = test_nio_bindc.c touza_nio_interface.h touza_nio_param.h
 test_nio_bindc_LDADD = $(TEST_COMMON_LIBS) $(FCLIBS)
+
+check_PROGRAMS += test_nio_std
+test_nio_std_SOURCES = $(TEST_COMMON_SOURCES) nio_std.F90
+test_nio_std_LDADD = $(TEST_COMMON_LIBS)
+test_nio_std_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_NIO_STD=1
 
 $(CAL_SWITCH):
 	@cp $(srcdir)/../cal/$@ .

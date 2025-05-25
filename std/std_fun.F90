@@ -1,7 +1,7 @@
 !!!_! std_fun.F90 - touza/std file units manipulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 22 2020
-#define TIME_STAMP 'Time-stamp: <2024/08/01 09:48:04 fuyuki std_fun.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 17:09:15 fuyuki std_fun.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020,2021,2022,2023,2024
@@ -166,7 +166,7 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_log,only: mwe_finalize=>finalize
+    use TOUZA_Std_mwe,only: mwe_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: levv, mode
@@ -189,6 +189,7 @@ contains
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call mwe_finalize(ierr, utmp, levv, mode=lmd)
        endif
+       fine_counts = fine_counts + 1
     endif
     return
   end subroutine finalize

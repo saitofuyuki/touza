@@ -1,10 +1,10 @@
 !!!_! std_ipc.F90 - touza/std intrinsic procedures compatible gallery
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 25 2023
-#define TIME_STAMP 'Time-stamp: <2024/02/25 22:15:58 fuyuki std_ipc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 08:47:48 fuyuki std_ipc.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2023
+! Copyright (C) 2023-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -485,10 +485,9 @@ program test_std_ipc
   ierr = 0
   call init(ierr)
   if (ierr.eq.0) call diag(ierr)
-  if (ierr.eq.0) call finalize(ierr)
-  if (ierr.eq.0) call bld_init(ierr)
+  if (ierr.eq.0) call bld_init(ierr, mode=MODE_SURFACE)
   if (ierr.eq.0) call bld_diag(ierr, levv=+9)
-  if (ierr.eq.0) call bld_finalize(ierr)
+  if (ierr.eq.0) call bld_finalize(ierr, levv=+9)
 
   if (ierr.eq.0) call exam_IBITS(ierr, 0_KITGT, levv=0)
 
@@ -505,6 +504,7 @@ program test_std_ipc
   call test_invht(ierr, 0.5_KRTGT)
   call test_invht(ierr, 0.0_KRTGT)
 
+  call finalize(ierr, levv=+9)
   write(*, 101) ierr
   stop
 contains

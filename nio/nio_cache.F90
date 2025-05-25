@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2025/02/27 10:16:31 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:45:23 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023,2024,2025
@@ -225,7 +225,7 @@ contains
        & (ierr, u, levv, mode, stdv, icomm, ncache, sep)
     use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,   only: ns_init=>init, choice, get_size_bytes, KDBL
-    use TOUZA_Nio_header,only: nh_init=>init
+    ! use TOUZA_Nio_header,only: nh_init=>init
     use TOUZA_Nio_record,only: nr_init=>init
     use TOUZA_Nio_axis,only: na_init=>init
     use TOUZA_Nio_sparse,only: np_init=>init
@@ -236,7 +236,7 @@ contains
     integer,         intent(in),optional :: icomm
     integer,         intent(in),optional :: ncache
     character(len=*),intent(in),optional :: sep
-    integer lv, md, lmd
+    integer lv, md, lmd, chmd
 
     ierr = 0
 
@@ -253,7 +253,7 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
-          if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
+          ! if (ierr.eq.0) call nh_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call nr_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call na_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call np_init(ierr, u=ulog, levv=lv, mode=MODE_SURFACE)
@@ -274,7 +274,7 @@ contains
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
-    use TOUZA_Nio_header,only: nh_diag=>diag
+    ! use TOUZA_Nio_header,only: nh_diag=>diag
     use TOUZA_Nio_record,only: nr_diag=>diag
     use TOUZA_Nio_axis,only: na_diag=>diag
     use TOUZA_Nio_sparse,only: np_diag=>diag
@@ -306,7 +306,7 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
+          ! if (ierr.eq.0) call nh_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call nr_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call na_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call np_diag(ierr, utmp, levv=lv, mode=MODE_SURFACE)
@@ -320,7 +320,7 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
     use TOUZA_Nio_std,   only: ns_finalize=>finalize, choice
-    use TOUZA_Nio_header,only: nh_finalize=>finalize
+    ! use TOUZA_Nio_header,only: nh_finalize=>finalize
     use TOUZA_Nio_record,only: nr_finalize=>finalize
     use TOUZA_Nio_axis,only: na_finalize=>finalize
     use TOUZA_Nio_sparse,only: np_finalize=>finalize
@@ -345,7 +345,7 @@ contains
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ns_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
+          ! if (ierr.eq.0) call nh_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call nr_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call na_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)
           if (ierr.eq.0) call np_finalize(ierr, utmp, levv=lv, mode=MODE_SURFACE)

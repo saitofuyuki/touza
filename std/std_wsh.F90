@@ -1,10 +1,10 @@
 !!!_! std_wsh.F90 - touza/std standard work-sharing
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2024/02/25 21:58:29 fuyuki std_wsh.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 08:38:37 fuyuki std_wsh.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022,2023
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -183,7 +183,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        if (is_first_force(fine_counts, mode)) then
           if (VCHECK_DEBUG(lv)) then
-311          format(STD_FORMAT_FUN(__MDL__, 'finalize'), 'fine: ', I0, 1x, I0, 1x, I0, 1x, I0)
+311          format(STD_FORMAT_FUN(__MDL__, 'finalize'), 'fine[', I0, '] ', I0, 1x, I0, 1x, I0)
              if (utmp.ge.0) then
                 write(utmp, 311) ierr, init_counts, diag_counts, fine_counts
              else
@@ -530,7 +530,7 @@ program test_std_wsh
   implicit none
   integer ierr
 
-  call init(ierr)
+  call init(ierr, levv=+9)
   if (ierr.eq.0) call diag(ierr)
   if (ierr.eq.0) call finalize(ierr)
 101 format('FINAL = ', I0)

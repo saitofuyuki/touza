@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2025/03/20 10:15:02 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 08:35:21 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -287,7 +287,7 @@ contains
     if (md.ge.MODE_SURFACE) then
        if (is_first_force(fine_counts, mode)) then
           if (VCHECK_DEBUG(lv)) then
-311          format(STD_FORMAT_FUN(__MDL__, 'finalize'), 'fine: ', I0, 1x, I0, 1x, I0, 1x, I0)
+311          format(STD_FORMAT_FUN(__MDL__, 'finalize'), 'fine[', I0, '] ', I0, 1x, I0, 1x, I0)
              if (utmp.ge.0) then
                 write(utmp, 311) ierr, init_counts, diag_counts, fine_counts
              else
@@ -1000,7 +1000,7 @@ contains
 
 !!!_  & compact_string
   subroutine compact_string_f &
-       & (ierr, str, v, fmt, ldelim, rdelim, append, mag, tol, decp)
+       & (ierr, str, v, fmt, ldelim, rdelim, append, mag, decp)
     implicit none
     integer,parameter :: KTGT=KFLT
     integer,         intent(out)         :: ierr
@@ -1011,9 +1011,9 @@ contains
     logical,         intent(in),optional :: append
     logical,         intent(in),optional :: decp    ! leave decimal point (.FALSE.)
     integer,         intent(in),optional :: mag
-    real(kind=KTGT), intent(in),optional :: tol
+    ! real(kind=KTGT), intent(in),optional :: tol   ! (reserved)
     character(len=128) :: buf, bfmt
-    integer nd, nr, m
+    integer nd, nr, m, r
     integer lt
     integer jpp, jpx, jpe, jpt
 
@@ -1032,7 +1032,9 @@ contains
 102       format('(F0.', I0, ')')
           write(bfmt, 102) nd
        else
-          nr = ndigits(RANGE(v) / 2)
+          ! to avoid warning of Integer division truncation
+          r = RANGE(v) - MOD(RANGE(v), 2)
+          nr = ndigits(r / 2)
 101       format('(ES', I0, '.', I0, 'E', I0, ')')
           write(bfmt, 101) nd + nr + 5, nd, nr
        endif
@@ -1079,7 +1081,7 @@ contains
     endif
   end subroutine compact_string_f
   subroutine compact_string_d &
-       & (ierr, str, v, fmt, ldelim, rdelim, append, mag, tol, decp)
+       & (ierr, str, v, fmt, ldelim, rdelim, append, mag, decp)
     implicit none
     integer,parameter :: KTGT=KDBL
     integer,         intent(out)         :: ierr
@@ -1090,9 +1092,9 @@ contains
     logical,         intent(in),optional :: append
     logical,         intent(in),optional :: decp    ! leave decimal point (.FALSE.)
     integer,         intent(in),optional :: mag
-    real(kind=KTGT), intent(in),optional :: tol
+    ! real(kind=KTGT), intent(in),optional :: tol   ! (reserved)
     character(len=128) :: buf, bfmt
-    integer nd, nr, m
+    integer nd, nr, m, r
     integer lt
     integer jpp, jpx, jpe, jpt
 
@@ -1111,7 +1113,9 @@ contains
 102       format('(F0.', I0, ')')
           write(bfmt, 102) nd
        else
-          nr = ndigits(RANGE(v) / 2)
+          ! to avoid warning of Integer division truncation
+          r = RANGE(v) - MOD(RANGE(v), 2)
+          nr = ndigits(r / 2)
 101       format('(ES', I0, '.', I0, 'E', I0, ')')
           write(bfmt, 101) nd + nr + 5, nd, nr
        endif
@@ -2772,8 +2776,6 @@ program test_std_utl
   call test_nparser('*123')
   call test_nparser(',123')
 
-  call finalize(ierr)
-
   a(:) = (/11, 12, 13, 14/)
   b(:) = (/21, 22/)
   call test_choice(0)
@@ -2850,6 +2852,8 @@ program test_std_utl
   call test_bisection(6, -1)
   call test_bisection(7, -1)
   call test_bisection(0, -1)
+
+  call finalize(ierr)
 
   stop
 contains

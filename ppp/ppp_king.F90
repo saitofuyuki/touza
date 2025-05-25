@@ -1,10 +1,10 @@
 !!!_! ppp_king.F90 - TOUZA/ppp king control (xmcomm/xmking replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2024/07/11 22:19:10 fuyuki ppp_king.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 12:53:09 fuyuki ppp_king.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022,2023,2024
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 #ifdef HAVE_CONFIG_H
@@ -89,7 +89,7 @@ contains
     integer,intent(in),optional :: levv, mode, stdv
     integer,intent(in),optional :: icomm
     integer,intent(in),optional :: nking
-    integer lv, md, lmd
+    integer lv, md, lmd, chmd
 
     ierr = 0
 
@@ -105,8 +105,9 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ps_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
-          if (ierr.eq.0) call pc_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
+          if (ierr.eq.0) call pc_init(ierr, u=ulog, levv=lv, mode=chmd, stdv=stdv, icomm=icomm)
        endif
        if (is_first_force(init_counts, mode)) then
           if (ierr.eq.0) call init_table(ierr, nking)
@@ -126,7 +127,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -147,8 +148,9 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ps_diag(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call pc_diag(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pc_diag(ierr, utmp, levv=lv, mode=chmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -164,7 +166,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -180,8 +182,9 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
-          if (ierr.eq.0) call pc_finalize(ierr, utmp, levv=lv, mode=lmd)
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ps_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pc_finalize(ierr, utmp, levv=lv, mode=chmd)
        endif
        fine_counts = fine_counts + 1
     endif
@@ -612,7 +615,7 @@ program test_ppp_king
   integer ktest
 
 101 format(A, ' = ', I0)
-  call init(ierr)
+  call init(ierr, stdv=+9)
   write(*, 101) 'INIT', ierr
 
   icw = MPI_COMM_WORLD
@@ -622,7 +625,7 @@ program test_ppp_king
   write(*, 101) 'TEST', ierr
   call diag(ierr)
   write(*, 101) 'DIAG', ierr
-  call finalize(ierr)
+  call finalize(ierr, levv=+9)
   write(*, 101) 'FINAL', ierr
   stop
 contains

@@ -1,10 +1,10 @@
 !!!_! ppp.F90 - touza/ppp ppp manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2023/03/25 13:41:31 fuyuki ppp.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 11:55:21 fuyuki ppp.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -44,7 +44,7 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode, stdv
     integer,intent(in),optional :: icomm
-    integer lv, md, lmd
+    integer lv, md, lmd, chmd
 
     ierr = 0
 
@@ -60,10 +60,11 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ps_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
-          if (ierr.eq.0) call pa_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call pk_init(ierr, u=ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call pc_init(ierr, u=ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pa_init(ierr, u=ulog, levv=lv, mode=chmd)
+          if (ierr.eq.0) call pk_init(ierr, u=ulog, levv=lv, mode=chmd)
+          if (ierr.eq.0) call pc_init(ierr, u=ulog, levv=lv, mode=chmd)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -79,7 +80,7 @@ contains
     integer,intent(in),optional :: u
     integer,intent(in),optional :: mode
     integer,intent(in),optional :: levv
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -97,10 +98,11 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ps_diag(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call pa_diag(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call pk_diag(ierr, ulog, levv=lv, mode=lmd)
-          if (ierr.eq.0) call pc_diag(ierr, ulog, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pa_diag(ierr, ulog, levv=lv, mode=chmd)
+          if (ierr.eq.0) call pk_diag(ierr, ulog, levv=lv, mode=chmd)
+          if (ierr.eq.0) call pc_diag(ierr, ulog, levv=lv, mode=chmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -114,7 +116,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     integer,intent(in),optional :: levv, mode
-    integer utmp, lv, md, lmd
+    integer utmp, lv, md, lmd, chmd
 
     ierr = err_default
 
@@ -130,10 +132,11 @@ contains
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
+          chmd = MODE_SURFACE
           if (ierr.eq.0) call ps_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call pa_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call pk_finalize(ierr, utmp, levv=lv, mode=lmd)
-          if (ierr.eq.0) call pc_finalize(ierr, utmp, levv=lv, mode=lmd)
+          if (ierr.eq.0) call pa_finalize(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call pk_finalize(ierr, utmp, levv=lv, mode=chmd)
+          if (ierr.eq.0) call pc_finalize(ierr, utmp, levv=lv, mode=chmd)
        endif
        fine_counts = fine_counts + 1
     endif

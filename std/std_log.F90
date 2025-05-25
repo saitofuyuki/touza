@@ -1,7 +1,7 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2024/02/25 21:57:57 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/23 08:39:43 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2024
@@ -274,7 +274,7 @@ contains
     character(len=128) :: txt
     integer jerr
 
-311 format('fine: ', I0, 1x, I0, 1x, I0, 1x, I0)
+311 format('fine[', I0, '] ', I0, 1x, I0, 1x, I0)
     lv = choice(msglev_normal, levv)
     if (is_msglev_DEBUG(lv)) then
        call gen_tag(tag, pkg, grp, mdl, fun, asfx, isfx)
@@ -953,7 +953,7 @@ program test_std_log
   call banner(ierr, 'test std_log', -1, '*')
   call banner(ierr, 'test std_log', -1, '=', 5)
 
-  call init(ierr)
+  call init(ierr, levv=+9)
 
   call diag(ierr)
   call diag(ierr)
