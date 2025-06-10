@@ -1,7 +1,7 @@
 !!!_! ppp_std.F90 - TOUZA/Ppp utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/23 12:50:58 fuyuki ppp_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/06/03 08:38:38 fuyuki ppp_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -19,6 +19,7 @@ module TOUZA_Ppp_std
 !!!_ = declaration
 !!!_  - modules
   use TOUZA_Std,only: choice,       choice_a
+  use TOUZA_Std,only: ndigits
   use TOUZA_Std,only: control_deep, control_mode, is_first_force
   use TOUZA_Std,only: is_msglev
   use TOUZA_Std,only: is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
@@ -57,9 +58,10 @@ module TOUZA_Ppp_std
   end interface msg
 !!!_  - public procedures
   public init, diag, finalize
-  public msg
+  public msg,  msg_mon, gen_tag
 !!!_   . TOUZA_Std
   public choice,       choice_a
+  public ndigits
   public control_mode, control_deep, is_first_force
   public is_msglev
   public is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
@@ -192,16 +194,39 @@ contains
   end subroutine finalize
 
 !!!_ + user interfaces
+!!!_  & gen_tag
+  subroutine gen_tag &
+       & (tag, mdl)
+    use TOUZA_Std,only: std_gen_tag=>gen_tag
+    implicit none
+    character(len=*),intent(out)         :: tag
+    character(len=*),intent(in),optional :: mdl
+    call std_gen_tag(tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl)
+    return
+  end subroutine gen_tag
+
+!!!_  & msg_mon - msg for monitoring (light-weight)
+  subroutine msg_mon &
+       & (txt, tag, u)
+    use TOUZA_Std,only: std_msg=>msg
+    implicit none
+    character(len=*),intent(in) :: txt
+    character(len=*),intent(in) :: tag
+    integer,         intent(in),optional :: u
+    call std_msg(txt, tag, u, to_flush=.FALSE.)
+    return
+  end subroutine msg_mon
+
 !!!_  & msg_txt - message dispatcher (to override std)
   subroutine msg_txt &
        & (txt, mdl, u)
-    use TOUZA_Std,only: choice, std_msg=>msg, gen_tag
+    use TOUZA_Std,only: choice, std_msg=>msg
     implicit none
     character(len=*),intent(in)          :: txt
     character(len=*),intent(in),optional :: mdl
     integer,         intent(in),optional :: u
     character(len=1024) :: tag
-    call gen_tag(tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl)
+    call gen_tag(tag, mdl=mdl)
     call std_msg(txt, tag, u)
     return
   end subroutine msg_txt

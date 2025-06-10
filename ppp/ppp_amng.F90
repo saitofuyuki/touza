@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/24 20:59:42 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/06/06 08:39:42 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -111,6 +111,9 @@ module TOUZA_Ppp_amng
   integer,save :: ulog = unit_global
 #define __MDL__ 'a'
 # define _ERROR(E) (E - ERR_MASK_PPP_AMNG)
+!!!_  - others
+  character(len=128), save :: mon_tag=' '
+  integer,save :: lmt=0
 !!!_ + overload
   interface switch_agent
      module procedure switch_agent_ai, switch_agent_ni
@@ -156,6 +159,7 @@ contains
   subroutine init(ierr, u, levv, mode, stdv, icomm, nstack, nagent)
     use TOUZA_Ppp_std,only: control_mode, control_deep, is_first_force
     use TOUZA_Ppp_std,only: choice, ps_init=>init
+    use TOUZA_Ppp_std,only: gen_tag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -177,6 +181,10 @@ contains
           ulog = choice(ulog, u)
           lev_verbose = lv
        endif
+
+       call gen_tag(mon_tag, __MDL__)
+       lmt = len_trim(mon_tag)
+
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           if (ierr.eq.0) call ps_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv, icomm=icomm)
@@ -421,7 +429,7 @@ contains
 !!!_  - diag_maps_batch
   subroutine diag_maps_batch &
        & (ierr, iaref, u)
-    use TOUZA_Std,only: choice, ndigits
+    use TOUZA_Ppp_std,only: choice, ndigits, msg
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: iaref
@@ -448,6 +456,7 @@ contains
        if (atblp(ja)%isrc.lt.0) then
           if (ierr.eq.0) call diag_map_root(ierr, ja, ref, nrref, irref, utmp, fmt_rr)
        else if (atblp(ja)%kflg.eq.flag_base) then
+          call msg('----', __MDL__, utmp)
           jas = source_agent(ja)
           if (ierr.eq.0) call diag_map_family(ierr, jas, ref, nrref, irref, utmp, fmt_rr)
        endif
@@ -697,7 +706,7 @@ contains
 
 !!!_  & show_stack
   subroutine show_stack(ierr, iagent, dir, levv, u)
-    use TOUZA_Ppp_std,only: choice, msg
+    use TOUZA_Ppp_std,only: choice, msg_mon
     implicit none
     integer,intent(out) :: ierr
     integer,intent(in)  :: iagent
@@ -732,7 +741,7 @@ contains
        write(b, 101) jt, trim(atblp(jt)%name)
        buf = trim(buf) // ' >> ' // trim(b)
     endif
-    call msg(buf, __MDL__, utmp)
+    call msg_mon(buf, mon_tag(1:lmt), utmp)
   end subroutine show_stack
 
 !!!_ + manipulation
@@ -903,7 +912,8 @@ contains
     a = min(+1, max(-1, choice(0, lev)))
     jstack = jstack + a
     if (jstack.lt.0.or.jstack.ge.lstack) ierr = -1
-    if (ierr.eq.0) call show_stack_simple(ierr, iagent, a)
+    ! if (ierr.eq.0) call show_stack_simple(ierr, iagent, a)
+    if (ierr.eq.0) call show_stack(ierr, iagent, a)
     if (a.ge.0) then
        if (iagent.lt.0.or.iagent.ge.matbl) ierr = -1
        if (ierr.eq.0) astack(jstack) = iagent
@@ -2165,6 +2175,7 @@ contains
     endif
     e = reg_agent(name, source, n)
     atblp(n)%isrc = source
+    ! write(*, *) 'reg:', source, n, ' ', trim(name)
     if (e.lt.0) n = e
   end function add_agent_core
 
@@ -2240,13 +2251,15 @@ program test_ppp_amng
   implicit none
 
   integer ierr
-  integer icw
+  integer icw, ibase
   integer irw, nrw
   integer mclr
   integer color
+  integer jseq, icol, jdmy
   integer j
   integer jarg
   integer ktest
+  integer nrlim
   character(len=256) :: T
 
   ierr = 0
@@ -2266,14 +2279,37 @@ program test_ppp_amng
      if (ierr.ne.0) T = '0'
      read(T, *, IOSTAT=ierr) ktest
   endif
+  if (ierr.eq.0) then
+     jarg = jarg + 1
+     call get_command_argument(jarg, T, STATUS=ierr)
+     if (ierr.ne.0) T = '17'
+     read(T, *, IOSTAT=ierr) nrlim
+     nrlim = max(0, nrlim)
+     ierr = 0
+  endif
 
-  mclr = 11
-  color = 0
-  do j = 0, nrw / mclr
-     if (irw.ge.j*mclr .and. irw.lt.(j+1)*mclr) exit
-     color = color + 1
-  enddo
-  call test_ppp_agent(icw, color, ktest)
+  if (nrw.gt.nrlim.and.nrlim.gt.0) then
+     jseq = irw - (nrw - nrlim) / 2
+     icol = 0
+     if (jseq.lt.0.or.jseq.ge.NRLIM) icol = MPI_UNDEFINED
+     if (ierr.eq.0) call MPI_Comm_split(icw, icol, jseq, ibase, jdmy)
+  else
+     icol = 0
+     ibase = icw
+  endif
+
+  if (icol.ge.0) then
+     call MPI_Comm_rank(ibase, irw, ierr)
+     call MPI_Comm_size(ibase, nrw, ierr)
+
+     mclr = 11
+     color = 0
+     do j = 0, nrw / mclr
+        if (irw.ge.j*mclr .and. irw.lt.(j+1)*mclr) exit
+        color = color + 1
+     enddo
+     call test_ppp_agent(ibase, color, ktest)
+  endif
 
   call diag(ierr)
   write(*, 101) 'DIAG', ierr
@@ -2367,11 +2403,13 @@ contains
     if (ierr.eq.0) then
        iaref = query_agent('X')
        if (is_member(iaref)) then
+          ! write(*, *) 'spinoff:0:ref=', iaref
           call new_agent_spinoff(ierr, 'J', iaref, switch=-1)
           if (is_child_agent('I', iaref)) then
              write(*, 102) 'I', .TRUE.
           else
              write(*, 102) 'I', .FALSE.
+             ! write(*, *) 'spinoff:1:ref=', iaref
              call new_agent_spinoff(ierr, 'I', iaref)
           endif
           write(*, 102) 'I', is_child_agent('I', iaref)
