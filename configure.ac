@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/05/21 14:16:56 fuyuki configure.ac>
+# Time-stamp: <2025/06/11 13:21:30 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -126,10 +126,12 @@ MT_SUB_PACKAGE([trp], [],     [std])
 MT_SUB_PACKAGE([ppp], [],     [std emu])
 dnl MT_SUB_PACKAGE([div], [[$]enable_sub_div_default],     [std])
 AM_CONDITIONAL([BUILD_div], [false])
+dnl MT_SUB_PACKAGE([ami], [],     [std emu nio trp])
+AM_CONDITIONAL([BUILD_ami], [false])
 dnl MT_SUB_PACKAGE([nio], [],     [std emu trp div])
 MT_SUB_PACKAGE([nio], [],     [std emu trp])
-MT_SUB_PACKAGE([ami], [],     [std emu nio trp])
-MT_SUB_PACKAGE([zbt], [no],   [std nio])
+dnl MT_SUB_PACKAGE([zbt], [no],   [std nio])
+AM_CONDITIONAL([BUILD_zbt], [false])
 
 AC_ARG_ENABLE([nctcdf],
 [AS_HELP_STRING([--enable-nctcdf], [enable nio/n*c*tcdf features@<:@default=no@:>@])],
@@ -148,31 +150,31 @@ AM_CONDITIONAL([with_nctcdf], [test x"[$]use_nctcdf" = xyes])
 AS_IF([test x"[$]use_nctcdf" = xyes],
       [AC_DEFINE([OPT_WITH_NCTCDF], [1], [build with TOUZA/Nio/nctcdf])])
 
-AC_MSG_CHECKING([if also build jmz])
-AC_ARG_WITH([build-jmz],
-   [AS_HELP_STRING([--with-build-jmz=(yes|no)],
-                   [whether to build jmz programs.  @<:@default=no@:>@])],
-   [], [with_build_jmz=no])
-AS_IF([test "x$with_build_jmz" != xno],
-      [AC_MSG_RESULT([yes])
-       enable_sub_nio=yes],
-      [AC_MSG_RESULT([no])])
+dnl AC_MSG_CHECKING([if also build jmz])
+dnl AC_ARG_WITH([build-jmz],
+dnl    [AS_HELP_STRING([--with-build-jmz=(yes|no)],
+dnl                    [whether to build jmz programs.  @<:@default=no@:>@])],
+dnl    [], [with_build_jmz=no])
+dnl AS_IF([test "x$with_build_jmz" != xno],
+dnl       [AC_MSG_RESULT([yes])
+dnl        enable_sub_nio=yes],
+dnl       [AC_MSG_RESULT([no])])
 
-AS_IF([test "x$with_build_jmz" != xno],
-[
-AS_IF([test x"[$]use_nctcdf" = xno],
-      [jmz_nctcdf=no],
-      [jmz_nctcdf=force])
-AX_SUBDIRS_CONFIGURE([jmz],
-    [],
-    [[TOUZA_top_builddir=${ac_top_build_prefix}],
-     [TOUZA_VERSION="${PACKAGE_VERSION}"],
-     [TOUZA_NAME="${PACKAGE_NAME}"],
-     [TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}ami ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}emu ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}],
-     [TOUZA_LIBRARY=${ac_top_build_prefix}lib${with_touza_name}.la],
-     [TOUZA_LIBS=${NETCDF4_FLIBS} ${NETCDF4_LIBS}]],
-    [[--enable-nctcdf="[$]jmz_nctcdf"]],
-    [--with-build-jmz])])
+dnl AS_IF([test "x$with_build_jmz" != xno],
+dnl [
+dnl AS_IF([test x"[$]use_nctcdf" = xno],
+dnl       [jmz_nctcdf=no],
+dnl       [jmz_nctcdf=force])
+dnl AX_SUBDIRS_CONFIGURE([jmz],
+dnl     [],
+dnl     [[TOUZA_top_builddir=${ac_top_build_prefix}],
+dnl      [TOUZA_VERSION="${PACKAGE_VERSION}"],
+dnl      [TOUZA_NAME="${PACKAGE_NAME}"],
+dnl      [TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}ami ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}emu ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}],
+dnl      [TOUZA_LIBRARY=${ac_top_build_prefix}lib${with_touza_name}.la],
+dnl      [TOUZA_LIBS=${NETCDF4_FLIBS} ${NETCDF4_LIBS}]],
+dnl     [[--enable-nctcdf="[$]jmz_nctcdf"]],
+dnl     [--with-build-jmz])])
 
 AC_ARG_ENABLE([install-switches],
               [AS_HELP_STRING([--enable-install-switches],
@@ -220,37 +222,33 @@ AM_CONDITIONAL([enable_module_dependencies], [
   test "x$use_mod_dependencies" != xno \
   && test x"$ax_f90_modext" != xunknown])
 
-AS_IF([test "x$enable_sub_zbt" != xno],
-[AC_MSG_WARN([TOUZA/Zbt will be deleted from TOUZA.  This package still contains it for compatibility.])])
-
-AS_IF([test "x$enable_sub_zbt" != xno],
-[AM_PATH_PYTHON([3.11], ,
-                [AC_MSG_ERROR([cannot enable zbt.  check python environemnt])])
-AX_PYTHON()
-AX_PYTHON_MODULE([ctypes], [FATAL], [python3])
-AX_PYTHON_MODULE([numpy], [FATAL], [python3])
-AX_PYTHON_MODULE([xarray], [FATAL], [python3])
-AX_PYTHON_MODULE([build], [FATAL], [python3])
-AX_PYTHON_MODULE([matplotlib], [FATAL], [python3])
-AX_PYTHON_MODULE([cartopy], [FATAL], [python3])
-AX_PYTHON_MODULE([tomllib], [FATAL], [python3])
-AC_CONFIG_FILES([zbt/pyproject.toml:zbt/pyproject.in])
-AC_CONFIG_FILES([zbt/zbt/Makefile])
-AC_CONFIG_FILES([zbt/tests/Makefile])])
+dnl AM_CONDITIONAL([ZBT_BUILD_ONLY], [test "x$enable_sub_zbt" = xbuild])
+dnl AS_IF([test "x$enable_sub_zbt" != xno],
+dnl [AM_PATH_PYTHON([3.11], ,
+dnl                 [AC_MSG_ERROR([cannot enable zbt.  check python environemnt])])
+dnl AX_PYTHON()
+dnl AX_PYTHON_MODULE([ctypes], [FATAL], [python3])
+dnl AX_PYTHON_MODULE([numpy], [FATAL], [python3])
+dnl AX_PYTHON_MODULE([xarray], [FATAL], [python3])
+dnl AX_PYTHON_MODULE([build], [FATAL], [python3])
+dnl AX_PYTHON_MODULE([matplotlib], [FATAL], [python3])
+dnl AX_PYTHON_MODULE([cartopy], [FATAL], [python3])
+dnl AX_PYTHON_MODULE([tomllib], [FATAL], [python3])
+dnl AC_CONFIG_FILES([zbt/pyproject.toml:zbt/pyproject.in])
+dnl AC_CONFIG_FILES([zbt/zbt/Makefile])
+dnl AC_CONFIG_FILES([zbt/tests/Makefile])])
 
 AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
 
-AM_CONDITIONAL([ZBT_BUILD_ONLY], [test "x$enable_sub_zbt" = xbuild])
-
-AC_ARG_ENABLE([zbt-embed-libdir],
-[AS_HELP_STRING([--enable-zbt-embed-libdir],
- [enable hard-coded libtouza dlocation @<:@default=no@:>@])],
- [enable_zbt_embed_libdir=$enableval],
- [enable_zbt_embed_libdir=no])
-AM_CONDITIONAL([enable_module_dependencies], [
-  test "x$use_mod_dependencies" != xno \
-  && test x"$ax_f90_modext" != xunknown])
-AM_CONDITIONAL([zbt_embed_libdir], [test "x$enable_zbt_embed_libdir" = xyes])
+dnl AC_ARG_ENABLE([zbt-embed-libdir],
+dnl [AS_HELP_STRING([--enable-zbt-embed-libdir],
+dnl  [enable hard-coded libtouza dlocation @<:@default=no@:>@])],
+dnl  [enable_zbt_embed_libdir=$enableval],
+dnl  [enable_zbt_embed_libdir=no])
+dnl AM_CONDITIONAL([enable_module_dependencies], [
+dnl   test "x$use_mod_dependencies" != xno \
+dnl   && test x"$ax_f90_modext" != xunknown])
+dnl AM_CONDITIONAL([zbt_embed_libdir], [test "x$enable_zbt_embed_libdir" = xyes])
 
 dnl AM_CONDITIONAL([am__fastdepFC], [false])
 

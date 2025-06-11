@@ -659,9 +659,7 @@ ac_includes_default="\
 #endif"
 
 ac_header_c_list=
-enable_option_checking=no
-ac_subst_vars='subdirs_extra
-am__EXEEXT_FALSE
+ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
@@ -670,20 +668,6 @@ PACKAGE_REQUIRES
 PKG_CONFIG_LIBDIR
 PKG_CONFIG_PATH
 PKG_CONFIG
-FC_LDADD_touza_zbt
-FC_MODULE_touza_zbt
-FC_INCLUDE_touza_zbt
-builddir_touza_zbt
-srcdir_touza_zbt
-BUILD_zbt_FALSE
-BUILD_zbt_TRUE
-FC_LDADD_touza_ami
-FC_MODULE_touza_ami
-FC_INCLUDE_touza_ami
-builddir_touza_ami
-srcdir_touza_ami
-BUILD_ami_FALSE
-BUILD_ami_TRUE
 FC_LDADD_touza_nio
 FC_MODULE_touza_nio
 FC_INCLUDE_touza_nio
@@ -733,24 +717,8 @@ OPT_STDOUT_UNIT
 OPT_STDIN_UNIT
 have_iso_c_binding_FALSE
 have_iso_c_binding_TRUE
-zbt_embed_libdir_FALSE
-zbt_embed_libdir_TRUE
-ZBT_BUILD_ONLY_FALSE
-ZBT_BUILD_ONLY_TRUE
 HAVE_PYTHON_FALSE
 HAVE_PYTHON_TRUE
-PYTHON_LIB
-PYTHON_INCLUDE_DIR
-PYTHON_BIN
-pkgpyexecdir
-pyexecdir
-pkgpythondir
-pythondir
-PYTHON_EXEC_PREFIX
-PYTHON_PREFIX
-PYTHON_PLATFORM
-PYTHON_VERSION
-PYTHON
 enable_module_dependencies_FALSE
 enable_module_dependencies_TRUE
 gcc_dependencies_FALSE
@@ -773,6 +741,10 @@ NETCDF4_CC
 NETCDF4_VERSION
 NF_CONFIG
 NC_CONFIG
+BUILD_zbt_FALSE
+BUILD_zbt_TRUE
+BUILD_ami_FALSE
+BUILD_ami_TRUE
 BUILD_div_FALSE
 BUILD_div_TRUE
 LT_SYS_LIBRARY_PATH
@@ -958,19 +930,12 @@ enable_sub_cal
 enable_sub_trp
 enable_sub_ppp
 enable_sub_nio
-enable_sub_ami
-enable_sub_zbt
 enable_nctcdf
 with_netcdf4
-with_build_jmz
 enable_install_switches
 enable_follow_revision
 enable_diag_dependencies
 enable_mod_dependencies
-with_python_sys_prefix
-with_python_prefix
-with_python_exec_prefix
-enable_zbt_embed_libdir
 '
       ac_precious_vars='build_alias
 host_alias
@@ -987,7 +952,6 @@ CC
 CFLAGS
 CPPFLAGS
 LT_SYS_LIBRARY_PATH
-PYTHON
 OPT_STDIN_UNIT
 OPT_STDOUT_UNIT
 OPT_STDERR_UNIT
@@ -1662,10 +1626,6 @@ Optional Features:
                           whether to build ppp subpackage. [default=yes]
   --enable-sub-nio=(yes|no)
                           whether to build nio subpackage. [default=yes]
-  --enable-sub-ami=(yes|no)
-                          whether to build ami subpackage. [default=yes]
-  --enable-sub-zbt=(yes|no)
-                          whether to build zbt subpackage. [default=yes]
   --enable-nctcdf         enable nio/n*c*tcdf features[default=no]
   --enable-install-switches
                           install switcher sources if applicable
@@ -1676,8 +1636,6 @@ Optional Features:
                           diagnose dependencies using gcc features[default=no]
   --enable-mod-dependencies
                           enable generated dependencies [default=yes]
-  --enable-zbt-embed-libdir
-                          enable hard-coded libtouza dlocation [default=no]
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -1690,13 +1648,6 @@ Optional Packages:
                           compiler's sysroot if not specified).
   --with-netcdf4=yes/no/PATH
                           base directory of serial NetCDF4 installation
-  --with-build-jmz=(yes|no)
-                          whether to build jmz programs. [default=no]
-  --with-python-sys-prefix
-                          use Python's sys.prefix and sys.exec_prefix values
-  --with-python_prefix    override the default PYTHON_PREFIX
-  --with-python_exec_prefix
-                          override the default PYTHON_EXEC_PREFIX
 
 Some influential environment variables:
   MPIFC       MPI Fortran compiler command
@@ -1714,7 +1665,6 @@ Some influential environment variables:
               you have headers in a nonstandard directory <include dir>
   LT_SYS_LIBRARY_PATH
               User-defined run-time library search path.
-  PYTHON      the Python interpreter
   OPT_STDIN_UNIT
               fortran i/o unit for stdin
   OPT_STDOUT_UNIT
@@ -24041,6 +23991,14 @@ else
   BUILD_div_FALSE=
 fi
 
+ if false; then
+  BUILD_ami_TRUE=
+  BUILD_ami_FALSE='#'
+else
+  BUILD_ami_TRUE='#'
+  BUILD_ami_FALSE=
+fi
+
 
 
 
@@ -24058,38 +24016,12 @@ else case e in #(
 esac
 fi
 
-
-
-
-
-
-
-
-
-
-
-# Check whether --enable-sub-ami was given.
-if test ${enable_sub_ami+y}
-then :
-  enableval=$enable_sub_ami;
-else case e in #(
-  e) enable_sub_ami=yes ;;
-esac
-fi
-
-
-
-
-
-
-
-# Check whether --enable-sub-zbt was given.
-if test ${enable_sub_zbt+y}
-then :
-  enableval=$enable_sub_zbt;
-else case e in #(
-  e) enable_sub_zbt=no ;;
-esac
+ if false; then
+  BUILD_zbt_TRUE=
+  BUILD_zbt_FALSE='#'
+else
+  BUILD_zbt_TRUE='#'
+  BUILD_zbt_FALSE=
 fi
 
 
@@ -24634,225 +24566,7 @@ printf "%s\n" "#define OPT_WITH_NCTCDF 1" >>confdefs.h
 
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking if also build jmz" >&5
-printf %s "checking if also build jmz... " >&6; }
 
-# Check whether --with-build-jmz was given.
-if test ${with_build_jmz+y}
-then :
-  withval=$with_build_jmz;
-else case e in #(
-  e) with_build_jmz=no ;;
-esac
-fi
-
-if test "x$with_build_jmz" != xno
-then :
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-       enable_sub_nio=yes
-else case e in #(
-  e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; } ;;
-esac
-fi
-
-
-
-if test "x$with_build_jmz" != xno
-then :
-
-if test x"$use_nctcdf" = xno
-then :
-  jmz_nctcdf=no
-else case e in #(
-  e) jmz_nctcdf=force ;;
-esac
-fi
-
-
-  # Various preliminary checks.
-
-
-
-
-
-    ax_dir="jmz"
-
-                    # Do not complain, so a configure script can configure whichever parts of a
-    # large source tree are present.
-    if test -d "$srcdir/$ax_dir"; then
-      ac_builddir=.
-
-case "$ax_dir" in
-.) ac_dir_suffix= ac_top_builddir_sub=. ac_top_build_prefix= ;;
-*)
-  ac_dir_suffix=/`printf "%s\n" "$ax_dir" | sed 's|^\.[\\/]||'`
-  # A ".." for each directory in $ac_dir_suffix.
-  ac_top_builddir_sub=`printf "%s\n" "$ac_dir_suffix" | sed 's|/[^\\/]*|/..|g;s|/||'`
-  case $ac_top_builddir_sub in
-  "") ac_top_builddir_sub=. ac_top_build_prefix= ;;
-  *)  ac_top_build_prefix=$ac_top_builddir_sub/ ;;
-  esac ;;
-esac
-ac_abs_top_builddir=$ac_pwd
-ac_abs_builddir=$ac_pwd$ac_dir_suffix
-# for backward compatibility:
-ac_top_builddir=$ac_top_build_prefix
-
-case $srcdir in
-  .)  # We are building in place.
-    ac_srcdir=.
-    ac_top_srcdir=$ac_top_builddir_sub
-    ac_abs_top_srcdir=$ac_pwd ;;
-  [\\/]* | ?:[\\/]* )  # Absolute name.
-    ac_srcdir=$srcdir$ac_dir_suffix;
-    ac_top_srcdir=$srcdir
-    ac_abs_top_srcdir=$srcdir ;;
-  *) # Relative name.
-    ac_srcdir=$ac_top_build_prefix$srcdir$ac_dir_suffix
-    ac_top_srcdir=$ac_top_build_prefix$srcdir
-    ac_abs_top_srcdir=$ac_pwd/$srcdir ;;
-esac
-ac_abs_srcdir=$ac_abs_top_srcdir$ac_dir_suffix
-
-      # Remove --cache-file, --srcdir, and --disable-option-checking arguments
-      # so they do not pile up.
-      ax_args=
-      ax_prev=
-      eval "set x $ac_configure_args"
-      shift
-      for ax_arg; do
-        if test -n "$ax_prev"; then
-          ax_prev=
-          continue
-        fi
-        case $ax_arg in
-          -cache-file | --cache-file | --cache-fil | --cache-fi | --cache-f \
-          | --cache- | --cache | --cach | --cac | --ca | --c)
-            ax_prev=cache_file ;;
-          -cache-file=* | --cache-file=* | --cache-fil=* | --cache-fi=* \
-          | --cache-f=* | --cache-=* | --cache=* | --cach=* | --cac=* | --ca=* \
-          | --c=*)
-            ;;
-          --config-cache | -C)
-            ;;
-          -srcdir | --srcdir | --srcdi | --srcd | --src | --sr)
-            ax_prev=srcdir ;;
-          -srcdir=* | --srcdir=* | --srcdi=* | --srcd=* | --src=* | --sr=*)
-            ;;
-          -prefix | --prefix | --prefi | --pref | --pre | --pr | --p)
-            ax_prev=prefix ;;
-          -prefix=* | --prefix=* | --prefi=* | --pref=* | --pre=* | --pr=* \
-          | --p=*)
-            ;;
-          --disable-option-checking)
-            ;;
-          *) case $ax_arg in
-              *\'*) ax_arg=$(printf "%s\n" "$ax_arg" | sed "s/'/'\\\\\\\\''/g");;
-            esac
-            as_fn_append ax_args " '$ax_arg'" ;;
-        esac
-      done
-      # Always prepend --disable-option-checking to silence warnings, since
-      # different subdirs can have different --enable and --with options.
-      ax_args="--disable-option-checking $ax_args"
-      # Options that must be added as they are provided.
-
-      # New options that may need to be merged with existing options.
-      ax_candidate="TOUZA_top_builddir=${ac_top_build_prefix}"
-           ax_candidate_flag="${ax_candidate%%=*}"
-           ax_candidate_content="${ax_candidate#*=}"
-           if test "x$ax_candidate" != "x" -a "x$ax_candidate_flag" != "x"; then
-             if echo "$ax_args" | grep -- "${ax_candidate_flag}=" >/dev/null 2>&1; then
-               ax_args=$(echo $ax_args | sed "s,\(${ax_candidate_flag}=[^']*\),\1 ${ax_candidate_content},")
-             else
-               as_fn_append ax_args " 'TOUZA_top_builddir=${ac_top_build_prefix}'"
-             fi
-           fi
-      ax_candidate="TOUZA_VERSION="${PACKAGE_VERSION}""
-           ax_candidate_flag="${ax_candidate%%=*}"
-           ax_candidate_content="${ax_candidate#*=}"
-           if test "x$ax_candidate" != "x" -a "x$ax_candidate_flag" != "x"; then
-             if echo "$ax_args" | grep -- "${ax_candidate_flag}=" >/dev/null 2>&1; then
-               ax_args=$(echo $ax_args | sed "s,\(${ax_candidate_flag}=[^']*\),\1 ${ax_candidate_content},")
-             else
-               as_fn_append ax_args " 'TOUZA_VERSION="${PACKAGE_VERSION}"'"
-             fi
-           fi
-      ax_candidate="TOUZA_NAME="${PACKAGE_NAME}""
-           ax_candidate_flag="${ax_candidate%%=*}"
-           ax_candidate_content="${ax_candidate#*=}"
-           if test "x$ax_candidate" != "x" -a "x$ax_candidate_flag" != "x"; then
-             if echo "$ax_args" | grep -- "${ax_candidate_flag}=" >/dev/null 2>&1; then
-               ax_args=$(echo $ax_args | sed "s,\(${ax_candidate_flag}=[^']*\),\1 ${ax_candidate_content},")
-             else
-               as_fn_append ax_args " 'TOUZA_NAME="${PACKAGE_NAME}"'"
-             fi
-           fi
-      ax_candidate="TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}ami ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}emu ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}"
-           ax_candidate_flag="${ax_candidate%%=*}"
-           ax_candidate_content="${ax_candidate#*=}"
-           if test "x$ax_candidate" != "x" -a "x$ax_candidate_flag" != "x"; then
-             if echo "$ax_args" | grep -- "${ax_candidate_flag}=" >/dev/null 2>&1; then
-               ax_args=$(echo $ax_args | sed "s,\(${ax_candidate_flag}=[^']*\),\1 ${ax_candidate_content},")
-             else
-               as_fn_append ax_args " 'TOUZA_CFLAGS=-I${ac_top_build_prefix}/ -I${ac_top_srcdir} ${FC_MODINC}${ac_top_build_prefix}ami ${FC_MODINC}${ac_top_build_prefix}nio ${FC_MODINC}${ac_top_build_prefix}trp ${FC_MODINC}${ac_top_build_prefix}emu ${FC_MODINC}${ac_top_build_prefix}std ${NETCDF4_FFLAGS}'"
-             fi
-           fi
-      ax_candidate="TOUZA_LIBRARY=${ac_top_build_prefix}lib${with_touza_name}.la"
-           ax_candidate_flag="${ax_candidate%%=*}"
-           ax_candidate_content="${ax_candidate#*=}"
-           if test "x$ax_candidate" != "x" -a "x$ax_candidate_flag" != "x"; then
-             if echo "$ax_args" | grep -- "${ax_candidate_flag}=" >/dev/null 2>&1; then
-               ax_args=$(echo $ax_args | sed "s,\(${ax_candidate_flag}=[^']*\),\1 ${ax_candidate_content},")
-             else
-               as_fn_append ax_args " 'TOUZA_LIBRARY=${ac_top_build_prefix}lib${with_touza_name}.la'"
-             fi
-           fi
-      ax_candidate="TOUZA_LIBS=${NETCDF4_FLIBS} ${NETCDF4_LIBS}"
-           ax_candidate_flag="${ax_candidate%%=*}"
-           ax_candidate_content="${ax_candidate#*=}"
-           if test "x$ax_candidate" != "x" -a "x$ax_candidate_flag" != "x"; then
-             if echo "$ax_args" | grep -- "${ax_candidate_flag}=" >/dev/null 2>&1; then
-               ax_args=$(echo $ax_args | sed "s,\(${ax_candidate_flag}=[^']*\),\1 ${ax_candidate_content},")
-             else
-               as_fn_append ax_args " 'TOUZA_LIBS=${NETCDF4_FLIBS} ${NETCDF4_LIBS}'"
-             fi
-           fi
-
-      # New options that must replace existing options.
-      ax_candidate="--enable-nctcdf="$jmz_nctcdf""
-           ax_candidate_flag="${ax_candidate%%=*}"
-           ax_candidate_content="${ax_candidate#*=}"
-           if test "x$ax_candidate" != "x" -a "x$ax_candidate_flag" != "x"; then
-             if echo "$ax_args" | grep -- "${ax_candidate_flag}=" >/dev/null 2>&1; then
-               ax_args=$(echo $ax_args | sed "s,${ax_candidate_flag}=[^']*,${ax_candidate},")
-             else
-               as_fn_append ax_args " '--enable-nctcdf="$jmz_nctcdf"'"
-             fi
-           fi
-
-      # Options that must be removed.
-      ax_args=$(echo $ax_args | sed "s,'--with-build-jmz',,")
-
-      as_fn_append ax_args " '--srcdir=$ac_srcdir'"
-
-      # Add the subdirectory to the list of target subdirectories.
-      ax_subconfigures="$ax_subconfigures $ax_dir"
-      # Save the argument list for this subdirectory.
-                              ax_var=$(printf "$ax_dir" | tr -c "0-9a-zA-Z_" "_")
-      eval "ax_sub_configure_args_$ax_var=\"$ax_args\""
-      eval "ax_sub_configure_$ax_var=\"yes\""
-    else
-      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: could not find source tree for $ax_dir" >&5
-printf "%s\n" "$as_me: WARNING: could not find source tree for $ax_dir" >&2;}
-    fi
-
-
-
-
-fi
 
 # Check whether --enable-install-switches was given.
 if test ${enable_install_switches+y}
@@ -25096,850 +24810,6 @@ else
 fi
 
 
-if test "x$enable_sub_zbt" != xno
-then :
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: TOUZA/Zbt will be deleted from TOUZA.  This package still contains it for compatibility." >&5
-printf "%s\n" "$as_me: WARNING: TOUZA/Zbt will be deleted from TOUZA.  This package still contains it for compatibility." >&2;}
-fi
-
-if test "x$enable_sub_zbt" != xno
-then :
-
-
-
-
-
-
-        if test -n "$PYTHON"; then
-      # If the user set $PYTHON, use it and don't search something else.
-      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether $PYTHON version is >= 3.11" >&5
-printf %s "checking whether $PYTHON version is >= 3.11... " >&6; }
-      prog="import sys
-# split strings by '.' and convert to numeric.  Append some zeros
-# because we need at least 4 digits for the hex conversion.
-# map returns an iterator in Python 3.0 and a list in 2.x
-minver = list(map(int, '3.11'.split('.'))) + [0, 0, 0]
-minverhex = 0
-# xrange is not present in Python 3.0 and range returns an iterator
-for i in list(range(0, 4)): minverhex = (minverhex << 8) + minver[i]
-sys.exit(sys.hexversion < minverhex)"
-  if { echo "$as_me:$LINENO: $PYTHON -c "$prog"" >&5
-   ($PYTHON -c "$prog") >&5 2>&5
-   ac_status=$?
-   echo "$as_me:$LINENO: \$? = $ac_status" >&5
-   (exit $ac_status); }
-then :
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-else case e in #(
-  e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-			       as_fn_error $? "Python interpreter is too old" "$LINENO" 5 ;;
-esac
-fi
-      am_display_PYTHON=$PYTHON
-    else
-      # Otherwise, try each interpreter until we find one that satisfies
-      # VERSION.
-      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for a Python interpreter with version >= 3.11" >&5
-printf %s "checking for a Python interpreter with version >= 3.11... " >&6; }
-if test ${am_cv_pathless_PYTHON+y}
-then :
-  printf %s "(cached) " >&6
-else case e in #(
-  e)
-	for am_cv_pathless_PYTHON in python python3  python3.20 python3.19 python3.18 python3.17 python3.16  python3.15 python3.14 python3.13 python3.12 python3.11 python3.10  python3.9 python3.8 python3.7 python3.6 python3.5 python3.4 python3.3  python3.2 python3.1 python3.0  python2  python2.7 python2.6 python2.5 python2.4 python2.3 python2.2 python2.1  python2.0 none; do
-	  test "$am_cv_pathless_PYTHON" = none && break
-	  prog="import sys
-# split strings by '.' and convert to numeric.  Append some zeros
-# because we need at least 4 digits for the hex conversion.
-# map returns an iterator in Python 3.0 and a list in 2.x
-minver = list(map(int, '3.11'.split('.'))) + [0, 0, 0]
-minverhex = 0
-# xrange is not present in Python 3.0 and range returns an iterator
-for i in list(range(0, 4)): minverhex = (minverhex << 8) + minver[i]
-sys.exit(sys.hexversion < minverhex)"
-  if { echo "$as_me:$LINENO: $am_cv_pathless_PYTHON -c "$prog"" >&5
-   ($am_cv_pathless_PYTHON -c "$prog") >&5 2>&5
-   ac_status=$?
-   echo "$as_me:$LINENO: \$? = $ac_status" >&5
-   (exit $ac_status); }
-then :
-  break
-fi
-	done ;;
-esac
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_cv_pathless_PYTHON" >&5
-printf "%s\n" "$am_cv_pathless_PYTHON" >&6; }
-      # Set $PYTHON to the absolute path of $am_cv_pathless_PYTHON.
-      if test "$am_cv_pathless_PYTHON" = none; then
-	PYTHON=:
-      else
-        # Extract the first word of "$am_cv_pathless_PYTHON", so it can be a program name with args.
-set dummy $am_cv_pathless_PYTHON; ac_word=$2
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-printf %s "checking for $ac_word... " >&6; }
-if test ${ac_cv_path_PYTHON+y}
-then :
-  printf %s "(cached) " >&6
-else case e in #(
-  e) case $PYTHON in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_PYTHON="$PYTHON" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  case $as_dir in #(((
-    '') as_dir=./ ;;
-    */) ;;
-    *) as_dir=$as_dir/ ;;
-  esac
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir$ac_word$ac_exec_ext"; then
-    ac_cv_path_PYTHON="$as_dir$ac_word$ac_exec_ext"
-    printf "%s\n" "$as_me:${as_lineno-$LINENO}: found $as_dir$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  ;;
-esac ;;
-esac
-fi
-PYTHON=$ac_cv_path_PYTHON
-if test -n "$PYTHON"; then
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $PYTHON" >&5
-printf "%s\n" "$PYTHON" >&6; }
-else
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-fi
-
-
-      fi
-      am_display_PYTHON=$am_cv_pathless_PYTHON
-    fi
-
-
-  if test "$PYTHON" = :; then
-        as_fn_error $? "cannot enable zbt.  check python environemnt" "$LINENO" 5
-  else
-
-              { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $am_display_PYTHON version" >&5
-printf %s "checking for $am_display_PYTHON version... " >&6; }
-if test ${am_cv_python_version+y}
-then :
-  printf %s "(cached) " >&6
-else case e in #(
-  e) am_cv_python_version=`$PYTHON -c "import sys; print ('%u.%u' % sys.version_info[:2])"` ;;
-esac
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_cv_python_version" >&5
-printf "%s\n" "$am_cv_python_version" >&6; }
-  PYTHON_VERSION=$am_cv_python_version
-
-
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $am_display_PYTHON platform" >&5
-printf %s "checking for $am_display_PYTHON platform... " >&6; }
-if test ${am_cv_python_platform+y}
-then :
-  printf %s "(cached) " >&6
-else case e in #(
-  e) am_cv_python_platform=`$PYTHON -c "import sys; sys.stdout.write(sys.platform)"` ;;
-esac
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_cv_python_platform" >&5
-printf "%s\n" "$am_cv_python_platform" >&6; }
-  PYTHON_PLATFORM=$am_cv_python_platform
-
-
-                            if test "x$prefix" = xNONE; then
-    am__usable_prefix=$ac_default_prefix
-  else
-    am__usable_prefix=$prefix
-  fi
-
-  # Allow user to request using sys.* values from Python,
-  # instead of the GNU $prefix values.
-
-# Check whether --with-python-sys-prefix was given.
-if test ${with_python_sys_prefix+y}
-then :
-  withval=$with_python_sys_prefix; am_use_python_sys=:
-else case e in #(
-  e) am_use_python_sys=false ;;
-esac
-fi
-
-
-  # Allow user to override whatever the default Python prefix is.
-
-# Check whether --with-python_prefix was given.
-if test ${with_python_prefix+y}
-then :
-  withval=$with_python_prefix; am_python_prefix_subst=$withval
-   am_cv_python_prefix=$withval
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for explicit $am_display_PYTHON prefix" >&5
-printf %s "checking for explicit $am_display_PYTHON prefix... " >&6; }
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_cv_python_prefix" >&5
-printf "%s\n" "$am_cv_python_prefix" >&6; }
-else case e in #(
-  e)
-   if $am_use_python_sys; then
-     # using python sys.prefix value, not GNU
-     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for python default $am_display_PYTHON prefix" >&5
-printf %s "checking for python default $am_display_PYTHON prefix... " >&6; }
-if test ${am_cv_python_prefix+y}
-then :
-  printf %s "(cached) " >&6
-else case e in #(
-  e) am_cv_python_prefix=`$PYTHON -c "import sys; sys.stdout.write(sys.prefix)"` ;;
-esac
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_cv_python_prefix" >&5
-printf "%s\n" "$am_cv_python_prefix" >&6; }
-
-               case $am_cv_python_prefix in
-     $am__usable_prefix*)
-       am__strip_prefix=`echo "$am__usable_prefix" | sed 's|.|.|g'`
-       am_python_prefix_subst=`echo "$am_cv_python_prefix" | sed "s,^$am__strip_prefix,\\${prefix},"`
-       ;;
-     *)
-       am_python_prefix_subst=$am_cv_python_prefix
-       ;;
-     esac
-   else # using GNU prefix value, not python sys.prefix
-     am_python_prefix_subst='${prefix}'
-     am_python_prefix=$am_python_prefix_subst
-     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for GNU default $am_display_PYTHON prefix" >&5
-printf %s "checking for GNU default $am_display_PYTHON prefix... " >&6; }
-     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_python_prefix" >&5
-printf "%s\n" "$am_python_prefix" >&6; }
-   fi ;;
-esac
-fi
-
-  # Substituting python_prefix_subst value.
-  PYTHON_PREFIX=$am_python_prefix_subst
-
-
-  # emacs-page Now do it all over again for Python exec_prefix, but with yet
-  # another conditional: fall back to regular prefix if that was specified.
-
-# Check whether --with-python_exec_prefix was given.
-if test ${with_python_exec_prefix+y}
-then :
-  withval=$with_python_exec_prefix; am_python_exec_prefix_subst=$withval
-   am_cv_python_exec_prefix=$withval
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for explicit $am_display_PYTHON exec_prefix" >&5
-printf %s "checking for explicit $am_display_PYTHON exec_prefix... " >&6; }
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_cv_python_exec_prefix" >&5
-printf "%s\n" "$am_cv_python_exec_prefix" >&6; }
-else case e in #(
-  e)
-   # no explicit --with-python_exec_prefix, but if
-   # --with-python_prefix was given, use its value for python_exec_prefix too.
-   if test -n "$with_python_prefix"
-then :
-  am_python_exec_prefix_subst=$with_python_prefix
-    am_cv_python_exec_prefix=$with_python_prefix
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for python_prefix-given $am_display_PYTHON exec_prefix" >&5
-printf %s "checking for python_prefix-given $am_display_PYTHON exec_prefix... " >&6; }
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_cv_python_exec_prefix" >&5
-printf "%s\n" "$am_cv_python_exec_prefix" >&6; }
-else case e in #(
-  e)
-    # Set am__usable_exec_prefix whether using GNU or Python values,
-    # since we use that variable for pyexecdir.
-    if test "x$exec_prefix" = xNONE; then
-      am__usable_exec_prefix=$am__usable_prefix
-    else
-      am__usable_exec_prefix=$exec_prefix
-    fi
-    #
-    if $am_use_python_sys; then # using python sys.exec_prefix, not GNU
-      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for python default $am_display_PYTHON exec_prefix" >&5
-printf %s "checking for python default $am_display_PYTHON exec_prefix... " >&6; }
-if test ${am_cv_python_exec_prefix+y}
-then :
-  printf %s "(cached) " >&6
-else case e in #(
-  e) am_cv_python_exec_prefix=`$PYTHON -c "import sys; sys.stdout.write(sys.exec_prefix)"` ;;
-esac
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_cv_python_exec_prefix" >&5
-printf "%s\n" "$am_cv_python_exec_prefix" >&6; }
-                        case $am_cv_python_exec_prefix in
-      $am__usable_exec_prefix*)
-        am__strip_prefix=`echo "$am__usable_exec_prefix" | sed 's|.|.|g'`
-        am_python_exec_prefix_subst=`echo "$am_cv_python_exec_prefix" | sed "s,^$am__strip_prefix,\\${exec_prefix},"`
-        ;;
-      *)
-        am_python_exec_prefix_subst=$am_cv_python_exec_prefix
-        ;;
-     esac
-   else # using GNU $exec_prefix, not python sys.exec_prefix
-     am_python_exec_prefix_subst='${exec_prefix}'
-     am_python_exec_prefix=$am_python_exec_prefix_subst
-     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for GNU default $am_display_PYTHON exec_prefix" >&5
-printf %s "checking for GNU default $am_display_PYTHON exec_prefix... " >&6; }
-     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_python_exec_prefix" >&5
-printf "%s\n" "$am_python_exec_prefix" >&6; }
-   fi ;;
-esac
-fi ;;
-esac
-fi
-
-  # Substituting python_exec_prefix_subst.
-  PYTHON_EXEC_PREFIX=$am_python_exec_prefix_subst
-
-
-  # Factor out some code duplication into this shell variable.
-  am_python_setup_sysconfig="\
-import sys
-# Prefer sysconfig over distutils.sysconfig, for better compatibility
-# with python 3.x.  See automake bug#10227.
-try:
-    import sysconfig
-except ImportError:
-    can_use_sysconfig = 0
-else:
-    can_use_sysconfig = 1
-# Can't use sysconfig in CPython 2.7, since it's broken in virtualenvs:
-# <https://github.com/pypa/virtualenv/issues/118>
-try:
-    from platform import python_implementation
-    if python_implementation() == 'CPython' and sys.version[:3] == '2.7':
-        can_use_sysconfig = 0
-except ImportError:
-    pass" # end of am_python_setup_sysconfig
-
-  # More repeated code, for figuring out the installation scheme to use.
-  am_python_setup_scheme="if hasattr(sysconfig, 'get_default_scheme'):
-      scheme = sysconfig.get_default_scheme()
-    else:
-      scheme = sysconfig._get_default_scheme()
-    if scheme == 'posix_local':
-      if '$am_py_prefix' == '/usr':
-        scheme = 'deb_system' # should only happen during Debian package builds
-      else:
-        # Debian's default scheme installs to /usr/local/ but we want to
-        # follow the prefix, as we always have.
-        # See bugs#54412, #64837, et al.
-        scheme = 'posix_prefix'" # end of am_python_setup_scheme
-
-
-              { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $am_display_PYTHON script directory (pythondir)" >&5
-printf %s "checking for $am_display_PYTHON script directory (pythondir)... " >&6; }
-if test ${am_cv_python_pythondir+y}
-then :
-  printf %s "(cached) " >&6
-else case e in #(
-  e) if test "x$am_cv_python_prefix" = x; then
-     am_py_prefix=$am__usable_prefix
-   else
-     am_py_prefix=$am_cv_python_prefix
-   fi
-   am_cv_python_pythondir=`$PYTHON -c "
-$am_python_setup_sysconfig
-if can_use_sysconfig:
-  try:
-    $am_python_setup_scheme
-    sitedir = sysconfig.get_path('purelib', scheme, vars={'base':'$am_py_prefix'})
-  except:
-    sitedir = sysconfig.get_path('purelib', vars={'base':'$am_py_prefix'})
-else:
-  from distutils import sysconfig
-  sitedir = sysconfig.get_python_lib(0, 0, prefix='$am_py_prefix')
-sys.stdout.write(sitedir)"`
-   #
-   case $am_cv_python_pythondir in
-   $am_py_prefix*)
-     am__strip_prefix=`echo "$am_py_prefix" | sed 's|.|.|g'`
-     am_cv_python_pythondir=`echo "$am_cv_python_pythondir" | sed "s,^$am__strip_prefix,\\${PYTHON_PREFIX},"`
-     ;;
-   *)
-     case $am_py_prefix in
-       /usr|/System*) ;;
-       *) am_cv_python_pythondir="\${PYTHON_PREFIX}/lib/python$PYTHON_VERSION/site-packages"
-          ;;
-     esac
-     ;;
-   esac
-   ;;
-esac
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_cv_python_pythondir" >&5
-printf "%s\n" "$am_cv_python_pythondir" >&6; }
-  pythondir=$am_cv_python_pythondir
-
-
-          pkgpythondir=\${pythondir}/$PACKAGE
-
-
-            { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $am_display_PYTHON extension module directory (pyexecdir)" >&5
-printf %s "checking for $am_display_PYTHON extension module directory (pyexecdir)... " >&6; }
-if test ${am_cv_python_pyexecdir+y}
-then :
-  printf %s "(cached) " >&6
-else case e in #(
-  e) if test "x$am_cv_python_exec_prefix" = x; then
-     am_py_exec_prefix=$am__usable_exec_prefix
-   else
-     am_py_exec_prefix=$am_cv_python_exec_prefix
-   fi
-   am_cv_python_pyexecdir=`$PYTHON -c "
-$am_python_setup_sysconfig
-if can_use_sysconfig:
-  try:
-    $am_python_setup_scheme
-    sitedir = sysconfig.get_path('platlib', scheme, vars={'platbase':'$am_py_exec_prefix'})
-  except:
-    sitedir = sysconfig.get_path('platlib', vars={'platbase':'$am_py_exec_prefix'})
-else:
-  from distutils import sysconfig
-  sitedir = sysconfig.get_python_lib(1, 0, prefix='$am_py_exec_prefix')
-sys.stdout.write(sitedir)"`
-   #
-   case $am_cv_python_pyexecdir in
-   $am_py_exec_prefix*)
-     am__strip_prefix=`echo "$am_py_exec_prefix" | sed 's|.|.|g'`
-     am_cv_python_pyexecdir=`echo "$am_cv_python_pyexecdir" | sed "s,^$am__strip_prefix,\\${PYTHON_EXEC_PREFIX},"`
-     ;;
-   *)
-     case $am_py_exec_prefix in
-       /usr|/System*) ;;
-       *) am_cv_python_pyexecdir="\${PYTHON_EXEC_PREFIX}/lib/python$PYTHON_VERSION/site-packages"
-          ;;
-     esac
-     ;;
-   esac
-   ;;
-esac
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $am_cv_python_pyexecdir" >&5
-printf "%s\n" "$am_cv_python_pyexecdir" >&6; }
-  pyexecdir=$am_cv_python_pyexecdir
-
-
-      pkgpyexecdir=\${pyexecdir}/$PACKAGE
-
-
-
-  fi
-
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for python build information" >&5
-printf %s "checking for python build information... " >&6; }
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: " >&5
-printf "%s\n" "" >&6; }
-for python in python3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3.5 python3.4 python3.3 python3.2 python3.1 python3.0 python2.7 python2.6 python2.5 python2.4 python2.3 python2.2 python2.1 python; do
-for ac_prog in $python
-do
-  # Extract the first word of "$ac_prog", so it can be a program name with args.
-set dummy $ac_prog; ac_word=$2
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-printf %s "checking for $ac_word... " >&6; }
-if test ${ac_cv_prog_PYTHON_BIN+y}
-then :
-  printf %s "(cached) " >&6
-else case e in #(
-  e) if test -n "$PYTHON_BIN"; then
-  ac_cv_prog_PYTHON_BIN="$PYTHON_BIN" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  case $as_dir in #(((
-    '') as_dir=./ ;;
-    */) ;;
-    *) as_dir=$as_dir/ ;;
-  esac
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if as_fn_executable_p "$as_dir$ac_word$ac_exec_ext"; then
-    ac_cv_prog_PYTHON_BIN="$ac_prog"
-    printf "%s\n" "$as_me:${as_lineno-$LINENO}: found $as_dir$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-fi ;;
-esac
-fi
-PYTHON_BIN=$ac_cv_prog_PYTHON_BIN
-if test -n "$PYTHON_BIN"; then
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $PYTHON_BIN" >&5
-printf "%s\n" "$PYTHON_BIN" >&6; }
-else
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-fi
-
-
-  test -n "$PYTHON_BIN" && break
-done
-
-ax_python_bin=$PYTHON_BIN
-if test x$ax_python_bin != x; then
-   as_ac_Lib=`printf "%s\n" "ac_cv_lib_$ax_python_bin""_main" | sed "$as_sed_sh"`
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for main in -l$ax_python_bin" >&5
-printf %s "checking for main in -l$ax_python_bin... " >&6; }
-if eval test \${$as_ac_Lib+y}
-then :
-  printf %s "(cached) " >&6
-else case e in #(
-  e) ac_check_lib_save_LIBS=$LIBS
-LIBS="-l$ax_python_bin  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-
-int
-main (void)
-{
-return main ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"
-then :
-  eval "$as_ac_Lib=yes"
-else case e in #(
-  e) eval "$as_ac_Lib=no" ;;
-esac
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.beam \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS ;;
-esac
-fi
-eval ac_res=\$$as_ac_Lib
-	       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-printf "%s\n" "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_Lib"\" = x"yes"
-then :
-  ax_python_lib=$ax_python_bin
-else case e in #(
-  e) ax_python_lib=no ;;
-esac
-fi
-
-   if test x$ax_python_lib == xno; then
-     as_ac_Lib=`printf "%s\n" "ac_cv_lib_${ax_python_bin}m""_main" | sed "$as_sed_sh"`
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for main in -l${ax_python_bin}m" >&5
-printf %s "checking for main in -l${ax_python_bin}m... " >&6; }
-if eval test \${$as_ac_Lib+y}
-then :
-  printf %s "(cached) " >&6
-else case e in #(
-  e) ac_check_lib_save_LIBS=$LIBS
-LIBS="-l${ax_python_bin}m  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-
-int
-main (void)
-{
-return main ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"
-then :
-  eval "$as_ac_Lib=yes"
-else case e in #(
-  e) eval "$as_ac_Lib=no" ;;
-esac
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.beam \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS ;;
-esac
-fi
-eval ac_res=\$$as_ac_Lib
-	       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-printf "%s\n" "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_Lib"\" = x"yes"
-then :
-  ax_python_lib=${ax_python_bin}m
-else case e in #(
-  e) ax_python_lib=no ;;
-esac
-fi
-
-   fi
-   if test x$ax_python_lib != xno; then
-     ax_python_header=`$ax_python_bin -c "from distutils.sysconfig import *; print(get_config_var('CONFINCLUDEPY'))"`
-     if test x$ax_python_header != x; then
-       break;
-     fi
-   fi
-fi
-done
-if test x$ax_python_bin = x; then
-   ax_python_bin=no
-fi
-if test x$ax_python_header = x; then
-   ax_python_header=no
-fi
-if test x$ax_python_lib = x; then
-   ax_python_lib=no
-fi
-
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result:   results of the Python check:" >&5
-printf "%s\n" "  results of the Python check:" >&6; }
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result:     Binary:      $ax_python_bin" >&5
-printf "%s\n" "    Binary:      $ax_python_bin" >&6; }
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result:     Library:     $ax_python_lib" >&5
-printf "%s\n" "    Library:     $ax_python_lib" >&6; }
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result:     Include Dir: $ax_python_header" >&5
-printf "%s\n" "    Include Dir: $ax_python_header" >&6; }
-
-if test x$ax_python_header != xno; then
-  PYTHON_INCLUDE_DIR=$ax_python_header
-
-fi
-if test x$ax_python_lib != xno; then
-  PYTHON_LIB=$ax_python_lib
-
-fi
-
-
-    if test -z $PYTHON;
-    then
-        if test -z "python3";
-        then
-            PYTHON="python3"
-        else
-            PYTHON="python3"
-        fi
-    fi
-    PYTHON_NAME=`basename $PYTHON`
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking $PYTHON_NAME module: ctypes" >&5
-printf %s "checking $PYTHON_NAME module: ctypes... " >&6; }
-    $PYTHON -c "import ctypes" 2>/dev/null
-    if test $? -eq 0;
-    then
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-        eval HAVE_PYMOD_CTYPES=yes
-    else
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-        eval HAVE_PYMOD_CTYPES=no
-        #
-        if test -n "FATAL"
-        then
-            as_fn_error $? "failed to find required module ctypes" "$LINENO" 5
-            exit 1
-        fi
-    fi
-
-
-    if test -z $PYTHON;
-    then
-        if test -z "python3";
-        then
-            PYTHON="python3"
-        else
-            PYTHON="python3"
-        fi
-    fi
-    PYTHON_NAME=`basename $PYTHON`
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking $PYTHON_NAME module: numpy" >&5
-printf %s "checking $PYTHON_NAME module: numpy... " >&6; }
-    $PYTHON -c "import numpy" 2>/dev/null
-    if test $? -eq 0;
-    then
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-        eval HAVE_PYMOD_NUMPY=yes
-    else
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-        eval HAVE_PYMOD_NUMPY=no
-        #
-        if test -n "FATAL"
-        then
-            as_fn_error $? "failed to find required module numpy" "$LINENO" 5
-            exit 1
-        fi
-    fi
-
-
-    if test -z $PYTHON;
-    then
-        if test -z "python3";
-        then
-            PYTHON="python3"
-        else
-            PYTHON="python3"
-        fi
-    fi
-    PYTHON_NAME=`basename $PYTHON`
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking $PYTHON_NAME module: xarray" >&5
-printf %s "checking $PYTHON_NAME module: xarray... " >&6; }
-    $PYTHON -c "import xarray" 2>/dev/null
-    if test $? -eq 0;
-    then
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-        eval HAVE_PYMOD_XARRAY=yes
-    else
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-        eval HAVE_PYMOD_XARRAY=no
-        #
-        if test -n "FATAL"
-        then
-            as_fn_error $? "failed to find required module xarray" "$LINENO" 5
-            exit 1
-        fi
-    fi
-
-
-    if test -z $PYTHON;
-    then
-        if test -z "python3";
-        then
-            PYTHON="python3"
-        else
-            PYTHON="python3"
-        fi
-    fi
-    PYTHON_NAME=`basename $PYTHON`
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking $PYTHON_NAME module: build" >&5
-printf %s "checking $PYTHON_NAME module: build... " >&6; }
-    $PYTHON -c "import build" 2>/dev/null
-    if test $? -eq 0;
-    then
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-        eval HAVE_PYMOD_BUILD=yes
-    else
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-        eval HAVE_PYMOD_BUILD=no
-        #
-        if test -n "FATAL"
-        then
-            as_fn_error $? "failed to find required module build" "$LINENO" 5
-            exit 1
-        fi
-    fi
-
-
-    if test -z $PYTHON;
-    then
-        if test -z "python3";
-        then
-            PYTHON="python3"
-        else
-            PYTHON="python3"
-        fi
-    fi
-    PYTHON_NAME=`basename $PYTHON`
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking $PYTHON_NAME module: matplotlib" >&5
-printf %s "checking $PYTHON_NAME module: matplotlib... " >&6; }
-    $PYTHON -c "import matplotlib" 2>/dev/null
-    if test $? -eq 0;
-    then
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-        eval HAVE_PYMOD_MATPLOTLIB=yes
-    else
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-        eval HAVE_PYMOD_MATPLOTLIB=no
-        #
-        if test -n "FATAL"
-        then
-            as_fn_error $? "failed to find required module matplotlib" "$LINENO" 5
-            exit 1
-        fi
-    fi
-
-
-    if test -z $PYTHON;
-    then
-        if test -z "python3";
-        then
-            PYTHON="python3"
-        else
-            PYTHON="python3"
-        fi
-    fi
-    PYTHON_NAME=`basename $PYTHON`
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking $PYTHON_NAME module: cartopy" >&5
-printf %s "checking $PYTHON_NAME module: cartopy... " >&6; }
-    $PYTHON -c "import cartopy" 2>/dev/null
-    if test $? -eq 0;
-    then
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-        eval HAVE_PYMOD_CARTOPY=yes
-    else
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-        eval HAVE_PYMOD_CARTOPY=no
-        #
-        if test -n "FATAL"
-        then
-            as_fn_error $? "failed to find required module cartopy" "$LINENO" 5
-            exit 1
-        fi
-    fi
-
-
-    if test -z $PYTHON;
-    then
-        if test -z "python3";
-        then
-            PYTHON="python3"
-        else
-            PYTHON="python3"
-        fi
-    fi
-    PYTHON_NAME=`basename $PYTHON`
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking $PYTHON_NAME module: tomllib" >&5
-printf %s "checking $PYTHON_NAME module: tomllib... " >&6; }
-    $PYTHON -c "import tomllib" 2>/dev/null
-    if test $? -eq 0;
-    then
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-        eval HAVE_PYMOD_TOMLLIB=yes
-    else
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-        eval HAVE_PYMOD_TOMLLIB=no
-        #
-        if test -n "FATAL"
-        then
-            as_fn_error $? "failed to find required module tomllib" "$LINENO" 5
-            exit 1
-        fi
-    fi
-
-ac_config_files="$ac_config_files zbt/pyproject.toml:zbt/pyproject.in"
-
-ac_config_files="$ac_config_files zbt/zbt/Makefile"
-
-ac_config_files="$ac_config_files zbt/tests/Makefile"
-
-fi
 
  if test "$PYTHON" != :; then
   HAVE_PYTHON_TRUE=
@@ -25949,42 +24819,6 @@ else
   HAVE_PYTHON_FALSE=
 fi
 
-
- if test "x$enable_sub_zbt" = xbuild; then
-  ZBT_BUILD_ONLY_TRUE=
-  ZBT_BUILD_ONLY_FALSE='#'
-else
-  ZBT_BUILD_ONLY_TRUE='#'
-  ZBT_BUILD_ONLY_FALSE=
-fi
-
-
-# Check whether --enable-zbt-embed-libdir was given.
-if test ${enable_zbt_embed_libdir+y}
-then :
-  enableval=$enable_zbt_embed_libdir; enable_zbt_embed_libdir=$enableval
-else case e in #(
-  e) enable_zbt_embed_libdir=no ;;
-esac
-fi
-
- if
-  test "x$use_mod_dependencies" != xno \
-  && test x"$ax_f90_modext" != xunknown; then
-  enable_module_dependencies_TRUE=
-  enable_module_dependencies_FALSE='#'
-else
-  enable_module_dependencies_TRUE='#'
-  enable_module_dependencies_FALSE=
-fi
-
- if test "x$enable_zbt_embed_libdir" = xyes; then
-  zbt_embed_libdir_TRUE=
-  zbt_embed_libdir_FALSE='#'
-else
-  zbt_embed_libdir_TRUE='#'
-  zbt_embed_libdir_FALSE=
-fi
 
 
 
@@ -26103,94 +24937,6 @@ then :
     eval enable_sub_std=dep ;; #(
   "") :
     eval enable_sub_std=yes ;; #(
-  *) :
-     ;;
-esac
-case "$enable_sub_emu" in #(
-  no) :
-    eval enable_sub_emu=dep ;; #(
-  "") :
-    eval enable_sub_emu=yes ;; #(
-  *) :
-     ;;
-esac
-case "$enable_sub_trp" in #(
-  no) :
-    eval enable_sub_trp=dep ;; #(
-  "") :
-    eval enable_sub_trp=yes ;; #(
-  *) :
-     ;;
-esac
-
-fi
-if test x"$enable_sub_ami" = x
-then :
-  eval enable_sub_ami="$enable_sub_all"
-fi
-       if test x"$enable_sub_ami" = x
-then :
-  eval enable_sub_ami="yes"
-fi
-if test x"$enable_sub_ami" != xno
-then :
-  case "$enable_sub_std" in #(
-  no) :
-    eval enable_sub_std=dep ;; #(
-  "") :
-    eval enable_sub_std=yes ;; #(
-  *) :
-     ;;
-esac
-case "$enable_sub_emu" in #(
-  no) :
-    eval enable_sub_emu=dep ;; #(
-  "") :
-    eval enable_sub_emu=yes ;; #(
-  *) :
-     ;;
-esac
-case "$enable_sub_nio" in #(
-  no) :
-    eval enable_sub_nio=dep ;; #(
-  "") :
-    eval enable_sub_nio=yes ;; #(
-  *) :
-     ;;
-esac
-case "$enable_sub_trp" in #(
-  no) :
-    eval enable_sub_trp=dep ;; #(
-  "") :
-    eval enable_sub_trp=yes ;; #(
-  *) :
-     ;;
-esac
-
-fi
-if test x"$enable_sub_zbt" = x
-then :
-  eval enable_sub_zbt="$enable_sub_all"
-fi
-       if test x"$enable_sub_zbt" = x
-then :
-  eval enable_sub_zbt="no"
-fi
-if test x"$enable_sub_zbt" != xno
-then :
-  case "$enable_sub_std" in #(
-  no) :
-    eval enable_sub_std=dep ;; #(
-  "") :
-    eval enable_sub_std=yes ;; #(
-  *) :
-     ;;
-esac
-case "$enable_sub_nio" in #(
-  no) :
-    eval enable_sub_nio=dep ;; #(
-  "") :
-    eval enable_sub_nio=yes ;; #(
   *) :
      ;;
 esac
@@ -29483,75 +28229,6 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 fi
-case "$enable_sub_ami" in #(
-  always) :
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: load subpackage ami (mandatory)" >&5
-printf "%s\n" "$as_me: load subpackage ami (mandatory)" >&6;} ;; #(
-  yes) :
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: load subpackage ami" >&5
-printf "%s\n" "$as_me: load subpackage ami" >&6;} ;; #(
-  dep) :
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: load subpackage ami (dependency)" >&5
-printf "%s\n" "$as_me: load subpackage ami (dependency)" >&6;} ;; #(
-  no) :
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: skip subpackage ami" >&5
-printf "%s\n" "$as_me: skip subpackage ami" >&6;} ;; #(
-  build) :
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: (if possible) build-only subpackage ami" >&5
-printf "%s\n" "$as_me: (if possible) build-only subpackage ami" >&6;} ;; #(
-  *) :
-    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in '$ac_pwd':" >&5
-printf "%s\n" "$as_me: error: in '$ac_pwd':" >&2;}
-as_fn_error $? "invalid switch for subpackage ami $enable_sub_ami.\"
-See 'config.log' for more details" "$LINENO" 5; } ;;
-esac
-if test x"$enable_sub_ami" != xno
-then :
-
-
-ac_ext=${ac_fc_srcext-f}
-ac_compile='$FC -c $FCFLAGS $ac_fcflags_srcext conftest.$ac_ext >&5'
-ac_link='$FC -o conftest$ac_exeext $FCFLAGS $LDFLAGS $ac_fcflags_srcext conftest.$ac_ext $LIBS >&5'
-ac_compiler_gnu=$ac_cv_fc_compiler_gnu
-
-
-ac_ext=c
-ac_cpp='$CPP $CPPFLAGS'
-ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
-ac_compiler_gnu=$ac_cv_c_compiler_gnu
-
-
-
-fi
-case "$enable_sub_zbt" in #(
-  always) :
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: load subpackage zbt (mandatory)" >&5
-printf "%s\n" "$as_me: load subpackage zbt (mandatory)" >&6;} ;; #(
-  yes) :
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: load subpackage zbt" >&5
-printf "%s\n" "$as_me: load subpackage zbt" >&6;} ;; #(
-  dep) :
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: load subpackage zbt (dependency)" >&5
-printf "%s\n" "$as_me: load subpackage zbt (dependency)" >&6;} ;; #(
-  no) :
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: skip subpackage zbt" >&5
-printf "%s\n" "$as_me: skip subpackage zbt" >&6;} ;; #(
-  build) :
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: (if possible) build-only subpackage zbt" >&5
-printf "%s\n" "$as_me: (if possible) build-only subpackage zbt" >&6;} ;; #(
-  *) :
-    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in '$ac_pwd':" >&5
-printf "%s\n" "$as_me: error: in '$ac_pwd':" >&2;}
-as_fn_error $? "invalid switch for subpackage zbt $enable_sub_zbt.\"
-See 'config.log' for more details" "$LINENO" 5; } ;;
-esac
-if test x"$enable_sub_zbt" != xno
-then :
-
-
-
-fi
 if test "x$enable_sub_std" != xno
 then :
   ac_config_files="$ac_config_files std/Makefile"
@@ -29721,64 +28398,6 @@ builddir_touza_nio='$(top_builddir)/nio'
 FC_INCLUDE_touza_nio='-I$(srcdir_touza_nio)'
 FC_MODULE_touza_nio='$(FC_MODINC)$(builddir_touza_nio)'
 FC_LDADD_touza_nio='$(builddir_touza_nio)/libtouza_local.la'
-
-
-
-
-
-if test "x$enable_sub_ami" != xno
-then :
-  ac_config_files="$ac_config_files ami/Makefile"
-
-fi
- if test x"$enable_sub_ami" != xno; then
-  BUILD_ami_TRUE=
-  BUILD_ami_FALSE='#'
-else
-  BUILD_ami_TRUE='#'
-  BUILD_ami_FALSE=
-fi
-
-if test x"$enable_sub_ami" != xno
-then :
-
-printf "%s\n" "#define ENABLE_TOUZA_AMI 1" >>confdefs.h
-
-fi
-srcdir_touza_ami='$(top_srcdir)/ami'
-builddir_touza_ami='$(top_builddir)/ami'
-FC_INCLUDE_touza_ami='-I$(srcdir_touza_ami)'
-FC_MODULE_touza_ami='$(FC_MODINC)$(builddir_touza_ami)'
-FC_LDADD_touza_ami='$(builddir_touza_ami)/libtouza_local.la'
-
-
-
-
-
-if test "x$enable_sub_zbt" != xno
-then :
-  ac_config_files="$ac_config_files zbt/Makefile"
-
-fi
- if test x"$enable_sub_zbt" != xno; then
-  BUILD_zbt_TRUE=
-  BUILD_zbt_FALSE='#'
-else
-  BUILD_zbt_TRUE='#'
-  BUILD_zbt_FALSE=
-fi
-
-if test x"$enable_sub_zbt" != xno
-then :
-
-printf "%s\n" "#define ENABLE_TOUZA_ZBT 1" >>confdefs.h
-
-fi
-srcdir_touza_zbt='$(top_srcdir)/zbt'
-builddir_touza_zbt='$(top_builddir)/zbt'
-FC_INCLUDE_touza_zbt='-I$(srcdir_touza_zbt)'
-FC_MODULE_touza_zbt='$(FC_MODINC)$(builddir_touza_zbt)'
-FC_LDADD_touza_zbt='$(builddir_touza_zbt)/libtouza_local.la'
 
 
 
@@ -30105,98 +28724,18 @@ if test -z "${BUILD_div_TRUE}" && test -z "${BUILD_div_FALSE}"; then
   as_fn_error $? "conditional \"BUILD_div\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
+if test -z "${BUILD_ami_TRUE}" && test -z "${BUILD_ami_FALSE}"; then
+  as_fn_error $? "conditional \"BUILD_ami\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${BUILD_zbt_TRUE}" && test -z "${BUILD_zbt_FALSE}"; then
+  as_fn_error $? "conditional \"BUILD_zbt\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
 if test -z "${with_nctcdf_TRUE}" && test -z "${with_nctcdf_FALSE}"; then
   as_fn_error $? "conditional \"with_nctcdf\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
-      ax_dir="jmz"
-
-      # Convert the path to the subdirectory into a shell variable name.
-      ax_var=$(printf "$ax_dir" | tr -c "0-9a-zA-Z_" "_")
-      ax_configure_ax_var=$(eval "echo \"\$ax_sub_configure_$ax_var\"")
-      if test "$no_recursion" != "yes" -a "x$ax_configure_ax_var" = "xyes"; then
-        subdirs_extra="$subdirs_extra $ax_dir"
-
-        ax_msg="=== configuring in $ax_dir ($(pwd)/$ax_dir)"
-        printf "%s\n" "$as_me:${as_lineno-$LINENO}: $ax_msg" >&5
-        printf "%s\n" "$ax_msg" >&6
-        as_dir="$ax_dir"; as_fn_mkdir_p
-        ac_builddir=.
-
-case "$ax_dir" in
-.) ac_dir_suffix= ac_top_builddir_sub=. ac_top_build_prefix= ;;
-*)
-  ac_dir_suffix=/`printf "%s\n" "$ax_dir" | sed 's|^\.[\\/]||'`
-  # A ".." for each directory in $ac_dir_suffix.
-  ac_top_builddir_sub=`printf "%s\n" "$ac_dir_suffix" | sed 's|/[^\\/]*|/..|g;s|/||'`
-  case $ac_top_builddir_sub in
-  "") ac_top_builddir_sub=. ac_top_build_prefix= ;;
-  *)  ac_top_build_prefix=$ac_top_builddir_sub/ ;;
-  esac ;;
-esac
-ac_abs_top_builddir=$ac_pwd
-ac_abs_builddir=$ac_pwd$ac_dir_suffix
-# for backward compatibility:
-ac_top_builddir=$ac_top_build_prefix
-
-case $srcdir in
-  .)  # We are building in place.
-    ac_srcdir=.
-    ac_top_srcdir=$ac_top_builddir_sub
-    ac_abs_top_srcdir=$ac_pwd ;;
-  [\\/]* | ?:[\\/]* )  # Absolute name.
-    ac_srcdir=$srcdir$ac_dir_suffix;
-    ac_top_srcdir=$srcdir
-    ac_abs_top_srcdir=$srcdir ;;
-  *) # Relative name.
-    ac_srcdir=$ac_top_build_prefix$srcdir$ac_dir_suffix
-    ac_top_srcdir=$ac_top_build_prefix$srcdir
-    ac_abs_top_srcdir=$ac_pwd/$srcdir ;;
-esac
-ac_abs_srcdir=$ac_abs_top_srcdir$ac_dir_suffix
-
-
-        ax_popdir=$(pwd)
-        cd "$ax_dir"
-
-        # Check for guested configure; otherwise get Cygnus style configure.
-        if test -f "$ac_srcdir/configure.gnu"; then
-          ax_sub_configure=$ac_srcdir/configure.gnu
-        elif test -f "$ac_srcdir/configure"; then
-          ax_sub_configure=$ac_srcdir/configure
-        elif test -f "$ac_srcdir/configure.in"; then
-          # This should be Cygnus configure.
-          ax_sub_configure=$ac_aux_dir/configure
-        else
-          { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: no configuration information is in $ax_dir" >&5
-printf "%s\n" "$as_me: WARNING: no configuration information is in $ax_dir" >&2;}
-          ax_sub_configure=
-        fi
-
-        if test -n "$ax_sub_configure"; then
-          # Get the configure arguments for the current configure.
-          eval "ax_sub_configure_args=\"\$ax_sub_configure_args_${ax_var}\""
-
-          # Always prepend --prefix to ensure using the same prefix
-          # in subdir configurations.
-          ax_arg="--prefix=$prefix"
-          case $ax_arg in
-            *\'*) ax_arg=$(printf "%s\n" "$ax_arg" | sed "s/'/'\\\\\\\\''/g");;
-          esac
-          ax_sub_configure_args="'$ax_arg' $ax_sub_configure_args"
-          if test "$silent" = yes; then
-            ax_sub_configure_args="--silent $ax_sub_configure_args"
-          fi
-
-          { printf "%s\n" "$as_me:${as_lineno-$LINENO}: running $SHELL $ax_sub_configure $ax_sub_configure_args --cache-file=$cache_file" >&5
-printf "%s\n" "$as_me: running $SHELL $ax_sub_configure $ax_sub_configure_args --cache-file=$cache_file" >&6;}
-          eval "\$SHELL \"$ax_sub_configure\" $ax_sub_configure_args --cache-file=\"$cache_file\"" \
-              || as_fn_error $? "$ax_sub_configure failed for $ax_dir" "$LINENO" 5
-        fi
-
-        cd "$ax_popdir"
-      fi
-
 if test -z "${autorevision_TRUE}" && test -z "${autorevision_FALSE}"; then
   as_fn_error $? "conditional \"autorevision\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
@@ -30211,18 +28750,6 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${HAVE_PYTHON_TRUE}" && test -z "${HAVE_PYTHON_FALSE}"; then
   as_fn_error $? "conditional \"HAVE_PYTHON\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${ZBT_BUILD_ONLY_TRUE}" && test -z "${ZBT_BUILD_ONLY_FALSE}"; then
-  as_fn_error $? "conditional \"ZBT_BUILD_ONLY\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${enable_module_dependencies_TRUE}" && test -z "${enable_module_dependencies_FALSE}"; then
-  as_fn_error $? "conditional \"enable_module_dependencies\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${zbt_embed_libdir_TRUE}" && test -z "${zbt_embed_libdir_FALSE}"; then
-  as_fn_error $? "conditional \"zbt_embed_libdir\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${have_iso_c_binding_TRUE}" && test -z "${have_iso_c_binding_FALSE}"; then
@@ -30251,14 +28778,6 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${BUILD_nio_TRUE}" && test -z "${BUILD_nio_FALSE}"; then
   as_fn_error $? "conditional \"BUILD_nio\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${BUILD_ami_TRUE}" && test -z "${BUILD_ami_FALSE}"; then
-  as_fn_error $? "conditional \"BUILD_ami\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${BUILD_zbt_TRUE}" && test -z "${BUILD_zbt_FALSE}"; then
-  as_fn_error $? "conditional \"BUILD_zbt\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 
@@ -31325,17 +29844,12 @@ do
     "touza_config.h") CONFIG_HEADERS="$CONFIG_HEADERS touza_config.h" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "m4c/Makefile") CONFIG_FILES="$CONFIG_FILES m4c/Makefile" ;;
-    "zbt/pyproject.toml") CONFIG_FILES="$CONFIG_FILES zbt/pyproject.toml:zbt/pyproject.in" ;;
-    "zbt/zbt/Makefile") CONFIG_FILES="$CONFIG_FILES zbt/zbt/Makefile" ;;
-    "zbt/tests/Makefile") CONFIG_FILES="$CONFIG_FILES zbt/tests/Makefile" ;;
     "std/Makefile") CONFIG_FILES="$CONFIG_FILES std/Makefile" ;;
     "emu/Makefile") CONFIG_FILES="$CONFIG_FILES emu/Makefile" ;;
     "cal/Makefile") CONFIG_FILES="$CONFIG_FILES cal/Makefile" ;;
     "trp/Makefile") CONFIG_FILES="$CONFIG_FILES trp/Makefile" ;;
     "ppp/Makefile") CONFIG_FILES="$CONFIG_FILES ppp/Makefile" ;;
     "nio/Makefile") CONFIG_FILES="$CONFIG_FILES nio/Makefile" ;;
-    "ami/Makefile") CONFIG_FILES="$CONFIG_FILES ami/Makefile" ;;
-    "zbt/Makefile") CONFIG_FILES="$CONFIG_FILES zbt/Makefile" ;;
     "touza.pc") CONFIG_FILES="$CONFIG_FILES touza.pc" ;;
 
   *) as_fn_error $? "invalid argument: '$ac_config_target'" "$LINENO" 5;;

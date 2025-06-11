@@ -1,8 +1,5 @@
 /* touza_config.h.in.  Generated from configure.ac by autoheader.  */
 
-/* ami is enabled */
-#undef ENABLE_TOUZA_AMI
-
 /* cal is enabled */
 #undef ENABLE_TOUZA_CAL
 
@@ -20,9 +17,6 @@
 
 /* trp is enabled */
 #undef ENABLE_TOUZA_TRP
-
-/* zbt is enabled */
-#undef ENABLE_TOUZA_ZBT
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H

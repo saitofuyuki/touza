@@ -16,3 +16,6 @@ See INSTALL for generic installation instructions.
 See README-touza.org for brief guide on TOUZA packages.
 
 TOUZA package may be embedded in MIROC.  Not to be confused with the license of MIROC.
+
+This is a special subpackage of TOUZA to be included in the MIROC package.
+The reference revision is recorded in autorevision.h, but it may not be an official one.
