@@ -1,10 +1,16 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/05/25 15:34:18 fuyuki NEWS>
+# Time-stamp: <2025/06/11 09:15:36 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.16.2
+** Improvement for MIROC infrastructure replacement
+Frequent flush-ing may affect the cpu-time significantly.
+Accordingly, monitoring of ppp-agents on the stack (which was very
+frequent in miroc) now disables flushing.
 
 * Changes in 1.16.1
 ** Improvement for MIROC infrastructure replacement

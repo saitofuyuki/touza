@@ -1,10 +1,10 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2025/05/23 08:39:43 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/06/11 07:08:18 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2011-2024
+! Copyright (C) 2011-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -45,7 +45,7 @@ module TOUZA_Std_log
   integer,save :: err_default = ERR_NO_INIT - ERR_MASK_STD_LOG
   integer,save :: default_unit = unit_star
 
-  logical,save :: to_flush = .TRUE.
+  logical,save :: to_flush_msg = .TRUE.
 !!!_  - interfaces
   interface msg
      module procedure msg_txt
@@ -105,10 +105,11 @@ module TOUZA_Std_log
   public banner
   public trace_control,     trace_fine,         trace_err
   public is_error_match
+  public toggle_flush
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, bflush)
+  subroutine init(ierr, u, levv, mode, to_flush)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: utl_init=>init, choice
     ! use TOUZA_Std_prc,only: prc_init=>init   ! included by TOUZA_Std_utl
@@ -116,7 +117,7 @@ contains
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u             ! global log unit (untouch if unit_global)
     integer,intent(in),optional :: levv, mode
-    logical,intent(in),optional :: bflush        ! flush (default: T)
+    logical,intent(in),optional :: to_flush        ! flush (default: T)
     integer md, lv, lmd
     integer utmp
 
@@ -138,7 +139,7 @@ contains
           ! if (ierr.eq.0) call prc_init(ierr, default_unit, levv=lv, mode=lmd)
           if (ierr.eq.0) call utl_init(ierr, default_unit, levv=lv, mode=lmd)
        endif
-       to_flush = choice(to_flush, bflush)
+       to_flush_msg = choice(to_flush_msg, to_flush)
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
     endif
@@ -328,134 +329,143 @@ contains
 !!!_ + module friends
 !!!_  & msg_fun_ia - log message [function level]
   subroutine msg_fun_ia &
-       & (fmt, vv, mdl, fun, u)
+       & (fmt, vv, mdl, fun, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: fmt
     integer,         intent(in)          :: vv(:)
     character(len=*),intent(in)          :: mdl
     character(len=*),intent(in)          :: fun
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=lpfx) :: tag
 
     call gen_tag(tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl, fun=fun)
-    call msg_ia(fmt, vv, tag, u)
+    call msg_ia(fmt, vv, tag, u, to_flush)
     return
   end subroutine msg_fun_ia
 !!!_  & msg_fun_txt - log message [function level]
   subroutine msg_fun_txt &
-       & (txt, mdl, fun, u)
+       & (txt, mdl, fun, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: txt
     character(len=*),intent(in)          :: mdl
     character(len=*),intent(in)          :: fun
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=lpfx) :: tag
 
     call gen_tag(tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl, fun=fun)
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
     return
   end subroutine msg_fun_txt
 
 !!!_  & msg_mdl - log message [module level]
   subroutine msg_mdl_ia &
-       & (fmt, vv, mdl, u)
+       & (fmt, vv, mdl, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: fmt
     integer,         intent(in)          :: vv(:)
     character(len=*),intent(in)          :: mdl
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=lpfx) :: tag
 
     call gen_tag(tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl)
-    call msg_ia(fmt, vv, tag, u)
+    call msg_ia(fmt, vv, tag, u, to_flush)
     return
   end subroutine msg_mdl_ia
 
   subroutine msg_mdl_is &
-       & (fmt, v, mdl, u)
+       & (fmt, v, mdl, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: fmt
     integer,         intent(in)          :: v
     character(len=*),intent(in)          :: mdl
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=lpfx) :: tag
 
     call gen_tag(tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl)
-    call msg_is(fmt, v, tag, u)
+    call msg_is(fmt, v, tag, u, to_flush)
     return
   end subroutine msg_mdl_is
 
   subroutine msg_mdl_as &
-       & (fmt, v, mdl, u)
+       & (fmt, v, mdl, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: fmt
     character(len=*),intent(in)          :: v
     character(len=*),intent(in)          :: mdl
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=lpfx) :: tag
 
     call gen_tag(tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl)
-    call msg_as(fmt, v, tag, u)
+    call msg_as(fmt, v, tag, u, to_flush)
     return
   end subroutine msg_mdl_as
 
 !!!_  & msg_mdl_txt - log message [module level]
   subroutine msg_mdl_txt &
-       & (txt, mdl, u)
+       & (txt, mdl, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: txt
     character(len=*),intent(in)          :: mdl
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=lpfx) :: tag
 
     call gen_tag(tag, pkg=PACKAGE_TAG, grp=__GRP__, mdl=mdl)
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
     return
   end subroutine msg_mdl_txt
 
 !!!_  & msg_grp_ia - log message [group level]
   subroutine msg_grp_ia &
-       & (fmt, vv, grp, mdl, u)
+       & (fmt, vv, grp, mdl, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: fmt
     integer,         intent(in)          :: vv(:)
     character(len=*),intent(in),optional :: grp
     character(len=*),intent(in),optional :: mdl
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=lpfx) :: tag
 
     call gen_tag(tag, pkg=PACKAGE_TAG, grp=grp, mdl=mdl)
-    call msg_ia(fmt, vv, tag, u)
+    call msg_ia(fmt, vv, tag, u, to_flush)
     return
   end subroutine msg_grp_ia
 !!!_  & msg_grp_aa - log message [module level]
   subroutine msg_grp_aa &
-       & (fmt, vv, grp, mdl, u)
+       & (fmt, vv, grp, mdl, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: fmt
     character(len=*),intent(in)          :: vv(:)
     character(len=*),intent(in),optional :: grp
     character(len=*),intent(in),optional :: mdl
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=lpfx) :: tag
 
     call gen_tag(tag, pkg=PACKAGE_TAG, grp=grp, mdl=mdl)
-    call msg_aa(fmt, vv(:), tag, u)
+    call msg_aa(fmt, vv(:), tag, u, to_flush)
     return
   end subroutine msg_grp_aa
 
 !!!_  & msg_grp_txt - log message [module level]
   subroutine msg_grp_txt &
-       & (txt, grp, mdl, u)
+       & (txt, grp, mdl, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: txt
     character(len=*),intent(in),optional :: grp
     character(len=*),intent(in),optional :: mdl
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=lpfx) :: tag
 
     call gen_tag(tag, pkg=PACKAGE_TAG, grp=grp, mdl=mdl)
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
     return
   end subroutine msg_grp_txt
 
@@ -530,187 +540,199 @@ contains
 
 !!!_  & msg_*a - log message (format and array)
   subroutine msg_ia &
-       & (fmt, vv, tag, u)
+       & (fmt, vv, tag, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: fmt
     integer,         intent(in)          :: vv(:)
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=ltxt) :: txt
     integer jerr
 
     write(txt, fmt, IOSTAT=jerr) vv(:)
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
 
   end subroutine msg_ia
 
   subroutine msg_fa &
-       & (fmt, vv, tag, u)
+       & (fmt, vv, tag, u, to_flush)
     use TOUZA_Std_prc,only: KFLT
     implicit none
     character(len=*),intent(in)          :: fmt
     real(kind=KFLT), intent(in)          :: vv(:)
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=ltxt) :: txt
     integer jerr
 
     write(txt, fmt, IOSTAT=jerr) vv(:)
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
 
   end subroutine msg_fa
 
   subroutine msg_da &
-       & (fmt, vv, tag, u)
+       & (fmt, vv, tag, u, to_flush)
     use TOUZA_Std_prc,only: KDBL
     implicit none
     character(len=*),intent(in)          :: fmt
     real(kind=KDBL), intent(in)          :: vv(:)
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=ltxt) :: txt
     integer jerr
 
     write(txt, fmt, IOSTAT=jerr) vv(:)
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
 
   end subroutine msg_da
 
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   subroutine msg_qa &
-       & (fmt, vv, tag, u)
+       & (fmt, vv, tag, u, to_flush)
     use TOUZA_Std_prc,only: KQPL
     implicit none
     character(len=*),intent(in)          :: fmt
     real(kind=KQPL), intent(in)          :: vv(:)
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=ltxt) :: txt
     integer jerr
 
     write(txt, fmt, IOSTAT=jerr) vv(:)
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
 
   end subroutine msg_qa
 #endif /* OPT_REAL_QUADRUPLE_DIGITS */
 
   subroutine msg_aa &
-       & (fmt, vv, tag, u)
+       & (fmt, vv, tag, u, to_flush)
     use TOUZA_Std_prc,only: KDBL
     implicit none
     character(len=*),intent(in)          :: fmt
     character(len=*),intent(in)          :: vv(:)
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=ltxt) :: txt
     integer j
     integer jerr
 
     write(txt, fmt, IOSTAT=jerr) (trim(vv(j)), j=1, size(vv))
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
 
   end subroutine msg_aa
 
 !!!_  & msg_*s - log message (format and single variable)
   subroutine msg_is &
-       & (fmt, v, tag, u)
+       & (fmt, v, tag, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: fmt
     integer,         intent(in)          :: v
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=ltxt) :: txt
     integer jerr
 
     write(txt, fmt, IOSTAT=jerr) v
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
 
   end subroutine msg_is
 
   subroutine msg_fs &
-       & (fmt, v, tag, u)
+       & (fmt, v, tag, u, to_flush)
     use TOUZA_Std_prc,only: KFLT
     implicit none
     character(len=*),intent(in)          :: fmt
     real(kind=KFLT), intent(in)          :: v
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=ltxt) :: txt
     integer jerr
 
     write(txt, fmt, IOSTAT=jerr) v
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
 
   end subroutine msg_fs
 
   subroutine msg_ds &
-       & (fmt, v, tag, u)
+       & (fmt, v, tag, u, to_flush)
     use TOUZA_Std_prc,only: KDBL
     implicit none
     character(len=*),intent(in)          :: fmt
     real(kind=KDBL), intent(in)          :: v
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=ltxt) :: txt
     integer jerr
 
     write(txt, fmt, IOSTAT=jerr) v
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
 
   end subroutine msg_ds
 
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   subroutine msg_qs &
-       & (fmt, v, tag, u)
+       & (fmt, v, tag, u, to_flush)
     use TOUZA_Std_prc,only: KQPL
     implicit none
     character(len=*),intent(in)          :: fmt
     real(kind=KQPL), intent(in)          :: v
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=ltxt) :: txt
     integer jerr
 
     write(txt, fmt, IOSTAT=jerr) v
-    call msg_txt(txt, tag, u)
+    call msg_txt(txt, tag, u, to_flush)
 
   end subroutine msg_qs
 #endif /* OPT_REAL_QUADRUPLE_DIGITS */
 
   subroutine msg_as &
-       & (fmt, v, tag, u)
+       & (fmt, v, tag, u, to_flush)
     implicit none
     character(len=*),intent(in)          :: fmt
     character(len=*),intent(in)          :: v
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
     character(len=ltxt) :: txt
     integer jerr
 
     write(txt, fmt, IOSTAT=jerr) trim(v)
     if (jerr.eq.0) then
-       call msg_txt(txt, tag, u)
+       call msg_txt(txt, tag, u, to_flush)
     else
        if (HAVE_FORTRAN_FC_CONCATENATION.ne.0) then
           txt = trim(fmt) // ' ' // trim(v)
-          call msg_txt(txt, tag, u)
+          call msg_txt(txt, tag, u, to_flush)
        else
-          call msg_txt(fmt, tag, u)
-          call msg_txt(v,   tag, u)
+          call msg_txt(fmt, tag, u, .FALSE.)
+          call msg_txt(v,   tag, u, to_flush)
        endif
     endif
   end subroutine msg_as
 
 !!!_  & msg_txt - message core
   subroutine msg_txt &
-       & (txt, tag, u)
+       & (txt, tag, u, to_flush)
     use TOUZA_Std_utl,only: choice
     implicit none
     character(len=*),intent(in)          :: txt
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush   ! default as global
     integer jerr
     integer ut
+    logical bf
     ut = choice(unit_global, u)
     if (ut.eq.unit_global) ut = default_unit
 101 format(_TOUZA_FORMAT_TAG(A), A)
@@ -737,7 +759,8 @@ contains
        endif
     endif
     if (ut.ge.0) then
-       if (to_flush) then
+       bf = choice(to_flush_msg, to_flush)
+       if (bf) then
 #if HAVE_FORTRAN_FLUSH_UNIT
           flush(unit=ut, IOSTAT=jerr)
 #endif
@@ -939,6 +962,20 @@ contains
        endif
     endif
   end function is_error_match
+
+!!!_  & toggle_flush() - toggle flush boolean and return the current
+  logical function toggle_flush(switch) result (b)
+    implicit none
+    logical,optional,intent(in) :: switch
+    if (present(switch)) then
+       to_flush_msg = switch
+    else
+       to_flush_msg = .not. to_flush_msg
+    endif
+    b = to_flush_msg
+    return
+  end function toggle_flush
+
 !!!_ + end
 end module TOUZA_Std_log
 !!!_@ test_std_log - test program

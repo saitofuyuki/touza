@@ -1,7 +1,7 @@
 !!!_! std_ipc.F90 - touza/std intrinsic procedures compatible gallery
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 25 2023
-#define TIME_STAMP 'Time-stamp: <2025/05/23 08:47:48 fuyuki std_ipc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/05/25 14:40:51 fuyuki std_ipc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023-2025
@@ -17,6 +17,17 @@
 #include "touza_std.h"
 #ifndef    OPT_IPC_HYPOT_ITER
 #  define  OPT_IPC_HYPOT_ITER 3
+#endif
+!!!_ + ETIME
+#define HAVE_FORTRAN_ETIME 0   /* RESERVED */
+#ifndef   HAVE_FORTRAN_ETIME
+#  if HAVE_FORTRAN_ETIME_8
+#    define HAVE_FORTRAN_ETIME 8
+#  elif HAVE_FORTRAN_ETIME_4
+#    define HAVE_FORTRAN_ETIME 4
+#  else
+#    define HAVE_FORTRAN_ETIME 0
+#  endif
 #endif
 !!!_ + debug
 #ifndef   TEST_STD_IPC
@@ -66,11 +77,16 @@ module TOUZA_Std_ipc
      module procedure ipc_ATANH_d, ipc_ATANH_f
   end interface ipc_ATANH
 
+  interface ipc_ETIME
+     module procedure ipc_ETIME_d, ipc_ETIME_f
+  end interface ipc_ETIME
+
 !!!_  - public
   public init, diag, finalize
   public ipc_IBITS,  exam_IBITS
   public ipc_HYPOT
   public ipc_ASINH,  ipc_ACOSH, ipc_ATANH
+  public ipc_ETIME
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -456,6 +472,39 @@ contains
     return
   end function ipc_ATANH_d
 
+!!!_ + ETIME - Execution time
+  subroutine ipc_ETIME_d(VALUES, TIME)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(out) :: VALUES(2)
+    real(kind=KTGT),intent(out) :: TIME
+#if HAVE_FORTRAN_ETIME
+    integer,parameter :: karg = HAVE_FORTRAN_ETIME
+    real(kind=karg) :: v(2), t
+    call ETIME(v, t)
+    VALUES(1:2) = real(v(1:2), kind=KTGT)
+    TIME = real(TIME, kind=KTGT)
+#else
+    VALUES(1:2) = 0.0_KTGT
+    TIME = 0.0_KTGT
+#endif
+  end subroutine ipc_ETIME_d
+  subroutine ipc_ETIME_f(VALUES, TIME)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    real(kind=KTGT),intent(out) :: VALUES(2)
+    real(kind=KTGT),intent(out) :: TIME
+#if HAVE_FORTRAN_ETIME
+    integer,parameter :: karg = HAVE_FORTRAN_ETIME
+    real(kind=karg) :: v(2), t
+    call ETIME(v, t)
+    VALUES(1:2) = real(v(1:2), kind=KTGT)
+    TIME = real(TIME, kind=KTGT)
+#else
+    VALUES(1:2) = 0.0_KTGT
+    TIME = 0.0_KTGT
+#endif
+  end subroutine ipc_ETIME_f
 !!!_ + end TOUZA_Std_ipc
 end module TOUZA_Std_ipc
 
@@ -503,6 +552,8 @@ program test_std_ipc
   call test_invht(ierr, 1.0_KRTGT)
   call test_invht(ierr, 0.5_KRTGT)
   call test_invht(ierr, 0.0_KRTGT)
+
+  call test_etime(ierr)
 
   call finalize(ierr, levv=+9)
   write(*, 101) ierr
@@ -559,6 +610,30 @@ contains
     write(*, 101) 'atanh', zt, yt, zt-yt
   end subroutine test_invht
 
+  subroutine test_etime(ierr)
+    integer,intent(out) :: ierr
+    integer j, k
+    integer,parameter :: n = 65536 * 4
+
+    real(kind=KRTGT) :: V(2), T
+
+    ierr = 0
+
+101 format('etime: ', I0, 2(1x, F0.4), 1x, F0.4)
+
+    call ipc_ETIME(V, T)
+    write(*, 101) n, V, T
+
+    k = 0
+    do j = 0, n - 1
+       k = k + 1 ! dummy
+    enddo
+
+    call ipc_ETIME(V, T)
+    write(*, 101) k, V, T
+
+    return
+  end subroutine test_etime
 end program test_std_ipc
 
 #endif /* TEST_STD_IPC */
