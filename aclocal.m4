@@ -13169,11 +13169,12 @@ dnl mode: autoconf
 dnl end:
 
 dnl Filename:  touza/m4c/mt_fortran_check.m4
-dnl Author:    SAITO Fuyuki
+dnl Maintainer: SAITO Fuyuki
 dnl Created:   Jun 3 2020
-dnl Time-stamp: <2023/01/31 09:04:01 fuyuki mt_fortran_check.m4>
+dnl Time-stamp: <2025/05/25 14:01:16 fuyuki mt_fortran_check.m4>
 
-dnl Copyright: 2020, 2021 JAMSTEC
+dnl Copyright (C) 2020-2025
+dnl           Japan Agency for Marine-Earth Science and Technology
 dnl Licensed under the Apache License, Version 2.0
 dnl   (https://www.apache.org/licenses/LICENSE-2.0)
 
@@ -13202,15 +13203,15 @@ AC_DEFUN([MT_FORTRAN_BATCH_CHECK_FUNCTION],
           [MT_FORTRAN_CHECK_FUNCTION],
           $@)])# MT_FORTRAN_BATCH_CHECK_FUNCTION
 
-# MT_FORTRAN_BATCH_CHECK_SUBROUTINE(SUBROUTINE, ARGUMENTS, PROLOGUE)
+# MT_FORTRAN_BATCH_CHECK_SUBROUTINE(SUBROUTINE, ARGUMENTS, PROLOGUE[, SYMBOL])
 # ------------------------------------------------------
 AC_DEFUN([MT_FORTRAN_BATCH_CHECK_SUBROUTINE],
 [m4_indir([MT_FORTRAN_BATCH_CHECK],
           [whether subroutine $1 works],
-          [MT_FORTRAN_CACHE_ID($1)],
-          [MT_FORTRAN_CPP_HAVE([$1])],
+          [MT_FORTRAN_CACHE_ID(m4_default([$4], [$1]))],
+          [MT_FORTRAN_CPP_HAVE(m4_default([$4], [$1]))],
           [MT_FORTRAN_CHECK_SUBROUTINE],
-          $@)])# MT_FORTRAN_BATCH_CHECK_SUBROUTINE
+          [$1], [$2], [$3])])# MT_FORTRAN_BATCH_CHECK_SUBROUTINE
 
 # MT_FORTRAN_BATCH_CHECK_MODULE(MODULE, [MEMBER])
 # ------------------------------------------------------

@@ -54,6 +54,12 @@
 /* whether function command_argument_count works */
 #undef HAVE_FORTRAN_COMMAND_ARGUMENT_COUNT
 
+/* whether subroutine etime works */
+#undef HAVE_FORTRAN_ETIME_4
+
+/* whether subroutine etime works */
+#undef HAVE_FORTRAN_ETIME_8
+
 /* whether function exp2 works */
 #undef HAVE_FORTRAN_EXP2
 
