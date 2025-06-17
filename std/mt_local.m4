@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2025/05/25 14:04:05 fuyuki mt_local.m4>
+dnl Time-stamp: <2025/06/19 11:08:31 fuyuki mt_local.m4>
 
 dnl Copyright: 2020-2023 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -105,6 +105,14 @@ MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getenv], ['A', T], [
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([hostnm], [T], [
       character T*30])
 
+dnl GNU, nfort
+dnl    GNU provides both function and subroutine forms,
+dnl    while nfort provides the latter form by
+dnl    F90_UNIX_DIR module.
+MT_FORTRAN_BATCH_CHECK_FUNCTION([chdir], ['.'])
+MT_FORTRAN_BATCH_CHECK_SUBROUTINE([getcwd], [T], [
+      character T*30])
+
 dnl etime
 dnl ETIME in GNU extension requires real(4) arguments
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([etime], [V, T], [
@@ -116,10 +124,17 @@ dnl intel IFPORT module
 MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [getenv])
 MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [getlog])
 MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [hostnam])
+MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [chdir])
+MT_FORTRAN_BATCH_CHECK_MODULE([ifport], [getcwd])
+
 dnl SX F90_UNIX_ENV module
 MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [getenv])
 MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [getlogin])
 MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_env], [gethostname])
+
+dnl SX F90_UNIX_DIR module
+MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_dir], [chdir])
+MT_FORTRAN_BATCH_CHECK_MODULE([f90_unix_dir], [getcwd])
 
 MT_FC_F2003_DEFERRED_TYPE()
 MT_FC_F2003_ALLOCATABLE_DUMMY()

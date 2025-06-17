@@ -1,7 +1,7 @@
 !!!_! std_ipc.F90 - touza/std intrinsic procedures compatible gallery
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 25 2023
-#define TIME_STAMP 'Time-stamp: <2025/05/25 14:40:51 fuyuki std_ipc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/06/19 11:46:36 fuyuki std_ipc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023-2025
@@ -87,6 +87,7 @@ module TOUZA_Std_ipc
   public ipc_HYPOT
   public ipc_ASINH,  ipc_ACOSH, ipc_ATANH
   public ipc_ETIME
+  public ipc_GETCWD, ipc_CHDIR
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -505,6 +506,68 @@ contains
     TIME = 0.0_KTGT
 #endif
   end subroutine ipc_ETIME_f
+!!!_ + chdir
+  subroutine ipc_CHDIR(PATH, status, flag)
+#if   HAVE_FORTRAN_F90_UNIX_DIR_CHDIR
+#   define _PCASE 1  /* subroutine */    
+    use F90_UNIX_DIR,only: CHDIR
+#elif HAVE_FORTRAN_IFPORT_CHDIR
+#   define _PCASE 2  /* function */    
+    use IFPORT,only: CHDIR
+#elif HAVE_FORTRAN_CHDIR
+#   define _PCASE 1  /* subroutine */    
+#else
+#   define _PCASE 0
+#endif
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    character(len=*),intent(in)  :: PATH
+    integer,         intent(out) :: status
+    integer,optional,intent(in)  :: flag    ! if nonzero return status as is
+    integer f
+#if _PCASE == 1
+    call CHDIR(PATH, status)
+#elif _PCASE == 2
+    status = CHDIR(PATH)
+#else
+    status = ERR_NOT_IMPLEMENTED
+#endif
+    f = choice(0, flag)
+    if (f.eq.0) then
+       if (status.ne.0) status = ERR_INVALID_PARAMETER
+    endif
+  end subroutine ipc_CHDIR
+!!!_ + getcwd
+  subroutine ipc_GETCWD(PATH, status, flag)
+#if   HAVE_FORTRAN_F90_UNIX_DIR_GETCWD
+#   define _PCASE 1  /* subroutine */    
+    use F90_UNIX_DIR,only: GETCWD
+#elif HAVE_FORTRAN_IFPORT_GETCWD
+#   define _PCASE 2  /* function */    
+    use IFPORT,only: GETCWD
+#elif HAVE_FORTRAN_GETCWD
+#   define _PCASE 1  /* subroutine */    
+#else
+#   define _PCASE 0
+#endif
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    character(len=*),intent(out) :: PATH
+    integer,         intent(out) :: status
+    integer,optional,intent(in)  :: flag
+    integer f
+#if _PCASE == 1
+    call GETCWD(PATH, status)
+#elif _PCASE == 2
+    status = GETCWD(PATH)
+#else
+    status = ERR_NOT_IMPLEMENTED
+#endif
+    f = choice(0, flag)
+    if (f.eq.0) then
+       if (status.ne.0) status = ERR_INVALID_PARAMETER
+    endif
+  end subroutine ipc_GETCWD
 !!!_ + end TOUZA_Std_ipc
 end module TOUZA_Std_ipc
 
@@ -554,6 +617,8 @@ program test_std_ipc
   call test_invht(ierr, 0.0_KRTGT)
 
   call test_etime(ierr)
+
+  call test_dir(ierr)
 
   call finalize(ierr, levv=+9)
   write(*, 101) ierr
@@ -634,6 +699,39 @@ contains
 
     return
   end subroutine test_etime
+
+  subroutine test_dir(ierr)
+    implicit none
+    integer,intent(out) :: ierr
+
+    character(len=1024) :: path0, path1
+
+101 format('pwd[', I0, '] ', A)
+102 format('chdir[', I0, '] ', A)
+
+    call ipc_GETCWD(path0, ierr)
+    write(*, 101) ierr, trim(path0)
+
+    path1 = ' non exist'
+    call ipc_CHDIR(path1, ierr)
+    write(*, 102) ierr, trim(path1)
+    call ipc_GETCWD(path1, ierr)
+    write(*, 101) ierr, trim(path1)
+
+    path1 = '..'
+    call ipc_CHDIR(path1, ierr)
+    write(*, 102) ierr, trim(path1)
+    call ipc_GETCWD(path1, ierr)
+    write(*, 101) ierr, trim(path1)
+
+    path1 = path0
+    call ipc_CHDIR(path1, ierr)
+    write(*, 102) ierr, trim(path1)
+    call ipc_GETCWD(path1, ierr)
+    write(*, 101) ierr, trim(path1)
+
+  end subroutine test_dir
+  
 end program test_std_ipc
 
 #endif /* TEST_STD_IPC */
