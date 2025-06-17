@@ -1,7 +1,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/05/21 13:36:38 fuyuki Makefile.am>
+# Time-stamp: <2025/06/20 12:28:25 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -79,10 +79,6 @@ lib@TOUZA_NAME@_la_LIBADD += ami/$(local_name)
 AM_FCFLAGS_MODULE         += $(FC_MODULE_touza_ami)
 endif
 
-if BUILD_zbt
-SUBDIRS += zbt
-endif
-
 pkgconfigdir	=	$(libdir)/pkgconfig
 pkgconfig_DATA	=	@TOUZA_NAME@.pc
 
@@ -145,11 +141,6 @@ export: $(AUTOREVISION_h)
 		export=`$(REALPATH) --relative-to=$(top_builddir) $(EXPORT)` || exit $$?; \
 		$(MAKE) distdir=$${export} distdir; \
 	fi
-
-if BUILD_zbt
-python-build:
-	@cd zbt; $(MAKE) $@
-endif
 
 include Makedep.inc
 
