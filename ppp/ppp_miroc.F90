@@ -1,7 +1,7 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/23 13:10:29 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/09 14:17:26 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -50,6 +50,9 @@ module TOUZA_Ppp_miroc
 #define __MDL__ 'm'
 !!!_  - parmater
   integer,parameter,public :: lmod = 9
+
+  integer,parameter,public :: flag_abort = 0
+  integer,parameter,public :: flag_warn = 1
 !!!   - public static
   integer,save,public :: nproc_quit = 0
   integer,save,public :: icomm_quit = 0
@@ -143,8 +146,9 @@ module TOUZA_Ppp_miroc
   integer,save :: ncolor_world = -1
 !!!_  - public
   public init, diag, finalize
+  public init_rainbow, init_color, affils_legacy
+  public init_king
   public get_wcolor
-  public affils_legacy
   public gen_agent_union
   public push_agent, pop_agent, top_agent, switch_agent, spinoff_agent
   public diag_agent_maps
@@ -160,25 +164,18 @@ module TOUZA_Ppp_miroc
 contains
 !!!_ + common interfaces
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, stdv, icomm, affils, greeting)
+  subroutine init &
+       & (ierr, u, levv, mode, stdv, icomm)
     use TOUZA_Ppp,only: ppp_init=>init
     use TOUZA_Ppp,only: control_mode, control_deep, is_first_force
     use TOUZA_Ppp,only: choice, is_msglev_NORMAL
     use TOUZA_Std,only: mwe_init, bld_init
     use TOUZA_Emu,only: usi_init
     implicit none
-    integer,         intent(out)         :: ierr
-    integer,         intent(in),optional :: u
-    integer,         intent(in),optional :: levv, mode, stdv
-    integer,         intent(in),optional :: icomm
-    character(len=*),intent(in),optional :: affils(:)
-    optional :: greeting
-    interface
-       subroutine greeting(jfpar)
-         implicit none
-         integer,intent(in) :: jfpar
-       end subroutine greeting
-    end interface
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: u
+    integer,intent(in),optional :: levv, mode, stdv
+    integer,intent(in),optional :: icomm
 
     integer lv, md, lmd, chmd
 
@@ -203,9 +200,6 @@ contains
           chmd = MODE_SURFACE
           if (ierr.eq.0) call bld_init(ierr, u, levv, mode=chmd)
           if (ierr.eq.0) call ppp_init(ierr, u, levv, mode=lmd, stdv=stdv, icomm=icomm)
-       endif
-       if (present(affils)) then
-          if (ierr.eq.0) call init_batch(ierr, affils(:), greeting, icomm=icomm)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = ERR_FAILURE_INIT
@@ -294,15 +288,86 @@ contains
     return
   end subroutine finalize
 
-!!!_ + init subcontracts
-!!!_  & init_batch - XCKINI compatible procedure
-  subroutine init_batch &
-       & (ierr, affils, greeting, icomm)
+!!!_ + Core procedures for MIROC
+!!!_  & init_rainbow - XCKINI compatible procedure
+  subroutine init_rainbow &
+       & (ierr, cdir, icomm)
+    use TOUZA_Std,only: lpath
     use TOUZA_Std,only: set_defu
+    use TOUZA_Emu,only: open_sysin_primary, open_bind_sysin, search_sysin_colored
+    use TOUZA_Emu,only: get_sysu, open_bind_sysout
+    use TOUZA_Emu,only: update_ranks, update_color
+    use TOUZA_PPP,only: lagent
     implicit none
-    integer,         intent(out) :: ierr
-    character(len=*),intent(in)  :: affils(:)
-    integer,optional,intent(in)  :: icomm
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(out)         :: cdir
+    integer,         optional,intent(in) :: icomm
+
+    integer nrank, irank
+    integer ifpar
+    integer ncolor, icolor
+    character(len=lagent) :: aname
+    ! logical bworld
+
+    ierr = 0
+    ! bworld = .TRUE.
+    call init_root(ierr, nrank, irank)
+    if (ierr.eq.0) call update_ranks(nr=nrank, ir=irank)
+
+    ! master sysin
+    if (ierr.eq.0) call open_sysin_primary(ierr, ifpar, ' ')
+
+    if (ierr.eq.0) then
+       call config_rainbow &
+            & (ierr,  ncolor, icolor, cdir, aname, &
+            &  nrank, irank,  ifpar)
+    endif
+    if (ierr.eq.0) call update_color(icol=icolor, ncol=ncolor)
+
+#if 0 /* test */
+    if (ierr.eq.0) then
+       if (mod(irank, 2).eq.0) then
+          call init_comms &
+               & (ierr, nrank, irank, ncolor, icolor, aname, icomm)
+       else
+          call init_comms &
+               & (ierr, nrank, irank, ncolor, icolor, 'x', icomm)
+          ! call init_comms &
+          !      & (ierr, nrank, irank, affils(:), ncolor, icolor, ' ', icomm)
+       endif
+    endif
+#else /* default, not test */
+    if (ierr.eq.0) then
+101    format('CL', I0)
+       if (aname.eq.' ') write(aname, 101) icolor
+       call init_comms &
+            & (ierr, nrank, irank, ncolor, icolor, aname, icomm)
+    endif
+#endif /* default, not test */
+
+    ! store cache
+    if (ierr.eq.0) then
+       icolor_world = icolor
+       ncolor_world = ncolor
+    endif
+    return
+  end subroutine init_rainbow
+
+!!!_  & init_color - XCKINI compatible procedure
+  subroutine init_color &
+       & (ierr, affils, cdir, config, greeting, flag)
+    use TOUZA_Std,only: lpath, choice
+    use TOUZA_Std,only: set_defu
+    use TOUZA_Emu,only: open_bind_sysin, search_sysin_colored
+    use TOUZA_Emu,only: get_sysu, open_bind_sysout
+    use TOUZA_Emu,only: update_ranks, update_color
+    use TOUZA_PPP,only: lagent, inquire_agent, new_agent_family
+    implicit none
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(in)          :: affils(:)
+    character(len=*),intent(in)          :: cdir
+    character(len=*),intent(in),optional :: config
+    integer,         intent(in),optional :: flag
     optional :: greeting
     interface
        subroutine greeting(jfpar)
@@ -314,34 +379,130 @@ contains
     integer nrank, irank
     integer ifpar, jfpar
     integer ncolor, icolor
+    character(len=lpath) :: csysin
+    integer ncs
+    integer f
+    logical bworld
 
     ierr = 0
-    call init_root(ierr, nrank, irank)
 
-    if (ierr.eq.0) call init_sysio(ierr, ifpar, jfpar, nrank, irank)
-    call set_defu(jfpar)
-    if (present(greeting)) then
-       call greeting(jfpar)
+    bworld = (cdir.eq.' ')
+
+    icolor = icolor_world
+    ncolor = ncolor_world
+
+    csysin = ' '
+    if (present(config)) then
+       if (config.ne.' ') csysin = config
     endif
 
-    if (ierr.eq.0) &
-         & call init_rainbow(ierr, ncolor, icolor, nrank, irank, ifpar, jfpar)
-    if (ierr.eq.0) &
-         call init_sysi_colored(ierr, ifpar, jfpar, ncolor, icolor)
+    f = choice(flag_abort, flag)
+    ncs = 0
+
+    if (ncolor.gt.0) then
+       ! [CAUTION]
+       !    Secondary sysin (configuration) is opened *AFTER* chdir.
+       !    You may use the absolute path to avoid a complex relative path.
+       !    See realpath(1), to compute a relative path in shell scripts.
+       if (ierr.eq.0) then
+          call search_sysin_colored(ncs, csysin, icolor, pfx=config)
+       endif
+       if (cdir.eq.' ') then
+          if (ncs.le.0) then
+             call terminate(1, 'Legacy colored-SYSIN not found.')
+             return
+          else if (ncs.gt.1) then
+             call terminate(1, 'Panic in Legacy colored-SYSIN search.')
+             return
+          endif
+          call open_bind_sysin(ierr, ifpar, csysin, 'colored')
+       else
+          ! For safety, SYSIN.CLxxx should not exist when enabled subdirectory run.
+          if (ncs.gt.0) then
+             if (f.ne.flag_warn) then
+                call terminate(1, 'Legacy colored-SYSIN exists with subdir run.')
+                return
+             endif
+101          format('WARNING: found colored-sysin with subdir run: ' A)
+             if (ulog.lt.0) then
+                write(*, 101) trim(csysin)
+             else
+                write(ulog, 101) trim(csysin)
+             endif
+          endif
+          call switch_dir(ierr, cdir)
+          if (ierr.eq.0) call open_bind_sysin(ierr, ifpar, csysin, 'colored')
+       endif
+    else
+       call get_sysu(sysi=ifpar)
+    endif
+
+    if (ierr.eq.0) call inquire_agent(ierr, irank=irank, nrank=nrank)
+
     if (ierr.eq.0) then
-       call init_comms &
-            & (ierr, affils(:), ncolor, icolor, nrank, irank, ifpar, jfpar, icomm)
+       if (.not.bworld) then
+          if (ierr.eq.0) call update_ranks(nr=nrank, ir=irank)
+       endif
     endif
-    if (ierr.eq.0) &
-         call init_king(ierr, ifpar, jfpar)
+    if (ierr.eq.0) call open_bind_sysout(ierr, jfpar, ' ')
 
-    ! store cache
     if (ierr.eq.0) then
-       icolor_world = icolor
-       ncolor_world = ncolor
+       call set_defu(jfpar)
+       if (present(greeting)) then
+          call greeting(jfpar)
+       endif
     endif
+
+    if (ierr.eq.0) then
+       call diag_rainbow &
+            & (ierr,   &
+            &  ncolor, icolor, cdir,   ' ', &
+            &  nrank,  irank,  jfpar)
+    endif
+
+    if (ierr.eq.0) call new_agent_family(ierr, affils(:))
+
     return
-  end subroutine init_batch
+  end subroutine init_color
+
+!!!_  & switch_dir - chdir wrapper
+  subroutine switch_dir &
+       & (ierr, dir, u)
+    use TOUZA_Std,only: ipc_GETCWD, ipc_CHDIR, lpath
+    use TOUZA_Std,only: get_logu, choice, is_unit_star
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(in)  :: dir
+    integer,optional,intent(in)  :: u
+
+    character(len=lpath) :: cwd0, cwd1
+    integer utmp
+
+    ierr = 0
+    utmp = get_logu(u, ulog)
+
+    if (dir.ne.' ') then
+       if (ierr.eq.0) call ipc_GETCWD(cwd0, ierr)
+       if (ierr.eq.0) call ipc_CHDIR(dir, ierr)
+       if (ierr.eq.0) call ipc_GETCWD(cwd1, ierr)
+101    format('chdir:', A, ' > ', A)
+109    format('chdir failed:', A)
+       if (ierr.eq.0) then
+          if (is_unit_star(utmp)) then
+             write(*, 101) trim(cwd0), trim(cwd1)
+          else if (utmp.ge.0) then
+             write(utmp, 101) trim(cwd0), trim(cwd1)
+          endif
+       else
+          if (utmp.lt.0) then
+             write(*, 109) trim(dir)
+          else
+             write(utmp, 109) trim(dir)
+          endif
+       endif
+    endif
+  end subroutine switch_dir
+
 !!!_  & init_root
   subroutine init_root &
        & (ierr, nrank, irank)
@@ -366,112 +527,243 @@ contains
 
     call CLCEND('Comm.')
   end subroutine init_root
-!!!_  - init_sysio
-  subroutine init_sysio &
-       & (ierr, ifpar, jfpar, nrank, irank)
-    use TOUZA_Emu,only: update_ranks, open_sysin, open_sysout
-    implicit none
-    integer,intent(out) :: ierr
-    integer,intent(out) :: ifpar, jfpar
-    integer,intent(in)  :: nrank, irank
-    integer jerri, jerro
 
-    ierr = 0
-
-    call update_ranks(nr=nrank, ir=irank)
-    call open_sysin(jerri)
-    call open_sysout(jerro)
-    call REWNML(ifpar, jfpar)
-
-    if (jerro.ne.0) ierr = jerro
-    if (jerri.ne.0) ierr = jerri
-
-    return
-  end subroutine init_sysio
-
-!!!_  - init_sysi_colored
-  subroutine init_sysi_colored &
-       & (ierr, ifpar, jfpar, ncolor, icolor)
-    use TOUZA_Emu,only: update_color, open_sysin, get_sysu
-    implicit none
-    integer,intent(out) :: ierr
-    integer,intent(out) :: ifpar
-    integer,intent(in)  :: jfpar
-    integer,intent(in)  :: ncolor, icolor
-
-    ierr = 0
-    call update_color(icol=icolor, ncol=ncolor)
-    if (ierr.eq.0) call open_sysin(ierr)
-    if (ierr.eq.0) call get_sysu(sysi=ifpar)
-    return
-  end subroutine init_sysi_colored
-
-!!!_  & init_rainbow - rainbow sectioning with namelists
-  subroutine init_rainbow &
+!!!_  & config_rainbow - rainbow sectioning with namelists
+  subroutine config_rainbow &
        & (ierr,   &
-       &  ncolor, icolor, &
+       &  ncolor, icolor, cdir,   agent, &
        &  nrank,  irank,  ifpar,  jfpar)
+    use TOUZA_Std,only: lpath
+    use TOUZA_Std,only: is_eof_ss
+    use TOUZA_Std,only: get_logu, choice, is_unit_star
+    use TOUZA_PPP,only: lagent
     implicit none
-    integer,intent(out) :: ierr
-    integer,intent(out) :: ncolor, icolor
-    integer,intent(in)  :: nrank,  irank
-    integer,intent(in)  :: ifpar,  jfpar
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: ncolor,icolor
+    character(len=*),intent(out) :: cdir
+    character(len=*),intent(out) :: agent
+    integer,         intent(in)  :: nrank, irank
+    integer,         intent(in)  :: ifpar
+    integer,optional,intent(in)  :: jfpar
 
-    integer  ISPLR
-    namelist /NMWSPL/ ISPLR
+    integer utmp
+    integer  ISPLR, MSPLR
+    character(len=lpath)  :: DIR
+    character(len=lagent) :: NAME
+    namelist /NMWSPL/ ISPLR, MSPLR, DIR, NAME
+
+    ! To split for each 10 ranks, set number of ranks as:
+    !    &nmwspl msplr=10, /
+
+    ! or (traditional) explicitly define the head rank for each color:
+    !    &nmwspl isplr=0, /
+    !    &nmwspl isplr=10, /
+    !    &nmwspl isplr=20, /
+    !    :
+
+    ! Moreover, msplr can be set twice or more, to define different
+    ! ranks for each color:
+    !    &nmwspl msplr=5, /      ! color 0   0:5
+    !    &nmwspl msplr=10, /     !       1   5:15
+    !    &nmwspl msplr=7, /      !       2   15:22
+
+    ! Above is the mostly same as traditional setting:
+    !    &nmwspl isplr=0, /
+    !    &nmwspl isplr=5, /
+    !    &nmwspl isplr=15, /
+    !    &nmwspl isplr=22, /
+
+    ! There is a slightly inconsistent behavior between above two:
+    ! The former repeats the final specification msplr=7 after color 3,
+    ! while the latter bundles all the remaing ranks to the single color 3.
+
+    integer nmem
+    integer mreq, jprv, jnxt, mleft
+    integer jerr
+    character(len=lpath) :: defd
 
     ierr = 0
+
+    utmp = get_logu(jfpar, ulog)
+
     icolor = 0
     ncolor = 0
+    cdir = ' '
+    agent = ' '
 
+    nmem = -1
+    defd = ' '
+    mreq = 0
+    jprv = 0
     rewind(unit=ifpar, IOSTAT=ierr)
     do
        if (ierr.ne.0) exit
        if (ierr.eq.0) then
           isplr = -1
-          read (ifpar, nmwspl, IOSTAT=ierr)
-          write(jfpar, nmwspl)
-       endif
-       if (ierr.eq.0) then
-          ! isplr==0 is trivial
-          if (isplr.gt.0 .and. isplr.lt.nrank) then
-             ncolor = ncolor + 1
-             if (isplr.gt.irank) icolor = icolor + 1
+          msplr = -1
+          DIR = ' '
+          NAME= ' '
+          read (ifpar, nmwspl, IOSTAT=jerr)
+          if (jerr.eq.0) then
+             if (is_unit_star(utmp)) then
+                write(*, nmwspl)
+             else if (utmp.ge.0) then
+                write(utmp, nmwspl)
+             endif
+          else
+             if (.not.is_eof_ss(jerr)) ierr = jerr
+             exit
           endif
        endif
+       if (isplr.ge.0.and.msplr.ge.0) then
+109       format('xmcomm: PANIC.  Both ISPLR and MSPLR are set.')
+          if (is_unit_star(utmp)) then
+             write(*, 109)
+          else if (utmp.ge.0) then
+             write(utmp, 109)
+          endif
+          ierr = -1
+          exit
+       endif
+       if (isplr.eq.0) cycle
+       if (isplr.gt.0) msplr = isplr - jprv
+       if (msplr.gt.0) nmem = msplr
+       if (nmem.le.0) nmem = nrank - jprv   ! full ranks if even non-positive
+
+       jnxt = jprv + nmem
+       if (irank.ge.jnxt) then
+          icolor = icolor + 1
+       else if (irank.ge.jprv) then
+          cdir = dir
+          agent = name
+       endif
+       if (nrank.ge.jnxt) ncolor = ncolor + 1
+       if (isplr.ge.0) then
+          if (jprv.lt.nrank) mreq = jnxt
+          nmem = 0  ! for compatibility
+       else
+          if (msplr.ge.0.or.jprv.lt.nrank) mreq = jnxt
+       endif
+       jprv = jnxt
     enddo
-    if (ncolor.gt.0) ncolor = ncolor + 1
-    ierr = max(0, ierr) ! clear eof
-101 format('xmcomm: color = ', I0, 1x, I0, 1x, I0)
     if (ierr.eq.0) then
-       icolor = max(0, ncolor - icolor - 1)
-       write(jfpar, 101) irank, icolor, ncolor
+       if (mreq.gt.nrank) then
+          if (is_unit_star(utmp)) then
+             write(*, 108) mreq, nrank
+          else if (utmp.ge.0) then
+             write(utmp, 108) mreq, nrank
+          endif
+          ierr = -1
+       endif
+    endif
+    if (ierr.eq.0) then
+       mleft = max(mreq, nrank) - jprv
+       if (mleft.gt.0) then
+          if (nmem.le.0) nmem = mleft
+          if (mod(mleft, nmem).ne.0) then
+             jnxt = (mleft / nmem + 1) * nmem + jprv
+108          format('xmcomm: PANIC.  Insufficient ranks ', I0, '>', I0)
+             if (is_unit_star(utmp)) then
+                write(*, 108) jnxt, nrank
+             else if (utmp.ge.0) then
+                write(utmp, 108) jnxt, nrank
+             endif
+             ierr = -1
+          else if (ncolor.eq.0) then
+             continue
+          else
+             if (ncolor.eq.1) then
+107             format('xmcomm: warning. monochrome-rainbow mode.')
+                if (is_unit_star(utmp)) then
+                   write(*, 107)
+                else if (utmp.ge.0) then
+                   write(utmp, 107)
+                endif
+             endif
+             ncolor = ncolor + mleft / nmem
+             if (irank.ge.jprv) icolor = icolor + (irank - jprv) / nmem
+          endif
+       endif
+    endif
+    if (ierr.eq.0) then
+       call diag_rainbow &
+            & (ierr,   &
+            &  ncolor, icolor, cdir, agent, &
+            &  nrank,  irank,  utmp)
+    endif
+    return
+  end subroutine config_rainbow
+
+!!!_  & diag_rainbow - report of rainbow sectioning
+  subroutine diag_rainbow &
+       & (ierr,   &
+       &  ncolor, icolor, cdir,   agent, &
+       &  nrank,  irank,  u)
+    use TOUZA_Std,only: get_logu, is_unit_star
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: ncolor,icolor
+    character(len=*),intent(in)  :: cdir
+    character(len=*),intent(in)  :: agent
+    integer,         intent(in)  :: nrank, irank
+    integer,optional,intent(in)  :: u
+
+    integer utmp
+    character(len=128) :: tag
+
+    ierr = 0
+    utmp = get_logu(u, ulog)
+
+101 format(A, 1x, I0, 1x, I0)
+102 format(A, 1x, I0, 1x, I0, 1x, '[', A, ']')
+103 format('xmcomm: color<', A, ':', I0, '/', I0, '>')
+104 format('xmcomm: color(', I0, '/', I0, ')')
+    if (ierr.eq.0) then
+       if (agent.ne.' ') then
+          write(tag, 103) trim(agent), icolor, ncolor
+       else
+          write(tag, 104) icolor, ncolor
+       endif
+       if (cdir.ne.' ') then
+          if (is_unit_star(utmp)) then
+             write(*, 102) trim(tag), irank, nrank, trim(cdir)
+          else if (utmp.ge.0) then
+             write(utmp, 102) trim(tag), irank, nrank, trim(cdir)
+          endif
+       else
+          if (is_unit_star(utmp)) then
+             write(*, 101) trim(tag), irank, nrank
+          else if (utmp.ge.0) then
+             write(utmp, 101) trim(tag), irank, nrank
+          endif
+       endif
     endif
 
-    return
-  end subroutine init_rainbow
+  end subroutine diag_rainbow
+
 !!!_  & init_comms
   subroutine init_comms &
        & (ierr,   &
-       &  affils, &
-       &  ncolor, icolor, &
-       &  nrank,  irank,  ifpar,  jfpar, icomm)
+       &  nrank,  irank,  &
+       &  ncolor, icolor, acolor, icomm)
     use MPI,only: MPI_COMM_WORLD
     use TOUZA_Std,only: choice, get_comm
     use TOUZA_Ppp,only: lagent, &
          & new_agent_color, new_agent_derived, &
          & new_agent_family, new_agent_root
+    use TOUZA_Ppp,only: inquire_agent
     implicit none
     integer,         intent(out) :: ierr
-    character(len=*),intent(in)  :: affils(:)
+    integer,         intent(out) :: nrank,  irank
     integer,         intent(in)  :: ncolor, icolor
-    integer,         intent(in)  :: nrank,  irank
-    integer,         intent(in)  :: ifpar,  jfpar
+    character(len=*),intent(in)  :: acolor
     integer,optional,intent(in)  :: icomm
 
     integer ic
 
     ierr = 0
+    irank = -1
+    nrank = 0
 
     if (present(icomm)) then
        ic = icomm
@@ -480,9 +772,8 @@ contains
     endif
 
     if (ierr.eq.0) call new_agent_root(ierr, ic)
-    if (ierr.eq.0) call new_agent_color(ierr, icolor, 'X')
-    if (ierr.eq.0) call new_agent_family(ierr, affils(:))
-
+    if (ierr.eq.0) call new_agent_color(ierr, icolor, acolor)
+    if (ierr.eq.0) call inquire_agent(ierr, irank=irank, nrank=nrank)
   end subroutine init_comms
 
 !!!_  & init_king - king configuration with namelists
@@ -490,27 +781,35 @@ contains
        & (ierr,   &
        &  ifpar,  jfpar)
     use TOUZA_Ppp,only: is_eof_ss, set_king
+    use TOUZA_Ppp_std,only: choice
+    use TOUZA_Emu,only: get_sysu
     implicit none
     integer,intent(out) :: ierr
-    integer,intent(in)  :: ifpar,  jfpar
+    integer,intent(in),optional :: ifpar, jfpar
 
     character(len=lmod) :: HMOD, HREF
     integer krank
+    integer uin, uout
     NAMELIST /NMKING/ HMOD, KRANK, HREF
     ierr = 0
+
+    uin =  choice(-1, ifpar)
+    uout = choice(-1, jfpar)
+    if (uin.lt.0) call get_sysu(sysi=uin)
+    if (uout.lt.0) call get_sysu(syso=uout)
 
     ! call set_king(ierr, 0, 'A', 'A')
     ! call set_king(ierr, 0, 'O', 'O')
 
-    rewind(unit=ifpar, IOSTAT=ierr)
+    rewind(unit=uin, IOSTAT=ierr)
     do
        if (ierr.ne.0) exit
        if (ierr.eq.0) then
           HMOD = ' '
           KRANK = -1
           HREF = ' '
-          read (ifpar, nmking, IOSTAT=ierr)
-          write(jfpar, nmking)
+          read (uin, nmking, IOSTAT=ierr)
+          write(uout, nmking)
        endif
        if (ierr.eq.0) then
           if (KRANK.ge.0) then
@@ -522,7 +821,7 @@ contains
     if (is_eof_ss(ierr)) ierr = 0
     return
   end subroutine init_king
-!!!_  - affils_legacy - create affils array from string
+!!!_  & affils_legacy - create affils array from string
   subroutine affils_legacy &
        & (ierr, affils, na, dstr)
     implicit none
@@ -764,29 +1063,44 @@ contains
     write(msg, 101) trim(STR), NUM
     call terminate_core(LEV, MSG)
   end subroutine terminate_ai
+
 !!!_ + end module
 end module TOUZA_Ppp_Miroc
 !!!_* /nonmodule/ interfaces
 !!!_ + xmcomm
 !!!_  & XCKINI
 subroutine XCKINI(AFFILS, N, GREETING, ICROOT)
-  use TOUZA_Ppp_miroc,only: init, diag
+  use TOUZA_Ppp_miroc,only: init, diag, terminate
+  use TOUZA_Ppp_miroc,only: init_rainbow, init_color, init_king
+  use TOUZA_Ppp_std, only: lpath
   implicit none
   character(len=*),intent(in) :: AFFILS(*) ! array of agents I belong to.
   integer,         intent(in) :: N
   integer,optional,intent(in) :: ICROOT
   external :: greeting
   integer jerr
-  call init &
-       & (jerr, levv=+9, stdv=+9, &
-       &  icomm=ICROOT, affils=AFFILS(1:N), greeting=greeting)
+  character(len=lpath) :: cdir
+  call init(jerr, levv=+9, stdv=+9, icomm=ICROOT)
+  if (jerr.eq.0) then
+     call init_rainbow(jerr, cdir, icomm=ICROOT)
+  endif
+  if (jerr.eq.0) then
+     call init_color(jerr, AFFILS(1:N), cdir, greeting=greeting)
+  endif
+  if (jerr.ne.0) then
+     call terminate(1, 'XCKINI FAILED')
+     return
+  endif
+  if (jerr.eq.0) call init_king(jerr)
   call diag(jerr, levv=+2)
   return
 end subroutine XCKINI
 !!!_  & XCKINI_legacy
 subroutine XCKINI_legacy(HDRVR, GREETING, ICROOT)
   use TOUZA_Ppp_miroc,only: init, diag, affils_legacy, terminate
+  use TOUZA_Ppp_miroc,only: init_rainbow, init_color, init_king
   use TOUZA_Ppp_amng, only: lagent
+  use TOUZA_Ppp_std, only: lpath
   implicit none
   character(len=*),intent(in) :: HDRVR         ! sequence of <CI> I belong to.
   integer,optional,intent(in) :: ICROOT
@@ -795,17 +1109,22 @@ subroutine XCKINI_legacy(HDRVR, GREETING, ICROOT)
   integer na
   integer,parameter :: maff = 16
   character(len=lagent) :: affils(maff)
+  character(len=lpath) :: cdir
 
   jerr = 0
-  call affils_legacy(jerr, affils, na, HDRVR)
+
+  call init(jerr, levv=+9, stdv=+9, icomm=ICROOT)
+  if (jerr.eq.0) then
+     call init_rainbow(jerr, cdir, icomm=ICROOT)
+  endif
+  if (jerr.eq.0) call affils_legacy(jerr, affils, na, HDRVR)
+  if (jerr.eq.0) call init_color(jerr, affils(1:na), cdir, greeting=greeting)
   if (jerr.ne.0) then
      call terminate(1, 'XCKINI LEGACY FAILED: ', HDRVR)
      return
   endif
+  if (jerr.eq.0) call init_king(jerr)
 
-  call init &
-       & (jerr, levv=+9, stdv=+9, &
-       &  icomm=ICROOT, affils=affils(1:na), greeting=greeting)
   call diag(jerr, levv=+2)
   return
 end subroutine XCKINI_legacy
@@ -974,17 +1293,25 @@ end subroutine XMFinal
 !!!_@ test_ppp_miroc - test program
 #if TEST_PPP_MIROC
 program test_ppp_miroc
-  use TOUZA_Ppp,only: diag_cache
+  use TOUZA_Ppp,only: diag_cache, show_status
   use TOUZA_Ppp_miroc
   use MPI
   implicit none
   integer ierr
+#define _DRIVER_A 'AB0C1'
+#define _DRIVER_O 'OO0O1'
+#define _DRIVER_S 'AB0C1OO0O1'
+#define _DRIVER_Z 'Z'
+
 # if TEST_PPP_MIROC == 1
-#   define _DRIVER 'AB0C1'
+#   define _DRIVER _DRIVER_A
 # elif TEST_PPP_MIROC == 2
-#   define _DRIVER 'OO0O1'
+#   define _DRIVER _DRIVER_O
+# elif TEST_PPP_MIROC == 3
+#   define _DRIVER _DRIVER_S
 # else
-#   define _DRIVER 'AB0C1OO0O1'
+#   define _IS_A(J,N) MOD(J+3,4).lt.2
+#   define _IS_O(J,N) MOD(J,4).eq.0
 # endif
   integer nrw, irw
 
@@ -1012,12 +1339,24 @@ program test_ppp_miroc
   endif
 
   if (icol.ne.MPI_UNDEFINED) then
+#if TEST_PPP_MIROC < 4
      call XCKINI_legacy(_DRIVER, greeting, icomm)
+#else
+     if (_IS_A(irw, nrw)) then
+        call XCKINI_legacy(_DRIVER_A, greeting, icomm)
+     else if (_IS_O(irw, nrw)) then
+        call XCKINI_legacy(_DRIVER_O, greeting, icomm)
+     else
+        call XCKINI_legacy(_DRIVER_Z, greeting, icomm)
+     endif
+#endif
      call gen_agent_union(jdmy, 'W', (/'A', 'O'/), 2)
      call gen_agent_union(jdmy, 'H', (/'@'/), 1)
 
      call getjfp(JFPAR)
      call diag_agent_maps(ierr, JFPAR)
+
+     call show_status(ierr, tag='current')
 
      call XMGETK('AM', ' ', kaa, 'a root')
      call XMGETK('AM', 'W', kaw, 'a root')
@@ -1078,10 +1417,12 @@ end subroutine MSGBOX
 subroutine CLCSTR(A)
   implicit none
   character(len=*),intent(in) :: A
+  if (A.eq.' ') continue ! dummy
 end subroutine CLCSTR
 subroutine CLCEND(A)
   implicit none
   character(len=*),intent(in) :: A
+  if (A.eq.' ') continue ! dummy
 end subroutine CLCEND
 #endif /* TEST_PPP_MIROC */
 !!!_! FOOTER
