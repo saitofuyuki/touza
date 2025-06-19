@@ -1,7 +1,7 @@
 !!!_! ppp_std.F90 - TOUZA/Ppp utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2025/06/03 08:38:38 fuyuki ppp_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/06/29 16:39:13 fuyuki ppp_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -25,6 +25,7 @@ module TOUZA_Ppp_std
   use TOUZA_Std,only: is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
   use TOUZA_Std,only: is_msglev_severe, is_msglev_fatal
   use TOUZA_Std,only: get_logu,         unit_global,      trace_fine,       trace_control
+  use TOUZA_Std,only: is_unit_star
   use TOUZA_Std,only: get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
   use TOUZA_Std,only: comp_comms, comp_groups, cc_unequal, cc_both_null
   use TOUZA_Std,only: MPI_COMM_NULL, MPI_GROUP_NULL, MPI_COMM_WORLD, MPI_UNDEFINED
@@ -34,6 +35,8 @@ module TOUZA_Ppp_std
   use TOUZA_Std,only: MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
   use TOUZA_Std,only: MPI_WAIT, MPI_BARRIER
   use TOUZA_Std,only: is_eof_ss
+  use TOUZA_Std,only: lpath
+  use TOUZA_Std,only: ipc_getcwd,  ipc_chdir
   use TOUZA_Std,only: new_htable,  new_entry, settle_entry
   use TOUZA_Std,only: diag_htable, reg_entry, query_status
 !!!_  - default
@@ -67,9 +70,12 @@ module TOUZA_Ppp_std
   public is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
   public is_msglev_severe, is_msglev_fatal
   public get_logu,         unit_global,      trace_fine,       trace_control
+  public is_unit_star
   public get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
   public comp_comms, comp_groups, cc_unequal, cc_both_null
   public is_eof_ss
+  public lpath
+  public ipc_getcwd,  ipc_chdir
   public new_htable,  new_entry, settle_entry
   public diag_htable, reg_entry, query_status
   public MPI_COMM_NULL, MPI_GROUP_NULL, MPI_COMM_WORLD, MPI_UNDEFINED
