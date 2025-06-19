@@ -1,7 +1,7 @@
 !!!_! emu_usi.F90 - touza/emu usysio emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/05/23 09:36:36 fuyuki emu_usi.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/03 11:09:07 fuyuki emu_usi.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -20,6 +20,7 @@ module TOUZA_Emu_usi
 !!!_ = declaration
 !!!_  - modules
   use TOUZA_Std,only: get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Std,only: MPI_COMM_NULL
 !!!_  - default
   implicit none
   private
@@ -27,8 +28,13 @@ module TOUZA_Emu_usi
   integer,parameter :: lpath = 128
   integer,parameter :: max_digits = 11
   integer,parameter :: lmsg = 256
+
+  character(len=*),parameter :: sp_stdin = '-'
+  character(len=*),parameter :: sp_dummy = '--'
+  character(len=*),parameter :: sp_stdout = '-'
+
 !!!_  - static
-  integer,save :: pos_arg = -1
+  integer,save :: pos_arg = -1          ! negative to ignore command-line arguments
 
   logical,save :: sw_stdi = .FALSE.
   logical,save :: sw_stdo = .FALSE.
@@ -58,7 +64,7 @@ module TOUZA_Emu_usi
   integer,save,public :: icolor = -1, ncolor = -1
 
   integer,save,public :: IFILE = -1, JFILE = -1
-  integer,save,public :: CROOT = 0
+  integer,save,public :: CROOT = MPI_COMM_NULL
 !!!_  - interfaces
   interface
      subroutine SETNML(IFILE, JFILE)
@@ -107,14 +113,23 @@ module TOUZA_Emu_usi
      end subroutine GETJFP
 
   end interface
-
+!!!_   . private interface
+  interface msg_grp
+     module procedure msg_grp_ia
+     module procedure msg_grp_aa
+     module procedure msg_grp_txt
+  end interface msg_grp
 !!!_  - public
   public init, diag, finalize
   public update_color, update_ranks
-  public open_sysin,   open_sysout
+  public open_bind_sysin, open_bind_sysout
+  public open_sysin_primary, search_sysin_colored
   public get_sysu
   public is_locked_rewind, rewind_lock, rewind_unlock
   public show_lock_status
+!!!_   . legacy procedures
+  public legacy_open_sysin, legacy_open_sysout
+!!!_   . miroc compatible interfaces
   public SETNML, SETBCM, SETCLR, SETRNK, SETSIZ
   public OPNNML, REWNML, GETIFP, GETJFP
 contains
@@ -122,8 +137,7 @@ contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm, pos, stdi, stdo)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std,only: &
-         & msg_grp, choice, mwe_init, arg_init, env_init, fun_init
+    use TOUZA_Std,only: choice, mwe_init, arg_init, env_init, fun_init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -167,7 +181,7 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std,only: choice, is_msglev_NORMAL, msg_grp, &
+    use TOUZA_Std,only: choice, is_msglev_NORMAL, &
          & arg_diag, mwe_diag, env_diag, fun_diag
     implicit none
     integer,intent(out)         :: ierr
@@ -190,18 +204,18 @@ contains
        if (is_first_force(diag_counts, mode)) then
           if (is_msglev_NORMAL(lv)) then
              if (ierr.eq.0) then
-                call msg_grp(TIME_STAMP, __GRP__, __MDL__, utmp)
-                call msg_grp('(''sysin unit = '', I0)', (/IFILE/), __GRP__, __MDL__, utmp)
+                call msg_grp(TIME_STAMP, utmp)
+                call msg_grp('(''sysin unit = '', I0)', (/IFILE/), utmp)
                 if (IFILE.ge.0) then
                    inquire(NAME=file, UNIT=IFILE, IOSTAT=jerr)
                    if (jerr.eq.0) &
-                        & call msg_grp('(''sysin file = '', A)', (/file/), __GRP__, __MDL__, utmp)
+                        & call msg_grp('(''sysin file = '', A)', (/file/), utmp)
                 endif
-                call msg_grp('(''sysout unit = '', I0)', (/JFILE/), __GRP__, __MDL__, utmp)
+                call msg_grp('(''sysout unit = '', I0)', (/JFILE/), utmp)
                 if (JFILE.ge.0) then
                    inquire(NAME=file, UNIT=JFILE, IOSTAT=jerr)
                    if (jerr.eq.0) &
-                        & call msg_grp('(''sysout file = '', A)', (/file/), __GRP__, __MDL__, utmp)
+                        & call msg_grp('(''sysout file = '', A)', (/file/), utmp)
                 endif
              endif
           endif
@@ -219,7 +233,6 @@ contains
     endif
     return
   end subroutine diag
-
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
@@ -257,7 +270,56 @@ contains
     endif
     return
   end subroutine finalize
+!!!_  & msg_grp
+  subroutine msg_grp_txt &
+       & (txt, u, to_flush)
+    use TOUZA_Std,only: ts_msg_grp=>msg_grp
+    implicit none
+    character(len=*),intent(in)          :: txt
+    integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
+    call ts_msg_grp(txt, __GRP__, __MDL__, u, to_flush)
+    return
+  end subroutine msg_grp_txt
+
+  subroutine msg_grp_ia &
+       & (fmt, vv, u, to_flush)
+    use TOUZA_Std,only: ts_msg_grp=>msg_grp
+    implicit none
+    character(len=*),intent(in)          :: fmt
+    integer,         intent(in)          :: vv(:)
+    integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
+    call ts_msg_grp(fmt, vv(:), __GRP__, __MDL__, u, to_flush)
+    return
+  end subroutine msg_grp_ia
+
+  subroutine msg_grp_aa &
+       & (fmt, vv, u, to_flush)
+    use TOUZA_Std,only: ts_msg_grp=>msg_grp
+    implicit none
+    character(len=*),intent(in)          :: fmt
+    character(len=*),intent(in)          :: vv(:)
+    integer,         intent(in),optional :: u
+    logical,         intent(in),optional :: to_flush
+    call ts_msg_grp(fmt, vv(:), __GRP__, __MDL__, u, to_flush)
+    return
+  end subroutine msg_grp_aa
+
 !!!_ + user subroutines
+!!!_  & get_sysu
+  subroutine get_sysu(sysi, syso)
+    implicit none
+    integer,intent(out),optional :: sysi
+    integer,intent(out),optional :: syso
+    if (present(sysi)) then
+       sysi = IFILE
+    endif
+    if (present(syso)) then
+       syso = JFILE
+    endif
+    return
+  end subroutine get_sysu
 !!!_  & update_color
   subroutine update_color(icol, ncol, icomm)
     use TOUZA_Std,only: choice
@@ -278,263 +340,313 @@ contains
     irank = choice(irank, ir)
     nrank = choice(nrank, nr)
   end subroutine update_ranks
-
-!!!_  & open_sysin - YYSYSI compatible
-  subroutine open_sysin(ierr)
-    use TOUZA_Std,only: &
-         & choice, &
-         & parse, get_nparam, get_param, &
-         & msg_grp, get_wni, uin, is_msglev_INFO, new_unit
+!!!_  & open_bind_sysin - open_sysin core
+  subroutine open_bind_sysin &
+       & (ierr, usys, file, tag, u)
+    use TOUZA_Std,only: is_msglev_WARNING, is_msglev_INFO
+    use TOUZA_Std,only: new_unit, uin
+    use TOUZA_Std,only: get_wni
     implicit none
-    integer,intent(out)         :: ierr
-    character(len=lpath) :: file, pfx
-    integer jp, np, na
-    integer nrw
-    integer jz
-    logical bo
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: usys
+    character(len=*),intent(in)          :: file
+    character(len=*),intent(in)          :: tag
+    integer,         intent(in),optional :: u        ! log unit
+
     integer utmp
+    integer nrw
+    logical bo
+    character(len=256) :: txt
+    character(len=lpath) :: f
 
     ierr = 0
-    file = ' '
-    na = 0
-    jp = -1
+    utmp = get_logu(u, ulog)
+    f = file
+    if (f.eq.' ') f = pfx_sysin
 
-    if (ierr.eq.0) call parse(ierr)
-    if (ierr.eq.0) then
-       jp = max(1, pos_arg)
-       np = get_nparam()
-       na = np - (jp - 1)
-       if ((na.gt.1) &
-            & .and. ((ncolor.gt.0.and.ncolor.gt.na) &
-            &        .or.(icolor.ge.0.and.icolor.gt.na))) then
-          call msg_grp('(''insufficient command-line argument: '', I0, 1x, I0, 1x, I0)', &
-               &       (/icolor, ncolor, na/), __GRP__, __MDL__, ulog)
-          ierr = -1
-       endif
-    endif
-    if (ierr.eq.0) then
-       if (na.eq.1) then
-          call get_param(ierr, file, jp, ' ')
-       else
-          call get_param(ierr, file, jp + max(0, icolor), ' ')
-       endif
-    endif
-    if (ierr.eq.0) then
-       if (file.eq.' '.and.sw_stdi) file = '-'
-       if (file.eq.'-') then
-          ! stdin; warn if non-single ranks
-          call get_wni(ierr, nrank=nrw)
-          if (nrw.gt.1.or.nrw.lt.0) call msg_grp('stdin enabled.', __GRP__, __MDL__, ulog)
-       else if (file.eq.' ') then
-          call search_sysin(ierr, file, pfx_sysin, sfx_sysin, icolor, digits_sysin)
-          if (file.eq.' ') ierr = -1
-       else
-          jz = verify(file, '0', .TRUE.)
-          if (jz.eq.0) then
-             pfx = file
-             call search_sysin(ierr, file, pfx, sfx_sysin, icolor, digits_sysin)
-          else
-             if (icolor.lt.0) then
-                pfx = file
-                call search_sysin(ierr, file, pfx, ' ', icolor)
-             else
-                pfx = file(1:jz)
-                call search_sysin(ierr, file, pfx, ' ', icolor, digits_sysin)
-             endif
-          endif
-       endif
-    endif
-    if (file.eq.' ') ierr = -1
+    usys = -1
     if (ierr.eq.0) then
        if (IFILE.ge.0) then
-          if (is_msglev_INFO(lev_verbose)) then
-             call msg_grp('(''old sysin unit: '', I0)', (/IFILE/), __GRP__, __MDL__, ulog)
+          if (is_msglev_WARNING(lev_verbose)) then
+101          format('old sysin unit/', A, ': ', I0)
+             write(txt, 101) trim(tag), IFILE
+             call msg_grp(txt, utmp)
           endif
        endif
-       if (file.eq.'-') then
-          IFILE = uin
+    endif
+    if (ierr.eq.0) then
+       if (f.eq.sp_stdin) then
+          usys = uin
        else
-          inquire(NUMBER=utmp, OPENED=bo, FILE=file, IOSTAT=ierr)
-          if (ierr.eq.0) then
-             if (.not.bo) then
-                utmp = ISET
-                if (utmp.lt.0) utmp = new_unit()
-                if (utmp.lt.0) then
-                   ierr = -1
-                else
-                   if (IFILE.ne.uin.and.IFILE.ge.0) close(IFILE)
-                   open(unit=utmp, FILE=file, FORM='FORMATTED', STATUS='OLD', &
-                        & ACCESS='SEQUENTIAL', IOSTAT=ierr)
-                endif
-             endif
-             IFILE = utmp
+          usys = ISET
+          if (usys.lt.0) usys = new_unit()
+       endif
+       ierr = min(0, usys)
+       if (ierr.eq.0) then
+          if (ISET.ge.0.and.ISET.ne.uin) then
+             inquire(UNIT=ISET, OPENED=bo, IOSTAT=ierr)
+             if (ierr.eq.0.and.bo) close(ISET, IOSTAT=ierr)
           endif
        endif
-       if (is_msglev_INFO(lev_verbose)) then
-          call msg_grp('(''new sysin unit: '', I0)', (/IFILE/), __GRP__, __MDL__, ulog)
+    endif
+    if (ierr.eq.0) then
+       if (f.eq.sp_dummy) then
+          if (is_msglev_WARNING(lev_verbose)) then
+102          format('dummy input for sysin/', A)
+             write(txt, 102) trim(tag)
+             call msg_grp(txt, utmp)
+          endif
+          open(unit=usys, FORM='FORMATTED', STATUS='SCRATCH', &
+               & ACCESS='SEQUENTIAL', ACTION='READWRITE', IOSTAT=ierr)
+       else if (f.eq.sp_stdin) then
+          call get_wni(ierr, nrank=nrw)
+          if (nrw.gt.1.or.nrw.lt.0) then
+             if (is_msglev_WARNING(lev_verbose)) then
+103             format('enabled stdin on mpi/', A)
+                write(txt, 103) trim(tag)
+                call msg_grp(txt, utmp)
+             endif
+          endif
+       else
+          open(unit=usys, FILE=f, FORM='FORMATTED', STATUS='OLD', &
+               & ACCESS='SEQUENTIAL', ACTION='READ', IOSTAT=ierr)
        endif
     endif
-    return
-  end subroutine open_sysin
-!!!_  & get_sysu
-  subroutine get_sysu(sysi, syso)
-    implicit none
-    integer,intent(out),optional :: sysi
-    integer,intent(out),optional :: syso
-    if (present(sysi)) then
-       sysi = IFILE
+    if (ierr.eq.0) then
+       IFILE = usys
+       if (is_msglev_INFO(lev_verbose)) then
+104       format('Open sysin/', A, ': ', A)
+          write(txt, 104) trim(tag), trim(f)
+          call msg_grp(txt, utmp)
+       endif
+    else
+105    format('Failed to open sysin/', A, ': ', A)
+       write(txt, 105) trim(tag), trim(f)
+       call msg_grp(txt, utmp)
+       ierr = ERR_FAILURE_INIT
     endif
-    if (present(syso)) then
-       syso = JFILE
-    endif
-    return
-  end subroutine get_sysu
-!!!_  & open_sysout - YYSYSO compatible
-  subroutine open_sysout(ierr)
+  end subroutine open_bind_sysin
+!!!_  & open_bind_sysout - YYSYSO compatible
+  subroutine open_bind_sysout(ierr, usys, file, sfx, u)
     use TOUZA_Std,only: &
          & choice, ndigits, &
-         & msg_grp, get_wni, uout, is_msglev_INFO, new_unit
+         & get_wni, uout, is_msglev_INFO, new_unit
     implicit none
-    integer,intent(out)         :: ierr
-    character(len=lpath) :: file
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: usys
+    character(len=*),intent(in)          :: file
+    character(len=*),intent(in),optional :: sfx
+    integer,         intent(in),optional :: u        ! log unit
+
     character(len=lmsg)  :: txt
+    character(len=lpath) :: f, pbuf, sbuf
     integer nr, ir
     integer nd
     integer utmp
     logical bo
 
     ierr = 0
-    file = ' '
+    utmp = get_logu(u, ulog)
 
-    if (ierr.eq.0) then
-       if (JFILE.ge.0) then
-          if (is_msglev_INFO(lev_verbose)) then
-             call msg_grp('(''old sysout unit: '', I0)', (/JFILE/), __GRP__, __MDL__)
-          endif
-       endif
+    f = file
+    if (f.eq.' ') then
        if (sw_stdo) then
-          file = '-'
-          JFILE = uout
+          f = sp_stdout
        else
-          nr = nrank
-          ir = irank
-          if (nr.lt.0.or.ir.lt.0) then
-             call get_wni(ierr, nrank=nr, irank=ir)
-          endif
-          if (nr.ne.0) then
-             nd = max(ndigits(nr), digits_sysout)
-             call gen_path(file, pfx_sysout, sfx_sysout, max(0, ir), nd)
-          else
-             file = pfx_sysout
-          endif
-          inquire(NUMBER=utmp, OPENED=bo, FILE=file, IOSTAT=ierr)
-          if (ierr.eq.0) then
-             if (.not.bo) then
-                utmp = JSET
-                if (utmp.lt.0) utmp = new_unit()
-                if (utmp.lt.0) then
-                   ierr = -1
-                else
-                   if (JFILE.ne.uout.and.JFILE.ge.0) close(JFILE)
-                   open(unit=utmp, FILE=file, FORM='FORMATTED', &
-                        & ACCESS='SEQUENTIAL', ACTION='WRITE', IOSTAT=ierr)
-                endif
-             endif
-             JFILE = utmp
-          endif
+          f = pfx_sysout
        endif
-       if (is_msglev_INFO(lev_verbose)) then
-          call msg_grp('(''new sysout unit: '', I0)', (/JFILE/), __GRP__, __MDL__)
+    endif
+
+    if (f.eq.sp_stdout) then
+       usys = uout
+    else
+       nr = nrank
+       ir = irank
+       if (nr.lt.0.or.ir.lt.0) then
+          call get_wni(ierr, nrank=nr, irank=ir)
+       endif
+       if (nr.ne.0) then
+          nd = max(ndigits(nr), digits_sysout)
+          pbuf = f
+          if (present(sfx)) then
+             sbuf = sfx
+          else
+             sbuf = sfx_sysout
+          endif
+          call gen_path(f, pbuf, sbuf, max(0, ir), nd)
+       else
+          continue
+       endif
+       inquire(NUMBER=usys, OPENED=bo, FILE=f, IOSTAT=ierr)
+       if (ierr.eq.0) then
+          if (.not.bo) then
+             usys = JSET
+             if (usys.lt.0) usys = new_unit()
+             if (usys.lt.0) then
+                ierr = -1
+             else
+                ! if (JFILE.ne.uout.and.JFILE.ge.0) close(JFILE)
+                open(unit=usys, FILE=f, FORM='FORMATTED', &
+                     & ACCESS='SEQUENTIAL', ACTION='WRITE', IOSTAT=ierr)
+             endif
+          endif
        endif
     endif
     if (is_msglev_INFO(lev_verbose)) then
-104    format('result:sysout=', A)
-       write(txt, 104) trim(file)
-       call msg_grp(txt, __GRP__, __MDL__)
+       if (JFILE.ge.0) then
+          call msg_grp('(''old sysout unit: '', I0)', (/JFILE/), utmp)
+       endif
+       call msg_grp('(''new sysout unit: '', I0)', (/usys/), utmp)
+    endif
+
+104 format('result:sysout=', A)
+    write(txt, 104) trim(f)
+    if (is_msglev_INFO(lev_verbose)) then
+       call msg_grp(txt, utmp)
+    endif
+    if (JFILE.ge.0.and.usys.ne.JFILE) then
+       call msg_grp('sysout: switched.', utmp)
+    endif
+
+    if (ierr.eq.0) then
+       JFILE = usys
     endif
 
     return
-  end subroutine open_sysout
-
-!!!_  & search_sysin
-  subroutine search_sysin &
-       & (ierr, file, pfx, sfx, num, digits)
-    use TOUZA_Std,only: msg_grp, is_msglev_INFO, is_msglev_DEBUG
+  end subroutine open_bind_sysout
+!!!_  & open_sysin_primary - open /primary/ SYSIN file
+  subroutine open_sysin_primary &
+       & (ierr, uprim, file, pos, u)
+    use TOUZA_Std,only: is_msglev_WARNING, is_msglev_INFO
+    use TOUZA_Std,only: new_unit
+    use TOUZA_Std,only: get_wni
     implicit none
-    integer,         intent(out) :: ierr
-    character(len=*),intent(out) :: file
-    character(len=*),intent(in)  :: pfx, sfx
-    integer,         intent(in)  :: num
-    integer,optional,intent(in)  :: digits
-    integer nf
-    integer j
-    logical bx
-    character(len=lpath) :: path
-    character(len=lmsg)  :: txt
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: uprim    ! primary unit
+    character(len=*),intent(in),optional :: file
+    integer,         intent(in),optional :: pos
+    integer,         intent(in),optional :: u        ! log unit
+
+    integer utmp
+    character(len=lpath) :: pprim
+
     ierr = 0
-    nf = 0
-    file = ' '
-    if (present(digits)) then
-       do j = max(1, digits), max_digits
-          call gen_path(path, pfx, sfx, (max(0, num)), j)
-          if (is_msglev_DEBUG(lev_verbose)) then
-             call msg_grp('(''search '', A)', (/path/), __GRP__, __MDL__)
-          endif
-          if (ierr.eq.0) inquire(FILE=path, EXIST=bx, IOSTAT=ierr)
-          if (ierr.eq.0.and.bx) then
-             nf = nf + 1
-             if (file.eq.' ') then
-                file = path
-             else
-101             format('multiple candidates for sysin: ', A)
-                if (nf.eq.2) then
-                   write(txt, 101) trim(file)
-                   call msg_grp(txt, __GRP__, __MDL__)
-                endif
-                write(txt, 101) trim(path)
-                call msg_grp(txt, __GRP__, __MDL__)
-             endif
-          endif
-       enddo
-    endif
-    if (ierr.eq.0) inquire(FILE=pfx, EXIST=bx, IOSTAT=ierr)
+
+    utmp = get_logu(u, ulog)
+    uprim = -1
+    pprim = ' '
+
+    if (ierr.eq.0) call parse_arg_sysin(ierr, pprim, pos, utmp)
     if (ierr.eq.0) then
-       if (is_msglev_DEBUG(lev_verbose)) then
-          call msg_grp('(''search '', A)', (/pfx/), __GRP__, __MDL__)
-       endif
-102    format('ignore sysin candidate (rank=', I0, '): ', A)
-       if (bx) then
-          if (num.lt.0) then
-             if (file.ne.' ') then
-                write(txt, 102) num, trim(file)
-                call msg_grp(txt, __GRP__, __MDL__)
-             endif
-             file = pfx
-          else if (nf.eq.0) then
-             file = pfx
-          else if (nf.eq.1) then
-             write(txt, 102) num, trim(pfx)
-             call msg_grp(txt, __GRP__, __MDL__)
-          else
-             call msg_grp('too much sysin candidates', __GRP__, __MDL__)
-             ierr = -1
+       if (pprim.eq.' ') then
+          if (present(file)) then
+             pprim = file
           endif
-       else if (nf.gt.1) then
-          call msg_grp('too much sysin candidates', __GRP__, __MDL__)
-          ierr = -1
+       endif
+       if (pprim.eq.' '.and.sw_stdi) pprim = sp_stdin
+    endif
+    if (ierr.eq.0) call open_bind_sysin(ierr, uprim, pprim, 'primary', utmp)
+  end subroutine open_sysin_primary
+!!!_  & parse_arg_sysin
+  subroutine parse_arg_sysin &
+       & (ierr, file, pos, u)
+    use TOUZA_Std,only: choice
+    use TOUZA_Std,only: parse, get_nparam, get_param
+    use TOUZA_Std,only: is_msglev_INFO, is_msglev_WARNING
+    implicit none
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(out)         :: file
+    integer,         intent(in),optional :: pos
+    integer,         intent(in),optional :: u
+
+    integer utmp
+    integer jp, np
+
+    ierr = 0
+    utmp = get_logu(u, ulog)
+    jp = choice(pos, pos_arg)
+    file = ' '
+    if (jp.lt.0) then
+       if (is_msglev_INFO(lev_verbose)) then
+          call msg_grp('command-line argument ignored.', utmp)
+       endif
+       file = ' '
+    else
+       if (ierr.eq.0) call parse(ierr)
+       if (ierr.eq.0) then
+          jp = max(1, jp)
+          np = get_nparam()
+          if (jp.le.np) then
+             call get_param(ierr, file, jp, ' ')
+          else
+             if (is_msglev_WARNING(lev_verbose)) then
+                call msg_grp('no command-line argument.', utmp)
+             endif
+          endif
        endif
     endif
-    if (file.eq.' ') then
-103    format('not found sysin: ', A, 1x, A, 1x, I0)
-       write(txt, 103) trim(pfx), trim(sfx), num
-       call msg_grp(txt, __GRP__, __MDL__)
-       ierr = -1
-    else if (is_msglev_INFO(lev_verbose)) then
-104    format('result:sysin=', A)
-       write(txt, 104) trim(file)
-       call msg_grp(txt, __GRP__, __MDL__)
+  end subroutine parse_arg_sysin
+!!!_  & search_sysin_colored
+  subroutine search_sysin_colored &
+       & (num, file, idx, pfx, sfx, digits, u)
+    use TOUZA_Std,only: choice, choice_a, get_logu
+    use TOUZA_Std,only: is_msglev_INFO, is_msglev_DEBUG
+    implicit none
+    integer,         intent(out)         :: num      ! number or error code
+    character(len=*),intent(out)         :: file
+    integer,         intent(in)          :: idx
+    character(len=*),intent(in),optional :: pfx, sfx
+    integer,         intent(in),optional :: digits
+    integer,         intent(in),optional :: u
+    integer j
+    integer md
+    logical bx
+    integer jerr
+    integer utmp
+    character(len=lpath) :: path, pbuf, sbuf
+    character(len=lmsg)  :: txt
+
+    jerr = 0
+    utmp = get_logu(u, ulog)
+
+    num = 0
+    file = ' '
+    md = choice(max_digits, digits)
+
+    ! Default prefix with blank pfx
+    call choice_a(pbuf, ' ', pfx)
+    if (pbuf.eq.' ') pbuf = pfx_sysin
+
+    ! Empty suffix with blank sfx
+    if (present(sfx)) then
+       sbuf = sfx
+    else
+       sbuf = sfx_sysin
     endif
-  end subroutine search_sysin
+
+    do j = 1, max(1, md)
+       call gen_path(path, pbuf, sbuf, (max(0, idx)), j)
+       if (is_msglev_DEBUG(lev_verbose)) then
+          call msg_grp('(''search '', A)', (/path/), utmp)
+       endif
+       if (jerr.eq.0) inquire(FILE=path, EXIST=bx, IOSTAT=jerr)
+       if (jerr.eq.0.and.bx) then
+          num = num + 1
+          if (file.eq.' ') then
+             file = path
+          else
+101          format('multiple candidates for sysin: ', A)
+             if (num.eq.2) then
+                write(txt, 101) trim(file)
+                call msg_grp(txt, utmp)
+             endif
+             write(txt, 101) trim(path)
+             call msg_grp(txt, utmp)
+          endif
+       endif
+    enddo
+    if (jerr.ne.0) num = -1
+  end subroutine search_sysin_colored
 !!!_  & gen_path
   subroutine gen_path &
        & (path, pfx, sfx, num, mlow)
@@ -555,9 +667,8 @@ contains
     endif
     path = trim(pfx) // trim(sfx) // dbuf(jz:lint)
   end subroutine gen_path
-!!!_  - rewind_lock
+!!!_  & rewind_lock
   subroutine rewind_lock(tag, u)
-    use TOUZA_Std,only: msg_grp
     implicit none
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
@@ -573,13 +684,11 @@ contains
        else
           txt = 'rewind locked'
        endif
-       call msg_grp(txt, __GRP__, __MDL__, utmp)
+       call msg_grp(txt, utmp)
     endif
   end subroutine rewind_lock
-
-!!!_  - rewind_unlock
+!!!_  & rewind_unlock
   subroutine rewind_unlock(tag, u)
-    use TOUZA_Std,only: msg_grp
     implicit none
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
@@ -594,22 +703,20 @@ contains
        else
           txt = 'rewind unlocked'
        endif
-       call msg_grp(txt, __GRP__, __MDL__, utmp)
+       call msg_grp(txt, utmp)
     else if (lock_tag.ne.' ') then
        write(txt, 101) trim(lock_tag)
-       call msg_grp(txt, __GRP__, __MDL__, utmp)
+       call msg_grp(txt, utmp)
     endif
     lock_tag = ' '
   end subroutine rewind_unlock
-
-!!!_  - is_locked_rewind
+!!!_  & is_locked_rewind
   logical function is_locked_rewind() result(b)
     implicit none
     b = lock_rewind
   end function is_locked_rewind
-!!!_  - show_lock_status
+!!!_  & show_lock_status
   subroutine show_lock_status(u)
-    use TOUZA_Std,only: msg_grp
     implicit none
     integer,intent(in),optional :: u
     integer utmp
@@ -625,21 +732,214 @@ contains
     else
        txt = 'rewind unlocked'
     endif
-    call msg_grp(txt, __GRP__, __MDL__, utmp)
+    call msg_grp(txt, utmp)
   end subroutine show_lock_status
+!!!_ + Deprecated
+!!!_  & legacy_open_sysin - YYSYSI compatible
+  subroutine legacy_open_sysin(ierr, u)
+    use TOUZA_Std,only: &
+         & choice, &
+         & parse, get_nparam, get_param, &
+         & get_wni, uin, is_msglev_INFO, new_unit
+    implicit none
+    integer,         intent(out)          :: ierr
+    integer,         intent(out),optional :: u
+    character(len=lpath) :: file, pfx
+    integer jp, np, na
+    integer nrw
+    integer jz
+    logical bo
+    integer utmp
 
-!!!_  - end TOUZA_Emu_usi
+    ierr = 0
+    file = ' '
+    na = 0
+
+    if (pos_arg.lt.0) then
+       call msg_grp('command-line argument ignored.', ulog)
+    else
+       jp = -1
+
+       if (ierr.eq.0) call parse(ierr)
+       if (ierr.eq.0) then
+          jp = max(1, pos_arg)
+          np = get_nparam()
+          na = np - (jp - 1)
+          if ((na.gt.1) &
+               & .and. ((ncolor.gt.0.and.ncolor.gt.na) &
+               &        .or.(icolor.ge.0.and.icolor.gt.na))) then
+             call msg_grp('(''insufficient command-line argument: '', I0, 1x, I0, 1x, I0)', &
+                  &       (/icolor, ncolor, na/), ulog)
+             ierr = -1
+          endif
+       endif
+       if (ierr.eq.0) then
+          if (na.eq.1) then
+             call get_param(ierr, file, jp, ' ')
+          else
+             call get_param(ierr, file, jp + max(0, icolor), ' ')
+          endif
+       endif
+    endif
+    if (ierr.eq.0) then
+       if (file.eq.' '.and.sw_stdi) file = '-'
+       if (file.eq.'-') then
+          ! stdin; warn if non-single ranks
+          call get_wni(ierr, nrank=nrw)
+          if (nrw.gt.1.or.nrw.lt.0) call msg_grp('stdin enabled.', ulog)
+       else if (file.eq.' ') then
+          call legacy_search_sysin(ierr, file, pfx_sysin, sfx_sysin, icolor, digits_sysin)
+          if (file.eq.' ') ierr = -1
+       else
+          jz = verify(file, '0', .TRUE.)
+          if (jz.eq.0) then
+             pfx = file
+             call legacy_search_sysin(ierr, file, pfx, sfx_sysin, icolor, digits_sysin)
+          else
+             if (icolor.lt.0) then
+                pfx = file
+                call legacy_search_sysin(ierr, file, pfx, ' ', icolor)
+             else
+                pfx = file(1:jz)
+                call legacy_search_sysin(ierr, file, pfx, ' ', icolor, digits_sysin)
+             endif
+          endif
+       endif
+    endif
+    if (file.eq.' ') ierr = -1
+    if (ierr.eq.0) then
+       if (IFILE.ge.0) then
+          if (is_msglev_INFO(lev_verbose)) then
+             call msg_grp('(''old sysin unit: '', I0)', (/IFILE/), ulog)
+          endif
+       endif
+       if (file.eq.'-') then
+          IFILE = uin
+       else
+          inquire(NUMBER=utmp, OPENED=bo, FILE=file, IOSTAT=ierr)
+          write(*, *) 'opened:', utmp, bo, ' ', trim(FILE)
+          if (ierr.eq.0) then
+             if (.not.bo) then
+                utmp = ISET
+                if (utmp.lt.0) utmp = new_unit()
+                if (utmp.lt.0) then
+                   ierr = -1
+                else
+                   if (IFILE.ne.uin.and.IFILE.ge.0) close(IFILE)
+                   open(unit=utmp, FILE=file, FORM='FORMATTED', STATUS='OLD', &
+                        & ACCESS='SEQUENTIAL', IOSTAT=ierr)
+                endif
+             endif
+             IFILE = utmp
+          endif
+       endif
+       if (is_msglev_INFO(lev_verbose)) then
+          call msg_grp('(''new sysin unit: '', I0)', (/IFILE/), ulog)
+       endif
+    endif
+    if (present(u)) then
+       u = IFILE
+    endif
+    return
+  end subroutine legacy_open_sysin
+!!!_  & legacy_search_sysin
+  subroutine legacy_search_sysin &
+       & (ierr, file, pfx, sfx, num, digits)
+    use TOUZA_Std,only: is_msglev_INFO, is_msglev_DEBUG
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: file
+    character(len=*),intent(in)  :: pfx, sfx
+    integer,         intent(in)  :: num
+    integer,optional,intent(in)  :: digits
+    integer nf
+    integer j
+    logical bx
+    character(len=lpath) :: path
+    character(len=lmsg)  :: txt
+    ierr = 0
+    nf = 0
+    file = ' '
+    if (present(digits)) then
+       do j = max(1, digits), max_digits
+          call gen_path(path, pfx, sfx, (max(0, num)), j)
+          if (is_msglev_DEBUG(lev_verbose)) then
+             call msg_grp('(''search '', A)', (/path/))
+          endif
+          if (ierr.eq.0) inquire(FILE=path, EXIST=bx, IOSTAT=ierr)
+          if (ierr.eq.0.and.bx) then
+             nf = nf + 1
+             if (file.eq.' ') then
+                file = path
+             else
+101             format('multiple candidates for sysin: ', A)
+                if (nf.eq.2) then
+                   write(txt, 101) trim(file)
+                   call msg_grp(txt)
+                endif
+                write(txt, 101) trim(path)
+                call msg_grp(txt)
+             endif
+          endif
+       enddo
+    endif
+    if (ierr.eq.0) inquire(FILE=pfx, EXIST=bx, IOSTAT=ierr)
+    if (ierr.eq.0) then
+       if (is_msglev_DEBUG(lev_verbose)) then
+          call msg_grp('(''search '', A)', (/pfx/))
+       endif
+102    format('ignore sysin candidate (rank=', I0, '): ', A)
+       if (bx) then
+          if (num.lt.0) then
+             if (file.ne.' ') then
+                write(txt, 102) num, trim(file)
+                call msg_grp(txt)
+             endif
+             file = pfx
+          else if (nf.eq.0) then
+             file = pfx
+          else if (nf.eq.1) then
+             write(txt, 102) num, trim(pfx)
+             call msg_grp(txt)
+          else
+             call msg_grp('too much sysin candidates')
+             ierr = -1
+          endif
+       else if (nf.gt.1) then
+          call msg_grp('too much sysin candidates')
+          ierr = -1
+       endif
+    endif
+    if (file.eq.' ') then
+103    format('not found sysin: ', A, 1x, A, 1x, I0)
+       write(txt, 103) trim(pfx), trim(sfx), num
+       call msg_grp(txt)
+       ierr = -1
+    else if (is_msglev_INFO(lev_verbose)) then
+104    format('result:sysin=', A)
+       write(txt, 104) trim(file)
+       call msg_grp(txt)
+    endif
+  end subroutine legacy_search_sysin
+
+!!!_  & legacy_open_sysout
+  subroutine legacy_open_sysout(ierr)
+    implicit none
+    integer,intent(out) :: ierr
+    integer udummy
+    call open_bind_sysout(ierr, udummy, ' ')
+  end subroutine legacy_open_sysout
+!!!_ + end TOUZA_Emu_usi
 end module TOUZA_Emu_usi
-
 !!!_* non-module Procedures
 !!!_ + OPNNML - open SYSIN, SYSOUT
 subroutine OPNNML(IOS)
-  use TOUZA_Emu_usi,only: open_sysin, open_sysout
+  use TOUZA_Emu_usi,only: legacy_open_sysin, legacy_open_sysout
   implicit none
   integer,intent(out) :: IOS   !! io status
   integer jerri, jerro
-  call open_sysin(jerri)
-  call open_sysout(jerro)
+  call legacy_open_sysin(jerri)
+  call legacy_open_sysout(jerro)
   IOS = jerri
   if (IOS.eq.0) IOS = jerro
   return
@@ -702,7 +1002,7 @@ subroutine SETNML(IFILE, JFILE)
   return
 end subroutine SETNML
 
-!!!_ + SETCLR - set color index eused to make SYSIN filename
+!!!_ + SETCLR - set color index for SYSIN filename
 subroutine SETCLR(MYCOLR)
   use TOUZA_Emu_usi,only: update_color
   implicit none
@@ -711,7 +1011,7 @@ subroutine SETCLR(MYCOLR)
   return
 end subroutine SETCLR
 
-!!!_ + SETRNK - set myrank used to make SYSOUT filename
+!!!_ + SETRNK - set rank index for SYSOUT filename
 subroutine SETRNK(MYRANK)
   use TOUZA_Emu_usi,only: update_ranks
   implicit none
@@ -720,7 +1020,7 @@ subroutine SETRNK(MYRANK)
   return
 end subroutine SETRNK
 
-!!!_ + SETSIZ - set number of ranks used to make SYSOUT filename
+!!!_ + SETSIZ - set number of ranks for SYSOUT filename
 subroutine SETSIZ(MYSIZE)
   use TOUZA_Emu_usi,only: update_ranks
   implicit none
@@ -730,29 +1030,65 @@ subroutine SETSIZ(MYSIZE)
 end subroutine SETSIZ
 
 !!!_@ test_emu_usi - test program
-#ifdef TEST_EMU_USI
+#if TEST_EMU_USI
 program test_emu_usi
   use TOUZA_std,only: get_wni
-  use TOUZA_Emu_usi
+  use TOUZA_Emu_usi,only: init, diag, finalize
+  use TOUZA_Emu_usi,only: SETNML, OPNNML, REWNML
+  use TOUZA_Emu_usi,only: SETRNK, SETSIZ, SETCLR
+  use TOUZA_Emu_usi,only: open_bind_sysin, open_bind_sysout, update_color
   implicit none
   integer ierr
-  integer ir
+  integer ir, nr, icolor
+  integer ifpar, jfpar
 
   ierr = 0
-101 format(A, ' = ', I0)
+101 format(A, ' = ', I0, 1x, I0)
 
-  call init(ierr, u=-1, levv=9, stdv=+9)
+  call init(ierr, u=-1, levv=+9, stdv=+9, pos=0)
+#if TEST_EMU_USI == 1
   if (ierr.eq.0) call SETNML(98, 99)
+  if (ierr.eq.0) call get_wni(ierr, irank=ir, nrank=nr)
+  if (ierr.eq.0) then
+     call SETSIZ(nr)
+     if (ir.ge.1) call SETRNK(ir)
+  endif
+  if (ierr.eq.0) call OPNNML(ierr)
+  if (ierr.eq.0) call REWNML(ifpar, jfpar)
+  if (ierr.eq.0) then
+     write(*, *) 'Primary: ', ifpar, jfpar
+     write(jfpar, *) 'Primary: ', ifpar, jfpar
+  else
+     write(*, *) 'Primary: error= ', ierr
+  endif
 
-  if (ierr.eq.0) call open_sysin(ierr)
-  write(*, 101) 'open_sysin', ierr
+  if (ierr.eq.0) then
+     icolor = ir
+     call SETCLR(icolor)
+  endif
+
+  if (ierr.eq.0) call OPNNML(ierr)
+  if (ierr.eq.0) call REWNML(ifpar, jfpar)
+  if (ierr.eq.0) then
+     write(*, *) 'Colored: ', ifpar, jfpar
+     write(jfpar, *) 'Colored: ', ifpar, jfpar
+  else
+     write(*, *) 'Colored: error= ', ierr
+  endif
+#else /* not TEST_EMU_USI == 1 */
+  if (ierr.eq.0) call open_bind_sysin(ierr, ifpar, ' ', 'primary')
+  write(*, 101) 'open_bind_sysin', ierr
+  write(*, *) 'Primary: ', ifpar
 
   if (ierr.eq.0) call get_wni(ierr, irank=ir)
   if (ierr.eq.0) call update_color(ir)
-  if (ierr.eq.0) call open_sysin(ierr)
-  write(*, 101) 'open_sysin', ierr
-  if (ierr.eq.0) call open_sysout(ierr)
-  write(*, 101) 'open_sysout', ierr
+  if (ierr.eq.0) call open_bind_sysin(ierr, ifpar, ' ', 'secondary')
+  write(*, 101) 'open_bind_sysin', ierr
+  write(*, *) 'Colored: ', ifpar
+  if (ierr.eq.0) call open_bind_sysout(ierr, jfpar, ' ')
+  write(*, 101) 'open_bind_sysout', ierr
+  write(*, *) 'sysout: ', jfpar
+#endif /* not TEST_EMU_USI == 1 */
   call diag(ierr)
   call finalize(ierr)
   write(*, 101) 'fine', ierr
