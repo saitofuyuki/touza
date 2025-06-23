@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/05/22 16:12:39 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/06/23 21:45:34 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -41,6 +41,7 @@ module TOUZA_Std_mwe
 #if OPT_USE_MPI
 #else  /* not OPT_USE_MPI */
   ! dummy parameters
+  integer,parameter :: MPI_SUCCESS = 0
   integer,parameter :: MPI_COMM_NULL  = 2
   integer,parameter :: MPI_COMM_SELF  = 1
   integer,parameter :: MPI_COMM_WORLD = 0
@@ -83,6 +84,7 @@ module TOUZA_Std_mwe
   public is_mpi_activated
   public safe_mpi_init, safe_mpi_finalize
   public show_mpi_type
+  public MPI_SUCCESS
   public MPI_COMM_WORLD, MPI_COMM_SELF, MPI_COMM_NULL
   public MPI_DATATYPE_NULL, MPI_GROUP_NULL, MPI_UNDEFINED
   public MPI_STATUS_SIZE,   MPI_GROUP_EMPTY
@@ -590,21 +592,29 @@ contains
   subroutine safe_mpi_init(ierr)
     implicit none
     integer,intent(out) :: ierr
+#if OPT_USE_MPI
     logical b
     call MPI_Initialized(b, ierr)
     if (ierr.eq.0) then
        if (.not.b) call MPI_Init(ierr)
     endif
+#else
+    ierr = 0
+#endif
   end subroutine safe_mpi_init
 !!!_  & safe_mpi_finalize
   subroutine safe_mpi_finalize(ierr)
     implicit none
     integer,intent(out) :: ierr
+#if OPT_USE_MPI
     logical b
     call MPI_Finalized(b, ierr)
     if (ierr.eq.0) then
        if (.not.b) call MPI_Finalize(ierr)
     endif
+#else
+    ierr = 0
+#endif
   end subroutine safe_mpi_finalize
 !!!_  & show_mpi_type - check properties of mpi-type
   subroutine show_mpi_type &
