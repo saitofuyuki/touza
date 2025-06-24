@@ -1,9 +1,9 @@
 # touza/ppp Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jan 26 2022
-# Time-stamp: <2024/07/11 21:26:25 fuyuki Makefile.am>
+# Time-stamp: <2025/06/25 09:08:06 fuyuki Makefile.am>
 
-# Copyright (C) 2022-2024
+# Copyright (C) 2022-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -66,6 +66,22 @@ test_ppp_miroc_o_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_PPP_MIROC=2
 test_ppp_miroc_s_SOURCES	= $(test_ppp_miroc_a_SOURCES)
 test_ppp_miroc_s_LDADD		= $(test_ppp_miroc_a_LDADD)
 test_ppp_miroc_s_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_PPP_MIROC=3
+
+noinst_SCRIPTS	=	$(WTC)
+CLEANFILES		+=	$(noinst_SCRIPTS) $(MIROCH)
+
+WTC_LOGDIR	=	log
+WTC		=	wtc.sh
+WTCin 	=	$(WTC).in
+
+EXTRA_DIST+=$(WTCin)
+
+$(WTC): $(srcdir)/$(WTCin)
+	@echo "Generate $@."
+	@if sed -e 's![@]srcdir@!$(srcdir)!g' \
+			-e 's![@]MPIRUN@!$(MPIRUN)!g' $(srcdir)/$(WTCin) > $@; \
+	then chmod +x $@; \
+	else rm -f $@; false; fi
 
 include Makedep.inc
 
