@@ -1,10 +1,10 @@
 !!!_! calendar_ils.F90 - touza/calendar: (sample) ILS interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2022/02/16 15:02:42 fuyuki calendar_ils.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/06/26 16:04:21 fuyuki calendar_ils.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021
+! Copyright (C) 2020-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -111,8 +111,8 @@ contains
     integer,intent(in) :: date2(6)
     integer cday1, cday2
     integer tsec1, tsec2
-    cday1 = conv_date_cday(date1(1:3), xk=cday1)
-    cday2 = conv_date_cday(date2(1:3), xk=cday2)
+    cday1 = conv_date_cday(date1(1:3), mold=cday1)
+    cday2 = conv_date_cday(date2(1:3), mold=cday2)
     tsec1 = conv_time_tsec(date1(4:6))
     tsec2 = conv_time_tsec(date2(4:6))
 
@@ -132,8 +132,8 @@ contains
     integer,intent(in) :: date2(6)
     real(kind=KRC) :: cday1, cday2
     integer tsec1, tsec2
-    cday1 = conv_date_cday(date1(1:3), xk=cday1)
-    cday2 = conv_date_cday(date2(1:3), xk=cday2)
+    cday1 = conv_date_cday(date1(1:3), mold=cday1)
+    cday2 = conv_date_cday(date2(1:3), mold=cday2)
     tsec1 = conv_time_tsec(date1(4:6))
     tsec2 = conv_time_tsec(date2(4:6))
 
@@ -154,7 +154,7 @@ contains
     integer cday
     integer tsec
 
-    cday = conv_date_cday(date(1:3), xk=cday)
+    cday = conv_date_cday(date(1:3), mold=cday)
     tsec = conv_time_tsec(date(4:6))
     tsec = tsec + delta_t
 
@@ -186,7 +186,7 @@ contains
     real(kind=KRC) :: cday
     real(kind=KRC) :: tsec
 
-    cday = conv_date_cday(date(1:3), xk=cday)
+    cday = conv_date_cday(date(1:3), mold=cday)
     tsec = xreal(conv_time_tsec(date(4:6)))
     tsec = tsec + delta_t
 
@@ -234,7 +234,7 @@ contains
     real(kind=KRC) :: cday
 
     date(2) = date(2) + month
-    cday = conv_date_cday(date(1:3), xk=cday)
+    cday = conv_date_cday(date(1:3), mold=cday)
     date(1:3) = conv_cday_adate(cday)
 
     return
@@ -252,7 +252,7 @@ contains
     real(kind=KRC) :: cday
 
     date(2) = date(2) - month
-    cday = conv_date_cday(date(1:3), xk=cday)
+    cday = conv_date_cday(date(1:3), mold=cday)
     date(1:3) = conv_cday_adate(cday)
 
     return

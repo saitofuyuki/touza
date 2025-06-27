@@ -1,7 +1,7 @@
 !!!_! calendar_miroc.F90 - touza/calendar: miroc compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2025/05/11 20:57:03 fuyuki calendar_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/06/26 16:04:55 fuyuki calendar_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -513,7 +513,7 @@ subroutine CYM2DD &
   implicit none
   integer,intent(out) :: IDAYS
   integer,intent(in)  :: IYEAR, IMONTH, IDAY
-  IDAYS = conv_adate_cday((/IYEAR, IMONTH, IDAY/), XK=IDAYS)
+  IDAYS = conv_adate_cday((/IYEAR, IMONTH, IDAY/), MOLD=IDAYS)
   return
 end subroutine CYM2DD
 

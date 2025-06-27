@@ -1,7 +1,7 @@
 !!!_! calendar_core.F90 - TOUZA/Cal core
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2025/05/12 08:24:35 fuyuki calendar_core.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/06/27 18:43:00 fuyuki calendar_core.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -53,7 +53,7 @@ module TOUZA_Cal_core
   public :: conv_date_dayy,       conv_date_dayy_compat
   public :: conv_csec_calendar,   conv_calendar_csec
   public :: conv_cday_cydayy,     conv_csec_date,       conv_csec_cydayy
-  public :: advance_csec,         conv_duration_sec
+  public :: advance_csec,         conv_duration_sec,    conv_sec_duration
   public :: conv_string_calendar, conv_calendar_string, conv_csec_string_ppt_off
   public :: is_passed,            is_passed_compat
 
@@ -188,6 +188,11 @@ module TOUZA_Cal_core
      module procedure conv_uduration_sec
      module procedure conv_jduration_sec
   end interface conv_duration_sec
+
+  interface conv_sec_duration
+     module procedure conv_sec_uduration
+     module procedure conv_sec_jduration
+  end interface conv_sec_duration
 
   interface advance_csec
      module procedure advancej_csec_c
@@ -555,7 +560,7 @@ contains
 
 !!!_  & conv_cdaysec_csec()
   real(kind=KRC) function conv_cdaysec_csec_c &
-       & (self, daysec, cd, xk) &
+       & (self, daysec, cd, mold) &
        result (r)
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_cdaysec_csec_c => conv_cdaysec_csec_c
@@ -563,14 +568,14 @@ contains
     type(cal_attr_t),  intent(in) :: self
     type(cal_daysec_t),intent(in) :: daysec
     type(cal_date_t),  intent(in) :: cd
-    real(kind=KRC),    intent(in) :: xk ! dummy
+    real(kind=KRC),    intent(in) :: mold ! dummy
 
-    r = primitive_conv_cdaysec_csec_c(self % mode, daysec, cd)
+    r = REAL(primitive_conv_cdaysec_csec_c(self % mode, daysec, cd), kind=kind(mold))
     return
   end function conv_cdaysec_csec_c
 
   integer function conv_cdaysec_csec_i &
-       & (self, daysec, cd, xk) &
+       & (self, daysec, cd, mold) &
        result (r)
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_cdaysec_csec_i => conv_cdaysec_csec_i
@@ -578,9 +583,9 @@ contains
     type(cal_attr_t),  intent(in) :: self
     type(cal_daysec_t),intent(in) :: daysec
     type(cal_date_t),  intent(in) :: cd
-    integer,           intent(in) :: xk ! dummy
+    integer,           intent(in) :: mold ! dummy
 
-    r = primitive_conv_cdaysec_csec_i(self % mode, daysec, cd)
+    r = INT(primitive_conv_cdaysec_csec_i(self % mode, daysec, cd), kind=KIND(mold))
     return
   end function conv_cdaysec_csec_i
 
@@ -615,7 +620,7 @@ contains
 
 !!!_  & conv_time_tsec()
   integer function conv_time_tsec_i &
-       & (self, t, cd, xk) &
+       & (self, t, cd, mold) &
        result (r)
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_time_tsec_i => conv_time_tsec_i
@@ -623,14 +628,14 @@ contains
     type(cal_attr_t),intent(in) :: self
     type(cal_time_t),intent(in) :: t
     type(cal_date_t),intent(in) :: cd
-    integer,         intent(in) :: xk ! dummy
+    integer,         intent(in) :: mold ! dummy
 
-    r = primitive_conv_time_tsec_i(self % mode, t, cd)
+    r = INT(primitive_conv_time_tsec_i(self % mode, t, cd), kind=KIND(mold))
     return
   end function conv_time_tsec_i
 
   real(kind=KRC) function conv_time_tsec_c &
-       & (self, t, cd, xk) &
+       & (self, t, cd, mold) &
        result (r)
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_time_tsec_c => conv_time_tsec_c
@@ -638,9 +643,9 @@ contains
     type(cal_attr_t),intent(in) :: self
     type(cal_time_t),intent(in) :: t
     type(cal_date_t),intent(in) :: cd
-    real(kind=KRC),  intent(in) :: xk ! dummy
+    real(kind=KRC),  intent(in) :: mold ! dummy
 
-    r = primitive_conv_time_tsec_c(self % mode, t, cd)
+    r = REAL(primitive_conv_time_tsec_c(self % mode, t, cd), kind=KIND(mold))
     return
   end function conv_time_tsec_c
 
@@ -687,31 +692,31 @@ contains
 
 !!!_  & conv_date_cday()
   integer function conv_date_cday_i &
-       & (self, cd, xk) &
+       & (self, cd, mold) &
        & result (r)
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_date_cday_i => conv_date_cday_i
     implicit none
     type(cal_attr_t),intent(inout) :: self
     type(cal_date_t),intent(in)    :: cd
-    integer,         intent(in)    :: xk ! dummy
+    integer,         intent(in)    :: mold ! dummy
     integer :: mode
     mode = check_mode_year (self, cd % y)
-    r = primitive_conv_date_cday_i(mode, cd)
+    r = INT(primitive_conv_date_cday_i(mode, cd), kind=KIND(mold))
   end function conv_date_cday_i
 
   real(kind=KRC) function conv_date_cday_c &
-       & (self, cd, xk) &
+       & (self, cd, mold) &
        & result (r)
     use TOUZA_Cal_primitive,only: &
          & primitive_conv_date_cday_c => conv_date_cday_c
     implicit none
     type(cal_attr_t),intent(inout) :: self
     type(cal_date_t),intent(in)    :: cd
-    real(kind=KRC),  intent(in)    :: xk
+    real(kind=KRC),  intent(in)    :: mold
     integer :: mode
     mode = check_mode_year (self, cd % y)
-    r = primitive_conv_date_cday_c(mode, cd)
+    r = REAL(primitive_conv_date_cday_c(mode, cd), kind=KIND(mold))
   end function conv_date_cday_c
 
 !!!_  & conv_date_dayy()
@@ -776,36 +781,36 @@ contains
 
 !!!_  & conv_calendar_csec () - get calendar[sec] from calendar[D,T]
   real(kind=KRC) function conv_calendar_csec_c &
-       & (self, cal, xk) &
+       & (self, cal, mold) &
        & result (r)
     implicit none
     type(cal_attr_t),intent(inout) :: self
     type(calendar_t),intent(in)    :: cal
-    real(kind=KRC),  intent(in)    :: xk ! dummy
+    real(kind=KRC),  intent(in)    :: mold ! dummy
 
     type(cal_daysec_t) :: ds
 
     ds%d = conv_date_cday(self, cal%d, ds%d)
-    ds%s = conv_time_tsec_c(self, cal % t, cal % d, xk)
+    ds%s = conv_time_tsec_c(self, cal % t, cal % d, mold)
 
-    r = conv_cdaysec_csec(self, ds, cal % d, xk)
+    r = conv_cdaysec_csec(self, ds, cal % d, mold)
 
   end function conv_calendar_csec_c
 
   integer function conv_calendar_csec_i &
-       & (self, cal, xk) &
+       & (self, cal, mold) &
        & result (r)
     implicit none
     type(cal_attr_t),intent(inout) :: self
     type(calendar_t),intent(in)    :: cal
-    integer,         intent(in)    :: xk ! dummy
+    integer,         intent(in)    :: mold ! dummy
 
     type(cal_daysec_t) :: ds
 
     ds%d = conv_date_cday(self, cal%d, ds%d)
-    ds%s = xreal(conv_time_tsec_i(self, cal % t, cal % d, xk))
+    ds%s = xreal(conv_time_tsec_i(self, cal % t, cal % d, mold))
 
-    r = conv_cdaysec_csec_i(self, ds, cal % d, xk)
+    r = conv_cdaysec_csec_i(self, ds, cal % d, mold)
 
   end function conv_calendar_csec_i
 
@@ -900,6 +905,119 @@ contains
     return
   end function conv_jduration_sec
 
+!!!_  & conv_sec_duration () - get duration[unit] from duration[sec] since calendar[sec]
+  real(kind=KRC) function conv_sec_uduration &
+       & (self, sec, unit, refsec) &
+       & result (r)
+    implicit none
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: sec
+    character(len=*),intent(in)    :: unit
+    real(kind=KRC),  intent(in)    :: refsec
+
+    character (len=10) :: unit_buf
+    integer ju
+
+    unit_buf = unit
+    ju = parse_unit(unit_buf)
+    r = conv_sec_jduration(self, sec, ju, refsec)
+
+    return
+  end function conv_sec_uduration
+
+  real(kind=KRC) function conv_sec_jduration &
+       & (self, sec, junit, refsec) &
+       & result (r)
+    implicit none
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: sec
+    integer,         intent(in)    :: junit
+    real(kind=KRC),  intent(in)    :: refsec
+
+    type(cal_date_t) :: cd
+
+    if      (junit .eq. iunit_SC)  then
+       r = sec
+    else if (junit .eq. iunit_MI) then
+       r = sec / xreal(inq_nsec_minute (self))
+    else if (junit .eq. iunit_HR)  then
+       r = sec / xreal(inq_nsec_hour (self))
+    else if (junit .eq. iunit_DY)  then
+       r = sec / xreal(inq_nsec_day (self))
+    else if (junit .eq. iunit_MO)  then
+       cd = conv_csec_date (self, refsec)
+       r = sec / (xreal(inq_nday_month (self, cd)) * xreal(inq_nsec_day (self)))
+    else if (junit .eq. iunit_YR)  then
+       cd = conv_csec_date (self, refsec)
+       r = sec / (xreal(inq_nday_year (self, cd)) * xreal(inq_nsec_day (self)))
+    else
+       r = sec
+    endif
+    return
+  end function conv_sec_jduration
+
+!!!_   . reserved implementation (not symmetric to the counterpart, conv_duration_sec)
+#if 0 /* reserved */
+  real(kind=KRC) function conv_sec_jduration_test &
+       & (self, sec, junit, refsec) &
+       & result (r)
+    implicit none
+    type(cal_attr_t),intent(inout) :: self
+    real(kind=KRC),  intent(in)    :: sec
+    integer,         intent(in)    :: junit
+    real(kind=KRC),  intent(in)    :: refsec
+
+    real(kind=KRC)   :: td, te, tt, dur
+    type(calendar_t) :: cal
+
+    if      (junit .eq. iunit_SC)  then
+       r = sec
+    else if (junit .eq. iunit_MI) then
+       r = sec / xreal(inq_nsec_minute (self))
+    else if (junit .eq. iunit_HR)  then
+       r = sec / xreal(inq_nsec_hour (self))
+    else if (junit .eq. iunit_DY)  then
+       r = sec / xreal(inq_nsec_day (self))
+    else if (junit .eq. iunit_MO)  then
+       r = 0.0_KRC
+       te = refsec + sec
+       cal = conv_csec_calendar(self, refsec)
+       td = refsec
+       do
+          cal%d%m = cal%d%m + 1
+          tt = conv_calendar_csec(self, cal, tt)
+          write(*, *) te, r, tt, td, te - td, cal%d, cal%t
+          if (tt.gt.te) exit
+          r = r + 1.0_KRC
+          td = tt
+       enddo
+       if (te.gt.td) then
+          dur = conv_duration_sec(self, 1.0_KRC, junit, td)
+          r = r + (te - td) / dur
+       endif
+    else if (junit .eq. iunit_YR)  then
+       r = 0.0_KRC
+       te = refsec + sec
+       cal = conv_csec_calendar(self, refsec)
+       td = refsec
+       do
+          cal%d%y = cal%d%y + 1
+          tt = conv_calendar_csec(self, cal, tt)
+          if (tt.gt.te) exit
+          r = r + 1.0_KRC
+          td = tt
+       enddo
+       if (te.gt.td) then
+          dur = conv_duration_sec(self, 1.0_KRC, junit, td)
+          r = r + (te - td) / dur
+       endif
+    else
+       r = sec
+    endif
+    return
+  end function conv_sec_jduration_test
+#endif /* reserved */
+
 !!!_  & conv_string_calendar () - parse calendar[D,T] from string
   type(calendar_t) function conv_string_calendar &
        & (str) &
@@ -975,32 +1093,32 @@ contains
 
 !!!_  & advance_csec() - get calendar[sec] advanced by duration[unit] since calendar[sec]
   real(kind=KRC) function advanceu_csec_c &
-       & (self, dur, unit, refsec, xk) &
+       & (self, dur, unit, refsec, mold) &
        & result (r)
     implicit none
     type(cal_attr_t),intent(inout) :: self
     real(kind=KRC),  intent(in)    :: dur
     real(kind=KRC),  intent(in)    :: refsec
     character(len=*),intent(in)    :: unit
-    real(kind=KRC),  intent(in)    :: xk ! dummy
+    real(kind=KRC),  intent(in)    :: mold ! dummy
 
     character (len=10) :: unit_buf
     integer ju
     unit_buf = unit
     ju = parse_unit(unit_buf)
-    r = advancej_csec_c(self, dur, ju, refsec, xk)
+    r = advancej_csec_c(self, dur, ju, refsec, mold)
     return
   end function advanceu_csec_c
 
   real(kind=KRC) function advancej_csec_c &
-       & (self, dur, junit, refsec, xk) &
+       & (self, dur, junit, refsec, mold) &
        & result (r)
     implicit none
     type(cal_attr_t),intent(inout) :: self
     real(kind=KRC),  intent(in)    :: dur
     real(kind=KRC),  intent(in)    :: refsec
     integer,         intent(in)    :: junit
-    real(kind=KRC),  intent(in)    :: xk ! dummy
+    real(kind=KRC),  intent(in)    :: mold ! dummy
 
     real(kind=KRC) :: step
     type(cal_daysec_t) :: ds
@@ -1015,7 +1133,7 @@ contains
           cd % m = cd % m + int (dur)
        endif
        ds % d = conv_date_cday(self, cd, ds%d)
-       r = conv_cdaysec_csec(self, ds, cd, xk)
+       r = conv_cdaysec_csec(self, ds, cd, mold)
     else
        step = conv_duration_sec (self, dur, junit, refsec)
        r = refsec + step
