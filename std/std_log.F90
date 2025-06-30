@@ -1,7 +1,7 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2025/06/11 07:08:18 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/06/29 16:38:18 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -95,6 +95,7 @@ module TOUZA_Std_log
 !!!_  - public
   public init, diag, finalize
   public get_logu,   set_defu
+  public is_unit_star
   public msg,  msg_grp, msg_mdl, msg_fun
   public gen_tag
   public is_msglev
@@ -938,6 +939,13 @@ contains
     call pset_defu(default_unit)
     return
   end subroutine set_defu
+
+!!!_  & is_unit_star() - check if i/o unit corresponds to star
+  logical function is_unit_star(u) result(b)
+    implicit none
+    integer,intent(in) :: u
+    b = u .eq. unit_star
+  end function is_unit_star
 
 !!!_  & is_error_match () - check if error-code matches
   logical function is_error_match &
