@@ -570,10 +570,18 @@ contains
     integer,         intent(out)         :: mbits,  xbits, xbtm
     real(kind=KRFLD),intent(in)          :: refmax, refmin
     real(kind=KRFLD),intent(in),optional :: res
-    integer,parameter :: ixone = exponent(1.0_KRFLD)
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+    integer,parameter :: ixone = EXPONENT(1.0_KRFLD)
+#else
+    integer :: ixone
+#endif
 
     integer ixh, ixl, ixr
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(1.0_KRFLD)
+#endif
     ixh = exponent(refmax) - ixone
     ixl = exponent(refmin) - ixone
     ! write(*,*) 'helper input', ixh, ixl, ixone
@@ -601,10 +609,17 @@ contains
     integer,         intent(out)         :: mbits,  xbits, xbtm
     real(kind=KRFLD),intent(in)          :: refmax, refmin
     real(kind=KRFLD),intent(in),optional :: res
-    integer,parameter :: ixone = exponent(1.0_KRFLD)
-
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+    integer,parameter :: ixone = EXPONENT(1.0_KRFLD)
+#else
+    integer :: ixone
+#endif
     integer ixh, ixl, ixr
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(1.0_KRFLD)
+#endif
     ixh = exponent(refmax) - ixone
     ixl = exponent(refmin) - ixone
 
@@ -755,7 +770,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
     integer,parameter :: kxspc = kxmax + 1
@@ -781,6 +800,10 @@ contains
 
     ierr = 0
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
     xbi = xbits
     jwx = 0
     jwh = jwx + mem
@@ -948,7 +971,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
     integer,parameter :: kxspc = kxmax + 1
@@ -971,6 +998,11 @@ contains
     integer kpackx, kpackh, kpackl
 
     ierr = 0
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     xbi = xbits
     jwx = 0
@@ -1310,7 +1342,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1326,6 +1362,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = lbgz - 1
     nbitsl = max(0, mbits - nbitsh)
@@ -1448,7 +1488,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1464,6 +1508,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = mbits
     nbitsl = 0
@@ -1559,7 +1607,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1575,6 +1627,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = mbits
     nbitsl = 0
@@ -1677,7 +1733,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1693,6 +1753,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = lbgz - 1
     nbitsl = max(0, mbits - nbitsh)
@@ -1798,7 +1862,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1814,6 +1882,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = mbits
     nbitsl = 0
@@ -1911,7 +1983,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1927,6 +2003,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = mbits
     nbitsl = 0
@@ -2711,7 +2791,11 @@ contains
     real(kind=KRFLD),   parameter :: one   = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: zero  = 0.0_KRFLD
     integer(kind=KIBGZ),parameter :: kstkh = 0_KIBGZ
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,            parameter :: ixone = EXPONENT(one)
+#else
+    integer :: ixone
+#endif
 
     integer,parameter :: lbgz = BIT_SIZE(kstkh)
     integer,parameter :: lfrc = DIGITS(zero) - 1
@@ -2745,6 +2829,11 @@ contains
 
     ierr = 0
     vu = choice(-HUGE(vu), vskp)
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(one)
+#endif
 
     if (ierr.eq.0) call retrieve_basics(ierr, ibagaz, ixdnm, ixlbd, ixubd, ncnz, nbgz)
     if (ierr.eq.0) then
@@ -2983,7 +3072,11 @@ contains
     real(kind=KRFLD),   parameter :: one   = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: zero  = 0.0_KRFLD
     integer(kind=KIBGZ),parameter :: kstkh = 0_KIBGZ
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,            parameter :: ixone = EXPONENT(one)
+#else
+    integer :: ixone
+#endif
 
     integer,parameter :: lbgz = BIT_SIZE(kstkh)
     integer,parameter :: lfrc = DIGITS(zero) - 1
@@ -3018,6 +3111,11 @@ contains
 
     ierr = 0
     vu = choice(-HUGE(vu), vskp)
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(one)
+#endif
 
     if (ierr.eq.0) call retrieve_basics(ierr, ibagaz, ixdnm, ixlbd, ixubd, ncnz, nbgz)
     if (ierr.eq.0) then
@@ -3301,9 +3399,18 @@ contains
     real(kind=KRFLD),parameter :: one =  1.0_KRFLD
     real(kind=KRFLD),parameter :: sn  = -1.0_KRFLD
     real(kind=KRFLD) :: vpos
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: ixone = exponent(one)
+#else
+    integer :: ixone
+#endif
     integer jw
     integer ixd
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(one)
+#endif
 
     select case (kschm)
 #   if HAVE_FORTRAN_IEEE_ARITHMETIC
@@ -3368,9 +3475,18 @@ contains
     real(kind=KRFLD),parameter :: one =  1.0_KRFLD
     real(kind=KRFLD),parameter :: sn  = -1.0_KRFLD
     real(kind=KRFLD) :: vpos
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: ixone = exponent(one)
+#else
+    integer :: ixone
+#endif
     integer jw
     integer ixd
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(one)
+#endif
 
     select case (kschm)
 #   if HAVE_FORTRAN_IEEE_ARITHMETIC
@@ -3670,7 +3786,11 @@ contains
     real(kind=KRFLD),parameter :: vone = 1.0_KRFLD
     real(kind=KRFLD),parameter :: vfil = +HUGE(vone)
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: ixone = exponent(vone)
+#else
+    integer :: ixone
+#endif
     integer,parameter :: ml = minexponent(vone)
     integer,parameter :: mh = maxexponent(vone)
     character(len=2) :: tpackx, tpackh, tpackl
@@ -3682,6 +3802,12 @@ contains
 
     ierr = 0
     utmp = choice(-1, u)
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(vone)
+#endif
+
 101 format('bgz:', I0)
 102 format('bgz/', I0)
 111 format(A, ':', I0)
@@ -4329,7 +4455,11 @@ contains
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
 
-    integer,         parameter :: kxone = exponent(1.0_KRTGT)
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+    integer,         parameter :: kxone = EXPONENT(1.0_KRTGT)
+#else
+    integer :: kxone
+#endif
     real(kind=KRTGT),parameter :: zero  = 0.0_KRTGT
 
     integer nt
@@ -4339,6 +4469,11 @@ contains
 
     ierr = 0
     utmp = choice(-1, u)
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(1.0_KRTGT)
+#endif
+
     call choice_a(ti, 'cmp', tag)
 
 101 format(A, ':', I0)
@@ -4368,7 +4503,11 @@ contains
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,         parameter :: kxone = exponent(1.0_KRTGT)
+#else
+    integer :: kxone
+#endif
     real(kind=KRTGT),parameter :: zero  = 0.0_KRTGT
 
     integer nt
@@ -4382,6 +4521,12 @@ contains
 
     ierr = 0
     utmp = choice(-1, u)
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = exponent(1.0_KRTGT)
+#endif
+
     call choice_a(ti, ' ', tag)
     call choice_a(fi, ' ', fmt)
     if (ti.eq.' ') ti = 'cmp'
@@ -4469,11 +4614,19 @@ program test_trapiche_float
   integer jx
 
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
   integer,parameter :: kxone = exponent(vone)
+#else
+  integer :: kxone
+#endif
   integer,parameter :: kxmin = minexponent(vone)
   integer,parameter :: kxmax = maxexponent(vone)
 
   ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+  kxone = exponent(vone)
+#endif
 
 101 format(A, ' = ', I0)
 
@@ -4579,7 +4732,11 @@ contains
 
     real(kind=KRFLD),parameter :: vzero = 0.0_KRFLD
     real(kind=KRFLD),parameter :: vone = 1.0_KRFLD
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = exponent(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = minexponent(vone)
     integer,parameter :: kxmax = maxexponent(vone)
     integer,parameter :: lfrd = DIGITS(vone) - 1
@@ -4602,6 +4759,10 @@ contains
     integer :: j,  jj
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = exponent(vone)
+#endif
 
     do j = 1, lfrd
        FR010(j) = vone + set_exponent(vone, kxone-j)

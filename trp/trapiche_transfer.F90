@@ -1,7 +1,7 @@
 !!!_! trapiche_transfer.F90 - TOUZA/Trapiche(trapiche) communication
 ! Maintainer: SAITO Fuyuki
 ! Created: May 21 2022
-#define TIME_STAMP 'Time-stamp: <2024/08/13 20:14:23 fuyuki trapiche_transfer.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 14:14:25 fuyuki trapiche_transfer.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -477,7 +477,11 @@ contains
     real(kind=KDBL),parameter :: BASE = RADIX(ZERO)
 
     integer,parameter :: lfrd = DIGITS(ONE) - 1
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = exponent(ONE)
+#else
+    integer :: kxone
+#endif
 
     real(kind=KDBL) :: FR111    ! 1.111
     real(kind=KDBL) :: FR110    ! 1.110
@@ -491,6 +495,10 @@ contains
     integer kx
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(ONE)
+#endif
     FR111 = FRACTION(HUGE(ZERO))
     FR000 = FRACTION(ONE)
     FR100 = FR000 + FR000 / BASE
