@@ -7827,6 +7827,7 @@ contains
   end subroutine batch_test_symm
 
   subroutine test_symm(ierr, xl, dx, mx, yl, dy, my)
+    use TOUZA_Std_utl,only: backslash
     implicit none
     integer,intent(out) :: ierr
 
@@ -7858,7 +7859,7 @@ contains
        s(3:3) = '-'
     endif
     if (IBITS(k, 3, 1).eq.1) then
-       s(4:4) = '\'
+       s(4:4) = backslash
     else
        s(4:4) = '-'
     endif
