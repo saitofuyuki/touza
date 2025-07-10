@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:14:36 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 12:43:14 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -3459,9 +3459,11 @@ contains
   end function xuint_f
 
 !!!_  & xureal - unsigned integer conversion emulation
-  ELEMENTAL real(kind=KDBL) function xureal_d(n, mold) result(r)
+  ELEMENTAL &
+  function xureal_d(n, mold) result(r)
     implicit none
     integer,parameter :: KRTGT=KDBL
+    real(kind=KRTGT) :: r
     integer,         intent(in) :: n
     real(kind=KRTGT),intent(in) :: mold
     real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
@@ -3470,9 +3472,11 @@ contains
     r = mod(real(n, kind=KIND(mold)) + d, d)
     return
   end function xureal_d
-  ELEMENTAL real(kind=KFLT) function xureal_f(n, mold) result(r)
+  ELEMENTAL &
+  function xureal_f(n, mold) result(r)
     implicit none
     integer,parameter :: KRTGT=KFLT
+    real(kind=KRTGT) :: r
     integer,         intent(in) :: n
     real(kind=KRTGT),intent(in) :: mold
     real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
@@ -3520,11 +3524,12 @@ contains
 
 !!!_  & zspecial ()
   ELEMENTAL &
-       real(kind=KRTGT) function zspecial_d &
+  function zspecial_d &
        & (i, nh, kh, mh, nl, kl, ml, one, ixone) &
        & result(v)
     use TOUZA_Trp_std,only: KRTGT=>KDBL
     implicit none
+    real(kind=KRTGT) :: v
     integer,parameter :: KIBGZ=KI32
     integer(kind=KIBGZ),intent(in) :: i
     integer(kind=KIBGZ),intent(in) :: nh, kh, mh
@@ -3558,11 +3563,12 @@ contains
     return
   end function zspecial_d
   ELEMENTAL &
-       real(kind=KRTGT) function zspecial_f &
+  function zspecial_f &
        & (i, nh, kh, mh, nl, kl, ml, one, ixone) &
        & result(v)
     use TOUZA_Trp_std,only: KRTGT=>KFLT
     implicit none
+    real(kind=KRTGT) :: v
     integer,parameter :: KIBGZ=KI32
     integer(kind=KIBGZ),intent(in) :: i
     integer(kind=KIBGZ),intent(in) :: nh, kh, mh
@@ -4269,10 +4275,12 @@ contains
 
 !!!_  & XSETSX() - set_exponent alternates for SX system
 #if OPT_TRAPICHE_SX_SPECIALS
-  elemental real(kind=KRTGT) function XSETSX_d(X, I) &
+  ELEMENTAL &
+  function XSETSX_d(X, I) &
        & result(Y)
     use TOUZA_Trp_std,only: KRTGT=>KDBL
     implicit none
+    real(kind=KRTGT) :: Y
     real(kind=KRTGT),intent(in) :: X
     integer,         intent(in) :: I
     integer,parameter :: MH = MAXEXPONENT(0.0_KRTGT)
@@ -4287,10 +4295,12 @@ contains
     ! Y = AMT(X) * EXP2(REAL(I, KIND=KRTGT))
     return
   end function XSETSX_d
-  elemental real(kind=KRTGT) function XSETSX_f(X, I) &
+  ELEMENTAL &
+  function XSETSX_f(X, I) &
        & result(Y)
     use TOUZA_Trp_std,only: KRTGT=>KFLT
     implicit none
+    real(kind=KRTGT) :: Y
     real(kind=KRTGT),intent(in) :: X
     integer,         intent(in) :: I
     integer,parameter :: MH = MAXEXPONENT(0.0_KRTGT)

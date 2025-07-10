@@ -1,7 +1,7 @@
 !!!_! std_ipc.F90 - touza/std intrinsic procedures compatible gallery
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 25 2023
-#define TIME_STAMP 'Time-stamp: <2025/06/19 11:46:36 fuyuki std_ipc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 12:07:17 fuyuki std_ipc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023-2025
@@ -225,18 +225,20 @@ contains
   ! This feature originates from the design of IBITS() in GCC.
 !!!_  - ipc_IBITS(I, POS, LEN)
   ELEMENTAL &
-  integer(kind=KTGT) function ipc_IBITS_i(I, POS, LEN) result(n)
+  function ipc_IBITS_i(I, POS, LEN) result(n)
     use TOUZA_Std_prc,only: KTGT=>KI32
     implicit none
+    integer(kind=KTGT) :: n
     integer(kind=KTGT),intent(in) :: I
     integer,           intent(in) :: POS, LEN
     integer(kind=KTGT),parameter  :: FB = -1_KTGT
     n = IAND(ISHFT(I, - POS), NOT(ISHFT(FB, LEN)))
   end function ipc_IBITS_i
   ELEMENTAL &
-  integer(kind=KTGT) function ipc_IBITS_l(I, POS, LEN) result(n)
+  function ipc_IBITS_l(I, POS, LEN) result(n)
     use TOUZA_Std_prc,only: KTGT=>KI64
     implicit none
+    integer(kind=KTGT) :: n
     integer(kind=KTGT),intent(in) :: I
     integer,           intent(in) :: POS, LEN
     integer(kind=KTGT),parameter  :: FB = -1_KTGT
@@ -354,9 +356,10 @@ contains
   ! Moler and Morrison algorithm
 !!!_  - ipc_HYPOT
   ELEMENTAL &
-  real(kind=KTGT) function ipc_HYPOT_f(X, Y) result(r)
+  function ipc_HYPOT_f(X, Y) result(r)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: X, Y
     real(kind=KTGT) :: a, b
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
@@ -381,9 +384,10 @@ contains
     return
   end function ipc_HYPOT_f
   ELEMENTAL &
-  real(kind=KTGT) function ipc_HYPOT_d(X, Y) result(r)
+  function ipc_HYPOT_d(X, Y) result(r)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: X, Y
     real(kind=KTGT) :: a, b
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
@@ -410,18 +414,21 @@ contains
 !!!_ + Inverse hyperbolic functions (Fortran 2008)
 !!!_  - ipc_ASINH
   ELEMENTAL &
-  real(kind=KTGT) function ipc_ASINH_f(X) result(r)
+  function ipc_ASINH_f(X) result(r)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: X
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
 
     r = LOG(X + ipc_HYPOT(ONE, X))
     return
   end function ipc_ASINH_f
-  real(kind=KTGT) function ipc_ASINH_d(X) result(r)
+  ELEMENTAL &
+  function ipc_ASINH_d(X) result(r)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: X
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
 
@@ -431,18 +438,21 @@ contains
 
 !!!_  - ipc_ACOSH
   ELEMENTAL &
-  real(kind=KTGT) function ipc_ACOSH_f(X) result(r)
+  function ipc_ACOSH_f(X) result(r)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: X
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
 
     r = LOG(X + SQRT((X - ONE) * (X + ONE)))
     return
   end function ipc_ACOSH_f
-  real(kind=KTGT) function ipc_ACOSH_d(X) result(r)
+  ELEMENTAL &
+  function ipc_ACOSH_d(X) result(r)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: X
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
 
@@ -452,9 +462,10 @@ contains
 
 !!!_  - ipc_ATANH
   ELEMENTAL &
-  real(kind=KTGT) function ipc_ATANH_f(X) result(r)
+  function ipc_ATANH_f(X) result(r)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: X
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT),parameter :: TWO = 2.0_KTGT
@@ -462,9 +473,11 @@ contains
     r = LOG((ONE + X) / (ONE - X)) / TWO
     return
   end function ipc_ATANH_f
-  real(kind=KTGT) function ipc_ATANH_d(X) result(r)
+  ELEMENTAL &
+  function ipc_ATANH_d(X) result(r)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: X
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
     real(kind=KTGT),parameter :: TWO = 2.0_KTGT
@@ -509,13 +522,13 @@ contains
 !!!_ + chdir
   subroutine ipc_CHDIR(PATH, status, flag)
 #if   HAVE_FORTRAN_F90_UNIX_DIR_CHDIR
-#   define _PCASE 1  /* subroutine */    
+#   define _PCASE 1  /* subroutine */
     use F90_UNIX_DIR,only: CHDIR
 #elif HAVE_FORTRAN_IFPORT_CHDIR
-#   define _PCASE 2  /* function */    
+#   define _PCASE 2  /* function */
     use IFPORT,only: CHDIR
 #elif HAVE_FORTRAN_CHDIR
-#   define _PCASE 1  /* subroutine */    
+#   define _PCASE 1  /* subroutine */
 #else
 #   define _PCASE 0
 #endif
@@ -540,13 +553,13 @@ contains
 !!!_ + getcwd
   subroutine ipc_GETCWD(PATH, status, flag)
 #if   HAVE_FORTRAN_F90_UNIX_DIR_GETCWD
-#   define _PCASE 1  /* subroutine */    
+#   define _PCASE 1  /* subroutine */
     use F90_UNIX_DIR,only: GETCWD
 #elif HAVE_FORTRAN_IFPORT_GETCWD
-#   define _PCASE 2  /* function */    
+#   define _PCASE 2  /* function */
     use IFPORT,only: GETCWD
 #elif HAVE_FORTRAN_GETCWD
-#   define _PCASE 1  /* subroutine */    
+#   define _PCASE 1  /* subroutine */
 #else
 #   define _PCASE 0
 #endif
@@ -731,7 +744,7 @@ contains
     write(*, 101) ierr, trim(path1)
 
   end subroutine test_dir
-  
+
 end program test_std_ipc
 
 #endif /* TEST_STD_IPC */

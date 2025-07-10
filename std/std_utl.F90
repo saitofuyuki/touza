@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2025/05/23 08:35:21 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 12:20:35 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -324,8 +324,10 @@ contains
   end subroutine set_defu
 
 !!!_  & choice() - return D if not present A, otherwise A
-  _CHOICE_DECL integer function choice_i(d, a) result(r)
+  _CHOICE_DECL &
+  function choice_i(d, a) result(r)
     implicit none
+    integer :: r
     integer,intent(in)          :: d
     integer,intent(in),optional :: a
     if (present(a)) then
@@ -336,9 +338,11 @@ contains
     return
   end function choice_i
 
-  _CHOICE_DECL integer(kind=KTGT) function choice_l(d, a) result(r)
+  _CHOICE_DECL &
+  function choice_l(d, a) result(r)
     use TOUZA_Std_prc,only: KTGT=>KI64
     implicit none
+    integer(kind=KTGT) :: r
 !!!_   . note ifort cannot compile with the following declaration
     ! integer,parameter :: KTGT=kind(r)
 !!!_   . body
@@ -352,8 +356,10 @@ contains
     return
   end function choice_l
 
-  _CHOICE_DECL logical function choice_b(d, a) result(r)
+  _CHOICE_DECL &
+  function choice_b(d, a) result(r)
     implicit none
+    logical :: r
     logical,intent(in)          :: d
     logical,intent(in),optional :: a
     if (present(a)) then
@@ -364,9 +370,11 @@ contains
     return
   end function choice_b
 
-  _CHOICE_DECL real(kind=KTGT) function choice_f(d, a) result(r)
+  _CHOICE_DECL &
+  function choice_f(d, a) result(r)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in)          :: d
     real(kind=KTGT),intent(in),optional :: a
     if (present(a)) then
@@ -377,9 +385,11 @@ contains
     return
   end function choice_f
 
-  _CHOICE_DECL real(kind=KTGT) function choice_d(d, a) result(r)
+  _CHOICE_DECL &
+  function choice_d(d, a) result(r)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in)          :: d
     real(kind=KTGT),intent(in),optional :: a
     if (present(a)) then
@@ -390,9 +400,11 @@ contains
     return
   end function choice_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
-  _CHOICE_DECL real(kind=KTGT) function choice_q(d, a) result(r)
+  _CHOICE_DECL &
+  function choice_q(d, a) result(r)
     use TOUZA_Std_prc,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in)          :: d
     real(kind=KTGT),intent(in),optional :: a
     if (present(a)) then
@@ -570,8 +582,10 @@ contains
   end subroutine set_if_present_a
 
 !!!_  & condrep() - conditional replace operator
-  _CONDREP_DECL integer function condrep_i (v, src, rep) result(r)
+  _CONDREP_DECL &
+  function condrep_i (v, src, rep) result(r)
     implicit none
+    integer :: r
     integer,intent(in) :: v
     integer,intent(in) :: src, rep
     if (v.eq.src) then
@@ -581,9 +595,11 @@ contains
     endif
     return
   end function condrep_i
-  _CONDREP_DECL real(kind=KTGT) function condrep_f (v, src, rep) result(r)
+  _CONDREP_DECL &
+  function condrep_f (v, src, rep) result(r)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: v
     real(kind=KTGT),intent(in) :: src, rep
     if (v.eq.src) then
@@ -593,9 +609,11 @@ contains
     endif
     return
   end function condrep_f
-  _CONDREP_DECL real(kind=KTGT) function condrep_d (v, src, rep) result(r)
+  _CONDREP_DECL &
+  function condrep_d (v, src, rep) result(r)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: v
     real(kind=KTGT),intent(in) :: src, rep
     if (v.eq.src) then
@@ -607,8 +625,10 @@ contains
   end function condrep_d
 
 !!!_  & condop() - conditional operator
-  _CONDOP_DECL integer function condop_i (l, vt, vf) result(r)
+  _CONDOP_DECL &
+  function condop_i (l, vt, vf) result(r)
     implicit none
+    integer :: r
     logical,intent(in) :: l
     integer,intent(in) :: vt, vf
     if (l) then
@@ -619,9 +639,11 @@ contains
     return
   end function condop_i
 
-  _CONDOP_DECL real(kind=KTGT) function condop_f (l, vt, vf) result(r)
+  _CONDOP_DECL &
+  function condop_f (l, vt, vf) result(r)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
+    real(kind=KTGT) :: r
     logical,        intent(in) :: l
     real(kind=KTGT),intent(in) :: vt, vf
     if (l) then
@@ -632,9 +654,11 @@ contains
     return
   end function condop_f
 
-  _CONDOP_DECL real(kind=KTGT) function condop_d (l, vt, vf) result(r)
+  _CONDOP_DECL &
+  function condop_d (l, vt, vf) result(r)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     logical,        intent(in) :: l
     real(kind=KTGT),intent(in) :: vt, vf
     if (l) then
@@ -645,8 +669,10 @@ contains
     return
   end function condop_d
 
-  _CONDOP_DECL logical function condop_l (l, vt, vf) result(r)
+  _CONDOP_DECL &
+  function condop_l (l, vt, vf) result(r)
     implicit none
+    logical :: r
     logical,intent(in) :: l
     logical,intent(in) :: vt, vf
     if (l) then

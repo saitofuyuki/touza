@@ -1,7 +1,7 @@
 !!!_! ami_table.F90 - TOUZA/Ami/table amida-coupler table procedures
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/02/14 08:36:58 fuyuki ami_table.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 12:52:47 fuyuki ami_table.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024
@@ -1490,10 +1490,11 @@ contains
   end subroutine octant_wedge_lonseq_d
 
 ! !!!_   . octant_normalize_lon ()
-  real(kind=KTGT) function octant_normalize_lon_d(lon, cco, koct) result(v)
+  function octant_normalize_lon_d(lon, cco, koct) result(v)
     use TOUZA_Emu_ugg,only: psgp_inquire
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in)  :: lon
     real(kind=KTGT),intent(in)  :: cco(*)
     integer,        intent(in)  :: koct
@@ -2096,10 +2097,11 @@ contains
   end function get_octant_ndi_d
 
 !!!_    * octant_lon_d ()
-  real(kind=KTGT) function octant_lon_d(zone, cco, zofs, lorg) result(v)
+  function octant_lon_d(zone, cco, zofs, lorg) result(v)
     use TOUZA_Emu_ugg,only: deg2rad, psgp_inquire
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     integer,        intent(in) :: zone
     real(kind=KTGT),intent(in) :: cco(*)
     integer,        intent(in) :: zofs
@@ -2812,9 +2814,10 @@ contains
   end subroutine ps2g_store_fwd_d
 
 !!!_   & coeff2_line_integ
-  real(kind=KTGT) function coeff2_line_integ_d(s) result(v)
+  function coeff2_line_integ_d(s) result(v)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: s  ! sin(lat)
     real(kind=KTGT) :: c, la
 
@@ -2825,9 +2828,10 @@ contains
   end function coeff2_line_integ_d
 
 !!!_   & coeff3_line_integ
-  real(kind=KTGT) function coeff3_line_integ_d(s) result(v)
+  function coeff3_line_integ_d(s) result(v)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: s  ! sin(lat)
     real(kind=KTGT) :: c, la
 
@@ -3427,11 +3431,12 @@ contains
 
 !!!_   & segment_rel_sinlat() - set relative latitude within tiny rll segment
   PURE &
-    real(kind=KTGT) function segment_rel_sinlat_d &
+  function segment_rel_sinlat_d &
       & (slat, slat0, slat1, slat2, p1, p2, u) &
       &  result(r)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: slat           ! target sine latitude
     real(kind=KTGT),intent(in) :: slat0          ! reference sine latitude
     real(kind=KTGT),intent(in) :: slat1, slat2   ! segment boundary sine latitudes
@@ -3448,12 +3453,13 @@ contains
   end function segment_rel_sinlat_d
 
 !!!_   & segment_rel_lon() - set relative longitude within tiny rll segment
-  real(kind=KTGT) function segment_rel_lon_d &
+  function segment_rel_lon_d &
       & (lon, lon0, lon1, lon2, p1, p2, u) &
       &  result(r)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: hpsub_angle, sub_angle
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: lon(*)             ! target longitude
     real(kind=KTGT),intent(in) :: lon0(*)            ! reference longitude
     real(kind=KTGT),intent(in) :: lon1(*), lon2(*)   ! segment boundary longitude
@@ -4636,9 +4642,10 @@ contains
 
 !!!_   & set_tolerance()
   PURE &
-  real(kind=KTGT) function set_tolerance_d(tol) result(r)
+  function set_tolerance_d(tol) result(r)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: tol
 
     r = tol
@@ -5016,12 +5023,13 @@ contains
   end function anchor_pos
 
 !!!_   & parallel_dlongi ()
-  real(kind=KTGT) function parallel_dlongi_d &
+  function parallel_dlongi_d &
        & (dlon1, dlon2) &
        & result(v)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: hpsub_angle, sub_angle
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: dlon1(*)
     real(kind=KTGT),intent(in) :: dlon2(*)
     real(kind=KTGT) :: dlsc(2)
@@ -6944,12 +6952,13 @@ contains
 
   end subroutine sector_pattern_table
 !!!_   & sector_longitude_d ()
-  real(kind=KTGT) function sector_longitude_d &
+  function sector_longitude_d &
        & (jsect, msect, span, org, base, ref) &
        &  result(v)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu,only: span_longitude
     implicit none
+    real(kind=KTGT) :: v
     integer,        intent(in)          :: jsect   ! signle-id
     integer,        intent(in)          :: msect
     real(kind=KTGT),intent(in),optional :: span    ! one-cycle

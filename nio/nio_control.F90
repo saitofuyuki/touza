@@ -1,10 +1,10 @@
 !!!_! nio_control.F90 - TOUZA/Nio control center
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 12 2022
-#define TIME_STAMP 'Time-stamp: <2024/07/26 16:50:18 fuyuki nio_control.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 12:46:18 fuyuki nio_control.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023, 2024
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -472,8 +472,10 @@ contains
   end subroutine nio_search_d
 !!!_  - nio_time_repl
   PURE &
-  real(kind=KTGT) function nio_time_repl_d (v, rep) result (t)
+  function nio_time_repl_d (v, rep) result (t)
     use TOUZA_Nio_std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: t
     real(kind=KTGT),intent(in) :: v
     real(kind=KTGT),intent(in) :: rep
     t = v
@@ -482,8 +484,10 @@ contains
 
 !!!_  - nio_time_undef
   PURE &
-  real(kind=KTGT) function nio_time_undef_d (mold) result (t)
+  function nio_time_undef_d (mold) result (t)
     use TOUZA_Nio_std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: t
     real(kind=KTGT),intent(in) :: mold
     t = - HUGE(mold)
   end function nio_time_undef_d

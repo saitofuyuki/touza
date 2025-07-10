@@ -1,10 +1,10 @@
 !!!_! ami_utils.F90. - TOUZA/Ami/misc utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2022/12/23 12:17:34 fuyuki ami_utils.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 12:53:55 fuyuki ami_utils.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 !!!_* include
@@ -162,49 +162,55 @@ contains
 !!!_  - user procedures
 !!!_  - functions for Coupler/Exchanger/Mediator tables
 !!!_   & STOZ()
-  complex(kind=KTGT) function STOZ_d(LON, LAT) result(c)
+  function STOZ_d(LON, LAT) result(c)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    complex(kind=KTGT) :: c
     real(kind=KTGT),   intent(in) :: LON
     real(kind=KTGT),   intent(in) :: LAT
 
     c = TAN(PI * 0.25_KTGT - LAT * 0.5_KTGT) * EXP(LON * cuniti)
   end function STOZ_d
 !!!_   . ZTOLON()
-  real(kind=KTGT) function ZTOLON_d(Z) result(c)
+  function ZTOLON_d(Z) result(c)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: c
     complex(kind=KTGT),intent(in) :: Z
     c = ATAN2(AIMAG(Z), REAL(Z, kind=KTGT))      ! kind argument is redundant for complex
   end function ZTOLON_d
 !!!_   . ZTOLAT()
-  real(kind=KTGT) function ZTOLAT_d(Z) result(c)
+  function ZTOLAT_d(Z) result(c)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: c
     complex(kind=KTGT),intent(in) :: Z
     c = PI * 0.5_KTGT - 2.0_KTGT * ATAN(ABS(Z))
   end function ZTOLAT_d
 !!!_   . CONF()
-  complex(kind=KTGT) function CONF_d(Z, ZA, ZB, ZC, WC) result(c)
+  function CONF_d(Z, ZA, ZB, ZC, WC) result(c)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    complex(kind=KTGT) :: c
     complex(kind=KTGT),intent(in) :: Z, ZA, ZB, ZC, WC
     c = (- ZB * (ZC - ZA) * Z / WC + ZA * (ZC - ZB)) &
          &    / (- (ZC - ZA) * Z / WC + ZC - ZB)
   end function CONF_d
 
 !!!_   . RCONF()
-  complex(kind=KTGT) function RCONF_d(W, ZA, ZB, ZC, WC) result(c)
+  function RCONF_d(W, ZA, ZB, ZC, WC) result(c)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    complex(kind=KTGT) :: c
     complex(kind=KTGT),intent(in) :: W, ZA, ZB, ZC, WC
     c = (WC * (W - ZA) * (ZC - ZB)) / ((W - ZB) * (ZC - ZA))
   end function RCONF_d
 
 !!!_   . DCONF()
-  complex(kind=KTGT) function DCONF_d(Z, ZA, ZB, ZC, WC) result(c)
+  function DCONF_d(Z, ZA, ZB, ZC, WC) result(c)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    complex(kind=KTGT) :: c
     complex(kind=KTGT),intent(in) :: Z, ZA, ZB, ZC, WC
     c =    (ZC - ZA) * (ZC - ZB) * (ZA - ZB) / WC &
          & / (ZC - ZB - (ZC - ZA) * Z / WC) &
@@ -212,9 +218,10 @@ contains
   end function DCONF_d
 
 !!!_   . FMTRC()
-  real(kind=KTGT) function FMTRC_d(ZP, ZQ, ZA, ZB, ZC, WC) result(r)
+  function FMTRC_d(ZP, ZQ, ZA, ZB, ZC, WC) result(r)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     complex(kind=KTGT),intent(in) :: ZP, ZQ, ZA, ZB, ZC, WC
     r = (1.0_KTGT + ABS(ZQ) * ABS(ZQ)) * ABS(DCONF_d(ZQ, ZA, ZB, ZC, WC)) &
          & / (1.0_KTGT + ABS(ZP) * ABS(ZP))

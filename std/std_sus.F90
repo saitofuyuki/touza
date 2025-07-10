@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2025/05/23 09:05:31 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 12:13:57 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -6329,11 +6329,12 @@ contains
 !!!_ + private subroutines
 !!!_  & sus_eswap() - elemental
   ELEMENTAL &
-       integer(KIND=KI32) function sus_eswap_i(V) &
+  function sus_eswap_i(V) &
        & result(R)
     implicit none
     integer,parameter :: KARG=KI32
-    integer(KARG),intent(in) :: V
+    integer(KIND=KARG) :: R
+    integer(KIND=KARG),intent(in) :: V
     integer,parameter :: LTGT = BIT_SIZE(0_KARG)
     integer j
     R = IBITS(V, 0, LBU)
@@ -6343,11 +6344,12 @@ contains
   end function sus_eswap_i
 
   ELEMENTAL &
-       integer(KIND=KI64) function sus_eswap_l(V) &
+  function sus_eswap_l(V) &
        & result(R)
     implicit none
     integer,parameter :: KARG=KI64
-    integer(KARG),intent(in) :: V
+    integer(KIND=KARG) :: R
+    integer(KIND=KARG),intent(in) :: V
     integer,parameter :: LTGT = BIT_SIZE(0_KARG)
     integer j
     R = IBITS(V, 0, LBU)
@@ -6357,14 +6359,15 @@ contains
   end function sus_eswap_l
 !!!_  & sus_eswap_hl() - elemental (higher/lower bits independent swap)
   ELEMENTAL &
-       integer(KIND=KI64) function sus_eswap_hl(V) &
+  function sus_eswap_hl(V) &
        & result(R)
     implicit none
     integer,parameter :: KARG=KI64
-    integer(KARG),intent(in) :: V
+    integer(KIND=KARG) :: R
+    integer(KIND=KARG),intent(in) :: V
     integer,parameter :: LTGT = BIT_SIZE(0_KARG)
     integer,parameter :: NHF = LTGT / 2
-    integer(KARG) :: VH, VL
+    integer(KIND=KARG) :: VH, VL
     integer j
 
     VL = IBITS(V, 0, LBU)
@@ -6380,10 +6383,11 @@ contains
   end function sus_eswap_hl
 !!!_  & sus_swap() - swap expanded
   ELEMENTAL &
-       integer(KIND=KI32) function sus_swap_i(V) &
+  function sus_swap_i(V) &
        & result(R)
     implicit none
-    integer(kind=KI32),intent(in) :: V
+    integer(KIND=KI32) :: R
+    integer(KIND=KI32),intent(in) :: V
     R = IOR(IOR(ISHFT(IBITS(V, 0*LBU, LBU), 3*LBU),  &
          &      ISHFT(IBITS(V, 1*LBU, LBU), 2*LBU)), &
          &  IOR(ISHFT(IBITS(V, 2*LBU, LBU), 1*LBU),  &
@@ -6391,10 +6395,11 @@ contains
     return
   end function sus_swap_i
   ELEMENTAL &
-       integer(KIND=KI64) function sus_swap_l(V) &
+  function sus_swap_l(V) &
        & result(R)
     implicit none
-    integer(kind=KI64),intent(in) :: V
+    integer(KIND=KI64) :: R
+    integer(KIND=KI64),intent(in) :: V
     R = IOR(IOR(IOR(ISHFT(IBITS(V, LBU*0, LBU), LBU*7),   &
          &          ISHFT(IBITS(V, LBU*1, LBU), LBU*6)),  &
          &      IOR(ISHFT(IBITS(V, LBU*2, LBU), LBU*5),   &
@@ -6675,83 +6680,93 @@ contains
 
   end function is_irec_overflow_mix
 !!!_  & sus_size_irec - total record size in stream i/o unit
-  integer(kind=KMEM) function sus_size_irec_li (mold, n) result(l)
+  function sus_size_irec_li (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KI32, KMEM=>KI64, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     integer(kind=KTGT),intent(in) :: mold
     integer(kind=KMEM),intent(in) :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_li
-  integer(kind=KMEM) function sus_size_irec_ll (mold, n) result(l)
+  function sus_size_irec_ll (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KI64, KMEM=>KI64, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     integer(kind=KTGT),intent(in) :: mold
     integer(kind=KMEM),intent(in) :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_ll
-  integer(kind=KMEM) function sus_size_irec_lf (mold, n) result(l)
+  function sus_size_irec_lf (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KFLT, KMEM=>KI64, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     real(kind=KTGT),   intent(in) :: mold
     integer(kind=KMEM),intent(in) :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_lf
-  integer(kind=KMEM) function sus_size_irec_ld (mold, n) result(l)
+  function sus_size_irec_ld (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KDBL, KMEM=>KI64, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     real(kind=KTGT),   intent(in) :: mold
     integer(kind=KMEM),intent(in) :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_ld
-  integer(kind=KMEM) function sus_size_irec_la (mold, n) result(l)
+  function sus_size_irec_la (mold, n) result(l)
     use TOUZA_Std_prc,only: KMEM=>KI64, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     character(len=*),  intent(in) :: mold
     integer(kind=KMEM),intent(in) :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_la
 
-  integer(kind=KMEM) function sus_size_irec_i (mold, n) result(l)
+  function sus_size_irec_i (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KI32, KMEM=>KI32, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     integer(kind=KTGT),intent(in) :: mold
     integer(kind=KMEM),intent(in),optional :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_i
-  integer(kind=KMEM) function sus_size_irec_l (mold, n) result(l)
+  function sus_size_irec_l (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KI64, KMEM=>KI32, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     integer(kind=KTGT),intent(in) :: mold
     integer(kind=KMEM),intent(in),optional :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_l
-  integer(kind=KMEM) function sus_size_irec_f (mold, n) result(l)
+  function sus_size_irec_f (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KFLT, KMEM=>KI32, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     real(kind=KTGT),   intent(in) :: mold
     integer(kind=KMEM),intent(in),optional :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_f
-  integer(kind=KMEM) function sus_size_irec_d (mold, n) result(l)
+  function sus_size_irec_d (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KDBL, KMEM=>KI32, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     real(kind=KTGT),   intent(in) :: mold
     integer(kind=KMEM),intent(in),optional :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_d
-  integer(kind=KMEM) function sus_size_irec_a (mold, n) result(l)
+  function sus_size_irec_a (mold, n) result(l)
     use TOUZA_Std_prc,only: KMEM=>KI32, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     character(len=*),  intent(in) :: mold
     integer(kind=KMEM),intent(in),optional :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
