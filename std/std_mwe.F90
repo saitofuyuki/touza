@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/06/23 21:45:34 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/11 08:42:45 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -59,6 +59,9 @@ module TOUZA_Std_mwe
   integer,parameter :: MPI_CONGRUENT = 1
   integer,parameter :: MPI_SIMILAR = 2
   integer,parameter :: MPI_UNEQUAL = 3
+
+  integer,parameter :: MPI_MIN = -9990
+  integer,parameter :: MPI_MAX = -9991
 #endif /* not OPT_USE_MPI */
 !!!_  - static
 #define __MDL__ 'mwe'
@@ -89,14 +92,17 @@ module TOUZA_Std_mwe
   public MPI_DATATYPE_NULL, MPI_GROUP_NULL, MPI_UNDEFINED
   public MPI_STATUS_SIZE,   MPI_GROUP_EMPTY
   public MPI_INTEGER,       MPI_CHARACTER
+  public MPI_MIN,           MPI_MAX
   public MPI_ANY_TAG,       MPI_ANY_SOURCE
   public MPI_DOUBLE_PRECISION
   public MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
   public MPI_COMM_CREATE,   MPI_COMM_SPLIT, MPI_COMM_GROUP
+  public MPI_COMM_SIZE,     MPI_COMM_RANK
   public MPI_WAIT, MPI_BARRIER
   public MPI_PROBE, MPI_GET_COUNT
   public MPI_COMM_COMPARE, MPI_IDENT, MPI_CONGRUENT, MPI_SIMILAR, MPI_UNEQUAL
   public MPI_GROUP_COMPARE
+  public MPI_ABORT
 
 !!!_  - misc
   character(len=128) tmsg
@@ -441,7 +447,7 @@ contains
     endif
     return
   end subroutine get_gni
-!!!_  & get_wni
+!!!_  & get_wni - get properties of MPI_COMM_WORLD
   subroutine get_wni &
        & (ierr, nrank, irank, icomm)
     use TOUZA_Std_utl,only: choice, set_if_present
@@ -451,19 +457,24 @@ contains
     integer,intent(out),optional :: irank
     integer,intent(out),optional :: icomm
 
+#if OPT_USE_MPI
+    integer cw
+#endif
+
     ierr = err_default
 #if OPT_USE_MPI
     if (ierr.eq.0) then
        if (switch_mpi.eq.switch_enabled) then
+          cw = MPI_COMM_WORLD
           if (present(nrank)) then
              nrank = -1
-             if (ierr.eq.0) call MPI_Comm_size(MPI_COMM_WORLD, nrank, ierr)
+             if (ierr.eq.0) call MPI_Comm_size(cw, nrank, ierr)
           endif
           if (present(irank)) then
              irank = -1
-             if (ierr.eq.0) call MPI_Comm_rank(MPI_COMM_WORLD, irank, ierr)
+             if (ierr.eq.0) call MPI_Comm_rank(cw, irank, ierr)
           endif
-          call set_if_present(icomm, MPI_COMM_WORLD)
+          call set_if_present(icomm, cw)
        else
           call set_if_present(irank, -1)
           call set_if_present(nrank, -1)
@@ -481,7 +492,7 @@ contains
 #endif  /* not OPT_USE_MPI */
     return
   end subroutine get_wni
-!!!_  & get_wni_safe
+!!!_  & get_wni_safe - get properties of MPI_COMM_WORLD (safer)
   subroutine get_wni_safe &
        & (ierr, nrank, irank, icomm)
     use TOUZA_Std_utl,only: choice, set_if_present
@@ -518,9 +529,9 @@ contains
           b = .FALSE.
        endif
     endif
-#else
+#else /* not OPT_USE_MPI */
     b = .FALSE.
-#endif
+#endif /* not OPT_USE_MPI */
     return
   end function is_mpi_activated
 
@@ -588,7 +599,7 @@ contains
        endif
     endif
   end function comp_groups
-!!!_  & safe_mpi_init
+!!!_  & safe_mpi_init - safer MPI_Init
   subroutine safe_mpi_init(ierr)
     implicit none
     integer,intent(out) :: ierr
@@ -602,7 +613,7 @@ contains
     ierr = 0
 #endif
   end subroutine safe_mpi_init
-!!!_  & safe_mpi_finalize
+!!!_  & safe_mpi_finalize - safer MPI_Finalize
   subroutine safe_mpi_finalize(ierr)
     implicit none
     integer,intent(out) :: ierr
@@ -681,6 +692,7 @@ contains
     implicit none
     INTEGER   COMM, COLOR, KEY, NEWCOMM, IERROR
     IERROR = ERR_NOT_IMPLEMENTED
+    NEWCOMM = MPI_COMM_NULL
   end subroutine MPI_COMM_SPLIT
 
   subroutine MPI_COMM_GROUP &
@@ -689,6 +701,22 @@ contains
     INTEGER   COMM, GROUP, IERROR
     IERROR = ERR_NOT_IMPLEMENTED
   end subroutine MPI_COMM_GROUP
+
+  subroutine MPI_COMM_SIZE &
+       & (COMM, SIZE, IERROR)
+    implicit none
+    INTEGER COMM, SIZE, IERROR
+    SIZE = 0
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_COMM_SIZE
+
+  subroutine MPI_COMM_RANK &
+       & (COMM, RANK, IERROR)
+    implicit none
+    INTEGER COMM, RANK, IERROR
+    RANK = -1
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_COMM_RANK
 
   subroutine MPI_GROUP_SIZE &
        & (GROUP, SIZE, IERROR)
@@ -755,6 +783,13 @@ contains
     IERROR = ERR_NOT_IMPLEMENTED
   end subroutine MPI_GROUP_COMPARE
 
+  subroutine MPI_ABORT &
+       & (COMM, ERRORCODE, IERROR)
+    implicit none
+    INTEGER COMM, ERRORCODE, IERROR
+    IERROR = ERR_NOT_IMPLEMENTED
+  end subroutine MPI_ABORT
+
 #endif /* not OPT_USE_MPI */
 #if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
 #else
@@ -788,13 +823,14 @@ program test_std_mwe
   write(*, *) 'test = ', ktest
 
   icol = 0
+  icomm = MPI_COMM_NULL
 
   if (ktest.eq.0) then
      icomm = MPI_COMM_WORLD
   else if (ktest.lt.0) then
      icomm = MPI_COMM_NULL
   else
-     call MPI_Init(ierr)
+     call safe_mpi_init(ierr)
      ibase = MPI_COMM_WORLD
      if (ierr.eq.0) call MPI_Comm_size(ibase, nr, ierr)
      if (ierr.eq.0) call MPI_Comm_rank(ibase, ir, ierr)
