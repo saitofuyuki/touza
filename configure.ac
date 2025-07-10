@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/06/20 12:27:53 fuyuki configure.ac>
+# Time-stamp: <2025/07/10 21:50:56 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -43,6 +43,7 @@ AC_FC_MODULE_EXTENSION
 AC_FC_MODULE_FLAG
 AC_FC_MODULE_OUTPUT_FLAG([], [AC_MSG_WARN])
 AX_COMPILER_VENDOR
+AC_SUBST([FC_COMPILER_VENDOR], $ax_cv_fc_compiler_vendor)
 AC_LANG_POP([Fortran])
 
 AC_PROG_F77
