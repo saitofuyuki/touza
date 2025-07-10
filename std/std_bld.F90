@@ -4,7 +4,7 @@
 #define TIME_STAMP 'Time-stamp: <2024/02/25 22:12:23 fuyuki std_bld.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022,2023
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -174,6 +174,7 @@ contains
     if (ierr.eq.0) call check_gcc(ierr, ulog)
     if (ierr.eq.0) call check_nec(ierr, ulog)
     if (ierr.eq.0) call check_intel(ierr, ulog)
+    if (ierr.eq.0) call check_nvidia(ierr, ulog)
     return
   end subroutine check_all
 !!!_ + library
@@ -340,6 +341,35 @@ contains
 #endif /* not __INTEL_COMPILER__ */
     return
   end subroutine check_intel
+
+!!!_  & check_nvidia - nvidia build information
+  subroutine check_nvidia &
+       & (ierr, ulog)
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: ulog
+    ierr = 0
+#ifndef   __NVCOMPILER
+#  define __NVCOMPILER 0
+#endif
+#if __NVCOMPILER
+# ifndef __NVCOMPILER_MAJOR__
+# define __NVCOMPILER_MAJOR__ -1
+# endif
+# ifndef __NVCOMPILER_MINOR__
+# define __NVCOMPILER_MINOR__  -1
+# endif
+# ifndef __NVCOMPILER_PATCHLEVEL__
+# define __NVCOMPILER_PATCHLEVEL__  -1
+# endif
+    if (ierr.eq.0) call msg_macro(ierr, '__NVCOMPILER', __NVCOMPILER, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, '__NVCOMPILER_MAJOR__', __NVCOMPILER_MAJOR__, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, '__NVCOMPILER_MINOR__', __NVCOMPILER_MINOR__, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, '__NVCOMPILER_PATCHLEVEL__', __NVCOMPILER_PATCHLEVEL__, ulog)
+#else /* not __NVCOMPILER */
+    if (ierr.eq.0) call msg_macro(ierr, '__NVCOMPILER', ' ', ulog)
+#endif /* not __NVCOMPILER */
+    return
+  end subroutine check_nvidia
 
 !!!_ + utilities
   subroutine msg_macro_i &
