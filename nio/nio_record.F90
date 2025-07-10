@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:25:31 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 12:48:42 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -9967,7 +9967,7 @@ contains
 
     return
   end function parse_header_size_n
-  integer(kind=KI32) function parse_header_size_i &
+  function parse_header_size_i &
        & (head, kidx, lazy, mold) &
        & result (n)
     use TOUZA_Nio_std,only: choice
@@ -9976,10 +9976,11 @@ contains
          & hi_AEND1, hi_AEND2, hi_AEND3
     implicit none
     integer,parameter :: KARG=KI32
+    integer(KIND=KARG) :: n
     character(len=*),  intent(in)  :: head(*)
     integer,           intent(in)  :: kidx
     integer,optional,  intent(in)  :: lazy
-    integer(kind=KARG),intent(in)  :: mold
+    integer(KIND=KARG),intent(in)  :: mold
     integer kaxs(laxs)
     integer lz
     lz = choice(def_lazy_size, lazy) + (0 * mold)
