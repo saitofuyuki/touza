@@ -1,7 +1,7 @@
 !!!_! test_calendar.F90 - touza/calendar test program
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 28 2012
-#define TIME_STAMP 'Time-stamp: <2025/06/27 17:24:49 fuyuki test_calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 12:25:08 fuyuki test_calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -650,12 +650,13 @@ end subroutine test_PERIOD_ss
 !!!_* compatible minimum procedures
 #ifdef OPT_USE_BASE_UCALN
 !!!_ & dgaus()
-real(kind=OPT_KIND_REAL) function dgaus &
+function dgaus &
      & (DX) &
      result (r)
   use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
+  real(kind=KRC) :: r
   real(kind=KRC),intent(in) :: dx
   r = AINT (dx) + AINT (dx - AINT (dx) + 1.E0_KRC) - 1.E0_KRC
   return
