@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/09 12:43:48 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/11 08:22:25 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -1100,8 +1100,9 @@ contains
 !     use MPI,only: MPI_Comm_split
 ! #endif /* OPT_USE_MPI */
     use TOUZA_Ppp_std,only: MPI_INTEGER
+    use TOUZA_Ppp_std,only: MPI_MAX, MPI_MIN
 #  if HAVE_FORTRAN_MPI_MPI_BCAST
-    use MPI,only: MPI_Bcast, MPI_Reduce, MPI_MAX, MPI_MIN
+    use MPI,only: MPI_Bcast, MPI_Reduce
 #  endif
     use TOUZA_Ppp_std,only: get_ni, choice, msg
     implicit none
@@ -1146,6 +1147,7 @@ contains
           aname = ' '
        endif
     endif
+#if OPT_USE_MPI
     if (ierr.eq.0) then
        call MPI_Reduce &
             & (color, cbuf(1), 1, MPI_INTEGER, MPI_MIN, iroot, icsrc, ierr)
@@ -1157,6 +1159,11 @@ contains
     if (ierr.eq.0) then
        call MPI_Bcast(cbuf, 2, MPI_INTEGER, iroot, icsrc, ierr)
     endif
+#else /* not OPT_USE_MPI */
+    if (ierr.eq.0) then
+       cbuf(:) = color
+    endif
+#endif /* not OPT_USE_MPI */
     if (ierr.eq.0) then
        ncol = cbuf(2) - cbuf(1) + 1
        icol = color - cbuf(1)
@@ -2099,7 +2106,9 @@ contains
             & (drcv(1:nrcv), (nrcv * lagent), MPI_CHARACTER, &
             &  ipsrc, ktag,  icomm, istts, ierr)
     endif
-#endif /* OPT_USE_MPI */
+#else /* not OPT_USE_MPI */
+    nrcv = 0
+#endif /* not OPT_USE_MPI */
     if (ierr.eq.0) then
        ! merge
        urcv(1:nrcv) = urcv(1:nrcv) + mold
@@ -2307,7 +2316,9 @@ contains
             & (drcv(0:nrcv-1), (nrcv * lagent), MPI_CHARACTER, &
             &  ipsrc, ktag,  icomm, istts, ierr)
     endif
-#endif /* OPT_USE_MPI */
+#else /* not OPT_USE_MPI */
+    nrcv = 0
+#endif /* not OPT_USE_MPI */
     if (ierr.eq.0) then
        ! write(*, *) 'n:', ntotal, nrcv
        ! do j = 0, ntotal - 1
@@ -2404,7 +2415,9 @@ contains
              call MPI_Bcast(ranks(0:m-1), m, MPI_INTEGER, iroot, icomm, ierr)
           endif
           if (ierr.eq.0) call MPI_Group_incl(igsrc, m, ranks(0:m-1), jgnew, ierr)
-#endif /* OPT_USE_MPI */
+#else /* not OPT_USE_MPI */
+          jgnew = MPI_GROUP_NULL
+#endif /* not OPT_USE_MPI */
           ! write(*, *) 'incl', j, jgnew, m, ranks(0:m-1)
           if (ierr.eq.0) tbl_gr(j) = jgnew
        enddo
@@ -2457,7 +2470,9 @@ contains
              call MPI_Bcast(ranks(0:m-1), m, MPI_INTEGER, iroot, icomm, ierr)
           endif
           if (ierr.eq.0) call MPI_Group_incl(igsrc, m, ranks(0:m-1), jgnew, ierr)
-#endif /* OPT_USE_MPI */
+#else  /* not OPT_USE_MPI */
+          jgnew = MPI_GROUP_NULL
+#endif /* not OPT_USE_MPI */
           ! write(*, *) 'incl', j, jgnew, m, ranks(0:m-1)
           if (ierr.eq.0) tbl_gr(j) = jgnew
        enddo
@@ -2677,8 +2692,9 @@ end module TOUZA_Ppp_amng
 !!!_@ test_ppp_amng - test program
 #if TEST_PPP_AMNG
 program test_ppp_amng
-  use MPI
-  use TOUZA_Ppp_amng
+  ! use MPI
+  use TOUZA_Std_mwe
+  use TOUZA_Ppp_amng,tp_init=>init, tp_diag=>diag, tp_finalize=>finalize
   implicit none
 
   integer ierr
@@ -2697,7 +2713,7 @@ program test_ppp_amng
   jarg = 0
 
 101 format(A, ' = ', I0)
-  call init(ierr, levv=+9, stdv=+9)
+  call tp_init(ierr, levv=+9, stdv=+9)
   write(*, 101) 'INIT', ierr
 
   icw = MPI_COMM_WORLD
@@ -2744,9 +2760,9 @@ program test_ppp_amng
 
   call show_status(ierr, tag='final')
 
-  call diag(ierr)
+  call tp_diag(ierr)
   write(*, 101) 'DIAG', ierr
-  call finalize(ierr)
+  call tp_finalize(ierr)
   write(*, 101) 'FINAL', ierr
   stop
 contains

@@ -1,7 +1,7 @@
 !!!_! ppp_comm.F90 - TOUZA/ppp communication
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/23 13:09:34 fuyuki ppp_comm.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/11 08:24:08 fuyuki ppp_comm.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -372,7 +372,6 @@ end module TOUZA_Ppp_comm
 !!!_@ test_ppp_comm - test program
 #if TEST_PPP_COMM
 program test_ppp_comm
-  use MPI
   use TOUZA_Ppp_comm
   implicit none
 

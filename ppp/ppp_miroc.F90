@@ -1,7 +1,7 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/09 14:17:26 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/11 08:37:02 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -506,17 +506,15 @@ contains
 !!!_  & init_root
   subroutine init_root &
        & (ierr, nrank, irank)
-    use TOUZA_Std,only: get_ni, get_wni
+    use TOUZA_Std,only: get_ni, get_wni, safe_mpi_init
     implicit none
     integer,intent(out) :: ierr
     integer,intent(out) :: nrank, irank
     integer icomm
-    logical ocheck
 
     ierr = 0
     call CLCSTR('Comm.')
-    call MPI_Initialized(ocheck, ierr)
-    if (.not.ocheck) CALL MPI_Init(ierr)
+    call safe_mpi_init(ierr)
 #ifdef OPT_MPE
     call MX_Init_MPE
 #endif
@@ -746,7 +744,7 @@ contains
        & (ierr,   &
        &  nrank,  irank,  &
        &  ncolor, icolor, acolor, icomm)
-    use MPI,only: MPI_COMM_WORLD
+    use TOUZA_Std,only: MPI_COMM_WORLD
     use TOUZA_Std,only: choice, get_comm
     use TOUZA_Ppp,only: lagent, &
          & new_agent_color, new_agent_derived, &
@@ -999,7 +997,7 @@ contains
   subroutine query_comm(ICMZ, IAGNT)
     use TOUZA_Emu,only: get_sysu
     use TOUZA_Ppp,only: inquire_agent
-    use MPI, only: MPI_COMM_NULL
+    use TOUZA_Std,only: MPI_COMM_NULL
     implicit none
     integer,intent(out) :: ICMZ
     integer,intent(in)  :: IAGNT
@@ -1016,7 +1014,7 @@ contains
 !!!_  & terminate - abort
   subroutine terminate_core(LEV, MSG)
     use TOUZA_Emu,only: get_sysu
-    use MPI,only: MPI_Abort
+    use TOUZA_Std,only: MPI_Abort
     implicit none
     integer,         intent(in)          :: LEV
     character(len=*),intent(in),optional :: MSG
@@ -1178,7 +1176,7 @@ subroutine XMOKNG(HM, HC, OR, HR)
 end subroutine XMOKNG
 !!!_  & XMProc (XCKINI entry)
 subroutine XMProc(NPRZ, IRKZ, HCTZ)
-  use MPI,only: MPI_UNDEFINED
+  use TOUZA_Std,only: MPI_UNDEFINED
   use TOUZA_Ppp,only: inquire_agent
   use TOUZA_Ppp_miroc,only: terminate
   implicit none
@@ -1263,13 +1261,15 @@ subroutine XMabort0
 end subroutine XMabort0
 !!!_  & XMFinal (XMquit entry)
 subroutine XMFinal(OBARR)
-  use MPI,only: MPI_Barrier, MPI_Finalize, MPI_Finalized
   use TOUZA_Ppp_miroc,only: nproc_quit, icomm_quit, finalize
-  use TOUZA_Std,only: choice
+#if OPT_USE_MPI
+  use MPI,only: MPI_Barrier, MPI_Finalize, MPI_Finalized
+#endif
+  use TOUZA_Std,only: choice, safe_mpi_finalize
   implicit none
   logical,optional,intent(in) :: OBARR  ! final barrier switch
   integer ierr
-  logical ocheck, bb
+  logical bb
 
   ierr = 0
   if (nproc_quit .le. 0) then ! serial run
@@ -1277,16 +1277,16 @@ subroutine XMFinal(OBARR)
      if (ierr.eq.0) call finalize(ierr)
   else
      call MSGBOX('End Parallel Execution.')
-
      call CLCSTR('Comm.')
      bb = choice(.TRUE., obarr)
+#if OPT_USE_MPI
      if (bb) call MPI_Barrier(icomm_quit, ierr)
 #ifdef OPT_MPE
      CALL MX_Fin_MPI
 #endif
+#endif /* OPT_USE_MPI */
+     if (ierr.eq.0) call safe_mpi_finalize(ierr)
      if (ierr.eq.0) call finalize(ierr)
-     call MPI_Finalized(ocheck, ierr)
-     if (.not.ocheck) call MPI_Finalize(ierr)
      call CLCEND('Comm.')
   endif
 end subroutine XMFinal
@@ -1295,7 +1295,10 @@ end subroutine XMFinal
 program test_ppp_miroc
   use TOUZA_Ppp,only: diag_cache, show_status
   use TOUZA_Ppp_miroc
-  use MPI
+  use TOUZA_Std,only: safe_mpi_init
+  use TOUZA_Std,only: safe_mpi_finalize
+  use TOUZA_Std,only: MPI_Comm_size, MPI_Comm_rank
+  use TOUZA_Std,only: MPI_COMM_WORLD, MPI_UNDEFINED
   implicit none
   integer ierr
 #define _DRIVER_A 'AB0C1'
@@ -1326,7 +1329,7 @@ program test_ppp_miroc
   external greeting
   ierr = 0
 
-  call MPI_Init(jdmy)
+  call safe_mpi_Init(jdmy)
   ibase = MPI_COMM_WORLD
   call MPI_Comm_size(ibase, nrw, jdmy)
   call MPI_Comm_rank(ibase, irw, jdmy)
@@ -1334,7 +1337,9 @@ program test_ppp_miroc
      jseq = irw - (nrw - nrlim) / 2
      icol = 0
      if (jseq.lt.0.or.jseq.ge.NRLIM) icol = MPI_UNDEFINED
+#if OPT_USE_MPI
      if (ierr.eq.0) call MPI_Comm_split(ibase, icol, jseq, icomm, jdmy)
+#endif
      ibase = icomm
   endif
 
@@ -1393,7 +1398,7 @@ program test_ppp_miroc
      call diag_cache(ierr)
      call XMfinal(.FALSE.)
   else
-     call MPI_Finalize(jdmy)
+     call safe_mpi_finalize(jdmy)
   endif
 
 
