@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/10 12:20:35 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 18:41:43 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -44,6 +44,12 @@ module TOUZA_Std_utl
   character(len=*),parameter :: separator_item   = ' '
   character(len=*),parameter :: char_overflow  = '+'
   character(len=*),parameter :: char_underflow = '-'
+!!!_  - special character
+#if HAVE_FORTRAN_BACKSLASH_NOQUOTE
+  character(len=1),parameter,public :: backslash = '\' !'
+#else
+  character(len=1),parameter,public :: backslash = '\\'
+#endif
 !!!_  - interfaces
   interface choice
      module procedure choice_i,  choice_l,  choice_b,  choice_f,  choice_d
