@@ -1,5 +1,5 @@
 #!/bin/sh
-# Time-stamp: <2025/07/07 16:02:22 fuyuki wtc.sh.in>
+# Time-stamp: <2025/07/09 16:19:40 fuyuki wtc.sh.in>
 
 this=$0
 base=$(basename "$this")
@@ -26,6 +26,7 @@ main ()
   np=
   force=
   agent=
+  split=
   if is_nt "$src" "$this"; then
     echo "$root: Warning.  Newer $src is available." >&2
   fi
@@ -48,6 +49,7 @@ main ()
     -N*) nentr=${1#-N};;
     -C)  csys=$1;;
     -w)  wrap=wrap;;
+    -s)  split=out;;
     -*) echo "$root: Unknown argument $1" >&2; return 1;;
     *)  break;;
     esac
@@ -135,6 +137,15 @@ chmod +x $outd/$wrap
     echo "${root}: Abort $outd" >&2
   else
     echo "${root}: Abort(system) $outd" >&2
+  fi
+  if test -n "$split"; then
+    mkdir -p $split
+    jnp=0
+    while test $jnp -lt $lnp
+    do
+      sed -n -e "/^\\[1,$jnp\\]<stdout>: /s///p" $logo > $split/$logo.$jnp
+      jnp=$((jnp + 1))
+    done
   fi
   cd "$oldpwd" || return $?
   # patterns
