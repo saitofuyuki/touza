@@ -1,7 +1,7 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/11 08:37:02 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/11 15:35:29 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -146,8 +146,9 @@ module TOUZA_Ppp_miroc
   integer,save :: ncolor_world = -1
 !!!_  - public
   public init, diag, finalize
-  public init_rainbow, init_color, affils_legacy
+  public init_rainbow, init_sysio
   public init_king
+  public affils_legacy
   public get_wcolor
   public gen_agent_union
   public push_agent, pop_agent, top_agent, switch_agent, spinoff_agent
@@ -291,27 +292,27 @@ contains
 !!!_ + Core procedures for MIROC
 !!!_  & init_rainbow - XCKINI compatible procedure
   subroutine init_rainbow &
-       & (ierr, cdir, icomm)
-    use TOUZA_Std,only: lpath
-    use TOUZA_Std,only: set_defu
-    use TOUZA_Emu,only: open_sysin_primary, open_bind_sysin, search_sysin_colored
-    use TOUZA_Emu,only: get_sysu, open_bind_sysout
+       & (ierr, cdir, cagent, affils, icomm)
+    use TOUZA_Emu,only: open_sysin_primary
     use TOUZA_Emu,only: update_ranks, update_color
-    use TOUZA_PPP,only: lagent
+    use TOUZA_Ppp_std,only: get_comm
+    use TOUZA_Ppp,only: new_agent_root, new_agent_color, new_agent_family
     implicit none
-    integer,         intent(out)         :: ierr
-    character(len=*),intent(out)         :: cdir
-    integer,         optional,intent(in) :: icomm
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: cdir       ! directory for each color
+    character(len=*),intent(out) :: cagent     ! agent for each color
+    character(len=*),intent(in)  :: affils(:)
+    integer,optional,intent(in)  :: icomm
 
     integer nrank, irank
     integer ifpar
     integer ncolor, icolor
-    character(len=lagent) :: aname
-    ! logical bworld
+
+    integer ic
 
     ierr = 0
-    ! bworld = .TRUE.
-    call init_root(ierr, nrank, irank)
+
+    if (ierr.eq.0) call init_world(ierr, nrank, irank)
     if (ierr.eq.0) call update_ranks(nr=nrank, ir=irank)
 
     ! master sysin
@@ -319,53 +320,43 @@ contains
 
     if (ierr.eq.0) then
        call config_rainbow &
-            & (ierr,  ncolor, icolor, cdir, aname, &
+            & (ierr,  ncolor, icolor, cdir, cagent, &
             &  nrank, irank,  ifpar)
     endif
     if (ierr.eq.0) call update_color(icol=icolor, ncol=ncolor)
-
-#if 0 /* test */
-    if (ierr.eq.0) then
-       if (mod(irank, 2).eq.0) then
-          call init_comms &
-               & (ierr, nrank, irank, ncolor, icolor, aname, icomm)
-       else
-          call init_comms &
-               & (ierr, nrank, irank, ncolor, icolor, 'x', icomm)
-          ! call init_comms &
-          !      & (ierr, nrank, irank, affils(:), ncolor, icolor, ' ', icomm)
-       endif
-    endif
-#else /* default, not test */
-    if (ierr.eq.0) then
-101    format('CL', I0)
-       if (aname.eq.' ') write(aname, 101) icolor
-       call init_comms &
-            & (ierr, nrank, irank, ncolor, icolor, aname, icomm)
-    endif
-#endif /* default, not test */
-
     ! store cache
     if (ierr.eq.0) then
        icolor_world = icolor
        ncolor_world = ncolor
     endif
+
+    if (ierr.eq.0) then
+       if (present(icomm)) then
+          ic = icomm
+       else
+          call get_comm(ierr, ic)
+       endif
+    endif
+    if (ierr.eq.0) call new_agent_root(ierr, ic)
+    if (ierr.eq.0) call new_agent_color(ierr, icolor, cagent)
+    if (ierr.eq.0) call new_agent_family(ierr, affils(:))
+
     return
   end subroutine init_rainbow
 
-!!!_  & init_color - XCKINI compatible procedure
-  subroutine init_color &
-       & (ierr, affils, cdir, config, greeting, flag)
+!!!_  & init_sysio - XCKINI compatible procedure
+  subroutine init_sysio &
+       & (ierr, cdir, cagent, config, greeting, flag)
     use TOUZA_Std,only: lpath, choice
     use TOUZA_Std,only: set_defu
     use TOUZA_Emu,only: open_bind_sysin, search_sysin_colored
     use TOUZA_Emu,only: get_sysu, open_bind_sysout
-    use TOUZA_Emu,only: update_ranks, update_color
-    use TOUZA_PPP,only: lagent, inquire_agent, new_agent_family
+    use TOUZA_Emu,only: update_ranks
+    use TOUZA_PPP,only: inquire_agent
     implicit none
     integer,         intent(out)         :: ierr
-    character(len=*),intent(in)          :: affils(:)
     character(len=*),intent(in)          :: cdir
+    character(len=*),intent(in)          :: cagent
     character(len=*),intent(in),optional :: config
     integer,         intent(in),optional :: flag
     optional :: greeting
@@ -391,53 +382,22 @@ contains
     icolor = icolor_world
     ncolor = ncolor_world
 
-    csysin = ' '
-    if (present(config)) then
-       if (config.ne.' ') csysin = config
-    endif
-
     f = choice(flag_abort, flag)
     ncs = 0
 
-    if (ncolor.gt.0) then
-       ! [CAUTION]
-       !    Secondary sysin (configuration) is opened *AFTER* chdir.
-       !    You may use the absolute path to avoid a complex relative path.
-       !    See realpath(1), to compute a relative path in shell scripts.
-       if (ierr.eq.0) then
-          call search_sysin_colored(ncs, csysin, icolor, pfx=config)
-       endif
-       if (cdir.eq.' ') then
-          if (ncs.le.0) then
-             call terminate(1, 'Legacy colored-SYSIN not found.')
-             return
-          else if (ncs.gt.1) then
-             call terminate(1, 'Panic in Legacy colored-SYSIN search.')
-             return
-          endif
+    call search_sysin(ierr, csysin, cdir, cagent, config, flag)
+    if (cdir.ne.' ') then
+       if (ierr.eq.0) call switch_dir(ierr, cdir)
+    endif
+    if (ierr.eq.0) then
+       if (ncolor.gt.0) then
           call open_bind_sysin(ierr, ifpar, csysin, 'colored')
        else
-          ! For safety, SYSIN.CLxxx should not exist when enabled subdirectory run.
-          if (ncs.gt.0) then
-             if (f.ne.flag_warn) then
-                call terminate(1, 'Legacy colored-SYSIN exists with subdir run.')
-                return
-             endif
-101          format('WARNING: found colored-sysin with subdir run: ' A)
-             if (ulog.lt.0) then
-                write(*, 101) trim(csysin)
-             else
-                write(ulog, 101) trim(csysin)
-             endif
-          endif
-          call switch_dir(ierr, cdir)
-          if (ierr.eq.0) call open_bind_sysin(ierr, ifpar, csysin, 'colored')
+          call get_sysu(sysi=ifpar)
        endif
-    else
-       call get_sysu(sysi=ifpar)
     endif
 
-    if (ierr.eq.0) call inquire_agent(ierr, irank=irank, nrank=nrank)
+    if (ierr.eq.0) call inquire_agent(ierr, source=+1, irank=irank, nrank=nrank)
 
     if (ierr.eq.0) then
        if (.not.bworld) then
@@ -460,10 +420,79 @@ contains
             &  nrank,  irank,  jfpar)
     endif
 
-    if (ierr.eq.0) call new_agent_family(ierr, affils(:))
+    return
+  end subroutine init_sysio
+
+!!!_  & search_sysin
+  subroutine search_sysin &
+       & (ierr, csysin, cdir, cagent, config, flag)
+    use TOUZA_Std,only: lpath, choice, choice_a
+    use TOUZA_Std,only: set_defu
+    use TOUZA_Emu,only: open_bind_sysin, search_sysin_colored
+    use TOUZA_Emu,only: get_sysu, open_bind_sysout
+    use TOUZA_Emu,only: update_ranks
+    use TOUZA_PPP,only: inquire_agent
+    implicit none
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(out)         :: csysin
+    character(len=*),intent(in)          :: cdir
+    character(len=*),intent(in)          :: cagent
+    character(len=*),intent(in),optional :: config
+    integer,         intent(in),optional :: flag
+
+    integer ncolor, icolor
+    integer ncs
+    integer f
+    logical bworld
+
+    ierr = 0
+
+    bworld = (cdir.eq.' ')
+
+    icolor = icolor_world
+    ncolor = ncolor_world
+
+    f = choice(flag_abort, flag)
+    ncs = 0
+
+    if (ncolor.gt.0) then
+       ! [CAUTION]
+       !    Secondary sysin (configuration) is opened *AFTER* chdir.
+       !    You may use the absolute path to avoid a complex relative path.
+       !    See realpath(1), to compute a relative path in shell scripts.
+       if (ierr.eq.0) then
+          call search_sysin_colored(ncs, csysin, icolor, pfx=config)
+       endif
+       if (cdir.eq.' ') then
+          if (ncs.le.0) then
+             call terminate(1, 'Legacy colored-SYSIN not found.')
+             return
+          else if (ncs.gt.1) then
+             call terminate(1, 'Panic in Legacy colored-SYSIN search.')
+             return
+          endif
+       else
+          ! For safety, SYSIN.CLxxx should not exist when enabled subdirectory run.
+          if (ncs.gt.0) then
+             if (f.ne.flag_warn) then
+                call terminate(1, 'Legacy colored-SYSIN exists with subdir run.')
+                return
+             endif
+101          format('WARNING: found colored-sysin with subdir run: ' A)
+             if (ulog.lt.0) then
+                write(*, 101) trim(csysin)
+             else
+                write(ulog, 101) trim(csysin)
+             endif
+          endif
+          call choice_a(csysin, ' ', config)
+       endif
+    else
+       call choice_a(csysin, ' ', config)
+    endif
 
     return
-  end subroutine init_color
+  end subroutine search_sysin
 
 !!!_  & switch_dir - chdir wrapper
   subroutine switch_dir &
@@ -503,8 +532,8 @@ contains
     endif
   end subroutine switch_dir
 
-!!!_  & init_root
-  subroutine init_root &
+!!!_  & init_world
+  subroutine init_world &
        & (ierr, nrank, irank)
     use TOUZA_Std,only: get_ni, get_wni, safe_mpi_init
     implicit none
@@ -524,7 +553,7 @@ contains
     icomm_quit = icomm
 
     call CLCEND('Comm.')
-  end subroutine init_root
+  end subroutine init_world
 
 !!!_  & config_rainbow - rainbow sectioning with namelists
   subroutine config_rainbow &
@@ -738,41 +767,6 @@ contains
     endif
 
   end subroutine diag_rainbow
-
-!!!_  & init_comms
-  subroutine init_comms &
-       & (ierr,   &
-       &  nrank,  irank,  &
-       &  ncolor, icolor, acolor, icomm)
-    use TOUZA_Std,only: MPI_COMM_WORLD
-    use TOUZA_Std,only: choice, get_comm
-    use TOUZA_Ppp,only: lagent, &
-         & new_agent_color, new_agent_derived, &
-         & new_agent_family, new_agent_root
-    use TOUZA_Ppp,only: inquire_agent
-    implicit none
-    integer,         intent(out) :: ierr
-    integer,         intent(out) :: nrank,  irank
-    integer,         intent(in)  :: ncolor, icolor
-    character(len=*),intent(in)  :: acolor
-    integer,optional,intent(in)  :: icomm
-
-    integer ic
-
-    ierr = 0
-    irank = -1
-    nrank = 0
-
-    if (present(icomm)) then
-       ic = icomm
-    else
-       call get_comm(ierr, ic)
-    endif
-
-    if (ierr.eq.0) call new_agent_root(ierr, ic)
-    if (ierr.eq.0) call new_agent_color(ierr, icolor, acolor)
-    if (ierr.eq.0) call inquire_agent(ierr, irank=irank, nrank=nrank)
-  end subroutine init_comms
 
 !!!_  & init_king - king configuration with namelists
   subroutine init_king &
@@ -1069,7 +1063,8 @@ end module TOUZA_Ppp_Miroc
 !!!_  & XCKINI
 subroutine XCKINI(AFFILS, N, GREETING, ICROOT)
   use TOUZA_Ppp_miroc,only: init, diag, terminate
-  use TOUZA_Ppp_miroc,only: init_rainbow, init_color, init_king
+  use TOUZA_Ppp_miroc,only: init_rainbow, init_sysio, init_king
+  use TOUZA_Ppp_amng, only: lagent
   use TOUZA_Ppp_std, only: lpath
   implicit none
   character(len=*),intent(in) :: AFFILS(*) ! array of agents I belong to.
@@ -1078,12 +1073,13 @@ subroutine XCKINI(AFFILS, N, GREETING, ICROOT)
   external :: greeting
   integer jerr
   character(len=lpath) :: cdir
+  character(len=lagent) :: cagent
   call init(jerr, levv=+9, stdv=+9, icomm=ICROOT)
   if (jerr.eq.0) then
-     call init_rainbow(jerr, cdir, icomm=ICROOT)
+     call init_rainbow(jerr, cdir, cagent, AFFILS(1:N), icomm=ICROOT)
   endif
   if (jerr.eq.0) then
-     call init_color(jerr, AFFILS(1:N), cdir, greeting=greeting)
+     call init_sysio(jerr, cdir, cagent, greeting=greeting)
   endif
   if (jerr.ne.0) then
      call terminate(1, 'XCKINI FAILED')
@@ -1096,7 +1092,7 @@ end subroutine XCKINI
 !!!_  & XCKINI_legacy
 subroutine XCKINI_legacy(HDRVR, GREETING, ICROOT)
   use TOUZA_Ppp_miroc,only: init, diag, affils_legacy, terminate
-  use TOUZA_Ppp_miroc,only: init_rainbow, init_color, init_king
+  use TOUZA_Ppp_miroc,only: init_rainbow, init_sysio, init_king
   use TOUZA_Ppp_amng, only: lagent
   use TOUZA_Ppp_std, only: lpath
   implicit none
@@ -1106,17 +1102,20 @@ subroutine XCKINI_legacy(HDRVR, GREETING, ICROOT)
   integer jerr
   integer na
   integer,parameter :: maff = 16
-  character(len=lagent) :: affils(maff)
+  character(len=lagent) :: affils(maff), cagent
   character(len=lpath) :: cdir
 
   jerr = 0
 
   call init(jerr, levv=+9, stdv=+9, icomm=ICROOT)
-  if (jerr.eq.0) then
-     call init_rainbow(jerr, cdir, icomm=ICROOT)
-  endif
   if (jerr.eq.0) call affils_legacy(jerr, affils, na, HDRVR)
-  if (jerr.eq.0) call init_color(jerr, affils(1:na), cdir, greeting=greeting)
+  if (jerr.eq.0) then
+     call init_rainbow(jerr, cdir, cagent, affils(1:na), icomm=ICROOT)
+  endif
+  if (jerr.eq.0) then
+     ! call init_rainbow(jerr, cdir, icomm=ICROOT)
+     call init_sysio(jerr, cdir, cagent, greeting=greeting)
+  endif
   if (jerr.ne.0) then
      call terminate(1, 'XCKINI LEGACY FAILED: ', HDRVR)
      return
@@ -1132,6 +1131,7 @@ subroutine XMSETK(OKING, HC)
   implicit none
   logical,         intent(out) :: OKING    ! whether or not I am the king
   character(len=*),intent(in)  :: HC       ! <CI>
+  OKING = .FALSE.
   call terminate(1, 'DELETED: XMSETK', HC)
 end subroutine XMSETK
 !!!_  & XMGETK (XCKINI entry) - legacy, deprecated
@@ -1146,6 +1146,7 @@ subroutine XMGETK(HM, HC, IR, HR)
   integer jerr
   character(len=lmod) :: HA
   logical ismem
+  integer jfp
   HA = HM(1:1)
   call get_king(jerr, IR, HM, HA)
   if (jerr.eq.0) then
@@ -1161,6 +1162,9 @@ subroutine XMGETK(HM, HC, IR, HR)
      !    call get_king(jerr, IR, HM, HC(1:1))
      ! endif
   endif
+  call getjfp(jfp)
+101 format('XMGETK: DEPRECATED (', A, ')')
+  write(jfp, 101) trim(HR)
 end subroutine XMGETK
 !!!_  & XMOKNG
 subroutine XMOKNG(HM, HC, OR, HR)
@@ -1339,20 +1343,20 @@ program test_ppp_miroc
      if (jseq.lt.0.or.jseq.ge.NRLIM) icol = MPI_UNDEFINED
 #if OPT_USE_MPI
      if (ierr.eq.0) call MPI_Comm_split(ibase, icol, jseq, icomm, jdmy)
+     if (ierr.eq.0) ibase = icomm
 #endif
-     ibase = icomm
   endif
 
   if (icol.ne.MPI_UNDEFINED) then
 #if TEST_PPP_MIROC < 4
-     call XCKINI_legacy(_DRIVER, greeting, icomm)
+     call XCKINI_legacy(_DRIVER, greeting, ibase)
 #else
      if (_IS_A(irw, nrw)) then
-        call XCKINI_legacy(_DRIVER_A, greeting, icomm)
+        call XCKINI_legacy(_DRIVER_A, greeting, ibase)
      else if (_IS_O(irw, nrw)) then
-        call XCKINI_legacy(_DRIVER_O, greeting, icomm)
+        call XCKINI_legacy(_DRIVER_O, greeting, ibase)
      else
-        call XCKINI_legacy(_DRIVER_Z, greeting, icomm)
+        call XCKINI_legacy(_DRIVER_Z, greeting, ibase)
      endif
 #endif
      call gen_agent_union(jdmy, 'W', (/'A', 'O'/), 2)
