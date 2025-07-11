@@ -151,6 +151,7 @@ module TOUZA_Ppp_amng
   public switch_agent,  push_agent, pop_agent, top_agent
   public inquire_agent, is_member
   public query_agent,   source_agent, check_agent, base_agent, clone_agent
+  public trace_agent
   public is_child_agent
   public diag_maps_batch, show_status
 !!!_ + common interfaces
@@ -812,11 +813,12 @@ contains
 !!!_  & inquire_agent
   subroutine inquire_agent_a &
        & (ierr,  &
-       &  agent, &
+       &  agent, source, &
        &  irank, nrank, icomm, igroup, name, ismem)
     implicit none
     integer,         intent(out)          :: ierr
     character(len=*),intent(in)           :: agent
+    integer,         intent(in), optional :: source   ! to trace back source agents
     integer,         intent(out),optional :: irank
     integer,         intent(out),optional :: nrank
     integer,         intent(out),optional :: icomm
@@ -825,17 +827,19 @@ contains
     logical,         intent(out),optional :: ismem
     integer ja
     ja = query_agent(agent)
-    call inquire_agent_i(ierr, ja, irank, nrank, icomm, igroup, name, ismem)
+    call inquire_agent_i(ierr, ja, source, irank, nrank, icomm, igroup, name, ismem)
     return
   end subroutine inquire_agent_a
 
   subroutine inquire_agent_i &
        & (ierr,   &
-       &  iagent, &
-       &  irank,  nrank, icomm, igroup, name, ismem)
+       &  iagent, source, &
+       &  irank,  nrank,  icomm, igroup, name, ismem)
+    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out)          :: ierr
     integer,         intent(in), optional :: iagent
+    integer,         intent(in), optional :: source   ! to trace back source agents (negative to root)
     integer,         intent(out),optional :: irank
     integer,         intent(out),optional :: nrank
     integer,         intent(out),optional :: icomm
@@ -846,9 +850,12 @@ contains
     integer ic, ig, ir
 
     ierr = 0
-    ja = check_agent(iagent)
+    ! ja = check_agent(iagent)
+    ja = trace_agent(iagent, source)
     ic = MPI_COMM_NULL
-    if (ja.lt.0) ierr = -1
+    if (ja.lt.0) then
+       ierr = -1
+    endif
 
     if (ja.ge.0) ic = atblp(ja)%comm
     if (ja.ge.0) ig = atblp(ja)%mgrp
@@ -1639,6 +1646,29 @@ contains
        n = -1
     endif
   end function check_agent
+
+!!!_  & trace_agent
+  integer function trace_agent &
+       & (iagent, lev) &
+       & result(n)
+    use TOUZA_Ppp_std,only: choice
+    implicit none
+    integer,intent(in),optional :: iagent
+    integer,intent(in),optional :: lev
+    integer ntr
+    ntr = choice(0, lev)
+    if (ntr.lt.0) then
+       n = root_agent(iagent)
+    else
+       n = check_agent(iagent)
+       do
+          if (ntr.le.0) exit
+          if (n.lt.0) exit
+          n = atblp(n)%isrc
+          ntr = ntr - 1
+       enddo
+    endif
+  end function trace_agent
 
 !!!_  & source_agent
   integer function source_agent &
