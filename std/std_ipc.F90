@@ -1,7 +1,7 @@
 !!!_! std_ipc.F90 - touza/std intrinsic procedures compatible gallery
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 25 2023
-#define TIME_STAMP 'Time-stamp: <2025/07/10 12:07:17 fuyuki std_ipc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/15 17:35:17 fuyuki std_ipc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023-2025
@@ -33,6 +33,11 @@
 #ifndef   TEST_STD_IPC
 #  define TEST_STD_IPC 0
 #endif
+!!!_ + switches (_PCASE)
+#define _NAVL 0  /* not available */
+#define _SUBR 1  /* subroutine */
+#define _MFUN 2  /* module function */
+#define _OFUN 3  /* other function */
 !!!_@ TOUZA_Std_env - standard environments
 module TOUZA_Std_ipc
   use TOUZA_Std_prc,only: KI32, KI64
@@ -88,6 +93,7 @@ module TOUZA_Std_ipc
   public ipc_ASINH,  ipc_ACOSH, ipc_ATANH
   public ipc_ETIME
   public ipc_GETCWD, ipc_CHDIR
+  public ipc_EXIT
 contains
 !!!_ + common interfaces
 !!!_  & init
@@ -520,17 +526,20 @@ contains
 #endif
   end subroutine ipc_ETIME_f
 !!!_ + chdir
+#ifdef _PCASE
+#undef _PCASE
+#endif
   subroutine ipc_CHDIR(PATH, status, flag)
 #if   HAVE_FORTRAN_F90_UNIX_DIR_CHDIR
-#   define _PCASE 1  /* subroutine */
+#   define _PCASE _SUBR
     use F90_UNIX_DIR,only: CHDIR
 #elif HAVE_FORTRAN_IFPORT_CHDIR
-#   define _PCASE 2  /* function */
+#   define _PCASE _MFUN
     use IFPORT,only: CHDIR
 #elif HAVE_FORTRAN_CHDIR
-#   define _PCASE 1  /* subroutine */
+#   define _PCASE _OFUN
 #else
-#   define _PCASE 0
+#   define _PCASE _NAVL
 #endif
     use TOUZA_Std_utl,only: choice
     implicit none
@@ -538,9 +547,12 @@ contains
     integer,         intent(out) :: status
     integer,optional,intent(in)  :: flag    ! if nonzero return status as is
     integer f
-#if _PCASE == 1
+#if _PCASE == _OFUN
+    integer :: CHDIR
+#endif
+#if _PCASE == _SUBR
     call CHDIR(PATH, status)
-#elif _PCASE == 2
+#elif _PCASE == _MFUN || _PCASE == _OFUN
     status = CHDIR(PATH)
 #else
     status = ERR_NOT_IMPLEMENTED
@@ -551,15 +563,18 @@ contains
     endif
   end subroutine ipc_CHDIR
 !!!_ + getcwd
+#ifdef _PCASE
+#undef _PCASE
+#endif
   subroutine ipc_GETCWD(PATH, status, flag)
 #if   HAVE_FORTRAN_F90_UNIX_DIR_GETCWD
-#   define _PCASE 1  /* subroutine */
+#   define _PCASE _SUBR
     use F90_UNIX_DIR,only: GETCWD
 #elif HAVE_FORTRAN_IFPORT_GETCWD
-#   define _PCASE 2  /* function */
+#   define _PCASE _MFUN
     use IFPORT,only: GETCWD
 #elif HAVE_FORTRAN_GETCWD
-#   define _PCASE 1  /* subroutine */
+#   define _PCASE _OFUN
 #else
 #   define _PCASE 0
 #endif
@@ -569,9 +584,17 @@ contains
     integer,         intent(out) :: status
     integer,optional,intent(in)  :: flag
     integer f
-#if _PCASE == 1
+#if _PCASE == _OFUN
+    integer GETCWD
+#endif
+#if _PCASE == _SUBR
+#  if __NVCOMPILER
+    call GETCWD(PATH)
+    status = 0
+#  else
     call GETCWD(PATH, status)
-#elif _PCASE == 2
+#  endif
+#elif _PCASE == _MFUN || _PCASE == _OFUN
     status = GETCWD(PATH)
 #else
     status = ERR_NOT_IMPLEMENTED
@@ -581,11 +604,24 @@ contains
        if (status.ne.0) status = ERR_INVALID_PARAMETER
     endif
   end subroutine ipc_GETCWD
+!!!_ & ipc_exit
+  subroutine ipc_EXIT(ierr)
+    implicit none
+    integer,intent(in) :: ierr
+    integer jerr
+    jerr = max(-255, min(255, ierr))
+#if HAVE_FORTRAN_EXIT
+    call exit(jerr)
+#else /* default */
+    stop jerr
+#endif /* default */
+  end subroutine ipc_EXIT
 !!!_ + end TOUZA_Std_ipc
 end module TOUZA_Std_ipc
 
 !!!_@ test_std_ipc - test program
 #if TEST_STD_IPC
+#if TEST_STD_IPC <= 2
 #  if TEST_STD_IPC == 1
 #    define TEST_IPC_IKIND KI32
 #    define TEST_IPC_RKIND KFLT
@@ -634,7 +670,7 @@ program test_std_ipc
   call test_dir(ierr)
 
   call finalize(ierr, levv=+9)
-  write(*, 101) ierr
+  if (ierr.ne.0) call ipc_EXIT(ierr)
   stop
 contains
   subroutine test_hypot(ierr, x, y)
@@ -746,7 +782,231 @@ contains
   end subroutine test_dir
 
 end program test_std_ipc
+#else /* TEST_STD_IPC == 3 (chdir) */
+program test_std_ipc
+  use TOUZA_Std_bld,only: bld_init=>init, bld_diag=>diag, bld_finalize=>finalize
+  use TOUZA_Std_ipc
+  implicit none
+  integer ierr
+  character(len=*),parameter :: test_file_a = 'chdir-a.dat'
+  character(len=*),parameter :: test_file_b = 'chdir-b.dat'
+  character(len=*),parameter :: subd = 'sub00'
+  integer,parameter :: uchk = 10, upar = 20, usub = 30, udup = 40, ucmp = 50
 
+  ierr = 0
+  call init(ierr, levv=-9)
+  if (ierr.eq.0) call diag(ierr, levv=-9)
+  if (ierr.eq.0) call bld_init(ierr, mode=MODE_SURFACE, levv=-9)
+  if (ierr.eq.0) call bld_diag(ierr, levv=-9)
+  if (ierr.eq.0) call bld_finalize(ierr, levv=-9)
+
+  if (ierr.eq.0) call test_chdir_prepare(ierr, ' ',  test_file_a)
+  if (ierr.eq.0) call test_chdir_prepare(ierr, ' ',  test_file_b)
+  if (ierr.eq.0) call test_chdir_prepare(ierr, subd, test_file_a)
+  if (ierr.eq.0) call test_chdir_prepare(ierr, subd, test_file_b)
+
+  if (ierr.eq.0) then
+     call test_chdir_sub(ierr, '1', subd, test_file_a, usub, desc='sub only')
+  endif
+  if (ierr.eq.0) close(usub, iostat=ierr)
+
+  if (ierr.eq.0) then
+     call test_chdir_sub(ierr, '2', ' ',  test_file_a, upar, desc='parent')
+  endif
+
+  if (ierr.eq.0) then
+     call test_chdir_sub(ierr, '3', subd, test_file_a, usub, desc='keep parent')
+  endif
+  if (ierr.eq.0) close(usub, iostat=ierr)
+
+  if (ierr.eq.0) then
+     call test_chdir_sub(ierr, '4', subd, test_file_b, usub, desc='no parent open')
+  endif
+  if (ierr.eq.0) close(usub, iostat=ierr)
+
+  if (ierr.eq.0) then
+     call test_chdir_sub(ierr, '5', subd, test_file_a, usub, abs=.TRUE., desc='absolute')
+  endif
+  if (ierr.eq.0) close(usub, iostat=ierr)
+
+  ! close parent
+  if (ierr.eq.0) close(upar, iostat=ierr)
+  if (ierr.eq.0) then
+     call test_chdir_sub(ierr, '6', subd, test_file_a, usub, desc='after close parent')
+  endif
+  ! if (ierr.eq.0) close(usub, iostat=ierr)
+
+  ! keep sub open
+  if (ierr.eq.0) then
+     call test_chdir_sub(ierr, '7', subd, test_file_a, udup, abs=.TRUE., desc='sub opened, absolute')
+  endif
+
+  call finalize(ierr, levv=-9)
+  if (ierr.ne.0) call ipc_EXIT(ierr)
+  stop
+contains
+  subroutine test_chdir_prepare(ierr, sub, file)
+    implicit none
+    integer,intent(out) :: ierr
+    character(len=*),intent(in) :: sub, file
+    integer u
+    character(len=1024) :: path
+    character(len=1024) :: txt
+    logical bx
+
+    ierr = 0
+
+    if (sub.eq.' ') then
+       path = trim(file)
+    else
+       path = trim(sub) // '/' // trim(file)
+    endif
+    inquire(file=path, exist=bx, iostat=ierr)
+    u = uchk
+    if (ierr.eq.0) then
+       if (bx) then
+          call test_chdir_compare(ierr, path)
+       else
+          open(u, file=path, iostat=ierr, &
+               & status='new', form='formatted', action='write', &
+               & access='sequential', iomsg=txt)
+          if (ierr.eq.0) write(u, '(A)', iostat=ierr) trim(path)
+          if (ierr.eq.0) close(u, iostat=ierr)
+          if (ierr.ne.0) then
+119          format('Failed to create ', A)
+             write(*, 119) trim(path)
+          endif
+       endif
+    endif
+  end subroutine test_chdir_prepare
+
+  subroutine test_chdir_sub(ierr, test, sub, file, u, abs, desc)
+    use TOUZA_Std_utl,only: choice
+    implicit none
+    integer,         intent(out)         :: ierr
+    character(len=*),intent(in)          :: test
+    character(len=*),intent(in)          :: sub, file
+    integer,         intent(in)          :: u
+    logical,         intent(in),optional :: abs
+    character(len=*),intent(in),optional :: desc
+    character(len=1024) :: oldpwd, path, ftmp
+    character(len=1024) :: txt, ptxt
+    integer utmp
+    logical bo
+
+    ierr = 0
+301 format('[', A, '] ', A)
+    if (sub.eq.' ') then
+       path = trim(file)
+       write(ptxt, 301) '.', trim(file)
+    else
+       path = trim(sub) // '/' // trim(file)
+       write(ptxt, 301) trim(sub), trim(file)
+    endif
+
+    if (sub.ne.' ') then
+       call ipc_GETCWD(oldpwd, ierr)
+       if (ierr.eq.0) call ipc_CHDIR(sub, ierr)
+    endif
+    if (ierr.eq.0) then
+       utmp = u
+       if (choice(.FALSE., abs)) then
+          call ipc_getcwd(ftmp, ierr)
+          if (ierr.eq.0) ftmp = trim(ftmp) // '/' // trim(file)
+          if (ierr.eq.0) then
+             open(utmp, file=ftmp, iostat=ierr, &
+                  & status='old', form='formatted', action='read', &
+                  & access='sequential', iomsg=txt)
+          endif
+       else
+          open(utmp, file=file, iostat=ierr, &
+               & status='old', form='formatted', action='read', &
+               & access='sequential', iomsg=txt)
+       endif
+    endif
+101 format('# ', A, ' failed at open: ', A)
+102 format('# ', A, ' inquire unit  ', I0, ': ', A)
+103 format('# ', A, ' inquire name  ', I0, ': ', A)
+    if (ierr.ne.0) then
+       utmp = -1
+       write(*, 101) trim(test), trim(txt)
+       inquire(opened=bo, file=file, iostat=ierr, iomsg=txt)
+       if (ierr.eq.0) then
+          if (bo) then
+             inquire(number=utmp, file=file, iostat=ierr, iomsg=txt)
+             write(*, 102) trim(test), utmp, trim(file)
+             inquire(unit=utmp, name=ftmp, iostat=ierr, iomsg=txt)
+             write(*, 103) trim(test), utmp, trim(ftmp)
+          endif
+       endif
+    endif
+201 format('ok ',     A, 1x, '- ', A)
+202 format('not ok ', A, 1x, '- ', A)
+211 format('ok ',     A, 1x, '- ', A, 1x, '(', A, ')')
+212 format('not ok ', A, 1x, '- ', A, 1x, '(', A, ')')
+    if (ierr.eq.0) then
+       if (utmp.ge.0) then
+          call test_chdir_compare(ierr, path, utmp)
+          if (ierr.eq.0) then
+             if (present(desc)) then
+                write(*, 211) trim(test), trim(desc), trim(ptxt)
+             else
+                write(*, 201) trim(test), trim(ptxt)
+             endif
+          else
+             if (present(desc)) then
+                write(*, 212) trim(test), trim(desc), trim(ptxt)
+             else
+                write(*, 202) trim(test), trim(ptxt)
+             endif
+          endif
+          ierr = 0
+       endif
+    endif
+
+    if (sub.ne.' ') then
+       if (ierr.eq.0) call ipc_chdir(oldpwd, ierr)
+    endif
+  end subroutine test_chdir_sub
+
+  subroutine test_chdir_compare(ierr, path, u)
+    integer,intent(out) :: ierr
+    character(len=*),intent(in) :: path
+    integer,optional,intent(in) :: u
+    integer utmp
+    character(len=1024) :: txt
+
+    ierr = 0
+    if (present(u)) then
+       utmp = u
+       rewind(utmp, iostat=ierr)
+    else
+       utmp = ucmp
+       open(utmp, file=path, iostat=ierr, &
+            & status='old', form='formatted', action='read', &
+            & access='sequential', iomsg=txt)
+    endif
+    ! write(*, *) ierr, trim(path), '//'
+
+    if (ierr.eq.0) read(utmp, '(A)', iostat=ierr) txt
+    if (ierr.eq.0) then
+       if (txt.ne.path) then
+109       format('Invalid content for test in ', A)
+108       format(1x, A)
+          write(*, 109) trim(path)
+          write(*, 108) trim(txt)
+          ierr = -1
+       endif
+    endif
+    if (present(u)) then
+       continue
+    else
+       if (ierr.eq.0) close(utmp, iostat=ierr)
+    endif
+  end subroutine test_chdir_compare
+end program test_std_ipc
+
+#endif /* TEST_STD_IPC == 3 (chdir) */
 #endif /* TEST_STD_IPC */
 !!!_! FOOTER
 !!!_ + Local variables
