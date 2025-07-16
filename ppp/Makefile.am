@@ -1,7 +1,7 @@
 # touza/ppp Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jan 26 2022
-# Time-stamp: <2025/07/04 16:15:38 fuyuki Makefile.am>
+# Time-stamp: <2025/07/14 12:55:50 fuyuki Makefile.am>
 
 # Copyright (C) 2022-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -71,6 +71,11 @@ check_PROGRAMS += test_ppp_miroc_m
 test_ppp_miroc_m_SOURCES	= $(test_ppp_miroc_a_SOURCES)
 test_ppp_miroc_m_LDADD		= $(test_ppp_miroc_a_LDADD)
 test_ppp_miroc_m_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_PPP_MIROC=4
+
+check_PROGRAMS += test_ppp_miroc_mi
+test_ppp_miroc_mi_SOURCES	= $(test_ppp_miroc_a_SOURCES)
+test_ppp_miroc_mi_LDADD		= $(test_ppp_miroc_a_LDADD)
+test_ppp_miroc_mi_CPPFLAGS	= $(AM_CPPFLAGS) -DTEST_PPP_MIROC=5
 
 noinst_SCRIPTS	=	$(WTC)
 CLEANFILES		+=	$(noinst_SCRIPTS) $(MIROCH)
