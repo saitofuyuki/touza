@@ -1,7 +1,7 @@
 !!!_! emu_usi.F90 - touza/emu usysio emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/03 11:09:07 fuyuki emu_usi.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 15:49:31 fuyuki emu_usi.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -181,8 +181,8 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std,only: choice, is_msglev_NORMAL, &
-         & arg_diag, mwe_diag, env_diag, fun_diag
+    use TOUZA_Std,only: choice, is_msglev_NORMAL
+    use TOUZA_Std,only: arg_diag, mwe_diag, env_diag, fun_diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -236,8 +236,8 @@ contains
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std,only: choice, &
-         & mwe_finalize, arg_finalize, log_finalize, env_finalize, fun_finalize
+    use TOUZA_Std,only: choice
+    use TOUZA_Std,only: mwe_finalize, arg_finalize, log_finalize, env_finalize, fun_finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -428,9 +428,8 @@ contains
   end subroutine open_bind_sysin
 !!!_  & open_bind_sysout - YYSYSO compatible
   subroutine open_bind_sysout(ierr, usys, file, sfx, u)
-    use TOUZA_Std,only: &
-         & choice, ndigits, &
-         & get_wni, uout, is_msglev_INFO, new_unit
+    use TOUZA_Std,only: choice, ndigits
+    use TOUZA_Std,only: get_wni, uout, is_msglev_INFO, new_unit
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(out)         :: usys
@@ -737,10 +736,9 @@ contains
 !!!_ + Deprecated
 !!!_  & legacy_open_sysin - YYSYSI compatible
   subroutine legacy_open_sysin(ierr, u)
-    use TOUZA_Std,only: &
-         & choice, &
-         & parse, get_nparam, get_param, &
-         & get_wni, uin, is_msglev_INFO, new_unit
+    use TOUZA_Std,only: choice
+    use TOUZA_Std,only: parse, get_nparam, get_param
+    use TOUZA_Std,only: get_wni, uin, is_msglev_INFO, new_unit
     implicit none
     integer,         intent(out)          :: ierr
     integer,         intent(out),optional :: u

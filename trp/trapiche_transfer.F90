@@ -1,7 +1,7 @@
 !!!_! trapiche_transfer.F90 - TOUZA/Trapiche(trapiche) communication
 ! Maintainer: SAITO Fuyuki
 ! Created: May 21 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/10 14:14:25 fuyuki trapiche_transfer.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 15:48:34 fuyuki trapiche_transfer.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -229,8 +229,8 @@ contains
     use MPI,only: MPI_Irecv
 #  endif
     use TOUZA_Std,only: KDBL
-    use TOUZA_Trp_float,only: decode_alloc, retrieve_nbgz, KB_HEAD, &
-         & retrieve_ncnz, KCODE_MANUAL
+    use TOUZA_Trp_float,only: decode_alloc, retrieve_nbgz, KB_HEAD
+    use TOUZA_Trp_float,only: retrieve_ncnz, KCODE_MANUAL
     implicit none
     integer,parameter :: KTGT  = KDBL
     integer,parameter :: KMTGT = MPI_INTEGER
@@ -277,9 +277,9 @@ end module TOUZA_Trp_transfer
 !!!_@ test_trapiche_transfer - test program
 #ifdef TEST_TRAPICHE_TRANSFER
 program test_trapiche_transfer
-  use TOUZA_Std,only: get_ni, get_comm, diag_real_props, &
-       & std_init=>init, std_diag=>diag, std_finalize=>finalize, &
-       & KDBL
+  use TOUZA_Std,only: std_init=>init, std_diag=>diag, std_finalize=>finalize
+  use TOUZA_Std,only: get_ni, get_comm, diag_real_props
+  use TOUZA_Std,only: KDBL
   use TOUZA_Trp_pack,only: RELLENO_TRANSPOSE
   use TOUZA_Trp_std, only: binstr, MPI_STATUS_SIZE, MPI_DOUBLE_PRECISION
   use TOUZA_Trp_transfer
@@ -548,9 +548,8 @@ contains
   end subroutine set_test_array
   subroutine parse_args &
        & (ierr, test, scheme, n, itr, ksign, xbits)
-    use TOUZA_Std, only: &
-         & parse, decl_pos_arg, get_option, arg_init, arg_diag, &
-         & banner
+    use TOUZA_Std, only: parse, decl_pos_arg, get_option, arg_init, arg_diag
+    use TOUZA_Std, only: banner
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: test

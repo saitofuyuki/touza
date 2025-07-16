@@ -1,7 +1,7 @@
 !!!_! ppp_comm.F90 - TOUZA/ppp communication
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/11 08:24:08 fuyuki ppp_comm.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 15:50:36 fuyuki ppp_comm.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -249,8 +249,7 @@ contains
     use MPI,only: MPI_Irecv
 #  endif
     use TOUZA_Ppp_std,only: choice
-    use TOUZA_Ppp_amng,only: &
-         & check_agent, base_agent, agents_translate, inquire_agent
+    use TOUZA_Ppp_amng,only: check_agent, base_agent, agents_translate, inquire_agent
     implicit none
     integer,parameter :: KMTGT = MPI_INTEGER
     integer,intent(out)         :: ierr

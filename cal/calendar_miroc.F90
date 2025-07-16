@@ -1,7 +1,7 @@
 !!!_! calendar_miroc.F90 - touza/calendar: miroc compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2025/06/26 16:04:55 fuyuki calendar_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 15:57:56 fuyuki calendar_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -187,8 +187,8 @@ contains
 !!!_ & init - calendar init
   subroutine init (ifpar, jfpar, levv)
     use TOUZA_Cal_primitive,only: msg, msglev_normal, msglev_warning
-    use TOUZA_Cal,only: cal_init=>init, set_perpetual_date, &
-         & auto_once, auto_false
+    use TOUZA_Cal,only: cal_init=>init, set_perpetual_date
+    use TOUZA_Cal,only: auto_once, auto_false
     implicit none
     integer,intent(in)          :: ifpar, jfpar
     integer,intent(in),optional :: levv
@@ -243,8 +243,7 @@ contains
        & (mode,      auto, &
        &  ifpar,     jfpar, &
        &  perpetual, idatpp)
-    use TOUZA_Cal,only: &
-         & p_error, p_ideal, p_grego_i, p_grego_l, p_user
+    use TOUZA_Cal,only: p_error, p_ideal, p_grego_i, p_grego_l, p_user
     implicit none
     integer,intent(out) :: mode
     logical,intent(out) :: auto

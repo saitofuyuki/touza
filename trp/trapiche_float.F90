@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2025/07/10 12:43:14 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 16:11:25 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -1239,9 +1239,9 @@ contains
 !!!_  & health_check
   subroutine health_check_d &
        & (ierr, mold, u, levv)
-    use TOUZA_Trp_std,only: choice, &
-         & msg, is_msglev, is_msglev_detail, &
-         & check_real_dnm
+    use TOUZA_Trp_std,only: choice
+    use TOUZA_Trp_std,only: msg, is_msglev, is_msglev_detail
+    use TOUZA_Trp_std,only: check_real_dnm
     implicit none
     integer,parameter :: KRFLD=KDBL
     integer,         intent(out)         :: ierr
@@ -1262,9 +1262,9 @@ contains
   end subroutine health_check_d
   subroutine health_check_f &
        & (ierr, mold, u, levv)
-    use TOUZA_Trp_std,only: choice, &
-         & msg, is_msglev, is_msglev_detail, &
-         & check_real_dnm
+    use TOUZA_Trp_std,only: choice
+    use TOUZA_Trp_std,only: msg, is_msglev, is_msglev_detail
+    use TOUZA_Trp_std,only: check_real_dnm
     implicit none
     integer,parameter :: KRFLD=KFLT
     integer,         intent(out)         :: ierr
@@ -4355,9 +4355,8 @@ contains
        & (nbits, nmem, kcode, kfill) &
        & result(m)
     use TOUZA_Trp_std, only: choice
-    use TOUZA_Trp_pack,only: &
-         & RELLENO_TRANSPOSE, RELLENO_SEQUENTIAL, &
-         & RELLENO_STRIDE,    RELLENO_MANUAL
+    use TOUZA_Trp_pack,only: RELLENO_TRANSPOSE, RELLENO_SEQUENTIAL
+    use TOUZA_Trp_pack,only: RELLENO_STRIDE,    RELLENO_MANUAL
     implicit none
     integer,intent(in)          :: nbits
     integer,intent(in)          :: nmem

@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/10 12:01:32 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 15:46:19 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -77,9 +77,8 @@ module TOUZA_Std_env
 !!!_ = declaration
 !!!_  - ISO_FORTRAN_ENV module
 #if HAVE_FORTRAN_ISO_FORTRAN_ENV
-  use ISO_FORTRAN_ENV,only: &
-       &  OUTPUT_UNIT, INPUT_UNIT, ERROR_UNIT, &
-       &  FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
+  use ISO_FORTRAN_ENV,only: OUTPUT_UNIT, INPUT_UNIT, ERROR_UNIT
+  use ISO_FORTRAN_ENV,only: FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
 
 #  if OPT_STDOUT_UNIT < 0
 #    undef  OPT_STDOUT_UNIT
@@ -519,8 +518,7 @@ contains
 !!!_  & diag_recl
   subroutine diag_recl(ierr, u)
 #if HAVE_FORTRAN_ISO_FORTRAN_ENV
-  use ISO_FORTRAN_ENV,only: &
-       &  FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
+  use ISO_FORTRAN_ENV,only: FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
 #endif
     use TOUZA_Std_log,only: msg_mdl
     use TOUZA_Std_utl,only: choice
@@ -558,8 +556,7 @@ contains
 !!!_  & diag_strm
   subroutine diag_strm(ierr, u)
 #if HAVE_FORTRAN_ISO_FORTRAN_ENV
-  use ISO_FORTRAN_ENV,only: &
-       &  FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
+  use ISO_FORTRAN_ENV,only: FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
 #endif
     use TOUZA_Std_log,only: msg_mdl
     use TOUZA_Std_utl,only: choice

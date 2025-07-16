@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2025/07/10 12:48:42 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 16:12:15 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -695,9 +695,8 @@ contains
 !!!_  - init subcontracts
 !!!_   & set_bodr_wnative
   subroutine set_bodr_wnative(ierr, bodrw, u, levv)
-    use TOUZA_Nio_std,only: &
-         & choice, msg, is_msglev_info, is_msglev_fatal, &
-         & kendi_mem, kendi_file
+    use TOUZA_Nio_std,only: choice, msg, is_msglev_info, is_msglev_fatal
+    use TOUZA_Nio_std,only: kendi_mem, kendi_file
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: bodrw
@@ -785,12 +784,11 @@ contains
        &  vmiss, &
        &  utime, &
        &  csign, msign)
-    use TOUZA_Nio_header,only: &
-         & put_item, &
-         & hi_IDFM,  hi_UTIM,  hi_FNUM,  hi_DNUM,  &
-         & hi_ASTR1, hi_AEND1, hi_ASTR2, hi_AEND2, hi_ASTR3, hi_AEND3,  &
-         & hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL,  &
-         & hi_STYP,  hi_IOPTN, hi_ROPTN, hi_CSIGN, hi_MSIGN
+    use TOUZA_Nio_header,only: put_item
+    use TOUZA_Nio_header,only: hi_IDFM,  hi_UTIM,  hi_FNUM,  hi_DNUM
+    use TOUZA_Nio_header,only: hi_ASTR1, hi_AEND1, hi_ASTR2, hi_AEND2, hi_ASTR3, hi_AEND3
+    use TOUZA_Nio_header,only: hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL
+    use TOUZA_Nio_header,only: hi_STYP,  hi_IOPTN, hi_ROPTN, hi_CSIGN, hi_MSIGN
     use TOUZA_Nio_std,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
@@ -925,10 +923,9 @@ contains
   subroutine get_default_header &
        & (head,  &
        &  vmiss, utime, csign, msign)
-    use TOUZA_Nio_header,only: &
-         & put_item, &
-         & hi_UTIM,  hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL,  &
-         & hi_CSIGN, hi_MSIGN
+    use TOUZA_Nio_header,only: put_item
+    use TOUZA_Nio_header,only: hi_UTIM,  hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL
+    use TOUZA_Nio_header,only: hi_CSIGN, hi_MSIGN
     implicit none
     character(len=*),intent(out)         :: head(*)
     real(kind=KDBL), intent(in),optional :: vmiss
@@ -2057,8 +2054,7 @@ contains
   subroutine nio_skip_records &
        & (ierr, n, u, nskip, head, krect)
     use TOUZA_Nio_std,   only: WHENCE_CURRENT, sus_skip_irec, sus_skip_lrec, choice
-    use TOUZA_Nio_header,only: &
-         & nitem, litem, hi_DFMT, get_item
+    use TOUZA_Nio_header,only: nitem, litem, hi_DFMT, get_item
     implicit none
     integer,         intent(out)          :: ierr
     integer,         intent(in)           :: n
@@ -4490,9 +4486,8 @@ contains
        & (ierr,  &
        &  d,     n,   u, krect, vmiss, &
        &  kopts, bes, nr)
-    use TOUZA_Trp,only: &
-         & retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
-         & count_packed, suggest_filling
+    use TOUZA_Trp,only: retrieve_nbgz, retrieve_ncnz, retrieve_extra
+    use TOUZA_Trp,only: count_packed, suggest_filling
     use TOUZA_Nio_std,only: set_runl_loop
     use TOUZA_Trp,only: KB_HEAD
     implicit none
@@ -4592,9 +4587,8 @@ contains
        & (ierr,  &
        &  d,     n,   u, krect, vmiss, &
        &  kopts, bes, nr)
-    use TOUZA_Trp,only: &
-         & retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
-         & count_packed, suggest_filling
+    use TOUZA_Trp,only: retrieve_nbgz, retrieve_ncnz, retrieve_extra
+    use TOUZA_Trp,only: count_packed, suggest_filling
     use TOUZA_Nio_std,only: set_runl_loop
     use TOUZA_Trp,only: KB_HEAD
     implicit none
@@ -5037,9 +5031,8 @@ contains
        & (ierr,  &
        &  d,     n,     u,     krect, pre,  post,  &
        &  vmiss, mbits, xbits, xtop,  xbtm, kcode, kapp)
-    use TOUZA_Trp,only: &
-         & count_packed, encode_alloc, retrieve_nbgz, &
-         & KB_HEAD, guardar_extra
+    use TOUZA_Trp,only: count_packed, encode_alloc, retrieve_nbgz
+    use TOUZA_Trp,only: KB_HEAD, guardar_extra
     use TOUZA_Trp,only: show_bagazo_props
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
@@ -5101,9 +5094,8 @@ contains
        & (ierr,  &
        &  d,     n,     u,     krect, pre,  post,  &
        &  vmiss, mbits, xbits, xtop,  xbtm, kcode, kapp)
-    use TOUZA_Trp,only: &
-         & count_packed, encode_alloc, retrieve_nbgz, &
-         & KB_HEAD, guardar_extra
+    use TOUZA_Trp,only: count_packed, encode_alloc, retrieve_nbgz
+    use TOUZA_Trp,only: KB_HEAD, guardar_extra
     use TOUZA_Trp,only: show_bagazo_props
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
@@ -5169,9 +5161,8 @@ contains
        &  d,     m,     n,    u,    krect,  sub, &
        &  vmiss, kcode, kopts,napp, kapp)
     use TOUZA_Nio_std,only: choice
-    use TOUZA_Trp,only: &
-         & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
-         & KB_HEAD,      show_bagazo_props
+    use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
+    use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out)   :: ierr
@@ -5255,9 +5246,8 @@ contains
        &  d,     m,     n,     u,    krect,  sub, &
        &  vmiss, kcode, kopts, napp, kapp)
     use TOUZA_Nio_std,only: choice
-    use TOUZA_Trp,only: &
-         & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
-         & KB_HEAD,      show_bagazo_props
+    use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
+    use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
     integer,         intent(out)   :: ierr
@@ -5341,9 +5331,8 @@ contains
        &  ibagaz, runl,  jrpos, &
        &  vmiss,  kcode, kopts)
     use TOUZA_Nio_std,only: choice
-    use TOUZA_Trp,only: &
-         & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
-         & KB_HEAD,      show_bagazo_props
+    use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
+    use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,            intent(out)   :: ierr
@@ -5452,9 +5441,8 @@ contains
        &  ibagaz, runl,  jrpos, &
        &  vmiss,  kcode, kopts)
     use TOUZA_Nio_std,only: choice
-    use TOUZA_Trp,only: &
-         & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
-         & KB_HEAD,      show_bagazo_props
+    use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
+    use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
     integer,            intent(out)   :: ierr
@@ -5569,9 +5557,8 @@ contains
        &  ibagaz, runl,  jrpos, &
        &  vmiss,  kcode, kopts,napp, icom)
     use TOUZA_Nio_std,only: choice
-    use TOUZA_Trp,only: &
-         & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
-         & KB_HEAD,      show_bagazo_props, suggest_filling
+    use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
+    use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props, suggest_filling
     use TOUZA_Trp,only: count_packed, pack_restore
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
@@ -5699,9 +5686,8 @@ contains
        &  ibagaz, runl,  jrpos, &
        &  vmiss,  kcode, kopts,napp, icom)
     use TOUZA_Nio_std,only: choice
-    use TOUZA_Trp,only: &
-         & decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra, &
-         & KB_HEAD,      show_bagazo_props, suggest_filling
+    use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
+    use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props, suggest_filling
     use TOUZA_Trp,only: count_packed, pack_restore
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
@@ -8126,10 +8112,9 @@ contains
 !!!_  & get_record_prop - get sequential record properties (byte-order and separator size)
   subroutine get_record_prop &
        & (ierr, krect, u)
-    use TOUZA_Nio_std,   only: &
-         & KI32, KI64, KIOFS, is_eof_ss, &
-         & WHENCE_ABS, sus_read_isep, sus_rseek, sus_eswap
-    use TOUZA_Nio_std,   only: sus_getpos
+    use TOUZA_Nio_std, only: KI32, KI64, KIOFS, is_eof_ss
+    use TOUZA_Nio_std, only: WHENCE_ABS, sus_read_isep, sus_rseek, sus_eswap
+    use TOUZA_Nio_std, only: sus_getpos
     use TOUZA_Nio_header,only: nitem, litem
     implicit none
     integer,intent(out) :: ierr
@@ -9847,11 +9832,11 @@ contains
 !!!_  & parse_header_base - parse minimum properties
   subroutine parse_header_base &
        & (ierr, kfmt, kaxs, vmiss, head)
-    use TOUZA_Nio_header,only: litem, &
-         & hi_DFMT,  hi_MISS,  &
-         & hi_ASTR1, hi_ASTR2, hi_ASTR3, &
-         & hi_AEND1, hi_AEND2, hi_AEND3, &
-         & get_item
+    use TOUZA_Nio_header,only: litem
+    use TOUZA_Nio_header,only: hi_DFMT,  hi_MISS
+    use TOUZA_Nio_header,only: hi_ASTR1, hi_ASTR2, hi_ASTR3
+    use TOUZA_Nio_header,only: hi_AEND1, hi_AEND2, hi_AEND3
+    use TOUZA_Nio_header,only: get_item
     use TOUZA_Nio_std,only: KDBL, KFLT, KI32, KI64
     implicit none
     integer,         intent(out) :: ierr
@@ -9929,9 +9914,8 @@ contains
        & (head, kidx, lazy) &
        & result (n)
     use TOUZA_Nio_std,only: choice
-    use TOUZA_Nio_header,only: &
-         & hi_ASTR1, hi_ASTR2, hi_ASTR3, &
-         & hi_AEND1, hi_AEND2, hi_AEND3
+    use TOUZA_Nio_header,only: hi_ASTR1, hi_ASTR2, hi_ASTR3
+    use TOUZA_Nio_header,only: hi_AEND1, hi_AEND2, hi_AEND3
     implicit none
     character(len=*),intent(in)  :: head(*)
     integer,         intent(in)  :: kidx
@@ -9971,9 +9955,8 @@ contains
        & (head, kidx, lazy, mold) &
        & result (n)
     use TOUZA_Nio_std,only: choice
-    use TOUZA_Nio_header,only: &
-         & hi_ASTR1, hi_ASTR2, hi_ASTR3, &
-         & hi_AEND1, hi_AEND2, hi_AEND3
+    use TOUZA_Nio_header,only: hi_ASTR1, hi_ASTR2, hi_ASTR3
+    use TOUZA_Nio_header,only: hi_AEND1, hi_AEND2, hi_AEND3
     implicit none
     integer,parameter :: KARG=KI32
     integer(KIND=KARG) :: n
@@ -10144,9 +10127,8 @@ contains
 !!!_  & get_header_cname - get coordinate name
   subroutine get_header_cname &
        & (name, head, kidx)
-    use TOUZA_Nio_header,only: &
-         & get_item, &
-         & hi_AITM1, hi_AITM2, hi_AITM3
+    use TOUZA_Nio_header,only: get_item
+    use TOUZA_Nio_header,only: hi_AITM1, hi_AITM2, hi_AITM3
     implicit none
     character(len=*),intent(out) :: name
     character(len=*),intent(in)  :: head(*)
@@ -10169,9 +10151,8 @@ contains
 !!!_  & put_header_cname - put coordinate names
   subroutine put_header_cname &
        & (ierr, head, name, kidx)
-    use TOUZA_Nio_header,only: &
-         & put_item, &
-         & hi_AITM1, hi_AITM2, hi_AITM3
+    use TOUZA_Nio_header,only: put_item
+    use TOUZA_Nio_header,only: hi_AITM1, hi_AITM2, hi_AITM3
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(inout) :: head(*)
@@ -10193,11 +10174,10 @@ contains
 !!!_  & get_header_cprop - get coordinate properties
   subroutine get_header_cprop &
        & (name, irange, head, kidx)
-    use TOUZA_Nio_header,only: &
-         & get_item, &
-         & hi_AITM1, hi_AITM2, hi_AITM3, &
-         & hi_ASTR1, hi_ASTR2, hi_ASTR3, &
-         & hi_AEND1, hi_AEND2, hi_AEND3
+    use TOUZA_Nio_header,only: get_item
+    use TOUZA_Nio_header,only: hi_AITM1, hi_AITM2, hi_AITM3
+    use TOUZA_Nio_header,only: hi_ASTR1, hi_ASTR2, hi_ASTR3
+    use TOUZA_Nio_header,only: hi_AEND1, hi_AEND2, hi_AEND3
     implicit none
     character(len=*),intent(out) :: name
     integer,         intent(out) :: irange(*)
@@ -10229,11 +10209,10 @@ contains
 !!!_  & put_header_cprop - put coordinate properties
   subroutine put_header_cprop &
        & (ierr, head, name, irange, kidx)
-    use TOUZA_Nio_header,only: &
-         & put_item, &
-         & hi_AITM1, hi_AITM2, hi_AITM3, &
-         & hi_ASTR1, hi_ASTR2, hi_ASTR3, &
-         & hi_AEND1, hi_AEND2, hi_AEND3
+    use TOUZA_Nio_header,only: put_item
+    use TOUZA_Nio_header,only: hi_AITM1, hi_AITM2, hi_AITM3
+    use TOUZA_Nio_header,only: hi_ASTR1, hi_ASTR2, hi_ASTR3
+    use TOUZA_Nio_header,only: hi_AEND1, hi_AEND2, hi_AEND3
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(inout) :: head(*)
@@ -11858,8 +11837,8 @@ contains
   subroutine test_auto_record &
        & (ierr, jarg)
     use TOUZA_std,only: is_error_match
-    use TOUZA_Nio_std,   only: KDBL,  KIOFS, &
-         & sus_open, sus_close, sus_write_irec, sus_write_lrec
+    use TOUZA_Nio_std,only: KDBL,  KIOFS
+    use TOUZA_Nio_std,only: sus_open, sus_close, sus_write_irec, sus_write_lrec
     use TOUZA_Nio_header,only: nitem, litem, hi_ITEM, put_item, get_item
     use TOUZA_Nio_record
     implicit none

@@ -1,7 +1,7 @@
 !!!_! calendar_ils.F90 - touza/calendar: (sample) ILS interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2025/06/26 16:04:21 fuyuki calendar_ils.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 16:00:09 fuyuki calendar_ils.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -25,9 +25,8 @@
 #endif
 !!!_@ calendar_ils - calendar/ILS compatible procedures
 module TOUZA_Cal_ils
-  use TOUZA_Cal,only: &
-       & KRC, &
-       & p_grego_i, p_grego_l, p_ideal
+  use TOUZA_Cal,only: KRC
+  use TOUZA_Cal,only: p_grego_i, p_grego_l, p_ideal
 !!!_ = declaration
   implicit none
 !!!_  * private
@@ -54,8 +53,8 @@ module TOUZA_Cal_ils
 contains
 !!!_ & init - calendar init
   subroutine init (ierr, cmode, levv)
-    use TOUZA_Cal,only: cal_init=>init, inq_nsec_day, xreal, &
-         &              auto_false
+    use TOUZA_Cal,only: cal_init=>init, inq_nsec_day, xreal
+    use TOUZA_Cal,only: auto_false
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in)          :: cmode
@@ -104,8 +103,7 @@ contains
   integer(kind=KI4) function cal_date_diff4 &
        & (date1, date2) &
        &  result(dsec)
-    use TOUZA_Cal, only: &
-         & conv_date_cday, conv_time_tsec
+    use TOUZA_Cal, only: conv_date_cday, conv_time_tsec
     implicit none
     integer,intent(in) :: date1(6)
     integer,intent(in) :: date2(6)
@@ -125,8 +123,7 @@ contains
   integer(kind=KI8) function cal_date_diff8 &
        & (date1, date2) &
        &  result(dsec)
-    use TOUZA_Cal, only: &
-         & conv_date_cday, conv_time_tsec
+    use TOUZA_Cal, only: conv_date_cday, conv_time_tsec
     implicit none
     integer,intent(in) :: date1(6)
     integer,intent(in) :: date2(6)
@@ -144,9 +141,8 @@ contains
 !!!_ & inc_calendar4 - advance time in seconds since reference date
   subroutine inc_calendar4 &
        & (date, delta_t)
-    use TOUZA_Cal, only: &
-         & conv_date_cday, conv_time_tsec, &
-         & conv_cday_adate, conv_tsec_atime
+    use TOUZA_Cal, only: conv_date_cday, conv_time_tsec
+    use TOUZA_Cal, only: conv_cday_adate, conv_tsec_atime
     implicit none
     integer,          intent(inout) :: date(6)
     integer(kind=KI4),intent(in)    :: delta_t
@@ -175,10 +171,9 @@ contains
 !!!_ & inc_calendar8 - advance time in seconds since reference date
   subroutine inc_calendar8 &
        & (date, delta_t)
-    use TOUZA_Cal, only: &
-         & conv_date_cday, conv_time_tsec, &
-         & conv_cday_adate, conv_tsec_atime, &
-         & xreal
+    use TOUZA_Cal, only: conv_date_cday, conv_time_tsec
+    use TOUZA_Cal, only: conv_cday_adate, conv_tsec_atime
+    use TOUZA_Cal, only: xreal
     implicit none
     integer,          intent(inout) :: date(6)
     integer(kind=KI8),intent(in)    :: delta_t
@@ -225,8 +220,7 @@ contains
 !!!_ & inc_month - advance time in months since reference date
   subroutine inc_month &
        & (date, month)
-    use TOUZA_Cal, only: &
-         & conv_date_cday, conv_cday_adate
+    use TOUZA_Cal, only: conv_date_cday, conv_cday_adate
     implicit none
     integer,intent(inout) :: date(6)
     integer,intent(in)    :: month
@@ -243,8 +237,7 @@ contains
 !!!_ & dec_month - retreat time in months since reference date
   subroutine dec_month &
        & (date, month)
-    use TOUZA_Cal, only: &
-         & conv_date_cday, conv_cday_adate
+    use TOUZA_Cal, only: conv_date_cday, conv_cday_adate
     implicit none
     integer,intent(inout) :: date(6)
     integer,intent(in)    :: month

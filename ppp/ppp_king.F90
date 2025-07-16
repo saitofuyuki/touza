@@ -1,7 +1,7 @@
 !!!_! ppp_king.F90 - TOUZA/ppp king control (xmcomm/xmking replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/11 08:23:55 fuyuki ppp_king.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 15:50:22 fuyuki ppp_king.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -630,9 +630,8 @@ program test_ppp_king
   stop
 contains
   subroutine batch_test_king (ierr, icomm, ktest)
-    use TOUZA_Ppp_amng,only:&
-         & inquire_agent, &
-         & new_agent_root,new_agent_family
+    use TOUZA_Ppp_amng,only: inquire_agent
+    use TOUZA_Ppp_amng,only: new_agent_root,new_agent_family
     implicit none
     integer,intent(out) :: ierr
     integer,intent(in)  :: icomm

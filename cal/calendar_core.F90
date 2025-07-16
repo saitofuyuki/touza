@@ -1,7 +1,7 @@
 !!!_! calendar_core.F90 - TOUZA/Cal core
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2025/06/27 18:43:00 fuyuki calendar_core.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 16:03:45 fuyuki calendar_core.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -29,13 +29,12 @@
 module TOUZA_Cal_core
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Cal_primitive,only: &
-       & KRC,        XREAL,      &
-       & cal_date_t, cal_time_t, cal_daysec_t, &
-       & p_error,    p_ideal,    p_grego_i,    p_grego_l, p_user, &
-       & is_leap_year, &
-       & trace_control, trace_fine, &
-       & control_mode,  control_deep, is_first_force
+  use TOUZA_Cal_primitive,only: KRC,        XREAL
+  use TOUZA_Cal_primitive,only: cal_date_t, cal_time_t, cal_daysec_t
+  use TOUZA_Cal_primitive,only: p_error,    p_ideal,    p_grego_i,    p_grego_l, p_user
+  use TOUZA_Cal_primitive,only: is_leap_year
+  use TOUZA_Cal_primitive,only: trace_control, trace_fine
+  use TOUZA_Cal_primitive,only: control_mode,  control_deep, is_first_force
 !!!_  - private
   implicit none
 
@@ -243,9 +242,9 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Cal_primitive,only: primitive_diag=>diag, &
-         & choice, msg, msglev_normal, msglev_warning, &
-         & control_mode, control_deep
+    use TOUZA_Cal_primitive,only: primitive_diag=>diag
+    use TOUZA_Cal_primitive,only: choice, msg, msglev_normal, msglev_warning
+    use TOUZA_Cal_primitive,only: control_mode, control_deep
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -418,8 +417,7 @@ contains
   integer function inq_nday_month &
        & (self, cd) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_inq_nday_month => inq_nday_month
+    use TOUZA_Cal_primitive,only: primitive_inq_nday_month=>inq_nday_month
     implicit none
     type(cal_attr_t),intent(inout) :: self
     type(cal_date_t),intent(in)    :: cd
@@ -432,8 +430,7 @@ contains
   integer function inq_nday_year &
        & (self, cd) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_inq_nday_year => inq_nday_year
+    use TOUZA_Cal_primitive,only: primitive_inq_nday_year=>inq_nday_year
     implicit none
     type(cal_attr_t),intent(inout) :: self
     type(cal_date_t),intent(in)    :: cd
@@ -446,8 +443,7 @@ contains
   integer function inq_nmonth_year &
        & (self, cd) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_inq_nmonth_year => inq_nmonth_year
+    use TOUZA_Cal_primitive,only: primitive_inq_nmonth_year=>inq_nmonth_year
     implicit none
     type(cal_attr_t),intent(in) :: self
     type(cal_date_t),intent(in) :: cd
@@ -459,8 +455,7 @@ contains
   integer function inq_nsec_day &
        & (self, cd) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_inq_nsec_day => inq_nsec_day
+    use TOUZA_Cal_primitive,only: primitive_inq_nsec_day=>inq_nsec_day
     implicit none
     type(cal_attr_t),intent(in)          :: self
     type(cal_date_t),intent(in),optional :: cd
@@ -472,8 +467,7 @@ contains
   integer function inq_nsec_minute &
        & (self, cd) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_inq_nsec_minute => inq_nsec_minute
+    use TOUZA_Cal_primitive,only: primitive_inq_nsec_minute=>inq_nsec_minute
     implicit none
     type(cal_attr_t),intent(in)          :: self
     type(cal_date_t),intent(in),optional :: cd
@@ -485,8 +479,7 @@ contains
   integer function inq_nsec_hour &
        & (self, cd) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_inq_nsec_hour => inq_nsec_hour
+    use TOUZA_Cal_primitive,only: primitive_inq_nsec_hour=>inq_nsec_hour
     implicit none
     type(cal_attr_t),intent(in)          :: self
     type(cal_date_t),intent(in),optional :: cd
@@ -498,8 +491,7 @@ contains
   integer function inq_nminute_hour &
        & (self, cd) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_inq_nminute_hour => inq_nminute_hour
+    use TOUZA_Cal_primitive,only: primitive_inq_nminute_hour=>inq_nminute_hour
     implicit none
     type(cal_attr_t),intent(in)          :: self
     type(cal_date_t),intent(in),optional :: cd
@@ -511,8 +503,7 @@ contains
   integer function inq_nday_period &
        & (self) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_inq_nday_period => inq_nday_period
+    use TOUZA_Cal_primitive,only: primitive_inq_nday_period=>inq_nday_period
     implicit none
     type(cal_attr_t),intent(in)          :: self
     r = primitive_inq_nday_period (self % mode)
@@ -523,8 +514,7 @@ contains
   integer function inq_nyear_period &
        & (self) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_inq_nyear_period => inq_nyear_period
+    use TOUZA_Cal_primitive,only: primitive_inq_nyear_period=>inq_nyear_period
     implicit none
     type(cal_attr_t),intent(in)          :: self
     r = primitive_inq_nyear_period (self % mode)
@@ -535,8 +525,7 @@ contains
   type(cal_daysec_t) function conv_csec_cdaysec_c &
        & (self, csec, cd) &
        result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_csec_cdaysec_c => conv_csec_cdaysec_c
+    use TOUZA_Cal_primitive,only: primitive_conv_csec_cdaysec_c=>conv_csec_cdaysec_c
     implicit none
     type(cal_attr_t),intent(in)          :: self
     real(kind=KRC),  intent(in)          :: csec
@@ -548,8 +537,7 @@ contains
   type(cal_daysec_t) function conv_csec_cdaysec_i &
        & (self, csec, cd) &
        result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_csec_cdaysec_i => conv_csec_cdaysec_i
+    use TOUZA_Cal_primitive,only: primitive_conv_csec_cdaysec_i=>conv_csec_cdaysec_i
     implicit none
     type(cal_attr_t),intent(in)          :: self
     integer,         intent(in)          :: csec
@@ -562,8 +550,7 @@ contains
   real(kind=KRC) function conv_cdaysec_csec_c &
        & (self, daysec, cd, mold) &
        result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_cdaysec_csec_c => conv_cdaysec_csec_c
+    use TOUZA_Cal_primitive,only: primitive_conv_cdaysec_csec_c=>conv_cdaysec_csec_c
     implicit none
     type(cal_attr_t),  intent(in) :: self
     type(cal_daysec_t),intent(in) :: daysec
@@ -577,8 +564,7 @@ contains
   integer function conv_cdaysec_csec_i &
        & (self, daysec, cd, mold) &
        result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_cdaysec_csec_i => conv_cdaysec_csec_i
+    use TOUZA_Cal_primitive,only: primitive_conv_cdaysec_csec_i=>conv_cdaysec_csec_i
     implicit none
     type(cal_attr_t),  intent(in) :: self
     type(cal_daysec_t),intent(in) :: daysec
@@ -593,8 +579,7 @@ contains
   type(cal_time_t) function conv_tsec_time_c &
        & (self, tsec, cd) &
        result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_tsec_time_c => conv_tsec_time_c
+    use TOUZA_Cal_primitive,only: primitive_conv_tsec_time_c=>conv_tsec_time_c
     implicit none
     type(cal_attr_t),intent(in)          :: self
     real(kind=KRC),  intent(in)          :: tsec
@@ -607,8 +592,7 @@ contains
   type(cal_time_t) function conv_tsec_time_i &
        & (self, tsec, cd) &
        result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_tsec_time_i => conv_tsec_time_i
+    use TOUZA_Cal_primitive,only: primitive_conv_tsec_time_i=>conv_tsec_time_i
     implicit none
     type(cal_attr_t),intent(in)          :: self
     integer,         intent(in)          :: tsec
@@ -622,8 +606,7 @@ contains
   integer function conv_time_tsec_i &
        & (self, t, cd, mold) &
        result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_time_tsec_i => conv_time_tsec_i
+    use TOUZA_Cal_primitive,only: primitive_conv_time_tsec_i=>conv_time_tsec_i
     implicit none
     type(cal_attr_t),intent(in) :: self
     type(cal_time_t),intent(in) :: t
@@ -637,8 +620,7 @@ contains
   real(kind=KRC) function conv_time_tsec_c &
        & (self, t, cd, mold) &
        result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_time_tsec_c => conv_time_tsec_c
+    use TOUZA_Cal_primitive,only: primitive_conv_time_tsec_c=>conv_time_tsec_c
     implicit none
     type(cal_attr_t),intent(in) :: self
     type(cal_time_t),intent(in) :: t
@@ -654,8 +636,7 @@ contains
        & (self, &
        &  cday) &
        result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_cday_date_i => conv_cday_date_i
+    use TOUZA_Cal_primitive,only: primitive_conv_cday_date_i=>conv_cday_date_i
     implicit none
     type(cal_attr_t),intent(inout) :: self
     integer,         intent(in)    :: cday
@@ -674,8 +655,7 @@ contains
        & (self, &
        &  cday) &
        result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_cday_date_c => conv_cday_date_c
+    use TOUZA_Cal_primitive,only: primitive_conv_cday_date_c=>conv_cday_date_c
     implicit none
     type(cal_attr_t),intent(inout) :: self
     real(kind=KRC),  intent(in)    :: cday
@@ -694,8 +674,7 @@ contains
   integer function conv_date_cday_i &
        & (self, cd, mold) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_date_cday_i => conv_date_cday_i
+    use TOUZA_Cal_primitive,only: primitive_conv_date_cday_i=>conv_date_cday_i
     implicit none
     type(cal_attr_t),intent(inout) :: self
     type(cal_date_t),intent(in)    :: cd
@@ -708,8 +687,7 @@ contains
   real(kind=KRC) function conv_date_cday_c &
        & (self, cd, mold) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_date_cday_c => conv_date_cday_c
+    use TOUZA_Cal_primitive,only: primitive_conv_date_cday_c=>conv_date_cday_c
     implicit none
     type(cal_attr_t),intent(inout) :: self
     type(cal_date_t),intent(in)    :: cd
@@ -723,8 +701,7 @@ contains
   integer function conv_date_dayy &
        & (self, cd) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_date_dayy => conv_date_dayy
+    use TOUZA_Cal_primitive,only: primitive_conv_date_dayy=>conv_date_dayy
     implicit none
     type(cal_attr_t),intent(inout) :: self
     type(cal_date_t),intent(in)    :: cd
@@ -737,8 +714,7 @@ contains
   integer function conv_date_dayy_compat &
        & (self, cd) &
        & result (r)
-    use TOUZA_Cal_primitive,only: &
-         & primitive_conv_date_dayy_compat => conv_date_dayy_compat
+    use TOUZA_Cal_primitive,only: primitive_conv_date_dayy_compat=>conv_date_dayy_compat
     implicit none
     type(cal_attr_t),intent(inout) :: self
     type(cal_date_t),intent(in)    :: cd
