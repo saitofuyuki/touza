@@ -2,10 +2,10 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2024/06/25 14:06:06 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 09:12:50 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2019-2024
+! Copyright (C) 2019-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -89,7 +89,7 @@ module TOUZA_Std_arg
   character(len=16),save :: cstdin = '-'
   character(len=16),save :: ccomment = '#'
 
-  character(len=16),save :: ctagend = '--'
+  ! character(len=16),save :: ctagend = '--'
   character(len=16),save :: cundef = ' ###'
 
   integer,save :: nparam = -1
@@ -362,7 +362,7 @@ contains
        &  (ierr, &
        &   lrec, cha,  chs, chf, tagf, kmode, &
        &   u,    levv)
-    use TOUZA_Std_log,only: msg_mdl
+    use TOUZA_Std_log,only: msg_mdl, is_msglev_DEBUG
     use TOUZA_Std_utl,only: choice, choice_a
     implicit none
     integer,         intent(out)         :: ierr
@@ -372,8 +372,11 @@ contains
     integer,         intent(in),optional :: kmode
     integer,         intent(in),optional :: u
     integer,         intent(in),optional :: levv
+    integer lv
+    character(len=128) :: txt
 
     ierr = 0
+    lv = choice(lev_verbose, levv)
 
     call choice_a(csep, chs)
     if (csep.eq.' ') csep = ','
@@ -382,11 +385,21 @@ contains
     call choice_a(cfile, chf)
     if (cfile.eq.' ') cfile = '@'
 
+    if (is_msglev_DEBUG(lv)) then
+101    format('parser component[', A, '] = <', A, '>')
+       write(txt, 101) 'sep', trim(csep)
+       call msg_mdl(txt, __MDL__, u)
+       write(txt, 101) 'assign', trim(cassign)
+       call msg_mdl(txt, __MDL__, u)
+       write(txt, 101) 'file', trim(cfile)
+       call msg_mdl(txt, __MDL__, u)
+    endif
+
     lrecurs = choice(0, lrec)
     if (lrecurs.le.0) lrecurs = 5
     call choice_a(tag_file, tagf)
     if (tag_file.ne.' ') then
-       call msg_mdl('Deprecated usage of file-argument', __MDL__)
+       call msg_mdl('Deprecated usage of file-argument', __MDL__, u)
        ierr = _ERROR(ERR_NOT_IMPLEMENTED)
     endif
 
@@ -1660,7 +1673,8 @@ contains
 
        jch = 0
        do
-          call tag_search_walk(e, jch, tag, achunk, mchunk, atags)
+          ! call tag_search_walk(e, jch, tag, achunk, mchunk, atags)
+          call tag_search_walk(e, jch, tag, achunk, atags)
           if (e.lt.0) exit
           if (k.eq.n) exit
           k = k + 1
@@ -1703,7 +1717,8 @@ contains
              jch = chunk_search_entry(achunk, mchunk, mgtab, xr)
              e = xr
              do
-                call tag_search_walk(e, jch, tag, achunk, mchunk, atags)
+                ! call tag_search_walk(e, jch, tag, achunk, mchunk, atags)
+                call tag_search_walk(e, jch, tag, achunk, atags)
                 if (e.lt.0) exit
                 if (xn.eq.0) exit
                 xn = xn - 1
@@ -2250,16 +2265,16 @@ contains
     endif
   end subroutine set_incr_index
 
-!!!_  & tag_pos
-  subroutine tag_pos(tag, jpos)
-    implicit none
-    character(len=*),intent(out) :: tag
-    integer,         intent(in)  :: jpos
-    integer jerr
-101 format(A, I0)
-    write(tag, 101, IOSTAT=jerr) trim(ccomment), jpos
-    return
-  end subroutine tag_pos
+! !!!_  & tag_pos
+!   subroutine tag_pos(tag, jpos)
+!     implicit none
+!     character(len=*),intent(out) :: tag
+!     integer,         intent(in)  :: jpos
+!     integer jerr
+! 101 format(A, I0)
+!     write(tag, 101, IOSTAT=jerr) trim(ccomment), jpos
+!     return
+!   end subroutine tag_pos
 
 !!!_  & pos_search()
   integer function pos_search &
@@ -2311,20 +2326,21 @@ contains
        else
           jentr = ach(jch)%ebgn
        endif
-       call tag_search_walk(jentr, jch, tag, ach, mch, ttbl)
+       ! call tag_search_walk(jentr, jch, tag, ach, mch, ttbl)
+       call tag_search_walk(jentr, jch, tag, ach, ttbl)
     endif
   end subroutine tag_search
 
 !!!_  - tag_search_walk
   subroutine tag_search_walk &
-       & (jentr, jch, tag, ach, mch, ttbl)
+       & (jentr, jch, tag, ach, ttbl)
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,          intent(inout) :: jentr
     integer,          intent(inout) :: jch
     character(len=*), intent(in)    :: tag
     type(arg_chunk_t),intent(in)    :: ach(0:*)
-    integer,          intent(in)    :: mch
+    ! integer,          intent(in)    :: mch
     character(len=*), intent(in)    :: ttbl(0:*)
 
     integer re
@@ -2423,13 +2439,19 @@ contains
     integer,         intent(out)         :: ierr
     integer,         intent(inout)       :: val
     character(len=*),intent(in)          :: str
-    character(len=*),intent(in)          :: cud
+    character(len=*),intent(in),optional :: cud
     integer,         intent(in),optional :: def
     logical,         intent(in),optional :: unset
+    logical bu
 
     ierr = err_default
     if (ierr.eq.0) then
-       if (str.eq.' ') then
+       if (present(cud)) then
+          bu = str .eq. cud
+       else
+          bu = str .eq. ' '
+       endif
+       if (bu) then
           if (present(def)) then
              val = def
           else if (choice(.false.,unset)) then
@@ -2455,13 +2477,19 @@ contains
     integer,         intent(out)         :: ierr
     real(kind=KTGT), intent(inout)       :: val
     character(len=*),intent(in)          :: str
-    character(len=*),intent(in)          :: cud
+    character(len=*),intent(in),optional :: cud
     real(kind=KTGT), intent(in),optional :: def
     logical,         intent(in),optional :: unset
+    logical bu
 
     ierr = err_default
     if (ierr.eq.0) then
-       if (str.eq.' ') then
+       if (present(cud)) then
+          bu = str .eq. cud
+       else
+          bu = str .eq. ' '
+       endif
+       if (bu) then
           if (present(def)) then
              val = def
           else if (choice(.false.,unset)) then
@@ -2487,13 +2515,19 @@ contains
     integer,         intent(out)         :: ierr
     real(kind=KTGT), intent(inout)       :: val
     character(len=*),intent(in)          :: str
-    character(len=*),intent(in)          :: cud
+    character(len=*),intent(in),optional :: cud
     real(kind=KTGT), intent(in),optional :: def
     logical,         intent(in),optional :: unset
+    logical bu
 
     ierr = err_default
     if (ierr.eq.0) then
-       if (str.eq.' ') then
+       if (present(cud)) then
+          bu = str .eq. cud
+       else
+          bu = str .eq. ' '
+       endif
+       if (bu) then
           if (present(def)) then
              val = def
           else if (choice(.false.,unset)) then
@@ -2518,13 +2552,19 @@ contains
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: val
     character(len=*),intent(in)          :: str
-    character(len=*),intent(in)          :: cud
+    character(len=*),intent(in),optional :: cud
     character(len=*),intent(in),optional :: def
     logical,         intent(in),optional :: unset
+    logical bu
 
     ierr = err_default
     if (ierr.eq.0) then
-       if (str.eq.' ') then
+       if (present(cud)) then
+          bu = str .eq. cud
+       else
+          bu = str .eq. ' '
+       endif
+       if (bu) then
           if (present(def)) then
              val = def
           else if (choice(.false.,unset)) then
@@ -2550,7 +2590,7 @@ contains
     integer,         intent(out)          :: ierr
     integer,         intent(inout)        :: vals(:)
     character(len=*),intent(in)           :: str
-    character(len=*),intent(in)           :: cud
+    character(len=*),intent(in), optional :: cud
     integer,         intent(in), optional :: def
     character(len=*),intent(in), optional :: sep
     integer,         intent(out),optional :: nitem
@@ -2558,13 +2598,18 @@ contains
     integer jb, je, le
     integer jv, nv
     character(len=ltag) :: chs
-    logical us
+    logical us, bu
 
     ierr = err_default
     us = choice(present(def), unset)
     jv = 0
     if (ierr.eq.0) then
-       if (str.eq.cud) then
+       if (present(cud)) then
+          bu = str .eq. cud
+       else
+          bu = str .eq. ' '
+       endif
+       if (bu) then
           if (present(def)) then
              vals(:) = def
           else if (us) then
@@ -2608,25 +2653,30 @@ contains
     use TOUZA_Std_prc,only: KTGT=>KFLT
     use TOUZA_Std_utl,only: choice, choice_a, parse_number
     implicit none
-    integer,            intent(out)          :: ierr
-    real(kind=KTGT),    intent(inout)        :: vals(:)
-    character(len=*),   intent(in)           :: str
-    character(len=*),   intent(in)           :: cud
-    real(kind=KTGT),    intent(in), optional :: def
-    character(len=KTGT),intent(in), optional :: sep
-    integer,            intent(out),optional :: nitem
-    logical,            intent(in), optional :: unset
+    integer,         intent(out)          :: ierr
+    real(kind=KTGT), intent(inout)        :: vals(:)
+    character(len=*),intent(in)           :: str
+    character(len=*),intent(in), optional :: cud
+    real(kind=KTGT), intent(in), optional :: def
+    character(len=*),intent(in), optional :: sep
+    integer,         intent(out),optional :: nitem
+    logical,         intent(in), optional :: unset
     integer jb, je, le
     integer jv, nv
     character(len=ltag) :: chs
-    logical us
+    logical us, bu
 
     ierr = err_default
     us = choice(present(def), unset)
 
     jv = 0
     if (ierr.eq.0) then
-       if (str.eq.cud) then
+       if (present(cud)) then
+          bu = str .eq. cud
+       else
+          bu = str .eq. ' '
+       endif
+       if (bu) then
           if (present(def)) then
              vals(:) = def
           else if (us) then
@@ -2673,7 +2723,7 @@ contains
     integer,         intent(out)          :: ierr
     real(kind=KTGT), intent(inout)        :: vals(:)
     character(len=*),intent(in)           :: str
-    character(len=*),intent(in)           :: cud
+    character(len=*),intent(in), optional :: cud
     real(kind=KTGT), intent(in), optional :: def
     character(len=*),intent(in), optional :: sep
     integer,         intent(out),optional :: nitem
@@ -2681,14 +2731,19 @@ contains
     integer jb, je, le
     integer jv, nv
     character(len=ltag) :: chs
-    logical us
+    logical us, bu
 
     ierr = err_default
     us = choice(present(def), unset)
 
     jv = 0
     if (ierr.eq.0) then
-       if (str.eq.cud) then
+       if (present(cud)) then
+          bu = str .eq. cud
+       else
+          bu = str .eq. ' '
+       endif
+       if (bu) then
           if (present(def)) then
              vals(:) = def
           else if (us) then
@@ -3076,7 +3131,6 @@ contains
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: tag
 
-    character(len=128) :: val
     integer jt, nt, je
 
     ierr = 0

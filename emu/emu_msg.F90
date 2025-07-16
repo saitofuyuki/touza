@@ -1,7 +1,7 @@
 !!!_! emu_msg.F90 - touza/emu usubs::msgs emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 12 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/23 09:20:46 fuyuki emu_msg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 09:31:37 fuyuki emu_msg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -220,18 +220,21 @@ end subroutine MSSET
 subroutine MSSUNI(IOUTZ)
   implicit none
   integer,intent(in) :: IOUTZ
+  if (IOUTZ.eq.0) return   ! dummy
   return
 end subroutine MSSUNI
 !!!_ + MSGUNI - get unit no.
 subroutine MSGUNI(IOUTZ)
   implicit none
   integer,intent(out) :: IOUTZ
+  IOUTZ = -999
   return
 end subroutine MSGUNI
 !!!_ + MSGA - message(str)
 subroutine MSGA(HMSG)
   implicit none
   character(len=*),intent(in) :: HMSG
+  if (HMSG.eq.' ') return  ! dummy
   return
 end subroutine MSGA
 !!!_ + MSGB - message(str, str)
@@ -239,6 +242,8 @@ subroutine MSGB(HMSG, HMSG2)
   implicit none
   character(len=*),intent(in) :: HMSG
   character(len=*),intent(in) :: HMSG2
+  if (HMSG.eq.' ') return  ! dummy
+  if (HMSG2.eq.' ') return  ! dummy
   return
 end subroutine MSGB
 !!!_ + MSGC - message(str, str, str)
@@ -247,6 +252,9 @@ subroutine MSGC(HMSG, HMSG2, HMSG3)
   character(len=*),intent(in) :: HMSG
   character(len=*),intent(in) :: HMSG2
   character(len=*),intent(in) :: HMSG3
+  if (HMSG.eq.' ') return  ! dummy
+  if (HMSG2.eq.' ') return  ! dummy
+  if (HMSG3.eq.' ') return  ! dummy
   return
 end subroutine MSGC
 !!!_ + MSGD - message(str, str, str, str)
@@ -256,6 +264,10 @@ subroutine MSGD(HMSG, HMSG2, HMSG3, HMSG4)
   character(len=*),intent(in) :: HMSG2
   character(len=*),intent(in) :: HMSG3
   character(len=*),intent(in) :: HMSG4
+  if (HMSG.eq.' ') return  ! dummy
+  if (HMSG2.eq.' ') return  ! dummy
+  if (HMSG3.eq.' ') return  ! dummy
+  if (HMSG4.eq.' ') return  ! dummy
   return
 end subroutine MSGD
 !!!_ + MSGAI - message(str, int)
@@ -263,6 +275,8 @@ subroutine MSGAI(HMSG, IMSG)
   implicit none
   character(len=*),intent(in) :: HMSG
   integer,         intent(in) :: IMSG
+  if (HMSG.eq.' ') return  ! dummy
+  if (IMSG.eq.0) return  ! dummy
   return
 end subroutine MSGAI
 !!!_ + MSGBI - message(str, str, int)
@@ -271,6 +285,9 @@ subroutine MSGBI(HMSG, HMSG2, IMSG)
   character(len=*),intent(in) :: HMSG
   character(len=*),intent(in) :: HMSG2
   integer,         intent(in) :: IMSG
+  if (HMSG.eq.' ') return  ! dummy
+  if (HMSG2.eq.' ') return  ! dummy
+  if (IMSG.eq.0) return  ! dummy
   return
 end subroutine MSGBI
 !!!_ + MSGAJ - message(str, int, int)
@@ -279,6 +296,9 @@ subroutine MSGAJ(HMSG, IMSG, IMSG2)
   character(len=*),intent(in) :: HMSG
   integer,         intent(in) :: IMSG
   integer,         intent(in) :: IMSG2
+  if (HMSG.eq.' ') return  ! dummy
+  if (IMSG.eq.0) return  ! dummy
+  if (IMSG2.eq.0) return  ! dummy
   return
 end subroutine MSGAJ
 !!!_ + MSGBJ - message(str, str, int, int)
@@ -288,6 +308,10 @@ subroutine MSGBJ(HMSG, HMSG2, IMSG, IMSG2)
   character(len=*),intent(in) :: HMSG2
   integer,         intent(in) :: IMSG
   integer,         intent(in) :: IMSG2
+  if (HMSG.eq.' ') return  ! dummy
+  if (HMSG2.eq.' ') return  ! dummy
+  if (IMSG.eq.0) return  ! dummy
+  if (IMSG2.eq.0) return  ! dummy
   return
 end subroutine MSGBJ
 !!!_ + MSGAK - message(str, int, int, int)
@@ -297,12 +321,17 @@ subroutine MSGAK(HMSG, IMSG, IMSG2, IMSG3)
   integer,         intent(in) :: IMSG
   integer,         intent(in) :: IMSG2
   integer,         intent(in) :: IMSG3
+  if (HMSG.eq.' ') return  ! dummy
+  if (IMSG.eq.0) return  ! dummy
+  if (IMSG2.eq.0) return  ! dummy
+  if (IMSG3.eq.0) return  ! dummy
   return
 end subroutine MSGAK
 !!!_ + MSGBOX
 subroutine MSGBOX(HSTR0)
   implicit none
   character(len=*),intent(in) :: HSTR0
+  if (HSTR0.eq.' ') return  ! dummy
   return
 end subroutine MSGBOX
 !!!_@ test_emu_msg - test program
@@ -311,7 +340,6 @@ program test_emu_msg
   use TOUZA_Emu_msg
   implicit none
   integer ierr
-  integer ir
 
   ierr = 0
 101 format(A, ' = ', I0)

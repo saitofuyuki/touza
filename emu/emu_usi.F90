@@ -1,7 +1,7 @@
 !!!_! emu_usi.F90 - touza/emu usysio emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/16 15:49:31 fuyuki emu_usi.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 09:33:00 fuyuki emu_usi.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -1037,7 +1037,10 @@ program test_emu_usi
   use TOUZA_Emu_usi,only: open_bind_sysin, open_bind_sysout, update_color
   implicit none
   integer ierr
-  integer ir, nr, icolor
+  integer ir
+#if TEST_EMU_USI == 1
+  integer nr, icolor
+#endif
   integer ifpar, jfpar
 
   ierr = 0

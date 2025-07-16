@@ -1,7 +1,7 @@
 !!!_! std_ipc.F90 - touza/std intrinsic procedures compatible gallery
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 25 2023
-#define TIME_STAMP 'Time-stamp: <2025/07/15 17:35:17 fuyuki std_ipc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 08:19:07 fuyuki std_ipc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023-2025
@@ -838,7 +838,13 @@ program test_std_ipc
 
   ! keep sub open
   if (ierr.eq.0) then
-     call test_chdir_sub(ierr, '7', subd, test_file_a, udup, abs=.TRUE., desc='sub opened, absolute')
+     call test_chdir_sub(ierr, '7', subd, test_file_a, udup, abs=.TRUE., desc='keep sub, absolute')
+  endif
+  if (ierr.eq.0) close(udup, iostat=ierr)
+
+  ! keep sub open, and open again
+  if (ierr.eq.0) then
+     call test_chdir_sub(ierr, '8', subd, test_file_a, udup, desc='keep sub, same')
   endif
 
   call finalize(ierr, levv=-9)
@@ -908,29 +914,39 @@ contains
        call ipc_GETCWD(oldpwd, ierr)
        if (ierr.eq.0) call ipc_CHDIR(sub, ierr)
     endif
+    bo = .FALSE.
     if (ierr.eq.0) then
        utmp = u
        if (choice(.FALSE., abs)) then
           call ipc_getcwd(ftmp, ierr)
           if (ierr.eq.0) ftmp = trim(ftmp) // '/' // trim(file)
+          if (ierr.eq.0) inquire(opened=bo, file=ftmp, iostat=ierr, iomsg=txt)
           if (ierr.eq.0) then
              open(utmp, file=ftmp, iostat=ierr, &
                   & status='old', form='formatted', action='read', &
                   & access='sequential', iomsg=txt)
           endif
        else
-          open(utmp, file=file, iostat=ierr, &
-               & status='old', form='formatted', action='read', &
-               & access='sequential', iomsg=txt)
+          inquire(opened=bo, file=ftmp, iostat=ierr, iomsg=txt)
+          if (ierr.eq.0) then
+             open(utmp, file=file, iostat=ierr, &
+                  & status='old', form='formatted', action='read', &
+                  & access='sequential', iomsg=txt)
+          endif
        endif
     endif
 101 format('# ', A, ' failed at open: ', A)
 102 format('# ', A, ' inquire unit  ', I0, ': ', A)
 103 format('# ', A, ' inquire name  ', I0, ': ', A)
+104 format('# ', A, ' already opened ', A)
+    if (ierr.eq.0) then
+       if (bo) then
+          write(*, 104) trim(test), trim(file)
+       endif
+    endif
     if (ierr.ne.0) then
        utmp = -1
        write(*, 101) trim(test), trim(txt)
-       inquire(opened=bo, file=file, iostat=ierr, iomsg=txt)
        if (ierr.eq.0) then
           if (bo) then
              inquire(number=utmp, file=file, iostat=ierr, iomsg=txt)

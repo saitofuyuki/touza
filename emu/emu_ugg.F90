@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/10 12:37:47 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 09:28:20 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024, 2025
@@ -225,9 +225,9 @@ module TOUZA_Emu_ugg
      module procedure div_latitude_d
   end interface div_latitude
 
-  interface array_reverse
-     module procedure array_reverse_d
-  end interface array_reverse
+  ! interface array_reverse
+  !    module procedure array_reverse_d
+  ! end interface array_reverse
 
   interface check_precision
      module procedure check_precision_d, check_precision_f
@@ -462,9 +462,9 @@ module TOUZA_Emu_ugg
   interface gen_ctable_I2b
      module procedure gen_ctable_I2b_d
   end interface gen_ctable_I2b
-  interface gen_ctable_I2a
-     module procedure gen_ctable_I2a_d
-  end interface gen_ctable_I2a
+  ! interface gen_ctable_I2a
+  !    module procedure gen_ctable_I2a_d
+  ! end interface gen_ctable_I2a
 
   interface geodesic_direct_core
      module procedure geodesic_direct_core_d
@@ -716,7 +716,7 @@ module TOUZA_Emu_ugg
   public psgp_comp_dlon
   public psgp_bwd_geod
   public psgp_surf_area
-  public psgp_xlo_tr, psgp_ylo_tr
+  public psgp_xlo_tr, psgp_ylo_tr, psgp_xlo_once_tr, psgp_ylo_once_tr
   public psgp_xla_tr, psgp_yla_tr, psgp_xla_once_tr, psgp_yla_once_tr
   public psgp_dlo_tr, psgp_gla_tr, psgp_sinlat
 
@@ -1261,19 +1261,19 @@ contains
   end function rad2deg_q
 #endif
 !!!_  & array_reverse
-  subroutine array_reverse_d &
-       & (v, n)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(inout) :: v(*)
-    integer,        intent(in)    :: n
-    real(kind=KTGT) :: b(n)
-    integer j
-    do j = 1, n
-       b (n - j + 1) = v(j)
-    enddo
-    v(1:n) = b(1:n)
-  end subroutine array_reverse_d
+  ! subroutine array_reverse_d &
+  !      & (v, n)
+  !   use TOUZA_Std,only: KTGT=>KDBL
+  !   implicit none
+  !   real(kind=KTGT),intent(inout) :: v(*)
+  !   integer,        intent(in)    :: n
+  !   real(kind=KTGT) :: b(n)
+  !   integer j
+  !   do j = 1, n
+  !      b (n - j + 1) = v(j)
+  !   enddo
+  !   v(1:n) = b(1:n)
+  ! end subroutine array_reverse_d
 
 !!!_ + user subroutines (longitude)
 !!!_  & get_longitude
@@ -4840,34 +4840,34 @@ contains
     C2b(0) = (C2b(0) - eps) / (1.0_KTGT + eps)
   end subroutine gen_ctable_I2b_d
 !!!_  & gen_ctable_I2a
-  subroutine gen_ctable_I2a_d &
-       & (ierr, C2a, no, eps)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KTGT),intent(out) :: C2a(0:*)
-    integer,        intent(in)  :: no            ! limit order
-    real(kind=KTGT),intent(in)  :: eps
-    real(kind=KTGT)  :: epsc, eps2
-    ierr = 0
-    eps2 = eps ** 2
-    if (no.eq.9) then
-#      include "ggf/coeffs_i2a-o9.F90"
-    else if (no.eq.7) then
-#      include "ggf/coeffs_i2a-o7.F90"
-    else if (no.eq.6) then
-#      include "ggf/coeffs_i2a-o6.F90"
-    else if (no.eq.5) then
-#      include "ggf/coeffs_i2a-o5.F90"
-    else
-       ierr = ERR_NOT_IMPLEMENTED
-    endif
-    !! need special treatment for C2(0),
-    !! which currentrly hold t = A2/(1-e) - 1,
-    !! and return A2 - 1 = t * (1 - e) - e
-    !! to keep precision.
-    C2a(0) = C2a(0) * (1.0_KTGT - eps) - eps
-  end subroutine gen_ctable_I2a_d
+!   subroutine gen_ctable_I2a_d &
+!        & (ierr, C2a, no, eps)
+!     use TOUZA_Std,only: KTGT=>KDBL
+!     implicit none
+!     integer,        intent(out) :: ierr
+!     real(kind=KTGT),intent(out) :: C2a(0:*)
+!     integer,        intent(in)  :: no            ! limit order
+!     real(kind=KTGT),intent(in)  :: eps
+!     real(kind=KTGT)  :: epsc, eps2
+!     ierr = 0
+!     eps2 = eps ** 2
+!     if (no.eq.9) then
+! #      include "ggf/coeffs_i2a-o9.F90"
+!     else if (no.eq.7) then
+! #      include "ggf/coeffs_i2a-o7.F90"
+!     else if (no.eq.6) then
+! #      include "ggf/coeffs_i2a-o6.F90"
+!     else if (no.eq.5) then
+! #      include "ggf/coeffs_i2a-o5.F90"
+!     else
+!        ierr = ERR_NOT_IMPLEMENTED
+!     endif
+!     !! need special treatment for C2(0),
+!     !! which currentrly hold t = A2/(1-e) - 1,
+!     !! and return A2 - 1 = t * (1 - e) - e
+!     !! to keep precision.
+!     C2a(0) = C2a(0) * (1.0_KTGT - eps) - eps
+!   end subroutine gen_ctable_I2a_d
 
 !!!_ + symmetric tripolar coordinate
 !!!_  & stp_set
@@ -5897,7 +5897,7 @@ contains
 
     real(kind=KTGT) :: c
     integer,parameter :: ss = DIGITS(0.0_KTGT)
-    integer,parameter :: s = ss / 2 + mod(ss, 2)
+    integer,parameter :: s = (ss - mod(ss, 2)) / 2 + mod(ss, 2)
 
     real(kind=KTGT),parameter :: f = 2.0_KTGT ** s + 1.0_KTGT
 
@@ -7134,7 +7134,6 @@ contains
     real(kind=KTGT) :: sf
     real(kind=KTGT) :: rr(2), rts, llorg(2)
     real(kind=KTGT) :: xxo(3), xxc(3), xxr(3), lli(2), zref(2)
-    real(kind=KTGT) :: xxp(3)
     real(kind=KTGT) :: cco2(ncache_psgp_co), clo2(ncache_psgp_lo), cla2(ncache_psgp_la)
     real(kind=KTGT) :: cco3(ncache_psgp_co), clo3(ncache_psgp_lo), cla3(ncache_psgp_la)
     real(kind=KTGT) :: clor(ncache_psgp_lo)
@@ -7825,7 +7824,7 @@ contains
           ! call geodesic_inverse_core &
           !      (ierr, gdis, xlat1, xlat2, xglon, inia1, f, a, garea=garea)
           ! garea = garea * asign
-111       format('geod:c ', 4ES24.16, 1x, F24.10, 1x, ES24.16)
+! 111       format('geod:c ', 4ES24.16, 1x, F24.10, 1x, ES24.16)
           ! write(*, 111) v(0:3), gdis, garea
           gdis = -999
           garea = -999
@@ -8308,8 +8307,8 @@ contains
     real(kind=KTGT) :: lon1,  lon2
 
     ! y series: target kind
-    real(kind=KTGT) :: ylat1(2), ylat2(2), ydlat(2), ytdla(2)
-    real(kind=KTGT) :: ylon1(2), ylon2(2), ydlon(2), ytdlo(2)
+    real(kind=KTGT) :: ylat1(2), ylat2(2), ytdla(2)
+    real(kind=KTGT) :: ylon1(2), ylon2(2), ytdlo(2)
 
     real(kind=KTGT) :: vdlonh, vdlath
     real(kind=KTGT) :: vag, vap, va
@@ -8318,8 +8317,8 @@ contains
 
     ! z series: higher precision kind
     real(kind=KREF) :: qdlonh, qdlath
-    real(kind=KREF) :: zlat1(2), zlat2(2), zdlat(2)
-    real(kind=KREF) :: zlon1(2), zlon2(2), zdlon(2)
+    real(kind=KREF) :: zlat1(2), zlat2(2)
+    real(kind=KREF) :: zlon1(2), zlon2(2)
     real(kind=KREF) :: tqref
 
     real(kind=KREF) :: qag, qap, qa
@@ -8482,14 +8481,9 @@ contains
 
     integer,parameter :: ltbl = 128
     real(kind=KTGT) :: CC(0:ltbl)
-    real(kind=KTGT) :: ax, ag, ap, ad
+    real(kind=KTGT) :: ag, ap, ad
 
-    real(kind=KTGT) :: CD(0:ltbl)
-
-    real(kind=KTGT) :: CE(0:ltbl)
-    real(kind=KTGT) :: tdhsq, xtdhsq
-
-    real(kind=KTGT) :: xrlat, xrlon, xdlat, xdlonh, xtdlath
+    real(kind=KTGT) :: xrlat, xdlat, xdlonh, xtdlath
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
     integer,parameter :: KHPR=KQPL
     real(kind=KHPR) :: qlat1(2), qlat2(2)
@@ -8498,9 +8492,14 @@ contains
     real(kind=KHPR) :: qdlonh,   qtdlath
     real(kind=KHPR) :: qag, qap, qad
     real(kind=KHPR) :: qaref
-#endif
 
-    integer jo, jt, nt
+    real(kind=KTGT) :: tdhsq, xtdhsq
+
+    real(kind=KTGT) :: CD(0:ltbl)
+    real(kind=KTGT) :: CE(0:ltbl)
+    real(kind=KTGT) :: ax
+#endif
+    ierr = 0
 
     CC(:) = 0.0_KTGT
 
@@ -8559,10 +8558,10 @@ contains
 122 format('agmp:e:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
 132 format('agmp:d:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
 #else
-102 format('agmp:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
+! 102 format('agmp:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
 103 format('agmp:eq   ', I0, 1x, ES23.15, 1x, 2(1x, ES23.15))
-122 format('agmp:e:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
-132 format('agmp:d:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
+! 122 format('agmp:e:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
+! 132 format('agmp:d:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
 #endif
     write(*, 101) xrlat, xdlat, reflon, dlon
     write(*, 109) 1, tdlath, dlonh
@@ -8779,8 +8778,7 @@ contains
     real(kind=KTGT) :: wg(NGEOG), zg(NGEOG)
 
     integer pole
-    integer narg, jarg
-    integer j
+    integer narg
     integer nla, nlo, jla, jlo
     integer nxlo, nxla
 

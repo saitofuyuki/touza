@@ -1,7 +1,7 @@
 !!!_! trapiche_transfer.F90 - TOUZA/Trapiche(trapiche) communication
 ! Maintainer: SAITO Fuyuki
 ! Created: May 21 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/16 15:48:34 fuyuki trapiche_transfer.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 10:22:16 fuyuki trapiche_transfer.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -38,7 +38,6 @@ module TOUZA_Trp_transfer
   integer,allocatable,save :: works(:)
   integer,allocatable,save :: workr(:)
 !!!_  - common
-  character(len=256) :: tmsg
 !!!_  - interfaces
   interface trapiche_isend_core
      module procedure trapiche_isend_core_d

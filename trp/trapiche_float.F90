@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2025/07/16 16:11:25 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 10:27:46 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -249,22 +249,22 @@ module TOUZA_Trp_float
   interface set_special
      module procedure set_special_d, set_special_f
   end interface set_special
-  interface xsign
-     module procedure xsign_d, xsign_f
-  end interface xsign
+  ! interface xsign
+  !    module procedure xsign_d, xsign_f
+  ! end interface xsign
   interface which_sp
      module procedure which_sp_d, which_sp_f
   end interface which_sp
-  interface xspecial
-     module procedure xspecial_d, xspecial_f
-  end interface xspecial
+  ! interface xspecial
+  !    module procedure xspecial_d, xspecial_f
+  ! end interface xspecial
   interface zspecial
      module procedure zspecial_d, zspecial_f
   end interface zspecial
 
-  interface xuint
-     module procedure xuint_d, xuint_f
-  end interface xuint
+  ! interface xuint
+  !    module procedure xuint_d, xuint_f
+  ! end interface xuint
   interface xureal
      module procedure xureal_d, xureal_f
   end interface xureal
@@ -349,7 +349,7 @@ contains
           if (ierr.eq.0) call tp_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
        endif
        if (is_first_force(init_counts, mode)) then
-          if (ierr.eq.0) call init_batch(ierr, minbs, mwork, ulog, lv)
+          if (ierr.eq.0) call init_batch(ierr, minbs, mwork)
        endif
        if (is_first_force(init_counts, mode)) then
           if (present(hch)) then
@@ -456,14 +456,13 @@ contains
 !!!_  & init_batch
   subroutine init_batch &
        & (ierr, &
-       &  minbs, mwork, &
-       &  u,      levv)
+       &  minbs, mwork)
     use TOUZA_Trp_std, only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: minbs
     integer,intent(in),optional :: mwork ! initial work-area size to allocate
-    integer,intent(in),optional :: u, levv
+    ! integer,intent(in),optional :: u, levv
 
     integer mw
 
@@ -871,7 +870,7 @@ contains
     if (mbits.ge.lbgz) then
        if (ksignb.ne.0) then
           call reajustar_full_i &
-               & (ierr,   ibagaz, &
+               & (ierr,   &
                &  iwork(jwx:jwh-1), iwork(jwh:jwl-1), iwork(jwl:jwe-1), &
                &  mem,    &
                &  nbitsh, nbitsl, xbi,    &
@@ -881,7 +880,7 @@ contains
           nbitsl = nbitsl - 1
        else
           call ajustar_full_i &
-               & (ierr,   ibagaz, &
+               & (ierr,   &
                &  iwork(jwx:jwh-1), iwork(jwh:jwl-1), iwork(jwl:jwe-1), &
                &  mem,    &
                &  ksignb, nbitsh, nbitsl, xbi,   &
@@ -890,7 +889,7 @@ contains
        endif
     else
        call ajustar_high_i &
-            & (ierr,   ibagaz, &
+            & (ierr,   &
             &  iwork(jwx:jwh-1), iwork(jwh:jwl-1), &
             &  mem,    &
             &  ksignb, nbitsh, xbi,   &
@@ -1046,7 +1045,7 @@ contains
     endif
 
     call ajustar_high_i &
-         & (ierr,   ibagaz, &
+         & (ierr,   &
          &  iwork(jwx:jwh-1), iwork(jwh:jwl-1), &
          &  mem,    &
          &  ksignb, nbitsh, xbi,   &
@@ -2233,7 +2232,7 @@ contains
 
 !!!_  & reajustar_full - compressor (adjust again, no sign bit)
   subroutine reajustar_full_i &
-       & (ierr,   ibagaz, &
+       & (ierr,   &
        &  iwx,    iwh,    iwl,    &
        &  mem,    &
        &  nbitsh, nbitsl, xbits, &
@@ -2244,7 +2243,7 @@ contains
     integer,parameter :: KIBGZ=KI32
 
     integer,            intent(out)   :: ierr
-    integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
+    ! integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwx(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwh(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwl(0:*)
@@ -2267,7 +2266,7 @@ contains
     integer maskl, maskh
     integer,parameter :: nbmv = 1   ! other parameter never works
 
-    ierr = 0
+    ierr = kcode * 0            ! dummy kcode
 
     mbits = nbitsh + nbitsl
     maskl = IBSET(0, nbitsl - nbmv) - 1
@@ -2357,7 +2356,7 @@ contains
 
 !!!_  & ajustar_full - compressor
   subroutine ajustar_full_i &
-       & (ierr,   ibagaz, &
+       & (ierr,   &
        &  iwx,    iwh,    iwl,    &
        &  mem,    &
        &  ksignp, nbitsh, nbitsl, xbits, &
@@ -2368,7 +2367,7 @@ contains
     integer,parameter :: KIBGZ=KI32, KRFLD=KDBL
 
     integer,            intent(out)   :: ierr
-    integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
+    ! integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwx(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwh(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwl(0:*)
@@ -2391,7 +2390,7 @@ contains
     integer mask_sign, maskl, maskh, maska
     integer(kind=KIBGZ) :: msp
 
-    ierr = 0
+    ierr = kcode * 0            ! dummy kcode
 
     mbits = nbitsh + nbitsl
     mask_sign = condop((ksignp.eq.0), IBSET(0, nbitsh), 0)
@@ -2483,7 +2482,7 @@ contains
 
 !!!_  & ajustar_high - compressor
   subroutine ajustar_high_i &
-       & (ierr,   ibagaz, &
+       & (ierr,   &
        &  iwx,    iwh,    &
        &  mem,    &
        &  ksignp, nbitsh, xbits, &
@@ -2494,7 +2493,7 @@ contains
     integer,parameter :: KIBGZ=KI32
 
     integer,            intent(out)   :: ierr
-    integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
+    ! integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwx(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwh(0:*)
     integer,            intent(in)    :: mem
@@ -2514,7 +2513,7 @@ contains
     integer mh_ovf, mh_unf, mh_miss, mh_inf
     integer(kind=KIBGZ) :: msp
 
-    ierr = 0
+    ierr = kcode * 0   ! dummy(kcode)
 
     mbits = nbitsh + 0
     mask_sign = condop((ksignp.eq.0), IBSET(0, nbitsh), 0)
@@ -3102,7 +3101,7 @@ contains
     integer ixdnm, ixlbd,  ixubd
     integer kxspc, kxdnm
     integer jbbgn, jbend
-    real(kind=KRFLD) :: vmsk, vrst, vsign
+    real(kind=KRFLD) :: vmsk, vsign
     real(kind=KRFLD) :: vu, vnan(0:1), vinf(0:1), vovf(0:1), vudf(0:1), vdnm(0:1)
 
     real(kind=KRFLD) :: zz, zm, zu, zo, zi, zd
@@ -3553,26 +3552,26 @@ contains
     return
   end subroutine alloc_works
 !!!_  & xuint - unsigned integer conversion emulation
-  ELEMENTAL integer function xuint_d(v) result(n)
-    implicit none
-    integer,parameter :: KRTGT=KDBL
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
-    real(kind=KRTGT),parameter  :: d = o * 2.0_KRTGT
+  ! ELEMENTAL integer function xuint_d(v) result(n)
+  !   implicit none
+  !   integer,parameter :: KRTGT=KDBL
+  !   real(kind=KRTGT),intent(in) :: v
+  !   real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
+  !   real(kind=KRTGT),parameter  :: d = o * 2.0_KRTGT
 
-    n = int(mod(aint(abs(v)) + o, d) - o)
-    return
-  end function xuint_d
-  ELEMENTAL integer function xuint_f(v) result(n)
-    implicit none
-    integer,parameter :: KRTGT=KFLT
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
-    real(kind=KRTGT),parameter  :: d = o * 2.0_KRTGT
+  !   n = int(mod(aint(abs(v)) + o, d) - o)
+  !   return
+  ! end function xuint_d
+  ! ELEMENTAL integer function xuint_f(v) result(n)
+  !   implicit none
+  !   integer,parameter :: KRTGT=KFLT
+  !   real(kind=KRTGT),intent(in) :: v
+  !   real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
+  !   real(kind=KRTGT),parameter  :: d = o * 2.0_KRTGT
 
-    n = int(mod(aint(abs(v)) + o, d) - o)
-    return
-  end function xuint_f
+  !   n = int(mod(aint(abs(v)) + o, d) - o)
+  !   return
+  ! end function xuint_f
 
 !!!_  & xureal - unsigned integer conversion emulation
   ELEMENTAL &
@@ -3603,40 +3602,40 @@ contains
   end function xureal_f
 
 !!!_  & xsign_d() - return +1 if not sign bit, otherwise -1
-  ELEMENTAL integer function xsign_d(v) result(n)
-!NEC$ always_inline
-    implicit none
-    integer,parameter :: KRTGT=KDBL
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter :: one  = 1.0_KRTGT
-    n = int(sign(one, v))
-  end function xsign_d
-  ELEMENTAL integer function xsign_f(v) result(n)
-!NEC$ always_inline
-    implicit none
-    integer,parameter :: KRTGT=KFLT
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter :: one  = 1.0_KRTGT
-    n = int(sign(one, v))
-  end function xsign_f
+!   ELEMENTAL integer function xsign_d(v) result(n)
+! !NEC$ always_inline
+!     implicit none
+!     integer,parameter :: KRTGT=KDBL
+!     real(kind=KRTGT),intent(in) :: v
+!     real(kind=KRTGT),parameter :: one  = 1.0_KRTGT
+!     n = int(sign(one, v))
+!   end function xsign_d
+!   ELEMENTAL integer function xsign_f(v) result(n)
+! !NEC$ always_inline
+!     implicit none
+!     integer,parameter :: KRTGT=KFLT
+!     real(kind=KRTGT),intent(in) :: v
+!     real(kind=KRTGT),parameter :: one  = 1.0_KRTGT
+!     n = int(sign(one, v))
+!   end function xsign_f
 
 !!!_  & xspecial ()
-  ELEMENTAL integer function xspecial_d(v) result(n)
-    implicit none
-    integer,parameter :: KRTGT=KDBL
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter :: xmd = MAX_SPECIAL
-    n = int(mod(abs(v), xmd))
-    return
-  end function xspecial_d
-  ELEMENTAL integer function xspecial_f(v) result(n)
-    implicit none
-    integer,parameter :: KRTGT=KFLT
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter :: xmd = MAX_SPECIAL
-    n = int(mod(abs(v), xmd))
-    return
-  end function xspecial_f
+  ! ELEMENTAL integer function xspecial_d(v) result(n)
+  !   implicit none
+  !   integer,parameter :: KRTGT=KDBL
+  !   real(kind=KRTGT),intent(in) :: v
+  !   real(kind=KRTGT),parameter :: xmd = MAX_SPECIAL
+  !   n = int(mod(abs(v), xmd))
+  !   return
+  ! end function xspecial_d
+  ! ELEMENTAL integer function xspecial_f(v) result(n)
+  !   implicit none
+  !   integer,parameter :: KRTGT=KFLT
+  !   real(kind=KRTGT),intent(in) :: v
+  !   real(kind=KRTGT),parameter :: xmd = MAX_SPECIAL
+  !   n = int(mod(abs(v), xmd))
+  !   return
+  ! end function xspecial_f
 
 !!!_  & zspecial ()
   ELEMENTAL &

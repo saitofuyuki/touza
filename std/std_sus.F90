@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2025/07/10 12:13:57 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 09:13:32 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -267,6 +267,7 @@ module TOUZA_Std_sus
   public sus_rseek, sus_getpos
   public sus_pos_a2rel, sus_pos_r2abs, sus_rel_pos
   public sus_eswap
+  public sus_swap, sus_eswap_hl
   public sus_pad
   public sus_record_mems_irec
   public max_members, is_irec_overflow, is_irec_overflow_mix
@@ -514,34 +515,34 @@ contains
     endif
   end subroutine sus_check_stream_pos
 
-!!!_   & sus_check_kinds_literal - health_check
-  subroutine sus_check_kinds_literal &
-       & (ierr, u)
-    use TOUZA_Std_utl,only: choice
-    implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: u
-    integer,parameter :: KBUF=KI32
-    integer utmp
+! !!!_   & sus_check_kinds_literal - health_check
+!   subroutine sus_check_kinds_literal &
+!        & (ierr, u)
+!     use TOUZA_Std_utl,only: choice
+!     implicit none
+!     integer,intent(out)         :: ierr
+!     integer,intent(in),optional :: u
+!     integer,parameter :: KBUF=KI32
+!     integer utmp
 
-    ierr = 0
+!     ierr = 0
 
-201 format('kind:', A, ' = ', I0)
-    utmp = choice(ulog, u)
-    if (utmp.ge.0) then
-       write(utmp, 201) 'KBUF',    KBUF
-       write(utmp, 201) 'KI32',    KI32
-       write(utmp, 201) '0_4',     KIND(0_4)
-       write(utmp, 201) '0_KI32',  KIND(0_KI32)
-       write(utmp, 201) '0_KBUF',  KIND(0_KBUF)
-    else
-       write(*, 201) 'KBUF',   KBUF
-       write(*, 201) 'KI32',   KI32
-       write(*, 201) '0_4',    KIND(0_4)
-       write(*, 201) '0_KI32', KIND(0_KI32)
-       write(*, 201) '0_KBUF', KIND(0_KBUF)
-    endif
-  end subroutine sus_check_kinds_literal
+! 201 format('kind:', A, ' = ', I0)
+!     utmp = choice(ulog, u)
+!     if (utmp.ge.0) then
+!        write(utmp, 201) 'KBUF',    KBUF
+!        write(utmp, 201) 'KI32',    KI32
+!        write(utmp, 201) '0_4',     KIND(0_4)
+!        write(utmp, 201) '0_KI32',  KIND(0_KI32)
+!        write(utmp, 201) '0_KBUF',  KIND(0_KBUF)
+!     else
+!        write(*, 201) 'KBUF',   KBUF
+!        write(*, 201) 'KI32',   KI32
+!        write(*, 201) '0_4',    KIND(0_4)
+!        write(*, 201) '0_KI32', KIND(0_KI32)
+!        write(*, 201) '0_KBUF', KIND(0_KBUF)
+!     endif
+!   end subroutine sus_check_kinds_literal
 
 !!!_ + user subroutines
 !!!_  & sus_open - open stream
@@ -6595,6 +6596,7 @@ contains
     return
   end subroutine sus_rseek
 !!!_  & sus_rseek_workaround - seek position to read (workaround)
+#if OPT_STREAM_RPOS_WORKAROUND
   subroutine sus_rseek_workaround &
        & (ierr, u, apos)
     !! caution: T assumed to be 1-byte
@@ -6612,6 +6614,7 @@ contains
     if (ierr.gt.0) ierr = _ERROR(ERR_IO_GENERAL)
     return
   end subroutine sus_rseek_workaround
+#endif /* OPT_STREAM_RPOS_WORKAROUND */
 !!!_  & is_irec_overflow() - check if array size exceeds irec limit
   logical function is_irec_overflow_i(m, mold) result(b)
     implicit none
@@ -7161,9 +7164,10 @@ program test_std_sus
      lsep = index(arg, 'L').gt.0
 111  format('outsus-', I0, L1, L1, '.dat')
      write(file, 111) TEST_STD_SUS, swap, lsep
-     call batch_test_i(ierr, file, arg, swap, lsep, mem)
+     ! call batch_test_i(ierr, file, arg, swap, lsep, mem)
+     call batch_test_i(ierr, file, swap, lsep, mem)
      if (.not.lsep) then
-        call batch_test_suspend_i(ierr, file, arg, swap, mem)
+        call batch_test_suspend_i(ierr, file, swap, mem)
      endif
   endif
   if (ierr.eq.0) call batch_overflow_mix(ierr)
@@ -7176,13 +7180,13 @@ program test_std_sus
   write(*, 101) 'FINAL', ierr
   stop
 contains
-  subroutine batch_test_i(ierr, file, arg, swap, lsep, mem)
+  subroutine batch_test_i(ierr, file, swap, lsep, mem)
     use TOUZA_Std_prc,only: KSRC=>KI32
     use TOUZA_Std_env,only: KIOFS
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: file
-    character(len=*),intent(in)  :: arg
+    ! character(len=*),intent(in)  :: arg
     logical,         intent(in)  :: swap, lsep
     integer,         intent(in)  :: mem
     integer(kind=KSRC) :: v(0:mem-1), ref(0:mem-1), bref(0:mem-1)
@@ -7384,13 +7388,13 @@ contains
     if (ierr.eq.0) call sus_close(ierr, u, file)
   end subroutine batch_test_i
 
-  subroutine batch_test_suspend_i(ierr, file, arg, swap, mem)
+  subroutine batch_test_suspend_i(ierr, file, swap, mem)
     use TOUZA_Std_prc,only: KSRC=>KI32
     use TOUZA_Std_env,only: KIOFS
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: file
-    character(len=*),intent(in)  :: arg
+    ! character(len=*),intent(in)  :: arg
     logical,         intent(in)  :: swap
     integer,         intent(in)  :: mem
     integer(kind=KSRC) :: v(0:mem-1)
@@ -7496,11 +7500,11 @@ program test_std_sus
   integer u
   integer,parameter :: lv = 1024
   integer,parameter :: la = 16
-  integer(kind=KI32) :: vis(lv), vid(lv)
-  integer(kind=KI64) :: vls(lv), vld(lv)
-  real(kind=KFLT)    :: vfs(lv), vfd(lv)
-  real(kind=KDBL)    :: vds(lv), vdd(lv)
-  character(len=la)  :: vas(lv), vad(lv)
+  integer(kind=KI32) :: vis(lv)
+  integer(kind=KI64) :: vls(lv)
+  real(kind=KFLT)    :: vfs(lv)
+  real(kind=KDBL)    :: vds(lv)
+  character(len=la)  :: vas(lv)
 
   character(len=512) :: file = 'out.sus'
   character(len=512) :: file2 = 'out.sus2'
@@ -7510,7 +7514,6 @@ program test_std_sus
 
   integer dims(4)
 
-  integer kendi
   integer j
   integer mi, ml, mf, md, ma
   logical swap
@@ -7745,8 +7748,6 @@ contains
     real(kind=KFLT)    :: xf(lv)
     real(kind=KDBL)    :: xd(lv)
     character(len=la)  :: xa(lv)
-
-    logical swap
 
     ierr = 0
 
