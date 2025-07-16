@@ -1,7 +1,7 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:06:05 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 18:47:13 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -1512,8 +1512,7 @@ contains
   end subroutine set_def_tables
 !!!_  - get_hindex
   subroutine get_hindex(item, iteme, name)
-    use TOUZA_Std_utl,only: upcase
-    use TOUZA_Std_htb,only: query_status
+    use TOUZA_Nio_std,only: upcase, query_status
     implicit none
     integer,         intent(out) :: item, iteme
     character(len=*),intent(in)  :: name

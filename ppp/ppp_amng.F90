@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/11 08:22:25 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 22:09:18 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -1587,7 +1587,7 @@ contains
 
   subroutine agents_translate_i &
        & (ierr, irtgt, iatgt, irsrc, iasrc)
-    use TOUZA_Std_mwe,only: MPI_UNDEFINED
+    use TOUZA_Ppp_std,only: MPI_UNDEFINED
 ! #  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
 !     use MPI,only: MPI_Group_translate_ranks
 ! #  endif

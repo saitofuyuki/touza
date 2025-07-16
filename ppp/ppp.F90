@@ -1,7 +1,7 @@
 !!!_! ppp.F90 - touza/ppp ppp manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:55:21 fuyuki ppp.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 16:43:05 fuyuki ppp.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -18,13 +18,15 @@
 module TOUZA_Ppp
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Ppp_std,  ps_init=>init, ps_diag=>diag, ps_finalize=>finalize
+  use TOUZA_Ppp_std,only: unit_global
   use TOUZA_Ppp_amng, pa_init=>init, pa_diag=>diag, pa_finalize=>finalize
   use TOUZA_Ppp_king, pk_init=>init, pk_diag=>diag, pk_finalize=>finalize
   use TOUZA_Ppp_comm, pc_init=>init, pc_diag=>diag, pc_finalize=>finalize
 !!!_  - default
   implicit none
   public
+!!!_  - no export
+  private :: unit_global
 !!!_  - private static
   integer,save,private :: init_mode = 0
   integer,save,private :: init_counts = 0
@@ -38,7 +40,9 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
-    use TOUZA_Ppp_std,only: choice
+    use TOUZA_Ppp_std,only: ps_init=>init
+    use TOUZA_Ppp_std,only: control_mode, control_deep
+    use TOUZA_Ppp_std,only: choice, is_first_force
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -74,7 +78,12 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Ppp_std,only: choice
+    use TOUZA_Ppp_std,only: ps_diag=>diag
+    use TOUZA_Ppp_std,only: control_mode, control_deep
+    use TOUZA_Ppp_std,only: choice, is_first_force, get_logu
+    use TOUZA_Ppp_std,only: trace_control
+    use TOUZA_Ppp_std,only: is_msglev_NORMAL
+    use TOUZA_Ppp_std,only: msg
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -111,7 +120,10 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Ppp_std,only: choice
+    use TOUZA_Ppp_std,only: ps_finalize=>finalize
+    use TOUZA_Ppp_std,only: control_mode, control_deep
+    use TOUZA_Ppp_std,only: choice, is_first_force, get_logu
+    use TOUZA_Ppp_std,only: trace_fine
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u

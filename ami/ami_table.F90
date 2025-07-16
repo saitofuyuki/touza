@@ -1,10 +1,10 @@
 !!!_! ami_table.F90 - TOUZA/Ami/table amida-coupler table procedures
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/10 12:52:47 fuyuki ami_table.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 18:31:51 fuyuki ami_table.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022, 2023, 2024
+! Copyright (C) 2022, 2023, 2024, 2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 !!!_* include
@@ -41,7 +41,7 @@
 !!!_@ TOUZA_Ami_table - ami-da utilities
 module TOUZA_Ami_table
 !!!_ + modules
-  use TOUZA_Ami_std, as_init=>init, as_diag=>diag, as_finalize=>finalize
+  use TOUZA_Ami_std,only: unit_global
   use TOUZA_Emu,only: ncache_psgp_la, ncache_psgp_lo
   use TOUZA_Emu,only: NTRIG, NGEOG, JSIN, JCOS, JLATI, JLONGI
   use TOUZA_Emu,only: phase, rad2deg
@@ -432,6 +432,10 @@ module TOUZA_Ami_table
 contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
+    use TOUZA_Ami_std,only: as_init=>init
+    use TOUZA_Ami_std,only: choice
+    use TOUZA_Ami_std,only: is_first_force, trace_control
+    use TOUZA_Ami_std,only: control_deep, control_mode
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -466,6 +470,12 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Ami_std,only: as_diag=>diag
+    use TOUZA_Ami_std,only: choice, get_logu
+    use TOUZA_Ami_std,only: msg
+    use TOUZA_Ami_std,only: is_first_force, trace_control
+    use TOUZA_Ami_std,only: control_deep, control_mode
+    use TOUZA_Ami_std,only: is_msglev_NORMAL
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -502,6 +512,11 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Ami_std,only: as_finalize=>finalize
+    use TOUZA_Ami_std,only: is_first_force, trace_control
+    use TOUZA_Ami_std,only: control_deep, control_mode
+    use TOUZA_Ami_std,only: choice, get_logu
+    use TOUZA_Ami_std,only: trace_fine
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -537,25 +552,26 @@ contains
        &  lon_src, lat_src, nlon_s, nlat_s, &
        &  lgdst,   ltbl)
     use TOUZA_Emu_ugg,only: check_monotonic, non_monotonic
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out) :: ierr
     integer,        intent(in)  :: lgdst
-    real(kind=KDBL),intent(out) :: gtbl_factor(lgdst, *) !! interpolation factor table
+    real(kind=KTGT),intent(out) :: gtbl_factor(lgdst, *) !! interpolation factor table
     integer,        intent(out) :: gtbl_index (lgdst, *) !! interpolation index table
     integer,        intent(out) :: mtbl
-    real(kind=KDBL),intent(in)  :: lon_dst(*), lat_dst(*)  !! cell boundary coordinates, need +1 members
-    real(kind=KDBL),intent(in)  :: lon_src(*), lat_src(*)
+    real(kind=KTGT),intent(in)  :: lon_dst(*), lat_dst(*)  !! cell boundary coordinates, need +1 members
+    real(kind=KTGT),intent(in)  :: lon_src(*), lat_src(*)
     integer,        intent(in)  :: nlon_d,     nlat_d
     integer,        intent(in)  :: nlon_s,     nlat_s
     integer,        intent(in)  :: ltbl
 
-    real(kind=KDBL) :: flon(nlon_d, ltbl), flat(nlat_d, ltbl)
+    real(kind=KTGT) :: flon(nlon_d, ltbl), flat(nlat_d, ltbl)
     integer         :: ilon(nlon_d, ltbl), ilat(nlat_d, ltbl)
 
-    real(kind=KDBL),parameter :: ZERO = 0.0_KDBL
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
 
-    real(kind=KDBL) :: lonwd, loned
-    real(kind=KDBL) :: lonws, lones
+    real(kind=KTGT) :: lonwd, loned
+    real(kind=KTGT) :: lonws, lones
 
     integer mtx, mty
     integer jxoff
@@ -578,25 +594,26 @@ contains
        &  xsrc,       nsrc, &
        &  ldim,       ltbl)
     use TOUZA_Emu_ugg,only: check_monotonic, non_monotonic
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out) :: ierr
     integer,        intent(in)  :: ldim
-    real(kind=KDBL),intent(out) :: tbl_factor(ldim, *) !! interpolation factor table
+    real(kind=KTGT),intent(out) :: tbl_factor(ldim, *) !! interpolation factor table
     integer,        intent(out) :: tbl_index (ldim, *) !! interpolation index table
     integer,        intent(out) :: mtbl
-    real(kind=KDBL),intent(in)  :: xdst(*) !! cell boundary coordinates, need +1 members
-    real(kind=KDBL),intent(in)  :: xsrc(*)
+    real(kind=KTGT),intent(in)  :: xdst(*) !! cell boundary coordinates, need +1 members
+    real(kind=KTGT),intent(in)  :: xsrc(*)
     integer,        intent(in)  :: ndst
     integer,        intent(in)  :: nsrc
     integer,        intent(in)  :: ltbl
 
     !  boundaries xdst[i] = x(i-1/2)
 
-    real(kind=KDBL),parameter :: ZERO = 0.0_KDBL
+    real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
 
-    real(kind=KDBL) :: xld, xhd, dx
-    real(kind=KDBL) :: xls, xhs
-    real(kind=KDBL) :: f
+    real(kind=KTGT) :: xld, xhd, dx
+    real(kind=KTGT) :: xls, xhs
+    real(kind=KTGT) :: f
 
     integer idird, idirs
 
@@ -692,11 +709,14 @@ contains
        &  cco,    &
        &  lonlev, latlev,  inilev,  swlev, reqlev, tol,  &
        &  loround,laround, u,       levv,  tag,    udump)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: compact_string
+    use TOUZA_Ami_std,only: choice, get_logu
+    use TOUZA_Ami_std,only: msg, trace_err, is_msglev_INFO, is_msglev_DETAIL
+    use TOUZA_Ami_std,only: join_list
     use TOUZA_Emu_ugg,only: check_monotonic, ncache_psgp_co, round_choice
     use TOUZA_Emu_ugg,only: psgp_inquire
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: lmem                   ! limit size of iprj wprj  (negative to skip check)
     integer,         intent(out) :: iofs(0:*)              ! [(lo,la)+1] to subscript-vector offset (lv)
@@ -1064,10 +1084,10 @@ contains
        &  jlonb,    jlone,    &
        &  mx,       my,       round,    &
        &  u,        levv,     tag,      udump)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: compact_string
     use TOUZA_Emu_ugg,only: check_monotonic, ang2rad
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: lmem                   ! limit size of iprj wprj  (negative to skip check)
     integer,         intent(out) :: iofs(0:*)              ! [(lo,la)+1] to subscript-vector offset (lv)
@@ -1189,8 +1209,8 @@ contains
 !!!_   & octant_settle_table
   subroutine octant_settle_table_d &
        & (ierr, iprj, wprj, iofs, jlatb, jlate, jlonb, jlone, mdest)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,        intent(out)   :: ierr
     integer,        intent(inout) :: iprj(0:*)
     real(kind=KTGT),intent(inout) :: wprj(0:ps2g_weights-1, 0:*)
@@ -1256,8 +1276,8 @@ contains
        &  dectbl,   doct_dec, lonn_dec, adjl_dec, &
        &  lonn_ser, dlon_ser, lser,     ooffs, &
        &  lonn,     dlon,     jlonb,    jlone, cco)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out) :: ierr
     integer,        intent(out) :: dectbl(0:*)
     integer,        intent(out) :: doct_dec(0:*)
@@ -1379,8 +1399,8 @@ contains
        & (ierr,   nditbl, ofs,    mo,  &
        &  dectbl, ndiseq, lonseq, dloseq, adjseq, lseq, &
        &  lonn,   dlon,   jlonb,  jlone,  cco)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out) :: ierr
     integer,        intent(out) :: nditbl(0:*)
     integer,        intent(out) :: ofs(0:*)
@@ -1523,8 +1543,8 @@ contains
   subroutine octant_fill_table_d &
        & (ierr,  &
        &  ooffs, lonn_ser, dlon_ser)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out) :: ierr
     integer,        intent(inout) :: ooffs(0:*)
     real(kind=KTGT),intent(inout) :: lonn_ser(0:*)
@@ -1558,9 +1578,9 @@ contains
        &  lonn_grp, dlon_grp, ogrps, &
        &  lonn_ser, dlon_ser, osers, &
        &  lser)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: find_first
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out) :: ierr
     integer,        intent(inout) :: symmz(0:*)
     real(kind=KTGT),intent(out) :: lonn_grp(0:*)
@@ -1687,8 +1707,8 @@ contains
   subroutine set_octant_ends_d &
        & (ierr, nocts, opropi, &
        &  lonn, jlonb, jlone,  cco)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out)   :: ierr
     integer,        intent(out)   :: nocts
     integer,        intent(out)   :: opropi(lopi, 0:*)
@@ -1742,9 +1762,9 @@ contains
   subroutine set_zone_props_d &
        & (ierr,  zpropi, zpropr, &
        &  kasp,  symmz,  xl, dx, mx, yl, dy, my)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,        intent(out) :: ierr
     integer,        intent(out) :: zpropi(lzpi,0:locts-1,*)
     real(kind=KTGT),intent(out) :: zpropr(lzpr,0:locts-1,*)
@@ -1820,9 +1840,9 @@ contains
   subroutine set_zone_range_d &
        & (ierr,  zpropi, zpropr, &
        &  jzset, xl, xh, dx, yl, yh, dy)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,        intent(out) :: ierr
     integer,        intent(inout) :: zpropi(lzpi, 0:locts-1, *)
     real(kind=KTGT),intent(inout) :: zpropr(lzpr, 0:locts-1, *)
@@ -1888,8 +1908,8 @@ contains
   subroutine set_zone_range_core_d &
        & (ierr,  zpropi, zpropr, &
        &  jzset, xl, xh, dx, jco)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,        intent(out) :: ierr
     integer,        intent(inout) :: zpropi(lzpi, 0:locts-1, *)
     real(kind=KTGT),intent(inout) :: zpropr(lzpr, 0:locts-1, *)
@@ -1926,8 +1946,8 @@ contains
 !!!_    * adjust_zone_range
   subroutine adjust_zone_range_d &
        & (ierr,  zpropi, zpropr, symmz, jco)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,        intent(out) :: ierr
     integer,        intent(inout) :: zpropi(lzpi, 0:locts-1, *)
     real(kind=KTGT),intent(inout) :: zpropr(lzpr, 0:locts-1, *)
@@ -2002,9 +2022,9 @@ contains
   subroutine set_zone_coeffs_d &
        & (ierr,  zpropi, zpropr, &
        &  jzset, xl, xh, dx, yl, yh, dy)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,        intent(out) :: ierr
     integer,        intent(inout) :: zpropi(lzpi, 0:locts-1, *)
     real(kind=KTGT),intent(inout) :: zpropr(lzpr, 0:locts-1, *)
@@ -2036,9 +2056,9 @@ contains
 
 !!!_    * octant_zone_d ()
   integer function octant_zone_d(lon, cco, ofs) result(k)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: deg2rad, psgp_inquire
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT),intent(in) :: lon
     real(kind=KTGT),intent(in) :: cco(*)
     integer,        intent(in) :: ofs
@@ -2066,9 +2086,9 @@ contains
 
 !!!_    * get_octant_ndi () - return normalized doubled octant id
   integer function get_octant_ndi_d(lon, cco, ref) result(k)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: deg2rad, psgp_inquire
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT),intent(in) :: lon
     real(kind=KTGT),intent(in) :: cco(*)
     integer,        intent(in) :: ref
@@ -2132,8 +2152,8 @@ contains
        &  jwgt_dec, oref_dec, lwgt,     wtbl_dec, &
        &  doct_dec, lonn_dec, dectbl,   &
        &  lonn_ser, ooffs,    jlonb,    jlone,  symmz)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out) :: ierr
     integer,        intent(out) :: jwgt_dec(0:*)
     integer,        intent(out) :: oref_dec(0:*)
@@ -2197,9 +2217,9 @@ contains
   integer function is_symmetric_plane_d &
        & (xl, dx, mx, yl, dy, my, xo, yo) &
        & result(k)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT),intent(in)  :: xl, dx
     real(kind=KTGT),intent(in)  :: yl, dy
     integer,        intent(in)  :: mx, my
@@ -2225,9 +2245,9 @@ contains
 
 !!!_    * symmetric_coor
   integer function symmetric_coor_d (o, d, m, a) result(k)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT),intent(in)  :: o, d
     integer,        intent(in)  :: m
     real(kind=KTGT),intent(in),optional :: a
@@ -2329,14 +2349,16 @@ contains
        &  cco,    &
        &  lonlev, latlev,  inilev,  swlev, reqlev, tol,  &
        &  loround,laround, u,       levv,  tag,    udump)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: ncache_psgp_co
     use TOUZA_Emu_ugg,only: psgp_set_step, psgp_bwd_isf, psgp_inquire, psgp_dlo_tr
     use TOUZA_Emu_ugg,only: deg2rad, sind_canonical, cosd_canonical
     use TOUZA_Emu_ugg,only: sin_canonical, cos_canonical
     use TOUZA_Emu_ugg,only: check_monotonic, ang2deg, ang2rad, round_choice
     use TOUZA_Ami_Std,only: join_list, choice, is_msglev_WARNING
+    use TOUZA_Ami_std,only: msg, is_msglev_DEBUG, is_msglev_DETAIL, is_msglev_INFO
+    use TOUZA_Ami_std,only: get_logu
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: lmem                   ! limit size of iprj wprj  (negative to skip check)
     integer,         intent(out) :: iofs(0:*)              ! [(lo,la)+1] to subscript-vector offset (lv)
@@ -2718,9 +2740,9 @@ contains
        & (iprj,   wprj,   nmem, &
        &  ntiles, ptiles, lmem,  &
        &  aglon,  rlon,   mx, my, mdest, jtabr,  utseg)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: sub_angle, phase, rad2deg
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,        intent(in)    :: lmem
     integer,        intent(inout) :: iprj(0:*)
     real(kind=KTGT),intent(inout) :: wprj(0:ps2g_weights-1, 0:*)
@@ -2849,11 +2871,12 @@ contains
        &  uslat,   ulon,    round,   dir_nat, latflag, jclon_rep, repfac, &
        &  aplane,  mx,      my,      mdest,   destl,   &
        &  cco,     tol,     levv,    tag,     udump,   jlatph,  jlonph)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: KDBG=>KFLT
     use TOUZA_Emu_ugg,only: psgp_fwd, ang2rad
     use TOUZA_Ami_std,only: inrange, condop
+    use TOUZA_Ami_std,only: msg
     implicit none
-    integer,parameter :: KTGT=KDBL
-    integer,parameter :: KDBG=KFLT
     integer,         intent(in)    :: mx, my, mdest
     real(kind=KTGT), intent(inout) :: ntiles(0:mdest,0:*)       ! [0:mx*my]  must be reset before call  (larger)
     real(kind=KTGT), intent(inout) :: ptiles(0:mdest,0:*)       ! [0:mx*my]  must be reset before call  (smaller)
@@ -3091,11 +3114,12 @@ contains
        &  mx,        my,      mdest,   jdext,   jpos,  latflag, &
        &  jclon_rep, repfac,  lintg2,  &
        &  levv,      jlonph,  jlatph,  tag,     udump)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: inrange
     use TOUZA_Emu_ugg,only: psgp_fwd, psgp_dlo_tr, psgp_gla_tr
     use TOUZA_Emu_ugg,only: psgp_bwd_tr
     use TOUZA_Emu_ugg,only: hpsub_angle, sub_angle
     implicit none
-    integer,parameter  :: KTGT=KDBL
     integer,         intent(in)    :: mx, my, mdest
     real(kind=KTGT), intent(inout) :: ntiles(0:mdest, 0:*)
     real(kind=KTGT), intent(inout) :: ptiles(0:mdest, 0:*)
@@ -3486,10 +3510,10 @@ contains
        &  gsegco, nprops,  glat,   glon,  jxsec, jysec, &
        &  gdbl,   relpos,  adjstt, jf,    jt,    &
        &  xpos,   cachelo, cco,    uslat)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu,only: hpsub_sin, sub_sin, phase
     use TOUZA_Emu,only: psgp_yla_tr, psgp_xla_tr
     implicit none
-    integer,parameter  :: KTGT=KDBL
     real(kind=KTGT),intent(inout) :: aside(0:lnodes, 0:*)
     integer,        intent(inout) :: ngraph(0:*)
     real(kind=KTGT),intent(inout) :: gsegco(NGEOG, node_0:*)
@@ -3630,11 +3654,11 @@ contains
        &  gdbl,    relpos, adjstt, jf,    jt,    &
        &  xpos,    xlat,   xlon,   jxa,   jya,   &
        &  cachela, cco,    uone,   rlonn, li2,   ulon)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: inrange
     use TOUZA_Emu,only: hpsub_sin, sub_sin
     use TOUZA_Emu,only: psgp_xlo_tr, psgp_ylo_tr
     implicit none
-    integer,parameter  :: KTGT=KDBL
     real(kind=KTGT),intent(inout) :: aside(0:lnodes, 0:*)
     integer,        intent(inout) :: ngraph(0:*)
     real(kind=KTGT),intent(inout) :: gsegco(NGEOG, node_0:*)
@@ -3955,6 +3979,7 @@ contains
 !!!_   & ps2g_graph_connection
   subroutine ps2g_graph_connection &
        & (cflag, ngraph, nprops, nseq, jt)
+    use TOUZA_Ami_std,only: swap_items
     implicit none
     integer,intent(out)   :: cflag
     integer,intent(inout) :: ngraph(0:*)
@@ -4012,12 +4037,12 @@ contains
   subroutine ps2g_area_bent_d &
        & (asec, glat, glon, gsegco, &
        &  xlat, xlon, ngraph, nprops, uaseg, korder, xrlon, uslat, ulon)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: psgp_fwd
     use TOUZA_Emu_ugg,only: hpsub_angle, sub_angle
     use TOUZA_Emu_ugg,only: geodesic_dazim
     use TOUZA_Emu_ugg,only: agmpd_gen_table, agmpd_area_core
     implicit none
-    integer,parameter  :: KTGT=KDBL
     real(kind=KTGT),intent(out) :: asec(node_xi:node_yo, 0:*)
     real(kind=KTGT),intent(in)  :: glat(NTRIG, node_0:*)
     real(kind=KTGT),intent(in)  :: glon(NTRIG, node_0:*)
@@ -4102,12 +4127,12 @@ contains
   subroutine ps2g_area_straight_d &
        & (asec, glat, glon, gsegco, jf, jt, &
        &  ngraph, nprops, uaseg, korder, rlona, uslat, ulon)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: psgp_fwd
     use TOUZA_Emu_ugg,only: hpsub_angle, sub_angle
     use TOUZA_Emu_ugg,only: geodesic_dazim
     use TOUZA_Emu_ugg,only: agmpd_gen_table, agmpd_area_core
     implicit none
-    integer,parameter  :: KTGT=KDBL
     real(kind=KTGT),intent(out) :: asec(node_xi:node_yo, 0:*)
     real(kind=KTGT),intent(in)  :: glat(NTRIG, node_0:*)
     real(kind=KTGT),intent(in)  :: glon(NTRIG, node_0:*)
@@ -4199,9 +4224,10 @@ contains
          & (adiv, negmaxa, &
          &  asec, aside,   ngraph, nprops, relpos, nseq, uslat, &
          &  levv, tag, jlonph, jlatph)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: join_list
+    use TOUZA_Ami_std,only: msg, is_msglev_DEBUG
     implicit none
-    integer,parameter  :: KTGT=KDBL
     integer,parameter :: nquad = 4
 
     real(kind=KTGT), intent(out)   :: adiv(0:nquad-1, 0:*)
@@ -4341,9 +4367,9 @@ contains
   subroutine div_ps2g_advance_d &
        & (pstack,  jadd,    jpos, &
        &  cstride, cachela, jlatc, cachelo, jlonc, destl, tol)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: psgp_fwd
     implicit none
-    integer,parameter  :: KTGT=KDBL
     integer,        intent(out)   :: jadd
     integer,        intent(inout) :: pstack(prop_psg_size, 0:*) ! work area
     integer,        intent(in)    :: jpos
@@ -4410,10 +4436,10 @@ contains
        &  afact,  cstride, pstack,    &
        &  jlatc,  jlonc,   jclon_rep, repfac, lintg2, &
        &  mx,     my,      mdest,     jdext,  jpos)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: KDBG=>KFLT
     use TOUZA_Emu_ugg,only: psgp_fwd
     implicit none
-    integer,parameter  :: KTGT=KDBL
-    integer,parameter  :: KDBG=KFLT
     integer,        intent(in)    :: mx, my, mdest, jdext
     real(kind=KTGT),intent(inout) :: ptiles(0:mdest, 0:*)
     integer,        intent(inout) :: jtabr(lrange, *)
@@ -4479,9 +4505,9 @@ contains
 !!!_   & ps2g_simple_fallback
   subroutine ps2g_simple_fallback_d &
        & (ptiles, jx, jy, mx, my, jdext, ua, mdest)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: inrange
     implicit none
-    integer,parameter  :: KTGT=KDBL
     integer,        intent(in)    :: mdest
     real(kind=KTGT),intent(inout) :: ptiles(0:mdest, accum_w0:*)
     integer,        intent(in)    :: jx, jy
@@ -4508,10 +4534,11 @@ contains
        &  cachelo, jlonc,   cachela, jlatc,  jclon_rep, repfac, lintg2, &
        &  destl,   mx,      my,      mdest,  jdext,     &
        &  jpos,    tol,     jlonph,  jlatph, udump)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: KDBG=>KFLT
+    use TOUZA_Ami_std,only: inrange
     use TOUZA_Emu_ugg,only: psgp_fwd
     implicit none
-    integer,parameter  :: KTGT=KDBL
-    integer,parameter  :: KDBG=KFLT
     integer,        intent(in)    :: mx, my, mdest, jdext
     real(kind=KTGT),intent(inout) :: ptiles(0:mdest, 0:*)
     integer,        intent(inout) :: jtabr(lrange, *)
@@ -4661,9 +4688,9 @@ contains
 !!!_   & set_coor_anchor - set geographic and plane coordinate of anchors(plane gridline intersections)
   subroutine set_coor_anchor_d &
        & (aplane, aglat, aglon, destd, destl, mx, my, cco)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu,only: psgp_bwd_tr, phase, rad2deg
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT),intent(out) :: aplane(:, 0:, 0:)
     real(kind=KTGT),intent(out) :: aglat(:, 0:, 0:)
     real(kind=KTGT),intent(out) :: aglon(:, 0:, 0:)
@@ -4698,11 +4725,11 @@ contains
        &  latn,   wlat,   &
        &  jlatb,  jlate,  latile, cco,    dir, &
        &  round)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     use TOUZA_Emu_ugg,only: deg2rad, ang2rad, sind_canonical, sin_canonical
     use TOUZA_Emu_ugg,only: psgp_cachela, round_choice
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT), intent(out) :: gslatn(0:*)
     real(kind=KTGT), intent(out) :: dslatn(0:*)
     real(kind=KTGT), intent(out) :: uslatn(0:*)
@@ -4753,11 +4780,11 @@ contains
        &  lonn,  dlon,  &
        &  jlonb, jlone, lotile, cco,    dir, &
        &  round)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     use TOUZA_Emu_ugg,only: deg2rad, sind_canonical, sin_canonical
     use TOUZA_Emu_ugg,only: psgp_cachelo_px, psgp_inquire
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,         intent(out) :: ierr
     real(kind=KTGT), intent(out) :: glonn(0:*)
     real(kind=KTGT), intent(out) :: dlonn(0:*)
@@ -4888,9 +4915,9 @@ contains
 !!!_   & set_seg_lat_cache
   subroutine set_seg_lat_cache_d &
        & (cache, lintg2, slat0, slat1, dslat, cco, lcache)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: psgp_cachela
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT),intent(out) :: cache(:, 0:)
     real(kind=KTGT),intent(out) :: lintg2(0:*)
     real(kind=KTGT),intent(in)  :: slat0,  slat1, dslat
@@ -4929,9 +4956,9 @@ contains
 !!!_   & set_seg_rlon_cache
   subroutine set_seg_rlon_cache_d &
        & (cache, lon0, lon1, dlon, cco, lcache)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: psgp_cachelo_px, deg2rad
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT),intent(out) :: cache(:, 0:)
     real(kind=KTGT),intent(in)  :: lon0,   lon1
     real(kind=KTGT),intent(in)  :: dlon
@@ -5042,8 +5069,8 @@ contains
 !!!_   & nsort4 - sort 4-element array by /network/ method
   PURE &
   subroutine nsort4_d(seq, xy, idx)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,parameter :: n = 4, m = 2
     integer,        intent(out) :: seq(n)
     real(kind=KTGT),intent(in)  :: xy(m, n)
@@ -5084,9 +5111,9 @@ contains
        &  ipofs,  ipprj,  wpprj, mph, lpmem, &
        &  igofs,  igprj,  wgprj, mgh, lgmem, &
        &  sort)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice, bisection_find
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: lgmem, lpmem
     integer,         intent(out) :: ipofs(0:*)
@@ -5175,10 +5202,10 @@ contains
 !!!_   & debug_dump_cell
   subroutine debug_dump_cell_d &
        & (pcache, pstack, cachelo, cachela, destl, jdest, klev, jpos, udump)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: KDBG=>KFLT
     use TOUZA_Emu_ugg,only: psgp_fwd
     implicit none
-    integer,parameter  :: KTGT=KDBL
-    integer,parameter  :: KDBG=KFLT
     integer,        intent(in) :: pcache(2, 0:*)
     integer,        intent(in) :: pstack(prop_psg_size, 0:*) ! work area
     real(kind=KTGT),intent(in) :: cachelo(:, 0:)
@@ -5220,8 +5247,9 @@ contains
        &  latwn_tp, lonwn_tp, latws_tp, lonws_tp, &
        &  lonlev,   latlev,   inilev,   swlev,    reqlev, tol, &
        &  deg,      u,        levv,     tag,      udump)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: trace_err
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: lmem                   ! limit size of iprj wprj  (negative to skip check)
     integer,         intent(out) :: iofs(0:*)              ! [(lo,la)+1] to subscript-vector offset (lv)
@@ -5622,10 +5650,11 @@ contains
        &  pole,     latp_tp,  lonp_tp,  &
        &  latlev,   lonlev,   inilev,   swlev,    reqlev, tol, &
        &  laround,  loround,  u,        levv,     tag,    udump)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu_ugg,only: check_monotonic
     use TOUZA_Emu_ugg,only: ncache_stp_co
+    use TOUZA_Ami_std,only: msg, choice, get_logu
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: lmem                   ! limit size of iprj wprj  (negative to skip check)
     integer,         intent(out) :: iofs(0:*)              ! [(lo,la)+1] to subscript-vector offset (lv)
@@ -5826,10 +5855,10 @@ contains
        &  uslat,   ulon,    loround, dir_nat, jclon_rep, repfac,  &
        &  latn_tp, mlat_tp, lonn_tp, mlon_tp, &
        &  mdest,   csco,    tol,     levv,    tag,       udump,   jlatph,  jlonph)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: KDBG=>KFLT
     use TOUZA_Ami_std,only: inrange, condop
     implicit none
-    integer,parameter :: KTGT=KDBL
-    integer,parameter :: KDBG=KFLT
     integer,         intent(in)    :: mdest
     real(kind=KTGT), intent(inout) :: ntiles(0:mdest,0:*)       ! [0:mx*my]  must be reset before call  (larger)
     real(kind=KTGT), intent(inout) :: ptiles(0:mdest,0:*)       ! [0:mx*my]  must be reset before call  (smaller)
@@ -6054,10 +6083,10 @@ contains
        & (gslatn, dslatn, uslatn, &
        &  latn,   wlat,   &
        &  jlatb,  jlate,  latile, dir, span)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     use TOUZA_Emu_ugg,only: sin_canonical
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT), intent(out) :: gslatn(0:*)
     real(kind=KTGT), intent(out) :: dslatn(0:*)
     real(kind=KTGT), intent(out) :: uslatn(0:*)
@@ -6087,10 +6116,10 @@ contains
        & (glonn, dlonn, ulonn,  &
        &  lonn,  dlon,  &
        &  jlonb, jlone, lotile, dir, span)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     use TOUZA_Emu_ugg,only: sin_canonical
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT), intent(out) :: glonn(0:*)
     real(kind=KTGT), intent(out) :: dlonn(0:*)
     real(kind=KTGT), intent(out) :: ulonn(0:*)
@@ -6121,10 +6150,10 @@ contains
        &  xlatn, xwlat, nlat,  &
        &  latn,  wlat,  jlatb, jlate, &
        &  pole,  plat,  round)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: condop
     use TOUZA_Emu_ugg,only: span_latitude, sin_canonical, round_choice
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(out)         :: xlatn(0:*), xwlat(0:*)
     integer,        intent(out)         :: nlat
@@ -6190,10 +6219,10 @@ contains
        &  latn_wsp, jlatw, mlatw, &
        &  dlat,     jlatb, jlate, &
        &  dir,      msect, span,  base)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     use TOUZA_Emu,only: span_latitude
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(out)         :: latn_wsp(0:*)   !
     integer,        intent(in)          :: jlatw, mlatw
@@ -6292,8 +6321,8 @@ contains
        &  xlon_seq, lseq,  &
        &  lonn,     jlonb, jlone, &
        &  lptab,    msect, span,  org,   base)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(out)         :: lonn_grp(0:*)   ! 0:lptab
     integer,        intent(out)         :: grpph(0:*)
@@ -6337,8 +6366,8 @@ contains
        &  xlon_seq, lseq,  &
        &  lonn,     jlonb, jlone, &
        &  msect,    span,  org,   base)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out)         :: ierr
     integer,        intent(out)         :: nsect           ! effective sector size
     integer,        intent(out)         :: secth(0:*)      ! decomposition heads (sector)
@@ -6452,9 +6481,9 @@ contains
        &  nlon_grp, grpph, ngrpp, sptab, &
        &  xlon_seq, secth, nsect, &
        &  lptab,    msect, span,  org,   base)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: find_first
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(out)         :: nlon_grp(0:*)   ! 0:lptab
     integer,        intent(out)         :: grpph(0:*)
@@ -6722,9 +6751,9 @@ contains
        &  lonn_grp, grpph, sptab, &
        &  xlon_seq, secth, nsect, &
        &  ldech,    jlonb, jlone)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: condop, find_first
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out)         :: ierr
     integer,        intent(out)         :: cotab(0:*)
     real(kind=KTGT),intent(in)          :: lonn_grp(0:*)
@@ -6827,8 +6856,9 @@ contains
        &  xlon_seq, secth, nsect, &
        &  dlon,     ldech, jlonb, jlone, &
        &  lptab,    msect, span,  org,   base)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: join_list, compact_string
     implicit none
-    integer,parameter     :: KTGT=KDBL
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(out)         :: dlon_grp(0:*)
     integer,        intent(out)         :: grpph(0:*)
@@ -6904,8 +6934,8 @@ contains
        & (ierr, &
        &  xpat,  npat,  lpat, &
        &  spsrc, nssrc, spdst, nsdst)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    integer,parameter    :: KTGT=KDBL
     integer, intent(out) :: ierr
     integer, intent(out) :: xpat(pat_props,   0:*)
     integer, intent(out) :: npat
@@ -6956,6 +6986,7 @@ contains
        & (jsect, msect, span, org, base, ref) &
        &  result(v)
     use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: choice
     use TOUZA_Emu,only: span_longitude
     implicit none
     real(kind=KTGT) :: v
@@ -6991,10 +7022,10 @@ contains
   integer function get_sector_nidx_d &
        & (lon, msect, span, org, base, ref, dbl) &
        &  result(k)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     use TOUZA_Emu,only: span_longitude
     implicit none
-    integer,parameter :: KTGT=KDBL
     real(kind=KTGT),intent(in)          :: lon
     integer,        intent(in)          :: msect   ! number of orthant(sector) in span
     real(kind=KTGT),intent(in),optional :: span    ! one-cycle
@@ -7114,9 +7145,9 @@ program test_ami_table
   stop
 contains
   subroutine batch_test_nidx(ierr)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Emu, only: degree_modulo, get_longitude, mid_longitude
     implicit none
-    integer,parameter :: KTGT = KDBL
     integer,intent(out) :: ierr
 
     real(kind=KTGT) plon
@@ -7167,14 +7198,14 @@ contains
   end subroutine batch_test_nidx
 
   subroutine batch_test_tp2g(ierr)
-    use TOUZA_Ami_std,only: join_list
+    use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: join_list, new_unit
     use TOUZA_Ami_legacy,only: open_geofile_tripolar, read_geofile_tripolar
     use TOUZA_Emu, only: degree_modulo, get_longitude, mid_longitude, deg2ang
     use TOUZA_Emu, only: gauss_latitude, mid_latitude, rad2ang
     use TOUZA_Emu, only: ncache_stp_co, round_choice, round_degree
     use TOUZA_Emu, only: stp_set
     implicit none
-    integer,parameter :: KTGT = KDBL
     integer,intent(out) :: ierr
     integer,parameter :: lpath = 256
     character(len=lpath) :: geofile
@@ -7593,12 +7624,12 @@ contains
   end subroutine batch_test_tp2g
 
   subroutine batch_test_xlat(ierr)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: join_list
     ! use TOUZA_Ami_legacy,only: open_geofile_tripolar, read_geofile_tripolar
     use TOUZA_Emu, only: degree_modulo, get_longitude, mid_longitude, deg2ang
     use TOUZA_Emu, only: gauss_latitude, mid_latitude, rad2ang, round_degree
     implicit none
-    integer,parameter :: KTGT = KDBL
     integer,intent(out) :: ierr
 
     real(kind=KTGT) slat, plon, plat
@@ -7708,6 +7739,7 @@ contains
 
   subroutine test_table_1d &
        & (ierr, n, ddst, odst, dsrc, osrc)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
     integer,intent(out) :: ierr
     integer,intent(in)  :: n
@@ -7715,11 +7747,11 @@ contains
     integer,intent(in)  :: dsrc, osrc
 
     integer,parameter :: lx = 1024
-    real(kind=KDBL)   :: xdst(lx + 1)
-    real(kind=KDBL)   :: xsrc(lx + 1)
+    real(kind=KTGT)   :: xdst(lx + 1)
+    real(kind=KTGT)   :: xsrc(lx + 1)
 
     integer,parameter :: ltbl = 12
-    real(kind=KDBL),save :: ftbl(lx, ltbl)
+    real(kind=KTGT),save :: ftbl(lx, ltbl)
     integer,save         :: itbl(lx, ltbl)
 
     integer ndst, nsrc
@@ -7758,47 +7790,49 @@ contains
   end subroutine test_table_1d
 
   subroutine setco(x, n, o, d)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
-    real(kind=KDBL),intent(out) :: x(*)
+    real(kind=KTGT),intent(out) :: x(*)
     integer,        intent(in)  :: n, o, d
     integer j
     if (d.gt.0) then
        do j = 0, n - 1
-          x(1 + j) = real(o + j * d, kind=KDBL)
+          x(1 + j) = real(o + j * d, kind=KTGT)
        enddo
     else
        do j = 0, n - 1
-          x(n - j) = real(o - j * d, kind=KDBL)
+          x(n - j) = real(o - j * d, kind=KTGT)
        enddo
     endif
     return
   end subroutine setco
 
   subroutine batch_test_symm(ierr)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     implicit none
     integer,intent(out) :: ierr
 
-    real(kind=KDBL) :: xl, xh, dx, yl, yh, dy
+    real(kind=KTGT) :: xl, xh, dx, yl, yh, dy
     integer mx, my
     integer j
     ierr = 0
 
-    dx = 4.0_KDBL
+    dx = 4.0_KTGT
     dy = dx
     do j = -10, -1
-       xl = real(j, kind=KDBL)
+       xl = real(j, kind=KTGT)
        yl = xl
        mx = 3
        my = mx
        call test_symm(ierr, xl, dx, mx, yl, dy, my)
     enddo
     mx = 5
-    xl = -10.0_KDBL
-    dx = +6.0_KDBL
+    xl = -10.0_KTGT
+    dx = +6.0_KTGT
     xh = xl + mx * dx
     write(*, *) '#### xl = ', xl, xh
     do j = 0, +6
-       yl = xl + real(j, kind=KDBL)
+       yl = xl + real(j, kind=KTGT)
        dy = dx
        yh = yl + mx * dy
        write(*, *) '## yl = ', yl, yh
@@ -7809,12 +7843,12 @@ contains
     enddo
 
     mx = 5
-    xl = -9.0_KDBL
-    dx = +6.0_KDBL
+    xl = -9.0_KTGT
+    dx = +6.0_KTGT
     xh = xl + mx * dx
     write(*, *) '#### xl = ', xl, xh
     do j = 0, +6
-       yl = xl + real(j, kind=KDBL)
+       yl = xl + real(j, kind=KTGT)
        dy = dx
        yh = yl + mx * dy
        write(*, *) '## yl = ', yl, yh
@@ -7827,11 +7861,12 @@ contains
   end subroutine batch_test_symm
 
   subroutine test_symm(ierr, xl, dx, mx, yl, dy, my)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Std_utl,only: backslash
     implicit none
     integer,intent(out) :: ierr
 
-    real(kind=KDBL),intent(in):: xl, dx, yl, dy
+    real(kind=KTGT),intent(in):: xl, dx, yl, dy
     integer,intent(in) :: mx, my
     character(len=4) :: s
     integer kasp

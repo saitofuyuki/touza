@@ -1,7 +1,7 @@
 !!!_! ami_legacy.F90 - TOUZA/Ami/legacy
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 19 2023
-#define TIME_STAMP 'Time-stamp: <2024/06/27 10:15:45 fuyuki ami_legacy.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 18:32:11 fuyuki ami_legacy.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023,2024
@@ -19,7 +19,7 @@
 !!!_@ TOUZA_Ami_legacy - ami-da procedures for legacy format
 module TOUZA_Ami_legacy
 !!!_ + modules
-  use TOUZA_Ami_std, as_init=>init, as_diag=>diag, as_finalize=>finalize
+    use TOUZA_Ami_std,only: unit_global
 !!!_ + default
   implicit none
   private
@@ -93,6 +93,9 @@ module TOUZA_Ami_legacy
 contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
+    use TOUZA_Ami_std,only: as_init=>init
+    use TOUZA_Ami_std,only: control_mode, is_first_force, control_deep
+    use TOUZA_Ami_std,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -127,6 +130,12 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Ami_std,only: as_diag=>diag
+    use TOUZA_Ami_std,only: choice, get_logu
+    use TOUZA_Ami_std,only: msg, is_msglev_NORMAL
+    use TOUZA_Ami_std,only: control_mode, is_first_force, control_deep
+    use TOUZA_Ami_std,only: trace_control
+    use TOUZA_Ami_std,only: is_msglev_INFO
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -167,6 +176,10 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Ami_std,only: as_finalize=>finalize
+    use TOUZA_Ami_std,only: choice, get_logu
+    use TOUZA_Ami_std,only: control_mode, is_first_force, control_deep
+    use TOUZA_Ami_std,only: trace_fine
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -204,6 +217,7 @@ contains
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: is_error_match
     use TOUZA_Ami_std,only: sus_open, sus_read_irec, sus_skip_irec
+    use TOUZA_Ami_std,only: sus_record_mems_irec
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(out)         :: klegacy
@@ -291,6 +305,7 @@ contains
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     use TOUZA_Ami_std,only: sus_is_stream_unit, sus_read_irec, sus_suspend_read_irec
+    use TOUZA_Ami_std,only: suspend_begin, suspend_end
     implicit none
     integer,        intent(out)          :: ierr
     integer,        intent(out)          :: ij_ahead(0:*)                ! ij_amax
@@ -429,6 +444,7 @@ contains
        &  klegacy, swap, ijdim, file, u, mold)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: sus_open, sus_read_irec, sus_skip_irec
+    use TOUZA_Ami_std,only: sus_record_mems_irec
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(out)         :: klegacy
@@ -496,6 +512,7 @@ contains
        &  ijdim,    u,       swap)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: sus_is_stream_unit, sus_read_irec
+    use TOUZA_Ami_std,only: choice
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: ij_omax
@@ -560,6 +577,7 @@ contains
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     use TOUZA_Ami_std,only: sus_is_stream_unit, sus_read_irec, sus_suspend_read_irec
+    use TOUZA_Ami_std,only: suspend_begin, suspend_end
     implicit none
     integer,        intent(out)          :: ierr
     integer,        intent(out)          :: ij_ohead(0:*)
@@ -638,6 +656,8 @@ contains
        &  ijdim,    ij_omax, u,  swap,    klegacy, ij_o)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: sus_is_stream_unit, sus_read_irec, sus_suspend_read_irec
+    use TOUZA_Ami_std,only: suspend_begin, suspend_end
+    use TOUZA_Ami_std,only: choice
     implicit none
     integer,        intent(out)          :: ierr
     integer,        intent(out)          :: ij_ohead(0:*)
@@ -704,6 +724,7 @@ contains
        &  ijdim,     ij_omax,      u,      swap,    klegacy, ij_o)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: sus_is_stream_unit, sus_read_irec, sus_suspend_read_irec
+    use TOUZA_Ami_std,only: choice
     implicit none
     integer,        intent(out)          :: ierr
     integer,        intent(out)          :: ij_olhead(0:*)
@@ -755,6 +776,9 @@ contains
        &  ij_omax,  ijdim,       u,     swap)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: sus_read_irec, sus_is_stream_unit
+    use TOUZA_Ami_std,only: suspend_begin, suspend_end
+    use TOUZA_Ami_std,only: choice
+    use TOUZA_Ami_std,only: sus_suspend_write_irec, sus_write_irec
     implicit none
     integer,        intent(out)         :: ierr
     integer,        intent(in)          :: ij_ohead(0:*)
@@ -819,6 +843,9 @@ contains
        &  ijdim,    u,      swap, klegacy)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: sus_read_irec, sus_is_stream_unit
+    use TOUZA_Ami_std,only: suspend_begin, suspend_end
+    use TOUZA_Ami_std,only: choice
+    use TOUZA_Ami_std,only: sus_suspend_write_irec, sus_write_irec
     implicit none
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(in)          :: ruo(*), rvo(*), flandg(*)   ! ijdim
@@ -921,6 +948,7 @@ contains
        &  slat, plon, plat, &
        &  dy,   dz,   hi,   ageo, bgeo)
     use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: set_if_present
     implicit none
     integer,         intent(out)          :: ierr
     integer,         intent(in)           :: u

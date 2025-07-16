@@ -168,8 +168,8 @@ contains
   subroutine init &
        & (ierr, u, levv, mode, stdv, icomm)
     use TOUZA_Ppp,only: ppp_init=>init
-    use TOUZA_Ppp,only: control_mode, control_deep, is_first_force
-    use TOUZA_Ppp,only: choice, is_msglev_NORMAL
+    use TOUZA_Ppp_std,only: control_mode, control_deep, is_first_force
+    use TOUZA_Ppp_std,only: choice, is_msglev_NORMAL
     use TOUZA_Std,only: mwe_init, bld_init
     use TOUZA_Emu,only: usi_init
     implicit none
@@ -210,7 +210,8 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Ppp,only: ppp_diag=>diag, ppp_msg=>msg
+    use TOUZA_Ppp,only: ppp_diag=>diag
+    use TOUZA_Ppp_std,only: ppp_msg=>msg
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
     use TOUZA_Std,only: mwe_diag, get_logu, choice, is_msglev_NORMAL
     use TOUZA_Std,only: bld_diag
@@ -253,8 +254,8 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std,only: mwe_finalize, bld_finalize
     use TOUZA_Ppp,only: ppp_finalize=>finalize
-    use TOUZA_Ppp,only: control_mode, control_deep, is_first_force
-    use TOUZA_Ppp,only: get_logu, choice, trace_fine
+    use TOUZA_Ppp_std,only: control_mode, control_deep, is_first_force
+    use TOUZA_Ppp_std,only: get_logu, choice, trace_fine
     use TOUZA_Emu,only: usi_finalize
     implicit none
     integer,intent(out)         :: ierr
@@ -772,8 +773,8 @@ contains
   subroutine init_king &
        & (ierr,   &
        &  ifpar,  jfpar)
-    use TOUZA_Ppp,only: is_eof_ss, set_king
-    use TOUZA_Ppp_std,only: choice
+    use TOUZA_Ppp,only: set_king
+    use TOUZA_Ppp_std,only: choice, is_eof_ss
     use TOUZA_Emu,only: get_sysu
     implicit none
     integer,intent(out) :: ierr
@@ -932,8 +933,8 @@ contains
 !!!_  & spinoff_agent - create spinoff agent if not exists
   subroutine spinoff_agent &
        & (ierr, iaspin, name, iagnt)
-    use TOUZA_Ppp,only: is_child_agent, new_agent_spinoff, &
-         &              top_agent, pop_agent, clone_agent, query_agent
+    use TOUZA_Ppp,only: is_child_agent, new_agent_spinoff
+    use TOUZA_Ppp,only: top_agent, pop_agent, clone_agent, query_agent
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: iaspin
@@ -956,7 +957,8 @@ contains
 !!!_  & query_handle - get agent handle from agent string (XMCiJA)
   subroutine query_handle(IAGNT, HCTZ)
     use TOUZA_Emu,only: get_sysu
-    use TOUZA_Ppp,only: query_agent, msg
+    use TOUZA_Ppp,only: query_agent
+    use TOUZA_Ppp_std,only: msg
     implicit none
     integer,         intent(out) :: IAGNT
     character(len=*),intent(in)  :: HCTZ     ! <CI>

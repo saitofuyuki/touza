@@ -1,7 +1,7 @@
 !!!_! trapiche.F90 - TOUZA/Trapiche manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:20:37 fuyuki trapiche.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 16:39:55 fuyuki trapiche.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -17,13 +17,16 @@
 !!!_@ TOUZA_Trp - Trapiche interfaces
 module TOUZA_Trp
 !!!_ = declaration
-  use TOUZA_Trp_std,   ts_init=>init, ts_diag=>diag, ts_finalize=>finalize
+  use TOUZA_Trp_std,only: unit_global
+  use TOUZA_Trp_std,only: first_bit
   use TOUZA_Trp_pack,  tp_init=>init, tp_diag=>diag, tp_finalize=>finalize
   use TOUZA_Trp_float, tf_init=>init, tf_diag=>diag, tf_finalize=>finalize
   use TOUZA_Trp_ctl,   tc_init=>init, tc_diag=>diag, tc_finalize=>finalize
 !!!_  = defaults
   implicit none
   public
+!!!_  - no export
+  private :: unit_global
 !!!_  - static
   integer,save,private :: init_mode = 0
   integer,save,private :: init_counts = 0
@@ -37,6 +40,9 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv)
+    use TOUZA_Trp_std,only: ts_init=>init
+    use TOUZA_Trp_std,only: control_mode, control_deep
+    use TOUZA_Trp_std,only: choice, is_first_force
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -72,6 +78,12 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Trp_std,only: ts_diag=>diag
+    use TOUZA_Trp_std,only: control_mode, control_deep
+    use TOUZA_Trp_std,only: choice, is_first_force
+    use TOUZA_Trp_std,only: trace_control
+    use TOUZA_Trp_std,only: is_msglev_NORMAL
+    use TOUZA_Trp_std,only: msg
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -109,7 +121,10 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Trp_std,only: choice
+    use TOUZA_Trp_std,only: ts_finalize=>finalize
+    use TOUZA_Trp_std,only: control_mode, control_deep
+    use TOUZA_Trp_std,only: choice, is_first_force
+    use TOUZA_Trp_std,only: trace_fine
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u

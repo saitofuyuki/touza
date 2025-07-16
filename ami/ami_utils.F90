@@ -1,7 +1,7 @@
 !!!_! ami_utils.F90. - TOUZA/Ami/misc utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/10 12:53:55 fuyuki ami_utils.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 18:00:33 fuyuki ami_utils.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -19,13 +19,14 @@
 !!!_@ TOUZA_Ami_utils - ami-da utilities
 module TOUZA_Ami_utils
 !!!_ + modules
-  use TOUZA_Ami_std, as_init=>init, as_diag=>diag, as_finalize=>finalize
+  use TOUZA_Ami_std,only: unit_global
+  use TOUZA_Ami_std,only: KDBL
 !!!_ + default
   implicit none
   private
 !!!_ + parameter
-    real(kind=KDBL),   parameter :: PI = 4.0_KDBL * ATAN(1.0_KDBL)
-    complex(kind=KDBL),parameter :: CUNITI = (0.0, 1.0)
+  real(kind=KDBL),   parameter :: PI = 4.0_KDBL * ATAN(1.0_KDBL)
+  complex(kind=KDBL),parameter :: CUNITI = (0.0, 1.0)
 !!!_ + public
 !!!_ + static
 !!!_  - private static
@@ -69,6 +70,10 @@ module TOUZA_Ami_utils
 contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
+    use TOUZA_Ami_std,only: as_init=>init
+    use TOUZA_Ami_std,only: choice
+    use TOUZA_Ami_std,only: is_first_force, trace_control
+    use TOUZA_Ami_std,only: control_deep, control_mode
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -103,6 +108,12 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Ami_std,only: as_diag=>diag
+    use TOUZA_Ami_std,only: choice, get_logu
+    use TOUZA_Ami_std,only: msg
+    use TOUZA_Ami_std,only: is_first_force, trace_control
+    use TOUZA_Ami_std,only: control_deep, control_mode
+    use TOUZA_Ami_std,only: is_msglev_NORMAL
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -134,6 +145,11 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Ami_std,only: as_finalize=>finalize
+    use TOUZA_Ami_std,only: is_first_force, trace_control
+    use TOUZA_Ami_std,only: control_deep, control_mode
+    use TOUZA_Ami_std,only: choice, get_logu
+    use TOUZA_Ami_std,only: trace_fine
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u

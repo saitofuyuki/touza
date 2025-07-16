@@ -1,7 +1,7 @@
 !!!_! nio.F90 - TOUZA/Nio manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 11 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:50:34 fuyuki nio.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 16:51:26 fuyuki nio.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023,2024
@@ -18,8 +18,7 @@
 module TOUZA_Nio
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Nio_std,     ns_init=>init, ns_diag=>diag, ns_finalize=>finalize
-  use TOUZA_Nio_std,     nio_gen_tag=>gen_tag
+  use TOUZA_Nio_std,only: unit_global
   use TOUZA_Nio_header,  nh_init=>init, nh_diag=>diag, nh_finalize=>finalize
   use TOUZA_Nio_record,  nr_init=>init, nr_diag=>diag, nr_finalize=>finalize
   use TOUZA_Nio_axis,    na_init=>init, na_diag=>diag, na_finalize=>finalize
@@ -33,6 +32,8 @@ module TOUZA_Nio
 !!!_  - default
   implicit none
   public
+!!!_  - no export
+  private :: unit_global
 !!!_  - private static
   integer,save,private :: init_mode = 0
   integer,save,private :: init_counts = 0
@@ -46,6 +47,9 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
+    use TOUZA_Nio_std,only: ns_init=>init
+    use TOUZA_Nio_std,only: control_mode, control_deep
+    use TOUZA_Nio_std,only: choice, is_first_force
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -87,6 +91,12 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Nio_std,only: ns_diag=>diag
+    use TOUZA_Nio_std,only: control_mode, control_deep
+    use TOUZA_Nio_std,only: choice, is_first_force, get_logu
+    use TOUZA_Nio_std,only: trace_control
+    use TOUZA_Nio_std,only: is_msglev_NORMAL
+    use TOUZA_Nio_std,only: msg
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -130,6 +140,10 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Nio_std,only: ns_finalize=>finalize
+    use TOUZA_Nio_std,only: control_mode, control_deep
+    use TOUZA_Nio_std,only: choice, is_first_force, get_logu
+    use TOUZA_Nio_std,only: trace_fine
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
