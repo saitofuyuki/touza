@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/07/10 21:50:56 fuyuki configure.ac>
+# Time-stamp: <2025/07/13 16:07:44 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -44,9 +44,15 @@ AC_FC_MODULE_FLAG
 AC_FC_MODULE_OUTPUT_FLAG([], [AC_MSG_WARN])
 AX_COMPILER_VENDOR
 AC_SUBST([FC_COMPILER_VENDOR], $ax_cv_fc_compiler_vendor)
+AX_OPENMP
 AC_LANG_POP([Fortran])
 
 AC_PROG_F77
+dnl AC_LANG_PUSH([Fortran 77])
+dnl AX_OPENMP
+dnl AC_LANG_POP([Fortran 77])
+AC_SUBST([OPENMP_FCFLAGS])
+AC_SUBST([OPENMP_FFLAGS])
 
 AC_ARG_ENABLE([warn-max],
 [AS_HELP_STRING([--enable-warn-max], [compile with maximum warning option if found @<:@default=no@:>@])],
