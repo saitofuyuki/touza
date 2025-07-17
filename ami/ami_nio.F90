@@ -1,7 +1,7 @@
 !!!_! ami_nio.F90 - TOUZA/Ami/nio-format interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 19 2023
-#define TIME_STAMP 'Time-stamp: <2025/07/16 22:06:28 fuyuki ami_nio.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 11:38:59 c0210 ami_nio.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -564,7 +564,7 @@ contains
   end subroutine check_remove_wings_d
 
   subroutine check_remove_wings_i(ierr, v, lh, nz, mx, ww, we, my, wy, tag, u)
-    use TOUZA_Ami_std,only: get_logu
+    use TOUZA_Ami_std,only: get_logu, msg
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(inout) :: v(*)

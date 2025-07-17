@@ -1,7 +1,7 @@
 !!!_! ami_table.F90 - TOUZA/Ami/table amida-coupler table procedures
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/16 18:31:51 fuyuki ami_table.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 11:29:00 c0210 ami_table.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024, 2025
@@ -5204,6 +5204,7 @@ contains
        & (pcache, pstack, cachelo, cachela, destl, jdest, klev, jpos, udump)
     use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: KDBG=>KFLT
+    use TOUZA_Ami_std,only: msg
     use TOUZA_Emu_ugg,only: psgp_fwd
     implicit none
     integer,        intent(in) :: pcache(2, 0:*)
