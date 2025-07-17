@@ -1,7 +1,7 @@
 !!!_! ppp.F90 - touza/ppp ppp manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/16 16:43:05 fuyuki ppp.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 23:42:50 fuyuki ppp.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -19,12 +19,32 @@ module TOUZA_Ppp
 !!!_ = declaration
 !!!_  - modules
   use TOUZA_Ppp_std,only: unit_global
-  use TOUZA_Ppp_amng, pa_init=>init, pa_diag=>diag, pa_finalize=>finalize
-  use TOUZA_Ppp_king, pk_init=>init, pk_diag=>diag, pk_finalize=>finalize
-  use TOUZA_Ppp_comm, pc_init=>init, pc_diag=>diag, pc_finalize=>finalize
+  use TOUZA_Ppp_amng,only: pa_init=>init, pa_diag=>diag, pa_finalize=>finalize
+  use TOUZA_Ppp_king,only: pk_init=>init, pk_diag=>diag, pk_finalize=>finalize
+  use TOUZA_Ppp_comm,only: pc_init=>init, pc_diag=>diag, pc_finalize=>finalize
+
+  use TOUZA_Ppp_amng,only: new_agent_root,    new_agent_color,  new_agent_family
+  use TOUZA_Ppp_amng,only: new_agent_derived, new_agent_spinoff
+  use TOUZA_Ppp_amng,only: mod_agent_order
+  use TOUZA_Ppp_amng,only: agents_translate
+  use TOUZA_Ppp_amng,only: switch_agent,  push_agent, pop_agent, top_agent
+  use TOUZA_Ppp_amng,only: inquire_agent, is_member
+  use TOUZA_Ppp_amng,only: query_agent,   source_agent, check_agent, base_agent, clone_agent
+  use TOUZA_Ppp_amng,only: trace_agent
+  use TOUZA_Ppp_amng,only: is_child_agent
+  use TOUZA_Ppp_amng,only: diag_maps_batch, show_status
+  use TOUZA_Ppp_amng,only: lagent
+
+  use TOUZA_Ppp_king,only: get_king, set_king, is_king
+  use TOUZA_Ppp_king,only: diag_cache
+
+  use TOUZA_Ppp_comm,only: barrier_trace
+  use TOUZA_Ppp_comm,only: broadcast
+  use TOUZA_Ppp_comm,only: transfer
+
 !!!_  - default
   implicit none
-  public
+  private
 !!!_  - no export
   private :: unit_global
 !!!_  - private static
@@ -35,7 +55,31 @@ module TOUZA_Ppp
   integer,save,private :: lev_verbose = PPP_MSG_LEVEL
   integer,save,private :: err_default = ERR_NO_INIT
   integer,save,private :: ulog = unit_global
-!!!_  - private procedures
+!!!_  - public procedures
+  public :: init, diag, finalize
+  public :: pa_init, pa_diag, pa_finalize
+  public :: pk_init, pk_diag, pk_finalize
+  public :: pc_init, pc_diag, pc_finalize
+
+  public :: new_agent_root,    new_agent_color,  new_agent_family
+  public :: new_agent_derived, new_agent_spinoff
+  public :: mod_agent_order
+  public :: agents_translate
+  public :: switch_agent,  push_agent, pop_agent, top_agent
+  public :: inquire_agent, is_member
+  public :: query_agent,   source_agent, check_agent, base_agent, clone_agent
+  public :: trace_agent
+  public :: is_child_agent
+  public :: diag_maps_batch, show_status
+  public :: lagent
+
+  public :: get_king, set_king, is_king
+  public :: diag_cache
+
+  public :: barrier_trace
+  public :: broadcast
+  public :: transfer
+
 contains
 !!!_ + common interfaces
 !!!_  & init

@@ -1,7 +1,7 @@
 !!!_! nio.F90 - TOUZA/Nio manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 11 2021
-#define TIME_STAMP 'Time-stamp: <2025/07/16 16:51:26 fuyuki nio.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 23:17:11 fuyuki nio.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021,2022,2023,2024
@@ -19,19 +19,86 @@ module TOUZA_Nio
 !!!_ = declaration
 !!!_  - modules
   use TOUZA_Nio_std,only: unit_global
-  use TOUZA_Nio_header,  nh_init=>init, nh_diag=>diag, nh_finalize=>finalize
-  use TOUZA_Nio_record,  nr_init=>init, nr_diag=>diag, nr_finalize=>finalize
-  use TOUZA_Nio_axis,    na_init=>init, na_diag=>diag, na_finalize=>finalize
-  use TOUZA_Nio_sparse,  np_init=>init, np_diag=>diag, np_finalize=>finalize
-  use TOUZA_Nio_cache,   nc_init=>init, nc_diag=>diag, nc_finalize=>finalize
-  use TOUZA_Nio_control, nx_init=>init, nx_diag=>diag, nx_finalize=>finalize
-  use TOUZA_Nio_bindc,   nb_init=>init, nb_diag=>diag, nb_finalize=>finalize
+  use TOUZA_Nio_header,only:  nh_init=>init, nh_diag=>diag, nh_finalize=>finalize
+  use TOUZA_Nio_record,only:  nr_init=>init, nr_diag=>diag, nr_finalize=>finalize
+  use TOUZA_Nio_axis,only:    na_init=>init, na_diag=>diag, na_finalize=>finalize
+  use TOUZA_Nio_sparse,only:  np_init=>init, np_diag=>diag, np_finalize=>finalize
+  use TOUZA_Nio_cache,only:   nc_init=>init, nc_diag=>diag, nc_finalize=>finalize
+  use TOUZA_Nio_control,only: nx_init=>init, nx_diag=>diag, nx_finalize=>finalize
+  use TOUZA_Nio_bindc,only:   nb_init=>init, nb_diag=>diag, nb_finalize=>finalize
 # if OPT_WITH_NCTCDF
-  use TOUZA_Nio_nctcdf,  nn_init=>init, nn_diag=>diag, nn_finalize=>finalize
+  use TOUZA_Nio_nctcdf,only:  nn_init=>init, nn_diag=>diag, nn_finalize=>finalize
 # endif
+
+  use TOUZA_Nio_header,only: nitem, litem, lhead
+  use TOUZA_Nio_header,only: hi_IDFM,  hi_DSET,  hi_ITEM,   hi_EDIT1, hi_EDIT2, hi_EDIT3, hi_EDIT4, hi_EDIT5
+  use TOUZA_Nio_header,only: hi_EDIT6, hi_EDIT7, hi_EDIT8,  hi_FNUM,  hi_DNUM,  hi_TITL1, hi_TITL2, hi_UNIT
+  use TOUZA_Nio_header,only: hi_ETTL1, hi_ETTL2, hi_ETTL3,  hi_ETTL4, hi_ETTL5, hi_ETTL6, hi_ETTL7, hi_ETTL8
+  use TOUZA_Nio_header,only: hi_TIME,  hi_UTIM,  hi_DATE,   hi_TDUR,  hi_AITM1, hi_ASTR1, hi_AEND1, hi_AITM2
+  use TOUZA_Nio_header,only: hi_ASTR2, hi_AEND2, hi_AITM3,  hi_ASTR3, hi_AEND3, hi_DFMT,  hi_MISS,  hi_DMIN
+  use TOUZA_Nio_header,only: hi_DMAX,  hi_DIVS,  hi_DIVL,   hi_STYP,  hi_COPTN, hi_IOPTN, hi_ROPTN, hi_TIME2
+  use TOUZA_Nio_header,only: hi_UTIM2, hi_MEMO1, hi_MEMO2,  hi_MEMO3, hi_MEMO4, hi_MEMO5, hi_MEMO6, hi_MEMO7
+  use TOUZA_Nio_header,only: hi_MEMO8, hi_MEMO9, hi_MEMO10, hi_CDATE, hi_CSIGN, hi_MDATE, hi_MSIGN, hi_SIZE
+  use TOUZA_Nio_header,only: hi_DATE1, hi_DATE2
+  use TOUZA_Nio_header,only: put_item,       get_item,       store_item,       restore_item
+  use TOUZA_Nio_header,only: put_item_date,  get_item_date,  store_item_date,  restore_item_date
+  use TOUZA_Nio_header,only: fill_header
+  use TOUZA_Nio_header,only: show_header
+  use TOUZA_Nio_header,only: parse_date_tuple, unparse_date_tuple
+  use TOUZA_Nio_header,only: get_hitem
+
+  use TOUZA_Nio_control,only: nio_open, nio_close
+  use TOUZA_Nio_control,only: nio_search
+  use TOUZA_Nio_control,only: nio_show_status
+  use TOUZA_Nio_control,only: nio_time_undef
+
+  use TOUZA_Nio_record,only: set_default_switch
+  use TOUZA_Nio_record,only: set_default_header, get_default_header
+  use TOUZA_Nio_record,only: nio_record_std, nio_record_def
+  use TOUZA_Nio_record,only: nio_check_magic_file
+  use TOUZA_Nio_record,only: nio_read_header,    nio_write_header
+  use TOUZA_Nio_record,only: nio_read_data,      nio_write_data
+  use TOUZA_Nio_record,only: nio_read_data_slice
+  use TOUZA_Nio_record,only: nio_review_record
+  use TOUZA_Nio_record,only: nio_skip_records
+  use TOUZA_Nio_record,only: nio_bwd_record
+  use TOUZA_Nio_record,only: parse_header_base,  parse_record_fmt
+  use TOUZA_Nio_record,only: parse_header_size
+  use TOUZA_Nio_record,only: get_header_cprop,   put_header_cprop
+  use TOUZA_Nio_record,only: get_header_cname,   put_header_cname
+  use TOUZA_Nio_record,only: inquire_header_coor,search_null_coor,   shift_header_coor
+  use TOUZA_Nio_record,only: set_urt_defs,       parse_urt_options,  show_urt_options
+  use TOUZA_Nio_record,only: switch_urt_diag
+  use TOUZA_Nio_record,only: set_switch_subrec,  nio_allow_sub
+  use TOUZA_Nio_record,only: set_bodr_wnative
+  use TOUZA_Nio_record,only: subv_encode
+  use TOUZA_Nio_record,only: mtn_review
+  use TOUZA_Nio_record,only: mtn_read_array, mtn_read_data
+  use TOUZA_Nio_record,only: mtn_write_array, mtn_write_data
+  use TOUZA_Nio_record,only: nio_count_defined, decompose_packed_item
+  use TOUZA_Nio_record,only: ptx_check_vec
+  use TOUZA_Nio_record,only: ptx_def_options, ptx_parse_options, ptx_set_shape
+  use TOUZA_Nio_record,only: ptx_review,      ptx_parse_array
+  use TOUZA_Nio_record,only: ptx_write_array, ptx_write_data
+  use TOUZA_Nio_record,only: ptx_read_array,  ptx_read_data
+  use TOUZA_Nio_record,only: ptx_expand_data, ptx_set_loops
+  use TOUZA_Nio_record,only: ptx_gen_ccvec,   ptx_pack_data
+  use TOUZA_Nio_record,only: ptx_row_size
+  use TOUZA_Nio_record,only: pre_review,      post_review
+  use TOUZA_Nio_record,only: is_review_leave
+  use TOUZA_Nio_record,only: is_match_format
+  use TOUZA_Nio_record,only: REC_ERROR, REC_ASIS, REC_DEFAULT, REC_SWAP
+  use TOUZA_Nio_record,only: REC_LSEP,  REC_BIG,  REC_LITTLE,  REC_SUB_ALLOW
+  use TOUZA_Nio_record,only: REC_LEFT
+
+  use TOUZA_Nio_sparse,only: nio_column_coor
+  use TOUZA_Nio_sparse,only: nio_review_sparse, nio_inquire_sparse
+  use TOUZA_Nio_sparse,only: nio_store_csr,     nio_restore_csr
+  use TOUZA_Nio_sparse,only: nio_store_qjds,    nio_restore_qjds
+
 !!!_  - default
   implicit none
-  public
+  private
 !!!_  - no export
   private :: unit_global
 !!!_  - private static
@@ -42,6 +109,88 @@ module TOUZA_Nio
   integer,save,private :: lev_verbose = NIO_MSG_LEVEL
   integer,save,private :: err_default = ERR_NO_INIT
   integer,save,private :: ulog = unit_global
+
+!!!_  - public procedures
+  public :: init, diag, finalize
+
+  public :: nh_init, nh_diag, nh_finalize
+  public :: nitem, litem, lhead
+  public :: hi_IDFM,  hi_DSET,  hi_ITEM,   hi_EDIT1, hi_EDIT2, hi_EDIT3, hi_EDIT4, hi_EDIT5
+  public :: hi_EDIT6, hi_EDIT7, hi_EDIT8,  hi_FNUM,  hi_DNUM,  hi_TITL1, hi_TITL2, hi_UNIT
+  public :: hi_ETTL1, hi_ETTL2, hi_ETTL3,  hi_ETTL4, hi_ETTL5, hi_ETTL6, hi_ETTL7, hi_ETTL8
+  public :: hi_TIME,  hi_UTIM,  hi_DATE,   hi_TDUR,  hi_AITM1, hi_ASTR1, hi_AEND1, hi_AITM2
+  public :: hi_ASTR2, hi_AEND2, hi_AITM3,  hi_ASTR3, hi_AEND3, hi_DFMT,  hi_MISS,  hi_DMIN
+  public :: hi_DMAX,  hi_DIVS,  hi_DIVL,   hi_STYP,  hi_COPTN, hi_IOPTN, hi_ROPTN, hi_TIME2
+  public :: hi_UTIM2, hi_MEMO1, hi_MEMO2,  hi_MEMO3, hi_MEMO4, hi_MEMO5, hi_MEMO6, hi_MEMO7
+  public :: hi_MEMO8, hi_MEMO9, hi_MEMO10, hi_CDATE, hi_CSIGN, hi_MDATE, hi_MSIGN, hi_SIZE
+  public :: hi_DATE1, hi_DATE2
+  public :: put_item,       get_item,       store_item,       restore_item
+  public :: put_item_date,  get_item_date,  store_item_date,  restore_item_date
+  public :: fill_header
+  public :: show_header
+  public :: parse_date_tuple, unparse_date_tuple
+  public :: get_hitem
+
+  public :: nr_init, nr_diag, nr_finalize
+  public :: set_default_switch
+  public :: set_default_header, get_default_header
+  public :: nio_record_std, nio_record_def
+  public :: nio_check_magic_file
+  public :: nio_read_header,    nio_write_header
+  public :: nio_read_data,      nio_write_data
+  public :: nio_read_data_slice
+  public :: nio_review_record
+  public :: nio_skip_records
+  public :: nio_bwd_record
+  public :: parse_header_base,  parse_record_fmt
+  public :: parse_header_size
+  public :: get_header_cprop,   put_header_cprop
+  public :: get_header_cname,   put_header_cname
+  public :: inquire_header_coor,search_null_coor,   shift_header_coor
+  public :: set_urt_defs,       parse_urt_options,  show_urt_options
+  public :: switch_urt_diag
+  public :: set_switch_subrec,  nio_allow_sub
+  public :: set_bodr_wnative
+  public :: subv_encode
+  public :: mtn_review
+  public :: mtn_read_array, mtn_read_data
+  public :: mtn_write_array, mtn_write_data
+  public :: nio_count_defined, decompose_packed_item
+  public :: ptx_check_vec
+  public :: ptx_def_options, ptx_parse_options, ptx_set_shape
+  public :: ptx_review,      ptx_parse_array
+  public :: ptx_write_array, ptx_write_data
+  public :: ptx_read_array,  ptx_read_data
+  public :: ptx_expand_data, ptx_set_loops
+  public :: ptx_gen_ccvec,   ptx_pack_data
+  public :: ptx_row_size
+  public :: pre_review,      post_review
+  public :: is_review_leave
+  public :: is_match_format
+
+  public :: na_init, na_diag, na_finalize
+
+  public :: np_init, np_diag, np_finalize
+  public :: nio_column_coor
+  public :: nio_review_sparse, nio_inquire_sparse
+  public :: nio_store_csr,     nio_restore_csr
+  public :: nio_store_qjds,    nio_restore_qjds
+  public :: REC_ERROR, REC_ASIS, REC_DEFAULT, REC_SWAP
+  public :: REC_LSEP,  REC_BIG,  REC_LITTLE,  REC_SUB_ALLOW
+  public :: REC_LEFT
+
+  public :: nc_init, nc_diag, nc_finalize
+
+  public :: nx_init, nx_diag, nx_finalize
+  public :: nio_open, nio_close
+  public :: nio_search
+  public :: nio_show_status
+  public :: nio_time_undef
+
+  public :: nb_init, nb_diag, nb_finalize
+# if OPT_WITH_NCTCDF
+  public :: nn_init, nn_diag, nn_finalize
+# endif
 
 contains
 !!!_ + common interfaces
