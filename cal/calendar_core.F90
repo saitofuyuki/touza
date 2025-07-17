@@ -1,7 +1,7 @@
 !!!_! calendar_core.F90 - TOUZA/Cal core
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2025/07/16 16:03:45 fuyuki calendar_core.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 09:37:58 fuyuki calendar_core.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -44,7 +44,7 @@ module TOUZA_Cal_core
   public :: decl_cal
   public :: set_perpetual_date,   get_perpetual_date,   set_perpetual_switch
   public :: inq_nday_month,       inq_nday_year,        inq_nmonth_year
-  public :: inq_nsec_day,         inq_nsec_minute,      inq_nsec_hour
+  public :: inq_nsec_day,         inq_nsec_minute,      inq_nsec_hour,   inq_nminute_hour
   public :: inq_nday_period,      inq_nyear_period
   public :: conv_cdaysec_csec,    conv_csec_cdaysec
   public :: conv_time_tsec,       conv_tsec_time

@@ -1,7 +1,7 @@
 !!!_! calendar.F90 - TOUZA/Cal manager
 ! Maintainer: SAITO Fuyuki
 ! Created: May 31 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/16 16:07:03 fuyuki calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/18 10:30:47 fuyuki calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -21,7 +21,6 @@
 #endif
 !!!_& TOUZA_Cal - calendar manager
 module TOUZA_Cal
-  use TOUZA_Cal_primitive,only:
   use TOUZA_Cal_primitive,only: msglev_panic
   use TOUZA_Cal_primitive,only: msglev_fatal,   msglev_critical, msglev_severe
   use TOUZA_Cal_primitive,only: msglev_warning, msglev_normal,   msglev_info
