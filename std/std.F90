@@ -1,7 +1,7 @@
 !!!_! std.F90 - touza/std interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/17 23:38:37 fuyuki std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/22 14:13:34 fuyuki std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -90,6 +90,7 @@ module TOUZA_Std
   use TOUZA_Std_env,only: lpath
   use TOUZA_Std_env,only: nb_recl, nc_strm
   use TOUZA_Std_env,only: nbits_byte
+  use TOUZA_Std_env,only: is_abs_path,      join_path
 
   use TOUZA_Std_mwe,only: set_comm, get_comm
   use TOUZA_Std_mwe,only: get_ni,   get_ni_safe
@@ -271,6 +272,8 @@ module TOUZA_Std
   public :: lpath
   public :: nb_recl, nc_strm
   public :: nbits_byte
+  public :: is_abs_path,      join_path
+
 
   public :: set_comm, get_comm
   public :: get_ni,   get_ni_safe

@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/16 15:46:19 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/23 08:50:42 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -62,6 +62,10 @@
 
 #ifndef    ASCII_LF
 #  define  ASCII_LF 10     /* line-feed ascii code */
+#endif
+
+#ifndef    OPT_PATH_SEP_DIR
+#  define  OPT_PATH_SEP_DIR '/'         /* directory separator in path */
 #endif
 !!!_ + debug
 #ifndef   TEST_STD_ENV
@@ -218,21 +222,23 @@ module TOUZA_Std_env
   character(len=*),parameter :: etest_org = 'abcd'
   integer,save :: etest_big = 0, etest_little = 0
 
+  character(len=*),parameter :: sep_dir = OPT_PATH_SEP_DIR
 !!!_  - public
-  public init, diag, finalize
-  public init_batch
-  public init_unfmtd_recl, get_size_ufd
-  public init_unfmtd_strm, get_unit_strm, get_size_strm
-  public init_file_bodr,   check_byte_order, check_bodr_unit
-  public init_io_status,   is_eof_ss
-  public get_size_bytes,   conv_b2strm,   get_mems_bytes
-  public get_login_name,   get_host_name
-  public is_new_line,      new_line_ascii
+  public :: init, diag, finalize
+  public :: init_batch
+  public :: init_unfmtd_recl, get_size_ufd
+  public :: init_unfmtd_strm, get_unit_strm, get_size_strm
+  public :: init_file_bodr,   check_byte_order, check_bodr_unit
+  public :: init_io_status,   is_eof_ss
+  public :: get_size_bytes,   conv_b2strm,   get_mems_bytes
+  public :: get_login_name,   get_host_name
+  public :: is_new_line,      new_line_ascii
+  public :: is_abs_path,      join_path
 #if DEBUG_PRIVATES
-  public check_bodr_mem, check_bodr_files
-  public brute_force_stdu
-  public brute_force_recl_unit_rw, brute_force_recl_unit_w
-  public brute_force_recl_type
+  public :: check_bodr_mem, check_bodr_files
+  public :: brute_force_stdu
+  public :: brute_force_recl_unit_rw, brute_force_recl_unit_w
+  public :: brute_force_recl_type
 #endif
 !!!_  - interfaces
   interface brute_force_recl_type
@@ -286,8 +292,12 @@ module TOUZA_Std_env
      module procedure conv_b2strm_l
   end interface conv_b2strm
 
-contains
+  interface join_path
+     module procedure join_path_array, join_path_mod
+  end interface join_path
+
 !!!_ + common interfaces
+contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, levtry, icomm)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
@@ -359,6 +369,7 @@ contains
              if (VCHECK_NORMAL(lv)) then
                 call msg_mdl(TIME_STAMP, __MDL__, utmp)
                 call msg_mdl('(''offset kind = '', I0)', KIOFS, __MDL__, utmp)
+                call msg_mdl('(''directory separator = '', A)', sep_dir, __MDL__, utmp)
              endif
              if (VCHECK_DEBUG(lv)) then
                 call msg_mdl('(''init = '', I0)', (/init_counts/), __MDL__, utmp)
@@ -2519,6 +2530,45 @@ contains
 #endif
   end subroutine get_host_name
 !!!_  & get_env_var
+!!!_ + path style
+!!!_  & is_abs_path() - check if absolute path
+  logical function is_abs_path(p) result(b)
+    implicit none
+    character(len=*),intent(in) :: p
+    integer l
+    l = len_trim(sep_dir)
+    b = (p(1:l) .eq. sep_dir(1:l))
+  end function is_abs_path
+!!!_  & join_path()
+  subroutine join_path_array(ierr, path, elem)
+    use TOUZA_Std_utl,only:join_list
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: path
+    character(len=*),intent(in)  :: elem(0:)
+    integer l
+    l = len_trim(sep_dir)
+    call join_list(ierr, path, elem, sep=sep_dir(1:l))
+  end subroutine join_path_array
+
+  subroutine join_path_mod(ierr, path, base)
+    use TOUZA_Std_utl,only:join_list
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(inout) :: path
+    character(len=*),intent(in)    :: base
+    integer lp, ls, lb
+    lp = len_trim(path)
+    ls = len_trim(sep_dir)
+    lb = len_trim(base)
+    if ((lp + ls + lb).gt.len(path)) then
+       ierr = ERR_INSUFFICIENT_BUFFER
+    else
+       ierr = 0
+    endif
+    path = path(1:lp) // sep_dir(1:ls) // base(1:lb)
+  end subroutine join_path_mod
+
 !!!_ + misc
 !!!_  & is_new_line()
   logical function is_new_line(c) result(b)
