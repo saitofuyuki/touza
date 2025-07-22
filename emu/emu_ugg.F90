@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/17 09:28:20 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/22 16:05:47 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024, 2025
@@ -889,7 +889,7 @@ contains
     pp(3) = ATAN2(0.0_KTGT, -1.0_KTGT)
 
     do j = 1, size(pp)
-101    format('pi check/', I0, 1x, 2E24.16, 1x, E9.3)
+101    format('pi check/', I0, 1x, 2E24.16, 1x, E10.3)
 102    format('pi check/', I0, ' passed')
        if (p0.eq.pp(j)) then
           write(txt, 102) j
@@ -6423,7 +6423,7 @@ contains
           E  = E / b
           R  = ONE
           RP = R + E
-101       format('precision check .. ', F20.18, 1x, E9.3)
+101       format('precision check .. ', F20.18, 1x, E10.3)
           if (lv.ge.0) then
              write(TMSG, 101) RP, E
              call msg_grp(TMSG, __GRP__, __MDL__, u)
@@ -6473,7 +6473,7 @@ contains
           E  = E / b
           R  = ONE
           RP = R + E
-101       format('precision check .. ', F20.18, 1x, E9.3)
+101       format('precision check .. ', F20.18, 1x, E10.3)
           if (lv.ge.0) then
              write(TMSG, 101) RP, E
              call msg_grp(TMSG, __GRP__, __MDL__, u)
@@ -6975,7 +6975,7 @@ contains
        call test_equidistant(ierr, ylonc, ny,     'ylonc', -1.0_KTGT)
        call test_equidistant(ierr, ylonb, ny + 1, 'ylonb', -1.0_KTGT)
 
-201    format('consistency/', A, ': ', E9.3)
+201    format('consistency/', A, ': ', E10.3)
        ! check b vs b
        x(0:nlon) = glonb(0:nlon) - ylonb(0:ny:mdiv)
        write(*, 201) 'b', maxval(x(0:nlon)) - minval(x(0:nlon))

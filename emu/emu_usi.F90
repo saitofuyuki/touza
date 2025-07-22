@@ -1,7 +1,7 @@
 !!!_! emu_usi.F90 - touza/emu usysio emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/17 09:33:00 fuyuki emu_usi.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/22 15:28:09 fuyuki emu_usi.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -120,18 +120,18 @@ module TOUZA_Emu_usi
      module procedure msg_grp_txt
   end interface msg_grp
 !!!_  - public
-  public init, diag, finalize
-  public update_color, update_ranks
-  public open_bind_sysin, open_bind_sysout
-  public open_sysin_primary, search_sysin_colored
-  public get_sysu
-  public is_locked_rewind, rewind_lock, rewind_unlock
-  public show_lock_status
+  public :: init, diag, finalize
+  public :: update_color, update_ranks
+  public :: open_bind_sysin, open_bind_sysout
+  public :: open_sysin_primary, search_sysin_colored
+  public :: get_sysu
+  public :: is_locked_rewind, rewind_lock, rewind_unlock
+  public :: show_lock_status
 !!!_   . legacy procedures
-  public legacy_open_sysin, legacy_open_sysout
+  public :: legacy_open_sysin, legacy_open_sysout
 !!!_   . miroc compatible interfaces
-  public SETNML, SETBCM, SETCLR, SETRNK, SETSIZ
-  public OPNNML, REWNML, GETIFP, GETJFP
+  public :: SETNML, SETBCM, SETCLR, SETRNK, SETSIZ
+  public :: OPNNML, REWNML, GETIFP, GETJFP
 contains
 !!!_ + common interfaces
 !!!_  & init
