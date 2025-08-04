@@ -1,7 +1,7 @@
 !!!_! ppp_comm.F90 - TOUZA/ppp communication
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/16 15:50:36 fuyuki ppp_comm.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/23 08:59:34 fuyuki ppp_comm.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -168,6 +168,7 @@ contains
     ! use MPI,only: MPI_Barrier
 #endif /* OPT_USE_MPI */
     use TOUZA_Ppp_std,only: MPI_BARRIER
+    use TOUZA_Ppp_std,only: trace_err
     use TOUZA_Ppp_amng,only: inquire_agent
     implicit none
     integer,         intent(out)         :: ierr
@@ -185,6 +186,7 @@ contains
 #if HAVE_FTRACE_REGION_END
     if (present(tag)) call ftrace_region_end(tag)
 #endif
+    if (ierr.ne.0) call trace_err(ierr, fun='barrier_trace', asfx=tag, u=u)
     return
   end subroutine barrier_trace
 
