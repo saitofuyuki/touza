@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/16 22:09:18 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/26 14:42:00 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -272,12 +272,14 @@ contains
   subroutine init_world &
        & (ierr, u)
     use TOUZA_Ppp_std,only: MPI_COMM_WORLD
+    use TOUZA_Ppp_std,only: trace_err
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     ierr = 0
     call new_agent_root(ierr, MPI_COMM_WORLD, asp_world)
     if (ierr.eq.0) aworld = check_agent()
+    if (ierr.ne.0) call trace_err(ierr, fun='init_world', u=u)
     return
   end subroutine init_world
 !!!_  - init_stack - stack initialization
@@ -439,6 +441,7 @@ contains
     integer ja, jas
     integer ref
     integer nrref, irref
+    character(len=128) :: txt, name
     character(len=64) :: fmt_rr
     integer nd
 
@@ -446,33 +449,38 @@ contains
     utmp = get_logu(u, ulog)
     ref = choice(aworld, iaref)
 
-    call inquire_agent(ierr, iagent=ref, nrank=nrref, irank=irref)
+    call inquire_agent(ierr, iagent=ref, nrank=nrref, irank=irref, name=name)
 
     if (ierr.eq.0) then
        nd = ndigits(nrref)
 101    format('(I', I0, '.', I0, ', ''-'', I', I0, '.', I0, ')')
        write(fmt_rr, 101) nd, nd, nd, nd
     endif
+    if (ierr.eq.0) then
+102    format('agent map on [', I0, ':', A, ']')
+       write(txt, 102) ref, trim(name)
+       call msg(txt, __MDL__, utmp)
+    endif
     do ja = 0, matbl - 1
        if (atblp(ja)%isrc.lt.0) then
-          if (ierr.eq.0) call diag_map_root(ierr, ja, ref, nrref, irref, utmp, fmt_rr)
+          if (ierr.eq.0) call diag_map_root(ierr, ja, ref, nrref, utmp, fmt_rr)
        else if (atblp(ja)%kflg.eq.flag_base) then
           call msg('----', __MDL__, utmp)
           jas = source_agent(ja)
-          if (ierr.eq.0) call diag_map_family(ierr, jas, ref, nrref, irref, utmp, fmt_rr)
+          if (ierr.eq.0) call diag_map_family(ierr, jas, ref, nrref, utmp, fmt_rr)
        endif
     enddo
   end subroutine diag_maps_batch
 
 !!!_  - diag_map_root
   subroutine diag_map_root &
-       & (ierr, iagent, iaref, nrref, irref, u, fmt_rr)
+       & (ierr, iagent, iaref, nrref, u, fmt_rr)
     use TOUZA_Ppp_std,only: msg
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: iagent
     integer,         intent(in)          :: iaref
-    integer,         intent(in)          :: nrref, irref
+    integer,         intent(in)          :: nrref
     integer,         intent(in),optional :: u
     character(len=*),intent(in),optional :: fmt_rr
     integer utmp
@@ -482,7 +490,7 @@ contains
 
     character(len=32)  :: rr
     character(len=128) :: txt
-    character(len=32)  :: ttgt, tref
+    character(len=32)  :: ttgt
 
     integer jrbgn, jrend, mm
     integer nrtgt, irtgt
@@ -493,7 +501,7 @@ contains
     call inquire_agent(ierr, iagent=iagent, nrank=nrtgt, irank=irtgt)
 102 format('[', I0, ':', A, 1x, I0, '/', I0, ']')
     write(ttgt, 102) iagent, trim(atblp(iagent)%name), irtgt, nrtgt
-    write(tref, 102) iaref,  trim(atblp(iaref)%name),  irref, nrref
+    ! write(tref, 102) iaref,  trim(atblp(iaref)%name),  irref, nrref
 
     do jrbgn = 0, nrref - 1, map_div
        jrend = min(nrref, jrbgn + map_div) - 1
@@ -508,8 +516,8 @@ contains
           call diag_map_string &
                & (ierr, map, iagent, iaref, jrbgn, jrend, map_mod, map_rule)
 111       format('[', A, '] ', &
-               &  A, 1x, A, 1x, A)
-          write(txt, 111) trim(rr), trim(map), trim(ttgt), trim(tref)
+               &  A, 1x, A)
+          write(txt, 111) trim(rr), trim(map), trim(ttgt)
           call msg(txt, __MDL__, utmp)
        endif
     enddo
@@ -517,12 +525,12 @@ contains
 
 !!!_  - diag_map_family
   subroutine diag_map_family &
-       & (ierr, iasrc, iaref, nrref, irref, u, fmt_rr)
+       & (ierr, iasrc, iaref, nrref, u, fmt_rr)
     use TOUZA_Ppp_std,only: msg, MPI_UNDEFINED
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: iasrc
-    integer,         intent(in)          :: iaref, nrref, irref
+    integer,         intent(in)          :: iaref, nrref
     integer,         intent(in),optional :: u
     character(len=*),intent(in),optional :: fmt_rr
     integer utmp
@@ -541,7 +549,7 @@ contains
     ierr = 0
     utmp = get_logu(u, ulog)
 
-    if (ierr.eq.0) call diag_map_root(ierr, iasrc, iaref, nrref, irref, utmp, fmt_rr)
+    if (ierr.eq.0) call diag_map_root(ierr, iasrc, iaref, nrref, utmp, fmt_rr)
 
     do ja = 0, matbl - 1
        if (atblp(ja)%isrc.eq.iasrc) then
@@ -673,37 +681,37 @@ contains
 
   end subroutine diag_map_string
 !!!_  & show_stack_simple
-  subroutine show_stack_simple(ierr, iagent, dir, levv, u)
-    use TOUZA_Ppp_std,only: choice, msg
-    implicit none
-    integer,intent(out) :: ierr
-    integer,intent(in)  :: iagent
-    integer,intent(in)  :: dir
-    integer,intent(in),optional  :: u
-    integer,intent(in),optional  :: levv
-    integer lv, utmp
-    character(len=256) :: buf
-    integer jt
+!   subroutine show_stack_simple(ierr, iagent, dir, levv, u)
+!     use TOUZA_Ppp_std,only: choice, msg
+!     implicit none
+!     integer,intent(out) :: ierr
+!     integer,intent(in)  :: iagent
+!     integer,intent(in)  :: dir
+!     integer,intent(in),optional  :: u
+!     integer,intent(in),optional  :: levv
+!     integer lv, utmp
+!     character(len=256) :: buf
+!     integer jt
 
-    ierr = 0
-    lv = choice(lev_verbose, levv)
-    utmp = get_logu(u, ulog)
+!     ierr = 0
+!     lv = choice(lev_verbose, levv)
+!     utmp = get_logu(u, ulog)
 
-101 format('stack: << ', I0, ':', A)
-102 format('stack: <> ', I0, ':', A)
-103 format('stack: >> ', I0, ':', A)
-    if (dir.lt.0) then
-       jt = astack(jstack + 1)
-       write(buf, 101) jt, trim(atblp(jt)%name)
-    else if (dir.eq.0) then
-       jt = iagent
-       write(buf, 102) jt, trim(atblp(jt)%name)
-    else
-       jt = iagent
-       write(buf, 103) jt, trim(atblp(jt)%name)
-    endif
-    call msg(buf, __MDL__, utmp)
-  end subroutine show_stack_simple
+! 101 format('stack: << ', I0, ':', A)
+! 102 format('stack: <> ', I0, ':', A)
+! 103 format('stack: >> ', I0, ':', A)
+!     if (dir.lt.0) then
+!        jt = astack(jstack + 1)
+!        write(buf, 101) jt, trim(atblp(jt)%name)
+!     else if (dir.eq.0) then
+!        jt = iagent
+!        write(buf, 102) jt, trim(atblp(jt)%name)
+!     else
+!        jt = iagent
+!        write(buf, 103) jt, trim(atblp(jt)%name)
+!     endif
+!     call msg(buf, __MDL__, utmp)
+!   end subroutine show_stack_simple
 
 !!!_  & show_stack
   subroutine show_stack(ierr, iagent, dir, levv, u)
