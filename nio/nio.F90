@@ -1,10 +1,10 @@
 !!!_! nio.F90 - TOUZA/Nio manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 11 2021
-#define TIME_STAMP 'Time-stamp: <2025/07/17 23:17:11 fuyuki nio.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/04 13:13:07 fuyuki nio.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021,2022,2023,2024
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -87,14 +87,48 @@ module TOUZA_Nio
   use TOUZA_Nio_record,only: pre_review,      post_review
   use TOUZA_Nio_record,only: is_review_leave
   use TOUZA_Nio_record,only: is_match_format
+  use TOUZA_Nio_record,only: laxs
   use TOUZA_Nio_record,only: REC_ERROR, REC_ASIS, REC_DEFAULT, REC_SWAP
   use TOUZA_Nio_record,only: REC_LSEP,  REC_BIG,  REC_LITTLE,  REC_SUB_ALLOW
   use TOUZA_Nio_record,only: REC_LEFT
+  use TOUZA_Nio_record,only: GFMT_ERR, GFMT_END
+  use TOUZA_Nio_record,only: GFMT_UR8, GFMT_UR4, GFMT_URC, GFMT_URC2
+  use TOUZA_Nio_record,only: GFMT_MR8, GFMT_MR4
+  use TOUZA_Nio_record,only: GFMT_PR4, GFMT_PR8
+  use TOUZA_Nio_record,only: GFMT_URY, GFMT_MRY, GFMT_PRY
+  use TOUZA_Nio_record,only: GFMT_UI4, GFMT_UI8
+  use TOUZA_Nio_record,only: GFMT_MI4, GFMT_MI8
+  use TOUZA_Nio_record,only: GFMT_PI4, GFMT_PI8
+  use TOUZA_Nio_record,only: GFMT_URT, GFMT_MRT, GFMT_PRT
+  use TOUZA_Nio_record,only: BODR_CHECK_VERBOSE
+  use TOUZA_Nio_record,only: PROP_PTX_COLC
+  use TOUZA_Nio_record,only: lopts
 
   use TOUZA_Nio_sparse,only: nio_column_coor
   use TOUZA_Nio_sparse,only: nio_review_sparse, nio_inquire_sparse
   use TOUZA_Nio_sparse,only: nio_store_csr,     nio_restore_csr
   use TOUZA_Nio_sparse,only: nio_store_qjds,    nio_restore_qjds
+  use TOUZA_Nio_sparse,only: lopts_sparse
+
+  use TOUZA_Nio_axis,only: axis_cyclic, axis_loc, axis_parse, axis_set_header, axis_wgt
+
+  use TOUZA_Nio_cache,only: cache_co_all, cache_co_name, cache_co_len
+  use TOUZA_Nio_cache,only: cache_co_range, cache_var_len
+  use TOUZA_Nio_cache,only: cache_get_attr
+  use TOUZA_Nio_cache,only: cache_group_size, cache_group, cache_group_name, cache_group_recs
+  use TOUZA_Nio_cache,only: cache_open_read
+  use TOUZA_Nio_cache,only: cache_read_header
+  use TOUZA_Nio_cache,only: cache_sparse_review, cache_restore_csr
+  use TOUZA_Nio_cache,only: cache_unit
+  use TOUZA_Nio_cache,only: cache_var_read
+  use TOUZA_Nio_cache,only: cache_var_size, cache_var_id, cache_var_name, cache_co_size
+  use TOUZA_Nio_cache,only: grp_suite
+  use TOUZA_Nio_cache,only: show_cache
+
+# if OPT_WITH_NCTCDF
+  use TOUZA_Nio_nctcdf,only: nct_define_write, nct_write_data
+  use TOUZA_Nio_nctcdf,only: nct_open_write
+# endif
 
 !!!_  - default
   implicit none
@@ -131,6 +165,7 @@ module TOUZA_Nio
   public :: parse_date_tuple, unparse_date_tuple
   public :: get_hitem
 
+  ! TOUZA_Nio_record
   public :: nr_init, nr_diag, nr_finalize
   public :: set_default_switch
   public :: set_default_header, get_default_header
@@ -167,6 +202,10 @@ module TOUZA_Nio
   public :: pre_review,      post_review
   public :: is_review_leave
   public :: is_match_format
+  public :: laxs
+  public :: BODR_CHECK_VERBOSE
+  public :: lopts
+  public :: PROP_PTX_COLC
 
   public :: na_init, na_diag, na_finalize
 
@@ -178,6 +217,15 @@ module TOUZA_Nio
   public :: REC_ERROR, REC_ASIS, REC_DEFAULT, REC_SWAP
   public :: REC_LSEP,  REC_BIG,  REC_LITTLE,  REC_SUB_ALLOW
   public :: REC_LEFT
+  public :: GFMT_ERR, GFMT_END
+  public :: GFMT_UR8, GFMT_UR4, GFMT_URC, GFMT_URC2
+  public :: GFMT_MR8, GFMT_MR4
+  public :: GFMT_PR4, GFMT_PR8
+  public :: GFMT_URY, GFMT_MRY, GFMT_PRY
+  public :: GFMT_UI4, GFMT_UI8
+  public :: GFMT_MI4, GFMT_MI8
+  public :: GFMT_PI4, GFMT_PI8
+  public :: GFMT_URT, GFMT_MRT, GFMT_PRT
 
   public :: nc_init, nc_diag, nc_finalize
 
@@ -190,7 +238,29 @@ module TOUZA_Nio
   public :: nb_init, nb_diag, nb_finalize
 # if OPT_WITH_NCTCDF
   public :: nn_init, nn_diag, nn_finalize
+  public :: nct_open_write
+  public :: nct_define_write, nct_write_data
 # endif
+
+  ! TOUZA_Nio_axis
+  public :: axis_parse, axis_wgt, axis_cyclic, axis_set_header, axis_loc
+
+  ! TOUZA_Nio_cache
+  public :: cache_var_size, cache_var_id, cache_var_name, cache_co_size
+  public :: grp_suite
+  public :: cache_open_read
+  public :: show_cache
+  public :: cache_group_size, cache_group, cache_group_name, cache_group_recs
+  public :: cache_co_all, cache_co_name, cache_co_len
+  public :: cache_var_read
+  public :: cache_get_attr
+  public :: cache_read_header
+  public :: cache_co_range, cache_var_len
+  public :: cache_sparse_review, cache_restore_csr
+  public :: cache_unit
+
+  ! TOUZA_Nio_sparse
+  public :: lopts_sparse
 
 contains
 !!!_ + common interfaces
