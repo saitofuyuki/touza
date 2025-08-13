@@ -1,7 +1,7 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2025/06/29 16:38:18 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/13 11:29:36 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -971,16 +971,16 @@ contains
     endif
   end function is_error_match
 
-!!!_  & toggle_flush() - toggle flush boolean and return the current
+!!!_  & toggle_flush() - toggle flush boolean and return the previous
   logical function toggle_flush(switch) result (b)
     implicit none
     logical,optional,intent(in) :: switch
+    b = to_flush_msg
     if (present(switch)) then
        to_flush_msg = switch
     else
        to_flush_msg = .not. to_flush_msg
     endif
-    b = to_flush_msg
     return
   end function toggle_flush
 
