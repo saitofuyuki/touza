@@ -1,7 +1,7 @@
 !!!_! std_htb.F90 - touza/std simple hash table manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/22 09:23:15 fuyuki std_htb.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 09:03:16 fuyuki std_htb.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -198,9 +198,9 @@ module TOUZA_Std_htb
      module procedure query_status_entr_ik, query_status_entr_ih
   end interface query_status_entr
 
-  interface get_span
-     module procedure get_span_h, get_span_k
-  end interface get_span
+  ! interface get_span
+  !    module procedure get_span_h, get_span_k
+  ! end interface get_span
 
   interface bind_control
      module procedure bind_control_k, bind_control_h
@@ -233,6 +233,11 @@ module TOUZA_Std_htb
   interface repr_ctl
      module procedure repr_ctl_c, repr_ctl_j
   end interface repr_ctl
+
+  interface loop_entry
+     module procedure loop_entry_c
+     ! module procedure loop_entry_j
+  end interface loop_entry
 
 !!!_  - public
   public init,         diag,         finalize
@@ -1366,7 +1371,7 @@ contains
     jorg = hash_std(ktb, akey, ikey)
     jstp = 0
     do
-       ee = loop_entry_c(ctable(jc), jorg, jstp)
+       ee = loop_entry(ctable(jc), jorg, jstp)
        if (ee.lt.0) exit
        if (collate_keys(ktb, ee, akey, ikey)) return
     enddo
@@ -1696,33 +1701,33 @@ contains
     return
   end function check_key_args
 
-!!!_  & get_span()
-  integer function get_span_h(handle, full) result(n)
-    implicit none
-    integer,intent(in)          :: handle
-    logical,intent(in),optional :: full
-    integer jk
+! !!!_  & get_span()
+!   integer function get_span_h(handle, full) result(n)
+!     implicit none
+!     integer,intent(in)          :: handle
+!     logical,intent(in),optional :: full
+!     integer jk
 
-    jk = check_ktable(handle)
-    if (jk.ge.0) then
-       n = get_span_k(ktable(jk), full)
-    else
-       n = jk
-    endif
-  end function get_span_h
+!     jk = check_ktable(handle)
+!     if (jk.ge.0) then
+!        n = get_span_k(ktable(jk), full)
+!     else
+!        n = jk
+!     endif
+!   end function get_span_h
 
-  integer function get_span_k(ktb, full) result(n)
-    use TOUZA_Std_utl,only: choice
-    implicit none
-    type(ktable_t),  intent(in) :: ktb
-    logical,optional,intent(in) :: full
+!   integer function get_span_k(ktb, full) result(n)
+!     use TOUZA_Std_utl,only: choice
+!     implicit none
+!     type(ktable_t),  intent(in) :: ktb
+!     logical,optional,intent(in) :: full
 
-    if (choice(.FALSE., full)) then
-       n = ktb%memk
-    else
-       n = ktb%span
-    endif
-  end function get_span_k
+!     if (choice(.FALSE., full)) then
+!        n = ktb%memk
+!     else
+!        n = ktb%span
+!     endif
+!   end function get_span_k
 
 !!!_  & hash_std_k()
   integer function hash_std_k &
@@ -2071,23 +2076,23 @@ contains
   end subroutine load_status_c
 
 !!!_  & loop_entry()
-  integer function loop_entry_nocheck(jc, jorg, jstp) result(n)
-    integer,intent(in)    :: jc
-    integer,intent(inout) :: jorg
-    integer,intent(inout) :: jstp
-    n = loop_entry_c(ctable(jc), jorg, jstp)
-  end function loop_entry_nocheck
+  ! integer function loop_entry_nocheck(jc, jorg, jstp) result(n)
+  !   integer,intent(in)    :: jc
+  !   integer,intent(inout) :: jorg
+  !   integer,intent(inout) :: jstp
+  !   n = loop_entry_c(ctable(jc), jorg, jstp)
+  ! end function loop_entry_nocheck
 
-  integer function loop_entry_j(jctrl, jorg, jstp) result(n)
-    integer,intent(in)    :: jctrl
-    integer,intent(inout) :: jorg
-    integer,intent(inout) :: jstp
-    ! no check
-    integer jc
-    jc = check_ctable(jctrl)
-    n = min(0, jc)
-    if (n.eq.0) n = loop_entry_c(ctable(jc), jorg, jstp)
-  end function loop_entry_j
+  ! integer function loop_entry_j(jctrl, jorg, jstp) result(n)
+  !   integer,intent(in)    :: jctrl
+  !   integer,intent(inout) :: jorg
+  !   integer,intent(inout) :: jstp
+  !   ! no check
+  !   integer jc
+  !   jc = check_ctable(jctrl)
+  !   n = min(0, jc)
+  !   if (n.eq.0) n = loop_entry_c(ctable(jc), jorg, jstp)
+  ! end function loop_entry_j
 
   integer function loop_entry_c(ctb, jorg, jstp) result(entr)
     implicit none
@@ -2688,11 +2693,11 @@ contains
     j = normalize(handle, wsystem)
   end function wtable_h2index
 !!!_  & wtable_j2handle() - identity mapping
-  PURE integer function wtable_j2handle(idx) result(h)
-    implicit none
-    integer,intent(in) :: idx
-    h = watermark(idx, wsystem)
-  end function wtable_j2handle
+  ! PURE integer function wtable_j2handle(idx) result(h)
+  !   implicit none
+  !   integer,intent(in) :: idx
+  !   h = watermark(idx, wsystem)
+  ! end function wtable_j2handle
 
 !!!_  & ktable_h2index()
   PURE integer function ktable_h2index(handle) result(j)
@@ -2701,11 +2706,11 @@ contains
     j = normalize(handle, ksystem)
   end function ktable_h2index
 !!!_  & ktable_j2handle() - identity mapping
-  PURE integer function ktable_j2handle(idx) result(h)
-    implicit none
-    integer,intent(in) :: idx
-    h = watermark(idx, ksystem)
-  end function ktable_j2handle
+  ! PURE integer function ktable_j2handle(idx) result(h)
+  !   implicit none
+  !   integer,intent(in) :: idx
+  !   h = watermark(idx, ksystem)
+  ! end function ktable_j2handle
 
 !!!_  - set_dummy_keys
   subroutine set_dummy_keys (ikey, akey)

@@ -1,3 +1,11 @@
+Release-1.16.3 / 2025-08-17
+===========================
+
+  * Import revision for miroc7+ils+rainbow on ppp.
+  * zbt: removed from contents (to export on a new package zab).
+  * Sub-module bundlers are redesigned to avoid unlimited module-chaining.
+  * Revision for nvfortran building (not fully examined).
+
 Release-1.16.2 / 2025-06-11
 ===========================
 

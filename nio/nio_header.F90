@@ -1,7 +1,7 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:06:05 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 10:48:27 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -308,21 +308,26 @@ contains
 !!!_ + user interfaces
 !!!_  - show_header - diag entries
   subroutine show_header &
-       & (ierr, head, tag, u, lev)
-    use TOUZA_Nio_std,only: choice, choice_a
+       & (ierr, head, tag, u, levv)
+    use TOUZA_Nio_std,only: choice, choice_a, is_msglev_DEBUG
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(in)          :: head(*)
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
-    integer,         intent(in),optional :: lev
+    integer,         intent(in),optional :: levv
     integer ulog
     integer ji
     character(len=64) :: ti
+    integer lv
+    logical bstd
     ierr = 0
 
+    lv = choice(lev_verbose, levv)
     ulog = choice(-1, u)
     call choice_a(ti, ' ', tag)
+
+    bstd = is_msglev_DEBUG(lv) .or. ulog.eq.-1
 
 101 format(I2, 1x, A)
 102 format(A,  1x, I2, 1x, A)
@@ -340,7 +345,7 @@ contains
              endif
           enddo
        endif
-    else if (ulog.eq.-1) then
+    else if (bstd) then
        if (ti.eq.' ') then
           do ji = 1, nitem
              if (head(ji).ne.' ') then
@@ -1512,8 +1517,7 @@ contains
   end subroutine set_def_tables
 !!!_  - get_hindex
   subroutine get_hindex(item, iteme, name)
-    use TOUZA_Std_utl,only: upcase
-    use TOUZA_Std_htb,only: query_status
+    use TOUZA_Nio_std,only: upcase, query_status
     implicit none
     integer,         intent(out) :: item, iteme
     character(len=*),intent(in)  :: name

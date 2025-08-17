@@ -1,0 +1,334 @@
+#!/bin/sh
+# Time-stamp: <2025/08/12 10:54:25 fuyuki wtc.sh.in>
+
+this=$0
+base=$(basename "$this")
+root=${base%.*}
+
+srcdir=@srcdir@
+mpirun=@MPIRUN@
+test -z "$mpirun" && mpirun=mpirun
+
+is_nt ()
+{
+  test $# -ne 2 && echo "is_nt: invalid argument $*" >&2 && exit 1
+  _r="$(find "$1" -newer "$2")"
+  test -n "$_r"
+  return $?
+}
+
+call_uuid=0
+w_uuid()
+{
+  for _x in uuid uuidgen
+  do
+    if type "$_x" >/dev/null 2>&1; then
+      eval "$_x"; return $?
+    fi
+  done
+  env LANG= echo "$(date +%s)-$(uname -n)-$call_uuid"
+  call_uuid=$((call_uuid + 1))
+  return 0
+}
+
+main ()
+{
+  src=$srcdir/$base.in
+  rainbow=
+  outd=
+  test=
+  np=
+  force=
+  agent=
+  split=
+  if is_nt "$src" "$this"; then
+    echo "$root: Warning.  Newer $src is available." >&2
+  fi
+  while test $# -gt 0
+  do
+    case $1 in
+    -h) usage; return 0;;
+    -B) echo "Batch argument must comes first" >&2; return 1;;
+    -T) test=$2; shift;;
+    -d) outd=$2; shift;;
+    -A) agent=:;;
+    -R+) rainbow=;;     # loose
+    -R-) rainbow=-;;    # freeze
+    -R) test "$rainbow" = - || rainbow=$2; shift;;
+    -M) mpirun=$2; shift;;
+    -n) np=$2; shift;;
+    -f) force=$1;;
+    -S)  subd=/;;         # -SDIR[/[SYSIN]]
+    -S*) subd=${1#-S};;
+    -N*) nentr=${1#-N};;
+    -C)  csys=$1;;
+    -w)  wrap=wrap;;
+    -s)  split=out;;
+    -*) echo "$root: Unknown argument $1" >&2; return 1;;
+    *)  break;;
+    esac
+    shift
+  done
+  if type "$mpirun" > /dev/null 2>&1; then :; else
+    echo "$root: Cannot execute $mpirun." >&2
+    return 1
+  fi
+  test $# -eq 0 && usage && return 0
+
+  test "$rainbow" = - && rainbow=
+  lnp=0
+  test -z "$outd" && outd=out$root.$$ && echo "$root: output $outd" >&2
+  if test -d "$outd"; then
+    if test -n "$force"; then
+      echo "$root: Force clean $outd" >&2
+      rm -rf $outd
+    else
+      echo "$root: exists $outd" >&2
+      return 1
+    fi
+  fi
+  rainbow=$(echo "$rainbow" | sed -e 's/:/,/g')
+  rr=$rainbow,
+  rtotal=0
+  while test "$rr"
+  do
+    rj=${rr%%,*}
+    rtotal=$((rtotal + ${rj:-0}))
+    rr=${rr#*,}
+  done
+
+  mkdir -p "$outd" || return $?
+  app=$outd/app
+  rm -f "$app"; touch "$app"
+  while test $# -gt 0
+  do
+    jnp=$1
+    if expr "$jnp" : '^[---+]\?[0-9]\+$' > /dev/null 2>&1; then
+      shift
+    else
+      jnp=0
+    fi
+    case $jnp in
+    0)   jnp=$rtotal;;
+    +*)  jnp=$((rtotal + (jnp)));;
+    esac
+
+    exe=$1; shift
+    test ! -x "$exe" && echo "$root: cannot execute $exe" >&2 && return 1
+    exe=$(realpath "$exe") || return $?
+    while test $# -gt 0
+    do
+      test "$1" = : && shift && break
+      exe="$exe $1"
+      shift
+    done
+    if test -n "$wrap"; then
+      echo "-np $jnp ./$wrap $exe" >> "$app"
+    else
+      echo "-np $jnp $exe" >> "$app"
+    fi
+    lnp=$((lnp + jnp))
+  done
+
+  gen_sysin "$outd" SYSIN "${subd}" "${nentr}" "${csys}" $rainbow || return $?
+
+  if test -n "$wrap"; then
+    cat <<EOF > $outd/$wrap
+#!/bin/sh -x
+r=\$OMPI_COMM_WORLD_RANK
+R=$rainbow,
+j=0
+c=0
+echo "rank: \$r \$R"
+while test -n \$R
+do
+  b=\${R%%,*}
+  test \${b:-0} -eq 0 && break
+  j=\$((j + b))
+  test \$r -lt \$j && cd c\$c && break
+  R=\${R#*,}
+  c=\$((c + 1))
+done
+
+pwd
+exec "\$@"
+EOF
+chmod +x $outd/$wrap
+  fi
+
+  oldpwd=$PWD
+  logo=log.out
+  loge=log.err
+  cd "$outd" || return $?
+  $mpirun --oversubscribe --tag-output --app "$(basename "$app")" > $logo 2> $loge
+  if grep --silent ' +++ End' $logo; then
+    echo "${root}: End $outd" >&2
+  elif grep --silent 'Abort' $logo; then
+    echo "${root}: Abort $outd" >&2
+  else
+    echo "${root}: Abort(system) $outd" >&2
+  fi
+  if test -n "$split"; then
+    mkdir -p $split
+    jnp=0
+    while test $jnp -lt $lnp
+    do
+      sed -n -e "/^\\[1,$jnp\\]<stdout>: /s///p" $logo > $split/$logo.$jnp
+      jnp=$((jnp + 1))
+    done
+  fi
+  cd "$oldpwd" || return $?
+  # patterns
+  #    master SYSIN    true false
+  #    colored SYSIN   none std   subdir
+  #    SYSOUT          world subdir
+  return 0
+}
+
+usage ()
+{
+  cat <<EOF
+$root - Helper script of TOUZA/Ppp tests.
+
+Usage: $this [OPTIONS] [NP] EXEC [ARGS...] [: [NP] EXEC [ARGS]...]
+
+NP
+  NUMBER        Number of PE
+  unset or 0    Auto (same as required by rainbow parameter)
+  +NUMBER       Rainbow parameter plus n
+
+Options:
+  -h            show this help
+  -B BATCH      batch tests
+  -T TEST       test id [0]
+  -d DIR        test directory (auto if not set)
+  -R-           lock rainbow parameter
+  -R+           unlock rainbow parameter
+  -R COLORS     rainbow test
+  -M COMMAND    mpirun command [${mpirun}]
+  -n NP         total PE
+  -S            enable colored subdiretories
+  -Nc -Ns -Nn   change sysin parameter in namelist
+  -C            enable legacy colored sysin
+  -w            run via a shell wrapper
+EOF
+  return 0
+}
+
+gen_sysin ()
+{
+  _outd=$1; shift || return $?
+  _sysin=$1; shift || return $?
+  _subd="$1"; _nentr="$2"; _csys="$3"; shift 3 || return $?
+  OIFS="$IFS"; IFS=','; set -- $1; IFS="$OIFS"
+  j=0
+
+  _subb=''
+  case $_subd in
+  /)    _subd=c;;
+  -)    _subd=c; _subb=-;;
+  /*/*) _subb=$(basename $_subd); _subd=$(dirname "$_subd");;
+  /*)   _subb=$(basename $_subd); _subd=c;;
+  */*)  _subb=$(basename $_subd); _subd=$(dirname "$_subd");;
+  esac
+
+  # pattern
+  #    outd/SYSIN.CLxxx           -C
+  #    outd/subd                  -S-
+  #    outd/subd/SYSIN            -S/
+  #    outd/subd/OTHER            -S/OTHER
+  #    nmwspl::sysin='exist'      -Ny
+  #    nmwspl::sysin='non-exist'  -Nn
+
+  SA=''
+  for n in "$@"
+  do
+    cfg="msplr=$n"
+    _f=; _rf=
+    _c=; _rc=
+    _d=
+    _ui="$(w_uuid)" || return $?
+    if test -n "$_subd"; then
+      _d=$_subd$j
+      mkdir -p "$outd/$_d" || return $?
+      test -z "$wrap" && cfg="$cfg, dir='$_d'"
+
+      if test "$_subb" = -; then
+        :
+        # echo "$root: skip subdirectory sysin." >&2
+      else
+        _rf=${_subb:-SYSIN}
+        _f=$_d/${_rf}
+        touch "$_outd/$_f"
+        test "$_ui" != - && echo " &nmverify id='$_ui', &end" >> "$_outd/$_f"
+        SA="$SA $_outd/$_f"
+        # touch $_outd/$_f || return $?
+      fi
+    fi
+    if test -n "$_csys"; then
+      _c=${_sysin}.CL$(printf %03d $j)
+      _rc=$(realpath --relative-to=$_outd $_c)
+      touch "$_outd/$_c"
+      test "$_ui" != - && echo " &nmverify id='$_ui', &end" >> "$_outd/$_c"
+      SA="$SA $_outd/$_c"
+      # touch $_outd/$_c || return $?
+    fi
+    # case $_nentr in
+    # w) cfg="$cfg, sysin='${_subb:-SYSIN}'";;
+    # c) cfg="$cfg, sysin='$_rc'";;
+    # s) cfg="$cfg, sysin='$_rf'";;
+    # n) cfg="$cfg, sysin='not exists'";;
+    # '') :;;
+    # *) echo "Invalid namelist flag $_nentr" >&2; return 1;;
+    # esac
+    case $agent in
+    :) if test -n "$_d"; then
+         cfg="$cfg, name='$_d'"
+       else
+         cfg="$cfg, name='a$j'"
+       fi;;
+    esac
+    line=" &nmwspl $cfg, id='$_ui', &end"
+    echo "$line"
+    # test -n "$_c" && echo "$line" >> $_outd/$_c
+    # test -n "$_f" && echo "$line" >> $_outd/$_f
+    j=$((j + 1))
+  done > "$_outd/$_sysin"
+  for _s in $SA
+  do
+    cat "$_outd/$_sysin" >> "$_s" || return $?
+  done
+
+  return $?
+}
+
+batch ()
+{
+  b=$1; shift
+  case $b in
+  all)
+      $this -d out1  -R- "$@"
+      $this -d out2c -C            "$@"
+      $this -d out2s -S            "$@"
+      $this -d out3f -S/param  "$@"
+      $this -d out3z -S/param  -C "$@"
+      $this -d out3n -S-          "$@"
+      $this -d out3w -S-       -C "$@"
+      $this -d out3x -S        -C "$@"
+      # $this -d out3y -S        -Ns -C "$@"
+      # $this -d out4s -S -Nn    "$@"
+      # $this -d out4c -S     -C "$@"
+      ;;
+  *) echo "$root: Unknown batch = $b" >&2
+     return 1;;
+  esac
+  return 0
+}
+
+if test "$1" = -B; then
+   shift
+   batch "$@"; err=$?
+else
+   main "$@"; err=$?
+fi
+exit $err

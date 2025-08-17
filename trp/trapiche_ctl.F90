@@ -1,7 +1,7 @@
 !!!_! trapiche_ctl.F90 - TOUZA/Trapiche control
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 11 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:12:49 fuyuki trapiche_ctl.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 10:22:02 fuyuki trapiche_ctl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -35,7 +35,6 @@ module TOUZA_Trp_ctl
   integer,save :: def_code = 0
 # define __MDL__ 'c'
 !!!_  - common
-  character(len=256) :: tmsg
 !!!_  - interface
 !!!_  - public
   public init, diag, finalize

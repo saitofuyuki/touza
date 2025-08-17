@@ -1,7 +1,7 @@
 !!!_! touza.F90 - touza administration
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2023/03/25 14:00:56 fuyuki touza.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 16:46:04 fuyuki touza.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020, 2021, 2022, 2023
@@ -31,15 +31,15 @@ module TOUZA
 #endif /* ENABLE_TOUZA_CAL */
 !!!_  - trp(conditional)
 #if ENABLE_TOUZA_TRP
-  use TOUZA_Trp, trp_init=>init, trp_diag=>diag, trp_finalize=>finalize, trp_msg=>msg
+  use TOUZA_Trp, trp_init=>init, trp_diag=>diag, trp_finalize=>finalize
 #endif /* ENABLE_TOUZA_TRP */
 !!!_  - nio(conditional)
 #if ENABLE_TOUZA_NIO
-  use TOUZA_Nio, nio_init=>init, nio_diag=>diag, nio_finalize=>finalize, nio_msg=>msg
+  use TOUZA_Nio, nio_init=>init, nio_diag=>diag, nio_finalize=>finalize
 #endif /* ENABLE_TOUZA_NIO */
 !!!_  - ppp(conditional)
 #if ENABLE_TOUZA_PPP
-  use TOUZA_Ppp, ppp_init=>init, ppp_diag=>diag, ppp_finalize=>finalize, ppp_msg=>msg
+  use TOUZA_Ppp, ppp_init=>init, ppp_diag=>diag, ppp_finalize=>finalize
 #endif /* ENABLE_TOUZA_PPP */
 !!!_  - div(conditional)
 #if ENABLE_TOUZA_DIV

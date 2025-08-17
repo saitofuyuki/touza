@@ -1,7 +1,7 @@
 !!!_! ami.F90 - touza/ami interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2024
-#define TIME_STAMP 'Time-stamp: <2024/02/02 21:34:02 fuyuki ami.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 17:12:23 fuyuki ami.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2024
@@ -18,15 +18,16 @@
 !!!_* Macros
 !!!_@ TOUZA_Ami - touza/ami interfaces
 module TOUZA_Ami
+  use TOUZA_Ami_std,only: unit_global
   use TOUZA_Ami_legacy, al_init=>init, al_diag=>diag, al_finalize=>finalize
   use TOUZA_Ami_nio,    an_init=>init, an_diag=>diag, an_finalize=>finalize
   use TOUZA_Ami_table,  at_init=>init, at_diag=>diag, at_finalize=>finalize
   use TOUZA_Ami_xform,  ax_init=>init, ax_diag=>diag, ax_finalize=>finalize
-  use TOUZA_Ami_std,    as_init=>init, as_diag=>diag, as_finalize=>finalize
-  use TOUZA_Std,only: get_logu,     unit_global,  trace_fine,   trace_control
 !!!_  - default
   implicit none
   public
+!!!_  - no export
+  private :: unit_global
 !!!_  - private static
   integer,save,private :: init_mode = 0
   integer,save,private :: init_counts = 0
@@ -39,8 +40,9 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
-    use TOUZA_Std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std,only: msg_grp, choice
+    use TOUZA_Ami_std,only: as_init=>init
+    use TOUZA_Ami_std,only: control_mode, control_deep, is_first_force
+    use TOUZA_Ami_std,only: msg_grp, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -76,8 +78,12 @@ contains
   end subroutine init
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std,only: choice, is_msglev_NORMAL, msg
+    use TOUZA_Ami_std,only: as_diag=>diag
+    use TOUZA_Ami_std,only: control_mode, control_deep, is_first_force
+    use TOUZA_Ami_std,only: msg_grp, choice
+    use TOUZA_Ami_std,only: choice, is_msglev_NORMAL, msg
+    use TOUZA_Ami_std,only: get_logu
+    use TOUZA_Ami_std,only: trace_control
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -114,8 +120,12 @@ contains
   end subroutine diag
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std,only: choice, is_msglev_NORMAL, msg_grp
+    use TOUZA_Ami_std,only: as_finalize=>finalize
+    use TOUZA_Ami_std,only: control_mode, control_deep, is_first_force
+    use TOUZA_Ami_std,only: msg_grp, choice
+    use TOUZA_Ami_std,only: choice, is_msglev_NORMAL, msg
+    use TOUZA_Ami_std,only: get_logu
+    use TOUZA_Ami_std,only: trace_fine
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
