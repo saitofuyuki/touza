@@ -1,3 +1,23 @@
+Release-1.16.2 / 2025-06-11
+===========================
+
+  * Import flush controls at log.
+  * ETIME wrapper (reserved)
+
+Release-1.16.1 / 2025-05-25
+===========================
+
+  * Import restucturing for MIROC exports.
+  * ppp: (amng) Improved after on-the-fly experiment with MIROC.
+  * ppp: (amng) [FATAL] Fixed reference group to compare.
+  * std: (mwe) [FATAL] wrong finalization to call.
+  * cal: (primitive) [CRITICAL] fixed std::finalize call.
+  * [IMPORTANT] complex call-trees (init/diag/finalize) simplified.
+  * ppp: (amng) communicator and group identity checks in diag.
+  * std: (mwe) introduced comp_comms(), comp_groups().
+  * std: [severe] Inserted ierr reset.
+  * build: [FATAL] fix DIST_SUBDIRS duplicaton, etc.
+
 Release-1.16.0 / 2025-05-15
 ===========================
 
