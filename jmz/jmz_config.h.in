@@ -3,8 +3,11 @@
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
-/* whether statement error works with stop specifier */
+/* whether statement error_stop works */
 #undef HAVE_FORTRAN_ERROR_STOP
+
+/* whether statement error_stop works with quiet specifier */
+#undef HAVE_FORTRAN_ERROR_STOP_QUIET
 
 /* whether subroutine exit works */
 #undef HAVE_FORTRAN_EXIT

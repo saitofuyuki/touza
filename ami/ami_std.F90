@@ -1,7 +1,7 @@
 !!!_! ami_std.F90 - TOUZA/Ami bridge to Std
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2024/04/09 16:02:22 fuyuki ami_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 18:46:07 fuyuki ami_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -18,25 +18,26 @@
 module TOUZA_Ami_std
 !!!_ = declaration
 !!!_  - modules
-  use TOUZA_Std_prc,only: KDBL,         KFLT
-  use TOUZA_Std_utl,only: choice,       choice_a,     set_if_present, condop
-  use TOUZA_Std_utl,only: control_deep, control_mode, is_first_force
-  use TOUZA_Std_utl,only: find_first,   inrange,      swap_items,    bisection_find
-  use TOUZA_Std_utl,only: join_list,    compact_string
-  use TOUZA_Std_log,only: is_msglev
-  use TOUZA_Std_log,only: is_msglev_DEBUG,  is_msglev_INFO,   is_msglev_NORMAL, is_msglev_DETAIL
-  use TOUZA_Std_log,only: is_msglev_SEVERE, is_msglev_FATAL,  is_msglev_WARNING
-  use TOUZA_Std_log,only: get_logu,         unit_global,      trace_fine,       trace_control
-  use TOUZA_Std_log,only: is_error_match,   trace_err
-  use TOUZA_Std_env,only: conv_b2strm,      KIOFS
-  use TOUZA_Std_env,only: endian_BIG,       endian_LITTLE
-  use TOUZA_Std_fun,only: new_unit
-  use TOUZA_Std_sus,only: sus_open, sus_close, sus_skip_irec
-  use TOUZA_Std_sus,only: sus_read_isep,  sus_read_irec,  sus_read,  sus_suspend_read_irec
-  use TOUZA_Std_sus,only: sus_write_isep, sus_write_irec, sus_write, sus_suspend_write_irec
-  use TOUZA_Std_sus,only: suspend_begin, suspend_end
-  use TOUZA_Std_sus,only: sus_record_mems_irec
-  use TOUZA_Std_sus,only: sus_is_stream_unit
+  use TOUZA_Std,only: KDBL,         KFLT
+  use TOUZA_Std,only: choice,       choice_a,     set_if_present, condop
+  use TOUZA_Std,only: control_deep, control_mode, is_first_force
+  use TOUZA_Std,only: find_first,   inrange,      swap_items,    bisection_find
+  use TOUZA_Std,only: join_list,    compact_string
+  use TOUZA_Std,only: is_msglev
+  use TOUZA_Std,only: is_msglev_DEBUG,  is_msglev_INFO,   is_msglev_NORMAL, is_msglev_DETAIL
+  use TOUZA_Std,only: is_msglev_SEVERE, is_msglev_FATAL,  is_msglev_WARNING
+  use TOUZA_Std,only: get_logu,         unit_global,      trace_fine,       trace_control
+  use TOUZA_Std,only: msg_grp
+  use TOUZA_Std,only: is_error_match,   trace_err
+  use TOUZA_Std,only: conv_b2strm,      KIOFS
+  use TOUZA_Std,only: endian_BIG,       endian_LITTLE
+  use TOUZA_Std,only: new_unit
+  use TOUZA_Std,only: sus_open, sus_close, sus_skip_irec
+  use TOUZA_Std,only: sus_read_isep,  sus_read_irec,  sus_read,  sus_suspend_read_irec
+  use TOUZA_Std,only: sus_write_isep, sus_write_irec, sus_write, sus_suspend_write_irec
+  use TOUZA_Std,only: suspend_begin, suspend_end
+  use TOUZA_Std,only: sus_record_mems_irec
+  use TOUZA_Std,only: sus_is_stream_unit
 
 !!!_  - default
   implicit none
@@ -71,6 +72,7 @@ module TOUZA_Ami_std
   public is_msglev_DEBUG,  is_msglev_INFO,   is_msglev_NORMAL, is_msglev_DETAIL
   public is_msglev_SEVERE, is_msglev_FATAL,  is_msglev_WARNING
   public get_logu,         unit_global,      trace_fine,       trace_control
+  public msg_grp
   public is_error_match,   trace_err
   public conv_b2strm,      KIOFS
   public new_unit
@@ -84,10 +86,11 @@ contains
 !!!_ + common interfaces
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
-    use TOUZA_Std_mwe,only: mwe_init=>init
-    use TOUZA_Std_env,only: env_init=>init
-    use TOUZA_Std_fun,only: fun_init=>init
-    use TOUZA_Std_sus,only: sus_init=>init
+    ! use TOUZA_Std_mwe,only: mwe_init=>init
+    ! use TOUZA_Std_env,only: env_init=>init
+    ! use TOUZA_Std_fun,only: fun_init=>init
+    ! use TOUZA_Std_sus,only: sus_init=>init
+    use TOUZA_Std,only: mwe_init, env_init, fun_init, sus_init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -123,10 +126,11 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std_mwe,only: mwe_diag=>diag
-    use TOUZA_Std_env,only: env_diag=>diag
-    use TOUZA_Std_sus,only: sus_diag=>diag
-    use TOUZA_Std_fun,only: fun_diag=>diag
+    ! use TOUZA_Std_mwe,only: mwe_diag=>diag
+    ! use TOUZA_Std_env,only: env_diag=>diag
+    ! use TOUZA_Std_sus,only: sus_diag=>diag
+    ! use TOUZA_Std_fun,only: fun_diag=>diag
+    use TOUZA_Std,only: mwe_diag, env_diag, sus_diag, fun_diag
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -162,10 +166,11 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Std_mwe,only: mwe_finalize=>finalize
-    use TOUZA_Std_env,only: env_finalize=>finalize
-    use TOUZA_Std_sus,only: sus_finalize=>finalize
-    use TOUZA_Std_fun,only: fun_finalize=>finalize
+    ! use TOUZA_Std_mwe,only: mwe_finalize=>finalize
+    ! use TOUZA_Std_env,only: env_finalize=>finalize
+    ! use TOUZA_Std_sus,only: sus_finalize=>finalize
+    ! use TOUZA_Std_fun,only: fun_finalize=>finalize
+    use TOUZA_Std,only: mwe_finalize, env_finalize, sus_finalize, fun_finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u

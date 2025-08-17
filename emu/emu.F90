@@ -1,7 +1,7 @@
 !!!_! emu.F90 - touza/emu interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2025/05/23 09:25:48 fuyuki emu.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 18:04:45 fuyuki emu.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2023
@@ -21,10 +21,12 @@
 module TOUZA_Emu
   use TOUZA_Emu_usi, usi_init=>init, usi_diag=>diag, usi_finalize=>finalize
   use TOUZA_Emu_ugg, ugg_init=>init, ugg_diag=>diag, ugg_finalize=>finalize
-  use TOUZA_Std,only: get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Std,only: unit_global
 !!!_  - default
   implicit none
   public
+!!!_  - no export
+  private :: unit_global
 !!!_  - private static
   integer,save,private :: init_mode = 0
   integer,save,private :: init_counts = 0
@@ -73,6 +75,8 @@ contains
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
     use TOUZA_Std,only: choice, is_msglev_NORMAL, msg
+    use TOUZA_Std,only: get_logu
+    use TOUZA_Std,only: trace_control
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -108,6 +112,8 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
     use TOUZA_Std,only: choice, is_msglev_NORMAL, msg_grp
+    use TOUZA_Std,only: get_logu
+    use TOUZA_Std,only: trace_fine
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u

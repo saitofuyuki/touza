@@ -56,15 +56,23 @@
     integer,intent(in),optional :: ir
     integer,intent(in),optional :: nr
 #+end_src
-**** ~open_sysin~
+**** ~open_bind_sysin~
 #+begin_src f90
-  subroutine open_sysin(ierr)
-    integer,intent(out) :: ierr
+  subroutine open_bind_sysin(ierr, usys, file, tag, u)
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: usys
+    character(len=*),intent(in)          :: file
+    character(len=*),intent(in)          :: tag
+    integer,         intent(in),optional :: u        ! log unit
 #+end_src
-**** ~open_sysout~
+**** ~open_bind_sysout~
 #+begin_src f90
-  subroutine open_sysout(ierr)
-    integer,intent(out) :: ierr
+  subroutine open_bind_sysout(ierr, usys)
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: usys
+    character(len=*),intent(in)          :: file
+    character(len=*),intent(in),optional :: sfx
+    integer,         intent(in),optional :: u        ! log unit
 #+end_src
 **** ~get_sysu~
 #+begin_src f90
@@ -109,7 +117,7 @@ subroutine SETRNK(MYRANK)
 subroutine SETSIZ(MYSIZE)
   integer,intent(in) :: MYSIZE
 #+end_src
-**** ~OPNNML~ - batch call of =open_sysin=, =open_sysout=
+**** ~OPNNML~ - batch call of =legacy_open_sysin=, =legacy_open_sysout=
 #+begin_src f90
 subroutine OPNNML(IOS)
   integer,intent(out) :: IOS   !! io status

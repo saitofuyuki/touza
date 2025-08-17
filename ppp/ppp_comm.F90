@@ -1,7 +1,7 @@
 !!!_! ppp_comm.F90 - TOUZA/ppp communication
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/23 13:09:34 fuyuki ppp_comm.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/23 08:59:34 fuyuki ppp_comm.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -168,6 +168,7 @@ contains
     ! use MPI,only: MPI_Barrier
 #endif /* OPT_USE_MPI */
     use TOUZA_Ppp_std,only: MPI_BARRIER
+    use TOUZA_Ppp_std,only: trace_err
     use TOUZA_Ppp_amng,only: inquire_agent
     implicit none
     integer,         intent(out)         :: ierr
@@ -185,6 +186,7 @@ contains
 #if HAVE_FTRACE_REGION_END
     if (present(tag)) call ftrace_region_end(tag)
 #endif
+    if (ierr.ne.0) call trace_err(ierr, fun='barrier_trace', asfx=tag, u=u)
     return
   end subroutine barrier_trace
 
@@ -249,8 +251,7 @@ contains
     use MPI,only: MPI_Irecv
 #  endif
     use TOUZA_Ppp_std,only: choice
-    use TOUZA_Ppp_amng,only: &
-         & check_agent, base_agent, agents_translate, inquire_agent
+    use TOUZA_Ppp_amng,only: check_agent, base_agent, agents_translate, inquire_agent
     implicit none
     integer,parameter :: KMTGT = MPI_INTEGER
     integer,intent(out)         :: ierr
@@ -372,7 +373,6 @@ end module TOUZA_Ppp_comm
 !!!_@ test_ppp_comm - test program
 #if TEST_PPP_COMM
 program test_ppp_comm
-  use MPI
   use TOUZA_Ppp_comm
   implicit none
 

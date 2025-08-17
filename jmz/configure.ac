@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Nov 24 2021
-# Time-stamp: <2024/06/20 08:33:58 fuyuki configure.ac>
+# Time-stamp: <2025/07/03 08:54:29 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -32,8 +32,14 @@ AC_FC_MODULE_FLAG
 AC_FC_MODULE_OUTPUT_FLAG([], [AC_MSG_WARN])
 AX_COMPILER_VENDOR
 
-MT_FORTRAN_BATCH_CHECK_STATEMENT([error], [stop],[
-error stop 1])
+dnl Fortran 2008
+MT_FORTRAN_BATCH_CHECK_STATEMENT([error_stop], [],[
+      error stop 1
+])
+dnl Fortran 2018
+MT_FORTRAN_BATCH_CHECK_STATEMENT([error_stop], [quiet],[
+      error stop 1, quiet=.TRUE.
+])
 MT_FORTRAN_BATCH_CHECK_SUBROUTINE([exit], [1], [])
 
 AC_LANG_POP([Fortran])

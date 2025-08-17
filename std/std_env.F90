@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/05/22 09:22:49 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/23 08:50:42 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -63,6 +63,10 @@
 #ifndef    ASCII_LF
 #  define  ASCII_LF 10     /* line-feed ascii code */
 #endif
+
+#ifndef    OPT_PATH_SEP_DIR
+#  define  OPT_PATH_SEP_DIR '/'         /* directory separator in path */
+#endif
 !!!_ + debug
 #ifndef   TEST_STD_ENV
 #  define TEST_STD_ENV 0
@@ -77,9 +81,8 @@ module TOUZA_Std_env
 !!!_ = declaration
 !!!_  - ISO_FORTRAN_ENV module
 #if HAVE_FORTRAN_ISO_FORTRAN_ENV
-  use ISO_FORTRAN_ENV,only: &
-       &  OUTPUT_UNIT, INPUT_UNIT, ERROR_UNIT, &
-       &  FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
+  use ISO_FORTRAN_ENV,only: OUTPUT_UNIT, INPUT_UNIT, ERROR_UNIT
+  use ISO_FORTRAN_ENV,only: FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
 
 #  if OPT_STDOUT_UNIT < 0
 #    undef  OPT_STDOUT_UNIT
@@ -219,21 +222,23 @@ module TOUZA_Std_env
   character(len=*),parameter :: etest_org = 'abcd'
   integer,save :: etest_big = 0, etest_little = 0
 
+  character(len=*),parameter :: sep_dir = OPT_PATH_SEP_DIR
 !!!_  - public
-  public init, diag, finalize
-  public init_batch
-  public init_unfmtd_recl, get_size_ufd
-  public init_unfmtd_strm, get_unit_strm, get_size_strm
-  public init_file_bodr,   check_byte_order, check_bodr_unit
-  public init_io_status,   is_eof_ss
-  public get_size_bytes,   conv_b2strm,   get_mems_bytes
-  public get_login_name,   get_host_name
-  public is_new_line,      new_line_ascii
+  public :: init, diag, finalize
+  public :: init_batch
+  public :: init_unfmtd_recl, get_size_ufd
+  public :: init_unfmtd_strm, get_unit_strm, get_size_strm
+  public :: init_file_bodr,   check_byte_order, check_bodr_unit
+  public :: init_io_status,   is_eof_ss
+  public :: get_size_bytes,   conv_b2strm,   get_mems_bytes
+  public :: get_login_name,   get_host_name
+  public :: is_new_line,      new_line_ascii
+  public :: is_abs_path,      join_path
 #if DEBUG_PRIVATES
-  public check_bodr_mem, check_bodr_files
-  public brute_force_stdu
-  public brute_force_recl_unit_rw, brute_force_recl_unit_w
-  public brute_force_recl_type
+  public :: check_bodr_mem, check_bodr_files
+  public :: brute_force_stdu
+  public :: brute_force_recl_unit_rw, brute_force_recl_unit_w
+  public :: brute_force_recl_type
 #endif
 !!!_  - interfaces
   interface brute_force_recl_type
@@ -287,8 +292,12 @@ module TOUZA_Std_env
      module procedure conv_b2strm_l
   end interface conv_b2strm
 
-contains
+  interface join_path
+     module procedure join_path_array, join_path_mod
+  end interface join_path
+
 !!!_ + common interfaces
+contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, levtry, icomm)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
@@ -360,6 +369,7 @@ contains
              if (VCHECK_NORMAL(lv)) then
                 call msg_mdl(TIME_STAMP, __MDL__, utmp)
                 call msg_mdl('(''offset kind = '', I0)', KIOFS, __MDL__, utmp)
+                call msg_mdl('(''directory separator = '', A)', sep_dir, __MDL__, utmp)
              endif
              if (VCHECK_DEBUG(lv)) then
                 call msg_mdl('(''init = '', I0)', (/init_counts/), __MDL__, utmp)
@@ -519,8 +529,7 @@ contains
 !!!_  & diag_recl
   subroutine diag_recl(ierr, u)
 #if HAVE_FORTRAN_ISO_FORTRAN_ENV
-  use ISO_FORTRAN_ENV,only: &
-       &  FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
+  use ISO_FORTRAN_ENV,only: FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
 #endif
     use TOUZA_Std_log,only: msg_mdl
     use TOUZA_Std_utl,only: choice
@@ -558,8 +567,7 @@ contains
 !!!_  & diag_strm
   subroutine diag_strm(ierr, u)
 #if HAVE_FORTRAN_ISO_FORTRAN_ENV
-  use ISO_FORTRAN_ENV,only: &
-       &  FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
+  use ISO_FORTRAN_ENV,only: FILE_STORAGE_SIZE, CHARACTER_STORAGE_SIZE
 #endif
     use TOUZA_Std_log,only: msg_mdl
     use TOUZA_Std_utl,only: choice
@@ -2098,16 +2106,18 @@ contains
 !!!_ + conversion
 !!!_  & conv_b2strm - convert bytes to sizes in stream units
   PURE &
-  integer(KIND=KTGT) function conv_b2strm_i(nb) result (ms)
+  function conv_b2strm_i(nb) result (ms)
     use TOUZA_Std_prc,only: KTGT=>KI32
     implicit none
+    integer(KIND=KTGT) :: ms
     integer(KIND=KTGT),intent(in) :: nb
     ms = nb / nc_strm
   end function conv_b2strm_i
   PURE &
-  integer(KIND=KTGT) function conv_b2strm_l(nb) result (ms)
+  function conv_b2strm_l(nb) result (ms)
     use TOUZA_Std_prc,only: KTGT=>KI64
     implicit none
+    integer(KIND=KTGT) :: ms
     integer(KIND=KTGT),intent(in) :: nb
     ms = nb / nc_strm
   end function conv_b2strm_l
@@ -2150,91 +2160,101 @@ contains
 
 !!!_  & get_size_strm - get total length in stream i/o
   PURE &
-  integer(kind=KMEM) function get_size_strm_i (mold, n) result(l)
+  function get_size_strm_i (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: l
     integer(KIND=KTGT),intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
     l = mstrmi * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_i
   PURE &
-  integer(kind=KMEM) function get_size_strm_l (mold, n) result(l)
+  function get_size_strm_l (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: l
     integer(KIND=KTGT),intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
     l = mstrml * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_l
   PURE &
-  integer(kind=KMEM) function get_size_strm_f (mold, n) result(l)
+  function get_size_strm_f (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: l
     real(KIND=KTGT),   intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
     l = mstrmf * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_f
   PURE &
-  integer(kind=KMEM) function get_size_strm_d (mold, n) result(l)
+  function get_size_strm_d (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: l
     real(KIND=KTGT),   intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
     l = mstrmd * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_d
   PURE &
-  integer(kind=KMEM) function get_size_strm_a (mold, n) result(l)
+  function get_size_strm_a (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: l
     character(len=*),  intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
     l = (len(mold) / max(1, nc_strm)) * choice(1_KMEM, n)
   end function get_size_strm_a
   PURE &
-  integer(kind=KMEM) function get_size_strm_li (mold, n) result(l)
+  function get_size_strm_li (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: l
     integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
     l = mstrmi * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_li
   PURE &
-  integer(kind=KMEM) function get_size_strm_ll (mold, n) result(l)
+  function get_size_strm_ll (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: l
     integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
     l = mstrml * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_ll
   PURE &
-  integer(kind=KMEM) function get_size_strm_lf (mold, n) result(l)
+  function get_size_strm_lf (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: l
     real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
     l = mstrmf * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_lf
   PURE &
-  integer(kind=KMEM) function get_size_strm_ld (mold, n) result(l)
+  function get_size_strm_ld (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: l
     real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
     l = mstrmd * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_strm_ld
   PURE &
-  integer(kind=KMEM) function get_size_strm_la (mold, n) result(l)
+  function get_size_strm_la (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: l
     character(len=*),  intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
     l = (len(mold) / max(1, nc_strm)) * choice(1_KMEM, n)
@@ -2242,94 +2262,104 @@ contains
 
 !!!_  & get_size_bytes - get unit/total length in bytes
   PURE &
-  integer(kind=KMEM) function get_size_bytes_a (mold, n) result(l)
+  function get_size_bytes_a (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: l
     character(len=*),  intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
     !! todo: nbyta detection
     l = len(mold) * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_bytes_a
   PURE &
-  integer(kind=KMEM) function get_size_bytes_i (mold, n) result(l)
+  function get_size_bytes_i (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: l
     integer(KIND=KTGT),intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
     l = nbyti * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_bytes_i
   PURE &
-  integer(kind=KMEM) function get_size_bytes_l (mold, n) result(l)
+  function get_size_bytes_l (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: l
     integer(KIND=KTGT),intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
     l = nbytl * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_bytes_l
   PURE &
-  integer(kind=KMEM) function get_size_bytes_f (mold, n) result(l)
+  function get_size_bytes_f (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: l
     real(KIND=KTGT),   intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
     l = nbytf * choice(1_KMEM, n) + 0 * KIND(mold)
   end function get_size_bytes_f
   PURE &
-  integer(kind=KMEM) function get_size_bytes_d (mold, n) result(l)
+  function get_size_bytes_d (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: l
     real(KIND=KTGT),   intent(in)          :: mold
     integer(KIND=KMEM),intent(in),optional :: n
     l = nbytd * choice(1_KMEM, n)  + 0 * KIND(mold)
   end function get_size_bytes_d
 
   PURE &
-  integer(kind=KMEM) function get_size_bytes_la (mold, n) result(l)
+  function get_size_bytes_la (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: l
     character(len=*),  intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
     !! todo: nbyta detection
     l = len(mold) * n  + 0 * KIND(mold)
   end function get_size_bytes_la
   PURE &
-  integer(kind=KMEM) function get_size_bytes_li (mold, n) result(l)
+  function get_size_bytes_li (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: l
     integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
     l = nbyti * n  + 0 * KIND(mold)
   end function get_size_bytes_li
   PURE &
-  integer(kind=KMEM) function get_size_bytes_ll (mold, n) result(l)
+  function get_size_bytes_ll (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: l
     integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
     l = nbytl * n  + 0 * KIND(mold)
   end function get_size_bytes_ll
   PURE &
-  integer(kind=KMEM) function get_size_bytes_lf (mold, n) result(l)
+  function get_size_bytes_lf (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: l
     real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
     l = nbytf * n + 0 * KIND(mold)
   end function get_size_bytes_lf
   PURE &
-  integer(kind=KMEM) function get_size_bytes_ld (mold, n) result(l)
+  function get_size_bytes_ld (mold, n) result(l)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: l
     real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: n
     l = nbytd * n  + 0 * KIND(mold)
@@ -2337,94 +2367,104 @@ contains
 
 !!!_  & get_mems_bytes - get members from byte-length
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_a (l, mold) result(n)
+  function get_mems_bytes_a (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: n
     character(len=*),  intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     !! todo: nbyta detection
     n = l / len(mold)   + 0 * KIND(mold)
   end function get_mems_bytes_a
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_i (l, mold) result(n)
+  function get_mems_bytes_i (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: n
     integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     n = l / nbyti  + 0 * KIND(mold)
   end function get_mems_bytes_i
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_l (l, mold) result(n)
+  function get_mems_bytes_l (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: n
     integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     n = l / nbytl  + 0 * KIND(mold)
   end function get_mems_bytes_l
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_f (l, mold) result(n)
+  function get_mems_bytes_f (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: n
     real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     n = l / nbytf  + 0 * KIND(mold)
   end function get_mems_bytes_f
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_d (l, mold) result(n)
+  function get_mems_bytes_d (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI32
     implicit none
+    integer(kind=KMEM) :: n
     real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     n = l / nbytd  + 0 * KIND(mold)
   end function get_mems_bytes_d
 
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_la (l, mold) result(n)
+  function get_mems_bytes_la (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: n
     character(len=*),  intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     !! todo: nbyta detection
     n = l / len(mold)   + 0 * KIND(mold)
   end function get_mems_bytes_la
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_li (l, mold) result(n)
+  function get_mems_bytes_li (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: n
     integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     n = l / nbyti  + 0 * KIND(mold)
   end function get_mems_bytes_li
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_ll (l, mold) result(n)
+  function get_mems_bytes_ll (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: n
     integer(KIND=KTGT),intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     n = l / nbytl  + 0 * KIND(mold)
   end function get_mems_bytes_ll
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_lf (l, mold) result(n)
+  function get_mems_bytes_lf (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: n
     real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     n = l / nbytf  + 0 * KIND(mold)
   end function get_mems_bytes_lf
   PURE &
-  integer(kind=KMEM) function get_mems_bytes_ld (l, mold) result(n)
+  function get_mems_bytes_ld (l, mold) result(n)
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI64
     implicit none
+    integer(kind=KMEM) :: n
     real(KIND=KTGT),   intent(in) :: mold
     integer(KIND=KMEM),intent(in) :: l
     n = l / nbytd  + 0 * KIND(mold)
@@ -2490,6 +2530,45 @@ contains
 #endif
   end subroutine get_host_name
 !!!_  & get_env_var
+!!!_ + path style
+!!!_  & is_abs_path() - check if absolute path
+  logical function is_abs_path(p) result(b)
+    implicit none
+    character(len=*),intent(in) :: p
+    integer l
+    l = len_trim(sep_dir)
+    b = (p(1:l) .eq. sep_dir(1:l))
+  end function is_abs_path
+!!!_  & join_path()
+  subroutine join_path_array(ierr, path, elem)
+    use TOUZA_Std_utl,only:join_list
+    implicit none
+    integer,         intent(out) :: ierr
+    character(len=*),intent(out) :: path
+    character(len=*),intent(in)  :: elem(0:)
+    integer l
+    l = len_trim(sep_dir)
+    call join_list(ierr, path, elem, sep=sep_dir(1:l))
+  end subroutine join_path_array
+
+  subroutine join_path_mod(ierr, path, base)
+    use TOUZA_Std_utl,only:join_list
+    implicit none
+    integer,         intent(out)   :: ierr
+    character(len=*),intent(inout) :: path
+    character(len=*),intent(in)    :: base
+    integer lp, ls, lb
+    lp = len_trim(path)
+    ls = len_trim(sep_dir)
+    lb = len_trim(base)
+    if ((lp + ls + lb).gt.len(path)) then
+       ierr = ERR_INSUFFICIENT_BUFFER
+    else
+       ierr = 0
+    endif
+    path = path(1:lp) // sep_dir(1:ls) // base(1:lb)
+  end subroutine join_path_mod
+
 !!!_ + misc
 !!!_  & is_new_line()
   logical function is_new_line(c) result(b)

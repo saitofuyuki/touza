@@ -1,7 +1,7 @@
 !!!_! ami_xfrom.F90. - TOUZA/Ami/table amida transformer general
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 20 2023
-#define TIME_STAMP 'Time-stamp: <2023/10/10 13:56:59 fuyuki ami_xform.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 18:01:59 fuyuki ami_xform.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -19,7 +19,7 @@
 !!!_@ TOUZA_Ami_xform - ami-da transformation
 module TOUZA_Ami_xform
 !!!_ + modules
-  use TOUZA_Ami_std, as_init=>init, as_diag=>diag, as_finalize=>finalize
+  use TOUZA_Ami_std,only: unit_global
 !!!_ + default
   implicit none
   private
@@ -59,6 +59,10 @@ module TOUZA_Ami_xform
 contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
+    use TOUZA_Ami_std,only: as_init=>init
+    use TOUZA_Ami_std,only: choice
+    use TOUZA_Ami_std,only: is_first_force, trace_control
+    use TOUZA_Ami_std,only: control_deep, control_mode
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -93,6 +97,12 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Ami_std,only: as_diag=>diag
+    use TOUZA_Ami_std,only: choice, get_logu
+    use TOUZA_Ami_std,only: msg
+    use TOUZA_Ami_std,only: is_first_force, trace_control
+    use TOUZA_Ami_std,only: control_deep, control_mode
+    use TOUZA_Ami_std,only: is_msglev_NORMAL
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -124,6 +134,11 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Ami_std,only: as_finalize=>finalize
+    use TOUZA_Ami_std,only: is_first_force, trace_control
+    use TOUZA_Ami_std,only: control_deep, control_mode
+    use TOUZA_Ami_std,only: choice, get_logu
+    use TOUZA_Ami_std,only: trace_fine
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -156,9 +171,9 @@ contains
        &  z,   lzi, memz, &
        &  x,   lxi, memx, ni, no, &
        &  idx, val, cofs, sw)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     implicit none
-    integer,parameter :: KTGT = KDBL
     integer,         intent(out)   :: ierr
     real(kind=KTGT), intent(inout) :: z(0:*)       ! [lzi, memz, *]
     real(kind=KTGT), intent(in)    :: x(0:*)       ! [lxi, memx, *]
@@ -232,9 +247,9 @@ contains
        &  z,    lzi,  memz, &
        &  x,    lxi,  memx, ni,   no, &
        &  zidx, xidx, val,  cofs, nc, sw)
+    use TOUZA_Ami_std,only: KTGT=>KDBL
     use TOUZA_Ami_std,only: choice
     implicit none
-    integer,parameter :: KTGT = KDBL
     integer,         intent(out)   :: ierr
     real(kind=KTGT), intent(inout) :: z(0:*)       ! [lzi, memz, *]
     real(kind=KTGT), intent(in)    :: x(0:*)       ! [lxi, memx, *]

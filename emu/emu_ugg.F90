@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/23 09:50:40 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/22 16:05:47 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024, 2025
@@ -225,9 +225,9 @@ module TOUZA_Emu_ugg
      module procedure div_latitude_d
   end interface div_latitude
 
-  interface array_reverse
-     module procedure array_reverse_d
-  end interface array_reverse
+  ! interface array_reverse
+  !    module procedure array_reverse_d
+  ! end interface array_reverse
 
   interface check_precision
      module procedure check_precision_d, check_precision_f
@@ -462,9 +462,9 @@ module TOUZA_Emu_ugg
   interface gen_ctable_I2b
      module procedure gen_ctable_I2b_d
   end interface gen_ctable_I2b
-  interface gen_ctable_I2a
-     module procedure gen_ctable_I2a_d
-  end interface gen_ctable_I2a
+  ! interface gen_ctable_I2a
+  !    module procedure gen_ctable_I2a_d
+  ! end interface gen_ctable_I2a
 
   interface geodesic_direct_core
      module procedure geodesic_direct_core_d
@@ -716,7 +716,7 @@ module TOUZA_Emu_ugg
   public psgp_comp_dlon
   public psgp_bwd_geod
   public psgp_surf_area
-  public psgp_xlo_tr, psgp_ylo_tr
+  public psgp_xlo_tr, psgp_ylo_tr, psgp_xlo_once_tr, psgp_ylo_once_tr
   public psgp_xla_tr, psgp_yla_tr, psgp_xla_once_tr, psgp_yla_once_tr
   public psgp_dlo_tr, psgp_gla_tr, psgp_sinlat
 
@@ -889,7 +889,7 @@ contains
     pp(3) = ATAN2(0.0_KTGT, -1.0_KTGT)
 
     do j = 1, size(pp)
-101    format('pi check/', I0, 1x, 2E24.16, 1x, E9.3)
+101    format('pi check/', I0, 1x, 2E24.16, 1x, E10.3)
 102    format('pi check/', I0, ' passed')
        if (p0.eq.pp(j)) then
           write(txt, 102) j
@@ -937,9 +937,10 @@ contains
     real(kind=KTGT), intent(in)          :: z
     integer,         intent(in),optional :: u
     interface
-       real(kind=KTGT) function f(x)
+       function f(x)
          use TOUZA_Std,only: KTGT=>KDBL
          implicit none
+         real(kind=KTGT) :: f
          real(kind=KTGT),intent(in) :: x
        end function f
     end interface
@@ -997,31 +998,35 @@ contains
     endif
   end subroutine diag_trig_d
 !!!_   . wsin()
-  real(kind=KTGT) function wsin_d(x) result(z)
+  function wsin_d(x) result(z)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: z
     real(kind=KTGT),intent(in) :: x
     z = sin(x)
   end function wsin_d
 !!!_   . wcos()
-  real(kind=KTGT) function wcos_d(x) result(z)
+  function wcos_d(x) result(z)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: z
     real(kind=KTGT),intent(in) :: x
     z = cos(x)
   end function wcos_d
 !!!_   . wtan()
-  real(kind=KTGT) function wtan_d(x) result(z)
+  function wtan_d(x) result(z)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: z
     real(kind=KTGT),intent(in) :: x
     z = tan(x)
   end function wtan_d
 !!!_   . ang2rad
   ELEMENTAL &
-  real(kind=KTGT) function ang2rad_d(angl, round) result(r)
+  function ang2rad_d(angl, round) result(r)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
@@ -1035,9 +1040,10 @@ contains
   end function ang2rad_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   ELEMENTAL &
-  real(kind=KTGT) function ang2rad_q(angl, round) result(r)
+  function ang2rad_q(angl, round) result(r)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
@@ -1052,9 +1058,10 @@ contains
 #endif
 !!!_   . rad2ang
   ELEMENTAL &
-  real(kind=KTGT) function rad2ang_d(rad, round) result(a)
+  function rad2ang_d(rad, round) result(a)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: a
     real(kind=KTGT),intent(in) :: rad
     real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
@@ -1070,9 +1077,10 @@ contains
   end function rad2ang_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   ELEMENTAL &
-  real(kind=KTGT) function rad2ang_q(rad, round) result(a)
+  function rad2ang_q(rad, round) result(a)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT) :: a
     real(kind=KTGT),intent(in) :: rad
     real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
@@ -1089,9 +1097,10 @@ contains
 #endif
 !!!_   . ang2deg
   ELEMENTAL &
-  real(kind=KTGT) function ang2deg_d(angl, round) result(d)
+  function ang2deg_d(angl, round) result(d)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: d
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
@@ -1109,9 +1118,10 @@ contains
   end function ang2deg_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   ELEMENTAL &
-  real(kind=KTGT) function ang2deg_q(angl, round) result(d)
+  function ang2deg_q(angl, round) result(d)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT) :: d
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
@@ -1131,9 +1141,10 @@ contains
 
 !!!_   . deg2ang
   ELEMENTAL &
-  real(kind=KTGT) function deg2ang_d(deg, round) result(a)
+  function deg2ang_d(deg, round) result(a)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: a
     real(kind=KTGT),intent(in) :: deg
     real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
@@ -1151,9 +1162,10 @@ contains
   end function deg2ang_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   ELEMENTAL &
-  real(kind=KTGT) function deg2ang_q(deg, round) result(a)
+  function deg2ang_q(deg, round) result(a)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT) :: a
     real(kind=KTGT),intent(in) :: deg
     real(kind=KTGT),intent(in) :: round
     real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
@@ -1173,10 +1185,11 @@ contains
 
 !!!_   . deg2rad
   ELEMENTAL &
-  real(kind=KTGT) function deg2rad_d(deg, nml) result(r)
+  function deg2rad_d(deg, nml) result(r)
     use TOUZA_Std,only: KTGT=>KDBL
     use TOUZA_Std,only: choice
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: deg
     logical,optional,intent(in) :: nml
     real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
@@ -1190,10 +1203,11 @@ contains
   end function deg2rad_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   ELEMENTAL &
-  real(kind=KTGT) function deg2rad_q(deg, nml) result(r)
+  function deg2rad_q(deg, nml) result(r)
     use TOUZA_Std,only: KTGT=>KQPL
     use TOUZA_Std,only: choice
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: deg
     logical,optional,intent(in) :: nml
     real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
@@ -1208,10 +1222,11 @@ contains
 #endif
 !!!_   . rad2deg
   ELEMENTAL &
-  real(kind=KTGT) function rad2deg_d(rad, nml) result(d)
+  function rad2deg_d(rad, nml) result(d)
     use TOUZA_Std,only: KTGT=>KDBL
     use TOUZA_Std,only: choice
     implicit none
+    real(kind=KTGT) :: d
     real(kind=KTGT),intent(in) :: rad
     logical,optional,intent(in) :: nml
     real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
@@ -1226,10 +1241,11 @@ contains
   end function rad2deg_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   ELEMENTAL &
-  real(kind=KTGT) function rad2deg_q(rad, nml) result(d)
+  function rad2deg_q(rad, nml) result(d)
     use TOUZA_Std,only: KTGT=>KQPL
     use TOUZA_Std,only: choice
     implicit none
+    real(kind=KTGT) :: d
     real(kind=KTGT),intent(in) :: rad
     logical,optional,intent(in) :: nml
     real(kind=KTGT),parameter :: w = real(round_degree, kind=KTGT)
@@ -1245,19 +1261,19 @@ contains
   end function rad2deg_q
 #endif
 !!!_  & array_reverse
-  subroutine array_reverse_d &
-       & (v, n)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    real(kind=KTGT),intent(inout) :: v(*)
-    integer,        intent(in)    :: n
-    real(kind=KTGT) :: b(n)
-    integer j
-    do j = 1, n
-       b (n - j + 1) = v(j)
-    enddo
-    v(1:n) = b(1:n)
-  end subroutine array_reverse_d
+  ! subroutine array_reverse_d &
+  !      & (v, n)
+  !   use TOUZA_Std,only: KTGT=>KDBL
+  !   implicit none
+  !   real(kind=KTGT),intent(inout) :: v(*)
+  !   integer,        intent(in)    :: n
+  !   real(kind=KTGT) :: b(n)
+  !   integer j
+  !   do j = 1, n
+  !      b (n - j + 1) = v(j)
+  !   enddo
+  !   v(1:n) = b(1:n)
+  ! end subroutine array_reverse_d
 
 !!!_ + user subroutines (longitude)
 !!!_  & get_longitude
@@ -2269,9 +2285,10 @@ contains
 
 !!!_  & psgp_sinlat - extract sine lat properties from cache
   PURE &
-  real(kind=KTGT) function psgp_sinlat_d (cla, cco) result(v)
+  function psgp_sinlat_d (cla, cco) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in)  :: cla(*)
     real(kind=KTGT),intent(in)  :: cco(*)
 
@@ -2340,10 +2357,11 @@ contains
   end function psgp_fwd_cis_core_d
 
 !!!_  & psgp_fwd_isf()
-  real(kind=KTGT) function psgp_fwd_isf_d &
+  function psgp_fwd_isf_d &
        & (cla) result (isf)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: isf
     real(kind=KTGT),intent(in) :: cla(*)
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
     isf = ONE / cla(icache_psgp_sf)
@@ -2427,10 +2445,11 @@ contains
     endif
   end function psgp_bwd_ll_d
 !!!_  & psgp_bwd_sf() - scale factor
-  real(kind=KTGT) function psgp_bwd_sf_d &
+  function psgp_bwd_sf_d &
        & (x, y, cco) result(sf)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: sf
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
 
@@ -2450,10 +2469,11 @@ contains
     endif
   end function psgp_bwd_sf_d
 !!!_  & psgp_bwd_isf() - inverse scale factor
-  real(kind=KTGT) function psgp_bwd_isf_d &
+  function psgp_bwd_isf_d &
        & (x, y, cco) result(sf)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: sf
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
 
@@ -2473,10 +2493,11 @@ contains
     endif
   end function psgp_bwd_isf_d
 !!!_  & psgp_bwd_iaf() - inverse area factor
-  real(kind=KTGT) function psgp_bwd_iaf_d &
+  function psgp_bwd_iaf_d &
        & (x, y, cco) result(sf)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: sf
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
 
@@ -2496,29 +2517,32 @@ contains
     endif
   end function psgp_bwd_iaf_d
 !!!_  & psgp_bwd_rhonml
-  real(kind=KTGT) function psgp_bwd_rhonml_d &
+  function psgp_bwd_rhonml_d &
        & (x, y, cco) result(rhonml)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: rhonml
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
     rhonml = _hypot(x / cco(icache_psgp_xco), y / cco(icache_psgp_yco))
   end function psgp_bwd_rhonml_d
 !!!_  & psgp_bwd_rho
-  real(kind=KTGT) function psgp_bwd_rho_d &
+  function psgp_bwd_rho_d &
        & (x, y, cco) result(rho)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: rho
     real(kind=KTGT),intent(in) :: x, y
     real(kind=KTGT),intent(in) :: cco(*)
     ! rho = _hypot(x * cco(icache_psgp_xco), y * cco(icache_psgp_yco))
     rho = psgp_bwd_rhonml(x, y, cco) * cco(icache_psgp_maj)
   end function psgp_bwd_rho_d
 !!!_  & psgp_bwd_core
-  real(kind=KTGT) function psgp_bwd_core_d &
+  function psgp_bwd_core_d &
        & (rhonml, cco) result(tlat)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: tlat
     real(kind=KTGT),intent(in) :: rhonml   ! normalized rho
     real(kind=KTGT),intent(in) :: cco(*)
 
@@ -2927,8 +2951,10 @@ contains
   end subroutine psgp_bwd_geod_d
 
 !!!_  & psgp_surf_area ()
-  real(kind=KTGT) function psgp_surf_area_d(cco) result (v)
+  function psgp_surf_area_d(cco) result (v)
     use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: cco(*)
     real(kind=KTGT) :: a, aco
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
@@ -3200,8 +3226,10 @@ contains
 
 !!!_  & flatten_to_ecc ()
   ELEMENTAL &
-  real(kind=KTGT) function flatten_to_ecc_d (f) result (e)
+  function flatten_to_ecc_d (f) result (e)
     use TOUZA_Std,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT) :: e
     real(kind=KTGT),intent(in) :: f
     ! e = sqrt(2.0_KTGT * f - f * f)
     e = sqrt((2.0_KTGT - f) * f)
@@ -3210,9 +3238,9 @@ contains
   function reduced_latitude_d (glat, f) result (plat)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: plat(NTRIG)
     real(kind=KTGT),intent(in) :: glat(NTRIG)
     real(kind=KTGT),intent(in) :: f
-    real(kind=KTGT) :: plat(NTRIG)
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
 
     plat(1:NTRIG) = nml_sincos(_SIN(glat) * (ONE - f), _COS(glat))
@@ -3222,9 +3250,9 @@ contains
   function azimuth_node_d (aref, plat) result (eazim)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: eazim(NTRIG)
     real(kind=KTGT),intent(in) :: aref(NTRIG)
     real(kind=KTGT),intent(in) :: plat(NTRIG)
-    real(kind=KTGT) :: eazim(NTRIG)
     real(kind=KTGT),parameter :: ZERO=0.0_KTGT
     real(kind=KTGT),parameter :: ONE=1.0_KTGT
 
@@ -3244,9 +3272,9 @@ contains
        & result (aarc)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: aarc(NTRIG)
     real(kind=KTGT),intent(in) :: azim(*)
     real(kind=KTGT),intent(in) :: plat(*)
-    real(kind=KTGT) :: aarc(NTRIG)
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
 
@@ -3263,10 +3291,10 @@ contains
        & result (alonp)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: alonp(NTRIG)
     real(kind=KTGT),intent(in) :: eazim(NTRIG)
     real(kind=KTGT),intent(in) :: aref(NTRIG)
     real(kind=KTGT),intent(in) :: plat(NTRIG)
-    real(kind=KTGT) :: alonp(NTRIG)
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
 
@@ -3275,9 +3303,10 @@ contains
   end function alon_auxsph_ph_d
 !!!_  & conformal_latitude() - tan(conf. lat)
   ELEMENTAL &
-  real(kind=KTGT) function conformal_latitude_d (tglat, ecc) result (x)
+  function conformal_latitude_d (tglat, ecc) result (x)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: x
     real(kind=KTGT),intent(in) :: tglat ! tan(geod.lat)
     real(kind=KTGT),intent(in) :: ecc
     real(kind=KTGT) :: seglat, gd
@@ -4003,11 +4032,12 @@ contains
 
 !!!_  & geodesic_dazim ()
   PURE &
-  real(kind=KTGT) function geodesic_dazim_d &
+  function geodesic_dazim_d &
        & (plat1, plat2, dalon) &
        & result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: plat1(*), plat2(*), dalon(*)
 
     real(kind=KTGT) :: cb1d, cb2d
@@ -4025,11 +4055,12 @@ contains
   end function geodesic_dazim_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   PURE &
-  real(kind=KTGT) function geodesic_dazim_q &
+  function geodesic_dazim_q &
        & (plat1, plat2, dalon) &
        & result(v)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: plat1(*), plat2(*), dalon(*)
 
     real(kind=KTGT) :: cb1d, cb2d
@@ -4595,10 +4626,11 @@ contains
     return
   end function set_dlongi_d
 !!!_  & comp_series_sine
-  real(kind=KTGT) function comp_series_sine_d &
+  function comp_series_sine_d &
        & (CT, no, ss, cs) result(r)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in)  :: CT(0:*)
     integer,        intent(in)  :: no          ! limit order
     real(kind=KTGT),intent(in)  :: ss, cs      ! sine cosine
@@ -4808,34 +4840,34 @@ contains
     C2b(0) = (C2b(0) - eps) / (1.0_KTGT + eps)
   end subroutine gen_ctable_I2b_d
 !!!_  & gen_ctable_I2a
-  subroutine gen_ctable_I2a_d &
-       & (ierr, C2a, no, eps)
-    use TOUZA_Std,only: KTGT=>KDBL
-    implicit none
-    integer,        intent(out) :: ierr
-    real(kind=KTGT),intent(out) :: C2a(0:*)
-    integer,        intent(in)  :: no            ! limit order
-    real(kind=KTGT),intent(in)  :: eps
-    real(kind=KTGT)  :: epsc, eps2
-    ierr = 0
-    eps2 = eps ** 2
-    if (no.eq.9) then
-#      include "ggf/coeffs_i2a-o9.F90"
-    else if (no.eq.7) then
-#      include "ggf/coeffs_i2a-o7.F90"
-    else if (no.eq.6) then
-#      include "ggf/coeffs_i2a-o6.F90"
-    else if (no.eq.5) then
-#      include "ggf/coeffs_i2a-o5.F90"
-    else
-       ierr = ERR_NOT_IMPLEMENTED
-    endif
-    !! need special treatment for C2(0),
-    !! which currentrly hold t = A2/(1-e) - 1,
-    !! and return A2 - 1 = t * (1 - e) - e
-    !! to keep precision.
-    C2a(0) = C2a(0) * (1.0_KTGT - eps) - eps
-  end subroutine gen_ctable_I2a_d
+!   subroutine gen_ctable_I2a_d &
+!        & (ierr, C2a, no, eps)
+!     use TOUZA_Std,only: KTGT=>KDBL
+!     implicit none
+!     integer,        intent(out) :: ierr
+!     real(kind=KTGT),intent(out) :: C2a(0:*)
+!     integer,        intent(in)  :: no            ! limit order
+!     real(kind=KTGT),intent(in)  :: eps
+!     real(kind=KTGT)  :: epsc, eps2
+!     ierr = 0
+!     eps2 = eps ** 2
+!     if (no.eq.9) then
+! #      include "ggf/coeffs_i2a-o9.F90"
+!     else if (no.eq.7) then
+! #      include "ggf/coeffs_i2a-o7.F90"
+!     else if (no.eq.6) then
+! #      include "ggf/coeffs_i2a-o6.F90"
+!     else if (no.eq.5) then
+! #      include "ggf/coeffs_i2a-o5.F90"
+!     else
+!        ierr = ERR_NOT_IMPLEMENTED
+!     endif
+!     !! need special treatment for C2(0),
+!     !! which currentrly hold t = A2/(1-e) - 1,
+!     !! and return A2 - 1 = t * (1 - e) - e
+!     !! to keep precision.
+!     C2a(0) = C2a(0) * (1.0_KTGT - eps) - eps
+!   end subroutine gen_ctable_I2a_d
 
 !!!_ + symmetric tripolar coordinate
 !!!_  & stp_set
@@ -5169,34 +5201,38 @@ contains
 !!!_ + trigonometric function
 !!!_  & phase() - (atan2() wrapper)
   PURE &
-  real(kind=KTGT) function phase_1_d(terms) result(v)
+  function phase_1_d(terms) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: terms(*)
     v = ATAN2(_SIN(terms), _COS(terms))
   end function phase_1_d
 
   PURE &
-  real(kind=KTGT) function phase_2_d(s, c) result(v)
+  function phase_2_d(s, c) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: s, c
     v = ATAN2(s, c)
   end function phase_2_d
 
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   PURE &
-  real(kind=KTGT) function phase_1_q(terms) result(v)
+  function phase_1_q(terms) result(v)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: terms(*)
     v = ATAN2(_SIN(terms), _COS(terms))
   end function phase_1_q
 
   PURE &
-  real(kind=KTGT) function phase_2_q(s, c) result(v)
+  function phase_2_q(s, c) result(v)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: s, c
     v = ATAN2(s, c)
   end function phase_2_q
@@ -5204,34 +5240,38 @@ contains
 
 !!!_  & phased - (atan2() wrapper) in degree
   PURE &
-  real(kind=KTGT) function phased_1_d(terms) result(v)
+  function phased_1_d(terms) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: terms(*)
     v = rad2deg(phase(terms))
   end function phased_1_d
 
   PURE &
-  real(kind=KTGT) function phased_2_d(s, c) result(v)
+  function phased_2_d(s, c) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: s, c
     v = rad2deg(phase(s, c))
   end function phased_2_d
 
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   PURE &
-  real(kind=KTGT) function phased_1_q(terms) result(v)
+  function phased_1_q(terms) result(v)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: terms(*)
     v = rad2deg(phase(terms))
   end function phased_1_q
 
   PURE &
-  real(kind=KTGT) function phased_2_q(s, c) result(v)
+  function phased_2_q(s, c) result(v)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: s, c
     v = rad2deg(phase(s, c))
   end function phased_2_q
@@ -5239,9 +5279,10 @@ contains
 
 !!!_  & radian_modulo()
   ELEMENTAL &
-  real(kind=KTGT) function radian_modulo_d (angl) result(v)
+  function radian_modulo_d (angl) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT) c
     c = pi_(angl) * 2.0_KTGT
@@ -5250,9 +5291,10 @@ contains
 
 !!!_  & degree_modulo()
   ELEMENTAL &
-  real(kind=KTGT) function degree_modulo_d (angl) result(v)
+  function degree_modulo_d (angl) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT),parameter :: c = 360.0_KTGT
     v = modulo(angl, c)
@@ -5447,9 +5489,10 @@ contains
 
 !!!_  & sins_canonical() - canonical sine (with round angle)
   ELEMENTAL &
-  real(kind=KTGT) function sins_canonical_d (angl, round) result(v)
+  function sins_canonical_d (angl, round) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT),intent(in) :: round
 
@@ -5492,9 +5535,10 @@ contains
   end function sins_canonical_d
 !!!_  & coss_canonical() - canonical cosine (with round angle)
   ELEMENTAL &
-  real(kind=KTGT) function coss_canonical_d (angl, round) result(v)
+  function coss_canonical_d (angl, round) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT),intent(in) :: round
     real(kind=KTGT) r, a, q
@@ -5536,9 +5580,10 @@ contains
   end function coss_canonical_d
 !!!_  & sinr_canonical() - canonical sine (radian)
   ELEMENTAL &
-  real(kind=KTGT) function sinr_canonical_d (angl) result(v)
+  function sinr_canonical_d (angl) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: angl
 
     real(kind=KTGT) r, a, q
@@ -5575,9 +5620,10 @@ contains
   end function sinr_canonical_d
 !!!_  & cosr_canonical() - canonical cosine (radian)
   ELEMENTAL &
-  real(kind=KTGT) function cosr_canonical_d (angl) result(v)
+  function cosr_canonical_d (angl) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: angl
 
     real(kind=KTGT) r, a, q
@@ -5614,18 +5660,20 @@ contains
   end function cosr_canonical_d
 !!!_  & sind_canonical() - canonical sine (degree)
   ELEMENTAL &
-  real(kind=KTGT) function sind_canonical_d (angl) result(v)
+  function sind_canonical_d (angl) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT),parameter :: c = 360.0_KTGT
     v = sins_canonical(angl, c)
   end function sind_canonical_d
 !!!_  & cosd_canonical() - canonical sine (degree)
   ELEMENTAL &
-  real(kind=KTGT) function cosd_canonical_d (angl) result(v)
+  function cosd_canonical_d (angl) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: v
     real(kind=KTGT),intent(in) :: angl
     real(kind=KTGT),parameter :: c = 360.0_KTGT
     v = coss_canonical(angl, c)
@@ -5637,8 +5685,8 @@ contains
        & result(sc)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
-    real(kind=KTGT),intent(in) :: py, px
     real(kind=KTGT) :: sc(NTRIG)
+    real(kind=KTGT),intent(in) :: py, px
     real(kind=KTGT) :: d
 
     d = _hypot(px, py)
@@ -5653,9 +5701,9 @@ contains
        & result(scz)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: scz(NTRIG)
     real(kind=KTGT),intent(in) :: scx(NTRIG)
     real(kind=KTGT),intent(in) :: scy(NTRIG)
-    real(kind=KTGT) :: scz(NTRIG)
     ! sin(x+y) = sin(x)cos(y) + cos(x)sin(y)
     ! cos(x+y) = cos(x)cos(y) - sin(x)sin(y)
     _SIN(scz) = _SIN(scx)*_COS(scy) + _COS(scx)*_SIN(scy)
@@ -5680,9 +5728,10 @@ contains
 #endif
 !!!_  & sub_sine_d
   PURE &
-  real(kind=KTGT) function sub_sin_d(scx, scy) result(s)
+  function sub_sin_d(scx, scy) result(s)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: s
     real(kind=KTGT),intent(in) :: scx(NTRIG)
     real(kind=KTGT),intent(in) :: scy(NTRIG)
     ! sin(x-y) = sin(x)cos(y) - cos(x)sin(y)
@@ -5721,9 +5770,10 @@ contains
 
 !!!_  & hpsub_sin - high precision subtraction
   PURE &
-  real(kind=KTGT) function hpsub_sin_d(scx, scy) result(s)
+  function hpsub_sin_d(scx, scy) result(s)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: s
     real(kind=KTGT),intent(in) :: scx(NTRIG)
     real(kind=KTGT),intent(in) :: scy(NTRIG)
 
@@ -5785,9 +5835,10 @@ contains
 
 !!!_  & hpInProduct - high precision inner product
   PURE &
-  real(kind=KTGT) function hpInProduct_d(x, y) result (r)
+  function hpInProduct_d(x, y) result (r)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: x(:), y(:)
     real(kind=KTGT) :: p(2), h(2), s
     integer j
@@ -5846,7 +5897,7 @@ contains
 
     real(kind=KTGT) :: c
     integer,parameter :: ss = DIGITS(0.0_KTGT)
-    integer,parameter :: s = ss / 2 + mod(ss, 2)
+    integer,parameter :: s = (ss - mod(ss, 2)) / 2 + mod(ss, 2)
 
     real(kind=KTGT),parameter :: f = 2.0_KTGT ** s + 1.0_KTGT
 
@@ -5889,12 +5940,13 @@ contains
     endif
   end subroutine agmpe_gen_table_d
 !!!_  - agmpe_area_core
-  real(kind=KTGT) function agmpe_area_core_d &
+  function agmpe_area_core_d &
        & (slat, clat, tdlath, &
        &  C,    no) &
        &  result(a)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: a
     real(kind=KTGT),intent(in)  :: slat       ! sine latitude
     real(kind=KTGT),intent(in)  :: clat       ! cosine latitude
     real(kind=KTGT),intent(in)  :: tdlath     ! tangent[(d latitude)/2]
@@ -5974,12 +6026,13 @@ contains
   end subroutine agmpc_gen_table_d
 
 !!!_  - agmpc_area_core
-  real(kind=KTGT) function agmpc_area_core_d &
+  function agmpc_area_core_d &
        & (clat, tdlath, dlonh, &
        &  Cc,   no) &
        &  result(a)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: a
     real(kind=KTGT),intent(in)  :: clat       ! cosine latitude
     real(kind=KTGT),intent(in)  :: tdlath     ! tangent[(d latitude)/2]
     real(kind=KTGT),intent(in)  :: dlonh      ! (d longitude)/2
@@ -6065,12 +6118,13 @@ contains
   end subroutine agmpd_gen_table_d
 
 !!!_  - agmpd_area_core
-  real(kind=KTGT) function agmpd_area_core_d &
+  function agmpd_area_core_d &
        & (clat, tdlath, dlonh, &
        &  Cd,   no) &
        &  result(a)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: a
     real(kind=KTGT),intent(in)  :: clat       ! cosine latitude
     real(kind=KTGT),intent(in)  :: tdlath     ! tangent[(d latitude)/2]
     real(kind=KTGT),intent(in)  :: dlonh      ! (d longitude)/2
@@ -6306,11 +6360,12 @@ contains
 
 !!!_  & area_distortion() - area distortion factor along latitude
   ELEMENTAL &
-  real(kind=KTGT) function area_distortion_d &
+  function area_distortion_d &
        & (slat, ecc) &
        & result(r)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: r
     real(kind=KTGT),intent(in) :: slat  ! sine latitude
     real(kind=KTGT),intent(in) :: ecc
 
@@ -6328,13 +6383,14 @@ contains
   !  Actualy the return value is NOT epsilon(), but the first
   !  value to be ONE eq ONE + E.
   !  This implementation originates from MIROC legacy.
-  real(kind=KTGT) function check_precision_d &
+  function check_precision_d &
        & (u, max_iter, base, levv, mold) &
        & result(E)
     use TOUZA_Std,only: KTGT=>KDBL
     use TOUZA_Std,only: choice
     use TOUZA_Std,only: msg_grp
     implicit none
+    real(kind=KTGT) :: E
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: max_iter
     real(kind=KTGT),intent(in),optional :: base
@@ -6367,7 +6423,7 @@ contains
           E  = E / b
           R  = ONE
           RP = R + E
-101       format('precision check .. ', F20.18, 1x, E9.3)
+101       format('precision check .. ', F20.18, 1x, E10.3)
           if (lv.ge.0) then
              write(TMSG, 101) RP, E
              call msg_grp(TMSG, __GRP__, __MDL__, u)
@@ -6376,13 +6432,14 @@ contains
        enddo
     endif
   end function check_precision_d
-  real(kind=KTGT) function check_precision_f &
+  function check_precision_f &
        & (u, max_iter, base, levv, mold) &
        & result(E)
     use TOUZA_Std,only: KTGT=>KFLT
     use TOUZA_Std,only: choice
     use TOUZA_Std,only: msg_grp
     implicit none
+    real(kind=KTGT) :: E
     integer,        intent(in),optional :: u
     integer,        intent(in),optional :: max_iter
     real(kind=KTGT),intent(in),optional :: base
@@ -6416,7 +6473,7 @@ contains
           E  = E / b
           R  = ONE
           RP = R + E
-101       format('precision check .. ', F20.18, 1x, E9.3)
+101       format('precision check .. ', F20.18, 1x, E10.3)
           if (lv.ge.0) then
              write(TMSG, 101) RP, E
              call msg_grp(TMSG, __GRP__, __MDL__, u)
@@ -6427,9 +6484,10 @@ contains
   end function check_precision_f
 !!!_   . round_choice() - return default round-angle if not present or zero
   ELEMENTAL &
-    real(kind=KTGT) function round_choice_d(round, mold) result(x)
+  function round_choice_d(round, mold) result(x)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
+    real(kind=KTGT) :: x
     real(kind=KTGT),intent(in),optional :: round
     real(kind=KTGT),intent(in)          :: mold
     real(kind=KTGT),parameter :: DEF = real(round_2pi, kind=KTGT)
@@ -6437,18 +6495,20 @@ contains
     if (x.eq.DEF) x = 2.0_KTGT * pi_(mold)
   end function round_choice_d
   ELEMENTAL &
-    real(kind=KTGT) function round_choice_id(round, mold) result(x)
+  function round_choice_id(round, mold) result(x)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
+    real(kind=KTGT) :: x
     integer,        intent(in) :: round
     real(kind=KTGT),intent(in) :: mold
     x = round_choice(real(round, kind=KTGT), mold)
   end function round_choice_id
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   ELEMENTAL &
-    real(kind=KTGT) function round_choice_q(round, mold) result(x)
+  function round_choice_q(round, mold) result(x)
     use TOUZA_Std,only: KTGT=>KQPL, choice
     implicit none
+    real(kind=KTGT) :: x
     real(kind=KTGT),intent(in),optional :: round
     real(kind=KTGT),intent(in)          :: mold
     real(kind=KTGT),parameter :: DEF = real(round_2pi, kind=KTGT)
@@ -6456,9 +6516,10 @@ contains
     if (x.eq.DEF) x = 2.0_KTGT * pi_(mold)
   end function round_choice_q
   ELEMENTAL &
-    real(kind=KTGT) function round_choice_iq(round, mold) result(x)
+  function round_choice_iq(round, mold) result(x)
     use TOUZA_Std,only: KTGT=>KQPL, choice
     implicit none
+    real(kind=KTGT) :: x
     integer,        intent(in) :: round
     real(kind=KTGT),intent(in) :: mold
     x = round_choice(real(round, kind=KTGT), mold)
@@ -6467,26 +6528,30 @@ contains
 
 !!!_   . span_longitude() - return default span if not present or zero
   ELEMENTAL &
-    real(kind=KTGT) function span_longitude_d(round) result(x)
+  function span_longitude_d(round) result(x)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
+    real(kind=KTGT) :: x
     real(kind=KTGT),intent(in),optional :: round
     x = round_choice(round, mold=0.0_KTGT)
   end function span_longitude_d
 
 !!!_   . span_latitude() - return default span if not present or zero
   ELEMENTAL &
-    real(kind=KTGT) function span_latitude_d(round) result(x)
+  function span_latitude_d(round) result(x)
     use TOUZA_Std,only: KTGT=>KDBL, choice
     implicit none
+    real(kind=KTGT) :: x
     real(kind=KTGT),intent(in),optional :: round
     x = round_choice(round, mold=0.0_KTGT) / 2.0_KTGT
   end function span_latitude_d
 
 !!!_   . pi_()
-  PURE real(kind=KTGT) function pi_d(mold) result(x)
+  PURE &
+  function pi_d(mold) result(x)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT) :: x
     real(kind=KTGT),intent(in) :: mold
     real(kind=KTGT),parameter  :: ONE =  real(1, kind=kind(mold))
     real(kind=KTGT),parameter  :: FOUR = real(4, kind=kind(mold))
@@ -6494,9 +6559,11 @@ contains
     x = p
   end function pi_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
-  PURE real(kind=KTGT) function pi_q(mold) result(x)
+  PURE &
+  function pi_q(mold) result(x)
     use TOUZA_Std,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT) :: x
     real(kind=KTGT),intent(in) :: mold
     real(kind=KTGT),parameter  :: ONE =  real(1, kind=kind(mold))
     real(kind=KTGT),parameter  :: FOUR = real(4, kind=kind(mold))
@@ -6908,7 +6975,7 @@ contains
        call test_equidistant(ierr, ylonc, ny,     'ylonc', -1.0_KTGT)
        call test_equidistant(ierr, ylonb, ny + 1, 'ylonb', -1.0_KTGT)
 
-201    format('consistency/', A, ': ', E9.3)
+201    format('consistency/', A, ': ', E10.3)
        ! check b vs b
        x(0:nlon) = glonb(0:nlon) - ylonb(0:ny:mdiv)
        write(*, 201) 'b', maxval(x(0:nlon)) - minval(x(0:nlon))
@@ -7067,7 +7134,6 @@ contains
     real(kind=KTGT) :: sf
     real(kind=KTGT) :: rr(2), rts, llorg(2)
     real(kind=KTGT) :: xxo(3), xxc(3), xxr(3), lli(2), zref(2)
-    real(kind=KTGT) :: xxp(3)
     real(kind=KTGT) :: cco2(ncache_psgp_co), clo2(ncache_psgp_lo), cla2(ncache_psgp_la)
     real(kind=KTGT) :: cco3(ncache_psgp_co), clo3(ncache_psgp_lo), cla3(ncache_psgp_la)
     real(kind=KTGT) :: clor(ncache_psgp_lo)
@@ -7758,7 +7824,7 @@ contains
           ! call geodesic_inverse_core &
           !      (ierr, gdis, xlat1, xlat2, xglon, inia1, f, a, garea=garea)
           ! garea = garea * asign
-111       format('geod:c ', 4ES24.16, 1x, F24.10, 1x, ES24.16)
+! 111       format('geod:c ', 4ES24.16, 1x, F24.10, 1x, ES24.16)
           ! write(*, 111) v(0:3), gdis, garea
           gdis = -999
           garea = -999
@@ -8241,8 +8307,8 @@ contains
     real(kind=KTGT) :: lon1,  lon2
 
     ! y series: target kind
-    real(kind=KTGT) :: ylat1(2), ylat2(2), ydlat(2), ytdla(2)
-    real(kind=KTGT) :: ylon1(2), ylon2(2), ydlon(2), ytdlo(2)
+    real(kind=KTGT) :: ylat1(2), ylat2(2), ytdla(2)
+    real(kind=KTGT) :: ylon1(2), ylon2(2), ytdlo(2)
 
     real(kind=KTGT) :: vdlonh, vdlath
     real(kind=KTGT) :: vag, vap, va
@@ -8251,8 +8317,8 @@ contains
 
     ! z series: higher precision kind
     real(kind=KREF) :: qdlonh, qdlath
-    real(kind=KREF) :: zlat1(2), zlat2(2), zdlat(2)
-    real(kind=KREF) :: zlon1(2), zlon2(2), zdlon(2)
+    real(kind=KREF) :: zlat1(2), zlat2(2)
+    real(kind=KREF) :: zlon1(2), zlon2(2)
     real(kind=KREF) :: tqref
 
     real(kind=KREF) :: qag, qap, qa
@@ -8415,14 +8481,9 @@ contains
 
     integer,parameter :: ltbl = 128
     real(kind=KTGT) :: CC(0:ltbl)
-    real(kind=KTGT) :: ax, ag, ap, ad
+    real(kind=KTGT) :: ag, ap, ad
 
-    real(kind=KTGT) :: CD(0:ltbl)
-
-    real(kind=KTGT) :: CE(0:ltbl)
-    real(kind=KTGT) :: tdhsq, xtdhsq
-
-    real(kind=KTGT) :: xrlat, xrlon, xdlat, xdlonh, xtdlath
+    real(kind=KTGT) :: xrlat, xdlat, xdlonh, xtdlath
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
     integer,parameter :: KHPR=KQPL
     real(kind=KHPR) :: qlat1(2), qlat2(2)
@@ -8431,9 +8492,14 @@ contains
     real(kind=KHPR) :: qdlonh,   qtdlath
     real(kind=KHPR) :: qag, qap, qad
     real(kind=KHPR) :: qaref
-#endif
 
-    integer jo, jt, nt
+    real(kind=KTGT) :: tdhsq, xtdhsq
+
+    real(kind=KTGT) :: CD(0:ltbl)
+    real(kind=KTGT) :: CE(0:ltbl)
+    real(kind=KTGT) :: ax
+#endif
+    ierr = 0
 
     CC(:) = 0.0_KTGT
 
@@ -8492,10 +8558,10 @@ contains
 122 format('agmp:e:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
 132 format('agmp:d:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8, 1x, ES16.8)
 #else
-102 format('agmp:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
+! 102 format('agmp:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
 103 format('agmp:eq   ', I0, 1x, ES23.15, 1x, 2(1x, ES23.15))
-122 format('agmp:e:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
-132 format('agmp:d:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
+! 122 format('agmp:e:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
+! 132 format('agmp:d:area ', I0, 1x, ES23.15, 1x, ES16.8, 1x, ES16.8)
 #endif
     write(*, 101) xrlat, xdlat, reflon, dlon
     write(*, 109) 1, tdlath, dlonh
@@ -8712,8 +8778,7 @@ contains
     real(kind=KTGT) :: wg(NGEOG), zg(NGEOG)
 
     integer pole
-    integer narg, jarg
-    integer j
+    integer narg
     integer nla, nlo, jla, jlo
     integer nxlo, nxla
 

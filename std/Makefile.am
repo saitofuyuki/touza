@@ -1,7 +1,7 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2025/05/23 08:38:09 fuyuki Makefile.am>
+# Time-stamp: <2025/07/14 21:26:10 fuyuki Makefile.am>
 #
 # Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -154,6 +154,12 @@ test_std_ipc2_SOURCES = $(test_std_ipc1_SOURCES)
 test_std_ipc2_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_IPC=2
 test_std_ipc2_LDADD = $(test_std_ipc1_LDADD)
 EXTRA_test_std_ipc2_DEPENDENCIES = $(test_std_ipc2_LDADD)
+
+check_PROGRAMS += test_std_ipc3
+test_std_ipc3_SOURCES = $(test_std_ipc1_SOURCES)
+test_std_ipc3_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_IPC=3
+test_std_ipc3_LDADD = $(test_std_ipc1_LDADD)
+EXTRA_test_std_ipc3_DEPENDENCIES = $(test_std_ipc3_LDADD)
 
 check_PROGRAMS += test_std
 test_std_SOURCES = std.F90

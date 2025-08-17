@@ -17,7 +17,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2025/05/23 10:58:20 fuyuki Makefile.am>
+# Time-stamp: <2025/07/10 21:52:31 fuyuki Makefile.am>
 
 # Copyright (C) 2021-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -25,7 +25,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Wed Jun 11 13:22:13 JST 2025
+# from AX_AM_MACROS_STATIC on Sun Aug 17 22:29:50 JST 2025
 
 
 
@@ -610,6 +610,7 @@ FCFLAGS = @FCFLAGS@
 FCFLAGS_F = @FCFLAGS_F@
 FCFLAGS_F90 = @FCFLAGS_F90@
 FCLIBS = @FCLIBS@
+FC_COMPILER_VENDOR = @FC_COMPILER_VENDOR@
 FC_DEFINE = @FC_DEFINE@
 FC_INCLUDE_touza_cal = @FC_INCLUDE_touza_cal@
 FC_INCLUDE_touza_emu = @FC_INCLUDE_touza_emu@
@@ -670,6 +671,8 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENMP_FCFLAGS = @OPENMP_FCFLAGS@
+OPENMP_FFLAGS = @OPENMP_FFLAGS@
 OPT_STDERR_UNIT = @OPT_STDERR_UNIT@
 OPT_STDIN_UNIT = @OPT_STDIN_UNIT@
 OPT_STDOUT_UNIT = @OPT_STDOUT_UNIT@
@@ -1672,7 +1675,8 @@ install-mod: install-mod-recursive
 
 install-mod-am:
 @INSTALL_MODULES_TRUE@	@$(NORMAL_INSTALL)
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if $(AM_V_P); then echo " INST   [modules]"; fi
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		rm -f $(LIST_MODFILES); touch $(LIST_MODFILES);\
 @INSTALL_MODULES_TRUE@		for dir in $(DESTDIR)$(moddir); do \
@@ -1706,7 +1710,7 @@ uninstall-mod-recursive:
 uninstall-mod: uninstall-mod-recursive
 
 uninstall-mod-am:
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		list=`test -e $(LIST_MODFILES) && cat $(LIST_MODFILES)`; \
 @INSTALL_MODULES_TRUE@		files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
@@ -1750,6 +1754,7 @@ $(check_targets_all):
 
 $(WTEST): $(srcdir)/$(WTESTin)
 	@if sed -e 's!@srcdir@!$(srcdir)!g' \
+	        -e 's![@]FC_COMPILER_VENDOR[@]!@FC_COMPILER_VENDOR@!' \
 		$(srcdir)/$(WTESTin) > $@; \
 	then chmod +x $@; \
 	else rm -f $@; fi

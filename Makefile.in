@@ -17,7 +17,7 @@
 # touza Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/05/21 13:36:38 fuyuki Makefile.am>
+# Time-stamp: <2025/06/20 12:28:25 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -26,7 +26,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Wed Jun 11 13:22:13 JST 2025
+# from AX_AM_MACROS_STATIC on Sun Aug 17 22:29:50 JST 2025
 
 
 
@@ -139,7 +139,6 @@ target_triplet = @target@
 @BUILD_ami_TRUE@am__append_20 = ami
 @BUILD_ami_TRUE@am__append_21 = ami/$(local_name)
 @BUILD_ami_TRUE@am__append_22 = $(FC_MODULE_touza_ami)
-@BUILD_zbt_TRUE@am__append_23 = zbt
 check_PROGRAMS = test_touza$(EXEEXT)
 @NEVER_TRUE@EXTRA_PROGRAMS = dummy_never_built$(EXEEXT)
 subdir = .
@@ -316,10 +315,11 @@ am__DIST_COMMON = $(srcdir)/Makedep.inc $(srcdir)/Makefile.in \
 	$(top_srcdir)/build-aux/install-sh \
 	$(top_srcdir)/build-aux/ltmain.sh \
 	$(top_srcdir)/build-aux/missing \
-	$(top_srcdir)/build-aux/tap-driver.sh AUTHORS INSTALL README \
-	build-aux/ar-lib build-aux/compile build-aux/config.guess \
-	build-aux/config.sub build-aux/depcomp build-aux/install-sh \
-	build-aux/ltmain.sh build-aux/missing build-aux/py-compile
+	$(top_srcdir)/build-aux/tap-driver.sh AUTHORS ChangeLog \
+	INSTALL NEWS README build-aux/ar-lib build-aux/compile \
+	build-aux/config.guess build-aux/config.sub build-aux/depcomp \
+	build-aux/install-sh build-aux/ltmain.sh build-aux/missing \
+	build-aux/py-compile
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -401,6 +401,7 @@ FCFLAGS = @FCFLAGS@
 FCFLAGS_F = @FCFLAGS_F@
 FCFLAGS_F90 = @FCFLAGS_F90@
 FCLIBS = @FCLIBS@
+FC_COMPILER_VENDOR = @FC_COMPILER_VENDOR@
 FC_DEFINE = @FC_DEFINE@
 FC_INCLUDE_touza_cal = @FC_INCLUDE_touza_cal@
 FC_INCLUDE_touza_emu = @FC_INCLUDE_touza_emu@
@@ -461,6 +462,8 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENMP_FCFLAGS = @OPENMP_FCFLAGS@
+OPENMP_FFLAGS = @OPENMP_FFLAGS@
 OPT_STDERR_UNIT = @OPT_STDERR_UNIT@
 OPT_STDIN_UNIT = @OPT_STDIN_UNIT@
 OPT_STDOUT_UNIT = @OPT_STDOUT_UNIT@
@@ -591,8 +594,8 @@ lib@TOUZA_NAME@_la_LDFLAGS = $(lib@TOUZA_NAME@_version) \
 	$(NETCDF4_FLIBS) $(NETCDF4_LIBS)
 lib@TOUZA_NAME@_version = 
 SUBDIRS = std $(am__append_4) $(am__append_7) $(am__append_10) \
-	$(am__append_13) $(am__append_16) $(am__append_19) \
-	$(am__append_23) m4c . $(subdirs_extra)
+	$(am__append_13) $(am__append_16) $(am__append_19) m4c . \
+	$(subdirs_extra)
 DIST_SUBDIRS = std emu cal trp nio ppp $(am__append_20) m4c . \
 	$(subdirs_extra)
 lib@TOUZA_NAME@_la_LIBADD = std/$(local_name) $(am__append_5) \
@@ -1354,7 +1357,8 @@ install-mod: install-mod-recursive
 
 install-mod-am:
 @INSTALL_MODULES_TRUE@	@$(NORMAL_INSTALL)
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if $(AM_V_P); then echo " INST   [modules]"; fi
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		rm -f $(LIST_MODFILES); touch $(LIST_MODFILES);\
 @INSTALL_MODULES_TRUE@		for dir in $(DESTDIR)$(moddir); do \
@@ -1388,7 +1392,7 @@ uninstall-mod-recursive:
 uninstall-mod: uninstall-mod-recursive
 
 uninstall-mod-am:
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		list=`test -e $(LIST_MODFILES) && cat $(LIST_MODFILES)`; \
 @INSTALL_MODULES_TRUE@		files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
@@ -1446,9 +1450,6 @@ export: $(AUTOREVISION_h)
 		export=`$(REALPATH) --relative-to=$(top_builddir) $(EXPORT)` || exit $$?; \
 		$(MAKE) distdir=$${export} distdir; \
 	fi
-
-@BUILD_zbt_TRUE@python-build:
-@BUILD_zbt_TRUE@	@cd zbt; $(MAKE) $@
 
 ### automatic dependency
 $(builddir)/cal/touza_cal.$(FC_MODEXT): 

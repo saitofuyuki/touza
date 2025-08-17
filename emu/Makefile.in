@@ -17,15 +17,15 @@
 # touza/emu Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 15 2020
-# Time-stamp: <2025/05/23 09:26:20 fuyuki Makefile.am>
+# Time-stamp: <2025/07/03 11:10:47 fuyuki Makefile.am>
 
-# Copyright (C) 2020-2024
+# Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Wed Jun 11 13:22:13 JST 2025
+# from AX_AM_MACROS_STATIC on Sun Aug 17 22:29:50 JST 2025
 
 
 
@@ -112,8 +112,8 @@ target_triplet = @target@
 @gcc_dependencies_TRUE@am__append_2 = $(AM_FCFLAGS_DEP)
 @gcc_dependencies_TRUE@am__append_3 = *.dep
 @MAINTAINER_MODE_TRUE@am__append_4 = wrap-ugg.sh demo_stp.sh.in
-check_PROGRAMS = test_emu_msg$(EXEEXT) test_emu_usi$(EXEEXT) \
-	test_emu_ugg$(EXEEXT) test_emu$(EXEEXT)
+check_PROGRAMS = test_emu_msg$(EXEEXT) test_emu_usi1$(EXEEXT) \
+	test_emu_usi2$(EXEEXT) test_emu_ugg$(EXEEXT) test_emu$(EXEEXT)
 subdir = emu
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
@@ -150,9 +150,12 @@ test_emu_msg_DEPENDENCIES = $(am__DEPENDENCIES_2)
 am_test_emu_ugg_OBJECTS = test_emu_ugg-emu_ugg.$(OBJEXT)
 test_emu_ugg_OBJECTS = $(am_test_emu_ugg_OBJECTS)
 test_emu_ugg_DEPENDENCIES = $(am__DEPENDENCIES_2)
-am_test_emu_usi_OBJECTS = test_emu_usi-emu_usi.$(OBJEXT)
-test_emu_usi_OBJECTS = $(am_test_emu_usi_OBJECTS)
-test_emu_usi_DEPENDENCIES = $(am__DEPENDENCIES_2)
+am_test_emu_usi1_OBJECTS = test_emu_usi1-emu_usi.$(OBJEXT)
+test_emu_usi1_OBJECTS = $(am_test_emu_usi1_OBJECTS)
+test_emu_usi1_DEPENDENCIES = $(am__DEPENDENCIES_2)
+am_test_emu_usi2_OBJECTS = test_emu_usi2-emu_usi.$(OBJEXT)
+test_emu_usi2_OBJECTS = $(am_test_emu_usi2_OBJECTS)
+test_emu_usi2_DEPENDENCIES = $(am__DEPENDENCIES_2)
 SCRIPTS = $(noinst_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -206,11 +209,11 @@ am__v_CCLD_1 =
 SOURCES = $(libtouza_local_la_SOURCES) \
 	$(EXTRA_libtouza_local_la_SOURCES) $(test_emu_SOURCES) \
 	$(test_emu_msg_SOURCES) $(test_emu_ugg_SOURCES) \
-	$(test_emu_usi_SOURCES)
+	$(test_emu_usi1_SOURCES) $(test_emu_usi2_SOURCES)
 DIST_SOURCES = $(libtouza_local_la_SOURCES) \
 	$(EXTRA_libtouza_local_la_SOURCES) $(test_emu_SOURCES) \
 	$(test_emu_msg_SOURCES) $(test_emu_ugg_SOURCES) \
-	$(test_emu_usi_SOURCES)
+	$(test_emu_usi1_SOURCES) $(test_emu_usi2_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -342,6 +345,7 @@ FCFLAGS = @FCFLAGS@
 FCFLAGS_F = @FCFLAGS_F@
 FCFLAGS_F90 = @FCFLAGS_F90@
 FCLIBS = @FCLIBS@
+FC_COMPILER_VENDOR = @FC_COMPILER_VENDOR@
 FC_DEFINE = @FC_DEFINE@
 FC_INCLUDE_touza_cal = @FC_INCLUDE_touza_cal@
 FC_INCLUDE_touza_emu = @FC_INCLUDE_touza_emu@
@@ -402,6 +406,8 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENMP_FCFLAGS = @OPENMP_FCFLAGS@
+OPENMP_FFLAGS = @OPENMP_FFLAGS@
 OPT_STDERR_UNIT = @OPT_STDERR_UNIT@
 OPT_STDIN_UNIT = @OPT_STDIN_UNIT@
 OPT_STDOUT_UNIT = @OPT_STDOUT_UNIT@
@@ -529,9 +535,12 @@ libtouza_local_la_SOURCES = emu_usi.F90 emu_rpx.F90 emu_ugg.F90 \
 EXTRA_libtouza_local_la_SOURCES = emu_msg.F90
 noinst_SCRIPTS = $(am__append_4)
 TEST_COMMON_LIBS = $(noinst_LTLIBRARIES) $(FC_LDADD_touza_std)
-test_emu_usi_SOURCES = emu_usi.F90
-test_emu_usi_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_USI=1
-test_emu_usi_LDADD = $(TEST_COMMON_LIBS)
+test_emu_usi1_SOURCES = emu_usi.F90
+test_emu_usi1_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_USI=1
+test_emu_usi1_LDADD = $(TEST_COMMON_LIBS)
+test_emu_usi2_SOURCES = emu_usi.F90
+test_emu_usi2_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_USI=2
+test_emu_usi2_LDADD = $(TEST_COMMON_LIBS)
 test_emu_msg_SOURCES = emu_msg.F90
 test_emu_msg_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_MSG=1
 test_emu_msg_LDADD = $(TEST_COMMON_LIBS)
@@ -614,9 +623,13 @@ test_emu_ugg$(EXEEXT): $(test_emu_ugg_OBJECTS) $(test_emu_ugg_DEPENDENCIES) $(EX
 	@rm -f test_emu_ugg$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_emu_ugg_OBJECTS) $(test_emu_ugg_LDADD) $(LIBS)
 
-test_emu_usi$(EXEEXT): $(test_emu_usi_OBJECTS) $(test_emu_usi_DEPENDENCIES) $(EXTRA_test_emu_usi_DEPENDENCIES) 
-	@rm -f test_emu_usi$(EXEEXT)
-	$(AM_V_FCLD)$(FCLINK) $(test_emu_usi_OBJECTS) $(test_emu_usi_LDADD) $(LIBS)
+test_emu_usi1$(EXEEXT): $(test_emu_usi1_OBJECTS) $(test_emu_usi1_DEPENDENCIES) $(EXTRA_test_emu_usi1_DEPENDENCIES) 
+	@rm -f test_emu_usi1$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_emu_usi1_OBJECTS) $(test_emu_usi1_LDADD) $(LIBS)
+
+test_emu_usi2$(EXEEXT): $(test_emu_usi2_OBJECTS) $(test_emu_usi2_DEPENDENCIES) $(EXTRA_test_emu_usi2_DEPENDENCIES) 
+	@rm -f test_emu_usi2$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_emu_usi2_OBJECTS) $(test_emu_usi2_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -651,11 +664,17 @@ test_emu_ugg-emu_ugg.o: emu_ugg.F90
 test_emu_ugg-emu_ugg.obj: emu_ugg.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_ugg_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_ugg-emu_ugg.obj `if test -f 'emu_ugg.F90'; then $(CYGPATH_W) 'emu_ugg.F90'; else $(CYGPATH_W) '$(srcdir)/emu_ugg.F90'; fi`
 
-test_emu_usi-emu_usi.o: emu_usi.F90
-	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_usi_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_usi-emu_usi.o `test -f 'emu_usi.F90' || echo '$(srcdir)/'`emu_usi.F90
+test_emu_usi1-emu_usi.o: emu_usi.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_usi1_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_usi1-emu_usi.o `test -f 'emu_usi.F90' || echo '$(srcdir)/'`emu_usi.F90
 
-test_emu_usi-emu_usi.obj: emu_usi.F90
-	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_usi_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_usi-emu_usi.obj `if test -f 'emu_usi.F90'; then $(CYGPATH_W) 'emu_usi.F90'; else $(CYGPATH_W) '$(srcdir)/emu_usi.F90'; fi`
+test_emu_usi1-emu_usi.obj: emu_usi.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_usi1_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_usi1-emu_usi.obj `if test -f 'emu_usi.F90'; then $(CYGPATH_W) 'emu_usi.F90'; else $(CYGPATH_W) '$(srcdir)/emu_usi.F90'; fi`
+
+test_emu_usi2-emu_usi.o: emu_usi.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_usi2_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_usi2-emu_usi.o `test -f 'emu_usi.F90' || echo '$(srcdir)/'`emu_usi.F90
+
+test_emu_usi2-emu_usi.obj: emu_usi.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_emu_usi2_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_emu_usi2-emu_usi.obj `if test -f 'emu_usi.F90'; then $(CYGPATH_W) 'emu_usi.F90'; else $(CYGPATH_W) '$(srcdir)/emu_usi.F90'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -1050,7 +1069,8 @@ install-mod: install-mod-recursive
 
 install-mod-am:
 @INSTALL_MODULES_TRUE@	@$(NORMAL_INSTALL)
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if $(AM_V_P); then echo " INST   [modules]"; fi
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		rm -f $(LIST_MODFILES); touch $(LIST_MODFILES);\
 @INSTALL_MODULES_TRUE@		for dir in $(DESTDIR)$(moddir); do \
@@ -1084,7 +1104,7 @@ uninstall-mod-recursive:
 uninstall-mod: uninstall-mod-recursive
 
 uninstall-mod-am:
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		list=`test -e $(LIST_MODFILES) && cat $(LIST_MODFILES)`; \
 @INSTALL_MODULES_TRUE@		files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
@@ -1114,6 +1134,8 @@ check-bin: check-bin-recursive
 check-bin-am:$(check_PROGRAMS)
 
 install-data-hook: install-switchDATA
+
+test_emu_usi: test_emu_usi1 test_emu_usi2
 
 wrap-ugg.sh: wrap-ugg.sh.in
 	sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@

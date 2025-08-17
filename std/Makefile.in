@@ -17,7 +17,7 @@
 # touza/std Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2025/05/23 08:38:09 fuyuki Makefile.am>
+# Time-stamp: <2025/07/14 21:26:10 fuyuki Makefile.am>
 #
 # Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -27,7 +27,7 @@
 #
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Wed Jun 11 13:22:13 JST 2025
+# from AX_AM_MACROS_STATIC on Sun Aug 17 22:29:50 JST 2025
 
 
 
@@ -121,7 +121,8 @@ check_PROGRAMS = test_std_prc$(EXEEXT) test_std_utl$(EXEEXT) \
 	test_std_bld$(EXEEXT) test_std_mwe$(EXEEXT) \
 	test_std_htb1$(EXEEXT) test_std_htb2$(EXEEXT) \
 	test_std_htb3$(EXEEXT) test_std_ipc1$(EXEEXT) \
-	test_std_ipc2$(EXEEXT) test_std$(EXEEXT)
+	test_std_ipc2$(EXEEXT) test_std_ipc3$(EXEEXT) \
+	test_std$(EXEEXT)
 subdir = std
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
@@ -182,6 +183,10 @@ am__objects_4 = test_std_ipc2-std_ipc.$(OBJEXT)
 am_test_std_ipc2_OBJECTS = $(am__objects_4)
 test_std_ipc2_OBJECTS = $(am_test_std_ipc2_OBJECTS)
 test_std_ipc2_DEPENDENCIES = $(test_std_ipc1_LDADD)
+am__objects_5 = test_std_ipc3-std_ipc.$(OBJEXT)
+am_test_std_ipc3_OBJECTS = $(am__objects_5)
+test_std_ipc3_OBJECTS = $(am_test_std_ipc3_OBJECTS)
+test_std_ipc3_DEPENDENCIES = $(test_std_ipc1_LDADD)
 am_test_std_log_OBJECTS = test_std_log-std_log.$(OBJEXT)
 test_std_log_OBJECTS = $(am_test_std_log_OBJECTS)
 test_std_log_DEPENDENCIES = $(TEST_COMMON_LIBS)
@@ -261,21 +266,21 @@ SOURCES = $(libtouza_local_la_SOURCES) $(test_std_SOURCES) \
 	$(test_std_env_SOURCES) $(test_std_fun_SOURCES) \
 	$(test_std_htb1_SOURCES) $(test_std_htb2_SOURCES) \
 	$(test_std_htb3_SOURCES) $(test_std_ipc1_SOURCES) \
-	$(test_std_ipc2_SOURCES) $(test_std_log_SOURCES) \
-	$(test_std_mwe_SOURCES) $(test_std_prc_SOURCES) \
-	$(test_std_sus_SOURCES) $(test_std_sus1_SOURCES) \
-	$(test_std_sus2_SOURCES) $(test_std_utl_SOURCES) \
-	$(test_std_wsh_SOURCES)
+	$(test_std_ipc2_SOURCES) $(test_std_ipc3_SOURCES) \
+	$(test_std_log_SOURCES) $(test_std_mwe_SOURCES) \
+	$(test_std_prc_SOURCES) $(test_std_sus_SOURCES) \
+	$(test_std_sus1_SOURCES) $(test_std_sus2_SOURCES) \
+	$(test_std_utl_SOURCES) $(test_std_wsh_SOURCES)
 DIST_SOURCES = $(libtouza_local_la_SOURCES) $(test_std_SOURCES) \
 	$(test_std_arg_SOURCES) $(test_std_bld_SOURCES) \
 	$(test_std_env_SOURCES) $(test_std_fun_SOURCES) \
 	$(test_std_htb1_SOURCES) $(test_std_htb2_SOURCES) \
 	$(test_std_htb3_SOURCES) $(test_std_ipc1_SOURCES) \
-	$(test_std_ipc2_SOURCES) $(test_std_log_SOURCES) \
-	$(test_std_mwe_SOURCES) $(test_std_prc_SOURCES) \
-	$(test_std_sus_SOURCES) $(test_std_sus1_SOURCES) \
-	$(test_std_sus2_SOURCES) $(test_std_utl_SOURCES) \
-	$(test_std_wsh_SOURCES)
+	$(test_std_ipc2_SOURCES) $(test_std_ipc3_SOURCES) \
+	$(test_std_log_SOURCES) $(test_std_mwe_SOURCES) \
+	$(test_std_prc_SOURCES) $(test_std_sus_SOURCES) \
+	$(test_std_sus1_SOURCES) $(test_std_sus2_SOURCES) \
+	$(test_std_utl_SOURCES) $(test_std_wsh_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -407,6 +412,7 @@ FCFLAGS = @FCFLAGS@
 FCFLAGS_F = @FCFLAGS_F@
 FCFLAGS_F90 = @FCFLAGS_F90@
 FCLIBS = @FCLIBS@
+FC_COMPILER_VENDOR = @FC_COMPILER_VENDOR@
 FC_DEFINE = @FC_DEFINE@
 FC_INCLUDE_touza_cal = @FC_INCLUDE_touza_cal@
 FC_INCLUDE_touza_emu = @FC_INCLUDE_touza_emu@
@@ -467,6 +473,8 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENMP_FCFLAGS = @OPENMP_FCFLAGS@
+OPENMP_FFLAGS = @OPENMP_FFLAGS@
 OPT_STDERR_UNIT = @OPT_STDERR_UNIT@
 OPT_STDIN_UNIT = @OPT_STDIN_UNIT@
 OPT_STDOUT_UNIT = @OPT_STDOUT_UNIT@
@@ -670,6 +678,10 @@ test_std_ipc2_SOURCES = $(test_std_ipc1_SOURCES)
 test_std_ipc2_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_IPC=2
 test_std_ipc2_LDADD = $(test_std_ipc1_LDADD)
 EXTRA_test_std_ipc2_DEPENDENCIES = $(test_std_ipc2_LDADD)
+test_std_ipc3_SOURCES = $(test_std_ipc1_SOURCES)
+test_std_ipc3_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD_IPC=3
+test_std_ipc3_LDADD = $(test_std_ipc1_LDADD)
+EXTRA_test_std_ipc3_DEPENDENCIES = $(test_std_ipc3_LDADD)
 test_std_SOURCES = std.F90
 test_std_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_STD=1
 test_std_LDADD = $(TEST_COMMON_LIBS)
@@ -801,6 +813,10 @@ test_std_ipc2$(EXEEXT): $(test_std_ipc2_OBJECTS) $(test_std_ipc2_DEPENDENCIES) $
 	@rm -f test_std_ipc2$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_std_ipc2_OBJECTS) $(test_std_ipc2_LDADD) $(LIBS)
 
+test_std_ipc3$(EXEEXT): $(test_std_ipc3_OBJECTS) $(test_std_ipc3_DEPENDENCIES) $(EXTRA_test_std_ipc3_DEPENDENCIES) 
+	@rm -f test_std_ipc3$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_std_ipc3_OBJECTS) $(test_std_ipc3_LDADD) $(LIBS)
+
 test_std_log$(EXEEXT): $(test_std_log_OBJECTS) $(test_std_log_DEPENDENCIES) $(EXTRA_test_std_log_DEPENDENCIES) 
 	@rm -f test_std_log$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_std_log_OBJECTS) $(test_std_log_LDADD) $(LIBS)
@@ -907,6 +923,12 @@ test_std_ipc2-std_ipc.o: std_ipc.F90
 
 test_std_ipc2-std_ipc.obj: std_ipc.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_ipc2_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_ipc2-std_ipc.obj `if test -f 'std_ipc.F90'; then $(CYGPATH_W) 'std_ipc.F90'; else $(CYGPATH_W) '$(srcdir)/std_ipc.F90'; fi`
+
+test_std_ipc3-std_ipc.o: std_ipc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_ipc3_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_ipc3-std_ipc.o `test -f 'std_ipc.F90' || echo '$(srcdir)/'`std_ipc.F90
+
+test_std_ipc3-std_ipc.obj: std_ipc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_ipc3_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_ipc3-std_ipc.obj `if test -f 'std_ipc.F90'; then $(CYGPATH_W) 'std_ipc.F90'; else $(CYGPATH_W) '$(srcdir)/std_ipc.F90'; fi`
 
 test_std_log-std_log.o: std_log.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_std_log_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_std_log-std_log.o `test -f 'std_log.F90' || echo '$(srcdir)/'`std_log.F90
@@ -1349,7 +1371,8 @@ install-mod: install-mod-recursive
 
 install-mod-am:
 @INSTALL_MODULES_TRUE@	@$(NORMAL_INSTALL)
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if $(AM_V_P); then echo " INST   [modules]"; fi
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		rm -f $(LIST_MODFILES); touch $(LIST_MODFILES);\
 @INSTALL_MODULES_TRUE@		for dir in $(DESTDIR)$(moddir); do \
@@ -1383,7 +1406,7 @@ uninstall-mod-recursive:
 uninstall-mod: uninstall-mod-recursive
 
 uninstall-mod-am:
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		list=`test -e $(LIST_MODFILES) && cat $(LIST_MODFILES)`; \
 @INSTALL_MODULES_TRUE@		files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \

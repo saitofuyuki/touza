@@ -4531,8 +4531,8 @@ fi
 printf "%s\n" "$ax_cv_fc_compiler_vendor" >&6; }
 
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether statement error works with stop specifier" >&5
-printf %s "checking whether statement error works with stop specifier... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether statement error_stop works" >&5
+printf %s "checking whether statement error_stop works... " >&6; }
 if test ${mt_cv_fortran_error_stop+y}
 then :
   printf %s "(cached) " >&6
@@ -4540,7 +4540,8 @@ else case e in #(
   e) cat > conftest.$ac_ext <<_ACEOF
       program main
 
-error stop 1
+      error stop 1
+
       end
 _ACEOF
 if ac_fn_fc_try_link "$LINENO"
@@ -4561,6 +4562,40 @@ if test "x$mt_cv_fortran_error_stop" = xyes
 then :
 
 printf "%s\n" "#define HAVE_FORTRAN_ERROR_STOP 1" >>confdefs.h
+
+fi
+
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether statement error_stop works with quiet specifier" >&5
+printf %s "checking whether statement error_stop works with quiet specifier... " >&6; }
+if test ${mt_cv_fortran_error_stop_quiet+y}
+then :
+  printf %s "(cached) " >&6
+else case e in #(
+  e) cat > conftest.$ac_ext <<_ACEOF
+      program main
+
+      error stop 1, quiet=.TRUE.
+
+      end
+_ACEOF
+if ac_fn_fc_try_link "$LINENO"
+then :
+  mt_fortran_check=yes
+else case e in #(
+  e) mt_fortran_check=no ;;
+esac
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+mt_cv_fortran_error_stop_quiet=$mt_fortran_check ;;
+esac
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $mt_cv_fortran_error_stop_quiet" >&5
+printf "%s\n" "$mt_cv_fortran_error_stop_quiet" >&6; }
+if test "x$mt_cv_fortran_error_stop_quiet" = xyes
+then :
+
+printf "%s\n" "#define HAVE_FORTRAN_ERROR_STOP_QUIET 1" >>confdefs.h
 
 fi
 

@@ -1,7 +1,7 @@
 !!!_! ppp_std.F90 - TOUZA/Ppp utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2025/06/03 08:38:38 fuyuki ppp_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/13 11:31:33 fuyuki ppp_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -18,22 +18,32 @@
 module TOUZA_Ppp_std
 !!!_ = declaration
 !!!_  - modules
+  use TOUZA_Std,only: bld_init, bld_diag, bld_finalize
+  use TOUZA_Std,only: mwe_init, mwe_diag, mwe_finalize
   use TOUZA_Std,only: choice,       choice_a
   use TOUZA_Std,only: ndigits
   use TOUZA_Std,only: control_deep, control_mode, is_first_force
   use TOUZA_Std,only: is_msglev
   use TOUZA_Std,only: is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
   use TOUZA_Std,only: is_msglev_severe, is_msglev_fatal
+  use TOUZA_Std,only: set_defu,         is_unit_star
   use TOUZA_Std,only: get_logu,         unit_global,      trace_fine,       trace_control
+  use TOUZA_Std,only: trace_err
+  use TOUZA_Std,only: banner,           toggle_flush
+  use TOUZA_Std,only: safe_mpi_init, safe_mpi_finalize
+  use TOUZA_Std,only: get_wni
   use TOUZA_Std,only: get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
   use TOUZA_Std,only: comp_comms, comp_groups, cc_unequal, cc_both_null
   use TOUZA_Std,only: MPI_COMM_NULL, MPI_GROUP_NULL, MPI_COMM_WORLD, MPI_UNDEFINED
   use TOUZA_Std,only: MPI_STATUS_SIZE, MPI_GROUP_EMPTY, MPI_INTEGER, MPI_CHARACTER
+  use TOUZA_Std,only: MPI_MIN, MPI_MAX
   use TOUZA_Std,only: MPI_ANY_TAG,     MPI_ANY_SOURCE
   use TOUZA_Std,only: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
-  use TOUZA_Std,only: MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
-  use TOUZA_Std,only: MPI_WAIT, MPI_BARRIER
+  use TOUZA_Std,only: MPI_COMM_SIZE, MPI_COMM_RANK, MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
+  use TOUZA_Std,only: MPI_WAIT, MPI_BARRIER, MPI_ABORT
   use TOUZA_Std,only: is_eof_ss
+  use TOUZA_Std,only: lpath
+  use TOUZA_Std,only: ipc_getcwd,  ipc_chdir
   use TOUZA_Std,only: new_htable,  new_entry, settle_entry
   use TOUZA_Std,only: diag_htable, reg_entry, query_status
 !!!_  - default
@@ -57,31 +67,41 @@ module TOUZA_Ppp_std
      module procedure msg_i, msg_ia, msg_aa
   end interface msg
 !!!_  - public procedures
-  public init, diag, finalize
-  public msg,  msg_mon, gen_tag
+  public :: init, diag, finalize
+  public :: msg,  msg_mon, gen_tag
 !!!_   . TOUZA_Std
-  public choice,       choice_a
-  public ndigits
-  public control_mode, control_deep, is_first_force
-  public is_msglev
-  public is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
-  public is_msglev_severe, is_msglev_fatal
-  public get_logu,         unit_global,      trace_fine,       trace_control
-  public get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
-  public comp_comms, comp_groups, cc_unequal, cc_both_null
-  public is_eof_ss
-  public new_htable,  new_entry, settle_entry
-  public diag_htable, reg_entry, query_status
-  public MPI_COMM_NULL, MPI_GROUP_NULL, MPI_COMM_WORLD, MPI_UNDEFINED
-  public MPI_STATUS_SIZE, MPI_GROUP_EMPTY
-  public MPI_INTEGER, MPI_CHARACTER
-  public MPI_ANY_TAG, MPI_ANY_SOURCE
-  public MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
-  public MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
-  public MPI_WAIT, MPI_BARRIER
+  public :: bld_init, bld_diag, bld_finalize
+  public :: mwe_init, mwe_diag, mwe_finalize
+  public :: choice,       choice_a
+  public :: ndigits
+  public :: control_mode, control_deep, is_first_force
+  public :: is_msglev
+  public :: is_msglev_debug,  is_msglev_info,   is_msglev_normal, is_msglev_detail
+  public :: is_msglev_severe, is_msglev_fatal
+  public :: set_defu,         is_unit_star
+  public :: get_logu,         unit_global,      trace_fine,       trace_control
+  public :: trace_err
+  public :: banner,           toggle_flush
+  public :: safe_mpi_init, safe_mpi_finalize
+  public :: get_wni
+  public :: get_comm, get_ni, get_gni, get_wni_safe, is_mpi_activated
+  public :: comp_comms, comp_groups, cc_unequal, cc_both_null
+  public :: is_eof_ss
+  public :: lpath
+  public :: ipc_getcwd,  ipc_chdir
+  public :: new_htable,  new_entry, settle_entry
+  public :: diag_htable, reg_entry, query_status
+  public :: MPI_COMM_NULL, MPI_GROUP_NULL, MPI_COMM_WORLD, MPI_UNDEFINED
+  public :: MPI_STATUS_SIZE, MPI_GROUP_EMPTY
+  public :: MPI_INTEGER, MPI_CHARACTER
+  public :: MPI_MIN, MPI_MAX
+  public :: MPI_ANY_TAG, MPI_ANY_SOURCE
+  public :: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  public :: MPI_COMM_SIZE, MPI_COMM_RANK, MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
+  public :: MPI_WAIT, MPI_BARRIER, MPI_ABORT
 
-contains
 !!!_ + common interfaces
+contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
     ! use TOUZA_Std,only: mwe_init

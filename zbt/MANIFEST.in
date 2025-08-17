@@ -1,9 +1,0 @@
-include README*
-include tests
-include zbt/*.toml
-include doc/*.png
-exclude pyproject.in
-exclude *.m4
-exclude *.sh
-exclude */Makefile.*
-exclude */*.sh
