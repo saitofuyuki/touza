@@ -6,6 +6,22 @@ TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
+* Changes in 1.16.3
+** Import revision for miroc7+ils+rainbow on ppp.
+Agent-based communicator manager is improved and cleaned to export
+some procedures to ils, which enables MIROC-Rainbow again on the new
+framework of miroc7(+ils).
+** zbt: removed from contents (to export on a new package zab).
+TOUZA/Zbt is completely removed from TOUZA contents.  Now python
+library is developped under Zab package.
+** Revision for nvfortran building (not fully examined).
+There are some incompatible features of nvfortran from other compilers
+such as gcc or intel.  Some workarounds are introduced to enable
+building on nvfortran processing systems.  Moreover, module
+import/export sturctures are reformulated in order to achived success
+building and running on the nvfortran systems (the maintainer supposes
+that they are mostly bugs in the compiler).
+
 * Changes in 1.16.2
 ** Improvement for MIROC infrastructure replacement
 Frequent flush-ing may affect the cpu-time significantly.
