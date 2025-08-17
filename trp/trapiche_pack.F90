@@ -1,7 +1,7 @@
 !!!_! trapiche_pack.F90 - TOUZA/Trapiche integer packing/unpacking
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:18:20 fuyuki trapiche_pack.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/11 08:51:14 fuyuki trapiche_pack.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -4435,7 +4435,7 @@ contains
        do j = 0, mpack - 1
           write(*, 113) tag, j, ibagaz(j)
        enddo
-       iextr(:) = -1
+       iextr(0:gmem-1) = -1
        jp = 0
        js = 0
        do j = 0, nu - 1, 2
@@ -4470,7 +4470,7 @@ contains
        endif
     endif
     if (ierr.eq.0) then
-       ircv(:) = -1
+       ircv(0:lmem-1) = -1
        call pack_restore_dunp &
             & (ierr,  ircv,  &
             &  iextr, gmem, nbits, kpack, &

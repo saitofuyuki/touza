@@ -1,7 +1,7 @@
 dnl Filename:   touza/m4c/mt_am_include.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 16 2020
-dnl Time-stamp: <2023/03/13 11:28:15 fuyuki mt_am_include.m4>
+dnl Time-stamp: <2025/08/13 13:02:58 fuyuki mt_am_include.m4>
 
 dnl Copyright: 2020,2021,2022 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -85,7 +85,8 @@ MT_ADD_RECURSIVE_AM_MACRO_STATIC([install-mod],
 install_sh_MODULE = ${AX_DOLLAR}(install_sh_DATA) -C
 if INSTALL_MODULES
 	@${AX_DOLLAR}(NORMAL_INSTALL)
-	if test -z '${AX_DOLLAR}(moddir)'; then false; \\
+	@if ${AX_DOLLAR}(AM_V_P); then echo ${AX_DQ} INST   [modules]${AX_DQ}; fi
+	@if test -z '${AX_DOLLAR}(moddir)'; then false; \\
 	else \\
 		rm -f ${AX_DOLLAR}(LIST_MODFILES); touch ${AX_DOLLAR}(LIST_MODFILES);\\
 		for dir in ${AX_DOLLAR}(DESTDIR)${AX_DOLLAR}(moddir); do \\
@@ -103,7 +104,7 @@ endif
 
 MT_ADD_RECURSIVE_AM_MACRO_STATIC([uninstall-mod],
 [if INSTALL_MODULES
-	if test -z '${AX_DOLLAR}(moddir)'; then false; \\
+	@if test -z '${AX_DOLLAR}(moddir)'; then false; \\
 	else \\
 		list=\`test -e ${AX_DOLLAR}(LIST_MODFILES) && cat ${AX_DOLLAR}(LIST_MODFILES)\`; \\
 		files=\`for p in ${AX_DOLLAR}${AX_DOLLAR}list; do echo ${AX_DOLLAR}${AX_DOLLAR}p; done | sed -e 's|^.*/||'\`; \\

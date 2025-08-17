@@ -1,7 +1,7 @@
 !!!_! nio_nctcdf.F90 - TOUZA/Nio nanchatte netcdf interface
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 28 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:43:10 fuyuki nio_nctcdf.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 15:57:24 fuyuki nio_nctcdf.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -21,9 +21,8 @@
 module TOUZA_Nio_nctcdf
 !!!_ = declaration
   use netcdf
-  use TOUZA_Nio_std,only: &
-       & KI32, KI64, KDBL, KFLT, &
-       & get_logu,     unit_global,  trace_fine,   trace_control
+  use TOUZA_Nio_std,only: KI32, KI64, KDBL, KFLT
+  use TOUZA_Nio_std,only: get_logu,     unit_global,  trace_fine,   trace_control
   implicit none
   private
 !!!_  - parameters

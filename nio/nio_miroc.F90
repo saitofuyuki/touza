@@ -1,7 +1,7 @@
 !!!_! nio_miroc.F90 - TOUZA/Nio MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:52:02 fuyuki nio_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 18:26:32 fuyuki nio_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -187,7 +187,8 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Nio,only: nio_diag=>diag, nio_msg=>msg
+    use TOUZA_Nio,only: nio_diag=>diag
+    use TOUZA_Nio_std,only: nio_msg=>msg
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -783,9 +784,10 @@ subroutine GTZRDZ &
      &  ISTA,  IEND,  JSTA,  JEND,  KSTA, KEND, &
      &  IFILE, HITEM, HDFMT, HCLAS, &
      &  DSIZE)
-  use TOUZA_Nio,only: nio_msg=>msg,    get_item
+  use TOUZA_Nio,only: get_item
   use TOUZA_Nio,only: nio_read_header, parse_header_size, nio_read_data
   use TOUZA_Nio,only: hi_ASTR1, hi_ASTR2, hi_ASTR3, hi_AEND1, hi_AEND2, hi_AEND3
+  use TOUZA_Nio_std,only: nio_msg=>msg
   use TOUZA_Nio_miroc,only: KMD, NCC, NDC, init_common
   implicit none
   integer,            intent(in)  :: DSIZE
@@ -854,8 +856,9 @@ end subroutine GTZRDZ
 subroutine GFPEEK &
      & (HEAD, IEOD, IFILE)
   use TOUZA_Std,only: is_error_match
-  use TOUZA_Nio,only: nio_read_header,nitem,KIOFS,WHENCE_ABS,sus_rseek
+  use TOUZA_Nio,only: nio_read_header,nitem
   use TOUZA_Nio_miroc,only: NCC, NDC
+  use TOUZA_Nio_std,only: KIOFS,WHENCE_ABS,sus_rseek
   implicit none
 #if WITH_MIROC
 # include "zioparam.F"
@@ -913,7 +916,7 @@ subroutine GTZWRZ &
      &  HALON, HALAT, HASIG, &
      &  ISTA,  IEND,  JSTA,  JEND,  KSTA,  KEND, &
      &  DSIZE)
-  use TOUZA_Nio,only: nio_msg=>msg
+  use TOUZA_Nio_std,only: nio_msg=>msg
   use TOUZA_Nio_miroc,only:  vmiss_def
   use TOUZA_Nio_miroc,only:  put_item_time, init_common
   use TOUZA_Nio_header,only: litem, nitem, put_item, put_item_date
@@ -1058,7 +1061,7 @@ end subroutine GTZWRZ
 !!!_  - FOPEN
 subroutine FOPEN &
      & (IOS, IFILE, HFILE, HACT, HFORM, HACCSS)
-  use TOUZA_Nio,only: sus_open
+  use TOUZA_Nio_std,only: sus_open
 # if OPT_WITH_NCTCDF
   use TOUZA_Nio,only: nct_open_write
 # endif

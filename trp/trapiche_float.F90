@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:14:36 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 10:27:46 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -249,22 +249,22 @@ module TOUZA_Trp_float
   interface set_special
      module procedure set_special_d, set_special_f
   end interface set_special
-  interface xsign
-     module procedure xsign_d, xsign_f
-  end interface xsign
+  ! interface xsign
+  !    module procedure xsign_d, xsign_f
+  ! end interface xsign
   interface which_sp
      module procedure which_sp_d, which_sp_f
   end interface which_sp
-  interface xspecial
-     module procedure xspecial_d, xspecial_f
-  end interface xspecial
+  ! interface xspecial
+  !    module procedure xspecial_d, xspecial_f
+  ! end interface xspecial
   interface zspecial
      module procedure zspecial_d, zspecial_f
   end interface zspecial
 
-  interface xuint
-     module procedure xuint_d, xuint_f
-  end interface xuint
+  ! interface xuint
+  !    module procedure xuint_d, xuint_f
+  ! end interface xuint
   interface xureal
      module procedure xureal_d, xureal_f
   end interface xureal
@@ -349,7 +349,7 @@ contains
           if (ierr.eq.0) call tp_init(ierr, u=ulog, levv=lv, mode=lmd, stdv=stdv)
        endif
        if (is_first_force(init_counts, mode)) then
-          if (ierr.eq.0) call init_batch(ierr, minbs, mwork, ulog, lv)
+          if (ierr.eq.0) call init_batch(ierr, minbs, mwork)
        endif
        if (is_first_force(init_counts, mode)) then
           if (present(hch)) then
@@ -456,14 +456,13 @@ contains
 !!!_  & init_batch
   subroutine init_batch &
        & (ierr, &
-       &  minbs, mwork, &
-       &  u,      levv)
+       &  minbs, mwork)
     use TOUZA_Trp_std, only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: minbs
     integer,intent(in),optional :: mwork ! initial work-area size to allocate
-    integer,intent(in),optional :: u, levv
+    ! integer,intent(in),optional :: u, levv
 
     integer mw
 
@@ -570,10 +569,18 @@ contains
     integer,         intent(out)         :: mbits,  xbits, xbtm
     real(kind=KRFLD),intent(in)          :: refmax, refmin
     real(kind=KRFLD),intent(in),optional :: res
-    integer,parameter :: ixone = exponent(1.0_KRFLD)
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+    integer,parameter :: ixone = EXPONENT(1.0_KRFLD)
+#else
+    integer :: ixone
+#endif
 
     integer ixh, ixl, ixr
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(1.0_KRFLD)
+#endif
     ixh = exponent(refmax) - ixone
     ixl = exponent(refmin) - ixone
     ! write(*,*) 'helper input', ixh, ixl, ixone
@@ -601,10 +608,17 @@ contains
     integer,         intent(out)         :: mbits,  xbits, xbtm
     real(kind=KRFLD),intent(in)          :: refmax, refmin
     real(kind=KRFLD),intent(in),optional :: res
-    integer,parameter :: ixone = exponent(1.0_KRFLD)
-
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+    integer,parameter :: ixone = EXPONENT(1.0_KRFLD)
+#else
+    integer :: ixone
+#endif
     integer ixh, ixl, ixr
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(1.0_KRFLD)
+#endif
     ixh = exponent(refmax) - ixone
     ixl = exponent(refmin) - ixone
 
@@ -755,7 +769,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
     integer,parameter :: kxspc = kxmax + 1
@@ -781,6 +799,10 @@ contains
 
     ierr = 0
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
     xbi = xbits
     jwx = 0
     jwh = jwx + mem
@@ -848,7 +870,7 @@ contains
     if (mbits.ge.lbgz) then
        if (ksignb.ne.0) then
           call reajustar_full_i &
-               & (ierr,   ibagaz, &
+               & (ierr,   &
                &  iwork(jwx:jwh-1), iwork(jwh:jwl-1), iwork(jwl:jwe-1), &
                &  mem,    &
                &  nbitsh, nbitsl, xbi,    &
@@ -858,7 +880,7 @@ contains
           nbitsl = nbitsl - 1
        else
           call ajustar_full_i &
-               & (ierr,   ibagaz, &
+               & (ierr,   &
                &  iwork(jwx:jwh-1), iwork(jwh:jwl-1), iwork(jwl:jwe-1), &
                &  mem,    &
                &  ksignb, nbitsh, nbitsl, xbi,   &
@@ -867,7 +889,7 @@ contains
        endif
     else
        call ajustar_high_i &
-            & (ierr,   ibagaz, &
+            & (ierr,   &
             &  iwork(jwx:jwh-1), iwork(jwh:jwl-1), &
             &  mem,    &
             &  ksignb, nbitsh, xbi,   &
@@ -948,7 +970,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
     integer,parameter :: kxspc = kxmax + 1
@@ -971,6 +997,11 @@ contains
     integer kpackx, kpackh, kpackl
 
     ierr = 0
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     xbi = xbits
     jwx = 0
@@ -1014,7 +1045,7 @@ contains
     endif
 
     call ajustar_high_i &
-         & (ierr,   ibagaz, &
+         & (ierr,   &
          &  iwork(jwx:jwh-1), iwork(jwh:jwl-1), &
          &  mem,    &
          &  ksignb, nbitsh, xbi,   &
@@ -1207,9 +1238,9 @@ contains
 !!!_  & health_check
   subroutine health_check_d &
        & (ierr, mold, u, levv)
-    use TOUZA_Trp_std,only: choice, &
-         & msg, is_msglev, is_msglev_detail, &
-         & check_real_dnm
+    use TOUZA_Trp_std,only: choice
+    use TOUZA_Trp_std,only: msg, is_msglev, is_msglev_detail
+    use TOUZA_Trp_std,only: check_real_dnm
     implicit none
     integer,parameter :: KRFLD=KDBL
     integer,         intent(out)         :: ierr
@@ -1230,9 +1261,9 @@ contains
   end subroutine health_check_d
   subroutine health_check_f &
        & (ierr, mold, u, levv)
-    use TOUZA_Trp_std,only: choice, &
-         & msg, is_msglev, is_msglev_detail, &
-         & check_real_dnm
+    use TOUZA_Trp_std,only: choice
+    use TOUZA_Trp_std,only: msg, is_msglev, is_msglev_detail
+    use TOUZA_Trp_std,only: check_real_dnm
     implicit none
     integer,parameter :: KRFLD=KFLT
     integer,         intent(out)         :: ierr
@@ -1310,7 +1341,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1326,6 +1361,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = lbgz - 1
     nbitsl = max(0, mbits - nbitsh)
@@ -1448,7 +1487,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1464,6 +1507,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = mbits
     nbitsl = 0
@@ -1559,7 +1606,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1575,6 +1626,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = mbits
     nbitsl = 0
@@ -1677,7 +1732,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1693,6 +1752,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = lbgz - 1
     nbitsl = max(0, mbits - nbitsh)
@@ -1798,7 +1861,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1814,6 +1881,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = mbits
     nbitsl = 0
@@ -1911,7 +1982,11 @@ contains
     real(kind=KRFLD),   parameter :: vone  = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: vzero = 0.0_KRFLD
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = EXPONENT(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = MINEXPONENT(vone)
     integer,parameter :: kxmax = MAXEXPONENT(vone)
 
@@ -1927,6 +2002,10 @@ contains
     logical bzerom, bzerop, bneg, bpos
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(vone)
+#endif
 
     nbitsh = mbits
     nbitsl = 0
@@ -2153,7 +2232,7 @@ contains
 
 !!!_  & reajustar_full - compressor (adjust again, no sign bit)
   subroutine reajustar_full_i &
-       & (ierr,   ibagaz, &
+       & (ierr,   &
        &  iwx,    iwh,    iwl,    &
        &  mem,    &
        &  nbitsh, nbitsl, xbits, &
@@ -2164,7 +2243,7 @@ contains
     integer,parameter :: KIBGZ=KI32
 
     integer,            intent(out)   :: ierr
-    integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
+    ! integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwx(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwh(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwl(0:*)
@@ -2187,7 +2266,7 @@ contains
     integer maskl, maskh
     integer,parameter :: nbmv = 1   ! other parameter never works
 
-    ierr = 0
+    ierr = kcode * 0            ! dummy kcode
 
     mbits = nbitsh + nbitsl
     maskl = IBSET(0, nbitsl - nbmv) - 1
@@ -2277,7 +2356,7 @@ contains
 
 !!!_  & ajustar_full - compressor
   subroutine ajustar_full_i &
-       & (ierr,   ibagaz, &
+       & (ierr,   &
        &  iwx,    iwh,    iwl,    &
        &  mem,    &
        &  ksignp, nbitsh, nbitsl, xbits, &
@@ -2288,7 +2367,7 @@ contains
     integer,parameter :: KIBGZ=KI32, KRFLD=KDBL
 
     integer,            intent(out)   :: ierr
-    integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
+    ! integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwx(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwh(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwl(0:*)
@@ -2311,7 +2390,7 @@ contains
     integer mask_sign, maskl, maskh, maska
     integer(kind=KIBGZ) :: msp
 
-    ierr = 0
+    ierr = kcode * 0            ! dummy kcode
 
     mbits = nbitsh + nbitsl
     mask_sign = condop((ksignp.eq.0), IBSET(0, nbitsh), 0)
@@ -2403,7 +2482,7 @@ contains
 
 !!!_  & ajustar_high - compressor
   subroutine ajustar_high_i &
-       & (ierr,   ibagaz, &
+       & (ierr,   &
        &  iwx,    iwh,    &
        &  mem,    &
        &  ksignp, nbitsh, xbits, &
@@ -2414,7 +2493,7 @@ contains
     integer,parameter :: KIBGZ=KI32
 
     integer,            intent(out)   :: ierr
-    integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
+    ! integer(kind=KIBGZ),intent(out)   :: ibagaz(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwx(0:*)
     integer(kind=KIBGZ),intent(inout) :: iwh(0:*)
     integer,            intent(in)    :: mem
@@ -2434,7 +2513,7 @@ contains
     integer mh_ovf, mh_unf, mh_miss, mh_inf
     integer(kind=KIBGZ) :: msp
 
-    ierr = 0
+    ierr = kcode * 0   ! dummy(kcode)
 
     mbits = nbitsh + 0
     mask_sign = condop((ksignp.eq.0), IBSET(0, nbitsh), 0)
@@ -2711,7 +2790,11 @@ contains
     real(kind=KRFLD),   parameter :: one   = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: zero  = 0.0_KRFLD
     integer(kind=KIBGZ),parameter :: kstkh = 0_KIBGZ
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,            parameter :: ixone = EXPONENT(one)
+#else
+    integer :: ixone
+#endif
 
     integer,parameter :: lbgz = BIT_SIZE(kstkh)
     integer,parameter :: lfrc = DIGITS(zero) - 1
@@ -2745,6 +2828,11 @@ contains
 
     ierr = 0
     vu = choice(-HUGE(vu), vskp)
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(one)
+#endif
 
     if (ierr.eq.0) call retrieve_basics(ierr, ibagaz, ixdnm, ixlbd, ixubd, ncnz, nbgz)
     if (ierr.eq.0) then
@@ -2983,7 +3071,11 @@ contains
     real(kind=KRFLD),   parameter :: one   = 1.0_KRFLD
     real(kind=KRFLD),   parameter :: zero  = 0.0_KRFLD
     integer(kind=KIBGZ),parameter :: kstkh = 0_KIBGZ
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,            parameter :: ixone = EXPONENT(one)
+#else
+    integer :: ixone
+#endif
 
     integer,parameter :: lbgz = BIT_SIZE(kstkh)
     integer,parameter :: lfrc = DIGITS(zero) - 1
@@ -3009,7 +3101,7 @@ contains
     integer ixdnm, ixlbd,  ixubd
     integer kxspc, kxdnm
     integer jbbgn, jbend
-    real(kind=KRFLD) :: vmsk, vrst, vsign
+    real(kind=KRFLD) :: vmsk, vsign
     real(kind=KRFLD) :: vu, vnan(0:1), vinf(0:1), vovf(0:1), vudf(0:1), vdnm(0:1)
 
     real(kind=KRFLD) :: zz, zm, zu, zo, zi, zd
@@ -3018,6 +3110,11 @@ contains
 
     ierr = 0
     vu = choice(-HUGE(vu), vskp)
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(one)
+#endif
 
     if (ierr.eq.0) call retrieve_basics(ierr, ibagaz, ixdnm, ixlbd, ixubd, ncnz, nbgz)
     if (ierr.eq.0) then
@@ -3301,9 +3398,18 @@ contains
     real(kind=KRFLD),parameter :: one =  1.0_KRFLD
     real(kind=KRFLD),parameter :: sn  = -1.0_KRFLD
     real(kind=KRFLD) :: vpos
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: ixone = exponent(one)
+#else
+    integer :: ixone
+#endif
     integer jw
     integer ixd
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(one)
+#endif
 
     select case (kschm)
 #   if HAVE_FORTRAN_IEEE_ARITHMETIC
@@ -3368,9 +3474,18 @@ contains
     real(kind=KRFLD),parameter :: one =  1.0_KRFLD
     real(kind=KRFLD),parameter :: sn  = -1.0_KRFLD
     real(kind=KRFLD) :: vpos
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: ixone = exponent(one)
+#else
+    integer :: ixone
+#endif
     integer jw
     integer ixd
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(one)
+#endif
 
     select case (kschm)
 #   if HAVE_FORTRAN_IEEE_ARITHMETIC
@@ -3437,31 +3552,33 @@ contains
     return
   end subroutine alloc_works
 !!!_  & xuint - unsigned integer conversion emulation
-  ELEMENTAL integer function xuint_d(v) result(n)
-    implicit none
-    integer,parameter :: KRTGT=KDBL
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
-    real(kind=KRTGT),parameter  :: d = o * 2.0_KRTGT
+  ! ELEMENTAL integer function xuint_d(v) result(n)
+  !   implicit none
+  !   integer,parameter :: KRTGT=KDBL
+  !   real(kind=KRTGT),intent(in) :: v
+  !   real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
+  !   real(kind=KRTGT),parameter  :: d = o * 2.0_KRTGT
 
-    n = int(mod(aint(abs(v)) + o, d) - o)
-    return
-  end function xuint_d
-  ELEMENTAL integer function xuint_f(v) result(n)
-    implicit none
-    integer,parameter :: KRTGT=KFLT
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
-    real(kind=KRTGT),parameter  :: d = o * 2.0_KRTGT
+  !   n = int(mod(aint(abs(v)) + o, d) - o)
+  !   return
+  ! end function xuint_d
+  ! ELEMENTAL integer function xuint_f(v) result(n)
+  !   implicit none
+  !   integer,parameter :: KRTGT=KFLT
+  !   real(kind=KRTGT),intent(in) :: v
+  !   real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
+  !   real(kind=KRTGT),parameter  :: d = o * 2.0_KRTGT
 
-    n = int(mod(aint(abs(v)) + o, d) - o)
-    return
-  end function xuint_f
+  !   n = int(mod(aint(abs(v)) + o, d) - o)
+  !   return
+  ! end function xuint_f
 
 !!!_  & xureal - unsigned integer conversion emulation
-  ELEMENTAL real(kind=KDBL) function xureal_d(n, mold) result(r)
+  ELEMENTAL &
+  function xureal_d(n, mold) result(r)
     implicit none
     integer,parameter :: KRTGT=KDBL
+    real(kind=KRTGT) :: r
     integer,         intent(in) :: n
     real(kind=KRTGT),intent(in) :: mold
     real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
@@ -3470,9 +3587,11 @@ contains
     r = mod(real(n, kind=KIND(mold)) + d, d)
     return
   end function xureal_d
-  ELEMENTAL real(kind=KFLT) function xureal_f(n, mold) result(r)
+  ELEMENTAL &
+  function xureal_f(n, mold) result(r)
     implicit none
     integer,parameter :: KRTGT=KFLT
+    real(kind=KRTGT) :: r
     integer,         intent(in) :: n
     real(kind=KRTGT),intent(in) :: mold
     real(kind=KRTGT),parameter  :: o = REAL(HUGE(n), kind=KRTGT) + 1.0_KRTGT
@@ -3483,48 +3602,49 @@ contains
   end function xureal_f
 
 !!!_  & xsign_d() - return +1 if not sign bit, otherwise -1
-  ELEMENTAL integer function xsign_d(v) result(n)
-!NEC$ always_inline
-    implicit none
-    integer,parameter :: KRTGT=KDBL
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter :: one  = 1.0_KRTGT
-    n = int(sign(one, v))
-  end function xsign_d
-  ELEMENTAL integer function xsign_f(v) result(n)
-!NEC$ always_inline
-    implicit none
-    integer,parameter :: KRTGT=KFLT
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter :: one  = 1.0_KRTGT
-    n = int(sign(one, v))
-  end function xsign_f
+!   ELEMENTAL integer function xsign_d(v) result(n)
+! !NEC$ always_inline
+!     implicit none
+!     integer,parameter :: KRTGT=KDBL
+!     real(kind=KRTGT),intent(in) :: v
+!     real(kind=KRTGT),parameter :: one  = 1.0_KRTGT
+!     n = int(sign(one, v))
+!   end function xsign_d
+!   ELEMENTAL integer function xsign_f(v) result(n)
+! !NEC$ always_inline
+!     implicit none
+!     integer,parameter :: KRTGT=KFLT
+!     real(kind=KRTGT),intent(in) :: v
+!     real(kind=KRTGT),parameter :: one  = 1.0_KRTGT
+!     n = int(sign(one, v))
+!   end function xsign_f
 
 !!!_  & xspecial ()
-  ELEMENTAL integer function xspecial_d(v) result(n)
-    implicit none
-    integer,parameter :: KRTGT=KDBL
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter :: xmd = MAX_SPECIAL
-    n = int(mod(abs(v), xmd))
-    return
-  end function xspecial_d
-  ELEMENTAL integer function xspecial_f(v) result(n)
-    implicit none
-    integer,parameter :: KRTGT=KFLT
-    real(kind=KRTGT),intent(in) :: v
-    real(kind=KRTGT),parameter :: xmd = MAX_SPECIAL
-    n = int(mod(abs(v), xmd))
-    return
-  end function xspecial_f
+  ! ELEMENTAL integer function xspecial_d(v) result(n)
+  !   implicit none
+  !   integer,parameter :: KRTGT=KDBL
+  !   real(kind=KRTGT),intent(in) :: v
+  !   real(kind=KRTGT),parameter :: xmd = MAX_SPECIAL
+  !   n = int(mod(abs(v), xmd))
+  !   return
+  ! end function xspecial_d
+  ! ELEMENTAL integer function xspecial_f(v) result(n)
+  !   implicit none
+  !   integer,parameter :: KRTGT=KFLT
+  !   real(kind=KRTGT),intent(in) :: v
+  !   real(kind=KRTGT),parameter :: xmd = MAX_SPECIAL
+  !   n = int(mod(abs(v), xmd))
+  !   return
+  ! end function xspecial_f
 
 !!!_  & zspecial ()
   ELEMENTAL &
-       real(kind=KRTGT) function zspecial_d &
+  function zspecial_d &
        & (i, nh, kh, mh, nl, kl, ml, one, ixone) &
        & result(v)
     use TOUZA_Trp_std,only: KRTGT=>KDBL
     implicit none
+    real(kind=KRTGT) :: v
     integer,parameter :: KIBGZ=KI32
     integer(kind=KIBGZ),intent(in) :: i
     integer(kind=KIBGZ),intent(in) :: nh, kh, mh
@@ -3558,11 +3678,12 @@ contains
     return
   end function zspecial_d
   ELEMENTAL &
-       real(kind=KRTGT) function zspecial_f &
+  function zspecial_f &
        & (i, nh, kh, mh, nl, kl, ml, one, ixone) &
        & result(v)
     use TOUZA_Trp_std,only: KRTGT=>KFLT
     implicit none
+    real(kind=KRTGT) :: v
     integer,parameter :: KIBGZ=KI32
     integer(kind=KIBGZ),intent(in) :: i
     integer(kind=KIBGZ),intent(in) :: nh, kh, mh
@@ -3664,7 +3785,11 @@ contains
     real(kind=KRFLD),parameter :: vone = 1.0_KRFLD
     real(kind=KRFLD),parameter :: vfil = +HUGE(vone)
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: ixone = exponent(vone)
+#else
+    integer :: ixone
+#endif
     integer,parameter :: ml = minexponent(vone)
     integer,parameter :: mh = maxexponent(vone)
     character(len=2) :: tpackx, tpackh, tpackl
@@ -3676,6 +3801,12 @@ contains
 
     ierr = 0
     utmp = choice(-1, u)
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    ixone = EXPONENT(vone)
+#endif
+
 101 format('bgz:', I0)
 102 format('bgz/', I0)
 111 format(A, ':', I0)
@@ -4223,9 +4354,8 @@ contains
        & (nbits, nmem, kcode, kfill) &
        & result(m)
     use TOUZA_Trp_std, only: choice
-    use TOUZA_Trp_pack,only: &
-         & RELLENO_TRANSPOSE, RELLENO_SEQUENTIAL, &
-         & RELLENO_STRIDE,    RELLENO_MANUAL
+    use TOUZA_Trp_pack,only: RELLENO_TRANSPOSE, RELLENO_SEQUENTIAL
+    use TOUZA_Trp_pack,only: RELLENO_STRIDE,    RELLENO_MANUAL
     implicit none
     integer,intent(in)          :: nbits
     integer,intent(in)          :: nmem
@@ -4269,10 +4399,12 @@ contains
 
 !!!_  & XSETSX() - set_exponent alternates for SX system
 #if OPT_TRAPICHE_SX_SPECIALS
-  elemental real(kind=KRTGT) function XSETSX_d(X, I) &
+  ELEMENTAL &
+  function XSETSX_d(X, I) &
        & result(Y)
     use TOUZA_Trp_std,only: KRTGT=>KDBL
     implicit none
+    real(kind=KRTGT) :: Y
     real(kind=KRTGT),intent(in) :: X
     integer,         intent(in) :: I
     integer,parameter :: MH = MAXEXPONENT(0.0_KRTGT)
@@ -4287,10 +4419,12 @@ contains
     ! Y = AMT(X) * EXP2(REAL(I, KIND=KRTGT))
     return
   end function XSETSX_d
-  elemental real(kind=KRTGT) function XSETSX_f(X, I) &
+  ELEMENTAL &
+  function XSETSX_f(X, I) &
        & result(Y)
     use TOUZA_Trp_std,only: KRTGT=>KFLT
     implicit none
+    real(kind=KRTGT) :: Y
     real(kind=KRTGT),intent(in) :: X
     integer,         intent(in) :: I
     integer,parameter :: MH = MAXEXPONENT(0.0_KRTGT)
@@ -4319,7 +4453,11 @@ contains
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
 
-    integer,         parameter :: kxone = exponent(1.0_KRTGT)
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+    integer,         parameter :: kxone = EXPONENT(1.0_KRTGT)
+#else
+    integer :: kxone
+#endif
     real(kind=KRTGT),parameter :: zero  = 0.0_KRTGT
 
     integer nt
@@ -4329,6 +4467,11 @@ contains
 
     ierr = 0
     utmp = choice(-1, u)
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = EXPONENT(1.0_KRTGT)
+#endif
+
     call choice_a(ti, 'cmp', tag)
 
 101 format(A, ':', I0)
@@ -4358,7 +4501,11 @@ contains
     character(len=*),intent(in),optional :: tag
     integer,         intent(in),optional :: u
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,         parameter :: kxone = exponent(1.0_KRTGT)
+#else
+    integer :: kxone
+#endif
     real(kind=KRTGT),parameter :: zero  = 0.0_KRTGT
 
     integer nt
@@ -4372,6 +4519,12 @@ contains
 
     ierr = 0
     utmp = choice(-1, u)
+
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = exponent(1.0_KRTGT)
+#endif
+
     call choice_a(ti, ' ', tag)
     call choice_a(fi, ' ', fmt)
     if (ti.eq.' ') ti = 'cmp'
@@ -4459,11 +4612,19 @@ program test_trapiche_float
   integer jx
 
 
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
   integer,parameter :: kxone = exponent(vone)
+#else
+  integer :: kxone
+#endif
   integer,parameter :: kxmin = minexponent(vone)
   integer,parameter :: kxmax = maxexponent(vone)
 
   ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+  kxone = exponent(vone)
+#endif
 
 101 format(A, ' = ', I0)
 
@@ -4569,7 +4730,11 @@ contains
 
     real(kind=KRFLD),parameter :: vzero = 0.0_KRFLD
     real(kind=KRFLD),parameter :: vone = 1.0_KRFLD
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
     integer,parameter :: kxone = exponent(vone)
+#else
+    integer :: kxone
+#endif
     integer,parameter :: kxmin = minexponent(vone)
     integer,parameter :: kxmax = maxexponent(vone)
     integer,parameter :: lfrd = DIGITS(vone) - 1
@@ -4592,6 +4757,10 @@ contains
     integer :: j,  jj
 
     ierr = 0
+#if HAVE_FORTRAN_CONSTANT_EXPONENT
+#else
+    kxone = exponent(vone)
+#endif
 
     do j = 1, lfrd
        FR010(j) = vone + set_exponent(vone, kxone-j)

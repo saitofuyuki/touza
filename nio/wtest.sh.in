@@ -1,6 +1,6 @@
 #!/bin/sh
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2023/03/24 22:28:04 fuyuki wtest.sh.in>
+# Time-stamp: <2025/07/11 07:39:03 fuyuki wtest.sh.in>
 
 # Copyright (C) 2023
 #           Japan Agency for Marine-Earth Science and Technology
@@ -8,6 +8,8 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 this=$0
+
+: "${fc_vendor=@FC_COMPILER_VENDOR@}"
 
 ## usage
 usage ()
@@ -39,15 +41,15 @@ temp=$(mktemp)
 
 do_exit='rm -f $temp; exit $err'
 
-mkdir -p $logd || exit $?
+mkdir -p "$logd" || exit $?
 
-trap "$do_exit" 0 1 2 3 15
+trap '$do_exit' 0 1 2 3 15
 
 chk_cmds ()
 {
   for c in "$@"
   do
-    test ! -x $c && echo "$this: Aborts. Cannot execute $c." && exit 1
+    test ! -x "$c" && echo "$this: Aborts. Cannot execute $c." && exit 1
   done
   return 0
 }
@@ -61,8 +63,8 @@ chk_plan ()
 chk_record ()
 {
   tlow=1 thigh=9
-  test $tstt -eq 0 && tstt=$tlow
-  test $tstp -eq 0 && tstp=$thigh
+  test "$tstt" -eq 0 && tstt=$tlow
+  test "$tstp" -eq 0 && tstp=$thigh
 
   cmd=test_nio_record
   chk_cmds $cmd || return $?
@@ -70,59 +72,76 @@ chk_record ()
 
   testid=10
 
-  chk_plan ${tstt} ${tstp}
-  ref=''
-  for t in $(seq $tstt $tstp)
+  chk_plan "${tstt}" "${tstp}"
+  for t in $(seq "$tstt" "$tstp")
   do
-    mod=$(expr $t % 3)
-    if   test $t -ge 1 -a $t -lt 4; then
+    mod=$(expr "$t" % 3)
+    if   test "$t" -ge 1 -a "$t" -lt 4; then
       opt=n
-    elif test $t -ge 4 -a $t -lt 7; then
+    elif test "$t" -ge 4 -a "$t" -lt 7; then
       opt=b
-    elif test $t -ge 7 -a $t -lt 10; then
+    elif test "$t" -ge 7 -a "$t" -lt 10; then
       opt=l
     else
       echo "$this: invalid test id" >&2; return 1
     fi
-    if test $mod -eq 0; then
-      env="GFORTRAN_CONVERT_UNIT=native F_UFMTENDIAN="
-      sfx=n
-    elif test $mod -eq 1; then
-      env="GFORTRAN_CONVERT_UNIT=big_endian F_UFMTENDIAN=big"
-      sfx=b
+    var=; native=; big=; little=
+    case $fc_vendor in
+    gnu) var=GFORTRAN_CONVERT_UNIT
+         native=native; big=big_endian; little=little_endian
+         ;;
+    intel|sx) var=F_UFMTENDIAN
+         native=''; big=big; little=little
+         ;;
+    esac
+    cfg=
+    if test "$mod" -eq 0; then
+      test -n "$var" && cfg="$var=$native"
+      env=n
+    elif test "$mod" -eq 1; then
+      test -n "$var" && cfg="$var=$big"
+      env=b
     else
-      env="GFORTRAN_CONVERT_UNIT=little_endian F_UFMTENDIAN=little"
-      sfx=l
+      test -n "$var" && cfg="$var=$little"
+      env=l
     fi
+
     log=$logd/x$sub.t$t
-    out=$logd/o$sub.t${t}.${sfx}-$opt
-    eval env $env $cmd $testid $out $opt > $log 2>&1 || return $?
-    eval set - $(od -Ax -N4 -tx1 $out)
+    out=$logd/o$sub.t${t}.${env}-$opt
+    eval env $cfg $cmd $testid "$out" $opt > "$log" 2>&1 || return $?
+    eval set - $(od -Ax -N4 -tx1 "$out")
     res="$2$3$4$5"
     chk=F
     case $opt in
     b) test "$res" = 00000400 && chk=T;;
     l) test "$res" = 00040000 && chk=T;;
-    n) case $sfx in
+    n) case $env in
        b) test "$res" = 00000400 && chk=T;;
        l) test "$res" = 00040000 && chk=T;;
        n) chk=T;;
        esac;;
     esac
 
-    descr="byte-order $opt (env $sfx) == $res"
-    if test "$chk" = F; then
-      echo "not ok $t - $descr"
-    else        
-      echo "ok $t - $descr"
-    fi
+    descr="byte-order $opt (env $env) == $res"
+    case "$var.$env$opt" in
+    .nn|.[bl]?) 
+      echo "ok $t - $descr # SKIP (no environment control)"
+      ;;
+    *)
+      if test "$chk" = F; then
+        echo "not ok $t - $descr"
+      else        
+        echo "ok $t - $descr"
+      fi
+      ;;
+    esac
   done
 
   return 0
 }
 
 # ---------------------------------------- dispatcher
-for sub in $@
+for sub in "$@"
 do
   sub=$(basename "$sub")
   case $sub in

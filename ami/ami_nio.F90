@@ -1,7 +1,7 @@
 !!!_! ami_nio.F90 - TOUZA/Ami/nio-format interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 19 2023
-#define TIME_STAMP 'Time-stamp: <2024/02/16 22:16:13 fuyuki ami_nio.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 11:38:59 c0210 ami_nio.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023
@@ -22,7 +22,7 @@
 !!!_@ TOUZA_Ami_nio - ami-da procedures for nio-format
 module TOUZA_Ami_nio
 !!!_ + modules
-  use TOUZA_Ami_std, as_init=>init, as_diag=>diag, as_finalize=>finalize
+  use TOUZA_Ami_std,only: unit_global
   use TOUZA_Nio,only: REC_ASIS, REC_DEFAULT, REC_SWAP, REC_BIG, REC_LITTLE
   use TOUZA_Nio,only: hi_MEMO1, hi_MEMO2
 !!!_ + default
@@ -101,6 +101,10 @@ module TOUZA_Ami_nio
 contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
+    use TOUZA_Ami_std,only: as_init=>init
+    use TOUZA_Ami_std,only: choice
+    use TOUZA_Ami_std,only: control_deep, control_mode
+    use TOUZA_Ami_std,only: is_first_force
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -135,6 +139,11 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
+    use TOUZA_Ami_std,only: as_diag=>diag
+    use TOUZA_Ami_std,only: is_first_force
+    use TOUZA_Ami_std,only: control_deep, control_mode
+    use TOUZA_Ami_std,only: msg, is_msglev_NORMAL
+    use TOUZA_Ami_std,only: trace_control, choice, get_logu
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -166,6 +175,10 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
+    use TOUZA_Ami_std,only: as_finalize=>finalize
+    use TOUZA_Ami_std,only: control_deep, control_mode
+    use TOUZA_Ami_std,only: choice, get_logu
+    use TOUZA_Ami_std,only: trace_fine, is_first_force
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -199,6 +212,7 @@ contains
        &  cdest,    ndest,       csrc, nsrc, &
        &  item_map, item_offset, mode, tol)
     use TOUZA_Ami_std,only: KTIME=>KDBL
+    use TOUZA_Ami_std,only: sus_open
     use TOUZA_Nio,only: nio_check_magic_file
     use TOUZA_Nio,only: nio_time_undef
     implicit none
@@ -397,6 +411,7 @@ contains
   end subroutine normalize_rodata_d
 !!!_  - domain_normalize
   subroutine domain_normalize(ierr, v, n, tag, mx, my, ww, we, ws, ofs, u)
+    use TOUZA_Ami_std,only: get_logu, msg
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(inout) :: v(*)
@@ -466,6 +481,7 @@ contains
 !!!_  - check_remove_wings
   subroutine check_remove_wings_d(ierr, v, lh, nz, mx, ww, we, my, wy, tag, u)
     use TOUZA_Ami_std,only: KTGT=>KDBL
+    use TOUZA_Ami_std,only: get_logu, msg
     implicit none
     integer,         intent(out)   :: ierr
     real(kind=KTGT), intent(inout) :: v(*)   ! (lh,nz) to (mx,my,nz)
@@ -548,6 +564,7 @@ contains
   end subroutine check_remove_wings_d
 
   subroutine check_remove_wings_i(ierr, v, lh, nz, mx, ww, we, my, wy, tag, u)
+    use TOUZA_Ami_std,only: get_logu, msg
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(inout) :: v(*)
@@ -1067,7 +1084,8 @@ program test_ami_nio
   use TOUZA_Ami_nio
   use TOUZA_Std,only: parse, decl_pos_arg, get_option, get_param, arg_diag, arg_init, KDBL
   use TOUZA_Std,only: new_unit
-  use TOUZA_Std,only: sus_close
+  use TOUZA_Std,only: sus_open, sus_close
+  use TOUZA_Std,only: upcase
   use TOUZA_Nio,nio_init=>init, nio_diag=>diag, nio_finalize=>finalize
   implicit none
   integer,parameter :: KMD = KDBL

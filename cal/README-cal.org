@@ -226,7 +226,7 @@
    | =p_ideal=   | integer | mode: idealized 360-day calendar         |
    | =p_grego_i= | integer | mode: Gregorian no-leap calendar         |
    | =p_grego_l= | integer | mode: Gregorian calendar                 |
-   | =p_user=    | ingeger | mode: reserved for user-defined calendar |
+   | =p_user=    | integer | mode: reserved for user-defined calendar |
 
 ** registration and allocation
 *** =calendar::init()=
@@ -300,7 +300,7 @@
  when only one calendar is used.
 
 ** inquiry
-*** =calendar::inq_nday_month()=
+*** =calendar::inq_nday_month()= - Return number of days in the calendar-month
  #+begin_src f90
  integer function inq_nday_month(cd, jcalh)
  integer function inq_nday_month(ym, jcalh)
@@ -308,7 +308,7 @@
    integer,         intent(in)          :: ym(2)   ! calendar-year, month
    integer,         intent(in),optional :: jcalh   ! calendar id
  #+end_src
-*** =calendar::inq_nday_year()=
+*** =calendar::inq_nday_year()= - Return number of days in the calendar-year
  #+begin_src f90
  integer function inq_nday_year(cd, jcalh)
  integer function inq_nday_year(y,  jcalh)
@@ -316,7 +316,7 @@
    integer,         intent(in)          :: y       ! calendar-year
    integer,         intent(in),optional :: jcalh   ! calendar id
  #+end_src
-*** =calendar::inq_nmonth_year()=
+*** =calendar::inq_nmonth_year()= - Return number of months in the calendar-year
  #+begin_src f90
  integer function inq_nmonth_year(cd, jcalh)
  integer function inq_nmonth_year(y,  jcalh)
@@ -324,25 +324,46 @@
    integer,         intent(in)          :: y       ! calendar-year
    integer,         intent(in),optional :: jcalh   ! calendar id
  #+end_src
-*** =calendar::inq_nsec_day()=
+*** =calendar::inq_nsec_day()= - Return  number of seconds in the calendar-day
  #+begin_src f90
  integer function inq_nsec_day(cd, jcalh)
  integer function inq_nsec_day(jcalh)
    type(cal_date_t),intent(in)          :: cd      ! calendar-date
    integer,         intent(in),optional :: jcalh   ! calendar id
  #+end_src
-
-*** =calendar::inq_nsec_minute()=
-*** =calendar::inq_nsec_hour()=
+*** =calendar::inq_nsec_minute()= - Return number of seconds in the (dummy) calendar-minute
+#+begin_src f90
+  integer function inq_nsec_minute(cd, jcalh)
+  integer function inq_nsec_minute(jcalh)
+    type(cal_date_t),intent(in)          :: cd
+    integer,         intent(in),optional :: jcalh
+#+end_src
+*** =calendar::inq_nsec_hour()= - Return number of seconds in the (dummy) calendar-hour
+#+begin_src f90
+  integer function inq_nsec_hour(cd, jcalh)
+  integer function inq_nsec_hour(jcalh)
+    type(cal_date_t),intent(in)          :: cd
+    integer,         intent(in),optional :: jcalh
+#+end_src
+*** =calendar::inq_nyear_period= - Return number of years in the leap-year cycle
+#+begin_src f90
+  integer function inq_nyear_period(jcalh)
+    integer,intent(in),optional :: jcalh
+#+end_src
+*** =calendar::inq_nday_period= - Return number of days in the leap-year cycle
+#+begin_src f90
+  integer function inq_nday_period(jcalh)
+    integer,intent(in),optional :: jcalh
+#+end_src
 ** conversion
-*** =calendar::conv_csec_cdaysec()=
+*** =calendar::conv_csec_cdaysec()= - Convert calendar-second to calendar-day plus fraction in seconds
 #+begin_src f90
 type(cal_daysec_t) function conv_csec_cdaysec(csec, cd, jcalh)
   real(kind=KRC),  intent(in)          :: csec  !  calendar[sec]
   type(cal_date_t),intent(in),optional :: cd    !  calendar[date]
   integer,         intent(in),optional :: jcalh !  calendar id
 #+end_src
-*** =calendar::conv_csec_adaysec()=
+*** =calendar::conv_csec_adaysec()= - Convert calendar-second to calendar-day plus fraction in seconds
 #+begin_src f90
 subroutine conv_csec_adaysec(cday, rsec, csec, jcalh)
   integer,       intent(out)         :: cday    ! calendar[day]
@@ -350,15 +371,27 @@ subroutine conv_csec_adaysec(cday, rsec, csec, jcalh)
   real(kind=KRC),intent(in)          :: csec    ! calendar[sec]
   integer,       intent(in),optional :: jcalh   ! calendar id
 #+end_src
-*** =calendar::conv_cdaysec_csec()=
+*** =calendar::conv_cdaysec_csec()= - Convert calendar-day plus fraction in seconds to calender-second
 #+begin_src f90
-real(kind=KRC) function conv_cdaysec_csec(ds, xk, cd, jcalh)
+real(kind=KRC) function conv_cdaysec_csec(ds, mold, cd, jcalh)
+integer function conv_cdaysec_csec(ds, mold, cd, jcalh)
   type(cal_daysec_t),intent(in)          :: ds
-  real(kind=KRC),    intent(in)          :: xk ! dummy
+  real(kind=KRC),    intent(in)          :: mold ! dummy
+  integer,           intent(in)          :: mold ! dummy
   type(cal_date_t),  intent(in),optional :: cd
   integer,           intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_tsec_time()=
+*** =calendar::conv_adaysec_csec()= - Convert calendar-day plus fraction in seconds to calender-second
+#+begin_src f90
+  real(kind=KRC) function conv_adaysec_csec(cday, rsec, mold, jcalh)
+  integer        function conv_adaysec_csec(cday, rsec, mold, jcalh)
+    integer,       intent(in)          :: cday
+    real(kind=KRC),intent(in)          :: rsec
+    real(kind=KRC),intent(in)          :: mold ! dummy
+    integer,       intent(in)          :: mold ! dummy
+    integer,       intent(in),optional :: jcalh
+#+end_src
+*** =calendar::conv_tsec_time()= - Convert time in seconds to time in HMS
 #+begin_src f90
 type(cal_time_t) function conv_tsec_time(tsec, cd, jcalh)
   real(kind=KRC),  intent(in)          :: tsec
@@ -366,15 +399,15 @@ type(cal_time_t) function conv_tsec_time(tsec, cd, jcalh)
   type(cal_date_t),intent(in),optional :: cd
   integer,         intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_tsec_atime()=
+*** =calendar::conv_tsec_atime()= - Convert time in seconds to time in HMS
 #+begin_src f90
-integer        function conv_tsec_atime(tsec, jcalh)
-real(kind=KRC) function conv_tsec_atime(tsec, jcalh)
+integer,dimension(3)        function conv_tsec_atime(tsec, jcalh)
+real(kind=KRC),dimension(3) function conv_tsec_atime(tsec, jcalh)
   real(kind=KRC),intent(in)          :: tsec
   integer,       intent(in)          :: tsec
   integer,       intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_time_tsec()=
+*** =calendar::conv_time_tsec()= - Convert time in HMS to time in seconds
 #+begin_src f90
 integer function conv_time_tsec(t, cd, jcalh)
 integer function conv_time_tsec(hms, jcalh)
@@ -383,33 +416,33 @@ integer function conv_time_tsec(hms, jcalh)
   type(cal_date_t),intent(in),optional :: cd
   integer,         intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_cday_date()=
+*** =calendar::conv_cday_date()= - Convert calendar-day to calendar-date
 #+begin_src f90
 type(cal_date_t) function conv_cday_date(cday, jcalh)
   integer,       intent(in)          :: cday
   real(kind=KRC),intent(in)          :: cday
   integer,       intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_cday_adate()=
+*** =calendar::conv_cday_adate()= - Convert calendar-day to calendar-date
 #+begin_src f90
-integer(dim=3) function conv_cday_adate(cday, jcalh)
+integer,dimension(3) function conv_cday_adate(cday, jcalh)
   integer,       intent(in)          :: cday
   real(kind=KRC),intent(in)          :: cday
   integer,       intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_date_cday()=
+*** =calendar::conv_date_cday()= - Convert calendar-date to calendar-day
 #+begin_src f90
-integer        function conv_date_cday(cd, xk, jcalh)
-real(kind=KRC) function conv_date_cday(cd, xk, jcalh)
-integer        function conv_date_cday(ymd, xk, jcalh)
-real(kind=KRC) function conv_date_cday(ymd, xk, jcalh)
+integer        function conv_date_cday(cd, mold, jcalh)
+real(kind=KRC) function conv_date_cday(cd, mold, jcalh)
+integer        function conv_date_cday(ymd, mold, jcalh)
+real(kind=KRC) function conv_date_cday(ymd, mold, jcalh)
   type(cal_date_t),intent(in)          :: cd
   integer,         intent(in)          :: ymd(3)
-  integer,         intent(in)          :: xk ! dummy
-  real(kind=KRC),  intent(in)          :: xk ! dummy
+  integer,         intent(in)          :: mold ! dummy
+  real(kind=KRC),  intent(in)          :: mold ! dummy
   integer,         intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_date_dayy()=
+*** =calendar::conv_date_dayy()= - Convert calendar-date to year-day (days from new year's day)
 #+begin_src f90
 integer function conv_date_dayy(cd,  jcalh)
 integer function conv_date_dayy(ymd, jcalh)
@@ -417,7 +450,7 @@ integer function conv_date_dayy(ymd, jcalh)
   integer,         intent(in)          :: ymd(3)
   integer,         intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_date_dayy_compat()=
+*** =calendar::conv_date_dayy_compat()= - Convert calendar-date to year-day (days from new year's day)
 #+begin_src f90
 integer function conv_date_dayy_compat(cd,  jcalh)
 integer function conv_date_dayy_compat(ymd, jcalh)
@@ -425,101 +458,110 @@ integer function conv_date_dayy_compat(ymd, jcalh)
   integer,         intent(in)          :: ymd(3)
   integer,         intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_csec_calendar()=
+*** =calendar::conv_csec_calendar()= - Convert calendar-second to calendar YMD HMS
 #+begin_src f90
 type(calendar_t) function conv_csec_calendar(csec, jcalh)
   real(kind=KRC),intent(in)          :: csec
   integer,       intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_csec_acalendar()=
+*** =calendar::conv_csec_acalendar()= - Convert calendar-second to calendar YMD HMS
 #+begin_src f90
 integer(6) function conv_csec_acalendar(csec, jcalh)
   real(kind=KRC),intent(in)          :: csec
   integer,       intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_calendar_csec()=
+*** =calendar::conv_calendar_csec()= - Convert calendar YMD HMS to calendar-second
 #+begin_src f90
-real(kind=KRC) function conv_calendar_csec(cc, xk, jcalh)
-real(kind=KRC) function conv_calendar_csec(y,mo,d,h,mi,s, xk, jcalh)
+real(kind=KRC) function conv_calendar_csec(cc, mold, jcalh)
+real(kind=KRC) function conv_calendar_csec(y,mo,d,h,mi,s, mold, jcalh)
   type(calendar_t),intent(in)          :: cc
   integer,         intent(in)          :: y, mo, d
   integer,         intent(in)          :: h, mi, s
-  real(kind=KRC),  intent(in)          :: xk ! dummy
+  real(kind=KRC),  intent(in)          :: mold ! dummy
   integer,         intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_cday_cydayy()=
+*** =calendar::conv_cday_cydayy()= - Convert calendar-day to calendar-year plus fraction in day
 #+begin_src f90
 type(cal_ynday_t) function conv_cday_cydayy(cday, jcalh)
   integer,intent(in)          :: cday
   integer,intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_cday_aydayy()=
+*** =calendar::conv_cday_aydayy()= - Convert calendar-day to calendar-year plus fraction in day
 #+begin_src f90
-integer(dim=2) function conv_cday_aydayy(cday, jcalh)
+integer,dimension(2) function conv_cday_aydayy(cday, jcalh)
   integer,intent(in)          :: cday
   integer,intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_csec_date()=
+*** =calendar::conv_csec_date()= - Convert calendar-second to calendar-date
 #+begin_src f90
 type(cal_date_t) function conv_csec_date(dsec, jcalh)
   real(kind=KRC),intent(in)          :: dsec
   integer,       intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_csec_adate()=
+*** =calendar::conv_csec_adate()= - Convert calendar-second to calendar-date
 #+begin_src f90
-integer(dim=3) function conv_csec_adate(dsec, jcalh)
+integer,dimension(3) function conv_csec_adate(dsec, jcalh)
   real(kind=KRC),intent(in)          :: dsec
   integer,       intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_csec_cydayy()=
+*** =calendar::conv_csec_cydayy()= - Convert calendar-year plus fraction in day to calendar-day
 #+begin_src f90
 type(cal_ynday_t) function conv_csec_cydayy(csec, jcalh)
   real(kind=KRC),intent(in)          :: csec
   integer,       intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_csec_aydayy()=
+*** =calendar::conv_csec_aydayy()= - Convert calendar-year plus fraction in day to calendar-day
 #+begin_src f90
-integer(dim=2) function conv_csec_aydayy(csec, jcalh)
+integer,dimension(2) function conv_csec_aydayy(csec, jcalh)
   real(kind=KRC),intent(in)          :: csec
   integer,       intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_duration_sec()=
+*** =calendar::conv_duration_sec()= - Unit-conversion from duration[unit] to seconds
 #+begin_src f90
-real(kind=KRC) function conv_duration_sec(dur, unit, refsec, jcalh)
-  real(kind=KRC),  intent(in)          :: dur
-  character(len=*),intent(in)          :: unit
-  real(kind=KRC),  intent(in)          :: refsec
-  integer,         intent(in),optional :: jcalh
+  real(kind=KRC) function conv_duration_sec(dur, unit, refsec, jcalh)
+    real(kind=KRC),  intent(in)          :: dur
+    character(len=*),intent(in)          :: unit
+    real(kind=KRC),  intent(in)          :: refsec
+    integer,         intent(in),optional :: jcalh
 #+end_src
-*** =calendar::conv_string_acalendar()=
+*** =calendar::conv_sec_duration()= - Unit-conversion from seconds to duration[unit]
 #+begin_src f90
-integer(dim=6) function conv_string_acalendar(str)
+  real(kind=KRC) function conv_sec_duration(sec, unit, refsec, jcalh)
+    real(kind=KRC),  intent(in)          :: sec
+    character(len=*),intent(in)          :: unit
+    real(kind=KRC),  intent(in)          :: refsec
+    integer,         intent(in),optional :: jcalh
+#+end_src
+
+*** =calendar::conv_string_acalendar()= - Parse string into calendar YMD HMS array
+#+begin_src f90
+integer,dimension(6) function conv_string_acalendar(str)
 character(len=*),intent(in)  :: str
 #+end_src
-*** =calendar::conv_acalendar_string()=
+*** =calendar::conv_acalendar_string()= - Format string from calendar YMD HMS
 #+begin_src f90
 subroutine conv_string_acalendar(str, y,mo,d,h,mi,s)
   character(len=*),intent(out) :: str
   integer,         intent(in)  :: y,mo,d,h,mi,s
 #+end_src
 ** calendar operation
-*** =calendar::advance_csec()=
+*** =calendar::advance_csec()= - Advance calendar-second by duration[unit]
 #+begin_src f90
-real(kind=KRC) function advance_csec(dur, unit, refsec, xk, jcalh)
+real(kind=KRC) function advance_csec(dur, unit, refsec, mold, jcalh)
   real(kind=KRC),  intent(in)          :: dur
   real(kind=KRC),  intent(in)          :: refsec
   character(len=*),intent(in)          :: unit
-  real(kind=KRC),  intent(in)          :: xk ! dummy
+  real(kind=KRC),  intent(in)          :: mold ! dummy
   integer,         intent(in),optional :: jcalh
 #+end_src
-*** =calendar::is_passed()=
+*** =calendar::is_passed()= - Check whether calendar-second passes duration[unit]
 #+begin_src f90
 logical function is_passed(csec, refsec, orgsec, dur, unit, jcalh)
   real(kind=KRC),  intent(in)          :: csec, refsec, orgsec, dur
   character(len=*),intent(in)          :: unit
   integer,         intent(in),optional :: jcalh
 #+end_src
-*** =calendar::is_passed_compat()=
+*** =calendar::is_passed_compat()= - Check whether calendar-second passes duration[unit]
 #+begin_src f90
 logical function is_passed_compat(csec, refsec, orgsec, dur, unit, jcalh)
   real(kind=KRC),  intent(in)          :: csec, refsec, orgsec, dur
@@ -619,3 +661,6 @@ ndays = GetMonthNumDays(yyyy, mo)
 Copyright 2020, 2021 Japan Agency for Marine-Earth Science and Technology
 Licensed under the Apache License, Version 2.0
   (https://www.apache.org/licenses/LICENSE-2.0)
+
+#  LocalWords:  TOUZA SAITO Fuyuki css src Fortran saitofuyuki jp ILS
+#  LocalWords:  jamstec MIROC README MATSIRO cp miroc matsiro ils trs

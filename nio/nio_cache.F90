@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:45:23 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 11:09:03 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023,2024,2025
@@ -236,7 +236,7 @@ contains
     integer,         intent(in),optional :: icomm
     integer,         intent(in),optional :: ncache
     character(len=*),intent(in),optional :: sep
-    integer lv, md, lmd, chmd
+    integer lv, md, lmd
 
     ierr = 0
 
@@ -469,7 +469,7 @@ contains
     use TOUZA_Nio_std,only: is_file_opened
     implicit none
     character(len=*),intent(in)  :: path
-    integer u, h, jc
+    integer u, jc
     u = is_file_opened(path)
     if (u.ge.0) then
        handle = conv_u2handle(u)
@@ -1706,7 +1706,7 @@ contains
        ttmp = 'cache'
     endif
     if (is_msglev_DETAIL(levv-1)) then
-       if (ierr.eq.0) call show_header(ierr, grp%h, tag=ttmp, u=utmp, lev=levv)
+       if (ierr.eq.0) call show_header(ierr, grp%h, tag=ttmp, u=utmp, levv=lv)
     endif
     if (ierr.eq.0) then
        if (utmp.ge.0) then

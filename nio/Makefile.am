@@ -1,7 +1,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2025/05/23 10:58:20 fuyuki Makefile.am>
+# Time-stamp: <2025/07/10 21:52:31 fuyuki Makefile.am>
 
 # Copyright (C) 2021-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -131,6 +131,7 @@ $(check_targets_all):
 
 $(WTEST): $(srcdir)/$(WTESTin)
 	@if sed -e 's!@srcdir@!$(srcdir)!g' \
+	        -e 's![@]FC_COMPILER_VENDOR[@]!@FC_COMPILER_VENDOR@!' \
 		$(srcdir)/$(WTESTin) > $@; \
 	then chmod +x $@; \
 	else rm -f $@; fi

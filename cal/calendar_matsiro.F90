@@ -1,10 +1,10 @@
 !!!_! calendar_matsiro.F90 - touza/calendar: (sample) matsiro interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2021/11/14 15:50:14 fuyuki calendar_matsiro.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 15:58:33 fuyuki calendar_matsiro.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020, 2021
+! Copyright (C) 2020-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -18,9 +18,8 @@
 #include "touza_std.h"
 !!!_@ calendar_matsiro - calendar/matsiro compatible procedures
 module TOUZA_Cal_matsiro
-  use TOUZA_Cal,only: &
-       & KRC, &
-       & p_grego_i, p_grego_l, p_ideal
+  use TOUZA_Cal,only: KRC
+  use TOUZA_Cal,only: p_grego_i, p_grego_l, p_ideal
 !!!_ = declaration
   implicit none
 !!!_  * private
@@ -82,15 +81,14 @@ contains
   integer function get_interval &
        & (cal_a, cal_b) &
        &  result(dsec)
-    use TOUZA_Cal, only: &
-         & conv_date_cday, conv_time_tsec
+    use TOUZA_Cal, only: conv_date_cday, conv_time_tsec
     implicit none
     integer,intent(in) :: cal_a(6)
     integer,intent(in) :: cal_b(6)
     integer cdaya, cdayb
     integer tseca, tsecb
-    cdaya = conv_date_cday(cal_a(1:3), xk=cdaya)
-    cdayb = conv_date_cday(cal_b(1:3), xk=cdayb)
+    cdaya = conv_date_cday(cal_a(1:3), mold=cdaya)
+    cdayb = conv_date_cday(cal_b(1:3), mold=cdayb)
     tseca = conv_time_tsec(cal_a(4:6))
     tsecb = conv_time_tsec(cal_b(4:6))
 
@@ -102,9 +100,8 @@ contains
   ! cal_d = cal_r + dsec
   subroutine calendar_advance &
        & (cal_d, cal_r, dsec)
-    use TOUZA_Cal, only: &
-         & conv_date_cday, conv_time_tsec, &
-         & conv_cday_adate, conv_tsec_atime
+    use TOUZA_Cal,only: conv_date_cday, conv_time_tsec
+    use TOUZA_Cal,only: conv_cday_adate, conv_tsec_atime
     implicit none
     integer,intent(out) :: cal_d(6)
     integer,intent(in)  :: cal_r(6)
@@ -113,7 +110,7 @@ contains
     integer cday
     integer tsec
 
-    cday = conv_date_cday(cal_r(1:3), xk=cday)
+    cday = conv_date_cday(cal_r(1:3), mold=cday)
     tsec = conv_time_tsec(cal_r(4:6))
     tsec = tsec + dsec
 
