@@ -17,7 +17,7 @@
 # TOUZA/Nio Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Oct 11 2021
-# Time-stamp: <2025/05/23 10:58:20 fuyuki Makefile.am>
+# Time-stamp: <2025/07/10 21:52:31 fuyuki Makefile.am>
 
 # Copyright (C) 2021-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -25,7 +25,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Wed Jun 11 09:48:21 JST 2025
+# from AX_AM_MACROS_STATIC on Sun Aug 17 19:09:35 JST 2025
 
 
 
@@ -136,8 +136,7 @@ am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
 	$(top_srcdir)/std/mt_local.m4 $(top_srcdir)/emu/mt_local.m4 \
 	$(top_srcdir)/cal/mt_local.m4 $(top_srcdir)/trp/mt_local.m4 \
 	$(top_srcdir)/ppp/mt_local.m4 $(top_srcdir)/nio/mt_local.m4 \
-	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/zbt/mt_local.m4 \
-	$(top_srcdir)/configure.ac
+	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(include_HEADERS) \
@@ -611,6 +610,7 @@ FCFLAGS = @FCFLAGS@
 FCFLAGS_F = @FCFLAGS_F@
 FCFLAGS_F90 = @FCFLAGS_F90@
 FCLIBS = @FCLIBS@
+FC_COMPILER_VENDOR = @FC_COMPILER_VENDOR@
 FC_DEFINE = @FC_DEFINE@
 FC_INCLUDE_touza_ami = @FC_INCLUDE_touza_ami@
 FC_INCLUDE_touza_cal = @FC_INCLUDE_touza_cal@
@@ -619,7 +619,6 @@ FC_INCLUDE_touza_nio = @FC_INCLUDE_touza_nio@
 FC_INCLUDE_touza_ppp = @FC_INCLUDE_touza_ppp@
 FC_INCLUDE_touza_std = @FC_INCLUDE_touza_std@
 FC_INCLUDE_touza_trp = @FC_INCLUDE_touza_trp@
-FC_INCLUDE_touza_zbt = @FC_INCLUDE_touza_zbt@
 FC_LDADD_touza_ami = @FC_LDADD_touza_ami@
 FC_LDADD_touza_cal = @FC_LDADD_touza_cal@
 FC_LDADD_touza_emu = @FC_LDADD_touza_emu@
@@ -627,7 +626,6 @@ FC_LDADD_touza_nio = @FC_LDADD_touza_nio@
 FC_LDADD_touza_ppp = @FC_LDADD_touza_ppp@
 FC_LDADD_touza_std = @FC_LDADD_touza_std@
 FC_LDADD_touza_trp = @FC_LDADD_touza_trp@
-FC_LDADD_touza_zbt = @FC_LDADD_touza_zbt@
 FC_MODEXT = @FC_MODEXT@
 FC_MODINC = @FC_MODINC@
 FC_MODOUT = @FC_MODOUT@
@@ -638,7 +636,6 @@ FC_MODULE_touza_nio = @FC_MODULE_touza_nio@
 FC_MODULE_touza_ppp = @FC_MODULE_touza_ppp@
 FC_MODULE_touza_std = @FC_MODULE_touza_std@
 FC_MODULE_touza_trp = @FC_MODULE_touza_trp@
-FC_MODULE_touza_zbt = @FC_MODULE_touza_zbt@
 FFLAGS = @FFLAGS@
 FGREP = @FGREP@
 FILECMD = @FILECMD@
@@ -677,6 +674,8 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENMP_FCFLAGS = @OPENMP_FCFLAGS@
+OPENMP_FFLAGS = @OPENMP_FFLAGS@
 OPT_STDERR_UNIT = @OPT_STDERR_UNIT@
 OPT_STDIN_UNIT = @OPT_STDIN_UNIT@
 OPT_STDOUT_UNIT = @OPT_STDOUT_UNIT@
@@ -695,14 +694,6 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
-PYTHON = @PYTHON@
-PYTHON_BIN = @PYTHON_BIN@
-PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
-PYTHON_INCLUDE_DIR = @PYTHON_INCLUDE_DIR@
-PYTHON_LIB = @PYTHON_LIB@
-PYTHON_PLATFORM = @PYTHON_PLATFORM@
-PYTHON_PREFIX = @PYTHON_PREFIX@
-PYTHON_VERSION = @PYTHON_VERSION@
 RANLIB = @RANLIB@
 REALPATH = @REALPATH@
 SED = @SED@
@@ -743,7 +734,6 @@ builddir_touza_nio = @builddir_touza_nio@
 builddir_touza_ppp = @builddir_touza_ppp@
 builddir_touza_std = @builddir_touza_std@
 builddir_touza_trp = @builddir_touza_trp@
-builddir_touza_zbt = @builddir_touza_zbt@
 datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
@@ -768,13 +758,9 @@ moddir = @moddir@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 pkgconfig_CPPFLAGS = @pkgconfig_CPPFLAGS@
-pkgpyexecdir = @pkgpyexecdir@
-pkgpythondir = @pkgpythondir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-pyexecdir = @pyexecdir@
-pythondir = @pythondir@
 runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
@@ -786,7 +772,6 @@ srcdir_touza_nio = @srcdir_touza_nio@
 srcdir_touza_ppp = @srcdir_touza_ppp@
 srcdir_touza_std = @srcdir_touza_std@
 srcdir_touza_trp = @srcdir_touza_trp@
-srcdir_touza_zbt = @srcdir_touza_zbt@
 subdirs_extra = @subdirs_extra@
 switchdir = @switchdir@
 sysconfdir = @sysconfdir@
@@ -1696,7 +1681,8 @@ install-mod: install-mod-recursive
 
 install-mod-am:
 @INSTALL_MODULES_TRUE@	@$(NORMAL_INSTALL)
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if $(AM_V_P); then echo " INST   [modules]"; fi
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		rm -f $(LIST_MODFILES); touch $(LIST_MODFILES);\
 @INSTALL_MODULES_TRUE@		for dir in $(DESTDIR)$(moddir); do \
@@ -1730,7 +1716,7 @@ uninstall-mod-recursive:
 uninstall-mod: uninstall-mod-recursive
 
 uninstall-mod-am:
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		list=`test -e $(LIST_MODFILES) && cat $(LIST_MODFILES)`; \
 @INSTALL_MODULES_TRUE@		files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
@@ -1774,6 +1760,7 @@ $(check_targets_all):
 
 $(WTEST): $(srcdir)/$(WTESTin)
 	@if sed -e 's!@srcdir@!$(srcdir)!g' \
+	        -e 's![@]FC_COMPILER_VENDOR[@]!@FC_COMPILER_VENDOR@!' \
 		$(srcdir)/$(WTESTin) > $@; \
 	then chmod +x $@; \
 	else rm -f $@; fi

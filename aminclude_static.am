@@ -1,6 +1,6 @@
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Wed Jun 11 09:48:23 JST 2025
+# from AX_AM_MACROS_STATIC on Sun Aug 17 19:09:36 JST 2025
 
 BUILD_AUX  =    $(top_srcdir)/build-aux
 CLEANFILES =
@@ -88,7 +88,8 @@ install-mod-am:
 install_sh_MODULE = $(install_sh_DATA) -C
 if INSTALL_MODULES
 	@$(NORMAL_INSTALL)
-	if test -z '$(moddir)'; then false; \
+	@if $(AM_V_P); then echo " INST   [modules]"; fi
+	@if test -z '$(moddir)'; then false; \
 	else \
 		rm -f $(LIST_MODFILES); touch $(LIST_MODFILES);\
 		for dir in $(DESTDIR)$(moddir); do \
@@ -126,7 +127,7 @@ uninstall-mod: uninstall-mod-recursive
 
 uninstall-mod-am:
 if INSTALL_MODULES
-	if test -z '$(moddir)'; then false; \
+	@if test -z '$(moddir)'; then false; \
 	else \
 		list=`test -e $(LIST_MODFILES) && cat $(LIST_MODFILES)`; \
 		files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \

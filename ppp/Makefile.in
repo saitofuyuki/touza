@@ -17,15 +17,16 @@
 # touza/ppp Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jan 26 2022
-# Time-stamp: <2024/07/11 21:26:25 fuyuki Makefile.am>
+# Time-stamp: <2025/07/14 12:55:50 fuyuki Makefile.am>
 
-# Copyright (C) 2022-2024
+# Copyright (C) 2022-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Wed Jun 11 09:48:21 JST 2025
+# from AX_AM_MACROS_STATIC on Sun Aug 17 19:09:35 JST 2025
+
 
 
 
@@ -113,15 +114,15 @@ target_triplet = @target@
 check_PROGRAMS = test_ppp$(EXEEXT) test_ppp_std$(EXEEXT) \
 	test_ppp_amng$(EXEEXT) test_ppp_king$(EXEEXT) \
 	test_ppp_comm$(EXEEXT) test_ppp_miroc_a$(EXEEXT) \
-	test_ppp_miroc_o$(EXEEXT) test_ppp_miroc_s$(EXEEXT)
+	test_ppp_miroc_o$(EXEEXT) test_ppp_miroc_s$(EXEEXT) \
+	test_ppp_miroc_m$(EXEEXT) test_ppp_miroc_mi$(EXEEXT)
 subdir = ppp
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
 	$(top_srcdir)/std/mt_local.m4 $(top_srcdir)/emu/mt_local.m4 \
 	$(top_srcdir)/cal/mt_local.m4 $(top_srcdir)/trp/mt_local.m4 \
 	$(top_srcdir)/ppp/mt_local.m4 $(top_srcdir)/nio/mt_local.m4 \
-	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/zbt/mt_local.m4 \
-	$(top_srcdir)/configure.ac
+	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(include_HEADERS) \
@@ -158,18 +159,27 @@ test_ppp_king_DEPENDENCIES = $(am__DEPENDENCIES_2)
 am_test_ppp_miroc_a_OBJECTS = test_ppp_miroc_a-ppp_miroc.$(OBJEXT)
 test_ppp_miroc_a_OBJECTS = $(am_test_ppp_miroc_a_OBJECTS)
 test_ppp_miroc_a_DEPENDENCIES = $(am__DEPENDENCIES_2)
-am__objects_2 = test_ppp_miroc_o-ppp_miroc.$(OBJEXT)
-am_test_ppp_miroc_o_OBJECTS = $(am__objects_2)
-test_ppp_miroc_o_OBJECTS = $(am_test_ppp_miroc_o_OBJECTS)
+am__objects_2 = test_ppp_miroc_m-ppp_miroc.$(OBJEXT)
+am_test_ppp_miroc_m_OBJECTS = $(am__objects_2)
+test_ppp_miroc_m_OBJECTS = $(am_test_ppp_miroc_m_OBJECTS)
 am__DEPENDENCIES_3 = $(am__DEPENDENCIES_2)
+test_ppp_miroc_m_DEPENDENCIES = $(am__DEPENDENCIES_3)
+am__objects_3 = test_ppp_miroc_mi-ppp_miroc.$(OBJEXT)
+am_test_ppp_miroc_mi_OBJECTS = $(am__objects_3)
+test_ppp_miroc_mi_OBJECTS = $(am_test_ppp_miroc_mi_OBJECTS)
+test_ppp_miroc_mi_DEPENDENCIES = $(am__DEPENDENCIES_3)
+am__objects_4 = test_ppp_miroc_o-ppp_miroc.$(OBJEXT)
+am_test_ppp_miroc_o_OBJECTS = $(am__objects_4)
+test_ppp_miroc_o_OBJECTS = $(am_test_ppp_miroc_o_OBJECTS)
 test_ppp_miroc_o_DEPENDENCIES = $(am__DEPENDENCIES_3)
-am__objects_3 = test_ppp_miroc_s-ppp_miroc.$(OBJEXT)
-am_test_ppp_miroc_s_OBJECTS = $(am__objects_3)
+am__objects_5 = test_ppp_miroc_s-ppp_miroc.$(OBJEXT)
+am_test_ppp_miroc_s_OBJECTS = $(am__objects_5)
 test_ppp_miroc_s_OBJECTS = $(am_test_ppp_miroc_s_OBJECTS)
 test_ppp_miroc_s_DEPENDENCIES = $(am__DEPENDENCIES_3)
 am_test_ppp_std_OBJECTS = test_ppp_std-ppp_std.$(OBJEXT)
 test_ppp_std_OBJECTS = $(am_test_ppp_std_OBJECTS)
 test_ppp_std_DEPENDENCIES = $(am__DEPENDENCIES_1)
+SCRIPTS = $(noinst_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -223,12 +233,14 @@ SOURCES = $(libtouza_local_la_SOURCES) \
 	$(EXTRA_libtouza_local_la_SOURCES) $(test_ppp_SOURCES) \
 	$(test_ppp_amng_SOURCES) $(test_ppp_comm_SOURCES) \
 	$(test_ppp_king_SOURCES) $(test_ppp_miroc_a_SOURCES) \
+	$(test_ppp_miroc_m_SOURCES) $(test_ppp_miroc_mi_SOURCES) \
 	$(test_ppp_miroc_o_SOURCES) $(test_ppp_miroc_s_SOURCES) \
 	$(test_ppp_std_SOURCES)
 DIST_SOURCES = $(libtouza_local_la_SOURCES) \
 	$(EXTRA_libtouza_local_la_SOURCES) $(test_ppp_SOURCES) \
 	$(test_ppp_amng_SOURCES) $(test_ppp_comm_SOURCES) \
 	$(test_ppp_king_SOURCES) $(test_ppp_miroc_a_SOURCES) \
+	$(test_ppp_miroc_m_SOURCES) $(test_ppp_miroc_mi_SOURCES) \
 	$(test_ppp_miroc_o_SOURCES) $(test_ppp_miroc_s_SOURCES) \
 	$(test_ppp_std_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
@@ -362,6 +374,7 @@ FCFLAGS = @FCFLAGS@
 FCFLAGS_F = @FCFLAGS_F@
 FCFLAGS_F90 = @FCFLAGS_F90@
 FCLIBS = @FCLIBS@
+FC_COMPILER_VENDOR = @FC_COMPILER_VENDOR@
 FC_DEFINE = @FC_DEFINE@
 FC_INCLUDE_touza_ami = @FC_INCLUDE_touza_ami@
 FC_INCLUDE_touza_cal = @FC_INCLUDE_touza_cal@
@@ -370,7 +383,6 @@ FC_INCLUDE_touza_nio = @FC_INCLUDE_touza_nio@
 FC_INCLUDE_touza_ppp = @FC_INCLUDE_touza_ppp@
 FC_INCLUDE_touza_std = @FC_INCLUDE_touza_std@
 FC_INCLUDE_touza_trp = @FC_INCLUDE_touza_trp@
-FC_INCLUDE_touza_zbt = @FC_INCLUDE_touza_zbt@
 FC_LDADD_touza_ami = @FC_LDADD_touza_ami@
 FC_LDADD_touza_cal = @FC_LDADD_touza_cal@
 FC_LDADD_touza_emu = @FC_LDADD_touza_emu@
@@ -378,7 +390,6 @@ FC_LDADD_touza_nio = @FC_LDADD_touza_nio@
 FC_LDADD_touza_ppp = @FC_LDADD_touza_ppp@
 FC_LDADD_touza_std = @FC_LDADD_touza_std@
 FC_LDADD_touza_trp = @FC_LDADD_touza_trp@
-FC_LDADD_touza_zbt = @FC_LDADD_touza_zbt@
 FC_MODEXT = @FC_MODEXT@
 FC_MODINC = @FC_MODINC@
 FC_MODOUT = @FC_MODOUT@
@@ -389,7 +400,6 @@ FC_MODULE_touza_nio = @FC_MODULE_touza_nio@
 FC_MODULE_touza_ppp = @FC_MODULE_touza_ppp@
 FC_MODULE_touza_std = @FC_MODULE_touza_std@
 FC_MODULE_touza_trp = @FC_MODULE_touza_trp@
-FC_MODULE_touza_zbt = @FC_MODULE_touza_zbt@
 FFLAGS = @FFLAGS@
 FGREP = @FGREP@
 FILECMD = @FILECMD@
@@ -428,6 +438,8 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENMP_FCFLAGS = @OPENMP_FCFLAGS@
+OPENMP_FFLAGS = @OPENMP_FFLAGS@
 OPT_STDERR_UNIT = @OPT_STDERR_UNIT@
 OPT_STDIN_UNIT = @OPT_STDIN_UNIT@
 OPT_STDOUT_UNIT = @OPT_STDOUT_UNIT@
@@ -446,14 +458,6 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
 PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
-PYTHON = @PYTHON@
-PYTHON_BIN = @PYTHON_BIN@
-PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
-PYTHON_INCLUDE_DIR = @PYTHON_INCLUDE_DIR@
-PYTHON_LIB = @PYTHON_LIB@
-PYTHON_PLATFORM = @PYTHON_PLATFORM@
-PYTHON_PREFIX = @PYTHON_PREFIX@
-PYTHON_VERSION = @PYTHON_VERSION@
 RANLIB = @RANLIB@
 REALPATH = @REALPATH@
 SED = @SED@
@@ -494,7 +498,6 @@ builddir_touza_nio = @builddir_touza_nio@
 builddir_touza_ppp = @builddir_touza_ppp@
 builddir_touza_std = @builddir_touza_std@
 builddir_touza_trp = @builddir_touza_trp@
-builddir_touza_zbt = @builddir_touza_zbt@
 datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
@@ -519,13 +522,9 @@ moddir = @moddir@
 oldincludedir = @oldincludedir@
 pdfdir = @pdfdir@
 pkgconfig_CPPFLAGS = @pkgconfig_CPPFLAGS@
-pkgpyexecdir = @pkgpyexecdir@
-pkgpythondir = @pkgpythondir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
-pyexecdir = @pyexecdir@
-pythondir = @pythondir@
 runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
@@ -537,7 +536,6 @@ srcdir_touza_nio = @srcdir_touza_nio@
 srcdir_touza_ppp = @srcdir_touza_ppp@
 srcdir_touza_std = @srcdir_touza_std@
 srcdir_touza_trp = @srcdir_touza_trp@
-srcdir_touza_zbt = @srcdir_touza_zbt@
 subdirs_extra = @subdirs_extra@
 switchdir = @switchdir@
 sysconfdir = @sysconfdir@
@@ -549,10 +547,10 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-EXTRA_DIST = README-ppp.org
+EXTRA_DIST = README-ppp.org $(WTCin)
 SUBDIRS = .
 BUILD_AUX = $(top_srcdir)/build-aux
-CLEANFILES = 
+CLEANFILES = $(noinst_SCRIPTS) $(MIROCH)
 MOSTLYCLEANFILES = $(am__append_1) $(am__append_3)
 LIST_MODFILES = .modfiles
 DEBUG = 
@@ -597,31 +595,41 @@ test_ppp_miroc_o_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_PPP_MIROC=2
 test_ppp_miroc_s_SOURCES = $(test_ppp_miroc_a_SOURCES)
 test_ppp_miroc_s_LDADD = $(test_ppp_miroc_a_LDADD)
 test_ppp_miroc_s_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_PPP_MIROC=3
+test_ppp_miroc_m_SOURCES = $(test_ppp_miroc_a_SOURCES)
+test_ppp_miroc_m_LDADD = $(test_ppp_miroc_a_LDADD)
+test_ppp_miroc_m_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_PPP_MIROC=4
+test_ppp_miroc_mi_SOURCES = $(test_ppp_miroc_a_SOURCES)
+test_ppp_miroc_mi_LDADD = $(test_ppp_miroc_a_LDADD)
+test_ppp_miroc_mi_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_PPP_MIROC=5
+noinst_SCRIPTS = $(WTC)
+WTC_LOGDIR = log
+WTC = wtc.sh
+WTCin = $(WTC).in
 @enable_module_dependencies_TRUE@ppp_lo_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT) $(builddir)/touza_ppp_king.$(FC_MODEXT) $(builddir)/touza_ppp_comm.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@ppp_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT) $(builddir)/touza_ppp_king.$(FC_MODEXT) $(builddir)/touza_ppp_comm.$(FC_MODEXT) $(builddir)/touza_ppp.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@ppp_amng_lo_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@ppp_amng_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ppp_amng_lo_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ppp_amng_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@ppp_comm_lo_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@ppp_comm_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT) $(builddir)/touza_ppp_comm.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@ppp_king_lo_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@ppp_king_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT) $(builddir)/touza_ppp_king.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@ppp_miroc_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT) $(top_builddir)/emu/touza_emu.$(FC_MODEXT) $(builddir)/touza_ppp_miroc.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@ppp_std_lo_MODULE_DEPS = $(top_builddir)/std/touza_std_utl.$(FC_MODEXT) $(top_builddir)/std/touza_std_log.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(top_builddir)/std/touza_std_env.$(FC_MODEXT) $(top_builddir)/std/touza_std_htb.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@ppp_std_o_MODULE_DEPS = $(top_builddir)/std/touza_std_utl.$(FC_MODEXT) $(top_builddir)/std/touza_std_log.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(top_builddir)/std/touza_std_env.$(FC_MODEXT) $(top_builddir)/std/touza_std_htb.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/touza_ppp_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ppp_std_lo_MODULE_DEPS = $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@ppp_std_o_MODULE_DEPS = $(top_builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/touza_ppp_std.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@test_ppp_ppp_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT) $(builddir)/touza_ppp_king.$(FC_MODEXT) $(builddir)/touza_ppp_comm.$(FC_MODEXT) $(builddir)/touza_ppp.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_ppp_amng_ppp_amng_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@test_ppp_amng_ppp_amng_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@test_ppp_comm_ppp_comm_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT) $(builddir)/touza_ppp_comm.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@test_ppp_king_ppp_king_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT) $(builddir)/touza_ppp_king.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@test_ppp_miroc_a_ppp_miroc_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT) $(top_builddir)/emu/touza_emu.$(FC_MODEXT) $(builddir)/touza_ppp_miroc.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@test_ppp_miroc_o_ppp_miroc_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT) $(top_builddir)/emu/touza_emu.$(FC_MODEXT) $(builddir)/touza_ppp_miroc.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@test_ppp_miroc_s_ppp_miroc_o_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT) $(top_builddir)/emu/touza_emu.$(FC_MODEXT) $(builddir)/touza_ppp_miroc.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@test_ppp_std_ppp_std_o_MODULE_DEPS = $(top_builddir)/std/touza_std_utl.$(FC_MODEXT) $(top_builddir)/std/touza_std_log.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(top_builddir)/std/touza_std_env.$(FC_MODEXT) $(top_builddir)/std/touza_std_htb.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/touza_ppp_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@test_ppp_std_ppp_std_o_MODULE_DEPS = $(top_builddir)/std/touza_std.$(FC_MODEXT) $(builddir)/touza_ppp_std.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@touza_ppp_mod_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT) $(builddir)/touza_ppp_king.$(FC_MODEXT) $(builddir)/touza_ppp_comm.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_ppp_amng_mod_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_ppp_amng_mod_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@touza_ppp_comm_mod_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@touza_ppp_king_mod_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT)
 @enable_module_dependencies_TRUE@touza_ppp_miroc_mod_MODULE_DEPS = $(builddir)/touza_ppp_std.$(FC_MODEXT) $(builddir)/touza_ppp.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT) $(top_builddir)/emu/touza_emu.$(FC_MODEXT) $(builddir)/touza_ppp_amng.$(FC_MODEXT)
-@enable_module_dependencies_TRUE@touza_ppp_std_mod_MODULE_DEPS = $(top_builddir)/std/touza_std_utl.$(FC_MODEXT) $(top_builddir)/std/touza_std_log.$(FC_MODEXT) $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT) $(top_builddir)/std/touza_std_env.$(FC_MODEXT) $(top_builddir)/std/touza_std_htb.$(FC_MODEXT) $(top_builddir)/std/touza_std.$(FC_MODEXT)
+@enable_module_dependencies_TRUE@touza_ppp_std_mod_MODULE_DEPS = $(top_builddir)/std/touza_std.$(FC_MODEXT)
 all: all-recursive
 
 .SUFFIXES:
@@ -693,6 +701,14 @@ test_ppp_miroc_a$(EXEEXT): $(test_ppp_miroc_a_OBJECTS) $(test_ppp_miroc_a_DEPEND
 	@rm -f test_ppp_miroc_a$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_ppp_miroc_a_OBJECTS) $(test_ppp_miroc_a_LDADD) $(LIBS)
 
+test_ppp_miroc_m$(EXEEXT): $(test_ppp_miroc_m_OBJECTS) $(test_ppp_miroc_m_DEPENDENCIES) $(EXTRA_test_ppp_miroc_m_DEPENDENCIES) 
+	@rm -f test_ppp_miroc_m$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_ppp_miroc_m_OBJECTS) $(test_ppp_miroc_m_LDADD) $(LIBS)
+
+test_ppp_miroc_mi$(EXEEXT): $(test_ppp_miroc_mi_OBJECTS) $(test_ppp_miroc_mi_DEPENDENCIES) $(EXTRA_test_ppp_miroc_mi_DEPENDENCIES) 
+	@rm -f test_ppp_miroc_mi$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_ppp_miroc_mi_OBJECTS) $(test_ppp_miroc_mi_LDADD) $(LIBS)
+
 test_ppp_miroc_o$(EXEEXT): $(test_ppp_miroc_o_OBJECTS) $(test_ppp_miroc_o_DEPENDENCIES) $(EXTRA_test_ppp_miroc_o_DEPENDENCIES) 
 	@rm -f test_ppp_miroc_o$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_ppp_miroc_o_OBJECTS) $(test_ppp_miroc_o_LDADD) $(LIBS)
@@ -749,6 +765,18 @@ test_ppp_miroc_a-ppp_miroc.o: ppp_miroc.F90
 
 test_ppp_miroc_a-ppp_miroc.obj: ppp_miroc.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ppp_miroc_a_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ppp_miroc_a-ppp_miroc.obj `if test -f 'ppp_miroc.F90'; then $(CYGPATH_W) 'ppp_miroc.F90'; else $(CYGPATH_W) '$(srcdir)/ppp_miroc.F90'; fi`
+
+test_ppp_miroc_m-ppp_miroc.o: ppp_miroc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ppp_miroc_m_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ppp_miroc_m-ppp_miroc.o `test -f 'ppp_miroc.F90' || echo '$(srcdir)/'`ppp_miroc.F90
+
+test_ppp_miroc_m-ppp_miroc.obj: ppp_miroc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ppp_miroc_m_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ppp_miroc_m-ppp_miroc.obj `if test -f 'ppp_miroc.F90'; then $(CYGPATH_W) 'ppp_miroc.F90'; else $(CYGPATH_W) '$(srcdir)/ppp_miroc.F90'; fi`
+
+test_ppp_miroc_mi-ppp_miroc.o: ppp_miroc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ppp_miroc_mi_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ppp_miroc_mi-ppp_miroc.o `test -f 'ppp_miroc.F90' || echo '$(srcdir)/'`ppp_miroc.F90
+
+test_ppp_miroc_mi-ppp_miroc.obj: ppp_miroc.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ppp_miroc_mi_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ppp_miroc_mi-ppp_miroc.obj `if test -f 'ppp_miroc.F90'; then $(CYGPATH_W) 'ppp_miroc.F90'; else $(CYGPATH_W) '$(srcdir)/ppp_miroc.F90'; fi`
 
 test_ppp_miroc_o-ppp_miroc.o: ppp_miroc.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_ppp_miroc_o_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_ppp_miroc_o-ppp_miroc.o `test -f 'ppp_miroc.F90' || echo '$(srcdir)/'`ppp_miroc.F90
@@ -975,7 +1003,7 @@ distdir-am: $(DISTFILES)
 check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: check-recursive
-all-am: Makefile $(LTLIBRARIES) $(DATA) $(HEADERS)
+all-am: Makefile $(LTLIBRARIES) $(SCRIPTS) $(DATA) $(HEADERS)
 installdirs: installdirs-recursive
 installdirs-am:
 	for dir in "$(DESTDIR)$(switchdir)" "$(DESTDIR)$(includedir)"; do \
@@ -1161,7 +1189,8 @@ install-mod: install-mod-recursive
 
 install-mod-am:
 @INSTALL_MODULES_TRUE@	@$(NORMAL_INSTALL)
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if $(AM_V_P); then echo " INST   [modules]"; fi
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		rm -f $(LIST_MODFILES); touch $(LIST_MODFILES);\
 @INSTALL_MODULES_TRUE@		for dir in $(DESTDIR)$(moddir); do \
@@ -1195,7 +1224,7 @@ uninstall-mod-recursive:
 uninstall-mod: uninstall-mod-recursive
 
 uninstall-mod-am:
-@INSTALL_MODULES_TRUE@	if test -z '$(moddir)'; then false; \
+@INSTALL_MODULES_TRUE@	@if test -z '$(moddir)'; then false; \
 @INSTALL_MODULES_TRUE@	else \
 @INSTALL_MODULES_TRUE@		list=`test -e $(LIST_MODFILES) && cat $(LIST_MODFILES)`; \
 @INSTALL_MODULES_TRUE@		files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
@@ -1225,6 +1254,13 @@ check-bin: check-bin-recursive
 check-bin-am:$(check_PROGRAMS)
 
 install-data-hook: install-switchDATA
+
+$(WTC): $(srcdir)/$(WTCin)
+	@echo "Generate $@."
+	@if sed -e 's![@]srcdir@!$(srcdir)!g' \
+			-e 's![@]MPIRUN@!$(MPIRUN)!g' $(srcdir)/$(WTCin) > $@; \
+	then chmod +x $@; \
+	else rm -f $@; false; fi
 
 ### automatic dependency
 $(builddir)/ppp.lo: $(srcdir)/ppp.F90 $(top_builddir)/touza_config.h $(srcdir)/touza_ppp.h $(top_srcdir)/touza.h
@@ -1308,15 +1344,7 @@ $(top_builddir)/emu/touza_emu.$(FC_MODEXT):
 
 $(top_builddir)/std/touza_std.$(FC_MODEXT): 
 
-$(top_builddir)/std/touza_std_env.$(FC_MODEXT): 
-
-$(top_builddir)/std/touza_std_htb.$(FC_MODEXT): 
-
-$(top_builddir)/std/touza_std_log.$(FC_MODEXT): 
-
 $(top_builddir)/std/touza_std_mwe.$(FC_MODEXT): 
-
-$(top_builddir)/std/touza_std_utl.$(FC_MODEXT): 
 
 $(top_builddir)/touza_config.h: 
 

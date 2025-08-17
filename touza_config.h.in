@@ -21,9 +21,6 @@
 /* trp is enabled */
 #undef ENABLE_TOUZA_TRP
 
-/* zbt is enabled */
-#undef ENABLE_TOUZA_ZBT
-
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
@@ -51,8 +48,38 @@
 /* whether function atanh works */
 #undef HAVE_FORTRAN_ATANH
 
+/* whether statement backslash_noquote works */
+#undef HAVE_FORTRAN_BACKSLASH_NOQUOTE
+
+/* whether function chdir works */
+#undef HAVE_FORTRAN_CHDIR
+
 /* whether function command_argument_count works */
 #undef HAVE_FORTRAN_COMMAND_ARGUMENT_COUNT
+
+/* whether statement constant_exponent works */
+#undef HAVE_FORTRAN_CONSTANT_EXPONENT
+
+/* whether module dfport works with chdir */
+#undef HAVE_FORTRAN_DFPORT_CHDIR
+
+/* whether module dfport works with getcwd */
+#undef HAVE_FORTRAN_DFPORT_GETCWD
+
+/* whether module dfport works with getenv */
+#undef HAVE_FORTRAN_DFPORT_GETENV
+
+/* whether module dfport works with getlog */
+#undef HAVE_FORTRAN_DFPORT_GETLOG
+
+/* whether module dfport works with hostnam */
+#undef HAVE_FORTRAN_DFPORT_HOSTNAM
+
+/* whether statement error_stop works */
+#undef HAVE_FORTRAN_ERROR_STOP
+
+/* whether statement error_stop works with quiet specifier */
+#undef HAVE_FORTRAN_ERROR_STOP_QUIET
 
 /* whether subroutine etime works */
 #undef HAVE_FORTRAN_ETIME_4
@@ -60,8 +87,17 @@
 /* whether subroutine etime works */
 #undef HAVE_FORTRAN_ETIME_8
 
+/* whether subroutine exit works */
+#undef HAVE_FORTRAN_EXIT
+
 /* whether function exp2 works */
 #undef HAVE_FORTRAN_EXP2
+
+/* whether module f90_unix_dir works with chdir */
+#undef HAVE_FORTRAN_F90_UNIX_DIR_CHDIR
+
+/* whether module f90_unix_dir works with getcwd */
+#undef HAVE_FORTRAN_F90_UNIX_DIR_GETCWD
 
 /* whether module f90_unix_env works with getenv */
 #undef HAVE_FORTRAN_F90_UNIX_ENV_GETENV
@@ -96,6 +132,9 @@
 /* whether subroutine getarg works */
 #undef HAVE_FORTRAN_GETARG
 
+/* whether statement getcwd works */
+#undef HAVE_FORTRAN_GETCWD
+
 /* whether subroutine getenv works */
 #undef HAVE_FORTRAN_GETENV
 
@@ -122,6 +161,12 @@
 
 /* whether module ieee_arithmetic works */
 #undef HAVE_FORTRAN_IEEE_ARITHMETIC
+
+/* whether module ifport works with chdir */
+#undef HAVE_FORTRAN_IFPORT_CHDIR
+
+/* whether module ifport works with getcwd */
+#undef HAVE_FORTRAN_IFPORT_GETCWD
 
 /* whether module ifport works with getenv */
 #undef HAVE_FORTRAN_IFPORT_GETENV
@@ -246,11 +291,17 @@
 /* whether statement open works with stream specifier */
 #undef HAVE_FORTRAN_OPEN_STREAM
 
+/* whether statement stop works with quiet specifier */
+#undef HAVE_FORTRAN_STOP_QUIET
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
 /* Defined if you have NETCDF4 support */
 #undef HAVE_NETCDF4
+
+/* Define if OpenMP is enabled */
+#undef HAVE_OPENMP
 
 /* preprocessor comment */
 #undef HAVE_PP_COMMENT_KEPT
