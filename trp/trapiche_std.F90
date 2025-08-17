@@ -1,7 +1,7 @@
 !!!_! trapiche_std.F90 - TOUZA/Trapiche utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 30 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:11:54 fuyuki trapiche_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/16 16:53:29 fuyuki trapiche_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -17,15 +17,15 @@
 !!!_@ TOUZA_Trp_std - trapiche utilities
 module TOUZA_Trp_std
 !!!_ = declaration
-  use TOUZA_Std_prc,only: KI8, KI32, KI64, KDBL, KFLT
-  use TOUZA_Std_prc,only: check_real_dnm
-  use TOUZA_Std_utl,only: choice, choice_a, condop, control_mode, control_deep, is_first_force
-  use TOUZA_Std_log,only: is_msglev
-  use TOUZA_Std_log,only: is_msglev_severe, is_msglev_debug, is_msglev_normal, is_msglev_detail
-  use TOUZA_Std_log,only: unit_global,      trace_fine,      trace_control
-  use TOUZA_Std_mwe,only: MPI_INTEGER, MPI_STATUS_SIZE, MPI_DOUBLE_PRECISION
-  use TOUZA_Std_mwe,only: MPI_PROBE,   MPI_GET_COUNT
-  use TOUZA_Std_ipc,only: ipc_IBITS
+  use TOUZA_Std,only: KI8, KI32, KI64, KDBL, KFLT
+  use TOUZA_Std,only: check_real_dnm
+  use TOUZA_Std,only: choice, choice_a, condop, control_mode, control_deep, is_first_force
+  use TOUZA_Std,only: is_msglev
+  use TOUZA_Std,only: is_msglev_severe, is_msglev_debug, is_msglev_normal, is_msglev_detail
+  use TOUZA_Std,only: unit_global,      trace_fine,      trace_control
+  use TOUZA_Std,only: MPI_INTEGER, MPI_STATUS_SIZE, MPI_DOUBLE_PRECISION
+  use TOUZA_Std,only: MPI_PROBE,   MPI_GET_COUNT
+  use TOUZA_Std,only: ipc_IBITS
   implicit none
   private
 !!!_  - static

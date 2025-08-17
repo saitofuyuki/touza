@@ -1,9 +1,9 @@
 # touza/emu Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jun 15 2020
-# Time-stamp: <2025/05/23 09:26:20 fuyuki Makefile.am>
+# Time-stamp: <2025/07/03 11:10:47 fuyuki Makefile.am>
 
-# Copyright (C) 2020-2024
+# Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -33,12 +33,17 @@ AM_CPPFLAGS += $(FC_INCLUDE_touza_std)
 TEST_COMMON_LIBS =  $(noinst_LTLIBRARIES)
 TEST_COMMON_LIBS += $(FC_LDADD_touza_std)
 
-check_PROGRAMS =  test_emu_msg test_emu_usi
+check_PROGRAMS =  test_emu_msg test_emu_usi1 test_emu_usi2
 check_PROGRAMS += test_emu_ugg
 
-test_emu_usi_SOURCES  = emu_usi.F90
-test_emu_usi_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_USI=1
-test_emu_usi_LDADD    = $(TEST_COMMON_LIBS)
+test_emu_usi: test_emu_usi1 test_emu_usi2
+
+test_emu_usi1_SOURCES  = emu_usi.F90
+test_emu_usi1_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_USI=1
+test_emu_usi1_LDADD    = $(TEST_COMMON_LIBS)
+test_emu_usi2_SOURCES  = emu_usi.F90
+test_emu_usi2_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_USI=2
+test_emu_usi2_LDADD    = $(TEST_COMMON_LIBS)
 
 test_emu_msg_SOURCES  = emu_msg.F90
 test_emu_msg_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_EMU_MSG=1

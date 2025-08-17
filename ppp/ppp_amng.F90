@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2025/06/06 08:39:42 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/26 14:42:00 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -151,8 +151,9 @@ module TOUZA_Ppp_amng
   public switch_agent,  push_agent, pop_agent, top_agent
   public inquire_agent, is_member
   public query_agent,   source_agent, check_agent, base_agent, clone_agent
+  public trace_agent
   public is_child_agent
-  public diag_maps_batch
+  public diag_maps_batch, show_status
 !!!_ + common interfaces
 contains
 !!!_  & init
@@ -271,12 +272,14 @@ contains
   subroutine init_world &
        & (ierr, u)
     use TOUZA_Ppp_std,only: MPI_COMM_WORLD
+    use TOUZA_Ppp_std,only: trace_err
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
     ierr = 0
     call new_agent_root(ierr, MPI_COMM_WORLD, asp_world)
     if (ierr.eq.0) aworld = check_agent()
+    if (ierr.ne.0) call trace_err(ierr, fun='init_world', u=u)
     return
   end subroutine init_world
 !!!_  - init_stack - stack initialization
@@ -438,6 +441,7 @@ contains
     integer ja, jas
     integer ref
     integer nrref, irref
+    character(len=128) :: txt, name
     character(len=64) :: fmt_rr
     integer nd
 
@@ -445,33 +449,38 @@ contains
     utmp = get_logu(u, ulog)
     ref = choice(aworld, iaref)
 
-    call inquire_agent(ierr, iagent=ref, nrank=nrref, irank=irref)
+    call inquire_agent(ierr, iagent=ref, nrank=nrref, irank=irref, name=name)
 
     if (ierr.eq.0) then
        nd = ndigits(nrref)
 101    format('(I', I0, '.', I0, ', ''-'', I', I0, '.', I0, ')')
        write(fmt_rr, 101) nd, nd, nd, nd
     endif
+    if (ierr.eq.0) then
+102    format('agent map on [', I0, ':', A, ']')
+       write(txt, 102) ref, trim(name)
+       call msg(txt, __MDL__, utmp)
+    endif
     do ja = 0, matbl - 1
        if (atblp(ja)%isrc.lt.0) then
-          if (ierr.eq.0) call diag_map_root(ierr, ja, ref, nrref, irref, utmp, fmt_rr)
+          if (ierr.eq.0) call diag_map_root(ierr, ja, ref, nrref, utmp, fmt_rr)
        else if (atblp(ja)%kflg.eq.flag_base) then
           call msg('----', __MDL__, utmp)
           jas = source_agent(ja)
-          if (ierr.eq.0) call diag_map_family(ierr, jas, ref, nrref, irref, utmp, fmt_rr)
+          if (ierr.eq.0) call diag_map_family(ierr, jas, ref, nrref, utmp, fmt_rr)
        endif
     enddo
   end subroutine diag_maps_batch
 
 !!!_  - diag_map_root
   subroutine diag_map_root &
-       & (ierr, iagent, iaref, nrref, irref, u, fmt_rr)
+       & (ierr, iagent, iaref, nrref, u, fmt_rr)
     use TOUZA_Ppp_std,only: msg
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: iagent
     integer,         intent(in)          :: iaref
-    integer,         intent(in)          :: nrref, irref
+    integer,         intent(in)          :: nrref
     integer,         intent(in),optional :: u
     character(len=*),intent(in),optional :: fmt_rr
     integer utmp
@@ -481,7 +490,7 @@ contains
 
     character(len=32)  :: rr
     character(len=128) :: txt
-    character(len=32)  :: ttgt, tref
+    character(len=32)  :: ttgt
 
     integer jrbgn, jrend, mm
     integer nrtgt, irtgt
@@ -492,7 +501,7 @@ contains
     call inquire_agent(ierr, iagent=iagent, nrank=nrtgt, irank=irtgt)
 102 format('[', I0, ':', A, 1x, I0, '/', I0, ']')
     write(ttgt, 102) iagent, trim(atblp(iagent)%name), irtgt, nrtgt
-    write(tref, 102) iaref,  trim(atblp(iaref)%name),  irref, nrref
+    ! write(tref, 102) iaref,  trim(atblp(iaref)%name),  irref, nrref
 
     do jrbgn = 0, nrref - 1, map_div
        jrend = min(nrref, jrbgn + map_div) - 1
@@ -507,8 +516,8 @@ contains
           call diag_map_string &
                & (ierr, map, iagent, iaref, jrbgn, jrend, map_mod, map_rule)
 111       format('[', A, '] ', &
-               &  A, 1x, A, 1x, A)
-          write(txt, 111) trim(rr), trim(map), trim(ttgt), trim(tref)
+               &  A, 1x, A)
+          write(txt, 111) trim(rr), trim(map), trim(ttgt)
           call msg(txt, __MDL__, utmp)
        endif
     enddo
@@ -516,12 +525,12 @@ contains
 
 !!!_  - diag_map_family
   subroutine diag_map_family &
-       & (ierr, iasrc, iaref, nrref, irref, u, fmt_rr)
+       & (ierr, iasrc, iaref, nrref, u, fmt_rr)
     use TOUZA_Ppp_std,only: msg, MPI_UNDEFINED
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: iasrc
-    integer,         intent(in)          :: iaref, nrref, irref
+    integer,         intent(in)          :: iaref, nrref
     integer,         intent(in),optional :: u
     character(len=*),intent(in),optional :: fmt_rr
     integer utmp
@@ -540,7 +549,7 @@ contains
     ierr = 0
     utmp = get_logu(u, ulog)
 
-    if (ierr.eq.0) call diag_map_root(ierr, iasrc, iaref, nrref, irref, utmp, fmt_rr)
+    if (ierr.eq.0) call diag_map_root(ierr, iasrc, iaref, nrref, utmp, fmt_rr)
 
     do ja = 0, matbl - 1
        if (atblp(ja)%isrc.eq.iasrc) then
@@ -672,37 +681,37 @@ contains
 
   end subroutine diag_map_string
 !!!_  & show_stack_simple
-  subroutine show_stack_simple(ierr, iagent, dir, levv, u)
-    use TOUZA_Ppp_std,only: choice, msg
-    implicit none
-    integer,intent(out) :: ierr
-    integer,intent(in)  :: iagent
-    integer,intent(in)  :: dir
-    integer,intent(in),optional  :: u
-    integer,intent(in),optional  :: levv
-    integer lv, utmp
-    character(len=256) :: buf
-    integer jt
+!   subroutine show_stack_simple(ierr, iagent, dir, levv, u)
+!     use TOUZA_Ppp_std,only: choice, msg
+!     implicit none
+!     integer,intent(out) :: ierr
+!     integer,intent(in)  :: iagent
+!     integer,intent(in)  :: dir
+!     integer,intent(in),optional  :: u
+!     integer,intent(in),optional  :: levv
+!     integer lv, utmp
+!     character(len=256) :: buf
+!     integer jt
 
-    ierr = 0
-    lv = choice(lev_verbose, levv)
-    utmp = get_logu(u, ulog)
+!     ierr = 0
+!     lv = choice(lev_verbose, levv)
+!     utmp = get_logu(u, ulog)
 
-101 format('stack: << ', I0, ':', A)
-102 format('stack: <> ', I0, ':', A)
-103 format('stack: >> ', I0, ':', A)
-    if (dir.lt.0) then
-       jt = astack(jstack + 1)
-       write(buf, 101) jt, trim(atblp(jt)%name)
-    else if (dir.eq.0) then
-       jt = iagent
-       write(buf, 102) jt, trim(atblp(jt)%name)
-    else
-       jt = iagent
-       write(buf, 103) jt, trim(atblp(jt)%name)
-    endif
-    call msg(buf, __MDL__, utmp)
-  end subroutine show_stack_simple
+! 101 format('stack: << ', I0, ':', A)
+! 102 format('stack: <> ', I0, ':', A)
+! 103 format('stack: >> ', I0, ':', A)
+!     if (dir.lt.0) then
+!        jt = astack(jstack + 1)
+!        write(buf, 101) jt, trim(atblp(jt)%name)
+!     else if (dir.eq.0) then
+!        jt = iagent
+!        write(buf, 102) jt, trim(atblp(jt)%name)
+!     else
+!        jt = iagent
+!        write(buf, 103) jt, trim(atblp(jt)%name)
+!     endif
+!     call msg(buf, __MDL__, utmp)
+!   end subroutine show_stack_simple
 
 !!!_  & show_stack
   subroutine show_stack(ierr, iagent, dir, levv, u)
@@ -744,6 +753,45 @@ contains
     call msg_mon(buf, mon_tag(1:lmt), utmp)
   end subroutine show_stack
 
+!!!_  & show_status
+  subroutine show_status(ierr, u, levv, tag)
+    use TOUZA_Ppp_std,only: choice, msg_mon
+    implicit none
+    integer,         intent(out)         :: ierr
+    integer,         intent(in),optional :: u
+    integer,         intent(in),optional :: levv
+    character(len=*),intent(in),optional :: tag
+    integer utmp, lv
+    integer js, jt, ja
+    integer ir, nr
+    integer,parameter :: ltxt = lagent * latbl
+    character(len=ltxt) :: txt1, txt2
+    ierr = 0
+    utmp = get_logu(u, ulog)
+    lv = choice(lev_verbose, levv)
+    do js = 0, jstack
+       jt = astack(js)
+       ir = atblp(jt)%ir
+       nr = atblp(jt)%nr
+101    format('[', I0, ':', A, 1x, I0, '/', I0, ']')
+       ja = jt
+       txt2 = ' '
+       do
+          write(txt1, 101) ja, trim(atblp(ja)%name), ir, nr
+          txt2 = trim(txt2) // trim(txt1)
+          ja = atblp(ja)%isrc
+          if (ja.lt.0) exit
+       enddo
+102    format(A, ': agent on stack<', I0, '> ', A)
+103    format('agent on stack<', I0, '> ', A)
+       if (present(tag)) then
+          write(txt1, 102) trim(tag), js, trim(txt2)
+       else
+          write(txt1, 103) js, trim(txt2)
+       endif
+       call msg_mon(txt1, mon_tag, utmp)
+    enddo
+  end subroutine show_status
 !!!_ + manipulation
 !!!_  & query_agent() - return agent id from NAME
   integer function query_agent &
@@ -773,11 +821,12 @@ contains
 !!!_  & inquire_agent
   subroutine inquire_agent_a &
        & (ierr,  &
-       &  agent, &
+       &  agent, source, &
        &  irank, nrank, icomm, igroup, name, ismem)
     implicit none
     integer,         intent(out)          :: ierr
     character(len=*),intent(in)           :: agent
+    integer,         intent(in), optional :: source   ! to trace back source agents
     integer,         intent(out),optional :: irank
     integer,         intent(out),optional :: nrank
     integer,         intent(out),optional :: icomm
@@ -786,17 +835,19 @@ contains
     logical,         intent(out),optional :: ismem
     integer ja
     ja = query_agent(agent)
-    call inquire_agent_i(ierr, ja, irank, nrank, icomm, igroup, name, ismem)
+    call inquire_agent_i(ierr, ja, source, irank, nrank, icomm, igroup, name, ismem)
     return
   end subroutine inquire_agent_a
 
   subroutine inquire_agent_i &
        & (ierr,   &
-       &  iagent, &
-       &  irank,  nrank, icomm, igroup, name, ismem)
+       &  iagent, source, &
+       &  irank,  nrank,  icomm, igroup, name, ismem)
+    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out)          :: ierr
     integer,         intent(in), optional :: iagent
+    integer,         intent(in), optional :: source   ! to trace back source agents (negative to root)
     integer,         intent(out),optional :: irank
     integer,         intent(out),optional :: nrank
     integer,         intent(out),optional :: icomm
@@ -807,9 +858,12 @@ contains
     integer ic, ig, ir
 
     ierr = 0
-    ja = check_agent(iagent)
+    ! ja = check_agent(iagent)
+    ja = trace_agent(iagent, source)
     ic = MPI_COMM_NULL
-    if (ja.lt.0) ierr = -1
+    if (ja.lt.0) then
+       ierr = -1
+    endif
 
     if (ja.ge.0) ic = atblp(ja)%comm
     if (ja.ge.0) ig = atblp(ja)%mgrp
@@ -1060,7 +1114,12 @@ contains
 ! #if OPT_USE_MPI
 !     use MPI,only: MPI_Comm_split
 ! #endif /* OPT_USE_MPI */
-    use TOUZA_Ppp_std,only: get_ni, choice
+    use TOUZA_Ppp_std,only: MPI_INTEGER
+    use TOUZA_Ppp_std,only: MPI_MAX, MPI_MIN
+#  if HAVE_FORTRAN_MPI_MPI_BCAST
+    use MPI,only: MPI_Bcast, MPI_Reduce
+#  endif
+    use TOUZA_Ppp_std,only: get_ni, choice, msg
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: color
@@ -1070,10 +1129,25 @@ contains
 
     integer jas,   jau
     integer icsrc, icunit
-    integer irank, nrank
+    integer irank, nrank, iroot
+    integer jc
+    integer ncol,  icol,  cbuf(2)
     integer sw
 
+    integer nt, ntx
+    integer,parameter :: lttbl = latbl
+    character(len=lagent) :: affils(1)
+    character(len=lagent) :: aname
+    character(len=lagent) :: tci(lttbl)
+    integer               :: tui(lttbl)
+
+    character(len=128) :: txt
+
     ! no group control except for local color
+    ierr = 0
+
+    iroot = 0
+
     jas = check_agent(src)
     if (jas.lt.0) ierr = -1
 
@@ -1081,6 +1155,58 @@ contains
        icsrc = atblp(jas)%comm
        call get_ni(ierr, nrank, irank, icsrc)
     endif
+    if (ierr.eq.0) then
+       if (present(name)) then
+          aname = name
+       else
+          aname = ' '
+       endif
+    endif
+#if OPT_USE_MPI
+    if (ierr.eq.0) then
+       call MPI_Reduce &
+            & (color, cbuf(1), 1, MPI_INTEGER, MPI_MIN, iroot, icsrc, ierr)
+    endif
+    if (ierr.eq.0) then
+       call MPI_Reduce &
+            & (color, cbuf(2), 1, MPI_INTEGER, MPI_MAX, iroot, icsrc, ierr)
+    endif
+    if (ierr.eq.0) then
+       call MPI_Bcast(cbuf, 2, MPI_INTEGER, iroot, icsrc, ierr)
+    endif
+#else /* not OPT_USE_MPI */
+    if (ierr.eq.0) then
+       cbuf(:) = color
+    endif
+#endif /* not OPT_USE_MPI */
+    if (ierr.eq.0) then
+       ncol = cbuf(2) - cbuf(1) + 1
+       icol = color - cbuf(1)
+       call merge_color_table(ierr, nt, tci, tui, aname, icol, ncol, icsrc)
+       ntx = 0
+       do jc = 1, ncol
+          if (tci(jc).ne.' ') ntx = ntx + 1
+       enddo
+       if (nt.ne.ncol.or.(ntx.ne.0.and.ntx.ne.ncol)) then
+          call msg('(''INVALIE COLOR-AGENT SETS: '', I0, 1x, I0, 1x, I0)', &
+               &   (/ncol, nt, ntx/), __MDL__, ulog)
+          do jc = 1, nt
+101          format(I0, 1x, A)
+             write(txt, 101) jc, trim(tci(jc))
+             call msg(txt, __MDL__, ulog)
+          enddo
+          ierr = _ERROR(ERR_INVALID_PARAMETER)
+       endif
+    endif
+    if (ierr.eq.0) then
+       if (ntx.eq.ncol) then
+          affils(1) = tci(icol + 1)
+          call new_agent_table &
+               & (ierr, icol, ncol, tci(1:ncol), tui(1:ncol), src, switch)
+          return
+       endif
+    endif
+
     if (ierr.eq.0) then
        call MPI_Comm_split(icsrc, color, irank, icunit, ierr)
        ! communcator name
@@ -1105,6 +1231,62 @@ contains
     endif
     return
   end subroutine new_agent_color
+
+!!!_  & new_agent_table - core procedure of new_agent_color
+  subroutine new_agent_table &
+       & (ierr, icolor, ncolor, tci, tui, src, switch)
+    use TOUZA_Ppp_std,only: choice, get_ni, msg, is_msglev_debug
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(in)  :: icolor
+    integer,         intent(in)  :: ncolor
+    character(len=*),intent(in)  :: tci(:)
+    integer,         intent(in)  :: tui(:)
+    integer,optional,intent(in)  :: src
+    integer,optional,intent(in)  :: switch
+
+    integer icsrc
+    integer igsrc
+    integer jas,   jau
+    ! integer jt
+    integer nrsrc, irsrc
+    ! integer               :: tgr(ncolor)
+    integer               :: tgu(ncolor)
+    integer,allocatable   :: rgw(:)
+    integer sw
+
+    ierr = 0
+
+    jas = check_agent(src)
+    if (jas.lt.0) ierr = -1
+
+    if (ierr.eq.0) then
+       icsrc = atblp(jas)%comm
+       igsrc = atblp(jas)%mgrp
+    endif
+
+    if (ierr.eq.0) call get_ni(ierr, nrsrc, irsrc, icsrc)
+    ! write(*, *) 'ni', nrsrc, irsrc, icsrc
+    if (ierr.eq.0) allocate(rgw(0:nrsrc-1), STAT=ierr)
+    if (ierr.eq.0) then
+       call batch_group_color(ierr, rgw, tgu, icolor, ncolor, icsrc, igsrc, irsrc)
+    endif
+    if (ierr.eq.0) deallocate(rgw, STAT=ierr)
+
+    if (ierr.eq.0) then
+       ! jau is dummy
+       call add_entries_base(ierr, jau, jas)
+    endif
+    if (ierr.eq.0) then
+       call add_agent_units(ierr, jau, tgu, tui, ncolor, jas, tci)
+    endif
+
+    sw = choice(0, switch)
+    if (ierr.eq.0) then
+       if (sw.ge.0) call switch_agent(ierr, jau, sw)
+    endif
+  end subroutine new_agent_table
+
 !!!_  & new_agent_family
   subroutine new_agent_family &
        & (ierr, affils, src, switch)
@@ -1413,7 +1595,7 @@ contains
 
   subroutine agents_translate_i &
        & (ierr, irtgt, iatgt, irsrc, iasrc)
-    use TOUZA_Std_mwe,only: MPI_UNDEFINED
+    use TOUZA_Ppp_std,only: MPI_UNDEFINED
 ! #  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
 !     use MPI,only: MPI_Group_translate_ranks
 ! #  endif
@@ -1473,6 +1655,29 @@ contains
     endif
   end function check_agent
 
+!!!_  & trace_agent
+  integer function trace_agent &
+       & (iagent, lev) &
+       & result(n)
+    use TOUZA_Ppp_std,only: choice
+    implicit none
+    integer,intent(in),optional :: iagent
+    integer,intent(in),optional :: lev
+    integer ntr
+    ntr = choice(0, lev)
+    if (ntr.lt.0) then
+       n = root_agent(iagent)
+    else
+       n = check_agent(iagent)
+       do
+          if (ntr.le.0) exit
+          if (n.lt.0) exit
+          n = atblp(n)%isrc
+          ntr = ntr - 1
+       enddo
+    endif
+  end function trace_agent
+
 !!!_  & source_agent
   integer function source_agent &
        & (iagent) &
@@ -1506,19 +1711,20 @@ contains
        & (ierr, &
        &  jau,  &
        &  tgu,  &
-       &  tui,  nt, src)
+       &  tui,  nt, src, names)
 #if OPT_USE_MPI
     ! use MPI,only: MPI_Comm_create, MPI_Group_rank
     use MPI,only: MPI_Group_rank
 #endif
     use TOUZA_Ppp_std,only: choice, MPI_UNDEFINED
     implicit none
-    integer,intent(out) :: ierr
-    integer,intent(out) :: jau
-    integer,intent(in)  :: tgu(0:*)
-    integer,intent(in)  :: tui(:)
-    integer,intent(in)  :: nt
-    integer,intent(in)  :: src
+    integer,         intent(out)         :: ierr
+    integer,         intent(out)         :: jau
+    integer,         intent(in)          :: tgu(0:*)
+    integer,         intent(in)          :: tui(:)
+    integer,         intent(in)          :: nt
+    integer,         intent(in)          :: src
+    character(len=*),intent(in),optional :: names(0:*)
 
     character(len=lagent) :: buf
     integer munit
@@ -1535,7 +1741,11 @@ contains
        igdrv = tgu(ju)
        if (ierr.eq.0) call MPI_Group_rank(igdrv, ird, ierr)
        if (ierr.eq.0) then
-          write(buf, 101) trim(asp_unit), ju
+          buf = ' '
+          if (present(names)) then
+             buf = names(ju)
+          endif
+          if (buf.eq.' ') write(buf, 101) trim(asp_unit), ju
           if (ird.eq.MPI_UNDEFINED) then
              call add_entry_group(ierr, ja, buf, igdrv, src, flag_xunit)
           else
@@ -1934,7 +2144,9 @@ contains
             & (drcv(1:nrcv), (nrcv * lagent), MPI_CHARACTER, &
             &  ipsrc, ktag,  icomm, istts, ierr)
     endif
-#endif /* OPT_USE_MPI */
+#else /* not OPT_USE_MPI */
+    nrcv = 0
+#endif /* not OPT_USE_MPI */
     if (ierr.eq.0) then
        ! merge
        urcv(1:nrcv) = urcv(1:nrcv) + mold
@@ -1977,6 +2189,221 @@ contains
     endif
     return
   end subroutine recv_affils
+
+!!!_  & merge_color_table - merge color-agent table
+  subroutine merge_color_table &
+       & (ierr, &
+       &  ntotal, tbl_ci, tbl_ui, &
+       &  aname,  icolor, ncolor, icomm)
+    use TOUZA_Ppp_std,only: MPI_CHARACTER, MPI_INTEGER
+#  if HAVE_FORTRAN_MPI_MPI_BCAST
+    use MPI,only: MPI_Send, MPI_Bcast
+#  endif
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: ntotal     ! total number of agents
+    character(len=*),intent(out) :: tbl_ci(0:*)  ! agent table merged
+    integer,         intent(out) :: tbl_ui(0:*)  ! agent unit-id table
+    character(len=*),intent(in)  :: aname      ! affiliaion corresponds to icolor
+    integer,         intent(in)  :: icolor, ncolor
+    integer,         intent(in)  :: icomm      ! mpi communicator
+
+    integer nrank, irank, iroot
+    integer,parameter :: lbuf = OPT_AGENTS_MAX
+    integer,parameter :: ndiv = 3
+
+    character(len=lagent) :: dbuf(0:lbuf-1)
+    integer               :: ubuf(0:lbuf-1)
+    integer mstp,  ktag
+    integer ipsrc, ipdst
+    integer msend
+    integer j
+
+    ierr = 0
+    iroot = 0
+    ntotal = -1
+
+    call get_cnr(ierr, icomm, irank, nrank)
+
+    if (ierr.eq.0) then
+       ntotal = ncolor
+       do j = 0, ncolor - 1
+          ubuf(j) = j
+       enddo
+       dbuf(0:ncolor-1) = ' '
+       dbuf(icolor) = aname
+    endif
+
+    if (ierr.eq.0) then
+       if (irank.eq.iroot) then
+          ! recieve only
+          mstp = ndiv
+          do
+             ktag = 0
+             do j = 1, ndiv - 1
+                ipsrc = irank + j * (mstp / ndiv)
+                if (ipsrc.ge.nrank) exit
+                ktag = ktag + 1
+                if (ierr.eq.0) then
+                   call recv_color_affils &
+                        & (ierr,  ntotal, dbuf,  ubuf, &
+                        &  icomm, ncolor, ipsrc, ktag)
+                endif
+             enddo
+             if (ktag.eq.0) exit
+             mstp = mstp * ndiv
+          enddo
+       else
+          mstp = ndiv
+          do
+             if (mod(irank, mstp).ne.0) then
+                ! send and exit
+                ipdst = (irank / mstp) * mstp
+                ktag  = (irank - ipdst) / (mstp / ndiv)
+                msend = ntotal * lagent
+#if OPT_USE_MPI
+                if (ierr.eq.0) then
+                   call MPI_Send &
+                        & (ubuf(0:ntotal-1), ntotal, MPI_INTEGER, &
+                        &  ipdst, ktag,    icomm,  ierr)
+                endif
+                if (ierr.eq.0) then
+                   call MPI_Send &
+                        & (dbuf(0:ntotal-1), msend, MPI_CHARACTER, &
+                        &  ipdst, ktag,    icomm, ierr)
+                endif
+#endif /* OPT_USE_MPI */
+                exit
+             else
+                ! recieve and continue
+                ktag = 0
+                do j = 1, ndiv - 1
+                   ipsrc = irank + j * (mstp / ndiv)
+                   if (ipsrc.ge.nrank) exit
+                   ktag = ktag + 1
+                   if (ierr.eq.0) then
+                      call recv_color_affils &
+                           & (ierr,  ntotal, dbuf,  ubuf, &
+                           &  icomm, ncolor, ipsrc,  ktag)
+                   endif
+                enddo
+                mstp = mstp * ndiv
+             endif
+          enddo
+       endif
+    endif
+#if OPT_USE_MPI
+    if (ierr.eq.0) then
+       call MPI_Bcast(ntotal, 1, MPI_INTEGER, iroot, icomm, ierr)
+    endif
+    if (ierr.eq.0) then
+       call MPI_Bcast(ubuf(0:ntotal-1), ntotal, MPI_INTEGER, iroot, icomm, ierr)
+    endif
+    if (ierr.eq.0) then
+       msend = ntotal * lagent
+       call MPI_Bcast(dbuf(0:ntotal-1), msend, MPI_CHARACTER, iroot, icomm, ierr)
+    endif
+#endif /* OPT_USE_MPI */
+    if (ierr.eq.0) then
+       tbl_ci(0:ntotal-1) = dbuf(0:ntotal-1)
+       tbl_ui(0:ntotal-1) = ubuf(0:ntotal-1)
+    endif
+    return
+  end subroutine merge_color_table
+
+!!!_  & recv_color_affils
+  subroutine recv_color_affils &
+       & (ierr,  ntotal, dbuf,  ubuf, &
+       &  icomm, ncolor, ipsrc, ktag)
+    use TOUZA_Ppp_std,only: MPI_STATUS_SIZE
+    use TOUZA_Ppp_std,only: MPI_CHARACTER, MPI_INTEGER
+#if OPT_USE_MPI
+    use MPI,only: MPI_Probe, MPI_Get_count
+#endif
+#  if HAVE_FORTRAN_MPI_MPI_BCAST
+    use MPI,only: MPI_Recv
+#  endif
+    implicit none
+    integer,              intent(out)   :: ierr
+    integer,              intent(inout) :: ntotal
+    character(len=lagent),intent(inout) :: dbuf(0:)
+    integer,              intent(inout) :: ubuf(0:)
+    integer,              intent(in)    :: icomm
+    integer,              intent(in)    :: ncolor
+    integer,              intent(in)    :: ipsrc, ktag
+
+    integer,parameter     :: lrcv = OPT_AGENTS_MAX
+    character(len=lagent) :: drcv(0:lrcv-1)
+    integer               :: urcv(0:lrcv-1)
+    integer :: istts(MPI_STATUS_SIZE)
+    integer nrcv
+    integer j, jj, jn
+
+    ierr = 0
+
+#if OPT_USE_MPI
+    call MPI_Probe(ipsrc, ktag, icomm, istts, ierr)
+    if (ierr.eq.0) call MPI_Get_count(istts, MPI_INTEGER, nrcv, ierr)
+    if (ierr.eq.0) then
+       call MPI_Recv &
+            & (urcv(0:nrcv-1), nrcv, MPI_INTEGER, &
+            &  ipsrc, ktag,  icomm, istts, ierr)
+    endif
+    if (ierr.eq.0) then
+       call MPI_Recv &
+            & (drcv(0:nrcv-1), (nrcv * lagent), MPI_CHARACTER, &
+            &  ipsrc, ktag,  icomm, istts, ierr)
+    endif
+#else /* not OPT_USE_MPI */
+    nrcv = 0
+#endif /* not OPT_USE_MPI */
+    if (ierr.eq.0) then
+       ! write(*, *) 'n:', ntotal, nrcv
+       ! do j = 0, ntotal - 1
+       !    write(*, *) 'dbuf:', j, dbuf(j)
+       ! enddo
+       ! do j = 0, nrcv - 1
+       !    write(*, *) 'drcv:', j, drcv(j)
+       ! enddo
+       do j = 0, ncolor - 1
+          if (dbuf(j).eq.' ') then
+             dbuf(j) = drcv(j)
+          else if (drcv(j).eq.' ') then
+             continue
+          else if (drcv(j).eq.dbuf(j)) then
+             continue
+          else
+             jn = ntotal
+             do jj = ncolor, ntotal - 1
+                if (drcv(j).eq.dbuf(jj)) then
+                   jn = -1
+                   exit
+                endif
+             enddo
+             if (jn.ge.0) then
+                dbuf(jn) = drcv(j)
+                ubuf(jn) = jn
+                ntotal = ntotal + 1
+             endif
+          endif
+       enddo
+       do j = ncolor, nrcv - 1
+          jn = ntotal
+          do jj = ncolor, ntotal - 1
+             if (drcv(j).eq.dbuf(jj)) then
+                jn = -1
+                exit
+             endif
+          enddo
+          if (jn.ge.0) then
+             dbuf(jn) = drcv(j)
+             ubuf(jn) = jn
+             ntotal = ntotal + 1
+          endif
+       enddo
+    endif
+    return
+  end subroutine recv_color_affils
 
 !!!_  & batch_group_split
   subroutine batch_group_split &
@@ -2026,12 +2453,69 @@ contains
              call MPI_Bcast(ranks(0:m-1), m, MPI_INTEGER, iroot, icomm, ierr)
           endif
           if (ierr.eq.0) call MPI_Group_incl(igsrc, m, ranks(0:m-1), jgnew, ierr)
-#endif /* OPT_USE_MPI */
+#else /* not OPT_USE_MPI */
+          jgnew = MPI_GROUP_NULL
+#endif /* not OPT_USE_MPI */
           ! write(*, *) 'incl', j, jgnew, m, ranks(0:m-1)
           if (ierr.eq.0) tbl_gr(j) = jgnew
        enddo
     endif
   end subroutine batch_group_split
+
+!!!_  & batch_group_color
+  subroutine batch_group_color &
+       & (ierr,   ranks,  tbl_gr, &
+       &  icolor, ncolor, icomm, igsrc, ir)
+    use TOUZA_Ppp_std,only: MPI_UNDEFINED, MPI_COMM_NULL
+    use TOUZA_Ppp_std,only: MPI_INTEGER
+#  if HAVE_FORTRAN_MPI_MPI_BCAST
+    use MPI,only: MPI_Gather, MPI_Bcast
+#  endif
+    implicit none
+    integer,         intent(out) :: ierr
+    integer,         intent(out) :: ranks(0:)  ! work-array
+    integer,         intent(out) :: tbl_gr(0:*)
+    integer,         intent(in)  :: icolor, ncolor
+    integer,         intent(in)  :: icomm
+    integer,         intent(in)  :: igsrc
+    integer,         intent(in)  :: ir
+
+    integer ibuf(1)
+    integer iroot
+    integer jgnew
+    integer j, m
+
+    ierr = 0
+    if (ierr.eq.0) then
+       iroot = 0
+       do j = 0, ncolor - 1
+          if (icolor.eq.j) then
+             ibuf(1) = ir
+          else
+             ibuf(1) = -1
+          endif
+#if OPT_USE_MPI
+          call MPI_Gather(ibuf, 1, MPI_INTEGER, ranks, 1, MPI_INTEGER, iroot, icomm, ierr)
+          if (ierr.ne.0) exit
+#endif /* OPT_USE_MPI */
+          if (ir.eq.iroot) then
+             m = COUNT(ranks(:).ge.0)
+             ranks(0:m-1) = PACK(ranks(:), ranks(:).ge.0)
+          endif
+#if OPT_USE_MPI
+          call MPI_Bcast(m, 1, MPI_INTEGER, iroot, icomm, ierr)
+          if (ierr.eq.0) then
+             call MPI_Bcast(ranks(0:m-1), m, MPI_INTEGER, iroot, icomm, ierr)
+          endif
+          if (ierr.eq.0) call MPI_Group_incl(igsrc, m, ranks(0:m-1), jgnew, ierr)
+#else  /* not OPT_USE_MPI */
+          jgnew = MPI_GROUP_NULL
+#endif /* not OPT_USE_MPI */
+          ! write(*, *) 'incl', j, jgnew, m, ranks(0:m-1)
+          if (ierr.eq.0) tbl_gr(j) = jgnew
+       enddo
+    endif
+  end subroutine batch_group_color
 
 !!!_  & gen_comm_unit
   subroutine gen_comm_unit &
@@ -2246,8 +2730,9 @@ end module TOUZA_Ppp_amng
 !!!_@ test_ppp_amng - test program
 #if TEST_PPP_AMNG
 program test_ppp_amng
-  use MPI
-  use TOUZA_Ppp_amng
+  ! use MPI
+  use TOUZA_Std_mwe
+  use TOUZA_Ppp_amng,tp_init=>init, tp_diag=>diag, tp_finalize=>finalize
   implicit none
 
   integer ierr
@@ -2266,7 +2751,7 @@ program test_ppp_amng
   jarg = 0
 
 101 format(A, ' = ', I0)
-  call init(ierr, levv=+9, stdv=+9)
+  call tp_init(ierr, levv=+9, stdv=+9)
   write(*, 101) 'INIT', ierr
 
   icw = MPI_COMM_WORLD
@@ -2311,9 +2796,11 @@ program test_ppp_amng
      call test_ppp_agent(ibase, color, ktest)
   endif
 
-  call diag(ierr)
+  call show_status(ierr, tag='final')
+
+  call tp_diag(ierr)
   write(*, 101) 'DIAG', ierr
-  call finalize(ierr)
+  call tp_finalize(ierr)
   write(*, 101) 'FINAL', ierr
   stop
 contains

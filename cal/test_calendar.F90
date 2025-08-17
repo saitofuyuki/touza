@@ -1,7 +1,7 @@
 !!!_! test_calendar.F90 - touza/calendar test program
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 28 2012
-#define TIME_STAMP 'Time-stamp: <2025/05/14 17:37:12 fuyuki test_calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/10 12:25:08 fuyuki test_calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -473,6 +473,7 @@ subroutine test_CXX2SS &
      & (dur, unit, ss_start, ss_end, ss_step, orgsec, jfpar)
 #if OPT_USE_BASE_UCALN == 0
   use TOUZA_Cal_miroc
+  use TOUZA_Cal,only: conv_sec_duration
 #endif /* OPT_USE_BASE_UCALN == 0 */
   use TOUZA_Std, only: KDBL, KFLT
   implicit none
@@ -483,12 +484,13 @@ subroutine test_CXX2SS &
   integer,         intent(in) :: jfpar
 
   real(kind=KRC) :: ss, ddsec, cnext, cprev
+  real(kind=KRC) :: drev
   logical :: otp
 #if OPT_USE_BASE_UCALN
   logical OINTVL
 #endif
 111 format('CXX2SS:', F0.1, 1x, A, 2x, 'S >> dS S+')
-101 format('CXX2SS ', F0.2, 1x, F0.2, 1x, F0.2, 1x, F0.2, 1x, L1)
+101 format('CXX2SS ', F0.2, 1x, F0.2, 1x, F0.2, 1x, F0.2, 1x, L1, 1x, F0.2, 1x, L1)
   write (jfpar, 111) dur, trim(unit)
 
   ss = ss_start
@@ -499,9 +501,14 @@ subroutine test_CXX2SS &
      if (ss.gt.ss_end) exit
      call CXX2SS (ddsec, dur, unit, ss)
      otp = OINTVL (ss, cprev, orgsec, dur, unit)
-
+! #if OPT_USE_BASE_UCALN == 0
+!      drev = conv_sec_duration(ddsec, unit, ss)
+!      write (jfpar, 101) &
+!           & ss, ddsec, cnext, cprev, otp, drev, dur.eq.drev
+! #else
      write (jfpar, 101) &
           & ss, ddsec, cnext, cprev, otp
+! #endif
      if (otp) then
         cprev = cnext
         call CSSAFT (cnext, cprev, dur, unit)
@@ -524,7 +531,7 @@ subroutine test_PERIOD &
   integer,intent(in) :: orig(*)
   integer,intent(in) :: jfpar
 
-  integer :: iday
+  integer :: iday,  iday_end
   integer :: jdnml, iynml
   integer :: iy, im, id
 
@@ -532,7 +539,8 @@ subroutine test_PERIOD &
   integer :: jday_orig
   real(kind=KRC) :: apos, acyc
 
-111 format('PERIOD: ', I0, '/', I0, '/', I0, 1x, F16.9)
+111 format('PERIOD: ', I0, '/', I0, '/', I0, 1x, F16.9, 1x, I0, '--', I0)
+112 format('PERIOD: ', I0, '/', I0, '/', I0, 1x, F16.9, 1x, I0, '--', I0, 1x, 'SKIPPED')
 101 format('PERIOD ', 3(I0,1x), I0, ' > ', I0, 1x, I0, 1x, F10.3)
   mdper = inq_nday_period()
   myper = inq_nyear_period()
@@ -541,18 +549,22 @@ subroutine test_PERIOD &
 
   call CYM2DD(jday_orig,  orig(1), orig(2), orig(3))
   call CYM2DD(iday,       iy_start, 1, 1)
+  call CYM2DD(iday_end,   iy_end, 1, 1)
+  if (acyc.eq.0.0_KRC) then
+     write (jfpar, 112) mdper, myper, jday_orig, acyc, iday, iday_end
+  else
+     write (jfpar, 111) mdper, myper, jday_orig, acyc, iday, iday_end
 
-  write (jfpar, 111) mdper, myper, jday_orig, acyc
-
-  do
-     call CDD2YM(iy, im,  id, iday)
-     if (iy.gt.iy_end) exit
-     iynml = modulo(iy, myper)
-     jdnml = modulo(iday - jday_orig, mdper)
-     apos = (modulo(real(jdnml, kind=KRC), acyc) / acyc) * 360.0_KRC
-     write(jfpar, 101) iy, im, id, iday, iynml, jdnml, apos
-     iday = iday + id_step
-  enddo
+     do
+        call CDD2YM(iy, im,  id, iday)
+        if (iday.gt.iday_end) exit
+        iynml = modulo(iy, myper)
+        jdnml = modulo(iday - jday_orig, mdper)
+        apos = (modulo(real(jdnml, kind=KRC), acyc) / acyc) * 360.0_KRC
+        write(jfpar, 101) iy, im, id, iday, iynml, jdnml, apos
+        iday = iday + id_step
+     enddo
+  endif
 end subroutine test_PERIOD
 #endif
 
@@ -570,7 +582,7 @@ subroutine test_PERIOD_ss &
   integer,intent(in) :: orig(*)
   integer,intent(in) :: jfpar
 
-  integer :: idate(6)
+  integer :: idate(6), idate_end(6)
   integer :: iday
   integer :: jdnml, iynml
   integer :: iy, im, id
@@ -578,7 +590,7 @@ subroutine test_PERIOD_ss &
   integer :: mdper, myper
   integer :: nsd
   integer :: jday_orig
-  real(kind=KRC) :: ss,   sorg
+  real(kind=KRC) :: ss,   sorg, ss_end
   real(kind=KRC) :: apos, acyc
 
   mdper = inq_nday_period()
@@ -589,28 +601,35 @@ subroutine test_PERIOD_ss &
        & * real(nsd, kind=KRC)
 
 111 format('PERIODss: ', I0, '/', I0, 1x, F0.2, 1x, F0.2)
+112 format('PERIODss: ', I0, '/', I0, 1x, F0.2, 1x, F0.2, 1x, 'SKIPPED')
 102 format('PERIODss: ', F0.1, &
          & 1x, I0, '/', I0, '/', I0, &
          & 1x, I2.2, ':', I2.2, ':', I2.2, &
          & 1x, F0.1, 1x, F10.3)
 
   idate = (/iy_start, 1, 1, 0, 0, 0/)
+  idate_end = (/iy_end, 1, 1, 0, 0, 0/)
   call CYH2SS(ss,idate)
+  call CYH2SS(ss_end,idate_end)
   idate(1:3) = orig(1:3)
   idate(4:6) = 0
   call CYH2SS(sorg, idate)
 
-  write (jfpar, 111) mdper, myper, acyc, sorg
+  if (acyc.eq.0.0_KRC) then
+     write (jfpar, 112) mdper, myper, acyc, sorg
+  else
+     write (jfpar, 111) mdper, myper, acyc, sorg
+     do
+        call CSS2YH(idate, ss)
+        ! if (idate(1).gt.iy_end) exit
+        if (ss.gt.ss_end) exit
 
-  do
-     call CSS2YH(idate, ss)
-     if (idate(1).gt.iy_end) exit
-
-     apos = (modulo(ss - sorg, acyc) / acyc) * 360.0_KRC
-     write (jfpar, 102) &
-          ss, idate, ss-sorg, apos
-     ss = ss + ss_step
-  enddo
+        apos = (modulo(ss - sorg, acyc) / acyc) * 360.0_KRC
+        write (jfpar, 102) &
+             ss, idate, ss-sorg, apos
+        ss = ss + ss_step
+     enddo
+  endif
   ! call CYM2DD(jday_orig,  orig(1), orig(2), orig(3))
   ! call CYM2DD(iday,       iy_start, 1, 1)
 
@@ -631,12 +650,13 @@ end subroutine test_PERIOD_ss
 !!!_* compatible minimum procedures
 #ifdef OPT_USE_BASE_UCALN
 !!!_ & dgaus()
-real(kind=OPT_KIND_REAL) function dgaus &
+function dgaus &
      & (DX) &
      result (r)
   use TOUZA_Std, only: KDBL, KFLT
   implicit none
   integer,parameter :: KRC = OPT_KIND_REAL
+  real(kind=KRC) :: r
   real(kind=KRC),intent(in) :: dx
   r = AINT (dx) + AINT (dx - AINT (dx) + 1.E0_KRC) - 1.E0_KRC
   return

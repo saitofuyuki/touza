@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2025/05/23 09:05:31 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/17 09:13:32 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -267,6 +267,7 @@ module TOUZA_Std_sus
   public sus_rseek, sus_getpos
   public sus_pos_a2rel, sus_pos_r2abs, sus_rel_pos
   public sus_eswap
+  public sus_swap, sus_eswap_hl
   public sus_pad
   public sus_record_mems_irec
   public max_members, is_irec_overflow, is_irec_overflow_mix
@@ -514,34 +515,34 @@ contains
     endif
   end subroutine sus_check_stream_pos
 
-!!!_   & sus_check_kinds_literal - health_check
-  subroutine sus_check_kinds_literal &
-       & (ierr, u)
-    use TOUZA_Std_utl,only: choice
-    implicit none
-    integer,intent(out)         :: ierr
-    integer,intent(in),optional :: u
-    integer,parameter :: KBUF=KI32
-    integer utmp
+! !!!_   & sus_check_kinds_literal - health_check
+!   subroutine sus_check_kinds_literal &
+!        & (ierr, u)
+!     use TOUZA_Std_utl,only: choice
+!     implicit none
+!     integer,intent(out)         :: ierr
+!     integer,intent(in),optional :: u
+!     integer,parameter :: KBUF=KI32
+!     integer utmp
 
-    ierr = 0
+!     ierr = 0
 
-201 format('kind:', A, ' = ', I0)
-    utmp = choice(ulog, u)
-    if (utmp.ge.0) then
-       write(utmp, 201) 'KBUF',    KBUF
-       write(utmp, 201) 'KI32',    KI32
-       write(utmp, 201) '0_4',     KIND(0_4)
-       write(utmp, 201) '0_KI32',  KIND(0_KI32)
-       write(utmp, 201) '0_KBUF',  KIND(0_KBUF)
-    else
-       write(*, 201) 'KBUF',   KBUF
-       write(*, 201) 'KI32',   KI32
-       write(*, 201) '0_4',    KIND(0_4)
-       write(*, 201) '0_KI32', KIND(0_KI32)
-       write(*, 201) '0_KBUF', KIND(0_KBUF)
-    endif
-  end subroutine sus_check_kinds_literal
+! 201 format('kind:', A, ' = ', I0)
+!     utmp = choice(ulog, u)
+!     if (utmp.ge.0) then
+!        write(utmp, 201) 'KBUF',    KBUF
+!        write(utmp, 201) 'KI32',    KI32
+!        write(utmp, 201) '0_4',     KIND(0_4)
+!        write(utmp, 201) '0_KI32',  KIND(0_KI32)
+!        write(utmp, 201) '0_KBUF',  KIND(0_KBUF)
+!     else
+!        write(*, 201) 'KBUF',   KBUF
+!        write(*, 201) 'KI32',   KI32
+!        write(*, 201) '0_4',    KIND(0_4)
+!        write(*, 201) '0_KI32', KIND(0_KI32)
+!        write(*, 201) '0_KBUF', KIND(0_KBUF)
+!     endif
+!   end subroutine sus_check_kinds_literal
 
 !!!_ + user subroutines
 !!!_  & sus_open - open stream
@@ -6329,11 +6330,12 @@ contains
 !!!_ + private subroutines
 !!!_  & sus_eswap() - elemental
   ELEMENTAL &
-       integer(KIND=KI32) function sus_eswap_i(V) &
+  function sus_eswap_i(V) &
        & result(R)
     implicit none
     integer,parameter :: KARG=KI32
-    integer(KARG),intent(in) :: V
+    integer(KIND=KARG) :: R
+    integer(KIND=KARG),intent(in) :: V
     integer,parameter :: LTGT = BIT_SIZE(0_KARG)
     integer j
     R = IBITS(V, 0, LBU)
@@ -6343,11 +6345,12 @@ contains
   end function sus_eswap_i
 
   ELEMENTAL &
-       integer(KIND=KI64) function sus_eswap_l(V) &
+  function sus_eswap_l(V) &
        & result(R)
     implicit none
     integer,parameter :: KARG=KI64
-    integer(KARG),intent(in) :: V
+    integer(KIND=KARG) :: R
+    integer(KIND=KARG),intent(in) :: V
     integer,parameter :: LTGT = BIT_SIZE(0_KARG)
     integer j
     R = IBITS(V, 0, LBU)
@@ -6357,14 +6360,15 @@ contains
   end function sus_eswap_l
 !!!_  & sus_eswap_hl() - elemental (higher/lower bits independent swap)
   ELEMENTAL &
-       integer(KIND=KI64) function sus_eswap_hl(V) &
+  function sus_eswap_hl(V) &
        & result(R)
     implicit none
     integer,parameter :: KARG=KI64
-    integer(KARG),intent(in) :: V
+    integer(KIND=KARG) :: R
+    integer(KIND=KARG),intent(in) :: V
     integer,parameter :: LTGT = BIT_SIZE(0_KARG)
     integer,parameter :: NHF = LTGT / 2
-    integer(KARG) :: VH, VL
+    integer(KIND=KARG) :: VH, VL
     integer j
 
     VL = IBITS(V, 0, LBU)
@@ -6380,10 +6384,11 @@ contains
   end function sus_eswap_hl
 !!!_  & sus_swap() - swap expanded
   ELEMENTAL &
-       integer(KIND=KI32) function sus_swap_i(V) &
+  function sus_swap_i(V) &
        & result(R)
     implicit none
-    integer(kind=KI32),intent(in) :: V
+    integer(KIND=KI32) :: R
+    integer(KIND=KI32),intent(in) :: V
     R = IOR(IOR(ISHFT(IBITS(V, 0*LBU, LBU), 3*LBU),  &
          &      ISHFT(IBITS(V, 1*LBU, LBU), 2*LBU)), &
          &  IOR(ISHFT(IBITS(V, 2*LBU, LBU), 1*LBU),  &
@@ -6391,10 +6396,11 @@ contains
     return
   end function sus_swap_i
   ELEMENTAL &
-       integer(KIND=KI64) function sus_swap_l(V) &
+  function sus_swap_l(V) &
        & result(R)
     implicit none
-    integer(kind=KI64),intent(in) :: V
+    integer(KIND=KI64) :: R
+    integer(KIND=KI64),intent(in) :: V
     R = IOR(IOR(IOR(ISHFT(IBITS(V, LBU*0, LBU), LBU*7),   &
          &          ISHFT(IBITS(V, LBU*1, LBU), LBU*6)),  &
          &      IOR(ISHFT(IBITS(V, LBU*2, LBU), LBU*5),   &
@@ -6590,6 +6596,7 @@ contains
     return
   end subroutine sus_rseek
 !!!_  & sus_rseek_workaround - seek position to read (workaround)
+#if OPT_STREAM_RPOS_WORKAROUND
   subroutine sus_rseek_workaround &
        & (ierr, u, apos)
     !! caution: T assumed to be 1-byte
@@ -6607,6 +6614,7 @@ contains
     if (ierr.gt.0) ierr = _ERROR(ERR_IO_GENERAL)
     return
   end subroutine sus_rseek_workaround
+#endif /* OPT_STREAM_RPOS_WORKAROUND */
 !!!_  & is_irec_overflow() - check if array size exceeds irec limit
   logical function is_irec_overflow_i(m, mold) result(b)
     implicit none
@@ -6675,83 +6683,93 @@ contains
 
   end function is_irec_overflow_mix
 !!!_  & sus_size_irec - total record size in stream i/o unit
-  integer(kind=KMEM) function sus_size_irec_li (mold, n) result(l)
+  function sus_size_irec_li (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KI32, KMEM=>KI64, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     integer(kind=KTGT),intent(in) :: mold
     integer(kind=KMEM),intent(in) :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_li
-  integer(kind=KMEM) function sus_size_irec_ll (mold, n) result(l)
+  function sus_size_irec_ll (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KI64, KMEM=>KI64, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     integer(kind=KTGT),intent(in) :: mold
     integer(kind=KMEM),intent(in) :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_ll
-  integer(kind=KMEM) function sus_size_irec_lf (mold, n) result(l)
+  function sus_size_irec_lf (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KFLT, KMEM=>KI64, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     real(kind=KTGT),   intent(in) :: mold
     integer(kind=KMEM),intent(in) :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_lf
-  integer(kind=KMEM) function sus_size_irec_ld (mold, n) result(l)
+  function sus_size_irec_ld (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KDBL, KMEM=>KI64, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     real(kind=KTGT),   intent(in) :: mold
     integer(kind=KMEM),intent(in) :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_ld
-  integer(kind=KMEM) function sus_size_irec_la (mold, n) result(l)
+  function sus_size_irec_la (mold, n) result(l)
     use TOUZA_Std_prc,only: KMEM=>KI64, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     character(len=*),  intent(in) :: mold
     integer(kind=KMEM),intent(in) :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_la
 
-  integer(kind=KMEM) function sus_size_irec_i (mold, n) result(l)
+  function sus_size_irec_i (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KI32, KMEM=>KI32, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     integer(kind=KTGT),intent(in) :: mold
     integer(kind=KMEM),intent(in),optional :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_i
-  integer(kind=KMEM) function sus_size_irec_l (mold, n) result(l)
+  function sus_size_irec_l (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KI64, KMEM=>KI32, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     integer(kind=KTGT),intent(in) :: mold
     integer(kind=KMEM),intent(in),optional :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_l
-  integer(kind=KMEM) function sus_size_irec_f (mold, n) result(l)
+  function sus_size_irec_f (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KFLT, KMEM=>KI32, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     real(kind=KTGT),   intent(in) :: mold
     integer(kind=KMEM),intent(in),optional :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_f
-  integer(kind=KMEM) function sus_size_irec_d (mold, n) result(l)
+  function sus_size_irec_d (mold, n) result(l)
     use TOUZA_Std_prc,only: KTGT=>KDBL, KMEM=>KI32, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     real(kind=KTGT),   intent(in) :: mold
     integer(kind=KMEM),intent(in),optional :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
   end function sus_size_irec_d
-  integer(kind=KMEM) function sus_size_irec_a (mold, n) result(l)
+  function sus_size_irec_a (mold, n) result(l)
     use TOUZA_Std_prc,only: KMEM=>KI32, KSEP=>KI32
     use TOUZA_Std_env,only: get_size_strm
     implicit none
+    integer(kind=KMEM) :: l
     character(len=*),  intent(in) :: mold
     integer(kind=KMEM),intent(in),optional :: n
     l = get_size_strm(mold, n) + mstrm_sep(0_KSEP) * 2
@@ -7146,9 +7164,10 @@ program test_std_sus
      lsep = index(arg, 'L').gt.0
 111  format('outsus-', I0, L1, L1, '.dat')
      write(file, 111) TEST_STD_SUS, swap, lsep
-     call batch_test_i(ierr, file, arg, swap, lsep, mem)
+     ! call batch_test_i(ierr, file, arg, swap, lsep, mem)
+     call batch_test_i(ierr, file, swap, lsep, mem)
      if (.not.lsep) then
-        call batch_test_suspend_i(ierr, file, arg, swap, mem)
+        call batch_test_suspend_i(ierr, file, swap, mem)
      endif
   endif
   if (ierr.eq.0) call batch_overflow_mix(ierr)
@@ -7161,13 +7180,13 @@ program test_std_sus
   write(*, 101) 'FINAL', ierr
   stop
 contains
-  subroutine batch_test_i(ierr, file, arg, swap, lsep, mem)
+  subroutine batch_test_i(ierr, file, swap, lsep, mem)
     use TOUZA_Std_prc,only: KSRC=>KI32
     use TOUZA_Std_env,only: KIOFS
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: file
-    character(len=*),intent(in)  :: arg
+    ! character(len=*),intent(in)  :: arg
     logical,         intent(in)  :: swap, lsep
     integer,         intent(in)  :: mem
     integer(kind=KSRC) :: v(0:mem-1), ref(0:mem-1), bref(0:mem-1)
@@ -7369,13 +7388,13 @@ contains
     if (ierr.eq.0) call sus_close(ierr, u, file)
   end subroutine batch_test_i
 
-  subroutine batch_test_suspend_i(ierr, file, arg, swap, mem)
+  subroutine batch_test_suspend_i(ierr, file, swap, mem)
     use TOUZA_Std_prc,only: KSRC=>KI32
     use TOUZA_Std_env,only: KIOFS
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: file
-    character(len=*),intent(in)  :: arg
+    ! character(len=*),intent(in)  :: arg
     logical,         intent(in)  :: swap
     integer,         intent(in)  :: mem
     integer(kind=KSRC) :: v(0:mem-1)
@@ -7481,11 +7500,11 @@ program test_std_sus
   integer u
   integer,parameter :: lv = 1024
   integer,parameter :: la = 16
-  integer(kind=KI32) :: vis(lv), vid(lv)
-  integer(kind=KI64) :: vls(lv), vld(lv)
-  real(kind=KFLT)    :: vfs(lv), vfd(lv)
-  real(kind=KDBL)    :: vds(lv), vdd(lv)
-  character(len=la)  :: vas(lv), vad(lv)
+  integer(kind=KI32) :: vis(lv)
+  integer(kind=KI64) :: vls(lv)
+  real(kind=KFLT)    :: vfs(lv)
+  real(kind=KDBL)    :: vds(lv)
+  character(len=la)  :: vas(lv)
 
   character(len=512) :: file = 'out.sus'
   character(len=512) :: file2 = 'out.sus2'
@@ -7495,7 +7514,6 @@ program test_std_sus
 
   integer dims(4)
 
-  integer kendi
   integer j
   integer mi, ml, mf, md, ma
   logical swap
@@ -7730,8 +7748,6 @@ contains
     real(kind=KFLT)    :: xf(lv)
     real(kind=KDBL)    :: xd(lv)
     character(len=la)  :: xa(lv)
-
-    logical swap
 
     ierr = 0
 

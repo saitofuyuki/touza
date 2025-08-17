@@ -1,7 +1,7 @@
 !!!_! calendar_primitive.F90 - TOUZA/Cal primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 22 2011
-#define TIME_STAMP 'Time-stamp: <2025/05/23 10:47:03 fuyuki calendar_primitive.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/23 08:53:39 fuyuki calendar_primitive.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -420,6 +420,7 @@ contains
     implicit none
     integer,         intent(in)          :: mode
     type(cal_date_t),intent(in),optional :: cd ! for consistency
+    if (present(cd)) continue                    ! dummy
     r  = props(mode) % nmon_year
     return
   end function inq_nmonth_year
@@ -431,6 +432,7 @@ contains
     implicit none
     integer,         intent(in)          :: mode
     type(cal_date_t),intent(in),optional :: cd ! for consistency
+    if (present(cd)) continue                    ! dummy
     r  = props(mode) % nsec_day
     return
   end function inq_nsec_day
@@ -442,6 +444,7 @@ contains
     implicit none
     integer,         intent(in)          :: mode
     type(cal_date_t),intent(in),optional :: cd ! for consistency
+    if (present(cd)) continue                    ! dummy
     r  = props(mode) % nsec_min
     return
   end function inq_nsec_minute
@@ -453,6 +456,7 @@ contains
     implicit none
     integer,         intent(in)          :: mode
     type(cal_date_t),intent(in),optional :: cd ! for consistency
+    if (present(cd)) continue                  ! dummy
     r  = props(mode) % nsec_hour
     return
   end function inq_nsec_hour
@@ -464,6 +468,7 @@ contains
     implicit none
     integer,         intent(in)          :: mode
     type(cal_date_t),intent(in),optional :: cd   ! for consistency
+    if (present(cd)) continue                    ! dummy
     r  = props(mode) % nmin_hour
     return
   end function inq_nminute_hour

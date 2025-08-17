@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/05/21 14:16:56 fuyuki configure.ac>
+# Time-stamp: <2025/07/13 16:07:44 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -43,9 +43,16 @@ AC_FC_MODULE_EXTENSION
 AC_FC_MODULE_FLAG
 AC_FC_MODULE_OUTPUT_FLAG([], [AC_MSG_WARN])
 AX_COMPILER_VENDOR
+AC_SUBST([FC_COMPILER_VENDOR], $ax_cv_fc_compiler_vendor)
+AX_OPENMP
 AC_LANG_POP([Fortran])
 
 AC_PROG_F77
+dnl AC_LANG_PUSH([Fortran 77])
+dnl AX_OPENMP
+dnl AC_LANG_POP([Fortran 77])
+AC_SUBST([OPENMP_FCFLAGS])
+AC_SUBST([OPENMP_FFLAGS])
 
 AC_ARG_ENABLE([warn-max],
 [AS_HELP_STRING([--enable-warn-max], [compile with maximum warning option if found @<:@default=no@:>@])],
@@ -129,7 +136,6 @@ AM_CONDITIONAL([BUILD_div], [false])
 dnl MT_SUB_PACKAGE([nio], [],     [std emu trp div])
 MT_SUB_PACKAGE([nio], [],     [std emu trp])
 MT_SUB_PACKAGE([ami], [],     [std emu nio trp])
-MT_SUB_PACKAGE([zbt], [no],   [std nio])
 
 AC_ARG_ENABLE([nctcdf],
 [AS_HELP_STRING([--enable-nctcdf], [enable nio/n*c*tcdf features@<:@default=no@:>@])],
@@ -219,38 +225,6 @@ AC_ARG_ENABLE([mod-dependencies],
 AM_CONDITIONAL([enable_module_dependencies], [
   test "x$use_mod_dependencies" != xno \
   && test x"$ax_f90_modext" != xunknown])
-
-AS_IF([test "x$enable_sub_zbt" != xno],
-[AC_MSG_WARN([TOUZA/Zbt will be deleted from TOUZA.  This package still contains it for compatibility.])])
-
-AS_IF([test "x$enable_sub_zbt" != xno],
-[AM_PATH_PYTHON([3.11], ,
-                [AC_MSG_ERROR([cannot enable zbt.  check python environemnt])])
-AX_PYTHON()
-AX_PYTHON_MODULE([ctypes], [FATAL], [python3])
-AX_PYTHON_MODULE([numpy], [FATAL], [python3])
-AX_PYTHON_MODULE([xarray], [FATAL], [python3])
-AX_PYTHON_MODULE([build], [FATAL], [python3])
-AX_PYTHON_MODULE([matplotlib], [FATAL], [python3])
-AX_PYTHON_MODULE([cartopy], [FATAL], [python3])
-AX_PYTHON_MODULE([tomllib], [FATAL], [python3])
-AC_CONFIG_FILES([zbt/pyproject.toml:zbt/pyproject.in])
-AC_CONFIG_FILES([zbt/zbt/Makefile])
-AC_CONFIG_FILES([zbt/tests/Makefile])])
-
-AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
-
-AM_CONDITIONAL([ZBT_BUILD_ONLY], [test "x$enable_sub_zbt" = xbuild])
-
-AC_ARG_ENABLE([zbt-embed-libdir],
-[AS_HELP_STRING([--enable-zbt-embed-libdir],
- [enable hard-coded libtouza dlocation @<:@default=no@:>@])],
- [enable_zbt_embed_libdir=$enableval],
- [enable_zbt_embed_libdir=no])
-AM_CONDITIONAL([enable_module_dependencies], [
-  test "x$use_mod_dependencies" != xno \
-  && test x"$ax_f90_modext" != xunknown])
-AM_CONDITIONAL([zbt_embed_libdir], [test "x$enable_zbt_embed_libdir" = xyes])
 
 dnl AM_CONDITIONAL([am__fastdepFC], [false])
 

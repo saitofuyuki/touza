@@ -1,7 +1,7 @@
 !!!_! calendar.F90 - TOUZA/Cal manager
 ! Maintainer: SAITO Fuyuki
 ! Created: May 31 2020
-#define TIME_STAMP 'Time-stamp: <2025/05/12 08:31:56 fuyuki calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/07/18 10:30:47 fuyuki calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -21,23 +21,21 @@
 #endif
 !!!_& TOUZA_Cal - calendar manager
 module TOUZA_Cal
-  use TOUZA_Cal_primitive,only: &
-       & msglev_panic, &
-       & msglev_fatal,   msglev_critical, msglev_severe, &
-       & msglev_warning, msglev_normal,   msglev_info, &
-       & msglev_detail,  msglev_debug,    &
-       & control_mode,   control_deep,    is_first_force, &
-       & trace_control,  trace_fine
-  use TOUZA_Cal_core,only: &
-       & KRC,         XREAL, &
-       & cal_attr_t,  cal_daysec_t, cal_date_t, cal_time_t, &
-       & cal_ynday_t, calendar_t, &
-       & p_error, p_ideal, p_grego_i, p_grego_l, p_user, &
-       & auto_false, auto_once, auto_every, &
-       & set_perpetual_date_core        => set_perpetual_date, &
-       & get_perpetual_date_core        => get_perpetual_date, &
-       & conv_string_calendar,          &
-       & conv_calendar_string_core      => conv_calendar_string
+  use TOUZA_Cal_primitive,only: msglev_panic
+  use TOUZA_Cal_primitive,only: msglev_fatal,   msglev_critical, msglev_severe
+  use TOUZA_Cal_primitive,only: msglev_warning, msglev_normal,   msglev_info
+  use TOUZA_Cal_primitive,only: msglev_detail,  msglev_debug
+  use TOUZA_Cal_primitive,only: control_mode,   control_deep,    is_first_force
+  use TOUZA_Cal_primitive,only: trace_control,  trace_fine
+  use TOUZA_Cal_core,only: KRC,         XREAL
+  use TOUZA_Cal_core,only: cal_attr_t,  cal_daysec_t, cal_date_t, cal_time_t
+  use TOUZA_Cal_core,only: cal_ynday_t, calendar_t
+  use TOUZA_Cal_core,only: p_error, p_ideal, p_grego_i, p_grego_l, p_user
+  use TOUZA_Cal_core,only: auto_false, auto_once, auto_every
+  use TOUZA_Cal_core,only: set_perpetual_date_core=>set_perpetual_date
+  use TOUZA_Cal_core,only: get_perpetual_date_core=>get_perpetual_date
+  use TOUZA_Cal_core,only: conv_string_calendar
+  use TOUZA_Cal_core,only: conv_calendar_string_core=>conv_calendar_string
 !!!_ = declaration
   implicit none
   private
@@ -147,6 +145,7 @@ module TOUZA_Cal
   public :: conv_cdaysec_csec,      conv_time_tsec,     conv_date_cday
   public :: conv_date_dayy,         conv_date_dayy_compat
   public :: conv_calendar_csec,     conv_duration_sec,  conv_csec_string_ppt_off
+  public :: conv_sec_duration
   public :: advance_csec,           conv_calendar_string
   public :: is_passed,              is_passed_compat
   public :: conv_csec_cdaysec,      conv_csec_adaysec
@@ -191,7 +190,7 @@ contains
        &  ncals, global, auto)
 #   define __PROC__ 'init'
     use TOUZA_Cal_primitive,only: msg, choice, control_mode, control_deep
-    use TOUZA_Cal_core,only: core_init => init
+    use TOUZA_Cal_core,only: core_init=>init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -325,7 +324,7 @@ contains
   subroutine alloc &
        & (ierr, ncals)
 #   define __PROC__ 'alloc'
-    use TOUZA_Cal_core,only: core_init => init
+    use TOUZA_Cal_core,only: core_init=>init
     implicit none
     integer,intent(out) :: ierr
     integer,intent(in)  :: ncals
@@ -443,7 +442,7 @@ contains
 !!!_  & set_perpetual_switch
   subroutine set_perpetual_switch &
        & (sw, jcalh)
-    use TOUZA_Cal_core,only: set_perpetual_switch_core => set_perpetual_switch
+    use TOUZA_Cal_core,only: set_perpetual_switch_core=>set_perpetual_switch
     implicit none
     logical,intent(in)          :: sw
     integer,intent(in),optional :: jcalh
@@ -457,7 +456,7 @@ contains
   integer function inq_nday_month_t &
        & (cd, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: inq_nday_month_core => inq_nday_month
+    use TOUZA_Cal_core,only: inq_nday_month_core=>inq_nday_month
     implicit none
     type(cal_date_t),intent(in)          :: cd
     integer,         intent(in),optional :: jcalh
@@ -481,7 +480,7 @@ contains
   integer function inq_nday_year_t &
        & (cd, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: inq_nday_year_core => inq_nday_year
+    use TOUZA_Cal_core,only: inq_nday_year_core=>inq_nday_year
     implicit none
     type(cal_date_t),intent(in)          :: cd
     integer,         intent(in),optional :: jcalh
@@ -505,7 +504,7 @@ contains
   integer function inq_nmonth_year_t &
        & (cd, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: inq_nmonth_year_core => inq_nmonth_year
+    use TOUZA_Cal_core,only: inq_nmonth_year_core=>inq_nmonth_year
     implicit none
     type(cal_date_t),intent(in)          :: cd
     integer,         intent(in),optional :: jcalh
@@ -529,7 +528,7 @@ contains
   integer function inq_nsec_day_t &
        & (cd, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: inq_nsec_day_core => inq_nsec_day
+    use TOUZA_Cal_core,only: inq_nsec_day_core=>inq_nsec_day
     implicit none
     type(cal_date_t),intent(in)          :: cd
     integer,         intent(in),optional :: jcalh
@@ -552,7 +551,7 @@ contains
   integer function inq_nsec_minute_t &
        & (cd, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: inq_nsec_minute_core => inq_nsec_minute
+    use TOUZA_Cal_core,only: inq_nsec_minute_core=>inq_nsec_minute
     implicit none
     type(cal_date_t),intent(in)          :: cd
     integer,         intent(in),optional :: jcalh
@@ -575,7 +574,7 @@ contains
   integer function inq_nsec_hour_t &
        & (cd, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: inq_nsec_hour_core => inq_nsec_hour
+    use TOUZA_Cal_core,only: inq_nsec_hour_core=>inq_nsec_hour
     implicit none
     type(cal_date_t),intent(in)          :: cd
     integer,         intent(in),optional :: jcalh
@@ -598,7 +597,7 @@ contains
   integer function inq_nyear_period_t &
        & (jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: inq_nyear_period_core => inq_nyear_period
+    use TOUZA_Cal_core,only: inq_nyear_period_core=>inq_nyear_period
     implicit none
     integer,intent(in),optional :: jcalh
     integer jc
@@ -611,7 +610,7 @@ contains
   integer function inq_nday_period_t &
        & (jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: inq_nday_period_core => inq_nday_period
+    use TOUZA_Cal_core,only: inq_nday_period_core=>inq_nday_period
     implicit none
     integer,intent(in),optional :: jcalh
     integer jc
@@ -624,8 +623,7 @@ contains
   type(cal_daysec_t) function conv_csec_cdaysec &
        &  (csec, cd, jcalh) &
        result (r)
-    use TOUZA_Cal_core,only: &
-         & conv_csec_cdaysec_core => conv_csec_cdaysec
+    use TOUZA_Cal_core,only: conv_csec_cdaysec_core=>conv_csec_cdaysec
     implicit none
     real(kind=KRC),  intent(in)          :: csec
     type(cal_date_t),intent(in),optional :: cd
@@ -639,8 +637,7 @@ contains
 !!!_  & conv_csec_adaysec - calendar[sec] to calendar[day+sec] array
   subroutine conv_csec_adaysec &
        &  (cday, rsec, csec, jcalh)
-    use TOUZA_Cal_core,only: &
-         & conv_csec_cdaysec_core => conv_csec_cdaysec
+    use TOUZA_Cal_core,only: conv_csec_cdaysec_core=>conv_csec_cdaysec
     implicit none
     integer,       intent(out)         :: cday
     real(kind=KRC),intent(out)         :: rsec
@@ -657,67 +654,67 @@ contains
 
 !!!_  & conv_cdaysec_csec()
   real(kind=KRC) function conv_cdaysec_csec_c &
-       & (ds, xk, cd, jcalh) &
+       & (ds, mold, cd, jcalh) &
        result (r)
-    use TOUZA_Cal_core,only: conv_cdaysec_csec_core => conv_cdaysec_csec
+    use TOUZA_Cal_core,only: conv_cdaysec_csec_core=>conv_cdaysec_csec
     implicit none
     type(cal_daysec_t),intent(in)          :: ds
-    real(kind=KRC),    intent(in)          :: xk ! dummy
+    real(kind=KRC),    intent(in)          :: mold ! dummy
     type(cal_date_t),  intent(in),optional :: cd
     integer,           intent(in),optional :: jcalh
 
     integer jc
     jc = check_id(jcalh)
-    r = conv_cdaysec_csec_core(CALH(jc), ds, cd, xk)
+    r = conv_cdaysec_csec_core(CALH(jc), ds, cd, mold)
     return
   end function conv_cdaysec_csec_c
 
   integer function conv_cdaysec_csec_i &
-       & (ds, xk, cd, jcalh) &
+       & (ds, mold, cd, jcalh) &
        result (r)
-    use TOUZA_Cal_core,only: conv_cdaysec_csec_core => conv_cdaysec_csec
+    use TOUZA_Cal_core,only: conv_cdaysec_csec_core=>conv_cdaysec_csec
     implicit none
     type(cal_daysec_t),intent(in)          :: ds
-    integer,           intent(in)          :: xk ! dummy
+    integer,           intent(in)          :: mold ! dummy
     type(cal_date_t),  intent(in),optional :: cd
     integer,           intent(in),optional :: jcalh
 
     integer jc
     jc = check_id(jcalh)
-    r = conv_cdaysec_csec_core(CALH(jc), ds, cd, xk)
+    r = conv_cdaysec_csec_core(CALH(jc), ds, cd, mold)
     return
   end function conv_cdaysec_csec_i
 
 !!!_  & conv_adaysec_csec() - calendar[day+sec] array to calendar[sec]
   real(kind=KRC) function conv_adaysec_csec_c &
-       & (cday, rsec, xk, jcalh) &
+       & (cday, rsec, mold, jcalh) &
        result (r)
-    use TOUZA_Cal_core,only: conv_cdaysec_csec_core => conv_cdaysec_csec
+    use TOUZA_Cal_core,only: conv_cdaysec_csec_core=>conv_cdaysec_csec
     implicit none
     integer,       intent(in)          :: cday
     real(kind=KRC),intent(in)          :: rsec
-    real(kind=KRC),intent(in)          :: xk ! dummy
+    real(kind=KRC),intent(in)          :: mold ! dummy
     integer,       intent(in),optional :: jcalh
     integer jc
     jc = check_id(jcalh)
     r = conv_cdaysec_csec_core &
-         & (CALH(jc), cal_daysec_t(cday, rsec), cal_date_t(0, 0, 0), xk)
+         & (CALH(jc), cal_daysec_t(cday, rsec), cal_date_t(0, 0, 0), mold)
     return
   end function conv_adaysec_csec_c
 
   integer function conv_adaysec_csec_i &
-       & (cday, rsec, xk, jcalh) &
+       & (cday, rsec, mold, jcalh) &
        result (r)
-    use TOUZA_Cal_core,only: conv_cdaysec_csec_core => conv_cdaysec_csec
+    use TOUZA_Cal_core,only: conv_cdaysec_csec_core=>conv_cdaysec_csec
     implicit none
     integer,       intent(in)          :: cday
     real(kind=KRC),intent(in)          :: rsec
-    integer,       intent(in)          :: xk ! dummy
+    integer,       intent(in)          :: mold ! dummy
     integer,       intent(in),optional :: jcalh
     integer jc
     jc = check_id(jcalh)
     r = conv_cdaysec_csec_core &
-         & (CALH(jc), cal_daysec_t(cday, rsec), cal_date_t(0, 0, 0), xk)
+         & (CALH(jc), cal_daysec_t(cday, rsec), cal_date_t(0, 0, 0), mold)
     return
   end function conv_adaysec_csec_i
 
@@ -725,8 +722,7 @@ contains
   type(cal_time_t) function conv_tsec_time_c &
        & (tsec, cd, jcalh) &
        result (r)
-    use TOUZA_Cal_core,only: &
-         & conv_tsec_time_core => conv_tsec_time
+    use TOUZA_Cal_core,only: conv_tsec_time_core=>conv_tsec_time
     implicit none
     real(kind=KRC),  intent(in)          :: tsec
     type(cal_date_t),intent(in),optional :: cd
@@ -740,8 +736,7 @@ contains
   type(cal_time_t) function conv_tsec_time_i &
        & (tsec, cd, jcalh) &
        result (r)
-    use TOUZA_Cal_core,only: &
-         & conv_tsec_time_core => conv_tsec_time
+    use TOUZA_Cal_core,only: conv_tsec_time_core=>conv_tsec_time
     implicit none
     integer,         intent(in)          :: tsec
     type(cal_date_t),intent(in),optional :: cd
@@ -756,8 +751,7 @@ contains
   function conv_tsec_atime_c &
        & (tsec, jcalh) &
        & result(at)
-    use TOUZA_Cal_core,only: &
-         & conv_tsec_time_core => conv_tsec_time
+    use TOUZA_Cal_core,only: conv_tsec_time_core=>conv_tsec_time
     implicit none
     integer at(3)
     real(kind=KRC),intent(in)          :: tsec
@@ -773,8 +767,7 @@ contains
   function conv_tsec_atime_i &
        & (tsec, jcalh) &
        & result(at)
-    use TOUZA_Cal_core,only: &
-         & conv_tsec_time_core => conv_tsec_time
+    use TOUZA_Cal_core,only: conv_tsec_time_core=>conv_tsec_time
     implicit none
     integer at(3)
     integer,intent(in)          :: tsec
@@ -791,15 +784,15 @@ contains
   integer function conv_time_tsec_t &
        & (t, cd, jcalh) &
        result (r)
-    use TOUZA_Cal_core,only: conv_time_tsec_core => conv_time_tsec
+    use TOUZA_Cal_core,only: conv_time_tsec_core=>conv_time_tsec
     implicit none
     type(cal_time_t),intent(in)          :: t
     type(cal_date_t),intent(in),optional :: cd
     integer,         intent(in),optional :: jcalh
     integer jc
-    integer xk
+    integer mold
     jc = check_id(jcalh)
-    r = conv_time_tsec_core (CALH(jc), t, cd, xk)
+    r = conv_time_tsec_core (CALH(jc), t, cd, mold)
     return
   end function conv_time_tsec_t
 
@@ -818,8 +811,7 @@ contains
   type(cal_date_t) function conv_cday_date_i &
        & (cday, jcalh) &
        result (r)
-    use TOUZA_Cal_core,only: &
-         & conv_cday_date_core => conv_cday_date
+    use TOUZA_Cal_core,only: conv_cday_date_core=>conv_cday_date
     implicit none
     integer,intent(in)          :: cday
     integer,intent(in),optional :: jcalh
@@ -832,8 +824,7 @@ contains
   type(cal_date_t) function conv_cday_date_c &
        & (cday, jcalh) &
        result (r)
-    use TOUZA_Cal_core,only: &
-         & conv_cday_date_core => conv_cday_date
+    use TOUZA_Cal_core,only: conv_cday_date_core=>conv_cday_date
     implicit none
     real(kind=KRC),intent(in)          :: cday
     integer,       intent(in),optional :: jcalh
@@ -870,62 +861,62 @@ contains
 
 !!!_  & conv_date_cday() - calendar[D] to calendar[day]
   integer function conv_date_cday_i &
-       & (cd, xk, jcalh) &
+       & (cd, mold, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: conv_date_cday_core => conv_date_cday
+    use TOUZA_Cal_core,only: conv_date_cday_core=>conv_date_cday
     implicit none
     type(cal_date_t),intent(in)          :: cd
-    integer,         intent(in)          :: xk ! dummy
+    integer,         intent(in)          :: mold ! dummy
     integer,         intent(in),optional :: jcalh
     integer jc
     jc = check_id(jcalh)
-    r = conv_date_cday_core(CALH(jc), cd, xk)
+    r = conv_date_cday_core(CALH(jc), cd, mold)
     return
   end function conv_date_cday_i
 
   real(kind=KRC) function conv_date_cday_c &
-       & (cd, xk, jcalh) &
+       & (cd, mold, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: conv_date_cday_core => conv_date_cday
+    use TOUZA_Cal_core,only: conv_date_cday_core=>conv_date_cday
     implicit none
     type(cal_date_t),intent(in)          :: cd
-    real(kind=KRC),  intent(in)          :: xk
+    real(kind=KRC),  intent(in)          :: mold
     integer,         intent(in),optional :: jcalh
     integer jc
     jc = check_id(jcalh)
-    r = conv_date_cday_core(CALH(jc), cd, xk)
+    r = conv_date_cday_core(CALH(jc), cd, mold)
     return
   end function conv_date_cday_c
 
 !!!_  & conv_adate_cday() - calendar[D] array to calendar[day]
   integer function conv_adate_cday_i &
-       & (ymd, xk, jcalh) &
+       & (ymd, mold, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: conv_date_cday_core => conv_date_cday
+    use TOUZA_Cal_core,only: conv_date_cday_core=>conv_date_cday
     implicit none
     integer,intent(in)          :: ymd(3)
-    integer,intent(in)          :: xk ! dummy
+    integer,intent(in)          :: mold ! dummy
     integer,intent(in),optional :: jcalh
 
     integer jc
     jc = check_id(jcalh)
     r = conv_date_cday_core &
-         & (CALH(jc), cal_date_t(ymd(1), ymd(2), ymd(3)), xk)
+         & (CALH(jc), cal_date_t(ymd(1), ymd(2), ymd(3)), mold)
     return
   end function conv_adate_cday_i
 
   real(kind=KRC) function conv_adate_cday_c &
-       & (ymd, xk, jcalh) &
+       & (ymd, mold, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: conv_date_cday_core => conv_date_cday
+    use TOUZA_Cal_core,only: conv_date_cday_core=>conv_date_cday
     implicit none
     integer,       intent(in)          :: ymd(3)
-    real(kind=KRC),intent(in)          :: xk
+    real(kind=KRC),intent(in)          :: mold
     integer,       intent(in),optional :: jcalh
     integer jc
     jc = check_id(jcalh)
     r = conv_date_cday_core &
-         & (CALH(jc), cal_date_t(ymd(1), ymd(2), ymd(3)), xk)
+         & (CALH(jc), cal_date_t(ymd(1), ymd(2), ymd(3)), mold)
     return
   end function conv_adate_cday_c
 
@@ -933,7 +924,7 @@ contains
   integer function conv_date_dayy &
        & (cd, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: conv_date_dayy_core => conv_date_dayy
+    use TOUZA_Cal_core,only: conv_date_dayy_core=>conv_date_dayy
     implicit none
     type(cal_date_t),intent(in)          :: cd
     integer,         intent(in),optional :: jcalh
@@ -946,7 +937,7 @@ contains
   integer function conv_adate_dayy &
        & (ymd, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: conv_date_dayy_core => conv_date_dayy
+    use TOUZA_Cal_core,only: conv_date_dayy_core=>conv_date_dayy
     implicit none
     integer,intent(in)          :: ymd(3)
     integer,intent(in),optional :: jcalh
@@ -961,7 +952,7 @@ contains
   integer function conv_date_dayy_compat &
        & (cd, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: conv_date_dayy_compat_core => conv_date_dayy_compat
+    use TOUZA_Cal_core,only: conv_date_dayy_compat_core=>conv_date_dayy_compat
     implicit none
     type(cal_date_t),intent(in)          :: cd
     integer,         intent(in),optional :: jcalh
@@ -974,7 +965,7 @@ contains
   integer function conv_adate_dayy_compat &
        & (ymd, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: conv_date_dayy_compat_core => conv_date_dayy_compat
+    use TOUZA_Cal_core,only: conv_date_dayy_compat_core=>conv_date_dayy_compat
     implicit none
     integer,intent(in)          :: ymd(3)
     integer,intent(in),optional :: jcalh
@@ -989,8 +980,7 @@ contains
   type(calendar_t) function conv_csec_calendar &
        & (csec, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: &
-         & conv_csec_calendar_core => conv_csec_calendar
+    use TOUZA_Cal_core,only: conv_csec_calendar_core=>conv_csec_calendar
     implicit none
     real(kind=KRC),intent(in)          :: csec
     integer,       intent(in),optional :: jcalh
@@ -1004,8 +994,7 @@ contains
   function conv_csec_acalendar &
        & (csec, jcalh) &
        & result(ac)
-    use TOUZA_Cal_core,only: &
-         & conv_csec_calendar_core => conv_csec_calendar
+    use TOUZA_Cal_core,only: conv_csec_calendar_core=>conv_csec_calendar
     implicit none
     integer ac(6)
     real(kind=KRC),intent(in)          :: csec
@@ -1021,27 +1010,27 @@ contains
 
 !!!_  & conv_calendar_csec() - calendar[D,T] to calendar[sec]
   real(kind=KRC) function conv_calendar_csec_c &
-       & (cc, xk, jcalh) &
+       & (cc, mold, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: conv_calendar_csec_core => conv_calendar_csec
+    use TOUZA_Cal_core,only: conv_calendar_csec_core=>conv_calendar_csec
     implicit none
     type(calendar_t),intent(in)          :: cc
-    real(kind=KRC),  intent(in)          :: xk ! dummy
+    real(kind=KRC),  intent(in)          :: mold ! dummy
     integer,         intent(in),optional :: jcalh
     integer jc
     jc = check_id(jcalh)
-    r = conv_calendar_csec_core(CALH(jc), cc, xk)
+    r = conv_calendar_csec_core(CALH(jc), cc, mold)
     return
   end function conv_calendar_csec_c
 
 !!!_  & conv_acalendar_csec() - calendar[D,T] array to calendar[sec]
   real(kind=KRC) function conv_acalendar_csec_c &
-       & (y,mo,d,h,mi,s, xk, jcalh) &
+       & (y,mo,d,h,mi,s, mold, jcalh) &
        & result (r)
     implicit none
     integer,       intent(in)          :: y, mo, d
     integer,       intent(in)          :: h, mi, s
-    real(kind=KRC),intent(in)          :: xk ! dummy
+    real(kind=KRC),intent(in)          :: mold ! dummy
     integer,       intent(in),optional :: jcalh
 
     type(calendar_t) :: cc
@@ -1051,7 +1040,7 @@ contains
     cc%t%h = h
     cc%t%m = mi
     cc%t%s = s
-    r = conv_calendar_csec_c(cc, xk, jcalh)
+    r = conv_calendar_csec_c(cc, mold, jcalh)
     return
   end function conv_acalendar_csec_c
 
@@ -1059,8 +1048,7 @@ contains
   type(cal_ynday_t) function conv_cday_cydayy &
        & (cday, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: &
-         & conv_cday_cydayy_core => conv_cday_cydayy
+    use TOUZA_Cal_core,only: conv_cday_cydayy_core=>conv_cday_cydayy
     implicit none
     integer,intent(in)          :: cday
     integer,intent(in),optional :: jcalh
@@ -1074,8 +1062,7 @@ contains
   function conv_cday_aydayy &
        & (cday, jcalh) &
        & result(ayd)
-    use TOUZA_Cal_core,only: &
-         & conv_cday_cydayy_core => conv_cday_cydayy
+    use TOUZA_Cal_core,only: conv_cday_cydayy_core=>conv_cday_cydayy
     implicit none
     integer ayd(2)
     integer,intent(in)          :: cday
@@ -1092,8 +1079,7 @@ contains
   type(cal_date_t) function conv_csec_date &
        & (dsec, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: &
-         & conv_csec_date_core => conv_csec_date
+    use TOUZA_Cal_core,only: conv_csec_date_core=>conv_csec_date
     implicit none
     real(kind=KRC),intent(in)          :: dsec
     integer,       intent(in),optional :: jcalh
@@ -1107,8 +1093,7 @@ contains
   function conv_csec_adate &
        & (dsec, jcalh) &
        & result(ad)
-    use TOUZA_Cal_core,only: &
-         & conv_csec_date_core => conv_csec_date
+    use TOUZA_Cal_core,only: conv_csec_date_core=>conv_csec_date
     implicit none
     integer :: ad(3)
     real(kind=KRC),intent(in)          :: dsec
@@ -1125,8 +1110,7 @@ contains
   type(cal_ynday_t) function conv_csec_cydayy &
        & (csec, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: &
-         & conv_csec_cydayy_core => conv_csec_cydayy
+    use TOUZA_Cal_core,only: conv_csec_cydayy_core=>conv_csec_cydayy
     implicit none
     real(kind=KRC),intent(in)          :: csec
     integer,       intent(in),optional :: jcalh
@@ -1140,8 +1124,7 @@ contains
   function conv_csec_aydayy &
        & (csec, jcalh) &
        & result(ayd)
-    use TOUZA_Cal_core,only: &
-         & conv_csec_cydayy_core => conv_csec_cydayy
+    use TOUZA_Cal_core,only: conv_csec_cydayy_core=>conv_csec_cydayy
     implicit none
     integer ayd(2)
     real(kind=KRC),intent(in)          :: csec
@@ -1158,8 +1141,7 @@ contains
   real(kind=KRC) function conv_duration_sec &
        & (dur, unit, refsec, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: &
-         & conv_duration_sec_core => conv_duration_sec
+    use TOUZA_Cal_core,only: conv_duration_sec_core=>conv_duration_sec
     implicit none
     real(kind=KRC),  intent(in)          :: dur
     character(len=*),intent(in)          :: unit
@@ -1171,11 +1153,26 @@ contains
     return
   end function conv_duration_sec
 
+!!!_  & conv_sec_duration() - unit-conversion from seconds to duration[unit]
+  real(kind=KRC) function conv_sec_duration &
+       & (sec, unit, refsec, jcalh) &
+       & result (r)
+    use TOUZA_Cal_core,only: conv_sec_duration_core=>conv_sec_duration
+    implicit none
+    real(kind=KRC),  intent(in)          :: sec
+    character(len=*),intent(in)          :: unit
+    real(kind=KRC),  intent(in)          :: refsec
+    integer,         intent(in),optional :: jcalh
+    integer jc
+    jc = check_id(jcalh)
+    r = conv_sec_duration_core(CALH(jc), sec, unit, refsec)
+    return
+  end function conv_sec_duration
+
 !!!_  & conv_csec_string_ppt_off()
   subroutine conv_csec_string_ppt_off &
        (str, csec, jcalh)
-    use TOUZA_Cal_core,only: &
-         & conv_csec_string_ppt_off_core => conv_csec_string_ppt_off
+    use TOUZA_Cal_core,only: conv_csec_string_ppt_off_core=>conv_csec_string_ppt_off
     implicit none
     character(len=*),intent(out)         :: str
     real(kind=KRC),  intent(in)          :: csec
@@ -1217,19 +1214,18 @@ contains
 
 !!!_  & advance_csec() - calendar[sec] advance by duration[unit]
   real(kind=KRC) function advance_csec_c &
-       & (dur, unit, refsec, xk, jcalh) &
+       & (dur, unit, refsec, mold, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: &
-         & advance_csec_core => advance_csec
+    use TOUZA_Cal_core,only: advance_csec_core=>advance_csec
     implicit none
     real(kind=KRC),  intent(in)          :: dur
     real(kind=KRC),  intent(in)          :: refsec
     character(len=*),intent(in)          :: unit
-    real(kind=KRC),  intent(in)          :: xk ! dummy
+    real(kind=KRC),  intent(in)          :: mold ! dummy
     integer,         intent(in),optional :: jcalh
     integer jc
     jc = check_id(jcalh)
-    r = advance_csec_core(CALH(jc), dur, unit, refsec, xk)
+    r = advance_csec_core(CALH(jc), dur, unit, refsec, mold)
     return
   end function advance_csec_c
 
@@ -1237,8 +1233,7 @@ contains
   logical function is_passed &
        & (csec, refsec, orgsec, dur, unit, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: &
-         & is_passed_core => is_passed
+    use TOUZA_Cal_core,only: is_passed_core=>is_passed
     implicit none
     real(kind=KRC),  intent(in)          :: csec, refsec, orgsec, dur
     character(len=*),intent(in)          :: unit
@@ -1253,8 +1248,7 @@ contains
   logical function is_passed_compat &
        & (csec, refsec, orgsec, dur, unit, jcalh) &
        & result (r)
-    use TOUZA_Cal_core,only: &
-         & is_passed_compat_core => is_passed_compat
+    use TOUZA_Cal_core,only: is_passed_compat_core=>is_passed_compat
     implicit none
     real(kind=KRC),  intent(in)          :: csec, refsec, orgsec, dur
     character(len=*),intent(in)          :: unit

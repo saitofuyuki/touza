@@ -1,7 +1,7 @@
 dnl Filename:  touza/m4c/mt_fortran_check.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:   Jun 3 2020
-dnl Time-stamp: <2025/05/25 14:01:16 fuyuki mt_fortran_check.m4>
+dnl Time-stamp: <2025/07/02 11:55:45 fuyuki mt_fortran_check.m4>
 
 dnl Copyright (C) 2020-2025
 dnl           Japan Agency for Marine-Earth Science and Technology
@@ -60,16 +60,22 @@ AC_DEFUN([MT_FORTRAN_BATCH_CHECK_MODULE],
                       [MT_FORTRAN_CHECK_MODULE_MEMBER],
                       $@)])])# MT_FORTRAN_BATCH_CHECK_MODULE
 
-# MT_FORTRAN_BATCH_CHECK_STATEMENT(STATEMENT, SPEC, CODE)
+# MT_FORTRAN_BATCH_CHECK_STATEMENT(STATEMENT, [SPEC], CODE)
 # ------------------------------------------------------
 AC_DEFUN([MT_FORTRAN_BATCH_CHECK_STATEMENT],
-[m4_indir([MT_FORTRAN_BATCH_CHECK],
+[m4_ifblank([$2],
+ [m4_indir([MT_FORTRAN_BATCH_CHECK],
+          [whether statement $1 works],
+          [MT_FORTRAN_CACHE_ID($1)],
+          [MT_FORTRAN_CPP_HAVE([$1])],
+          [MT_FORTRAN_CHECK_STATEMENT_SPEC],
+          $@)],
+ [m4_indir([MT_FORTRAN_BATCH_CHECK],
           [whether statement $1 works with $2 specifier],
           [MT_FORTRAN_CACHE_ID($1_$2)],
           [MT_FORTRAN_CPP_HAVE([$1_$2])],
           [MT_FORTRAN_CHECK_STATEMENT_SPEC],
-          $@)])# MT_FORTRAN_BATCH_CHECK_STATEMENT
-
+          $@)])])# MT_FORTRAN_BATCH_CHECK_STATEMENT
 
 # MT_FORTRAN_BATCH_CHECK(MESSAGE, CACHE, MACRO, CHECKER, ARGUMENTS...)
 # -------------------------------------------------
