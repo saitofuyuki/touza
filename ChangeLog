@@ -1,3 +1,11 @@
+
+Release-1.16.4 / 2025-08-19
+===========================
+
+  * Fatal bug fixes to work miroc7+ils+rainbow.
+  * std: (ipc) [FATAL] fix chdir arguments on SX.
+  * ppp: (miroc) [FATAL] need to call switch_dir in XCKINI_ils.
+
 Release-1.16.3 / 2025-08-17
 ===========================
 
