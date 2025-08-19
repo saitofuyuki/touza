@@ -38,6 +38,7 @@
 #define _SUBR 1  /* subroutine */
 #define _MFUN 2  /* module function */
 #define _OFUN 3  /* other function */
+#define _SUBR_SX 4  /* subroutine (special for getcwd) */
 !!!_@ TOUZA_Std_env - standard environments
 module TOUZA_Std_ipc
   use TOUZA_Std_prc,only: KI32, KI64
@@ -563,12 +564,19 @@ contains
     endif
   end subroutine ipc_CHDIR
 !!!_ + getcwd
+!!!_  - note
+  !! F90_UNIX_DIR:GETCWD   (subroutine)   GETCWD(PATH[o], LENPATH[o], ERRNO[o])
+  !! gcc/GETCWD            (subroutine)   GETCWD(C, STATUS[o])
+  !!                       (function)     integer GETCWD(C)
+  !! nv/GETCWD             (subroutine)   GETCWD(C)
+  !! IFPORT:GETCWD         (function)     integer GETCWD(DIRNAME)
+!!!_  - code
 #ifdef _PCASE
 #undef _PCASE
 #endif
   subroutine ipc_GETCWD(PATH, status, flag)
 #if   HAVE_FORTRAN_F90_UNIX_DIR_GETCWD
-#   define _PCASE _SUBR
+#   define _PCASE _SUBR_SX
     use F90_UNIX_DIR,only: GETCWD
 #elif HAVE_FORTRAN_IFPORT_GETCWD
 #   define _PCASE _MFUN
@@ -594,6 +602,8 @@ contains
 #  else
     call GETCWD(PATH, status)
 #  endif
+#elif _PCASE == _SUBR_SX
+    call GETCWD(PATH, errno=status)
 #elif _PCASE == _MFUN || _PCASE == _OFUN
     status = GETCWD(PATH)
 #else

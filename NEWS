@@ -1,12 +1,12 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/06/11 09:15:36 fuyuki NEWS>
+# Time-stamp: <2025/08/19 23:15:45 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
-* Changes in 1.16.3
+* Changes in 1.16.4
 ** Import revision for miroc7+ils+rainbow on ppp.
 Agent-based communicator manager is improved and cleaned to export
 some procedures to ils, which enables MIROC-Rainbow again on the new
