@@ -1,7 +1,7 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/08/13 08:52:21 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/19 18:05:29 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -162,7 +162,7 @@ module TOUZA_Ppp_miroc
   character(len=*),parameter :: primary_sysin = MIROC_BOOTSTRAP
 !!!_  - public
   public init, diag, finalize
-  public init_rainbow, init_sysio
+  public init_rainbow, init_sysio, switch_dir
   public init_king
   public affils_legacy
   public get_wcolor
@@ -547,7 +547,7 @@ contains
 
     if (dir.ne.' ') then
        if (ierr.eq.0) call ipc_GETCWD(cwd0, ierr)
-       if (ierr.eq.0) call ipc_CHDIR(dir, ierr)
+       if (ierr.eq.0) call ipc_CHDIR(trim(dir), ierr)
        if (ierr.eq.0) call ipc_GETCWD(cwd1, ierr)
 101    format('chdir:', A, ' > ', A)
 109    format('chdir failed:', A)
@@ -1243,7 +1243,7 @@ end subroutine XCKINI_legacy
 !!!_  & XCKINI_ils - Simplified agent initialization for MIROC+ILS ILS side
 subroutine XCKINI_ils(AFFILS, N, ICROOT)
   use TOUZA_Ppp_miroc,only: init, diag, terminate
-  use TOUZA_Ppp_miroc,only: init_rainbow
+  use TOUZA_Ppp_miroc,only: init_rainbow, switch_dir
   use TOUZA_Ppp_miroc,only: lverify
   use TOUZA_Ppp_amng, only: lagent, inquire_agent
   use TOUZA_Ppp_std, only: lpath
@@ -1259,6 +1259,9 @@ subroutine XCKINI_ils(AFFILS, N, ICROOT)
   call init(jerr, levv=+9, stdv=+9, icomm=ICROOT)
   if (jerr.eq.0) then
      call init_rainbow(jerr, cdir, cagent, cid, AFFILS(1:N), icomm=ICROOT)
+  endif
+  if (jerr.eq.0) then
+     if (cdir.ne.' ') call switch_dir(jerr, cdir)
   endif
   if (jerr.ne.0) then
      call terminate(1, 'XCKINI FAILED')
@@ -1494,8 +1497,11 @@ program test_ppp_miroc
   integer icommo, nro, iro
   integer jdmy
   integer,parameter :: NRLIM = 17
-  integer ibase, icomm, jseq, icol
+  integer ibase, icomm, icol
   character(len=lagent) :: pname
+#if TEST_PPP_MIROC < _TEST_MI
+  integer jseq
+#endif
 
   external greeting
   ierr = 0
