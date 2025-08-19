@@ -26,7 +26,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Sun Aug 17 22:29:50 JST 2025
+# from AX_AM_MACROS_STATIC on Wed Aug 20 08:46:45 JST 2025
 
 
 
@@ -315,11 +315,10 @@ am__DIST_COMMON = $(srcdir)/Makedep.inc $(srcdir)/Makefile.in \
 	$(top_srcdir)/build-aux/install-sh \
 	$(top_srcdir)/build-aux/ltmain.sh \
 	$(top_srcdir)/build-aux/missing \
-	$(top_srcdir)/build-aux/tap-driver.sh AUTHORS ChangeLog \
-	INSTALL NEWS README build-aux/ar-lib build-aux/compile \
-	build-aux/config.guess build-aux/config.sub build-aux/depcomp \
-	build-aux/install-sh build-aux/ltmain.sh build-aux/missing \
-	build-aux/py-compile
+	$(top_srcdir)/build-aux/tap-driver.sh AUTHORS INSTALL README \
+	build-aux/ar-lib build-aux/compile build-aux/config.guess \
+	build-aux/config.sub build-aux/depcomp build-aux/install-sh \
+	build-aux/ltmain.sh build-aux/missing build-aux/py-compile
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
