@@ -1,7 +1,7 @@
 # touza/calendar Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 27 2020
-# Time-stamp: <2025/05/23 10:45:25 fuyuki Makefile.am>
+# Time-stamp: <2025/08/22 12:23:15 fuyuki Makefile.am>
 
 # Copyright (C) 2020-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -22,8 +22,7 @@ cal_SOURCES	=	calendar_primitive.F90 calendar_core.F90 calendar.F90 $(include_HE
 libtouza_local_la_SOURCES = $(cal_SOURCES) \
 	calendar_matsiro.F90 calendar_ils.F90
 
-switch_DATA += calendar_miroc.F90 calendar_coco.F90
-EXTRA_DIST += $(switch_DATA)
+switch_FILES += calendar_miroc.F90 calendar_coco.F90
 
 AM_FCFLAGS_MODULE += $(FC_MODULE_touza_std)
 AM_CPPFLAGS += $(FC_INCLUDE_touza_std)
