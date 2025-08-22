@@ -1,9 +1,9 @@
 # touza/m4c Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jan 20 2021
-# Time-stamp: <2022/11/24 16:51:36 fuyuki Makefile.am>
+# Time-stamp: <2025/08/22 12:34:35 fuyuki Makefile.am>
 
-# Copyright (C) 2021, 2022
+# Copyright (C) 2021-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -27,6 +27,10 @@ uninstall-mod:
 install-mod:
 	@:
 check-bin:
+	@:
+install-switches:
+	@:
+uninstall-switches:
 	@:
 
 ### Local Variables:
