@@ -17,7 +17,7 @@
 # touza/ami Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: May 2 2022
-# Time-stamp: <2024/08/14 09:32:03 fuyuki Makefile.am>
+# Time-stamp: <2025/08/22 12:23:07 fuyuki Makefile.am>
 
 # Copyright (C) 2022,2023,2024
 #           Japan Agency for Marine-Earth Science and Technology
@@ -25,8 +25,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Tue Aug 19 23:20:27 JST 2025
-
+# from AX_AM_MACROS_STATIC on Fri Aug 22 20:39:34 JST 2025
 
 
 VPATH = @srcdir@
@@ -262,8 +261,7 @@ am__uninstall_files_from_dir = { \
   || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
        $(am__cd) "$$dir" && echo $$files | $(am__xargs_n) 40 $(am__rm_f); }; \
   }
-am__installdirs = "$(DESTDIR)$(switchdir)" "$(DESTDIR)$(includedir)"
-DATA = $(switch_DATA)
+am__installdirs = "$(DESTDIR)$(includedir)"
 HEADERS = $(include_HEADERS)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
@@ -543,7 +541,8 @@ AM_FCFLAGS_MODULE = $(FC_MODULE_touza_trp) $(FC_MODULE_touza_nio) \
 COPY_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=copy-%)
 DIFF_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=diff-%)
 install_sh_MODULE = $(install_sh_DATA) -C
-switch_DATA = ami_miroc.F90
+INSTALL_SWITCHES = $(INSTALL_DATA) -C
+switch_FILES = ami_miroc.F90
 include_HEADERS = touza_ami.h
 noinst_LTLIBRARIES = libtouza_local.la
 libtouza_local_la_SOURCES = ami_std.F90 ami_table.F90 ami_utils.F90 \
@@ -738,27 +737,6 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
-install-switchDATA: $(switch_DATA)
-	@$(NORMAL_INSTALL)
-	@list='$(switch_DATA)'; test -n "$(switchdir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(switchdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(switchdir)" || exit 1; \
-	fi; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  echo "$$d$$p"; \
-	done | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(switchdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(switchdir)" || exit $$?; \
-	done
-
-uninstall-switchDATA:
-	@$(NORMAL_UNINSTALL)
-	@list='$(switch_DATA)'; test -n "$(switchdir)" || list=; \
-	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	dir='$(DESTDIR)$(switchdir)'; $(am__uninstall_files_from_dir)
 install-includeHEADERS: $(include_HEADERS)
 	@$(NORMAL_INSTALL)
 	@list='$(include_HEADERS)'; test -n "$(includedir)" || list=; \
@@ -940,10 +918,10 @@ distdir-am: $(DISTFILES)
 check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: check-recursive
-all-am: Makefile $(LTLIBRARIES) $(DATA) $(HEADERS)
+all-am: Makefile $(LTLIBRARIES) $(HEADERS)
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(switchdir)" "$(DESTDIR)$(includedir)"; do \
+	for dir in "$(DESTDIR)$(includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-recursive
@@ -1000,9 +978,8 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-includeHEADERS install-switchDATA
-	@$(NORMAL_INSTALL)
-	$(MAKE) $(AM_MAKEFLAGS) install-data-hook
+install-data-am: install-includeHEADERS
+
 install-dvi: install-dvi-recursive
 
 install-dvi-am:
@@ -1047,28 +1024,27 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-includeHEADERS uninstall-switchDATA
+uninstall-am: uninstall-includeHEADERS
 	@$(NORMAL_INSTALL)
 	$(MAKE) $(AM_MAKEFLAGS) uninstall-hook
-.MAKE: $(am__recursive_targets) check-am install-am install-data-am \
-	install-exec-am install-strip uninstall-am
+.MAKE: $(am__recursive_targets) check-am install-am install-exec-am \
+	install-strip uninstall-am
 
 .PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am check \
 	check-am clean clean-checkPROGRAMS clean-generic clean-libtool \
 	clean-noinstLTLIBRARIES cscopelist-am ctags ctags-am distclean \
 	distclean-compile distclean-generic distclean-libtool \
 	distclean-tags distdir dvi dvi-am html html-am info info-am \
-	install install-am install-data install-data-am \
-	install-data-hook install-dvi install-dvi-am install-exec \
-	install-exec-am install-exec-hook install-html install-html-am \
-	install-includeHEADERS install-info install-info-am \
-	install-man install-pdf install-pdf-am install-ps \
-	install-ps-am install-strip install-switchDATA installcheck \
-	installcheck-am installdirs installdirs-am maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags tags-am uninstall uninstall-am uninstall-hook \
-	uninstall-includeHEADERS uninstall-switchDATA
+	install install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-exec-hook \
+	install-html install-html-am install-includeHEADERS \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs installdirs-am \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
+	uninstall-hook uninstall-includeHEADERS
 
 .PRECIOUS: Makefile
 
@@ -1190,7 +1166,53 @@ check-bin: check-bin-recursive
 
 check-bin-am:$(check_PROGRAMS)
 
-install-data-hook: install-switchDATA
+install-switches-recursive:
+	@set fnord $$MAKEFLAGS; amf=$$2; \
+	dot_seen=no; \
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  echo "Making install-switches in $$subdir"; \
+	  if test "$$subdir" = "."; then \
+	    dot_seen=yes; \
+	    local_target="install-switches-am"; \
+	  else \
+	    local_target="install-switches"; \
+	  fi; \
+	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
+	done; \
+	if test "$$dot_seen" = "no"; then \
+	  $(MAKE) $(AM_MAKEFLAGS) "install-switches-am" || exit 1; \
+	fi; test -z "$$fail"
+
+install-switches: install-switches-recursive
+
+install-switches-am:
+	@$(NORMAL_INSTALL)
+	@list='$(switch_FILES)'; test -n "$(switchdir)" || list=; 	if test -n "$$list"; then 	  echo " $(MKDIR_P) '$(DESTDIR)$(switchdir)'"; 	  $(MKDIR_P) "$(DESTDIR)$(switchdir)" || exit 1; 	fi; 	for p in $$list; do 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; 	  echo "$$d$$p"; 	done | $(am__base_list) | 	while read files; do 	  echo " $(INSTALL_SWITCHES) $$files '$(DESTDIR)$(switchdir)'"; 	  $(INSTALL_SWITCHES) $$files "$(DESTDIR)$(switchdir)" || exit $$?; 	done
+
+uninstall-switches-recursive:
+	@set fnord $$MAKEFLAGS; amf=$$2; \
+	dot_seen=no; \
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  echo "Making uninstall-switches in $$subdir"; \
+	  if test "$$subdir" = "."; then \
+	    dot_seen=yes; \
+	    local_target="uninstall-switches-am"; \
+	  else \
+	    local_target="uninstall-switches"; \
+	  fi; \
+	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
+	done; \
+	if test "$$dot_seen" = "no"; then \
+	  $(MAKE) $(AM_MAKEFLAGS) "uninstall-switches-am" || exit 1; \
+	fi; test -z "$$fail"
+
+uninstall-switches: uninstall-switches-recursive
+
+uninstall-switches-am:
+	@$(NORMAL_UNINSTALL)
+	@list='$(switch_FILES)'; test -n "$(switchdir)" || list=; 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; 	dir='$(DESTDIR)$(switchdir)'; $(am__uninstall_files_from_dir)
 
 lib-nio:
 	cd ../nio; $(MAKE)

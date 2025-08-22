@@ -12619,9 +12619,9 @@ m4_ifndef([_LT_PROG_CXX],		[AC_DEFUN([_LT_PROG_CXX])])
 dnl Filename:   touza/m4c/mt_am_include.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 16 2020
-dnl Time-stamp: <2025/08/13 13:02:58 fuyuki mt_am_include.m4>
+dnl Time-stamp: <2025/08/22 12:40:55 fuyuki mt_am_include.m4>
 
-dnl Copyright: 2020,2021,2022 JAMSTEC
+dnl Copyright: 2020-2025 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
 dnl   (https://www.apache.org/licenses/LICENSE-2.0)
 
@@ -12699,8 +12699,7 @@ ${AX_DOLLAR}(DIFF_SOURCE_TARGETS):
 ])
 
 MT_ADD_RECURSIVE_AM_MACRO_STATIC([install-mod],
-[
-install_sh_MODULE = ${AX_DOLLAR}(install_sh_DATA) -C
+[install_sh_MODULE = ${AX_DOLLAR}(install_sh_DATA) -C
 if INSTALL_MODULES
 	@${AX_DOLLAR}(NORMAL_INSTALL)
 	@if ${AX_DOLLAR}(AM_V_P); then echo ${AX_DQ} INST   [modules]${AX_DQ}; fi
@@ -12734,7 +12733,33 @@ endif
 
 MT_ADD_RECURSIVE_AM_MACRO_STATIC([check-bin],[], [${AX_DOLLAR}(check_PROGRAMS)])
 
+MT_ADD_RECURSIVE_AM_MACRO_STATIC([install-switches],
+[INSTALL_SWITCHES = ${AX_DOLLAR}(INSTALL_DATA) -C
+	@${AX_DOLLAR}(NORMAL_INSTALL)
+	@list='${AX_DOLLAR}(switch_FILES)'; test -n ${AX_DQ}${AX_DOLLAR}(switchdir)${AX_DQ} || list=; \
+	if test -n ${AX_DQ}${AX_DOLLAR}${AX_DOLLAR}list${AX_DQ}; then \
+	  echo ${AX_DQ} ${AX_DOLLAR}(MKDIR_P) '${AX_DOLLAR}(DESTDIR)${AX_DOLLAR}(switchdir)'${AX_DQ}; \
+	  ${AX_DOLLAR}(MKDIR_P) ${AX_DQ}${AX_DOLLAR}(DESTDIR)${AX_DOLLAR}(switchdir)${AX_DQ} || exit 1; \
+	fi; \
+	for p in ${AX_DOLLAR}${AX_DOLLAR}list; do \
+	  if test -f ${AX_DQ}${AX_DOLLAR}${AX_DOLLAR}p${AX_DQ}; then d=; else d=${AX_DQ}${AX_DOLLAR}(srcdir)/${AX_DQ}; fi; \
+	  echo ${AX_DQ}${AX_DOLLAR}${AX_DOLLAR}d${AX_DOLLAR}${AX_DOLLAR}p${AX_DQ}; \
+	done | ${AX_DOLLAR}(am__base_list) | \
+	while read files; do \
+	  echo ${AX_DQ} ${AX_DOLLAR}(INSTALL_SWITCHES) ${AX_DOLLAR}${AX_DOLLAR}files '${AX_DOLLAR}(DESTDIR)${AX_DOLLAR}(switchdir)'${AX_DQ}; \
+	  ${AX_DOLLAR}(INSTALL_SWITCHES) ${AX_DOLLAR}${AX_DOLLAR}files ${AX_DQ}${AX_DOLLAR}(DESTDIR)${AX_DOLLAR}(switchdir)${AX_DQ} || exit ${AX_DOLLAR}${AX_DOLLAR}?; \
+	done
 ])
+
+MT_ADD_RECURSIVE_AM_MACRO_STATIC([uninstall-switches],
+[	@${AX_DOLLAR}(NORMAL_UNINSTALL)
+	@list='${AX_DOLLAR}(switch_FILES)'; test -n ${AX_DQ}${AX_DOLLAR}(switchdir)${AX_DQ} || list=; \
+	files=\`for p in ${AX_DOLLAR}${AX_DOLLAR}list; do echo ${AX_DOLLAR}${AX_DOLLAR}p; done | sed -e 's|^.*/||'\`; \
+	dir='${AX_DOLLAR}(DESTDIR)${AX_DOLLAR}(switchdir)'; ${AX_DOLLAR}(am__uninstall_files_from_dir)
+])
+
+])
+
 
 # MT_ADD_RECURSIVE_AM_MACRO_STATIC(TARGET, RULE, [DEP])
 # ----------------------------------------------

@@ -26,7 +26,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Tue Aug 19 23:20:27 JST 2025
+# from AX_AM_MACROS_STATIC on Fri Aug 22 20:39:34 JST 2025
 
 
 
@@ -185,7 +185,7 @@ am__uninstall_files_from_dir = { \
        $(am__cd) "$$dir" && echo $$files | $(am__xargs_n) 40 $(am__rm_f); }; \
   }
 am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(pkgconfigdir)" \
-	"$(DESTDIR)$(switchdir)" "$(DESTDIR)$(includedir)"
+	"$(DESTDIR)$(includedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 lib@TOUZA_NAME@_la_DEPENDENCIES = std/$(local_name) $(am__append_5) \
 	$(am__append_8) $(am__append_11) $(am__append_14) \
@@ -277,7 +277,7 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-DATA = $(pkgconfig_DATA) $(switch_DATA)
+DATA = $(pkgconfig_DATA)
 HEADERS = $(include_HEADERS)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
@@ -592,7 +592,8 @@ AM_FCFLAGS_MODULE = $(FC_MODULE_touza_std) $(am__append_6) \
 COPY_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=copy-%)
 DIFF_SOURCE_TARGETS = $(lib@TOUZA_NAME@_la_SOURCES:%=diff-%)
 install_sh_MODULE = $(install_sh_DATA) -C
-switch_DATA = 
+INSTALL_SWITCHES = $(INSTALL_DATA) -C
+switch_FILES = 
 include_HEADERS = touza.h $(CONFIG_HEADER)
 lib_LTLIBRARIES = lib@TOUZA_NAME@.la
 lib@TOUZA_NAME@_la_SOURCES = touza.F90 touza.h $(CONFIG_HEADER)
@@ -807,27 +808,6 @@ uninstall-pkgconfigDATA:
 	@list='$(pkgconfig_DATA)'; test -n "$(pkgconfigdir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
 	dir='$(DESTDIR)$(pkgconfigdir)'; $(am__uninstall_files_from_dir)
-install-switchDATA: $(switch_DATA)
-	@$(NORMAL_INSTALL)
-	@list='$(switch_DATA)'; test -n "$(switchdir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(switchdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(switchdir)" || exit 1; \
-	fi; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  echo "$$d$$p"; \
-	done | $(am__base_list) | \
-	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(switchdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(switchdir)" || exit $$?; \
-	done
-
-uninstall-switchDATA:
-	@$(NORMAL_UNINSTALL)
-	@list='$(switch_DATA)'; test -n "$(switchdir)" || list=; \
-	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	dir='$(DESTDIR)$(switchdir)'; $(am__uninstall_files_from_dir)
 install-includeHEADERS: $(include_HEADERS)
 	@$(NORMAL_INSTALL)
 	@list='$(include_HEADERS)'; test -n "$(includedir)" || list=; \
@@ -1163,7 +1143,7 @@ install-checkPROGRAMS: install-libLTLIBRARIES
 
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(switchdir)" "$(DESTDIR)$(includedir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: $(BUILT_SOURCES)
@@ -1225,10 +1205,8 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-includeHEADERS install-pkgconfigDATA \
-	install-switchDATA
-	@$(NORMAL_INSTALL)
-	$(MAKE) $(AM_MAKEFLAGS) install-data-hook
+install-data-am: install-includeHEADERS install-pkgconfigDATA
+
 install-dvi: install-dvi-recursive
 
 install-dvi-am:
@@ -1277,12 +1255,11 @@ ps: ps-recursive
 ps-am:
 
 uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES \
-	uninstall-pkgconfigDATA uninstall-switchDATA
+	uninstall-pkgconfigDATA
 	@$(NORMAL_INSTALL)
 	$(MAKE) $(AM_MAKEFLAGS) uninstall-hook
 .MAKE: $(am__recursive_targets) all check check-am install install-am \
-	install-data-am install-exec install-exec-am install-strip \
-	uninstall-am
+	install-exec install-exec-am install-strip uninstall-am
 
 .PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am \
 	am--depfiles am--refresh check check-am clean \
@@ -1293,19 +1270,18 @@ uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES \
 	distclean distclean-compile distclean-generic distclean-hdr \
 	distclean-libtool distclean-tags distcleancheck distdir \
 	distuninstallcheck dvi dvi-am html html-am info info-am \
-	install install-am install-data install-data-am \
-	install-data-hook install-dvi install-dvi-am install-exec \
-	install-exec-am install-exec-hook install-html install-html-am \
-	install-includeHEADERS install-info install-info-am \
-	install-libLTLIBRARIES install-man install-pdf install-pdf-am \
-	install-pkgconfigDATA install-ps install-ps-am install-strip \
-	install-switchDATA installcheck installcheck-am installdirs \
-	installdirs-am maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-compile mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-am uninstall \
-	uninstall-am uninstall-hook uninstall-includeHEADERS \
-	uninstall-libLTLIBRARIES uninstall-pkgconfigDATA \
-	uninstall-switchDATA
+	install install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-exec-hook \
+	install-html install-html-am install-includeHEADERS \
+	install-info install-info-am install-libLTLIBRARIES \
+	install-man install-pdf install-pdf-am install-pkgconfigDATA \
+	install-ps install-ps-am install-strip installcheck \
+	installcheck-am installdirs installdirs-am maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-am uninstall uninstall-am uninstall-hook \
+	uninstall-includeHEADERS uninstall-libLTLIBRARIES \
+	uninstall-pkgconfigDATA
 
 .PRECIOUS: Makefile
 
@@ -1427,7 +1403,53 @@ check-bin: check-bin-recursive
 
 check-bin-am:$(check_PROGRAMS)
 
-install-data-hook: install-switchDATA
+install-switches-recursive:
+	@set fnord $$MAKEFLAGS; amf=$$2; \
+	dot_seen=no; \
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  echo "Making install-switches in $$subdir"; \
+	  if test "$$subdir" = "."; then \
+	    dot_seen=yes; \
+	    local_target="install-switches-am"; \
+	  else \
+	    local_target="install-switches"; \
+	  fi; \
+	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
+	done; \
+	if test "$$dot_seen" = "no"; then \
+	  $(MAKE) $(AM_MAKEFLAGS) "install-switches-am" || exit 1; \
+	fi; test -z "$$fail"
+
+install-switches: install-switches-recursive
+
+install-switches-am:
+	@$(NORMAL_INSTALL)
+	@list='$(switch_FILES)'; test -n "$(switchdir)" || list=; 	if test -n "$$list"; then 	  echo " $(MKDIR_P) '$(DESTDIR)$(switchdir)'"; 	  $(MKDIR_P) "$(DESTDIR)$(switchdir)" || exit 1; 	fi; 	for p in $$list; do 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; 	  echo "$$d$$p"; 	done | $(am__base_list) | 	while read files; do 	  echo " $(INSTALL_SWITCHES) $$files '$(DESTDIR)$(switchdir)'"; 	  $(INSTALL_SWITCHES) $$files "$(DESTDIR)$(switchdir)" || exit $$?; 	done
+
+uninstall-switches-recursive:
+	@set fnord $$MAKEFLAGS; amf=$$2; \
+	dot_seen=no; \
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+	  echo "Making uninstall-switches in $$subdir"; \
+	  if test "$$subdir" = "."; then \
+	    dot_seen=yes; \
+	    local_target="uninstall-switches-am"; \
+	  else \
+	    local_target="uninstall-switches"; \
+	  fi; \
+	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
+	done; \
+	if test "$$dot_seen" = "no"; then \
+	  $(MAKE) $(AM_MAKEFLAGS) "uninstall-switches-am" || exit 1; \
+	fi; test -z "$$fail"
+
+uninstall-switches: uninstall-switches-recursive
+
+uninstall-switches-am:
+	@$(NORMAL_UNINSTALL)
+	@list='$(switch_FILES)'; test -n "$(switchdir)" || list=; 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; 	dir='$(DESTDIR)$(switchdir)'; $(am__uninstall_files_from_dir)
 
 autorevision: $(BUILT_SOURCES)
 
