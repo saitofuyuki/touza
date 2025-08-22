@@ -1,12 +1,12 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/08/19 23:15:45 fuyuki NEWS>
+# Time-stamp: <2025/08/22 18:17:58 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
-* Changes in 1.16.4
+* Changes in 1.16.5
 ** Import revision for miroc7+ils+rainbow on ppp.
 Agent-based communicator manager is improved and cleaned to export
 some procedures to ils, which enables MIROC-Rainbow again on the new
@@ -21,6 +21,13 @@ building on nvfortran processing systems.  Moreover, module
 import/export sturctures are reformulated in order to achived success
 building and running on the nvfortran systems (the maintainer supposes
 that they are mostly bugs in the compiler).
+** A new make-target install-switch is introduced.
+MIROC with-/without-T switching is updated, where on-the-fly switching
+is now managed on the without-T case.  There was a similar make-target
+install-switchDATA in Revision 1.16.4 or before, which is always
+called at make install-data (and thus at make install).  The new
+target make install-switch, independent from make install-data, may
+slightly simplify the build process.
 
 * Changes in 1.16.2
 ** Improvement for MIROC infrastructure replacement
