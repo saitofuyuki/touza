@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/07/13 16:07:44 fuyuki configure.ac>
+# Time-stamp: <2025/08/22 12:22:51 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -186,14 +186,14 @@ AC_ARG_ENABLE([install-switches],
                               [install switcher sources if applicable @<:@default='${datadir}/PACKAGE'@:>@])],
               [switchdir="$enableval"],
               [switchdir='yes'])
-AS_IF([test x"[$]switchdir" = xyes],
-      [switchdir='[$]{datadir}/[$]{PACKAGE}'])
+AS_CASE([x"[$]switchdir"],
+        [xyes], [switchdir='[$]{datadir}/[$]{PACKAGE}'],
+        [xno],  [switchdir=''])
 AC_SUBST([switchdir])
 
 AX_ADD_AM_MACRO_STATIC([
-install-data-hook: install-switchDATA
 switchdir     = @switchdir@
-switch_DATA   =
+switch_FILES =
 ])
 
 AC_ARG_ENABLE([follow-revision],

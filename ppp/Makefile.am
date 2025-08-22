@@ -1,7 +1,7 @@
 # touza/ppp Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Jan 26 2022
-# Time-stamp: <2025/07/14 12:55:50 fuyuki Makefile.am>
+# Time-stamp: <2025/08/22 12:23:37 fuyuki Makefile.am>
 
 # Copyright (C) 2022-2025
 #           Japan Agency for Marine-Earth Science and Technology
@@ -20,7 +20,7 @@ libtouza_local_la_SOURCES = ppp_std.F90 ppp_amng.F90
 libtouza_local_la_SOURCES += ppp_king.F90
 libtouza_local_la_SOURCES += ppp_comm.F90 ppp.F90 $(include_HEADERS)
 
-switch_DATA	+= ppp_miroc.F90
+switch_FILES += ppp_miroc.F90
 EXTRA_libtouza_local_la_SOURCES	= ppp_miroc.F90
 libtouza_local_la_SOURCES	+=	$(libtouza_APPENDS)
 libtouza_APPENDS =

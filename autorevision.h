@@ -5,18 +5,18 @@
 #define VCS_TYPE		'git'
 #define VCS_BASENAME	'public'
 #define VCS_UUID		'9a261761c4ebd54bb1c70f170b6a035a99a92914'
-#define VCS_NUM			899
-#define VCS_DATE		'2025-06-11T02:01:28Z'
+#define VCS_NUM			964
+#define VCS_DATE		'2025-08-22T09:20:32Z'
 #define VCS_BRANCH		'public'
-#define VCS_TAG			'Release-1.16.2'
+#define VCS_TAG			'Release-1.16.4'
 #define VCS_TAG_OPENPGP	' '
-#define VCS_TICK		0
+#define VCS_TICK		7
 #define VCS_EXTRA		' '
 
-#define VCS_ACTION_STAMP	'2025-06-11T02:01:28Z!saitofuyuki@jamstec.go.jp'
-#define VCS_FULL_HASH		'419272b3f64ed47b4f2cb2ecff8c719d6a1b625b'
+#define VCS_ACTION_STAMP	'2025-08-22T09:20:32Z!saitofuyuki@jamstec.go.jp'
+#define VCS_FULL_HASH		'063f8c20716a6737efaf95fd69d3af62bdb2655d'
 #define VCS_COMMIT_OPENPGP	' '
-#define VCS_SHORT_HASH		'419272b3'
+#define VCS_SHORT_HASH		'063f8c20'
 
 #define VCS_WC_MODIFIED		1
 
