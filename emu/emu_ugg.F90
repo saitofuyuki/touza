@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/22 16:05:47 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/28 14:04:33 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024, 2025
@@ -803,6 +803,12 @@ contains
        if (is_first_force(diag_counts, mode)) then
           if (is_msglev_NORMAL(lv)) then
              if (ierr.eq.0) call msg_grp(TIME_STAMP, __GRP__, __MDL__, utmp)
+          endif
+          if (is_msglev_NORMAL(lv)) then
+             if (ierr.eq.0) then
+                call msg_grp('(''constant atan2 = '', I0)', &
+                     & (/HAVE_FORTRAN_CONSTANT_ATAN2/), __GRP__, __MDL__, utmp)
+             endif
           endif
           if (is_msglev_DETAIL(lv)) then
              if (ierr.eq.0) call diag_pi(ierr, utmp)
@@ -6553,9 +6559,14 @@ contains
     implicit none
     real(kind=KTGT) :: x
     real(kind=KTGT),intent(in) :: mold
+#if HAVE_FORTRAN_CONSTANT_ATAN2
     real(kind=KTGT),parameter  :: ONE =  real(1, kind=kind(mold))
-    real(kind=KTGT),parameter  :: FOUR = real(4, kind=kind(mold))
-    real(kind=KTGT),parameter  :: p = ATAN(one) * FOUR
+    real(kind=KTGT),parameter  :: ZERO = real(0, kind=kind(mold))
+    real(kind=KTGT),parameter  :: p = ATAN2(ZERO, -ONE)
+#else
+    ! fallback, 22 digits
+    real(kind=KTGT),parameter  :: p = 3.141592653589793238462_KTGT
+#endif
     x = p
   end function pi_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
@@ -6565,9 +6576,14 @@ contains
     implicit none
     real(kind=KTGT) :: x
     real(kind=KTGT),intent(in) :: mold
+#if HAVE_FORTRAN_CONSTANT_ATAN2
     real(kind=KTGT),parameter  :: ONE =  real(1, kind=kind(mold))
-    real(kind=KTGT),parameter  :: FOUR = real(4, kind=kind(mold))
-    real(kind=KTGT),parameter  :: p = ATAN(one) * FOUR
+    real(kind=KTGT),parameter  :: ZERO = real(0, kind=kind(mold))
+    real(kind=KTGT),parameter  :: p = ATAN2(ZERO, -ONE)
+#else
+    ! fallback, 41 digits
+    real(kind=KTGT),parameter  :: p = 3.1415926535897932384626433832795028841971_KTGT
+#endif
     x = p
   end function pi_q
 #endif
@@ -8498,6 +8514,7 @@ contains
     real(kind=KTGT) :: CD(0:ltbl)
     real(kind=KTGT) :: CE(0:ltbl)
     real(kind=KTGT) :: ax
+    integer jo, nt
 #endif
     ierr = 0
 
