@@ -1,7 +1,7 @@
 !!!_! calendar_primitive.F90 - TOUZA/Cal primitives
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 22 2011
-#define TIME_STAMP 'Time-stamp: <2025/07/23 08:53:39 fuyuki calendar_primitive.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/26 22:20:39 fuyuki calendar_primitive.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -22,8 +22,6 @@
 #if TEST_CALENDAR_PRIMITIVE
 #  define DEBUG *
 #endif
-! #define _ELEMENTAL elemental
-#define _ELEMENTAL
 !!!_@ TOUZA_Cal_primitive - calendar primitive attributes definition
 module TOUZA_Cal_primitive
 !!!_ = declaration
@@ -368,7 +366,7 @@ contains
 !   end subroutine set_angular_months
 
 !!!_ & inq_nday_period () - return number of days in a leap-cycle period
-  _ELEMENTAL integer function inq_nday_period &
+  integer function inq_nday_period &
        & (mode) &
        & result (r)
     implicit none
@@ -378,7 +376,7 @@ contains
   end function inq_nday_period
 
 !!!_ & inq_nyear_period () - return number of years in a leap-cycle period
-  _ELEMENTAL integer function inq_nyear_period &
+  integer function inq_nyear_period &
        & (mode) &
        & result (r)
     implicit none
@@ -388,7 +386,7 @@ contains
   end function inq_nyear_period
 
 !!!_ & inq_nday_month () - return number of days in the month of the date
-  _ELEMENTAL integer function inq_nday_month &
+  integer function inq_nday_month &
        & (mode, cd) &
        & result (r)
     implicit none
@@ -401,7 +399,7 @@ contains
   end function inq_nday_month
 
 !!!_ & inq_nday_year () - return number of days in the year of the date
-  _ELEMENTAL integer function inq_nday_year &
+  integer function inq_nday_year &
        & (mode, cd) &
        & result (r)
     implicit none
@@ -414,7 +412,7 @@ contains
   end function inq_nday_year
 
 !!!_ & inq_nmonth_year () - return number of months in the year of the date
-  _ELEMENTAL integer function inq_nmonth_year &
+  integer function inq_nmonth_year &
        & (mode, cd) &
        & result (r)
     implicit none
@@ -426,7 +424,7 @@ contains
   end function inq_nmonth_year
 
 !!!_ & inq_nsec_day () - return number of seconds in the day of the date
-  _ELEMENTAL integer function inq_nsec_day &
+  integer function inq_nsec_day &
        & (mode, cd) &
        & result (r)
     implicit none
@@ -438,7 +436,7 @@ contains
   end function inq_nsec_day
 
 !!!_ & inq_nsec_minute () - return number of seconds in the minute of the date
-  _ELEMENTAL integer function inq_nsec_minute &
+  integer function inq_nsec_minute &
        & (mode, cd) &
        & result (r)
     implicit none
@@ -450,7 +448,7 @@ contains
   end function inq_nsec_minute
 
 !!!_ & inq_nsec_hour () - return number of seconds in the hour of the date
-  _ELEMENTAL integer function inq_nsec_hour &
+  integer function inq_nsec_hour &
        & (mode, cd) &
        & result (r)
     implicit none
@@ -462,7 +460,7 @@ contains
   end function inq_nsec_hour
 
 !!!_ & inq_nminute_hour () - return number of minutes in the hour of the date
-  _ELEMENTAL integer function inq_nminute_hour &
+  integer function inq_nminute_hour &
        & (mode, cd) &
        & result (r)
     implicit none
@@ -474,7 +472,7 @@ contains
   end function inq_nminute_hour
 
 !!!_ & conv_csec_cdaysec () - get calendar[day:sec] from calendar[sec]
-  _ELEMENTAL type(cal_daysec_t) function conv_csec_cdaysec_c &
+  type(cal_daysec_t) function conv_csec_cdaysec_c &
        & (mode, csec, cd) &
        result (r)
     implicit none
@@ -498,7 +496,7 @@ contains
     return
   end function conv_csec_cdaysec_c
 
-  _ELEMENTAL type(cal_daysec_t) function conv_csec_cdaysec_i &
+  type(cal_daysec_t) function conv_csec_cdaysec_i &
        & (mode, csec, cd) &
        result (r)
     implicit none
@@ -519,7 +517,7 @@ contains
   end function conv_csec_cdaysec_i
 
 !!!_ & conv_cdaysec_csec () - get calendar[sec] from calendar[day:sec]
-  _ELEMENTAL real(kind=KRC) function conv_cdaysec_csec_c &
+  real(kind=KRC) function conv_cdaysec_csec_c &
        & (mode, daysec, cd) &
        result (r)
     implicit none
@@ -533,7 +531,7 @@ contains
     return
   end function conv_cdaysec_csec_c
 
-  _ELEMENTAL integer function conv_cdaysec_csec_i &
+  integer function conv_cdaysec_csec_i &
        & (mode, daysec, cd) &
        result (r)
     implicit none
@@ -548,7 +546,7 @@ contains
   end function conv_cdaysec_csec_i
 
 !!!_ & conv_tsec_time () - get time[hour:min:sec] from time[sec]
-  _ELEMENTAL type(cal_time_t) function conv_tsec_time_c &
+  type(cal_time_t) function conv_tsec_time_c &
        & (mode, tsec, cd) &
        result (r)
 !!!_  - Note
@@ -579,7 +577,7 @@ contains
     return
   end function conv_tsec_time_c
 
-  _ELEMENTAL type(cal_time_t) function conv_tsec_time_i &
+  type(cal_time_t) function conv_tsec_time_i &
        & (mode, tsec, cd) &
        result (r)
 !!!_  - Note
@@ -602,7 +600,7 @@ contains
   end function conv_tsec_time_i
 
 !!!_ & conv_time_tsec () - get time[sec] from time[hour:min:sec]
-  _ELEMENTAL integer function conv_time_tsec_i &
+  integer function conv_time_tsec_i &
        & (mode, t, cd) &
        result (r)
 !!!_  - Note
@@ -619,7 +617,7 @@ contains
     return
   end function conv_time_tsec_i
 
-  _ELEMENTAL real(kind=KRC) function conv_time_tsec_c &
+  real(kind=KRC) function conv_time_tsec_c &
        & (mode, t, cd) &
        result (r)
 !!!_  - Body
@@ -632,7 +630,7 @@ contains
   end function conv_time_tsec_c
 
 !!!_ & conv_cday_date () - get date[year/month/day] from calendar[day]
-  _ELEMENTAL type(cal_date_t) function conv_cday_date_i &
+  type(cal_date_t) function conv_cday_date_i &
        & (mode, &
        &  cday) &
        result (r)
@@ -703,7 +701,7 @@ contains
     return
   end function conv_cday_date_i
 
-  _ELEMENTAL type(cal_date_t) function conv_cday_date_c &
+  type(cal_date_t) function conv_cday_date_c &
        & (mode, &
        &  cday) &
        result (r)
@@ -776,7 +774,7 @@ contains
   end function conv_cday_date_c
 
 !!!_ & conv_date_cday () - get calendar[day] from date[year/month/day]
-  _ELEMENTAL integer function conv_date_cday_i &
+  integer function conv_date_cday_i &
        & (mode, cd) &
        & result (r)
     implicit none
@@ -808,7 +806,7 @@ contains
     return
   end function conv_date_cday_i
 
-  _ELEMENTAL real(kind=KRC) function conv_date_cday_c &
+  real(kind=KRC) function conv_date_cday_c &
        & (mode, cd) &
        & result (r)
     implicit none
@@ -841,7 +839,7 @@ contains
   end function conv_date_cday_c
 
 !!!_ & conv_date_dayy () # (reserved) get serial-day number from date[year/month/day]
-  _ELEMENTAL integer function conv_date_dayy &
+  integer function conv_date_dayy &
        & (mode, cd) &
        & result(r)
     implicit none
@@ -866,7 +864,7 @@ contains
   end function conv_date_dayy
 
 !!!_ & conv_date_dayy_compat () # get serial-day number from date[year/month/day] compatible
-  _ELEMENTAL integer function conv_date_dayy_compat &
+  integer function conv_date_dayy_compat &
        & (mode, cd) &
        & result (r)
     implicit none
@@ -894,7 +892,7 @@ contains
   end function conv_date_dayy_compat
 
 !!!_ & date_normalize () # date normalization
-  _ELEMENTAL type(cal_date_t) function date_normalize &
+  type(cal_date_t) function date_normalize &
        & (mode, cd) &
        & result (r)
 !!!_  = declaration
@@ -920,7 +918,7 @@ contains
   end function date_normalize
 
 !!!_ & get_ndm_index () - get nday-month (leap-year) index
-  _ELEMENTAL integer function get_ndm_index &
+  integer function get_ndm_index &
        & (mode, iyear) &
        & result (r)
 !!!_  = declaration
@@ -938,7 +936,7 @@ contains
   end function get_ndm_index
 
 !!!_ & is_leap_year () - if or not leap year
-  _ELEMENTAL logical function is_leap_year &
+  logical function is_leap_year &
     & (iyear) &
     & result (l)
     implicit none
@@ -955,14 +953,16 @@ contains
   end function is_leap_year
 
 !!!_ & xreal () - type conversion wrapper
-  elemental real(kind=KRC) function xreal_i (IV) &
+  ELEMENTAL &
+  real(kind=KRC) function xreal_i (IV) &
        & result(r)
     integer,intent(in) :: IV
     r = real(IV, kind=KRC)
     return
   end function xreal_i
 
-  elemental real(kind=KRC) function xreal_c (RV) &
+  ELEMENTAL &
+  real(kind=KRC) function xreal_c (RV) &
        & result(r)
     real(kind=KRC),intent(in) :: RV
     r = RV
