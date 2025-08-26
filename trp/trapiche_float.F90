@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2025/07/17 10:27:46 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/26 22:21:16 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -3718,14 +3718,16 @@ contains
   end function zspecial_f
 
 !!!_  & which_sp () - return 0 if positive sign, +1 otherwise
-  ELEMENTAL integer function which_sp_d(v) result(n)
+  ELEMENTAL &
+  integer function which_sp_d(v) result(n)
     integer,parameter :: KRTGT=KDBL
     real(kind=KRTGT),intent(in) :: v
     real(kind=KRTGT),parameter  :: one = 1.0_KRTGT
     n = (1 - int(sign(one, v))) / 2
     return
   end function which_sp_d
-  ELEMENTAL integer function which_sp_f(v) result(n)
+  ELEMENTAL &
+  integer function which_sp_f(v) result(n)
     integer,parameter :: KRTGT=KFLT
     real(kind=KRTGT),intent(in) :: v
     real(kind=KRTGT),parameter  :: one = 1.0_KRTGT

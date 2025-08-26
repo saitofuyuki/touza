@@ -1,7 +1,7 @@
 !!!_! trapiche_std.F90 - TOUZA/Trapiche utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 30 2021
-#define TIME_STAMP 'Time-stamp: <2025/07/16 16:53:29 fuyuki trapiche_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/28 15:27:16 fuyuki trapiche_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -26,6 +26,12 @@ module TOUZA_Trp_std
   use TOUZA_Std,only: MPI_INTEGER, MPI_STATUS_SIZE, MPI_DOUBLE_PRECISION
   use TOUZA_Std,only: MPI_PROBE,   MPI_GET_COUNT
   use TOUZA_Std,only: ipc_IBITS
+# if HAVE_FORTRAN_MPI_MPI_ISEND == 1
+  use TOUZA_Std,only: MPI_Isend
+# endif
+# if HAVE_FORTRAN_MPI_MPI_IRECV == 1
+  use TOUZA_Std,only: MPI_Irecv
+# endif
   implicit none
   private
 !!!_  - static
@@ -90,6 +96,12 @@ module TOUZA_Trp_std
 !!!_   . TOUZA_Std_mwe
   public MPI_INTEGER, MPI_STATUS_SIZE, MPI_DOUBLE_PRECISION
   public MPI_PROBE,   MPI_GET_COUNT
+# if HAVE_FORTRAN_MPI_MPI_ISEND == 1
+  public :: MPI_Isend
+# endif
+# if HAVE_FORTRAN_MPI_MPI_IRECV == 1
+  public :: MPI_Irecv
+# endif
 !!!_   . TOUZA_Std_ipc
   public ipc_IBITS
 !!!_ + common interfaces
@@ -468,7 +480,8 @@ contains
   end subroutine binstr_l
 
 !!!_  & first_bit() - find first set-bit (return -1 if none)
-  ELEMENTAL integer function first_bit_l(v) result(n)
+  ELEMENTAL &
+  integer function first_bit_l(v) result(n)
     implicit none
     integer(kind=KI64),intent(in) :: v
     integer(kind=KI64),parameter  :: r = 2
@@ -509,7 +522,8 @@ contains
     endif
   end function first_bit_l
 
-  ELEMENTAL integer function first_bit_i(v) result(n)
+  ELEMENTAL &
+  integer function first_bit_i(v) result(n)
     implicit none
     integer(kind=KI32),intent(in) :: v
     integer(kind=KI32),parameter  :: r = 2
