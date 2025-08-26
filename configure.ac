@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/08/22 12:22:51 fuyuki configure.ac>
+# Time-stamp: <2025/08/26 22:25:38 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -98,16 +98,16 @@ AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([m4c/Makefile])
 dnl AC_CONFIG_FILES([makeshift], [chmod +x makeshift])
 
-AC_MSG_CHECKING([if enable elemental function])
-AC_ARG_ENABLE([elemental],
-[AS_HELP_STRING([--disable-elemental], [disable elemental functions])],
-[], [enableval=yes])
-AS_IF([test x"$enableval" = x"no"],
-      [enable_elemental=0
-       AC_MSG_RESULT([disable])],
-      [enable_elemental=1
-       AC_MSG_RESULT([enable])])
-AC_DEFINE_UNQUOTED([OPT_ENABLE_FORTRAN_ELEMENTAL], [$enable_elemental], [prefer elemental function])
+dnl AC_MSG_CHECKING([if enable elemental function])
+dnl AC_ARG_ENABLE([elemental],
+dnl [AS_HELP_STRING([--disable-elemental], [disable elemental functions])],
+dnl [], [enableval=yes])
+dnl AS_IF([test x"$enableval" = x"no"],
+dnl       [enable_elemental=0
+dnl        AC_MSG_RESULT([disable])],
+dnl       [enable_elemental=1
+dnl        AC_MSG_RESULT([enable])])
+dnl AC_DEFINE_UNQUOTED([OPT_ENABLE_FORTRAN_ELEMENTAL], [$enable_elemental], [prefer elemental function])
 
 AC_MSG_CHECKING([if enable binary128 variation])
 AC_ARG_ENABLE([binary128],
