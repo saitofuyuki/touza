@@ -1,7 +1,7 @@
 !!!_! std.F90 - touza/std interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/22 14:13:34 fuyuki std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/28 15:18:46 fuyuki std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -117,6 +117,27 @@ module TOUZA_Std
   use TOUZA_Std_mwe,only: MPI_GROUP_COMPARE
   use TOUZA_Std_mwe,only: MPI_ABORT
   use TOUZA_Std_mwe,only: cc_ident, cc_congruent, cc_similar, cc_both_null, cc_unequal, cc_either_null
+#if HAVE_FORTRAN_MPI_MPI_BCAST == 1
+  use TOUZA_Std_mwe,only: MPI_Bcast
+#endif
+#if HAVE_FORTRAN_MPI_MPI_REDUCE == 1
+  use TOUZA_Std_mwe,only: MPI_Reduce
+#endif
+#if HAVE_FORTRAN_MPI_MPI_SEND == 1
+  use TOUZA_Std_mwe,only: MPI_Send
+#endif
+#if HAVE_FORTRAN_MPI_MPI_RECV == 1
+  use TOUZA_Std_mwe,only: MPI_Recv
+#endif
+#if HAVE_FORTRAN_MPI_MPI_ISEND == 1
+  use TOUZA_Std_mwe,only: MPI_Isend
+#endif
+#if HAVE_FORTRAN_MPI_MPI_IRECV == 1
+  use TOUZA_Std_mwe,only: MPI_Irecv
+#endif
+#if HAVE_FORTRAN_MPI_MPI_GATHER == 1
+  use TOUZA_Std_mwe,only: MPI_Gather
+#endif
 
   use TOUZA_Std_fun,only: set_category_bound, set_category_default
   use TOUZA_Std_fun,only: brute_force_check_units
@@ -300,6 +321,27 @@ module TOUZA_Std
   public :: MPI_GROUP_COMPARE
   public :: MPI_ABORT
   public :: cc_ident, cc_congruent, cc_similar, cc_both_null, cc_unequal, cc_either_null
+#if HAVE_FORTRAN_MPI_MPI_BCAST == 1
+  public :: MPI_Bcast
+#endif
+#if HAVE_FORTRAN_MPI_MPI_REDUCE == 1
+  public :: MPI_Reduce
+#endif
+#if HAVE_FORTRAN_MPI_MPI_SEND == 1
+  public :: MPI_Send
+#endif
+#if HAVE_FORTRAN_MPI_MPI_RECV == 1
+  public :: MPI_Recv
+#endif
+#if HAVE_FORTRAN_MPI_MPI_ISEND == 1
+  public :: MPI_Isend
+#endif
+#if HAVE_FORTRAN_MPI_MPI_IRECV == 1
+  public :: MPI_Irecv
+#endif
+#if HAVE_FORTRAN_MPI_MPI_GATHER == 1
+  public :: MPI_Gather
+#endif
 
   public :: set_category_bound, set_category_default
   public :: brute_force_check_units
