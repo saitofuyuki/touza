@@ -1,7 +1,7 @@
 !!!_! trapiche_pack.F90 - TOUZA/Trapiche integer packing/unpacking
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2025/07/11 08:51:14 fuyuki trapiche_pack.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/26 22:22:03 fuyuki trapiche_pack.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -3700,7 +3700,8 @@ contains
   end subroutine count_remnants
 
 !!!_  & div_ceiling() - ceil(n/d)
-  ELEMENTAL integer function div_ceiling (num, den) result(r)
+  ELEMENTAL &
+  integer function div_ceiling (num, den) result(r)
     implicit none
     integer,intent(in) :: num, den
 
@@ -3709,7 +3710,8 @@ contains
   end function div_ceiling
 
 !!!_  & div_ceiling_safe() - ceil(f * n / d)
-  ELEMENTAL integer function div_ceiling_safe (f, num, den) result(r)
+  ELEMENTAL &
+  integer function div_ceiling_safe (f, num, den) result(r)
     implicit none
     integer,intent(in) :: f, num, den
 
@@ -3719,7 +3721,8 @@ contains
   end function div_ceiling_safe
 
 !!!_  & safe_div() - large * small / d
-  ELEMENTAL integer function safe_div (l, s, d) result(r)
+  ELEMENTAL &
+  integer function safe_div (l, s, d) result(r)
     implicit none
     !  L = da + b
     ! (L * S) / d = (Sda + Sb) / d = Sa + Sb / d
@@ -3729,7 +3732,8 @@ contains
   end function safe_div
 
 !!!_  & safe_mod() - large * small % d
-  ELEMENTAL integer function safe_mod (l, s, d) result(r)
+  ELEMENTAL &
+  integer function safe_mod (l, s, d) result(r)
     implicit none
     !  L = da + b
     ! (L * S) % d = (Sda + Sb) % d = Sb % d
@@ -3739,7 +3743,8 @@ contains
   end function safe_mod
 
 !!!_  & pos_pattern ()
-  ELEMENTAL integer function pos_pattern &
+  ELEMENTAL &
+  integer function pos_pattern &
        & (jzone, nbits, lbits) result(r)
     implicit none
     integer,intent(in) :: jzone
@@ -3749,7 +3754,8 @@ contains
   end function pos_pattern
 
 !!!_  & pos_storages ()
-  ELEMENTAL integer function pos_storages &
+  ELEMENTAL &
+  integer function pos_storages &
        & (jzone, ngflr, rgrps) result(r)
     implicit none
     integer,intent(in) :: jzone
@@ -3759,7 +3765,8 @@ contains
   end function pos_storages
 
 !!!_  & pos_source ()
-  ELEMENTAL integer function pos_source &
+  ELEMENTAL &
+  integer function pos_source &
        & (jofs, ngflr, ritms) result(r)
     implicit none
     integer,intent(in) :: jofs
@@ -3769,7 +3776,8 @@ contains
   end function pos_source
 
 !!!_  & initial_mask ()
-  ELEMENTAL integer function initial_mask &
+  ELEMENTAL &
+  integer function initial_mask &
        & (jzone, nbits, lbits) result(r)
     implicit none
     integer,intent(in) :: jzone
@@ -3779,7 +3787,8 @@ contains
   end function initial_mask
 
 !!!_  & popcount_tab()
-  ELEMENTAL integer function popcount_tab_i(i) result(n)
+  ELEMENTAL &
+  integer function popcount_tab_i(i) result(n)
     implicit none
     integer,parameter :: KITGT = KI32
     integer(kind=KITGT),intent(in) :: i
@@ -3794,7 +3803,8 @@ contains
        n = n + tab(IBITS(i, j, r))
     enddo
   end function popcount_tab_i
-  ELEMENTAL integer function popcount_tab_l(i) result(n)
+  ELEMENTAL &
+  integer function popcount_tab_l(i) result(n)
     implicit none
     integer,parameter :: KITGT = KI64
     integer(kind=KITGT),intent(in) :: i
@@ -4161,7 +4171,8 @@ contains
     enddo
   end subroutine test_batch_popcount
 
-  ELEMENTAL integer function popcount_ref(i) result(n)
+  ELEMENTAL &
+  integer function popcount_ref(i) result(n)
     implicit none
     integer(kind=TEST_TRAPICHE_PACK_KIND),intent(in) :: i
     integer,parameter :: bs = BIT_SIZE(i)

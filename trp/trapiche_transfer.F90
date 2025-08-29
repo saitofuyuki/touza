@@ -1,7 +1,7 @@
 !!!_! trapiche_transfer.F90 - TOUZA/Trapiche(trapiche) communication
 ! Maintainer: SAITO Fuyuki
 ! Created: May 21 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/17 10:22:16 fuyuki trapiche_transfer.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/28 15:26:11 fuyuki trapiche_transfer.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023
@@ -164,8 +164,8 @@ contains
        &  v,     n,     irank, icomm, ktag,  ireq, &
        &  vmiss, mbits, xbits, xtop,  xbtm,  kcode)
     use TOUZA_Trp_std,only: MPI_INTEGER
-#  if HAVE_FORTRAN_MPI_MPI_ISEND
-    use MPI,only: MPI_Isend
+#  if HAVE_FORTRAN_MPI_MPI_ISEND == 1
+    use TOUZA_Trp_std,only: MPI_Isend
 #  endif
     use TOUZA_Std,only: KDBL
     use TOUZA_Trp_float,only: encode_alloc, retrieve_nbgz, KB_HEAD, show_bagazo_props
@@ -224,8 +224,8 @@ contains
 #if OPT_USE_MPI
     ! use MPI,only: MPI_Probe, MPI_Get_count
 #endif /* OPT_USE_MPI */
-#  if HAVE_FORTRAN_MPI_MPI_IRECV
-    use MPI,only: MPI_Irecv
+#  if HAVE_FORTRAN_MPI_MPI_IRECV == 1
+    use TOUZA_Trp_std,only: MPI_Irecv
 #  endif
     use TOUZA_Std,only: KDBL
     use TOUZA_Trp_float,only: decode_alloc, retrieve_nbgz, KB_HEAD
@@ -341,11 +341,11 @@ contains
 #if OPT_USE_MPI
     use MPI,only: MPI_Wait, MPI_Barrier
 #endif /* OPT_USE_MPI */
-#  if HAVE_FORTRAN_MPI_MPI_ISEND
-    use MPI,only: MPI_Isend
+#  if HAVE_FORTRAN_MPI_MPI_ISEND == 1
+    use TOUZA_Trp_std,only: MPI_Isend
 #  endif
-#  if HAVE_FORTRAN_MPI_MPI_IRECV
-    use MPI,only: MPI_Irecv
+#  if HAVE_FORTRAN_MPI_MPI_IRECV == 1
+    use TOUZA_Trp_std,only: MPI_Irecv
 #  endif
     use TOUZA_Trp,only: XNOTOP, XNOBTM, KCODE_TRANSPOSE, KCODE_MANUAL
     implicit none

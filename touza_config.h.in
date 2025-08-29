@@ -54,6 +54,9 @@
 /* whether function command_argument_count works */
 #undef HAVE_FORTRAN_COMMAND_ARGUMENT_COUNT
 
+/* whether statement constant_atan2 works */
+#undef HAVE_FORTRAN_CONSTANT_ATAN2
+
 /* whether statement constant_exponent works */
 #undef HAVE_FORTRAN_CONSTANT_EXPONENT
 
@@ -264,10 +267,13 @@
 /* whether module mpi_f08 works */
 #undef HAVE_FORTRAN_MPI_F08
 
-/* whether module mpi works with mpi_bcast */
+/* whether subroutine mpi_bcast (module mpi) works */
 #undef HAVE_FORTRAN_MPI_MPI_BCAST
 
-/* whether module mpi works with mpi_group_translate_ranks */
+/* whether subroutine mpi_gather (module mpi) works */
+#undef HAVE_FORTRAN_MPI_MPI_GATHER
+
+/* whether subroutine mpi_group_translate_ranks (module mpi) works */
 #undef HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
 
 /* whether module mpi works with mpi_irecv */
@@ -275,6 +281,15 @@
 
 /* whether module mpi works with mpi_isend */
 #undef HAVE_FORTRAN_MPI_MPI_ISEND
+
+/* whether subroutine mpi_recv (module mpi) works */
+#undef HAVE_FORTRAN_MPI_MPI_RECV
+
+/* whether subroutine mpi_reduce (module mpi) works */
+#undef HAVE_FORTRAN_MPI_MPI_REDUCE
+
+/* whether subroutine mpi_send (module mpi) works */
+#undef HAVE_FORTRAN_MPI_MPI_SEND
 
 /* whether function new_line works */
 #undef HAVE_FORTRAN_NEW_LINE
@@ -332,9 +347,6 @@
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
-
-/* prefer elemental function */
-#undef OPT_ENABLE_FORTRAN_ELEMENTAL
 
 /* binary128 precision */
 #undef OPT_REAL_QUADRUPLE_DIGITS

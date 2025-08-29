@@ -26,7 +26,7 @@
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Fri Aug 22 20:39:34 JST 2025
+# from AX_AM_MACROS_STATIC on Fri Aug 29 14:34:49 JST 2025
 
 
 
@@ -147,7 +147,7 @@ am__aclocal_m4_deps = $(top_srcdir)/mt_local.m4 \
 	$(top_srcdir)/std/mt_local.m4 $(top_srcdir)/emu/mt_local.m4 \
 	$(top_srcdir)/cal/mt_local.m4 $(top_srcdir)/trp/mt_local.m4 \
 	$(top_srcdir)/ppp/mt_local.m4 $(top_srcdir)/nio/mt_local.m4 \
-	$(top_srcdir)/ami/mt_local.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(top_srcdir)/configure \
@@ -315,11 +315,10 @@ am__DIST_COMMON = $(srcdir)/Makedep.inc $(srcdir)/Makefile.in \
 	$(top_srcdir)/build-aux/install-sh \
 	$(top_srcdir)/build-aux/ltmain.sh \
 	$(top_srcdir)/build-aux/missing \
-	$(top_srcdir)/build-aux/tap-driver.sh AUTHORS ChangeLog \
-	INSTALL NEWS README build-aux/ar-lib build-aux/compile \
-	build-aux/config.guess build-aux/config.sub build-aux/depcomp \
-	build-aux/install-sh build-aux/ltmain.sh build-aux/missing \
-	build-aux/py-compile
+	$(top_srcdir)/build-aux/tap-driver.sh AUTHORS INSTALL README \
+	build-aux/ar-lib build-aux/compile build-aux/config.guess \
+	build-aux/config.sub build-aux/depcomp build-aux/install-sh \
+	build-aux/ltmain.sh build-aux/missing build-aux/py-compile
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -403,14 +402,12 @@ FCFLAGS_F90 = @FCFLAGS_F90@
 FCLIBS = @FCLIBS@
 FC_COMPILER_VENDOR = @FC_COMPILER_VENDOR@
 FC_DEFINE = @FC_DEFINE@
-FC_INCLUDE_touza_ami = @FC_INCLUDE_touza_ami@
 FC_INCLUDE_touza_cal = @FC_INCLUDE_touza_cal@
 FC_INCLUDE_touza_emu = @FC_INCLUDE_touza_emu@
 FC_INCLUDE_touza_nio = @FC_INCLUDE_touza_nio@
 FC_INCLUDE_touza_ppp = @FC_INCLUDE_touza_ppp@
 FC_INCLUDE_touza_std = @FC_INCLUDE_touza_std@
 FC_INCLUDE_touza_trp = @FC_INCLUDE_touza_trp@
-FC_LDADD_touza_ami = @FC_LDADD_touza_ami@
 FC_LDADD_touza_cal = @FC_LDADD_touza_cal@
 FC_LDADD_touza_emu = @FC_LDADD_touza_emu@
 FC_LDADD_touza_nio = @FC_LDADD_touza_nio@
@@ -420,7 +417,6 @@ FC_LDADD_touza_trp = @FC_LDADD_touza_trp@
 FC_MODEXT = @FC_MODEXT@
 FC_MODINC = @FC_MODINC@
 FC_MODOUT = @FC_MODOUT@
-FC_MODULE_touza_ami = @FC_MODULE_touza_ami@
 FC_MODULE_touza_cal = @FC_MODULE_touza_cal@
 FC_MODULE_touza_emu = @FC_MODULE_touza_emu@
 FC_MODULE_touza_nio = @FC_MODULE_touza_nio@
@@ -518,7 +514,6 @@ build_cpu = @build_cpu@
 build_os = @build_os@
 build_vendor = @build_vendor@
 builddir = @builddir@
-builddir_touza_ami = @builddir_touza_ami@
 builddir_touza_cal = @builddir_touza_cal@
 builddir_touza_emu = @builddir_touza_emu@
 builddir_touza_nio = @builddir_touza_nio@
@@ -556,14 +551,12 @@ runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
-srcdir_touza_ami = @srcdir_touza_ami@
 srcdir_touza_cal = @srcdir_touza_cal@
 srcdir_touza_emu = @srcdir_touza_emu@
 srcdir_touza_nio = @srcdir_touza_nio@
 srcdir_touza_ppp = @srcdir_touza_ppp@
 srcdir_touza_std = @srcdir_touza_std@
 srcdir_touza_trp = @srcdir_touza_trp@
-subdirs_extra = @subdirs_extra@
 switchdir = @switchdir@
 sysconfdir = @sysconfdir@
 target = @target@
