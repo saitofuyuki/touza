@@ -1,7 +1,7 @@
 !!!_! chak_lib.F90 - TOUZA/Jmz CH(swiss) army knife library
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 13 2022
-#define TIME_STAMP 'Time-stamp: <2024/10/15 11:41:38 fuyuki chak_lib.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/26 22:23:01 fuyuki chak_lib.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023
@@ -645,7 +645,8 @@ contains
   end function container_i2handle
 
 !!!_   . buf_h2item()
-  ELEMENTAL integer function buf_h2item(handle) result(n)
+  ELEMENTAL &
+  integer function buf_h2item(handle) result(n)
     implicit none
     integer,intent(in) :: handle
     n = handle - ofs_buffer
@@ -667,7 +668,8 @@ contains
   end function buf_i2handle
 
 !!!_   . stack_h2item()
-  ELEMENTAL integer function stack_h2item(handle) result(n)
+  ELEMENTAL &
+  integer function stack_h2item(handle) result(n)
     implicit none
     integer,intent(in) :: handle
     n = handle - ofs_stack
@@ -761,7 +763,8 @@ contains
   end function conv_physical_index
 
 !!!_   . user_index_bgn()
-  ELEMENTAL integer function user_index_bgn(j, n) result(k)
+  ELEMENTAL &
+  integer function user_index_bgn(j, n) result(k)
     implicit none
     integer,intent(in)          :: j
     integer,intent(in),optional :: n
@@ -772,7 +775,8 @@ contains
     endif
   end function user_index_bgn
 !!!_   . user_index_end()
-  ELEMENTAL integer function user_index_end(j, n) result(k)
+  ELEMENTAL &
+  integer function user_index_end(j, n) result(k)
     implicit none
     integer,intent(in)          :: j
     integer,intent(in),optional :: n
@@ -783,7 +787,8 @@ contains
     endif
   end function user_index_end
 !!!_   . system_index_bgn()
-  ELEMENTAL integer function system_index_bgn(j, n) result(k)
+  ELEMENTAL &
+  integer function system_index_bgn(j, n) result(k)
     implicit none
     integer,intent(in)          :: j
     integer,intent(in),optional :: n
@@ -794,7 +799,8 @@ contains
     endif
   end function system_index_bgn
 !!!_   . system_index_end()
-  ELEMENTAL integer function system_index_end(j, n) result(k)
+  ELEMENTAL &
+  integer function system_index_end(j, n) result(k)
     implicit none
     integer,intent(in)          :: j
     integer,intent(in),optional :: n
@@ -805,7 +811,8 @@ contains
     endif
   end function system_index_end
 !!!_   . logical_index
-  ELEMENTAL integer function logical_index (l, p) result(n)
+  ELEMENTAL &
+  integer function logical_index (l, p) result(n)
     implicit none
     integer,intent(in) :: l, p
     if (l.eq.null_range) then

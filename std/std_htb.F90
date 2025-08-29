@@ -1,7 +1,7 @@
 !!!_! std_htb.F90 - touza/std simple hash table manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/17 09:03:16 fuyuki std_htb.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/26 22:13:57 fuyuki std_htb.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -2193,8 +2193,7 @@ contains
     endif
   end function is_occupied_j
 
-  ELEMENTAL &
-       & logical function is_occupied_c(ctb, entr) result(b)
+  logical function is_occupied_c(ctb, entr) result(b)
     implicit none
     type(ctable_t),intent(in) :: ctb
     integer,       intent(in) :: entr

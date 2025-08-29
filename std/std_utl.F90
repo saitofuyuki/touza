@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/10 18:41:43 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/28 19:19:52 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -15,19 +15,6 @@
 #  include "touza_config.h"
 #endif
 #include "touza_std.h"
-!!!_* macros
-#ifndef   OPT_ENABLE_FORTRAN_ELEMENTAL
-#  define OPT_ENABLE_FORTRAN_ELEMENTAL 0
-#endif
-!!!_* switch
-#if OPT_ENABLE_FORTRAN_ELEMENTAL
-#  define _ELEMENTAL ELEMENTAL
-#else
-#  define _ELEMENTAL
-#endif
-#define _CHOICE_DECL  _ELEMENTAL
-#define _CONDOP_DECL  _ELEMENTAL
-#define _CONDREP_DECL _ELEMENTAL
 !!!_@ TOUZA_Std_utl - small utilities
 module TOUZA_Std_utl
   use TOUZA_Std_prc, only: KFLT, KDBL, KI64, KQPL
@@ -53,8 +40,24 @@ module TOUZA_Std_utl
 !!!_  - interfaces
   interface choice
      module procedure choice_i,  choice_l,  choice_b,  choice_f,  choice_d
-     module procedure choice_ia, choice_la, choice_ba, choice_fa, choice_da
   end interface choice
+
+  interface pchoice ! pure choice
+     module procedure choice_i,  choice_l,  choice_b,  choice_f,  choice_d
+  end interface pchoice
+
+  interface achoice ! array choice
+     module procedure achoice_i, achoice_l, achoice_b, achoice_f, achoice_d
+     module procedure schoice_i, schoice_l, schoice_b, schoice_f, schoice_d
+  end interface achoice
+
+  interface choice_a ! for compatibility
+     module procedure choice_str
+  end interface choice_a
+
+  ! interface echoice ! elemental choice, deprecated
+  !    module procedure echoice_i,  echoice_l,  echoice_b,  echoice_f,  echoice_d
+  ! end interface echoice
 
   interface set_if_present
      module procedure set_if_present_i, set_if_present_l
@@ -134,15 +137,27 @@ module TOUZA_Std_utl
 
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   interface choice
-     module procedure choice_q,  choice_qa
+     module procedure choice_q
   end interface choice
+  interface pchoice
+     module procedure choice_q
+  end interface pchoice
+  interface achoice
+     module procedure achoice_q
+     module procedure schoice_q
+  end interface achoice
+  ! interface echoice
+  !    module procedure echoice_q
+  ! end interface echoice
+
   interface parse_number
      module procedure parse_number_q
   end interface parse_number
 #endif
 !!!_  - public
   public init, diag, finalize
-  public choice, choice_a
+  public choice, pchoice, achoice, choice_str
+  public choice_a
   public set_if_present
   public condop, condrep
   public chcount
@@ -240,20 +255,12 @@ contains
        if (is_first_force(diag_counts, mode)) then
           if (ierr.eq.0) then
 101          format(__TAG__, A)
-102          format(__TAG__, 'with elemental = ', I0)
 103          format(__TAG__, 'find offset = ', I0)
              if (VCHECK_NORMAL(lv)) then
                 if (utmp.ge.0) then
                    write(utmp, 101) TIME_STAMP
                 else
                    write(*,    101) TIME_STAMP
-                endif
-             endif
-             if (VCHECK_INFO(lv)) then
-                if (utmp.ge.0) then
-                   write(utmp, 102) OPT_ENABLE_FORTRAN_ELEMENTAL
-                else
-                   write(*,    102) OPT_ENABLE_FORTRAN_ELEMENTAL
                 endif
              endif
              if (VCHECK_INFO(lv)) then
@@ -330,7 +337,7 @@ contains
   end subroutine set_defu
 
 !!!_  & choice() - return D if not present A, otherwise A
-  _CHOICE_DECL &
+  PURE &
   function choice_i(d, a) result(r)
     implicit none
     integer :: r
@@ -344,7 +351,7 @@ contains
     return
   end function choice_i
 
-  _CHOICE_DECL &
+  PURE &
   function choice_l(d, a) result(r)
     use TOUZA_Std_prc,only: KTGT=>KI64
     implicit none
@@ -362,7 +369,7 @@ contains
     return
   end function choice_l
 
-  _CHOICE_DECL &
+  PURE &
   function choice_b(d, a) result(r)
     implicit none
     logical :: r
@@ -376,7 +383,7 @@ contains
     return
   end function choice_b
 
-  _CHOICE_DECL &
+  PURE &
   function choice_f(d, a) result(r)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
@@ -391,7 +398,7 @@ contains
     return
   end function choice_f
 
-  _CHOICE_DECL &
+  PURE &
   function choice_d(d, a) result(r)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
@@ -406,7 +413,7 @@ contains
     return
   end function choice_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
-  _CHOICE_DECL &
+  PURE &
   function choice_q(d, a) result(r)
     use TOUZA_Std_prc,only: KTGT=>KQPL
     implicit none
@@ -422,103 +429,297 @@ contains
   end function choice_q
 #endif
 
-  function choice_ia(d, a) result(r)
+! !!!_  & echoice() - return D if not present A, otherwise A
+!   ELEMENTAL &
+!   function echoice_i(d, a) result(r)
+!     implicit none
+!     integer :: r
+!     integer,intent(in)          :: d
+!     integer,intent(in),optional :: a
+!     if (present(a)) then
+!        r = a
+!     else
+!        r = d
+!     endif
+!     return
+!   end function echoice_i
+
+!   ELEMENTAL &
+!   function echoice_l(d, a) result(r)
+!     use TOUZA_Std_prc,only: KTGT=>KI64
+!     implicit none
+!     integer(kind=KTGT) :: r
+! !!!_   . note ifort cannot compile with the following declaration
+!     ! integer,parameter :: KTGT=kind(r)
+! !!!_   . body
+!     integer(kind=KTGT),intent(in)          :: d
+!     integer(kind=KTGT),intent(in),optional :: a
+!     if (present(a)) then
+!        r = a
+!     else
+!        r = d
+!     endif
+!     return
+!   end function echoice_l
+
+!   ELEMENTAL &
+!   function echoice_b(d, a) result(r)
+!     implicit none
+!     logical :: r
+!     logical,intent(in)          :: d
+!     logical,intent(in),optional :: a
+!     if (present(a)) then
+!        r = a
+!     else
+!        r = d
+!     endif
+!     return
+!   end function echoice_b
+
+!   ELEMENTAL &
+!   function echoice_f(d, a) result(r)
+!     use TOUZA_Std_prc,only: KTGT=>KFLT
+!     implicit none
+!     real(kind=KTGT) :: r
+!     real(kind=KTGT),intent(in)          :: d
+!     real(kind=KTGT),intent(in),optional :: a
+!     if (present(a)) then
+!        r = a
+!     else
+!        r = d
+!     endif
+!     return
+!   end function echoice_f
+
+!   ELEMENTAL &
+!   function echoice_d(d, a) result(r)
+!     use TOUZA_Std_prc,only: KTGT=>KDBL
+!     implicit none
+!     real(kind=KTGT) :: r
+!     real(kind=KTGT),intent(in)          :: d
+!     real(kind=KTGT),intent(in),optional :: a
+!     if (present(a)) then
+!        r = a
+!     else
+!        r = d
+!     endif
+!     return
+!   end function echoice_d
+! #if OPT_REAL_QUADRUPLE_DIGITS > 0
+!   ELEMENTAL &
+!   function echoice_q(d, a) result(r)
+!     use TOUZA_Std_prc,only: KTGT=>KQPL
+!     implicit none
+!     real(kind=KTGT) :: r
+!     real(kind=KTGT),intent(in)          :: d
+!     real(kind=KTGT),intent(in),optional :: a
+!     if (present(a)) then
+!        r = a
+!     else
+!        r = d
+!     endif
+!     return
+!   end function echoice_q
+! #endif
+
+!!!_  - achoice()
+  subroutine achoice_i(r, d, a)
     implicit none
+    integer,intent(inout)        :: r(:)
     integer,intent(in)           :: d(:)
     integer,intent(in),optional  :: a(:)
-    integer,dimension(size(d,1)) :: r
     integer n
+    n = min(size(d, 1), size(r, 1))
     if (present(a)) then
-       n = min(size(d,1), size(a, 1))
+       n = min(n, size(a, 1))
        r(:n) = a(:n)
     else
-       r(:) = d(:)
+       r(:n) = d(:n)
     endif
     return
-  end function choice_ia
-
-  function choice_la(d, a) result(r)
+  end subroutine achoice_i
+  subroutine achoice_l(r, d, a)
     use TOUZA_Std_prc,only: KTGT=>KI64
     implicit none
+    integer(kind=KTGT),intent(inout)        :: r(:)
     integer(kind=KTGT),intent(in)           :: d(:)
     integer(kind=KTGT),intent(in),optional  :: a(:)
-    integer(kind=KTGT),dimension(size(d,1)) :: r
     integer n
+    n = min(size(d, 1), size(r, 1))
     if (present(a)) then
-       n = min(size(d,1), size(a, 1))
+       n = min(n, size(a, 1))
        r(:n) = a(:n)
     else
-       r(:) = d(:)
+       r(:n) = d(:n)
     endif
     return
-  end function choice_la
-
-  function choice_ba(d, a) result(r)
+  end subroutine achoice_l
+  subroutine achoice_b(r, d, a)
     implicit none
+    logical,intent(inout)        :: r(:)
     logical,intent(in)           :: d(:)
     logical,intent(in),optional  :: a(:)
-    logical,dimension(size(d,1)) :: r
     integer n
+    n = min(size(d, 1), size(r, 1))
     if (present(a)) then
-       n = min(size(d,1), size(a, 1))
+       n = min(n, size(a, 1))
        r(:n) = a(:n)
     else
-       r(:) = d(:)
+       r(:n) = d(:n)
     endif
     return
-  end function choice_ba
-
-  function choice_fa(d, a) result(r)
+  end subroutine achoice_b
+  subroutine achoice_f(r, d, a)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
+    real(kind=KTGT),intent(inout)        :: r(:)
     real(kind=KTGT),intent(in)           :: d(:)
     real(kind=KTGT),intent(in),optional  :: a(:)
-    real(kind=KTGT),dimension(size(d,1)) :: r
     integer n
+    n = min(size(d, 1), size(r, 1))
     if (present(a)) then
-       n = min(size(d,1), size(a, 1))
+       n = min(n, size(a, 1))
        r(:n) = a(:n)
     else
-       r(:) = d(:)
+       r(:n) = d(:n)
     endif
     return
-  end function choice_fa
-
-  function choice_da(d, a) result(r)
+  end subroutine achoice_f
+  subroutine achoice_d(r, d, a)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
+    real(kind=KTGT),intent(inout)        :: r(:)
     real(kind=KTGT),intent(in)           :: d(:)
     real(kind=KTGT),intent(in),optional  :: a(:)
-    real(kind=KTGT),dimension(size(d,1)) :: r
     integer n
+    n = min(size(d, 1), size(r, 1))
     if (present(a)) then
-       n = min(size(d,1), size(a, 1))
+       n = min(n, size(a, 1))
        r(:n) = a(:n)
     else
-       r(:) = d(:)
+       r(:n) = d(:n)
     endif
     return
-  end function choice_da
+  end subroutine achoice_d
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
-  function choice_qa(d, a) result(r)
+  subroutine achoice_q(r, d, a)
     use TOUZA_Std_prc,only: KTGT=>KQPL
     implicit none
+    real(kind=KTGT),intent(inout)        :: r(:)
     real(kind=KTGT),intent(in)           :: d(:)
     real(kind=KTGT),intent(in),optional  :: a(:)
-    real(kind=KTGT),dimension(size(d,1)) :: r
     integer n
+    n = min(size(d, 1), size(r, 1))
     if (present(a)) then
-       n = min(size(d,1), size(a, 1))
+       n = min(n, size(a, 1))
        r(:n) = a(:n)
     else
-       r(:) = d(:)
+       r(:n) = d(:n)
     endif
     return
-  end function choice_qa
+  end subroutine achoice_q
 #endif
 
-!!!_  & choice_a - work around for choice() string
-  subroutine choice_a &
+!!!_  - schoice()
+  subroutine schoice_i(r, d, a)
+    implicit none
+    integer,intent(inout)        :: r(:)
+    integer,intent(in)           :: d
+    integer,intent(in),optional  :: a(:)
+    integer n
+    if (present(a)) then
+       n = min(size(a, 1), size(r, 1))
+       r(:n) = a(:n)
+       r(n+1:) = d
+    else
+       r(:) = d
+    endif
+    return
+  end subroutine schoice_i
+  subroutine schoice_l(r, d, a)
+    use TOUZA_Std_prc,only: KTGT=>KI64
+    implicit none
+    integer(kind=KTGT),intent(inout)        :: r(:)
+    integer(kind=KTGT),intent(in)           :: d
+    integer(kind=KTGT),intent(in),optional  :: a(:)
+    integer n
+    if (present(a)) then
+       n = min(size(a, 1), size(r, 1))
+       r(:n) = a(:n)
+       r(n+1:) = d
+    else
+       r(:) = d
+    endif
+    return
+  end subroutine schoice_l
+  subroutine schoice_b(r, d, a)
+    implicit none
+    logical,intent(inout)        :: r(:)
+    logical,intent(in)           :: d
+    logical,intent(in),optional  :: a(:)
+    integer n
+    if (present(a)) then
+       n = min(size(a, 1), size(r, 1))
+       r(:n) = a(:n)
+       r(n+1:) = d
+    else
+       r(:) = d
+    endif
+    return
+  end subroutine schoice_b
+  subroutine schoice_f(r, d, a)
+    use TOUZA_Std_prc,only: KTGT=>KFLT
+    implicit none
+    real(kind=KTGT),intent(inout)        :: r(:)
+    real(kind=KTGT),intent(in)           :: d
+    real(kind=KTGT),intent(in),optional  :: a(:)
+    integer n
+    if (present(a)) then
+       n = min(size(a, 1), size(r, 1))
+       r(:n) = a(:n)
+       r(n+1:) = d
+    else
+       r(:) = d
+    endif
+    return
+  end subroutine schoice_f
+  subroutine schoice_d(r, d, a)
+    use TOUZA_Std_prc,only: KTGT=>KDBL
+    implicit none
+    real(kind=KTGT),intent(inout)        :: r(:)
+    real(kind=KTGT),intent(in)           :: d
+    real(kind=KTGT),intent(in),optional  :: a(:)
+    integer n
+    if (present(a)) then
+       n = min(size(a, 1), size(r, 1))
+       r(:n) = a(:n)
+       r(n+1:) = d
+    else
+       r(:) = d
+    endif
+    return
+  end subroutine schoice_d
+#if OPT_REAL_QUADRUPLE_DIGITS > 0
+  subroutine schoice_q(r, d, a)
+    use TOUZA_Std_prc,only: KTGT=>KQPL
+    implicit none
+    real(kind=KTGT),intent(inout)        :: r(:)
+    real(kind=KTGT),intent(in)           :: d
+    real(kind=KTGT),intent(in),optional  :: a(:)
+    integer n
+    if (present(a)) then
+       n = min(size(a, 1), size(r, 1))
+       r(:n) = a(:n)
+       r(n+1:) = d
+    else
+       r(:) = d
+    endif
+    return
+  end subroutine schoice_q
+#endif
+
+!!!_  & choice_str - work around for choice() string
+  subroutine choice_str &
        & (v, d, a)
     implicit none
     character(len=*),intent(inout)       :: v
@@ -532,7 +733,7 @@ contains
        continue
     endif
     return
-  end subroutine choice_a
+  end subroutine choice_str
 
 !!!_  & set_if_present - set value if variable is present
   subroutine set_if_present_i(var, val)
@@ -588,7 +789,7 @@ contains
   end subroutine set_if_present_a
 
 !!!_  & condrep() - conditional replace operator
-  _CONDREP_DECL &
+  ELEMENTAL &
   function condrep_i (v, src, rep) result(r)
     implicit none
     integer :: r
@@ -601,7 +802,7 @@ contains
     endif
     return
   end function condrep_i
-  _CONDREP_DECL &
+  ELEMENTAL &
   function condrep_f (v, src, rep) result(r)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
@@ -615,7 +816,7 @@ contains
     endif
     return
   end function condrep_f
-  _CONDREP_DECL &
+  ELEMENTAL &
   function condrep_d (v, src, rep) result(r)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
@@ -631,7 +832,7 @@ contains
   end function condrep_d
 
 !!!_  & condop() - conditional operator
-  _CONDOP_DECL &
+  ELEMENTAL &
   function condop_i (l, vt, vf) result(r)
     implicit none
     integer :: r
@@ -645,7 +846,7 @@ contains
     return
   end function condop_i
 
-  _CONDOP_DECL &
+  ELEMENTAL &
   function condop_f (l, vt, vf) result(r)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
@@ -660,7 +861,7 @@ contains
     return
   end function condop_f
 
-  _CONDOP_DECL &
+  ELEMENTAL &
   function condop_d (l, vt, vf) result(r)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
@@ -675,7 +876,7 @@ contains
     return
   end function condop_d
 
-  _CONDOP_DECL &
+  ELEMENTAL &
   function condop_l (l, vt, vf) result(r)
     implicit none
     logical :: r
@@ -2409,7 +2610,8 @@ contains
   end subroutine jot
 
 !!!_  & inrange() - return true if l<=v<=h
-  ELEMENTAL logical function inrange_i (v, l, h, s) result (b)
+  ! ELEMENTAL &
+  logical function inrange_i (v, l, h, s) result (b)
     implicit none
     integer,intent(in) :: v, l, h
     logical,intent(in),optional :: s  ! allow h<l case
@@ -2423,7 +2625,8 @@ contains
        b = (l.le.v .and. v.le.h)
     endif
   end function inrange_i
-  ELEMENTAL logical function inrange_f (v, l, h, s) result (b)
+  ! ELEMENTAL &
+  logical function inrange_f (v, l, h, s) result (b)
     use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
     real(kind=KTGT),intent(in) :: v, l, h
@@ -2438,7 +2641,8 @@ contains
        b = (l.le.v .and. v.le.h)
     endif
   end function inrange_f
-  ELEMENTAL logical function inrange_d (v, l, h, s) result (b)
+  ! ELEMENTAL &
+  logical function inrange_d (v, l, h, s) result (b)
     use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(in) :: v, l, h
@@ -2898,23 +3102,23 @@ contains
 
     q(:) = (/1, 2, 3/)
 
-101 format('choice:', I0, 1x, L1, 1x, A, T20, 1x, 3(1x, I0))
+101 format('choice:', I0, 1x, L1, 1x, A, T21, 1x, 3(1x, I0))
 
     if (k.eq.0) then
        p(:) = 0
        p(:) = choice(1, y)
        write(*, 101) k, present(y), '1, y', p(:)
 
-       p(:) = 0
-       p(:) = choice(q(:), y)
-       write(*, 101) k, present(y), 'q(:), y', p(:)
+       ! p(:) = 0
+       ! call schoice(p, q(:), y)
+       ! write(*, 101) k, present(y), 'q(:), y', p(:)
     else
        p(:) = 0
-       p(:) = choice(1, x)
+       call achoice(p, 1, x)
        write(*, 101) k, present(x), '1, x(:)', p(:)
 
        p(:) = 0
-       p(:) = choice(q(:), x)
+       call achoice(p, q(:), x)
        write(*, 101) k, present(x), 'q(:), x(:)', p(:)
     endif
 

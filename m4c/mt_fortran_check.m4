@@ -1,7 +1,7 @@
 dnl Filename:  touza/m4c/mt_fortran_check.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:   Jun 3 2020
-dnl Time-stamp: <2025/07/02 11:55:45 fuyuki mt_fortran_check.m4>
+dnl Time-stamp: <2025/08/27 12:48:29 fuyuki mt_fortran_check.m4>
 
 dnl Copyright (C) 2020-2025
 dnl           Japan Agency for Marine-Earth Science and Technology
@@ -91,6 +91,37 @@ AS_IF([test "x$[]$2" = xyes],
 ])# MT_FORTRAN_BATCH_CHECK
 
 # ======================================================================
+
+# MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE(MODULE, SUBROUTINE, ARGUMENTS, PROLOGUE[, SYMBOL])
+# ------------------------------------------------------
+# Define 1 if works "use module,subroutine"
+# Define 2 if works "call subroutien" without "use module"
+# Otherwise 0
+AC_DEFUN([MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE],
+[m4_indir([_$0],
+          [whether subroutine $2 (module $1) works],
+          [MT_FORTRAN_CACHE_ID($1_$2)],
+          [MT_FORTRAN_CPP_HAVE([$1_$2])],
+          $@)])# MT_FORTRAN_BATCH_CHECK_MODULE
+
+# _MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE(MESSAGE, CACHE, MACRO,
+#                                           MODULE, SUBROUTINE, ARGUMENTS, PROLOGUE[, SYMBOL])
+# ------------------------------------------------------
+AC_DEFUN([_MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE],
+[AC_CACHE_CHECK([$1], [$2],
+[MT_FORTRAN_CHECK_MODULE_MEMBER([$4], [$5],
+    [AS_VAR_SET([mt_fortran_check], [1])],
+    [AS_VAR_SET([mt_fortran_check], [0])])
+AS_IF([test "x$[]mt_fortran_check" = x0],
+      [MT_FORTRAN_CHECK_SUBROUTINE([$5], [$6], [$7],
+         [AS_VAR_SET([mt_fortran_check], [2])],
+         [AS_VAR_SET([mt_fortran_check], [0])])])
+AS_VAR_SET([$2], [$[]mt_fortran_check])])
+##
+AS_IF([test "x$[]$2" = x0],
+      [:],
+      [AC_DEFINE_UNQUOTED(m4_quote($3), [$[]$2], [$1])])
+])# _MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE
 
 # MT_FORTRAN_CHECK_FUNCTION(FUNCTION, [ARGUMENTS], [ACTION-IF-TRUE], [ACTION-IF-FALSE])
 # -------------------------------------------------------------------------------------
