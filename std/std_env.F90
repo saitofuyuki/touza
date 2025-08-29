@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/23 08:50:42 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/28 15:05:14 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -162,7 +162,7 @@ module TOUZA_Std_env
 #  undef OPT_INTEGER_OFFSET_KIND
 #  if OPT_USE_MPI
 #    define OPT_INTEGER_OFFSET_KIND MPI_OFFSET_KIND
-  use mpi,only: MPI_OFFSET_KIND
+  use TOUZA_Std_mwe,only: MPI_OFFSET_KIND
 #  else
 #    define OPT_INTEGER_OFFSET_KIND KI64
 #  endif
@@ -770,12 +770,9 @@ contains
 !!!_  & set_mpi
   subroutine set_mpi &
        & (ierr, irank, nrank, iroot, icomm, tag, iru, icu, u, levv)
-    use TOUZA_Std_mwe,only: get_ni, get_comm, MPI_COMM_NULL
+    use TOUZA_Std_mwe,only: get_ni, get_comm, MPI_COMM_NULL, MPI_COMM_SELF
     use TOUZA_Std_utl,only: choice
     use TOUZA_Std_log,only: msg_mdl
-#if OPT_USE_MPI
-    use mpi,only: MPI_COMM_SELF
-#endif
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: irank, nrank, iroot, icomm
@@ -876,10 +873,10 @@ contains
 !!!_  & init_unfmtd_recl - initialize unformatted direct access (user interface)
   subroutine init_unfmtd_recl &
        & (ierr, u, levv, levtry, iroot, icomm)
+    use TOUZA_Std_mwe,only: MPI_INTEGER, MPI_Abort
 #if OPT_USE_MPI
-    use mpi,only: MPI_INTEGER, MPI_Abort
-#  if HAVE_FORTRAN_MPI_MPI_BCAST
-    use mpi,only: MPI_Bcast
+#  if HAVE_FORTRAN_MPI_MPI_BCAST == 1
+    use TOUZA_Std_mwe,only: MPI_Bcast
 #  endif
 #endif
     use TOUZA_Std_utl,only: choice
@@ -1526,10 +1523,10 @@ contains
 !!!_  & init_unfmtd_strm
   subroutine init_unfmtd_strm &
        & (ierr, u, levv, levtry, iroot, icomm)
+    use TOUZA_Std_mwe,only: MPI_INTEGER, MPI_Abort
 #if OPT_USE_MPI
-    use mpi,only: MPI_INTEGER, MPI_Abort
-#  if HAVE_FORTRAN_MPI_MPI_BCAST
-    use mpi,only: MPI_Bcast
+#  if HAVE_FORTRAN_MPI_MPI_BCAST == 1
+    use TOUZA_Std_mwe,only: MPI_Bcast
 #  endif
 #endif
     use TOUZA_Std_utl,only: choice
@@ -1675,10 +1672,10 @@ contains
 !!!_  & init_file_bodr
   subroutine init_file_bodr &
        & (ierr, u, levv, ubgn, uend, ustp, iroot, icomm)
+    use TOUZA_Std_mwe,only: MPI_INTEGER, MPI_Abort
 #if OPT_USE_MPI
-    use mpi,only: MPI_INTEGER, MPI_Abort
-#  if HAVE_FORTRAN_MPI_MPI_BCAST
-    use mpi,only: MPI_Bcast
+#  if HAVE_FORTRAN_MPI_MPI_BCAST == 1
+    use TOUZA_Std_mwe,only: MPI_Bcast
 #  endif
 #endif
     implicit none
@@ -1967,10 +1964,10 @@ contains
 !!!_  & init_io_status
   subroutine init_io_status &
        & (ierr, u, levv, iroot, icomm)
+    use TOUZA_Std_mwe,only: MPI_INTEGER, MPI_Abort
 #if OPT_USE_MPI
-    use mpi,only: MPI_INTEGER, MPI_Abort
-#  if HAVE_FORTRAN_MPI_MPI_BCAST
-    use mpi,only: MPI_Bcast
+#  if HAVE_FORTRAN_MPI_MPI_BCAST == 1
+    use TOUZA_Std_mwe,only: MPI_Bcast
 #  endif
 #endif
     use TOUZA_Std_utl,only: choice

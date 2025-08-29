@@ -1,7 +1,7 @@
 !!!_! ppp_std.F90 - TOUZA/Ppp utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2025/08/13 11:31:33 fuyuki ppp_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/28 15:20:23 fuyuki ppp_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -41,6 +41,28 @@ module TOUZA_Ppp_std
   use TOUZA_Std,only: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
   use TOUZA_Std,only: MPI_COMM_SIZE, MPI_COMM_RANK, MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
   use TOUZA_Std,only: MPI_WAIT, MPI_BARRIER, MPI_ABORT
+  use TOUZA_Std,only: MPI_Probe, MPI_Get_count
+#if HAVE_FORTRAN_MPI_MPI_BCAST == 1
+  use TOUZA_Std,only: MPI_Bcast
+#endif
+#if HAVE_FORTRAN_MPI_MPI_REDUCE == 1
+  use TOUZA_Std,only: MPI_Reduce
+#endif
+#if HAVE_FORTRAN_MPI_MPI_SEND == 1
+  use TOUZA_Std,only: MPI_Send
+#endif
+#if HAVE_FORTRAN_MPI_MPI_RECV == 1
+  use TOUZA_Std,only: MPI_Recv
+#endif
+#if HAVE_FORTRAN_MPI_MPI_GATHER == 1
+  use TOUZA_Std,only: MPI_Gather
+#endif
+#if HAVE_FORTRAN_MPI_MPI_ISEND == 1
+  use TOUZA_Std,only: MPI_Isend
+#endif
+#if HAVE_FORTRAN_MPI_MPI_IRECV == 1
+  use TOUZA_Std,only: MPI_Irecv
+#endif
   use TOUZA_Std,only: is_eof_ss
   use TOUZA_Std,only: lpath
   use TOUZA_Std,only: ipc_getcwd,  ipc_chdir
@@ -99,7 +121,28 @@ module TOUZA_Ppp_std
   public :: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
   public :: MPI_COMM_SIZE, MPI_COMM_RANK, MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
   public :: MPI_WAIT, MPI_BARRIER, MPI_ABORT
-
+  public :: MPI_Probe, MPI_Get_count
+#if HAVE_FORTRAN_MPI_MPI_BCAST == 1
+  public :: MPI_Bcast
+#endif
+#if HAVE_FORTRAN_MPI_MPI_REDUCE == 1
+  public :: MPI_Reduce
+#endif
+#if HAVE_FORTRAN_MPI_MPI_SEND == 1
+  public :: MPI_Send
+#endif
+#if HAVE_FORTRAN_MPI_MPI_RECV == 1
+  public :: MPI_Recv
+#endif
+#if HAVE_FORTRAN_MPI_MPI_GATHER == 1
+  public :: MPI_Gather
+#endif
+#if HAVE_FORTRAN_MPI_MPI_IRECV == 1
+  public :: MPI_Irecv
+#endif
+#if HAVE_FORTRAN_MPI_MPI_ISEND == 1
+  public :: MPI_Isend
+#endif
 !!!_ + common interfaces
 contains
 !!!_  & init
