@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/11 08:42:45 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/28 15:24:48 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -20,8 +20,44 @@ module TOUZA_Std_mwe
 !!!_ + declaration
 !!!_  - modules
 #if OPT_USE_MPI
-  use mpi
+  use mpi,only: MPI_SUCCESS
+  use mpi,only: MPI_COMM_WORLD, MPI_COMM_SELF, MPI_COMM_NULL
+  use mpi,only: MPI_GROUP_NULL, MPI_GROUP_EMPTY, MPI_UNDEFINED
+  use mpi,only: MPI_STATUS_SIZE
+  use mpi,only: MPI_ANY_TAG,       MPI_ANY_SOURCE
+  use mpi,only: MPI_MIN,           MPI_MAX
+  use mpi,only: MPI_DATATYPE_NULL, MPI_INTEGER,       MPI_CHARACTER
+  use mpi,only: MPI_ADDRESS_KIND,  MPI_OFFSET_KIND,   MPI_DOUBLE_PRECISION
+  use mpi,only: MPI_IDENT, MPI_CONGRUENT, MPI_SIMILAR, MPI_UNEQUAL
+  use mpi,only: MPI_COMM_SIZE,     MPI_COMM_RANK
+  use mpi,only: MPI_COMM_CREATE,   MPI_COMM_SPLIT, MPI_COMM_GROUP
+  use mpi,only: MPI_COMM_COMPARE, MPI_GROUP_COMPARE
+  use mpi,only: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  use mpi,only: MPI_ABORT, MPI_WAIT,  MPI_BARRIER
+  use mpi,only: MPI_PROBE, MPI_GET_COUNT
 #endif
+#if HAVE_FORTRAN_MPI_MPI_BCAST == 1
+  use mpi,only: MPI_Bcast
+#endif
+#if HAVE_FORTRAN_MPI_MPI_REDUCE == 1
+  use mpi,only: MPI_Reduce
+#endif
+#if HAVE_FORTRAN_MPI_MPI_SEND == 1
+  use mpi,only: MPI_Send
+#endif
+#if HAVE_FORTRAN_MPI_MPI_RECV == 1
+  use mpi,only: MPI_Recv
+#endif
+#if HAVE_FORTRAN_MPI_MPI_ISEND == 1
+  use mpi,only: MPI_Isend
+#endif
+#if HAVE_FORTRAN_MPI_MPI_IRECV == 1
+  use mpi,only: MPI_Irecv
+#endif
+#if HAVE_FORTRAN_MPI_MPI_GATHER == 1
+  use mpi,only: MPI_Gather
+#endif
+
   use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
 !!!_  - default
   implicit none
@@ -59,6 +95,8 @@ module TOUZA_Std_mwe
   integer,parameter :: MPI_CONGRUENT = 1
   integer,parameter :: MPI_SIMILAR = 2
   integer,parameter :: MPI_UNEQUAL = 3
+  integer,parameter :: MPI_ADDRESS_KIND = 8
+  integer,parameter :: MPI_OFFSET_KIND = 8
 
   integer,parameter :: MPI_MIN = -9990
   integer,parameter :: MPI_MAX = -9991
@@ -78,32 +116,52 @@ module TOUZA_Std_mwe
 
 # define _ERROR(E) (E - ERR_MASK_STD_MWE)
 !!!_  - public
-  public init, diag, finalize
-  public set_comm, get_comm
-  public get_ni,   get_ni_safe
-  public get_wni,  get_wni_safe
-  public get_gni
-  public comp_comms, comp_groups
-  public is_mpi_activated
-  public safe_mpi_init, safe_mpi_finalize
-  public show_mpi_type
-  public MPI_SUCCESS
-  public MPI_COMM_WORLD, MPI_COMM_SELF, MPI_COMM_NULL
-  public MPI_DATATYPE_NULL, MPI_GROUP_NULL, MPI_UNDEFINED
-  public MPI_STATUS_SIZE,   MPI_GROUP_EMPTY
-  public MPI_INTEGER,       MPI_CHARACTER
-  public MPI_MIN,           MPI_MAX
-  public MPI_ANY_TAG,       MPI_ANY_SOURCE
-  public MPI_DOUBLE_PRECISION
-  public MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
-  public MPI_COMM_CREATE,   MPI_COMM_SPLIT, MPI_COMM_GROUP
-  public MPI_COMM_SIZE,     MPI_COMM_RANK
-  public MPI_WAIT, MPI_BARRIER
-  public MPI_PROBE, MPI_GET_COUNT
-  public MPI_COMM_COMPARE, MPI_IDENT, MPI_CONGRUENT, MPI_SIMILAR, MPI_UNEQUAL
-  public MPI_GROUP_COMPARE
-  public MPI_ABORT
-
+  public :: init, diag, finalize
+  public :: set_comm, get_comm
+  public :: get_ni,   get_ni_safe
+  public :: get_wni,  get_wni_safe
+  public :: get_gni
+  public :: comp_comms, comp_groups
+  public :: is_mpi_activated
+  public :: safe_mpi_init, safe_mpi_finalize
+  public :: show_mpi_type
+!!!_   . export from mpi
+  public :: MPI_SUCCESS
+  public :: MPI_COMM_WORLD, MPI_COMM_SELF, MPI_COMM_NULL
+  public :: MPI_GROUP_NULL, MPI_GROUP_EMPTY, MPI_UNDEFINED
+  public :: MPI_STATUS_SIZE
+  public :: MPI_ANY_TAG,       MPI_ANY_SOURCE
+  public :: MPI_MIN,           MPI_MAX
+  public :: MPI_DATATYPE_NULL, MPI_INTEGER,       MPI_CHARACTER
+  public :: MPI_ADDRESS_KIND,  MPI_OFFSET_KIND,   MPI_DOUBLE_PRECISION
+  public :: MPI_IDENT, MPI_CONGRUENT, MPI_SIMILAR, MPI_UNEQUAL
+  public :: MPI_COMM_SIZE,     MPI_COMM_RANK
+  public :: MPI_COMM_CREATE,   MPI_COMM_SPLIT, MPI_COMM_GROUP
+  public :: MPI_COMM_COMPARE, MPI_GROUP_COMPARE
+  public :: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  public :: MPI_ABORT, MPI_WAIT,  MPI_BARRIER
+  public :: MPI_PROBE, MPI_GET_COUNT
+#if HAVE_FORTRAN_MPI_MPI_BCAST == 1
+  public :: MPI_Bcast
+#endif
+#if HAVE_FORTRAN_MPI_MPI_REDUCE == 1
+  public :: MPI_Reduce
+#endif
+#if HAVE_FORTRAN_MPI_MPI_SEND == 1
+  public :: MPI_Send
+#endif
+#if HAVE_FORTRAN_MPI_MPI_RECV == 1
+  public :: MPI_Recv
+#endif
+#if HAVE_FORTRAN_MPI_MPI_ISEND == 1
+  public :: MPI_Isend
+#endif
+#if HAVE_FORTRAN_MPI_MPI_IRECV == 1
+  public :: MPI_Irecv
+#endif
+#if HAVE_FORTRAN_MPI_MPI_GATHER == 1
+  public :: MPI_Gather
+#endif
 !!!_  - misc
   character(len=128) tmsg
 contains

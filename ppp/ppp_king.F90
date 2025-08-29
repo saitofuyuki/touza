@@ -1,7 +1,7 @@
 !!!_! ppp_king.F90 - TOUZA/ppp king control (xmcomm/xmking replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/16 15:50:22 fuyuki ppp_king.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/08/28 14:34:58 fuyuki ppp_king.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -317,9 +317,6 @@ contains
   subroutine get_king_i &
        & (ierr, king, mdl, jaref, adef)
     use TOUZA_Ppp_std,only: MPI_UNDEFINED
-! #  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
-!     use MPI,only: MPI_Group_translate_ranks
-! #  endif
     use TOUZA_Ppp_amng,only: query_agent, source_agent, inquire_agent
     implicit none
     integer,                  intent(out) :: ierr
@@ -464,9 +461,6 @@ contains
   integer function cache_register &
        & (king, iaref, iasrc, pat) &
        & result(n)
-! #  if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
-!     use MPI,only: MPI_Group_translate_ranks
-! #  endif
     use TOUZA_Ppp_amng,only: inquire_agent
     implicit none
     integer,         intent(in)  :: king

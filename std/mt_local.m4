@@ -1,7 +1,7 @@
 dnl Filename:  std/mt_local.m4
 dnl Author:    SAITO Fuyuki
 dnl Created:   Jun 8 2020
-dnl Time-stamp: <2025/07/15 07:49:33 fuyuki mt_local.m4>
+dnl Time-stamp: <2025/08/28 15:11:32 fuyuki mt_local.m4>
 
 dnl Copyright: 2020-2023 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -30,8 +30,57 @@ MT_FORTRAN_BATCH_CHECK_FUNCTION([ftelli8], [0])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([mpi_f08])
 MT_FORTRAN_BATCH_CHECK_MODULE([mpi])
-MT_FORTRAN_BATCH_CHECK_MODULE([mpi], [mpi_bcast])
-MT_FORTRAN_BATCH_CHECK_MODULE([mpi], [mpi_group_translate_ranks])
+dnl MT_FORTRAN_BATCH_CHECK_MODULE([mpi], [mpi_bcast])
+dnl MT_FORTRAN_BATCH_CHECK_MODULE([mpi], [mpi_group_translate_ranks])
+
+MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE([mpi],
+      [mpi_group_translate_ranks],
+      [GROUP1, N, RANKS1, GROUP2, RANKS2, IERROR],
+      [INTEGER GROUP1, N, RANKS1(16), GROUP2, RANKS2(16), IERROR])
+
+MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE([mpi],
+      [mpi_bcast],
+      [BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR],
+      [integer BUFFER(1)
+       integer COUNT, DATATYPE, ROOT, COMM, IERROR])
+
+MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE([mpi],
+      [mpi_reduce],
+      [SENDBUF, RECVBUF, COUNT, DATATYPE, OP, ROOT, COMM, IERROR],
+      [integer SENDBUF(1), RECVBUF(1)
+       integer COUNT, DATATYPE, OP, ROOT, COMM, IERROR])
+
+MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE([mpi],
+      [mpi_isend],
+      [BUF, COUNT, DATATYPE, DEST, TAG, COMM, REQUEST, IERROR],
+      [integer  BUF(1)
+       integer COUNT, DATATYPE, DEST, TAG, COMM, REQUEST, IERROR])
+
+MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE([mpi],
+      [mpi_irecv],
+      [BUF, COUNT, DATATYPE, SOURCE, TAG, COMM, REQUEST, IERROR],
+      [integer BUF(1)
+       integer COUNT, DATATYPE, SOURCE, TAG, COMM, REQUEST, IERROR])
+
+MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE([mpi],
+      [mpi_send],
+      [BUF, COUNT, DATATYPE, DEST, TAG, COMM, IERROR],
+      [integer BUF(1)
+       integer COUNT, DATATYPE, DEST, TAG, COMM, IERROR])
+
+MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE([mpi],
+      [mpi_recv],
+      [BUF, COUNT, DATATYPE, SOURCE, TAG, COMM, STATUS, IERROR],
+      [integer BUF(1)
+       integer COUNT, DATATYPE, SOURCE, TAG, COMM
+       integer STATUS(16), IERROR])
+
+MT_FORTRAN_BATCH_CHECK_MODULE_SUBROUTINE([mpi],
+      [mpi_gather],
+      [SENDBUF, SENDCOUNT, SENDTYPE, RECVBUF, RECVCOUNT, RECVTYPE, ROOT, COMM, IERROR],
+      [integer SENDBUF(1), RECVBUF(1)
+       integer SENDCOUNT, SENDTYPE, RECVCOUNT, RECVTYPE, ROOT
+       integer COMM, IERROR])
 
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env])
 MT_FORTRAN_BATCH_CHECK_MODULE([iso_fortran_env], [INT8])

@@ -1,3 +1,10 @@
+Release-1.16.6 / 2025-08-29
+
+  * Import development around elemental procedure with optional arguments.
+  * emu: (ugg, pi) use ATAN2 instead of ATAN.
+  * std: (mwe, etc) Updated mpi module usages.
+  * std: (choice, etc) [FATAL] updated legacy elemental designs.
+
 Release-1.16.5 / 2025-08-22
 ===========================
 
