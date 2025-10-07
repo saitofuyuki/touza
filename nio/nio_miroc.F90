@@ -1,7 +1,7 @@
 !!!_! nio_miroc.F90 - TOUZA/Nio MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2025/10/07 12:54:25 fuyuki nio_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/07 20:38:32 fuyuki nio_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -111,6 +111,23 @@ module TOUZA_Nio_miroc
        integer,intent(out) :: IEOD
        integer,intent(in)  :: IFILE
      end subroutine GFSKIP
+!!!_   & GTINID
+     subroutine GTINID(HEAD)
+       implicit none
+       character(len=*),intent(out) :: HEAD(*)
+     end subroutine GTINID
+!!!_   & PUT_DATETUPLE
+     subroutine PUT_DATETUPLE(HDATE, IDATE)
+       implicit none
+       character(len=*),intent(out) :: HDATE
+       integer,         intent(in)  :: IDATE(6)
+     end subroutine PUT_DATETUPLE
+!!!_   & GET_DATETUPLE
+     subroutine GET_DATETUPLE(IDATE, HDATE)
+       implicit none
+       integer,         intent(out) :: IDATE(6)
+       character(len=*),intent(in)  :: HDATE
+     end subroutine GET_DATETUPLE
 !!!_   . FOPEN
      subroutine FOPEN &
           & (IOS, IFILE, HFILE, HACT, HFORM, HACCSS)
@@ -584,8 +601,30 @@ subroutine GTZWRZ &
 end subroutine GTZWRZ
 !!!_ + io/igtmeta.F
 !!!_  & GTINID
+subroutine GTINID(HEAD)
+  use TOUZA_Nio,only:get_default_header
+  implicit none
+  character(len=*),intent(out) :: HEAD(*)
+  call get_default_header(HEAD)
+end subroutine GTINID
 !!!_  & PUT_DATETUPLE
+subroutine PUT_DATETUPLE(HDATE, IDATE)
+  use TOUZA_Nio,only:unparse_date_tuple
+  implicit none
+  character(len=*),intent(out) :: HDATE
+  integer,         intent(in)  :: IDATE(6)
+  integer jerr
+  call unparse_date_tuple(jerr, hdate, idate)
+end subroutine PUT_DATETUPLE
 !!!_  & GET_DATETUPLE
+subroutine GET_DATETUPLE(IDATE, HDATE)
+  use TOUZA_Nio,only:parse_date_tuple
+  implicit none
+  integer,         intent(out) :: IDATE(6)
+  character(len=*),intent(in)  :: HDATE
+  integer jerr
+  call parse_date_tuple(jerr, idate, hdate)
+end subroutine GET_DATETUPLE
 !!!_ + io/ibase.F
 !!!_  - FOPEN
 subroutine FOPEN &
