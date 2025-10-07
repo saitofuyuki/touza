@@ -1,6 +1,12 @@
+Release-1.16.8 / 2025-10-07
+===========================
+
+  * nio: introduced igtmeta compatible procedures.
+
 Release-1.16.7 / 2025-10-07
 ===========================
 
+  * An accidental update.
   * nio: (record,miroc) set_fix_date introduced.
 
 Release-1.16.6 / 2025-08-29
