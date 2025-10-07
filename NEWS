@@ -1,12 +1,12 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/08/29 14:21:09 fuyuki NEWS>
+# Time-stamp: <2025/10/07 13:13:31 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
-* Changes in 1.16.6
+* Changes in 1.16.7 from 1.16.2
 ** Import development around elemental procedure with optional arguments.
 Elemental procedures with optional arguments may require careful
 calling, which is not easy to detect at compilation time, on some
@@ -36,6 +36,9 @@ install-switchDATA in Revision 1.16.4 or before, which is always
 called at make install-data (and thus at make install).  The new
 target make install-switch, independent from make install-data, may
 slightly simplify the build process.
+** Some minor updates
+- nio_miroc::set_fix_date() introduced to control CDATE MDATE items
+  in default nio header.
 
 * Changes in 1.16.2
 ** Improvement for MIROC infrastructure replacement
