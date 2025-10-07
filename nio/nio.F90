@@ -1,7 +1,7 @@
 !!!_! nio.F90 - TOUZA/Nio manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 11 2021
-#define TIME_STAMP 'Time-stamp: <2025/08/04 13:13:07 fuyuki nio.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/07 12:53:31 fuyuki nio.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -54,6 +54,7 @@ module TOUZA_Nio
 
   use TOUZA_Nio_record,only: set_default_switch
   use TOUZA_Nio_record,only: set_default_header, get_default_header
+  use TOUZA_Nio_record,only: set_default_date
   use TOUZA_Nio_record,only: nio_record_std, nio_record_def
   use TOUZA_Nio_record,only: nio_check_magic_file
   use TOUZA_Nio_record,only: nio_read_header,    nio_write_header
@@ -169,6 +170,7 @@ module TOUZA_Nio
   public :: nr_init, nr_diag, nr_finalize
   public :: set_default_switch
   public :: set_default_header, get_default_header
+  public :: set_default_date
   public :: nio_record_std, nio_record_def
   public :: nio_check_magic_file
   public :: nio_read_header,    nio_write_header

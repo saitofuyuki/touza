@@ -1,4 +1,10 @@
+Release-1.16.7 / 2025-10-07
+===========================
+
+  * nio: (record,miroc) set_fix_date introduced.
+
 Release-1.16.6 / 2025-08-29
+===========================
 
   * Import development around elemental procedure with optional arguments.
   * emu: (ugg, pi) use ATAN2 instead of ATAN.

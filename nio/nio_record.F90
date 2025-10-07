@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2025/07/16 16:12:15 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/07 12:58:18 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -468,6 +468,7 @@ module TOUZA_Nio_record
   public init, diag, finalize
   public set_default_switch
   public set_default_header, get_default_header
+  public set_default_date
   public nio_record_std, nio_record_def
   public nio_check_magic_file
   public nio_read_header,    nio_write_header
@@ -789,6 +790,7 @@ contains
     use TOUZA_Nio_header,only: hi_ASTR1, hi_AEND1, hi_ASTR2, hi_AEND2, hi_ASTR3, hi_AEND3
     use TOUZA_Nio_header,only: hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL
     use TOUZA_Nio_header,only: hi_STYP,  hi_IOPTN, hi_ROPTN, hi_CSIGN, hi_MSIGN
+    use TOUZA_Nio_header,only: hi_CDATE, hi_MDATE
     use TOUZA_Nio_std,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
@@ -838,6 +840,25 @@ contains
     endif
     return
   end subroutine set_default_header
+
+!!!_   & set_default_date
+  subroutine set_default_date &
+       & (ierr,  &
+       &  cdate, mdate)
+    use TOUZA_Nio_header,only: put_item_date
+    use TOUZA_Nio_header,only: hi_CDATE, hi_MDATE
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: cdate(*), mdate(*)
+    ierr = 0
+    if (present(cdate)) then
+       if (ierr.eq.0) call put_item_date(ierr, head_def, cdate(1:6), hi_CDATE)
+    endif
+    if (present(mdate)) then
+       if (ierr.eq.0) call put_item_date(ierr, head_def, mdate(1:6), hi_MDATE)
+    endif
+    return
+  end subroutine set_default_date
 
 !!!_  - diag subcontracts
   subroutine diag_works(ierr, u, levv)
