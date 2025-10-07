@@ -1,12 +1,20 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/08/22 18:17:58 fuyuki NEWS>
+# Time-stamp: <2025/08/29 14:21:09 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
 
-* Changes in 1.16.5
+* Changes in 1.16.6
+** Import development around elemental procedure with optional arguments.
+Elemental procedures with optional arguments may require careful
+calling, which is not easy to detect at compilation time, on some
+processors.  This revision reconstructs the elemental functions
+(mainly choice() defined in TOUZA_Std_utl) in order to avoid
+unexpected behaviors.  Some small functions are no more elemental,
+thus the invalid usage may be detected at the compilation time.
+
 ** Import revision for miroc7+ils+rainbow on ppp.
 Agent-based communicator manager is improved and cleaned to export
 some procedures to ils, which enables MIROC-Rainbow again on the new
