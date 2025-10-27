@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2025/08/28 15:08:41 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 17:07:57 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -81,6 +81,11 @@ module TOUZA_Ppp_amng
 
   integer,parameter :: agent_unset = -2
   integer,parameter :: agent_stack = -1
+
+  integer,parameter,public :: monitor_none = -1
+  integer,parameter,public :: monitor_def = 0         ! refer verbose level
+  integer,parameter,public :: monitor_simple = 1
+  integer,parameter,public :: monitor_verbose = 1
 !!!_ + type
   type aprop_t
      character(len=lagent) :: name = ' '            ! agent string (aka communicator indicator)
@@ -109,6 +114,8 @@ module TOUZA_Ppp_amng
   integer,save :: lev_verbose = PPP_MSG_LEVEL
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
+
+  integer,save :: lev_monitor = 0    ! default
 #define __MDL__ 'a'
 # define _ERROR(E) (E - ERR_MASK_PPP_AMNG)
 !!!_  - others
@@ -149,6 +156,7 @@ module TOUZA_Ppp_amng
   public mod_agent_order
   public agents_translate
   public switch_agent,  push_agent, pop_agent, top_agent
+  public set_monitoring
   public inquire_agent, is_member
   public query_agent,   source_agent, check_agent, base_agent, clone_agent
   public trace_agent
@@ -157,7 +165,7 @@ module TOUZA_Ppp_amng
 !!!_ + common interfaces
 contains
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, stdv, icomm, nstack, nagent)
+  subroutine init(ierr, u, levv, mode, stdv, icomm, nstack, nagent, levm)
     use TOUZA_Ppp_std,only: control_mode, control_deep, is_first_force
     use TOUZA_Ppp_std,only: choice, ps_init=>init
     use TOUZA_Ppp_std,only: gen_tag
@@ -168,6 +176,7 @@ contains
     integer,intent(in),optional :: icomm
     integer,intent(in),optional :: nstack
     integer,intent(in),optional :: nagent
+    integer,intent(in),optional :: levm    ! monitor level
     integer lv, md, lmd
 
     ierr = 0
@@ -194,6 +203,9 @@ contains
           if (ierr.eq.0) call init_table(ierr, nagent)
           if (ierr.eq.0) call init_stack(ierr, nstack)
           if (ierr.eq.0) call init_world(ierr, u=ulog)
+       endif
+       if (is_first_force(init_counts, mode)) then
+          if (ierr.eq.0) call set_monitoring(ierr, levm)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
@@ -225,6 +237,9 @@ contains
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
           endif
           if (ierr.eq.0) then
+             if (is_msglev_normal(lv)) then
+                call msg('(''monitor level = '', I0)', (/lev_monitor/), __MDL__, utmp)
+             endif
              if (is_msglev_normal(lv)) call diag_batch(ierr, utmp)
           endif
        endif
@@ -678,37 +693,37 @@ contains
 
   end subroutine diag_map_string
 !!!_  & show_stack_simple
-!   subroutine show_stack_simple(ierr, iagent, dir, levv, u)
-!     use TOUZA_Ppp_std,only: choice, msg
-!     implicit none
-!     integer,intent(out) :: ierr
-!     integer,intent(in)  :: iagent
-!     integer,intent(in)  :: dir
-!     integer,intent(in),optional  :: u
-!     integer,intent(in),optional  :: levv
-!     integer lv, utmp
-!     character(len=256) :: buf
-!     integer jt
+  subroutine show_stack_simple(ierr, iagent, dir, levv, u)
+    use TOUZA_Ppp_std,only: choice, msg_mon
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: iagent
+    integer,intent(in)  :: dir
+    integer,intent(in),optional  :: u
+    integer,intent(in),optional  :: levv
+    integer lv, utmp
+    character(len=256) :: buf
+    integer jt
 
-!     ierr = 0
-!     lv = choice(lev_verbose, levv)
-!     utmp = get_logu(u, ulog)
+    ierr = 0
+    lv = choice(lev_verbose, levv)
+    utmp = get_logu(u, ulog)
 
-! 101 format('stack: << ', I0, ':', A)
-! 102 format('stack: <> ', I0, ':', A)
-! 103 format('stack: >> ', I0, ':', A)
-!     if (dir.lt.0) then
-!        jt = astack(jstack + 1)
-!        write(buf, 101) jt, trim(atblp(jt)%name)
-!     else if (dir.eq.0) then
-!        jt = iagent
-!        write(buf, 102) jt, trim(atblp(jt)%name)
-!     else
-!        jt = iagent
-!        write(buf, 103) jt, trim(atblp(jt)%name)
-!     endif
-!     call msg(buf, __MDL__, utmp)
-!   end subroutine show_stack_simple
+101 format('stack: << ', I0, ':', A)
+102 format('stack: <> ', I0, ':', A)
+103 format('stack: >> ', I0, ':', A)
+    if (dir.lt.0) then
+       jt = astack(jstack + 1)
+       write(buf, 101) jt, trim(atblp(jt)%name)
+    else if (dir.eq.0) then
+       jt = iagent
+       write(buf, 102) jt, trim(atblp(jt)%name)
+    else
+       jt = iagent
+       write(buf, 103) jt, trim(atblp(jt)%name)
+    endif
+    call msg_mon(buf, mon_tag(1:lmt), utmp)
+  end subroutine show_stack_simple
 
 !!!_  & show_stack
   subroutine show_stack(ierr, iagent, dir, levv, u)
@@ -790,6 +805,31 @@ contains
     enddo
   end subroutine show_status
 !!!_ + manipulation
+!!!_  - set_monitoring - monitoring level
+  subroutine set_monitoring &
+       & (ierr, levm)
+    use TOUZA_Ppp_std,only: choice
+    use TOUZA_Ppp_std,only: is_msglev_NORMAL, is_msglev_INFO
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: levm
+
+    integer lm, lv
+    ierr = 0
+    lm = choice(monitor_def, levm)
+    lv = lev_verbose
+    if (lm.eq.monitor_def) then
+       if (is_msglev_INFO(lv)) then
+          lm = monitor_verbose
+       else if  (is_msglev_INFO(lv)) then
+          lm = monitor_simple
+       else
+          lm = monitor_none
+       endif
+    endif
+    lev_monitor = lm
+  end subroutine set_monitoring
+
 !!!_  & query_agent() - return agent id from NAME
   integer function query_agent &
        & (name, iaref) &
@@ -963,8 +1003,11 @@ contains
     a = min(+1, max(-1, choice(0, lev)))
     jstack = jstack + a
     if (jstack.lt.0.or.jstack.ge.lstack) ierr = -1
-    ! if (ierr.eq.0) call show_stack_simple(ierr, iagent, a)
-    if (ierr.eq.0) call show_stack(ierr, iagent, a)
+    if (lev_monitor.eq.monitor_simple) then
+       if (ierr.eq.0) call show_stack_simple(ierr, iagent, a)
+    else if (lev_monitor.eq.monitor_verbose) then
+       if (ierr.eq.0) call show_stack(ierr, iagent, a)
+    endif
     if (a.ge.0) then
        if (iagent.lt.0.or.iagent.ge.matbl) ierr = -1
        if (ierr.eq.0) astack(jstack) = iagent
