@@ -1,7 +1,7 @@
 !!!_! std.F90 - touza/std interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2025/08/28 15:18:46 fuyuki std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 14:41:28 fuyuki std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -39,7 +39,7 @@ module TOUZA_Std
   use TOUZA_Std_prc,only: check_real_mantissa
   use TOUZA_Std_prc,only: diag_real_props
 
-  use TOUZA_Std_utl,only: choice, choice_a
+  use TOUZA_Std_utl,only: choice, choice_a, achoice
   use TOUZA_Std_utl,only: set_if_present
   use TOUZA_Std_utl,only: condop, condrep
   use TOUZA_Std_utl,only: chcount
@@ -242,7 +242,7 @@ module TOUZA_Std
   public :: check_real_mantissa
   public :: diag_real_props
 
-  public :: choice, choice_a
+  public :: choice, choice_a, achoice
   public :: set_if_present
   public :: condop, condrep
   public :: chcount
