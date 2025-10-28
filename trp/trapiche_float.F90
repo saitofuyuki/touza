@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2025/08/26 22:21:16 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:33:33 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -563,7 +563,7 @@ contains
   subroutine helper_props_d &
        & (mbits,  xbits,  xbtm, &
        &  refmax, refmin, res)
-    use TOUZA_Trp_std,only: choice, first_bit
+    use TOUZA_Trp_std,only: first_bit
     implicit none
     integer,parameter :: KRFLD=KDBL
     integer,         intent(out)         :: mbits,  xbits, xbtm
@@ -602,7 +602,7 @@ contains
   subroutine helper_props_f &
        & (mbits,  xbits,  xbtm, &
        &  refmax, refmin, res)
-    use TOUZA_Trp_std,only: choice, first_bit
+    use TOUZA_Trp_std,only: first_bit
     implicit none
     integer,parameter :: KRFLD=KFLT
     integer,         intent(out)         :: mbits,  xbits, xbtm
@@ -749,7 +749,6 @@ contains
        & (ierr,  ibagaz, iwork, &
        &  vsrc,  mem,    vmiss, &
        &  mbits, xbits,  ixtop, ixbtm, kcode)
-    use TOUZA_Trp_std, only: first_bit
     use TOUZA_Trp_pack,only: count_packed, pack_store
     implicit none
     integer,parameter :: KIBGZ=KI32, KRFLD=KDBL
@@ -794,8 +793,8 @@ contains
     integer(kind=KIBGZ) :: moffsh, mmskh
     integer(kind=KIBGZ) :: moffsl, mmskl
     integer kpackx, kpackh, kpackl
-    integer(kind=KIBGZ) :: mhpmax, mhpmin, mhnmax, mhnmin
-    integer(kind=KIBGZ) :: mlpmax, mlpmin, mlnmax, mlnmin
+    ! integer(kind=KIBGZ) :: mhpmax, mhpmin, mhnmax, mhnmin
+    ! integer(kind=KIBGZ) :: mlpmax, mlpmin, mlnmax, mlnmin
 
     ierr = 0
 
@@ -809,14 +808,14 @@ contains
     jwl = jwh + mem
     jwe = jwl + mem
 
-    mlpmax = 0
-    mlpmin = 0
-    mlnmax = 0
-    mlnmin = 0
-    mhpmax = 0
-    mhpmin = 0
-    mhnmax = 0
-    mhnmin = 0
+    ! mlpmax = 0
+    ! mlpmin = 0
+    ! mlnmax = 0
+    ! mlnmin = 0
+    ! mhpmax = 0
+    ! mhpmin = 0
+    ! mhnmax = 0
+    ! mhnmin = 0
 
     if (IAND(kcode, KCODE_ROUND).gt.0) then
        if (mbits.ge.lbgz) then
@@ -950,7 +949,6 @@ contains
        & (ierr,  ibagaz, iwork, &
        &  vsrc,  mem,    vmiss, &
        &  mbits, xbits,  ixtop, ixbtm, kcode)
-    use TOUZA_Trp_std, only: first_bit
     use TOUZA_Trp_pack,only: count_packed, pack_store
     implicit none
     integer,parameter :: KIBGZ=KI32, KRFLD=KFLT
@@ -1239,7 +1237,7 @@ contains
   subroutine health_check_d &
        & (ierr, mold, u, levv)
     use TOUZA_Trp_std,only: choice
-    use TOUZA_Trp_std,only: msg, is_msglev, is_msglev_detail
+    use TOUZA_Trp_std,only: msg, is_msglev_detail
     use TOUZA_Trp_std,only: check_real_dnm
     implicit none
     integer,parameter :: KRFLD=KDBL
@@ -1262,7 +1260,7 @@ contains
   subroutine health_check_f &
        & (ierr, mold, u, levv)
     use TOUZA_Trp_std,only: choice
-    use TOUZA_Trp_std,only: msg, is_msglev, is_msglev_detail
+    use TOUZA_Trp_std,only: msg, is_msglev_detail
     use TOUZA_Trp_std,only: check_real_dnm
     implicit none
     integer,parameter :: KRFLD=KFLT
@@ -1355,7 +1353,8 @@ contains
     integer kx
     integer j
 
-    integer ixshh, ixshl, ixshm
+    integer ixshh, ixshm
+    ! integer ixshl
 
     real(kind=KRFLD) :: vmskl, vmskh, vh, vl, vsign
     logical bzerom, bzerop, bneg, bpos
@@ -1370,7 +1369,7 @@ contains
     nbitsl = max(0, mbits - nbitsh)
 
     ixshh = nbitsh + kxone
-    ixshl = nbitsl + kxone
+    ! ixshl = nbitsl + kxone
     ixshm = mbits  + kxone
 
     vmskh = _SET_EXPONENT(vone, ixshh)     ! first (skipped) bit
@@ -1746,7 +1745,8 @@ contains
     integer kx
     integer j
 
-    integer ixshh, ixshl, ixshm
+    integer ixshh
+    ! integer ixshl, ixshm
 
     real(kind=KRFLD) :: vmskl, vmskh, vh, vl, vsign, vt
     logical bzerom, bzerop, bneg, bpos
@@ -1761,8 +1761,8 @@ contains
     nbitsl = max(0, mbits - nbitsh)
 
     ixshh = nbitsh + kxone
-    ixshl = nbitsl + kxone
-    ixshm = mbits  + kxone
+    ! ixshl = nbitsl + kxone
+    ! ixshm = mbits  + kxone
 
     vmskh = _SET_EXPONENT(vone, ixshh)     ! first (skipped) bit
     vmskl = _SET_EXPONENT(vone, nbitsl + kxone)
@@ -2238,7 +2238,6 @@ contains
        &  nbitsh, nbitsl, xbits, &
        &  kxbgn,  kxdnm,  kxlbd,  kxubd,  kx0sp, kxspc, &
        &  kcode)
-    use TOUZA_Trp_std,only: condop
     implicit none
     integer,parameter :: KIBGZ=KI32
 
@@ -2590,7 +2589,8 @@ contains
   subroutine recortar_i &
        & (ierr,  moffs, nbeff, iwork, &
        &  ictlg, mem,   ixubd, ixufl, nbits)
-    use TOUZA_Trp_std,only: first_bit, show_pattern
+    use TOUZA_Trp_std,only: first_bit
+    ! use TOUZA_Trp_std,only: show_pattern
     implicit none
     integer,parameter :: KIBGZ=KI32
     integer,            intent(out)   :: ierr
@@ -2773,7 +2773,8 @@ contains
   subroutine diluir_di &
        & (ierr,   vdst,  ictlg, iwork, &
        &  ibagaz, mem,   vskp,  kcode)
-    use TOUZA_Trp_std, only: choice, show_pattern
+    use TOUZA_Trp_std, only: choice
+    ! use TOUZA_Trp_std, only: show_pattern
     use TOUZA_Trp_pack,only: pack_restore, count_packed
     implicit none
     integer,parameter :: KIBGZ=KI32, KRFLD=KDBL
@@ -3054,7 +3055,8 @@ contains
   subroutine diluir_fi &
        & (ierr,   vdst,  ictlg, iwork, &
        &  ibagaz, mem,   vskp,  kcode)
-    use TOUZA_Trp_std, only: choice, show_pattern
+    use TOUZA_Trp_std, only: choice
+    ! use TOUZA_Trp_std, only: show_pattern
     use TOUZA_Trp_pack,only: pack_restore, count_packed
     implicit none
     integer,parameter :: KIBGZ=KI32, KRFLD=KFLT
@@ -3770,7 +3772,7 @@ contains
 
     integer utmp
 
-    integer kid
+    ! integer kid
     integer ixdnm,  ixubd,  ixlbd
     integer mbgzx,  mbgzh,  mbgzl
     integer xbits,  ebitsx, kpackx
@@ -3839,7 +3841,7 @@ contains
     if (ierr.eq.0) call unparse_relleno(ierr, tpackl, kpackl)
 
     if (ierr.eq.0) then
-       kid = ibagaz(KB_ID)
+       ! kid = ibagaz(KB_ID)
        nbitsa = count_msbits(ebitsh, ksign)
        mbgzx = count_packed(xbits,  ncnz, kstkh)
        mbgzh = count_packed(nbitsa, ncnz, kstkh)
@@ -3894,7 +3896,7 @@ contains
   subroutine show_bagazo_patterns_di &
        & (ierr, ibagaz, vsrc, mem, u)
     use TOUZA_Trp_std,only: choice
-    use TOUZA_Trp_pack,only: count_packed, pack_store, show_packed
+    use TOUZA_Trp_pack,only: count_packed, show_packed
     implicit none
     integer,parameter :: KIBGZ=KI32, KRFLD=KDBL
     integer,            intent(out)         :: ierr
@@ -4510,12 +4512,13 @@ contains
 #endif
     real(kind=KRTGT),parameter :: zero  = 0.0_KRTGT
 
-    integer nt
+    ! integer nt
     character(len=128) :: fi
     character(len=128) :: ti
     character(len=128) :: BA, BB, BC
     character(len=128) :: sa, sb, sc
-    real(kind=KRTGT) :: ea, er
+    real(kind=KRTGT) :: ea
+    ! real(kind=KRTGT) :: er
     integer ja, jb, jc, jx, jo, lb
     integer utmp
 
@@ -4535,15 +4538,15 @@ contains
 1013 format(A, ': ', 4x,           A, 2x, A)
 1014 format(A, ': ', 4x,           A, 2x, A)
 1015 format(A, ': ', 1x, L1, I2.2, A, 2x, A)
-    nt = 0
+    ! nt = 0
     call binstr_float(BA, va)
     call binstr_float(BB, vb)
     ea = abs(va - vb)
-    if (va.eq.zero) then
-       er = ea
-    else
-       er = ea / abs(va)
-    endif
+    ! if (va.eq.zero) then
+    !    er = ea
+    ! else
+    !    er = ea / abs(va)
+    ! endif
 
     ja = SCAN(BA, '+-') - 1
     jb = SCAN(BB, '+-') - 1

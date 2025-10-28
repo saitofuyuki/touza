@@ -1,7 +1,7 @@
 !!!_! calendar_matsiro.F90 - touza/calendar: (sample) matsiro interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/16 15:58:33 fuyuki calendar_matsiro.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:27:52 fuyuki calendar_matsiro.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -18,7 +18,6 @@
 #include "touza_std.h"
 !!!_@ calendar_matsiro - calendar/matsiro compatible procedures
 module TOUZA_Cal_matsiro
-  use TOUZA_Cal,only: KRC
   use TOUZA_Cal,only: p_grego_i, p_grego_l, p_ideal
 !!!_ = declaration
   implicit none

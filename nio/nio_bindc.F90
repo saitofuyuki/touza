@@ -1,7 +1,7 @@
 !!!_! nio_bindc.F90 - TOUZA/Nio bind(c) interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2023
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:38:42 fuyuki nio_bindc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 08:34:17 fuyuki nio_bindc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023, 2024, 2025
@@ -197,9 +197,6 @@ contains
   integer(kind=C_INT) function tnb_file_is_opened &
        & (path) BIND(C) result(handle)
     ! return non-negative if gtool-format.
-    use TOUZA_Nio_record,only: nio_check_magic_file
-    use TOUZA_Nio_std,only: new_unit, search_from_last, sus_close, sus_open
-    use TOUZA_Nio_std,only: is_eof_ss, trace_err
     use TOUZA_Nio_cache,only: cache_is_registered
     implicit none
     character(len=1,kind=C_CHAR),intent(in) :: path(*)
@@ -272,7 +269,6 @@ contains
   integer(kind=C_INT) function tnb_group_co_idx &
        & (handle, cid) BIND(C) result(serial)
     use TOUZA_Nio_cache,only: cache_group_cserial
-    use TOUZA_Nio_header,only: litem
     implicit none
     integer(kind=C_INT),intent(in),value :: handle
     integer(kind=C_INT),intent(in),value :: cid
@@ -306,7 +302,6 @@ contains
   integer(kind=C_INT) function tnb_group_co_range &
        & (jbgn, jend, handle, cid) BIND(C) result(ierr)
     use TOUZA_Nio_cache,only: cache_group_coor_range
-    use TOUZA_Nio_header,only: litem
     implicit none
     integer(kind=C_INT),intent(out)      :: jbgn
     integer(kind=C_INT),intent(out)      :: jend
@@ -507,7 +502,7 @@ contains
 !!!_  - tnb_rec_time()
   integer(kind=C_INT) function tnb_rec_time &
        & (time, handle, vid, rec) BIND(C) result(ierr)
-    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_header,only: litem
     use TOUZA_Nio_cache,only: cache_rec_time
     implicit none
     character(len=1,kind=C_CHAR),intent(out)      :: time(*)
@@ -533,7 +528,7 @@ contains
 !!!_  - tnb_rec_date()
   integer(kind=C_INT) function tnb_rec_date &
        & (time, handle, vid, rec) BIND(C) result(ierr)
-    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_header,only: litem
     use TOUZA_Nio_cache,only: cache_rec_date
     implicit none
     character(len=1,kind=C_CHAR),intent(out)      :: time(*)
@@ -643,7 +638,7 @@ contains
 !!!_  - tnb_get_attr_int()
   integer(kind=C_INT) function tnb_get_attr_int &
        & (attr, item, handle, vid, rec) BIND(C) result(ierr)
-    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_header,only: litem
     use TOUZA_Nio_cache,only: cache_get_attr
     implicit none
     integer(kind=C_INT),         intent(out)      :: attr
@@ -667,7 +662,7 @@ contains
 !!!_  - tnb_get_attr_float()
   integer(kind=C_INT) function tnb_get_attr_float &
        & (attr, item, handle, vid, rec) BIND(C) result(ierr)
-    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_header,only: litem
     use TOUZA_Nio_cache,only: cache_get_attr
     implicit none
     real(kind=C_FLOAT),          intent(out)      :: attr
@@ -691,7 +686,7 @@ contains
 !!!_  - tnb_get_attr_double()
   integer(kind=C_INT) function tnb_get_attr_double &
        & (attr, item, handle, vid, rec) BIND(C) result(ierr)
-    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_header,only: litem
     use TOUZA_Nio_cache,only: cache_get_attr
     implicit none
     real(kind=C_DOUBLE),         intent(out)      :: attr
@@ -988,7 +983,7 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
-    use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
+    use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal
     use TOUZA_Nio_record,only: nr_diag=>diag
     use TOUZA_Nio_cache, only: nc_diag=>diag
     implicit none

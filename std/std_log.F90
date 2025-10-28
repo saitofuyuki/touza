@@ -1,7 +1,7 @@
 !!!_! std_log.F90 - touza/std simple logging helper
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 27 2011
-#define TIME_STAMP 'Time-stamp: <2025/08/13 11:29:36 fuyuki std_log.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 08:12:24 fuyuki std_log.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -558,10 +558,10 @@ contains
 
   subroutine msg_fa &
        & (fmt, vv, tag, u, to_flush)
-    use TOUZA_Std_prc,only: KFLT
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
     character(len=*),intent(in)          :: fmt
-    real(kind=KFLT), intent(in)          :: vv(:)
+    real(kind=KTGT), intent(in)          :: vv(:)
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     logical,         intent(in),optional :: to_flush
@@ -575,10 +575,10 @@ contains
 
   subroutine msg_da &
        & (fmt, vv, tag, u, to_flush)
-    use TOUZA_Std_prc,only: KDBL
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
     character(len=*),intent(in)          :: fmt
-    real(kind=KDBL), intent(in)          :: vv(:)
+    real(kind=KTGT), intent(in)          :: vv(:)
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     logical,         intent(in),optional :: to_flush
@@ -611,7 +611,6 @@ contains
 
   subroutine msg_aa &
        & (fmt, vv, tag, u, to_flush)
-    use TOUZA_Std_prc,only: KDBL
     implicit none
     character(len=*),intent(in)          :: fmt
     character(len=*),intent(in)          :: vv(:)
@@ -646,10 +645,10 @@ contains
 
   subroutine msg_fs &
        & (fmt, v, tag, u, to_flush)
-    use TOUZA_Std_prc,only: KFLT
+    use TOUZA_Std_prc,only: KTGT=>KFLT
     implicit none
     character(len=*),intent(in)          :: fmt
-    real(kind=KFLT), intent(in)          :: v
+    real(kind=KTGT), intent(in)          :: v
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     logical,         intent(in),optional :: to_flush
@@ -663,10 +662,10 @@ contains
 
   subroutine msg_ds &
        & (fmt, v, tag, u, to_flush)
-    use TOUZA_Std_prc,only: KDBL
+    use TOUZA_Std_prc,only: KTGT=>KDBL
     implicit none
     character(len=*),intent(in)          :: fmt
-    real(kind=KDBL), intent(in)          :: v
+    real(kind=KTGT), intent(in)          :: v
     character(len=*),intent(in)          :: tag
     integer,         intent(in),optional :: u
     logical,         intent(in),optional :: to_flush
@@ -951,7 +950,6 @@ contains
   logical function is_error_match &
        & (ierr, jcode, mdl) &
        & result(b)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(in)          :: ierr
     integer,intent(in)          :: jcode
@@ -1081,7 +1079,6 @@ contains
 
   subroutine test_error_code &
        & (egrp, ecode)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(in) :: egrp, ecode
     integer ierr

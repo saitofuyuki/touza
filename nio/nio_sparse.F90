@@ -1,7 +1,7 @@
 !!!_! nio_sparse.F90 - TOUZA/Nio sparse matrix interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Apr 1 2023
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:35:38 fuyuki nio_sparse.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 10:34:18 fuyuki nio_sparse.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023-2025
@@ -501,7 +501,6 @@ contains
     use TOUZA_Nio_record,only: parse_header_size, is_match_format
     use TOUZA_Nio_record,only: parse_header_base
     use TOUZA_Nio_record,only: ptx_parse_array, nio_read_data
-    use TOUZA_Nio_record,only: PROP_PTX_COLC
     use TOUZA_Nio_record,only: pre_review, post_review, is_review_leave, ptx_row_size
     implicit none
     integer,parameter :: KARG=KDBL
@@ -569,7 +568,6 @@ contains
     use TOUZA_Nio_record,only: parse_header_size, is_match_format
     use TOUZA_Nio_record,only: parse_header_base
     use TOUZA_Nio_record,only: ptx_parse_array, nio_read_data
-    use TOUZA_Nio_record,only: PROP_PTX_COLC
     use TOUZA_Nio_record,only: pre_review, post_review, is_review_leave, ptx_row_size
     implicit none
     integer,parameter :: KARG=KFLT
@@ -637,7 +635,6 @@ contains
     use TOUZA_Nio_record,only: parse_header_size, is_match_format
     use TOUZA_Nio_record,only: parse_header_base
     use TOUZA_Nio_record,only: ptx_parse_array, nio_read_data
-    use TOUZA_Nio_record,only: PROP_PTX_COLC
     use TOUZA_Nio_record,only: pre_review, post_review, is_review_leave, ptx_row_size
     implicit none
     integer,parameter :: KARG=KI32
@@ -702,7 +699,7 @@ contains
        & (ierr,  popts, &
        &  u,     krect, kaxs, laxs, colc, flag)
     use TOUZA_Nio_std,only: choice, msg
-    use TOUZA_Nio_record,only: ptx_review, parse_header_base, ptx_row_size
+    use TOUZA_Nio_record,only: ptx_review, ptx_row_size
     use TOUZA_Nio_record,only: PROP_PTX_COLC
     implicit none
     integer,         intent(out)         :: ierr
@@ -772,8 +769,8 @@ contains
     use TOUZA_Nio_record,only: ptx_read_data
     use TOUZA_Nio_record,only: ptx_gen_ccvec, ptx_pack_data
     use TOUZA_Nio_record,only: is_match_format, is_review_leave
-    use TOUZA_Nio_record,only: PROP_PTX_DATA, PROP_PTX_MCOL
-    use TOUZA_Nio_std,only: choice, msg
+    use TOUZA_Nio_record,only: PROP_PTX_DATA
+    use TOUZA_Nio_std,only: msg
     implicit none
     integer,parameter :: KARG=KDBL
     integer,         intent(out)         :: ierr
@@ -843,8 +840,8 @@ contains
     use TOUZA_Nio_record,only: ptx_read_data
     use TOUZA_Nio_record,only: ptx_gen_ccvec, ptx_pack_data
     use TOUZA_Nio_record,only: is_match_format, is_review_leave
-    use TOUZA_Nio_record,only: PROP_PTX_DATA, PROP_PTX_MCOL
-    use TOUZA_Nio_std,only: choice, msg
+    use TOUZA_Nio_record,only: PROP_PTX_DATA
+    use TOUZA_Nio_std,only: msg
     implicit none
     integer,parameter :: KARG=KFLT
     integer,         intent(out)         :: ierr
@@ -914,8 +911,8 @@ contains
     use TOUZA_Nio_record,only: ptx_read_data
     use TOUZA_Nio_record,only: ptx_gen_ccvec, ptx_pack_data
     use TOUZA_Nio_record,only: is_match_format, is_review_leave
-    use TOUZA_Nio_record,only: PROP_PTX_DATA, PROP_PTX_MCOL
-    use TOUZA_Nio_std,only: choice, msg
+    use TOUZA_Nio_record,only: PROP_PTX_DATA
+    use TOUZA_Nio_std,only: msg
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)         :: ierr
@@ -982,7 +979,6 @@ contains
   subroutine nio_store_csr_d &
        & (ierr, d, cofs,  &
        &  hd,   u, krect, cname, kopts)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_record,only: laxs
     use TOUZA_Nio_record,only: nio_write_data, nio_write_header
     use TOUZA_Nio_record,only: ptx_def_options, ptx_write_data, ptx_expand_data
@@ -1058,7 +1054,6 @@ contains
   subroutine nio_store_csr_f &
        & (ierr, d, cofs,  &
        &  hd,   u, krect, cname, kopts)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_record,only: laxs
     use TOUZA_Nio_record,only: nio_write_data, nio_write_header
     use TOUZA_Nio_record,only: ptx_def_options, ptx_write_data, ptx_expand_data
@@ -1134,7 +1129,6 @@ contains
   subroutine nio_store_csr_i &
        & (ierr, d, cofs,  &
        &  hd,   u, krect, cname, kopts)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_record,only: laxs
     use TOUZA_Nio_record,only: nio_write_data, nio_write_header
     use TOUZA_Nio_record,only: ptx_def_options, ptx_write_data, ptx_expand_data
@@ -1216,10 +1210,9 @@ contains
     use TOUZA_Nio_record,only: laxs, rev_pos_leave
     use TOUZA_Nio_record,only: parse_header_base
     use TOUZA_Nio_record,only: ptx_read_data
-    use TOUZA_Nio_record,only: ptx_gen_ccvec, ptx_pack_data
     use TOUZA_Nio_record,only: is_match_format, is_review_leave
     use TOUZA_Nio_record,only: PROP_PTX_DATA, PROP_PTX_MCOL
-    use TOUZA_Nio_std,only: choice, msg
+    use TOUZA_Nio_std,only: msg
     implicit none
     integer,parameter :: KARG=KDBL
     integer,         intent(out)         :: ierr
@@ -1294,10 +1287,9 @@ contains
     use TOUZA_Nio_record,only: laxs, rev_pos_leave
     use TOUZA_Nio_record,only: parse_header_base
     use TOUZA_Nio_record,only: ptx_read_data
-    use TOUZA_Nio_record,only: ptx_gen_ccvec, ptx_pack_data
     use TOUZA_Nio_record,only: is_match_format, is_review_leave
     use TOUZA_Nio_record,only: PROP_PTX_DATA, PROP_PTX_MCOL
-    use TOUZA_Nio_std,only: choice, msg
+    use TOUZA_Nio_std,only: msg
     implicit none
     integer,parameter :: KARG=KFLT
     integer,         intent(out)         :: ierr
@@ -1372,10 +1364,9 @@ contains
     use TOUZA_Nio_record,only: laxs, rev_pos_leave
     use TOUZA_Nio_record,only: parse_header_base
     use TOUZA_Nio_record,only: ptx_read_data
-    use TOUZA_Nio_record,only: ptx_gen_ccvec, ptx_pack_data
     use TOUZA_Nio_record,only: is_match_format, is_review_leave
     use TOUZA_Nio_record,only: PROP_PTX_DATA, PROP_PTX_MCOL
-    use TOUZA_Nio_std,only: choice, msg
+    use TOUZA_Nio_std,only: msg
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)         :: ierr
@@ -1449,10 +1440,9 @@ contains
   subroutine nio_store_qjds_d &
        & (ierr, d, ridx,  posh,  nvec, &
        &  hd,   u, krect, cname, kopts)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_record,only: laxs
     use TOUZA_Nio_record,only: nio_write_data, nio_write_header
-    use TOUZA_Nio_record,only: ptx_def_options, ptx_write_data, ptx_expand_data
+    use TOUZA_Nio_record,only: ptx_def_options, ptx_write_data
     use TOUZA_Nio_record,only: lopts_ptx
     use TOUZA_Nio_record,only: ptx_row_size
     use TOUZA_Nio_record,only: parse_header_base, is_match_format
@@ -1534,10 +1524,9 @@ contains
   subroutine nio_store_qjds_f &
        & (ierr, d, ridx,  posh,  nvec, &
        &  hd,   u, krect, cname, kopts)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_record,only: laxs
     use TOUZA_Nio_record,only: nio_write_data, nio_write_header
-    use TOUZA_Nio_record,only: ptx_def_options, ptx_write_data, ptx_expand_data
+    use TOUZA_Nio_record,only: ptx_def_options, ptx_write_data
     use TOUZA_Nio_record,only: lopts_ptx
     use TOUZA_Nio_record,only: ptx_row_size
     use TOUZA_Nio_record,only: parse_header_base, is_match_format
@@ -1619,10 +1608,9 @@ contains
   subroutine nio_store_qjds_i &
        & (ierr, d, ridx,  posh,  nvec, &
        &  hd,   u, krect, cname, kopts)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_record,only: laxs
     use TOUZA_Nio_record,only: nio_write_data, nio_write_header
-    use TOUZA_Nio_record,only: ptx_def_options, ptx_write_data, ptx_expand_data
+    use TOUZA_Nio_record,only: ptx_def_options, ptx_write_data
     use TOUZA_Nio_record,only: lopts_ptx
     use TOUZA_Nio_record,only: ptx_row_size
     use TOUZA_Nio_record,only: parse_header_base, is_match_format
@@ -2042,9 +2030,9 @@ contains
     integer jw, jv
     integer ji, jm, jo
     integer ni, nm, no
-    real(kind=KARG) :: vu
+    ! real(kind=KARG) :: vu
 
-    vu = real(vmiss, kind=KARG)
+    ! vu = real(vmiss, kind=KARG)
     call ptx_set_loops(ni, nm, no, xmems, mx, popts)
 
     posh(0:mcol) = 0
@@ -2092,9 +2080,9 @@ contains
     integer jw, jv
     integer ji, jm, jo
     integer ni, nm, no
-    real(kind=KARG) :: vu
+    ! real(kind=KARG) :: vu
 
-    vu = real(vmiss, kind=KARG)
+    ! vu = real(vmiss, kind=KARG)
     call ptx_set_loops(ni, nm, no, xmems, mx, popts)
 
     posh(0:mcol) = 0
@@ -2142,9 +2130,9 @@ contains
     integer jw, jv
     integer ji, jm, jo
     integer ni, nm, no
-    integer(kind=KARG) :: vu
+    ! integer(kind=KARG) :: vu
 
-    vu = int(vmiss, kind=KARG)
+    ! vu = int(vmiss, kind=KARG)
     call ptx_set_loops(ni, nm, no, xmems, mx, popts)
 
     posh(0:mcol) = 0
@@ -2198,12 +2186,12 @@ contains
   subroutine tweak_header_coor &
        & (ierr,  popts, hdest, &
        &  ncols, kfmt,  kaxs,  laxs, cname)
-    use TOUZA_Nio_record,only: ptx_def_options, inquire_header_coor
+    use TOUZA_Nio_record,only: inquire_header_coor
     use TOUZA_Nio_record,only: search_null_coor,shift_header_coor
-    use TOUZA_Nio_record,only: put_header_cprop,get_header_cprop
+    use TOUZA_Nio_record,only: put_header_cprop
     use TOUZA_Nio_record,only: ptx_set_shape, is_match_format
     use TOUZA_Nio_record,only: PROP_PTX_COLC
-    use TOUZA_Nio_header,only: litem, nitem
+    use TOUZA_Nio_header,only: litem
     use TOUZA_Nio_std,only: choice_a
     implicit none
     integer,         intent(out)         :: ierr
@@ -2306,9 +2294,9 @@ program test_nio_sparse
 contains
 !!!_ + test_read_sparse
   subroutine test_read_sparse(ierr, jarg)
-    use TOUZA_Std,only: KDBL, KFLT
+    use TOUZA_Std,only: KDBL
     use TOUZA_Std,only: new_unit
-    use TOUZA_Std,only: sus_open, is_eof_ss, is_error_match
+    use TOUZA_Std,only: sus_open, is_error_match
     use TOUZA_Nio_header
     use TOUZA_Nio_record,only: nio_read_header
     use TOUZA_Nio_record,only: nio_check_magic_file, nio_skip_records

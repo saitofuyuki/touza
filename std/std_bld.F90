@@ -1,7 +1,7 @@
 !!!_! std_bld.F90 - touza/std build environments
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 27 2021
-#define TIME_STAMP 'Time-stamp: <2024/02/25 22:12:23 fuyuki std_bld.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:01:36 fuyuki std_bld.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -129,8 +129,7 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: choice
-    ! use TOUZA_Std_utl,only: utl_diag=>diag
-    use TOUZA_Std_log,only: log_finalize=>finalize, msg_mdl
+    use TOUZA_Std_log,only: log_finalize=>finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -163,7 +162,6 @@ contains
 !!!_  & check_all - check and set environments
   subroutine check_all &
        & (ierr, ulog)
-    use TOUZA_Std_utl, only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: ulog

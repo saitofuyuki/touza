@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2025/10/07 12:58:18 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 08:55:53 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -790,7 +790,7 @@ contains
     use TOUZA_Nio_header,only: hi_ASTR1, hi_AEND1, hi_ASTR2, hi_AEND2, hi_ASTR3, hi_AEND3
     use TOUZA_Nio_header,only: hi_MISS,  hi_DMIN,  hi_DMAX,  hi_DIVS,  hi_DIVL
     use TOUZA_Nio_header,only: hi_STYP,  hi_IOPTN, hi_ROPTN, hi_CSIGN, hi_MSIGN
-    use TOUZA_Nio_header,only: hi_CDATE, hi_MDATE
+    ! use TOUZA_Nio_header,only: hi_CDATE, hi_MDATE
     use TOUZA_Nio_std,only: KDBL
     implicit none
     integer,         intent(out)         :: ierr
@@ -876,24 +876,24 @@ contains
     else
        n = -1
     endif
-    if (is_msglev_info(levv)) then
-       call msg('(''work:i = '', I0)', n, __MDL__, u)
+    if (is_msglev_info(lv)) then
+       call msg('(''work:i = '', I0)', n, __MDL__, utmp)
     endif
     if (allocated(workf)) then
        n = size(workf)
     else
        n = -1
     endif
-    if (is_msglev_info(levv)) then
-       call msg('(''work:f = '', I0)', n, __MDL__, u)
+    if (is_msglev_info(lv)) then
+       call msg('(''work:f = '', I0)', n, __MDL__, utmp)
     endif
     if (allocated(workd)) then
        n = size(workd)
     else
        n = -1
     endif
-    if (is_msglev_info(levv)) then
-       call msg('(''work:d = '', I0)', n, __MDL__, u)
+    if (is_msglev_info(lv)) then
+       call msg('(''work:d = '', I0)', n, __MDL__, utmp)
     endif
     return
   end subroutine diag_works
@@ -1116,7 +1116,7 @@ contains
        & (ierr, &
        &  head,  krect, u, pos, whence)
     use TOUZA_Nio_std,   only: KI32, KI64, KIOFS, is_eof_ss
-    use TOUZA_Nio_std,   only: WHENCE_ABS, sus_read_isep, sus_read_lsep, sus_skip_irec, sus_rseek, sus_eswap
+    use TOUZA_Nio_std,   only: WHENCE_ABS, sus_read_isep, sus_read_lsep, sus_skip_irec, sus_rseek
     use TOUZA_Nio_std,   only: conv_b2strm
     use TOUZA_Nio_std,   only: sus_pos_r2abs, sus_getpos
     use TOUZA_Nio_header,only: nitem, litem
@@ -1245,7 +1245,7 @@ contains
   subroutine nio_read_data_d &
        & (ierr, &
        &  d,    ld, head, krect, u, kopts, start, count)
-    use TOUZA_Nio_std,only: debug_status
+    ! use TOUZA_Nio_std,only: debug_status
     implicit none
     integer,parameter :: KARG=KDBL
     integer,         intent(out) :: ierr
@@ -1849,8 +1849,6 @@ contains
   subroutine nio_review_record &
        & (ierr,  nprop, nmask,  ndata, &
        &  head,  u,     krect,  flag)
-    use TOUZA_Nio_std,only: KIOFS, sus_getpos, sus_rseek, WHENCE_ABS
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_header,only: litem, hi_DFMT, get_item
     implicit none
     integer,         intent(out) :: ierr
@@ -2074,8 +2072,8 @@ contains
 !!!_  & nio_skip_records - forward/backward gtool-record skip
   subroutine nio_skip_records &
        & (ierr, n, u, nskip, head, krect)
-    use TOUZA_Nio_std,   only: WHENCE_CURRENT, sus_skip_irec, sus_skip_lrec, choice
-    use TOUZA_Nio_header,only: nitem, litem, hi_DFMT, get_item
+    use TOUZA_Nio_std,   only: choice
+    use TOUZA_Nio_header,only: nitem, litem
     implicit none
     integer,         intent(out)          :: ierr
     integer,         intent(in)           :: n
@@ -2139,8 +2137,8 @@ contains
 !!!_  & nio_skip_data - forward one data record
   subroutine nio_skip_data &
        & (ierr, u, head, krect)
-    use TOUZA_Nio_std,only: KIOFS, sus_rseek, WHENCE_ABS, WHENCE_CURRENT
-    use TOUZA_Nio_std,only: sus_skip_irec, sus_skip_lrec
+    use TOUZA_Nio_std,only: WHENCE_CURRENT
+    use TOUZA_Nio_std,only: sus_skip_lrec
     ! use TOUZA_Nio_header,only: &
     !      & nitem, litem, hi_DFMT, get_item
     implicit none
@@ -2173,7 +2171,6 @@ contains
 !!!_  & nio_skip_data_irec - forward one data record with irec-type record
   subroutine nio_skip_data_irec &
        & (ierr, kfmt, kaxs, krect, u)
-    use TOUZA_Nio_std,only: KIOFS, sus_rseek, WHENCE_ABS, WHENCE_CURRENT
     use TOUZA_Nio_std,only: sus_read_irec
     use TOUZA_Trp,only: count_packed
     implicit none
@@ -2316,9 +2313,8 @@ contains
        & (ierr, u, krect, limtry)
     use TOUZA_Nio_std,   only: choice
     use TOUZA_Nio_std,   only: sus_skip_irec, sus_skip_lrec, KIOFS
-    use TOUZA_Nio_std,   only: sus_rseek, WHENCE_CURRENT, WHENCE_ABS
+    use TOUZA_Nio_std,   only: sus_rseek, WHENCE_ABS
     use TOUZA_Nio_std,   only: sus_getpos
-    use TOUZA_Nio_header,only: nitem, litem, hi_DFMT, get_item
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in)          :: u
@@ -2381,7 +2377,7 @@ contains
   subroutine get_data_urc_d &
        & (ierr, &
        &  d, nh, nk, u, krect, vmiss, imiss, kfmt)
-    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,            intent(out) :: ierr
@@ -2494,7 +2490,6 @@ contains
   subroutine put_data_urc_d &
        & (ierr, &
        &  d, nh, nk, u, krect, vmiss, imiss, kfmt)
-    use TOUZA_Trp,only: count_packed, pack_restore
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,            intent(out) :: ierr
@@ -2980,7 +2975,6 @@ contains
        &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
     use TOUZA_Trp,only: count_packed, pack_restore, pack_restore_dunp
     use TOUZA_Trp,only: mask_to_idxl, gen_bfc_idxl, npropd
-    use TOUZA_Nio_std,only: KIOFS
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
@@ -3123,7 +3117,6 @@ contains
        &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
     use TOUZA_Trp,only: count_packed, pack_restore, pack_restore_dunp
     use TOUZA_Trp,only: mask_to_idxl, gen_bfc_idxl, npropd
-    use TOUZA_Nio_std,only: KIOFS
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KDBL
     integer,         intent(out) :: ierr
@@ -3266,7 +3259,6 @@ contains
        &  d, nd, u, krect, vmiss, kfmt, mh, mk, bes, nr)
     use TOUZA_Trp,only: count_packed, pack_restore, pack_restore_dunp
     use TOUZA_Trp,only: mask_to_idxl, gen_bfc_idxl, npropd
-    use TOUZA_Nio_std,only: KIOFS
     implicit none
     integer,parameter :: KARG=KI32, KISRC=KI32, KRSRC=KDBL
     integer,           intent(out) :: ierr
@@ -3532,7 +3524,7 @@ contains
   subroutine mtn_review &
        & (ierr,  nmask, ndata, &
        &  head,  u,     krect, flag)
-    use TOUZA_Nio_std,only: KIOFS, sus_getpos, sus_rseek, WHENCE_ABS
+    use TOUZA_Nio_std,only: KIOFS
     use TOUZA_Nio_std,only: choice
     use TOUZA_Trp,    only: count_packed
     implicit none
@@ -3577,8 +3569,7 @@ contains
        & (ierr, &
        &  d, mfull, &
        &  u, krect, vmiss, kfmt)
-    use TOUZA_Trp,only: count_packed, pack_restore
-    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Trp,only: count_packed
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32
     integer,         intent(out) :: ierr
@@ -3617,8 +3608,7 @@ contains
        & (ierr, &
        &  d, mfull, &
        &  u, krect, vmiss, kfmt)
-    use TOUZA_Trp,only: count_packed, pack_restore
-    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Trp,only: count_packed
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32
     integer,         intent(out) :: ierr
@@ -3657,8 +3647,7 @@ contains
        & (ierr, &
        &  d, mfull, &
        &  u, krect, vmiss, kfmt)
-    use TOUZA_Trp,only: count_packed, pack_restore
-    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Trp,only: count_packed
     implicit none
     integer,parameter :: KARG=KI32, KISRC=KI32
     integer,           intent(out) :: ierr
@@ -3751,13 +3740,13 @@ contains
 
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
-    integer kpack
+    ! integer kpack
 
     ! file position MUST be after header record
 
     ierr = 0
     ncom = count_packed(1, mfull, mold)
-    kpack = legacy_packing(1, mfull)
+    ! kpack = legacy_packing(1, mfull)
 
     if (ierr.eq.0) call put_data_record(ierr, mpack, u, krect)
     if (ierr.eq.0) call put_data_record(ierr, bmask, ncom,  u, krect)
@@ -3793,13 +3782,13 @@ contains
 
     integer(kind=KISRC),parameter :: mold = 0_KISRC
     integer ncom
-    integer kpack
+    ! integer kpack
 
     ! file position MUST be after header record
 
     ierr = 0
     ncom = count_packed(1, mfull, mold)
-    kpack = legacy_packing(1, mfull)
+    ! kpack = legacy_packing(1, mfull)
 
     if (ierr.eq.0) call put_data_record(ierr, mpack, u, krect)
     if (ierr.eq.0) call put_data_record(ierr, bmask, ncom,  u, krect)
@@ -3823,8 +3812,7 @@ contains
        & (ierr, &
        &  d, ldata, &
        &  u, krect, vmiss, kfmt, mfull, bes, nr)
-    use TOUZA_Trp,only: count_packed, pack_restore
-    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Trp,only: count_packed
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32
     integer,         intent(out) :: ierr
@@ -3879,8 +3867,7 @@ contains
        & (ierr, &
        &  d, ldata, &
        &  u, krect, vmiss, kfmt, mfull, bes, nr)
-    use TOUZA_Trp,only: count_packed, pack_restore
-    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Trp,only: count_packed
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32
     integer,         intent(out) :: ierr
@@ -3935,8 +3922,7 @@ contains
        & (ierr, &
        &  d, ldata, &
        &  u, krect, vmiss, kfmt, mfull, bes, nr)
-    use TOUZA_Trp,only: count_packed, pack_restore
-    use TOUZA_Trp,only: mask_to_idxl
+    use TOUZA_Trp,only: count_packed
     implicit none
     integer,parameter :: KARG=KI32, KISRC=KI32
     integer,           intent(out) :: ierr
@@ -3993,7 +3979,7 @@ contains
        & (ierr,  &
        &  d,     ldata, &
        &  u,     krect, vmiss, kfmt, mpack, mfull, bes, nr)
-    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: count_packed
     use TOUZA_Trp,only: mask_to_idxl
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32
@@ -4057,7 +4043,7 @@ contains
        & (ierr,  &
        &  d,     ldata, &
        &  u,     krect, vmiss, kfmt, mpack, mfull, bes, nr)
-    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: count_packed
     use TOUZA_Trp,only: mask_to_idxl
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32
@@ -4121,7 +4107,7 @@ contains
        & (ierr,  &
        &  d,     ldata, &
        &  u,     krect, vmiss, kfmt, mpack, mfull, bes, nr)
-    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: count_packed
     use TOUZA_Trp,only: mask_to_idxl
     implicit none
     integer,parameter :: KARG=KI32, KISRC=KI32
@@ -4200,14 +4186,14 @@ contains
     integer,            intent(in)  :: mfull
 
     integer,parameter :: mold = 0_KISRC
-    integer kpack
+    ! integer kpack
     integer ncom
 
     ! file position MUST be after [MTn physical data size] record
 
     ierr = 0
     ncom = count_packed(1, mfull, mold)
-    kpack = legacy_unpacking(1, mfull)
+    ! kpack = legacy_unpacking(1, mfull)
     if (ierr.eq.0) call get_data_record(ierr, bmask, ncom, u, krect)
     if (ierr.eq.0) then
        select case(kfmt)
@@ -4239,14 +4225,14 @@ contains
     integer,            intent(in)  :: mfull
 
     integer,parameter :: mold = 0_KISRC
-    integer kpack
+    ! integer kpack
     integer ncom
 
     ! file position MUST be after [MTn physical data size] record
 
     ierr = 0
     ncom = count_packed(1, mfull, mold)
-    kpack = legacy_unpacking(1, mfull)
+    ! kpack = legacy_unpacking(1, mfull)
     if (ierr.eq.0) call get_data_record(ierr, bmask, ncom, u, krect)
     if (ierr.eq.0) then
        select case(kfmt)
@@ -4278,14 +4264,14 @@ contains
     integer,            intent(in)  :: mfull
 
     integer,parameter :: mold = 0_KISRC
-    integer kpack
+    ! integer kpack
     integer ncom
 
     ! file position MUST be after [MTn physical data size] record
 
     ierr = 0
     ncom = count_packed(1, mfull, mold)
-    kpack = legacy_unpacking(1, mfull)
+    ! kpack = legacy_unpacking(1, mfull)
     if (ierr.eq.0) call get_data_record(ierr, bmask, ncom, u, krect)
     if (ierr.eq.0) then
        select case(kfmt)
@@ -4306,7 +4292,7 @@ contains
   subroutine review_mtn &
        & (ierr,  nprop, nmask, ndata, &
        &  head,  u,     krect, flag)
-    use TOUZA_Nio_std,only: KIOFS, sus_getpos, sus_rseek, WHENCE_ABS
+    use TOUZA_Nio_std,only: KIOFS
     use TOUZA_Nio_std,only: choice
     use TOUZA_Trp,    only: count_packed
     implicit none
@@ -4507,8 +4493,7 @@ contains
        & (ierr,  &
        &  d,     n,   u, krect, vmiss, &
        &  kopts, bes, nr)
-    use TOUZA_Trp,only: retrieve_nbgz, retrieve_ncnz, retrieve_extra
-    use TOUZA_Trp,only: count_packed, suggest_filling
+    use TOUZA_Trp,only: suggest_filling
     use TOUZA_Nio_std,only: set_runl_loop
     use TOUZA_Trp,only: KB_HEAD
     implicit none
@@ -4526,7 +4511,8 @@ contains
     integer(kind=KISRC) :: icom(0:n-1)
     real(kind=KRSRC)    :: buf(n)
     integer(kind=KISRC),parameter :: mold = 0_KISRC
-    integer ncom, na
+    integer na
+    ! integer ncom
     logical sub
     integer kpack
     integer jv, mv, nv, mp
@@ -4575,7 +4561,7 @@ contains
                   &  vmiss, def_decode_trapiche, kopts, napp=na, kapp=icom)
           endif
           if (ierr.eq.0) then
-             ncom = na - 2
+             ! ncom = na - 2
              mp = icom(0)
              kpack = icom(1)
              kpack = suggest_filling(1, mp, kcode=def_decode_trapiche, kfill=kpack)
@@ -4608,8 +4594,7 @@ contains
        & (ierr,  &
        &  d,     n,   u, krect, vmiss, &
        &  kopts, bes, nr)
-    use TOUZA_Trp,only: retrieve_nbgz, retrieve_ncnz, retrieve_extra
-    use TOUZA_Trp,only: count_packed, suggest_filling
+    use TOUZA_Trp,only: suggest_filling
     use TOUZA_Nio_std,only: set_runl_loop
     use TOUZA_Trp,only: KB_HEAD
     implicit none
@@ -4627,7 +4612,8 @@ contains
     integer(kind=KISRC) :: icom(0:n-1)
     real(kind=KRSRC)    :: buf(n)
     integer(kind=KISRC),parameter :: mold = 0_KISRC
-    integer ncom, na
+    integer na
+    ! integer ncom
     logical sub
     integer kpack
     integer jv, mv, nv, mp
@@ -4675,7 +4661,7 @@ contains
                   &  vmiss, def_decode_trapiche, kopts, napp=na, kapp=icom)
           endif
           if (ierr.eq.0) then
-             ncom = na - 2
+             ! ncom = na - 2
              mp = icom(0)
              kpack = icom(1)
              kpack = suggest_filling(1, mp, kcode=def_decode_trapiche, kfill=kpack)
@@ -5052,7 +5038,7 @@ contains
        & (ierr,  &
        &  d,     n,     u,     krect, pre,  post,  &
        &  vmiss, mbits, xbits, xtop,  xbtm, kcode, kapp)
-    use TOUZA_Trp,only: count_packed, encode_alloc, retrieve_nbgz
+    use TOUZA_Trp,only: encode_alloc, retrieve_nbgz
     use TOUZA_Trp,only: KB_HEAD, guardar_extra
     use TOUZA_Trp,only: show_bagazo_props
     implicit none
@@ -5115,7 +5101,7 @@ contains
        & (ierr,  &
        &  d,     n,     u,     krect, pre,  post,  &
        &  vmiss, mbits, xbits, xtop,  xbtm, kcode, kapp)
-    use TOUZA_Trp,only: count_packed, encode_alloc, retrieve_nbgz
+    use TOUZA_Trp,only: encode_alloc, retrieve_nbgz
     use TOUZA_Trp,only: KB_HEAD, guardar_extra
     use TOUZA_Trp,only: show_bagazo_props
     implicit none
@@ -5181,7 +5167,6 @@ contains
        & (ierr, &
        &  d,     m,     n,    u,    krect,  sub, &
        &  vmiss, kcode, kopts,napp, kapp)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
     use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props
     implicit none
@@ -5266,7 +5251,6 @@ contains
        & (ierr, &
        &  d,     m,     n,     u,    krect,  sub, &
        &  vmiss, kcode, kopts, napp, kapp)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
     use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props
     implicit none
@@ -5351,7 +5335,6 @@ contains
        &  d,      m,     n,    u,    krect, sub, &
        &  ibagaz, runl,  jrpos, &
        &  vmiss,  kcode, kopts)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
     use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props
     implicit none
@@ -5461,7 +5444,6 @@ contains
        &  d,      m,     n,    u,    krect, sub, &
        &  ibagaz, runl,  jrpos, &
        &  vmiss,  kcode, kopts)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
     use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props
     implicit none
@@ -5577,10 +5559,9 @@ contains
        &  d,      m,     n,    u,    krect, sub, &
        &  ibagaz, runl,  jrpos, &
        &  vmiss,  kcode, kopts,napp, icom)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
     use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props, suggest_filling
-    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
     integer,            intent(out)   :: ierr
@@ -5605,7 +5586,8 @@ contains
     logical cont
     integer jm, jc, mm
     integer rectx
-    integer kpack, ncom
+    integer kpack
+    ! integer ncom
     character(len=*),parameter :: proc = 'mrt:g'
 #define _WORK workd
 
@@ -5659,7 +5641,7 @@ contains
     endif
 
     if (ierr.eq.0) then
-       ncom = na - 2
+       ! ncom = na - 2
        kpack = icom(1)
        kpack = suggest_filling(1, mp, kcode=def_decode_trapiche, kfill=kpack)
     endif
@@ -5706,10 +5688,9 @@ contains
        &  d,      m,     n,    u,    krect, sub, &
        &  ibagaz, runl,  jrpos, &
        &  vmiss,  kcode, kopts,napp, icom)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Trp,only: decode_alloc, retrieve_nbgz, retrieve_ncnz, retrieve_extra
     use TOUZA_Trp,only: KB_HEAD,      show_bagazo_props, suggest_filling
-    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32, KRSRC=KFLT
     integer,            intent(out)   :: ierr
@@ -5734,7 +5715,8 @@ contains
     logical cont
     integer jm, jc, mm
     integer rectx
-    integer kpack, ncom
+    integer kpack
+    ! integer ncom
     character(len=*),parameter :: proc = 'mrt:g'
     real(kind=KRSRC) :: rmiss
 #define _WORK workf
@@ -5791,7 +5773,7 @@ contains
     endif
 
     if (ierr.eq.0) then
-       ncom = na - 2
+       ! ncom = na - 2
        kpack = icom(1)
        kpack = suggest_filling(1, mp, kcode=def_decode_trapiche, kfill=kpack)
     endif
@@ -6040,7 +6022,6 @@ contains
   end subroutine parse_urt_options
 !!!_  & show_urt_options
   subroutine show_urt_options(ierr, kopts, tag, u)
-    use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: kopts(*)
@@ -6074,7 +6055,7 @@ contains
   subroutine review_ptx &
        & (ierr,  nprop, nmask, ndata, &
        &  head,  u,     krect, flag)
-    use TOUZA_Nio_std,only: KIOFS, sus_getpos, sus_rseek, WHENCE_ABS
+    use TOUZA_Nio_std,only: KIOFS
     use TOUZA_Nio_std,only: choice
     use TOUZA_Trp,    only: count_packed
     implicit none
@@ -6123,7 +6104,6 @@ contains
   subroutine ptx_write_array_d &
        & (ierr, &
        &  d, n, u, krect, vmiss, kaxs, kfmt, kopts)
-    use TOUZA_Trp,only: pack_store
     implicit none
     integer,parameter :: KARG=KDBL
     integer,parameter :: KISRC=KI32
@@ -6170,7 +6150,6 @@ contains
   subroutine ptx_write_array_f &
        & (ierr, &
        &  d, n, u, krect, vmiss, kaxs, kfmt, kopts)
-    use TOUZA_Trp,only: pack_store
     implicit none
     integer,parameter :: KARG=KFLT
     integer,parameter :: KISRC=KI32
@@ -6217,7 +6196,6 @@ contains
   subroutine ptx_write_array_i &
        & (ierr, &
        &  d, n, u, krect, vmiss, kaxs, kfmt, kopts)
-    use TOUZA_Trp,only: pack_store
     implicit none
     integer,parameter :: KARG=KI32
     integer,parameter :: KISRC=KI32
@@ -6265,8 +6243,6 @@ contains
 !!!_  & ptx_gen_ccvec
   subroutine ptx_gen_ccvec_d &
        & (ierr, popts, ccvec, nbase, d, xmems, mx, vmiss)
-    use TOUZA_Trp,only: count_packed
-    use TOUZA_Trp,only: first_bit
     implicit none
     integer,parameter :: KARG=KDBL
     integer,         intent(out)   :: ierr
@@ -6278,7 +6254,8 @@ contains
     integer,         intent(in)    :: mx
     real(kind=KRMIS),intent(in)    :: vmiss
 
-    integer  jbase, jbgn,  jend
+    integer  jbase, jbgn
+    ! integer  jend
     integer  jint,  jout
     integer  nint,  ntgt,  nmem, nout, npack
     integer  j
@@ -6297,7 +6274,7 @@ contains
           jout = jbase / nint
           jint = mod(jbase, nint)
           jbgn = jout * ntgt + jint
-          jend = jbgn + ntgt
+          ! jend = jbgn + ntgt
           c = 0
           do j = nmem - 1, 0, -1
              jf = jbgn + nint * j
@@ -6314,8 +6291,6 @@ contains
   end subroutine ptx_gen_ccvec_d
   subroutine ptx_gen_ccvec_f &
        & (ierr, popts, ccvec, nbase, d, xmems, mx, vmiss)
-    use TOUZA_Trp,only: count_packed
-    use TOUZA_Trp,only: first_bit
     implicit none
     integer,parameter :: KARG=KFLT
     integer,         intent(out)   :: ierr
@@ -6327,7 +6302,8 @@ contains
     integer,         intent(in)    :: mx
     real(kind=KRMIS),intent(in)    :: vmiss
 
-    integer  jbase, jbgn,  jend
+    integer  jbase, jbgn
+    ! integer  jend
     integer  jint,  jout
     integer  nint,  ntgt,  nmem, nout, npack
     integer  j
@@ -6346,7 +6322,7 @@ contains
           jout = jbase / nint
           jint = mod(jbase, nint)
           jbgn = jout * ntgt + jint
-          jend = jbgn + ntgt
+          ! jend = jbgn + ntgt
           c = 0
           do j = nmem - 1, 0, -1
              jf = jbgn + nint * j
@@ -6363,8 +6339,6 @@ contains
   end subroutine ptx_gen_ccvec_f
   subroutine ptx_gen_ccvec_i &
        & (ierr, popts, ccvec, nbase, d, xmems, mx, vmiss)
-    use TOUZA_Trp,only: count_packed
-    use TOUZA_Trp,only: first_bit
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out)   :: ierr
@@ -6376,7 +6350,8 @@ contains
     integer,           intent(in)    :: mx
     real(kind=KRMIS),  intent(in)    :: vmiss
 
-    integer  jbase, jbgn,  jend
+    integer  jbase, jbgn
+    ! integer  jend
     integer  jint,  jout
     integer  nint,  ntgt,  nmem, nout, npack
     integer  j
@@ -6395,7 +6370,7 @@ contains
           jout = jbase / nint
           jint = mod(jbase, nint)
           jbgn = jout * ntgt + jint
-          jend = jbgn + ntgt
+          ! jend = jbgn + ntgt
           c = 0
           do j = nmem - 1, 0, -1
              jf = jbgn + nint * j
@@ -6820,7 +6795,6 @@ contains
        & (ierr, popts, ccvec, nbase, &
        &  u,    krect)
     use TOUZA_Trp,only: count_packed, pack_store
-    use TOUZA_Nio_std,only: choice
     implicit none
     integer,parameter :: KISRC=KI32
     integer,intent(out)   :: ierr
@@ -6960,7 +6934,6 @@ contains
        & (ierr, &
        &  d,    ldata, &
        &  u,    krect, vmiss, kaxs,  kfmt, bes, nr)
-    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KDBL
     integer,parameter :: KISRC=KI32
@@ -7025,7 +6998,6 @@ contains
        & (ierr, &
        &  d,    ldata, &
        &  u,    krect, vmiss, kaxs,  kfmt, bes, nr)
-    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KFLT
     integer,parameter :: KISRC=KI32
@@ -7090,7 +7062,6 @@ contains
        & (ierr, &
        &  d,    ldata, &
        &  u,    krect, vmiss, kaxs,  kfmt, bes, nr)
-    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KI32
     integer,parameter :: KISRC=KI32
@@ -7154,7 +7125,7 @@ contains
   subroutine ptx_review &
        & (ierr,  popts, &
        &  u,     krect, flag)
-    use TOUZA_Nio_std,only: KIOFS, sus_getpos, sus_rseek, WHENCE_ABS
+    use TOUZA_Nio_std,only: KIOFS
     use TOUZA_Nio_std,only: choice
     implicit none
     integer,parameter :: KISRC=KI32
@@ -7193,7 +7164,6 @@ contains
        & (ierr,  &
        &  ccvec, nbase, dpack, npack, &
        &  popts, u,     krect, kfmt,  bes, nr)
-    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KDBL
     integer,         intent(out) :: ierr
@@ -7265,7 +7235,6 @@ contains
        & (ierr,  &
        &  ccvec, nbase, dpack, npack, &
        &  popts, u,     krect, kfmt,  bes, nr)
-    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KFLT
     integer,         intent(out) :: ierr
@@ -7336,7 +7305,6 @@ contains
        & (ierr,  &
        &  ccvec, nbase, dpack, npack, &
        &  popts, u,     krect, kfmt,  bes, nr)
-    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KI32
     integer,           intent(out) :: ierr
@@ -7469,7 +7437,8 @@ contains
     integer,intent(in)    :: nr
     integer,intent(in)    :: opts(*)
     integer mbes(3, 1:nr)
-    integer mbgn, mend, mtgt
+    integer mbgn, mend
+    ! integer mtgt
     integer ml,   mh,   meff
     integer stp(1:nr), itr(1:nr), idx(1:nr)
     integer rr
@@ -7494,7 +7463,7 @@ contains
        ! write(*, *) 'mbes', cmem
        ! write(*, *) mbes(:, 1:nr)
 
-       mtgt = bes(3, cmem)
+       ! mtgt = bes(3, cmem)
        mbgn = bes(1, cmem)
        mend = bes(2, cmem)
 
@@ -7686,7 +7655,6 @@ contains
 
 !!!_  & ptx_def_options
   subroutine ptx_def_options(ierr, popts, uopts)
-    use TOUZA_Nio_std,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: popts(*)
@@ -7714,7 +7682,6 @@ contains
   end subroutine ptx_def_options
 !!!_  & ptx_parse_options
   subroutine ptx_parse_options(ierr, nbase, popts, kaxs, lx, uopts)
-    use TOUZA_Nio_std,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: nbase
@@ -8133,10 +8100,9 @@ contains
 !!!_  & get_record_prop - get sequential record properties (byte-order and separator size)
   subroutine get_record_prop &
        & (ierr, krect, u)
-    use TOUZA_Nio_std, only: KI32, KI64, KIOFS, is_eof_ss
+    use TOUZA_Nio_std, only: KI32, KIOFS, is_eof_ss
     use TOUZA_Nio_std, only: WHENCE_ABS, sus_read_isep, sus_rseek, sus_eswap
     use TOUZA_Nio_std, only: sus_getpos
-    use TOUZA_Nio_header,only: nitem, litem
     implicit none
     integer,intent(out) :: ierr
     integer,intent(out) :: krect
@@ -8248,7 +8214,7 @@ contains
 !!!_  & set_wrecord_prop - set sequential record properties to write (byte-order and separator size)
   subroutine set_wrecord_prop &
        & (ierr, krect, ufile, kendi)
-    use TOUZA_Nio_std,only: choice, check_bodr_unit, KIOFS, kendi_mem, kendi_file, endian_OTHER
+    use TOUZA_Nio_std,only: check_bodr_unit, KIOFS, kendi_mem, kendi_file, endian_OTHER
     use TOUZA_Nio_std,only: sus_getpos, msg, is_msglev_DEBUG
     implicit none
     integer,intent(out)         :: ierr
@@ -8324,7 +8290,7 @@ contains
   subroutine put_header &
        & (ierr, &
        &  head, u, krect)
-    use TOUZA_Nio_std,   only: KIOFS, sus_write_lrec, sus_write_irec
+    use TOUZA_Nio_std,   only: sus_write_lrec, sus_write_irec
     use TOUZA_Nio_header,only: nitem
     implicit none
     integer,            intent(out) :: ierr
@@ -8758,7 +8724,6 @@ contains
   subroutine get_data_drecord_list_f &
        & (ierr, &
        &  d,  list, nd, u, krect, md, sub)
-    use TOUZA_Nio_std,only: sus_list_read_irec
     implicit none
     integer,parameter :: KARG=KFLT, KRSRC=KDBL
     integer,           intent(out)            :: ierr
@@ -8790,7 +8755,6 @@ contains
   subroutine get_data_drecord_list_i &
        & (ierr, &
        &  d,  list, nd, u, krect, md, sub)
-    use TOUZA_Nio_std,only: sus_list_read_irec
     implicit none
     integer,parameter :: KARG=KI32, KRSRC=KDBL
     integer,           intent(out)            :: ierr
@@ -8853,7 +8817,6 @@ contains
   subroutine get_data_frecord_list_d &
        & (ierr, &
        &  d,  list, nd, u, krect, md, sub)
-    use TOUZA_Nio_std,only: sus_list_read_irec
     implicit none
     integer,parameter :: KARG=KDBL, KRSRC=KFLT
     integer,           intent(out)            :: ierr
@@ -8885,7 +8848,6 @@ contains
   subroutine get_data_frecord_list_i &
        & (ierr, &
        &  d,  list, nd, u, krect, md, sub)
-    use TOUZA_Nio_std,only: sus_list_read_irec
     implicit none
     integer,parameter :: KARG=KI32, KRSRC=KFLT
     integer,           intent(out)            :: ierr
@@ -8948,7 +8910,6 @@ contains
   subroutine get_data_irecord_list_f &
        & (ierr, &
        &  d,  list, nd, u, krect, md, sub)
-    use TOUZA_Nio_std,only: sus_list_read_irec
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32
     integer,           intent(out)            :: ierr
@@ -8980,7 +8941,6 @@ contains
   subroutine get_data_irecord_list_d &
        & (ierr, &
        &  d,  list, nd, u, krect, md, sub)
-    use TOUZA_Nio_std,only: sus_list_read_irec
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32
     integer,           intent(out)            :: ierr
@@ -9855,10 +9815,10 @@ contains
        & (ierr, kfmt, kaxs, vmiss, head)
     use TOUZA_Nio_header,only: litem
     use TOUZA_Nio_header,only: hi_DFMT,  hi_MISS
-    use TOUZA_Nio_header,only: hi_ASTR1, hi_ASTR2, hi_ASTR3
-    use TOUZA_Nio_header,only: hi_AEND1, hi_AEND2, hi_AEND3
+    ! use TOUZA_Nio_header,only: hi_ASTR1, hi_ASTR2, hi_ASTR3
+    ! use TOUZA_Nio_header,only: hi_AEND1, hi_AEND2, hi_AEND3
     use TOUZA_Nio_header,only: get_item
-    use TOUZA_Nio_std,only: KDBL, KFLT, KI32, KI64
+    ! use TOUZA_Nio_std,only: KDBL, KFLT, KI32, KI64
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: kfmt
@@ -10017,7 +9977,6 @@ contains
 !!!_  & parse_record_fmt - parse format
   subroutine parse_record_fmt &
        & (ierr, kfmt, str)
-    use TOUZA_Nio_std,only: KDBL, KFLT, KI32, KI64
     use TOUZA_Nio_std,only: parse_number
     implicit none
     integer,         intent(out) :: ierr
@@ -10388,7 +10347,7 @@ contains
   subroutine mask_encode_di &
        & (ierr, mb,   icom,   b, &
        &  d,    n,    vmiss,  kpack)
-    use TOUZA_Trp,only: count_packed, pack_store
+    use TOUZA_Trp,only: pack_store
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32
     integer,            intent(out) :: ierr
@@ -10423,7 +10382,7 @@ contains
   subroutine mask_encode_fi &
        & (ierr, mb,   icom,   b, &
        &  d,    n,    vmiss,  kpack)
-    use TOUZA_Trp,only: count_packed, pack_store
+    use TOUZA_Trp,only: pack_store
     implicit none
     integer,parameter :: KARG=KFLT, KISRC=KI32
     integer,            intent(out) :: ierr
@@ -10460,7 +10419,7 @@ contains
   subroutine mask_encode_ii &
        & (ierr, mb,   icom,   b, &
        &  d,    n,    vmiss,  kpack)
-    use TOUZA_Trp,only: count_packed, pack_store
+    use TOUZA_Trp,only: pack_store
     implicit none
     integer,parameter :: KARG=KI32, KISRC=KI32
     integer,            intent(out) :: ierr
@@ -10501,7 +10460,7 @@ contains
        & (ierr,  d,     n,  &
        &  b,     icom,  &
        &  vmiss, kpack)
-    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KDBL, KRSRC=KDBL, KISRC=KI32
     integer,            intent(out) :: ierr
@@ -10536,7 +10495,7 @@ contains
        & (ierr,  d,     n,  &
        &  b,     icom,  &
        &  vmiss, kpack)
-    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KFLT, KRSRC=KFLT, KISRC=KI32
     integer,            intent(out) :: ierr
@@ -10571,7 +10530,7 @@ contains
        & (ierr,  d,     n,  &
        &  b,     icom,  &
        &  vmiss, kpack)
-    use TOUZA_Trp,only: count_packed, pack_restore
+    use TOUZA_Trp,only: pack_restore
     implicit none
     integer,parameter :: KARG=KI32, KISRC=KI32
     integer,            intent(out) :: ierr
@@ -11290,7 +11249,7 @@ contains
 !!!_  & pre_review
   subroutine pre_review &
        & (ierr, apini, u, flag)
-    use TOUZA_Nio_std,only: sus_getpos, WHENCE_ABS, KIOFS, choice
+    use TOUZA_Nio_std,only: sus_getpos, WHENCE_ABS, KIOFS
     implicit none
     integer,            intent(out)         :: ierr
     integer(kind=KIOFS),intent(out)         :: apini
@@ -11304,7 +11263,7 @@ contains
 !!!_  & post_review
   subroutine post_review &
        & (ierr, apini, u, flag)
-    use TOUZA_Nio_std,only: sus_rseek, WHENCE_ABS, KIOFS, choice
+    use TOUZA_Nio_std,only: sus_rseek, WHENCE_ABS, KIOFS
     implicit none
     integer,            intent(out)         :: ierr
     integer(kind=KIOFS),intent(in)          :: apini
@@ -11329,7 +11288,7 @@ contains
   logical function is_match_format &
        & (kfmt, st, pr) &
        & result(b)
-    use TOUZA_Nio_std,only: choice, choice_a, upcase
+    use TOUZA_Nio_std,only: choice_a, upcase
     implicit none
     integer,         intent(in)          :: kfmt
     character(len=*),intent(in),optional :: st   ! storage   U P M
@@ -11386,7 +11345,7 @@ contains
   subroutine nio_count_defined &
        & (ierr, ends,  &
        &  head, krect, u, cid, flag)
-    use TOUZA_Nio_std,only: sus_rseek, WHENCE_ABS, KIOFS
+    ! use TOUZA_Nio_std,only: sus_rseek, WHENCE_ABS
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: ends(0:*) ! displacement array
@@ -11858,7 +11817,7 @@ contains
   subroutine test_auto_record &
        & (ierr, jarg)
     use TOUZA_std,only: is_error_match
-    use TOUZA_Nio_std,only: KDBL,  KIOFS
+    use TOUZA_Nio_std,only: KDBL
     use TOUZA_Nio_std,only: sus_open, sus_close, sus_write_irec, sus_write_lrec
     use TOUZA_Nio_header,only: nitem, litem, hi_ITEM, put_item, get_item
     use TOUZA_Nio_record
@@ -12099,7 +12058,7 @@ contains
 !!!_ + test_read_backward - read external gtool file (backward)
   subroutine test_read_backward &
        & (ierr, jarg)
-    use TOUZA_Std,    only: get_param, upcase
+    use TOUZA_Std,    only: get_param
     use TOUZA_Nio_std,only: KBUF=>KDBL
     use TOUZA_Nio_header
     use TOUZA_Std_sus,only: sus_open, sus_close, sus_rseek, WHENCE_ABS
@@ -12171,10 +12130,10 @@ contains
 !!!_ + test_read_skip - read external gtool file (skip)
   subroutine test_read_skip &
        & (ierr, jarg)
-    use TOUZA_Std,    only: get_param, upcase
+    use TOUZA_Std,    only: get_param
     use TOUZA_Nio_std,only: KBUF=>KDBL
     use TOUZA_Nio_header
-    use TOUZA_Std_sus,only: sus_open, sus_close, sus_rseek, WHENCE_ABS
+    use TOUZA_Std_sus,only: sus_open, sus_close
     implicit none
     integer,intent(out)   :: ierr
     integer,intent(inout) :: jarg
@@ -12261,7 +12220,6 @@ contains
 !!!_ + test_encoding - write extreme data
   subroutine test_encoding &
        & (ierr, jarg)
-    use TOUZA_Std,only: endian_LITTLE, endian_BIG
     use TOUZA_Nio_std,only: KBUF=>KDBL
     use TOUZA_Std_sus,only: sus_open,  sus_close
     use TOUZA_Nio_header
@@ -12583,12 +12541,11 @@ contains
 !!!_ + test_batch_read_slice
   subroutine test_batch_read_slice &
        & (ierr, jarg)
-    use TOUZA_Std,    only: get_param, upcase, get_option
+    use TOUZA_Std,    only: get_param, get_option
     use TOUZA_Nio_std,only: KBUF=>KDBL
     use TOUZA_Nio_std,only: is_error_match
-    use TOUZA_Nio_std,only: is_eof_ss
     use TOUZA_Nio_header
-    use TOUZA_Std_sus,only: sus_open, sus_close, sus_rseek, WHENCE_ABS
+    use TOUZA_Std_sus,only: sus_open, sus_close
     implicit none
     integer,intent(out)   :: ierr
     integer,intent(inout) :: jarg
@@ -12668,12 +12625,10 @@ contains
 !!!_ + test_batch_read_props
   subroutine test_batch_read_props &
        & (ierr, jarg)
-    use TOUZA_Std,    only: get_param, upcase, get_option
-    use TOUZA_Nio_std,only: KBUF=>KDBL
+    use TOUZA_Std,    only: get_param, get_option
     use TOUZA_Nio_std,only: is_error_match
-    use TOUZA_Nio_std,only: is_eof_ss
     use TOUZA_Nio_header
-    use TOUZA_Std_sus,only: sus_open, sus_close, sus_rseek, WHENCE_ABS
+    use TOUZA_Std_sus,only: sus_open, sus_close
     use TOUZA_Nio_record,only: REC_DEFAULT
     implicit none
     integer,intent(out)   :: ierr
@@ -12739,7 +12694,6 @@ contains
 !!!_ + test_batch_byte_order - write extreme data
   subroutine test_batch_byte_order &
        & (ierr, jarg)
-    use TOUZA_Std,only: endian_LITTLE, endian_BIG
     use TOUZA_Nio_std,only: KBUF=>KDBL
     use TOUZA_Std_sus,only: sus_open,  sus_close
     use TOUZA_Nio_header
@@ -12827,7 +12781,6 @@ end program test_nio_record
        & (ierr, &
        &  d,    ldata, subv, ends, u, krect, mfull, kaxs, citer, check)
     use TOUZA_Trp,only: count_packed, pack_restore
-    use TOUZA_Trp,only: mask_to_idxl
     use TOUZA_Nio_std,only: choice
     implicit none
     integer,parameter :: KARG=KDBL, KISRC=KI32, KRSRC=KDBL
@@ -13253,9 +13206,8 @@ end program test_nio_record
        & (ierr, jarg)
     use TOUZA_Nio_std,only: KBUF=>KDBL
     use TOUZA_Nio_std,only: is_error_match
-    use TOUZA_Nio_std,only: is_eof_ss
     use TOUZA_Nio_header
-    use TOUZA_Std_sus,only: sus_open, sus_close, sus_rseek, WHENCE_ABS
+    use TOUZA_Std_sus,only: sus_open, sus_close
     use TOUZA_Nio_record,only: REC_DEFAULT
     implicit none
     integer,intent(out)   :: ierr

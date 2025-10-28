@@ -1,7 +1,7 @@
 !!!_! calendar_ils.F90 - touza/calendar: (sample) ILS interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 8 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/16 16:00:09 fuyuki calendar_ils.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 08:26:37 fuyuki calendar_ils.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -451,7 +451,6 @@ contains
 
   subroutine test_ci_month &
        & (ierr, cal_o, lmax, dmon)
-    use TOUZA_Cal,only: conv_csec_acalendar, xreal
     implicit none
     integer,intent(out) :: ierr
     integer,intent(in)  :: cal_o(6)

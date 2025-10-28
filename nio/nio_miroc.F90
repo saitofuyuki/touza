@@ -1,7 +1,7 @@
 !!!_! nio_miroc.F90 - TOUZA/Nio MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 8 2021
-#define TIME_STAMP 'Time-stamp: <2025/10/07 20:38:32 fuyuki nio_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 10:55:36 fuyuki nio_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -264,7 +264,7 @@ contains
   end subroutine nio_tell
 !!!_  - nio_seek - set file position (ciof_seek emulation)
   subroutine nio_seek(ierr, u, jpos)
-    use TOUZA_Nio_std,only: KI64, WHENCE_ABS, sus_rseek, sus_eswap
+    use TOUZA_Nio_std,only: KI64, WHENCE_ABS, sus_rseek
     implicit none
     integer,           intent(out) :: ierr
     integer,           intent(in)  :: u
@@ -303,7 +303,7 @@ end module TOUZA_Nio_Miroc
 !!!_* /nonmodule/ interfaces
 !!!_ + init_common
 subroutine init_common(u)
-  use TOUZA_Std,only: choice
+  use TOUZA_Nio_std,only: choice
   use TOUZA_Nio_miroc,only: init, diag
   implicit none
   integer,intent(in),optional :: u
@@ -400,7 +400,7 @@ end subroutine GTZRDZ
 !!!_  & GFPEEK - peek meta data in GTOOL3 record
 subroutine GFPEEK &
      & (HEAD, IEOD, IFILE)
-  use TOUZA_Std,only: is_error_match
+  use TOUZA_Nio_std,only: is_error_match
   use TOUZA_Nio,only: nio_read_header,nitem
   use TOUZA_Nio_miroc,only: NCC, NDC
   use TOUZA_Nio_std,only: KIOFS,WHENCE_ABS,sus_rseek
@@ -711,8 +711,10 @@ end subroutine FINQUX
 !!!_  - FNUINI
 subroutine FNUINI &
      & (IFILMN, IFILMX)
-  use TOUZA_Std,only: kucat_black, set_category_bound
-  use TOUZA_Nio_miroc,only: categ_nio, categ_normal, init_common
+  use TOUZA_Nio_std,only: kucat_black, set_category_bound
+  ! reserved
+  ! use TOUZA_Nio_miroc,only: categ_nio, categ_normal, init_common
+  use TOUZA_Nio_miroc,only: categ_normal, init_common
   implicit none
   integer jerr
   integer,intent(in)  :: IFILMN, IFILMX
@@ -728,7 +730,7 @@ end subroutine FNUINI
 !!!_  - FNEWU
 subroutine FNEWU &
      & (OFOUND, IFILE,  HFORM, IFILED)
-  use TOUZA_Std,only: search_from_last, search_from_head, new_unit
+  use TOUZA_Nio_std,only: search_from_last, search_from_head, new_unit
   use TOUZA_Nio_miroc,only: categ_nio, categ_normal
   implicit none
   integer,         intent(out) :: IFILE

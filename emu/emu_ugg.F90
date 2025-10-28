@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2025/08/28 14:04:33 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 11:19:17 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024, 2025
@@ -864,8 +864,7 @@ contains
 
   subroutine diag_pi_d(ierr, mold, u)
     use TOUZA_Std,only: KTGT=>KDBL
-    use TOUZA_Std,only: choice
-    use TOUZA_Std,only: is_msglev_NORMAL, msg_grp
+    use TOUZA_Std,only: msg_grp
     implicit none
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(in)          :: mold
@@ -933,7 +932,6 @@ contains
 
   subroutine diag_trig_d(ierr, tag, f, p, c, z, u)
     use TOUZA_Std,only: KTGT=>KDBL
-    use TOUZA_Std,only: choice
     use TOUZA_Std,only: msg_grp
     implicit none
     integer,         intent(out)         :: ierr
@@ -1307,14 +1305,12 @@ contains
     real(kind=KTGT),parameter :: ZERO = 0.0_KTGT
     real(kind=KTGT),parameter :: ONE  = 1.0_KTGT
 
-    real(kind=KTGT) :: PI
     real(kind=KTGT) :: width, o, sp, wf
     logical bp
     integer j, lw
 
     ierr = 0
 
-    pi = pi_(ONE)
     o = choice(ZERO, org)
     sp = span_longitude(round)
     wf = choice(ZERO, wnml)
@@ -1371,12 +1367,9 @@ contains
     real(kind=KTGT),parameter :: ONE  = 1.0_KTGT
     real(kind=KTGT),parameter :: HALF = 0.5_KTGT
 
-    real(kind=KTGT) :: PI
     real(kind=KTGT) :: wc
     logical bp
     integer m
-
-    PI = pi_(ONE)
 
     ierr = 0
     bp = choice(.FALSE., plain)
@@ -1468,7 +1461,7 @@ contains
   subroutine check_div_longitude_d &
        & (ierr,  longi, div, boundary, longi_c, longi_b, base, &
        &  round, tag,   u,   tol)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
+    use TOUZA_Std,only: KTGT=>KDBL
     use TOUZA_Std,only: msg_grp
     implicit none
     integer,         intent(out)         :: ierr
@@ -1750,7 +1743,7 @@ contains
 !!!_  & div_latitude
   subroutine div_latitude_d &
        & (ierr, lati, div, boundary, lati_c, lati_b, base, method, round)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
+    use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(out)         :: lati(0:*)
@@ -2594,7 +2587,6 @@ contains
     !           input coordinate should be scaled with xco yco parameters,
     !           but return distance is actual value
     use TOUZA_Std,only: KTGT=>KDBL
-    use TOUZA_Std,only: choice
     implicit none
     real(kind=KTGT),intent(out)          :: dis
     real(kind=KTGT),intent(in)           :: x0, y0, x1, y1
@@ -2669,7 +2661,6 @@ contains
   subroutine psgp_bwd_area_d &
        & (area, x0, y0, x1, y1, cco, levbgn, levend, tol, res)
     use TOUZA_Std,only: KTGT=>KDBL
-    use TOUZA_Std,only: choice
     implicit none
     real(kind=KTGT),intent(out)          :: area
     real(kind=KTGT),intent(in)           :: x0, y0, x1, y1
@@ -2845,7 +2836,6 @@ contains
   subroutine psgp_bwd_geod_d &
        & (garea, gdis, x0, y0, x1, y1, cco, levbgn, levend, tol, ares, dres)
     use TOUZA_Std,only: KTGT=>KDBL
-    use TOUZA_Std,only: choice
     implicit none
     real(kind=KTGT),intent(out)          :: garea, gdis
     real(kind=KTGT),intent(in)           :: x0, y0, x1, y1
@@ -3346,7 +3336,7 @@ contains
        &  glat2, dglon, &
        &  glat1, azim1, gdis,  &
        &  f,     a)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
+    use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out) :: ierr
     real(kind=KTGT),intent(out) :: glat2(NTRIG)    ! geographic latitude of target
@@ -3411,7 +3401,7 @@ contains
        &  gdis,  &
        &  C1,    C1p,   C3,    i1odr, i3odr,    &
        &  f,     a)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
+    use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out) :: ierr
     real(kind=KTGT),intent(out) :: glat2(NTRIG)
@@ -3424,13 +3414,14 @@ contains
     integer,        intent(in)  :: i1odr,   i3odr
     real(kind=KTGT),intent(in)  :: f, a
 
-    real(kind=KTGT) :: azim2(NTRIG)
+    ! real(kind=KTGT) :: azim2(NTRIG)
     real(kind=KTGT) :: plat2(NTRIG)
     real(kind=KTGT) :: aarc2(NTRIG)
     real(kind=KTGT) :: alon2_ph(NTRIG)
     real(kind=KTGT) :: dalon_ph(NTRIG)
 
-    real(kind=KTGT) :: ee, ep2, fiii
+    real(kind=KTGT) :: ee
+    ! real(kind=KTGT) :: ep2, fiii
     real(kind=KTGT) :: b
 
     real(kind=KTGT) :: A1
@@ -3450,9 +3441,9 @@ contains
 
     ierr = 0
 
-    fiii = f / (TWO - f)
+    ! fiii = f / (TWO - f)
     ee = f * (TWO - f)
-    ep2 = ee / (ONE - ee)
+    ! ep2 = ee / (ONE - ee)
     b = a * (ONE - f)
 
     ! B1: B1(sigma1) == tau1 - sigma1
@@ -3477,7 +3468,7 @@ contains
     _TRIG(aarc2) = add_angle(aarc1, daarc)
     _TRIG(saarc) = add_angle(aarc1, aarc2)
 
-    _TRIG(azim2) = nml_sincos(_SIN(eazim), _COS(eazim) * _COS(aarc2))
+    ! _TRIG(azim2) = nml_sincos(_SIN(eazim), _COS(eazim) * _COS(aarc2))
     _SIN(plat2) = _COS(eazim) * _SIN(aarc2)
     _COS(plat2) = _hypot(_COS(eazim) * _COS(aarc2), _SIN(eazim))
     _SIN(alon2_ph) = _SIN(aarc2) * _SIN(eazim)
@@ -3501,8 +3492,7 @@ contains
        &  glat2, dglon, &
        &  glat1, azim1, gdis,  &
        &  f,     a)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
-    use TOUZA_Std,only: msg_grp
+    use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out) :: ierr
     real(kind=KTGT),intent(out) :: glat2(NTRIG)
@@ -3513,14 +3503,15 @@ contains
     real(kind=KTGT),intent(in)  :: f, a
 
     real(kind=KTGT) :: eazim(NTRIG)
-    real(kind=KTGT) :: azim2(NTRIG)
+    ! real(kind=KTGT) :: azim2(NTRIG)
     real(kind=KTGT) :: plat1(NTRIG), plat2(NTRIG)
     real(kind=KTGT) :: aarc1(NTRIG), aarc2(NTRIG)
     real(kind=KTGT) :: alon1_ph(NTRIG), alon2_ph(NTRIG)
     real(kind=KTGT) :: dalon_ph(NTRIG), dalon(NTRIG)
 
     real(kind=KTGT) :: ee, ep2, eps, kk, fiii, b
-    real(kind=KTGT) :: dis1, sdis, rdis
+    real(kind=KTGT) :: dis1, rdis
+    ! real(kind=KTGT) :: sdis
     real(kind=KTGT) :: rarc, st, ct
     real(kind=KTGT) :: daarc
     real(kind=KTGT) :: ds(NTRIG), ss(NTRIG)
@@ -3583,7 +3574,7 @@ contains
        ! distance
        rarc = phase(aarc1)
        dis1 = (rarc + I1) * (ONE + C1(0)) * b
-       sdis = dis1 + gdis
+       ! sdis = dis1 + gdis
        rdis = (rarc + I1) + gdis / (b * (ONE + C1(0)))
        ! write(*, *) 'sdis:', kk, eps, sdis, rdis, dis1, ONE + C1(0), dis1 / b
        st = sin(rdis)
@@ -3597,7 +3588,7 @@ contains
        _COS(aarc2) = cos(rarc)
        ! call diag_sc('sigma2', aarc2)
        ! NEB
-       _TRIG(azim2) = nml_sincos(_SIN(eazim), _COS(eazim) * _COS(aarc2))
+       ! _TRIG(azim2) = nml_sincos(_SIN(eazim), _COS(eazim) * _COS(aarc2))
        _SIN(plat2) = _COS(eazim) * _SIN(aarc2)
        _COS(plat2) = _hypot(_COS(eazim) * _COS(aarc2), _SIN(eazim))
        _SIN(alon2_ph) = _SIN(aarc2) * _SIN(eazim)
@@ -3644,8 +3635,7 @@ contains
        &  glat1, glat2, dglon, &
        &  f,     a,     &
        &  liter, rtol,  atol,  garea, azim1)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
-    use TOUZA_Std,only: msg_grp
+    use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out)          :: ierr
     real(kind=KTGT),intent(out)          :: gdis        ! geodesic distance toward target
@@ -3669,7 +3659,8 @@ contains
     real(kind=KTGT) :: asign, lasign, losign
     logical :: gswap
 
-    real(kind=KTGT) :: ee, ep2, fiii
+    ! real(kind=KTGT) :: ep2
+    real(kind=KTGT) :: ee, fiii
     integer,parameter :: lodr = 9
     integer,parameter :: i3odr = 6
     real(kind=KTGT) :: C3C(0:lodr, 0:lodr)
@@ -3686,7 +3677,7 @@ contains
 
     fiii = f / (TWO - f)
     ee = f * (TWO - f)
-    ep2 = ee / (ONE - ee)
+    ! ep2 = ee / (ONE - ee)
     call gen_ctable_elongi(ierr, C3C, i3odr, fiii)
 
     _TRIG(xlat1) = _TRIG(glat1)
@@ -3784,7 +3775,8 @@ contains
     real(kind=KTGT) :: daarc(NTRIG)  ! sig_{12}
     real(kind=KTGT) :: saarc(NTRIG)  ! sig_1 + sig_2
 
-    real(kind=KTGT) :: ee, ep2, eps, kk, fiii
+    real(kind=KTGT) :: ee, ep2, eps, kk
+    ! real(kind=KTGT) :: fiii
     real(kind=KTGT) :: nazim(NTRIG)
 
     integer jo
@@ -3823,7 +3815,7 @@ contains
 
     echk = epsilon(ZERO)
 
-    fiii = f / (TWO - f)
+    ! fiii = f / (TWO - f)
     ee = f * (TWO - f)
     ep2 = ee / (ONE - ee)
 
@@ -3946,7 +3938,7 @@ contains
        &  plat1, plat2, dglon, dalon_ph, &
        &  eazim, azim1, azim2, aarc1, aarc2, &
        &  f,     a,     C4C,   i4odr)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
+    use TOUZA_Std,only: KTGT=>KDBL
     use TOUZA_Std,only: msg_grp
     implicit none
     integer,        intent(out) :: ierr
@@ -3973,7 +3965,8 @@ contains
     real(kind=KTGT) :: F0(2)
     real(kind=KTGT) :: daarc(NTRIG), saarc(NTRIG)
 
-    real(kind=KTGT) :: ee, ep2, eps, kk, fiii, aco
+    real(kind=KTGT) :: ee, ep2, eps, kk, aco
+    ! real(kind=KTGT) :: fiii
     real(kind=KTGT) :: da(NTRIG), dazim, cc, b
 
     real(kind=KTGT) :: dalon(NTRIG)
@@ -3992,7 +3985,7 @@ contains
        return
     endif
 
-    fiii = f / (TWO - f)
+    ! fiii = f / (TWO - f)
     ee = f * (TWO - f)
     ep2 = ee / (ONE - ee)
 
@@ -4290,7 +4283,7 @@ contains
        &  plat1, plat2, dglon, dalon_ph, &
        &  eazim, azim1, azim2, aarc1, aarc2, &
        &  f,     a)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
+    use TOUZA_Std,only: KTGT=>KDBL
     use TOUZA_Std,only: msg_grp
     implicit none
     integer,        intent(out) :: ierr
@@ -4469,7 +4462,7 @@ contains
        & (ierr,  inia1, &
        &  glat1, glat2, dglon, &
        &  f)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
+    use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out) :: ierr
     real(kind=KTGT),intent(out) :: inia1(NTRIG)      ! initial guess of azimuth[1]
@@ -4882,7 +4875,7 @@ contains
     ! [caution]
     ! xs ys != 1 are special configuration for amida,
     ! which are not fully tested on consistency.
-    use TOUZA_Std,only: KTGT=>KDBL, choice
+    use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(out)         :: csco(*)
@@ -6250,7 +6243,7 @@ contains
 !!!_  - check_monotonic
   integer function check_monotonic_d &
        & (x, n, ddev, jbgn, jend) result(k)
-    use TOUZA_Std,only: KTGT=>KDBL, choice, set_if_present
+    use TOUZA_Std,only: KTGT=>KDBL, set_if_present
     implicit none
     real(kind=KTGT),intent(in)           :: x(0:*)
     integer,        intent(in)           :: n
@@ -6262,7 +6255,6 @@ contains
 
     if (n.le.1) then
        k = non_monotonic
-       continue
     else if (x(0).lt.x(1)) then
        ! monotonic increase
        k = +1
@@ -6502,7 +6494,7 @@ contains
   end function round_choice_d
   ELEMENTAL &
   function round_choice_id(round, mold) result(x)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
+    use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT) :: x
     integer,        intent(in) :: round
@@ -6523,7 +6515,7 @@ contains
   end function round_choice_q
   ELEMENTAL &
   function round_choice_iq(round, mold) result(x)
-    use TOUZA_Std,only: KTGT=>KQPL, choice
+    use TOUZA_Std,only: KTGT=>KQPL
     implicit none
     real(kind=KTGT) :: x
     integer,        intent(in) :: round
@@ -6535,7 +6527,7 @@ contains
 !!!_   . span_longitude() - return default span if not present or zero
   ELEMENTAL &
   function span_longitude_d(round) result(x)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
+    use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT) :: x
     real(kind=KTGT),intent(in),optional :: round
@@ -6545,7 +6537,7 @@ contains
 !!!_   . span_latitude() - return default span if not present or zero
   ELEMENTAL &
   function span_latitude_d(round) result(x)
-    use TOUZA_Std,only: KTGT=>KDBL, choice
+    use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT) :: x
     real(kind=KTGT),intent(in),optional :: round
@@ -6699,9 +6691,7 @@ program test_emu_ugg
      if (stereo.gt.0) call batch_test_stereog(ierr, stereo)
   endif
   if (ierr.eq.0) then
-     if (geod.eq.0) then
-        continue
-     else if (geod.gt.0) then
+     if (geod.gt.0) then
         call batch_test_geod_filter(ierr)
      else if (geod.lt.0) then
         call batch_test_geod_dfilter(ierr)
@@ -8775,7 +8765,7 @@ contains
   end subroutine test_hpangle
 
   subroutine batch_test_stp(ierr, stp)
-    use TOUZA_Std,only: get_nparam, get_param
+    use TOUZA_Std,only: get_nparam
     implicit none
     integer,parameter :: KTGT=KDBL
     integer,intent(out) :: ierr

@@ -1,10 +1,10 @@
 !!!_! calendar_coco.F90 - touza/calendar: coco compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 16 2021
-#define TIME_STAMP 'Time-stamp: <2021/11/15 13:18:40 fuyuki calendar_coco.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 11:05:48 fuyuki calendar_coco.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2021
+! Copyright (C) 2021-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -55,8 +55,8 @@ module TOUZA_Cal_coco
 contains
 !!!_ & init - calendar init
   subroutine init (cmode, jfpar)
-    use TOUZA_Cal_primitive,only: msg, msglev_normal, msglev_warning, choice
-    use TOUZA_Cal,only: cal_init=>init, auto_once, auto_false
+    use TOUZA_Cal_primitive,only: choice
+    use TOUZA_Cal,only: cal_init=>init, auto_false
     implicit none
     integer,intent(in)          :: cmode
     integer,intent(in),optional :: jfpar
@@ -129,7 +129,7 @@ subroutine CSS2YH &
      & (IDATE, &
      &  DSEC)
   use TOUZA_Cal_coco,only: KCI, KCD
-  use TOUZA_Cal,only: KRC,conv_csec_acalendar
+  use TOUZA_Cal,only: conv_csec_acalendar
   implicit none
   integer(kind=KCI),intent(out) :: IDATE (6)
   real(kind=KCD),   intent(in)  :: DSEC
@@ -143,7 +143,7 @@ subroutine CYH2SS &
      & (DSEC, &
      &  IDATE)
   use TOUZA_Cal_coco,only: KCI, KCD
-  use TOUZA_Cal,only: KRC, conv_calendar_csec
+  use TOUZA_Cal,only: conv_calendar_csec
   implicit none
   integer(kind=KCI),intent(in)  :: IDATE (6)
   real(kind=KCD),   intent(out) :: DSEC

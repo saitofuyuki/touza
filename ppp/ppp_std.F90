@@ -1,7 +1,7 @@
 !!!_! ppp_std.F90 - TOUZA/Ppp utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2025/08/28 15:20:23 fuyuki ppp_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 10:47:35 fuyuki ppp_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -185,7 +185,7 @@ contains
 
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
-    use TOUZA_Std,only: mwe_diag
+    ! use TOUZA_Std,only: mwe_diag
     use TOUZA_Std,only: env_diag
     use TOUZA_Std,only: htb_diag
     implicit none
@@ -283,7 +283,7 @@ contains
 !!!_  & msg_txt - message dispatcher (to override std)
   subroutine msg_txt &
        & (txt, mdl, u)
-    use TOUZA_Std,only: choice, std_msg=>msg
+    use TOUZA_Std,only: std_msg=>msg
     implicit none
     character(len=*),intent(in)          :: txt
     character(len=*),intent(in),optional :: mdl
@@ -296,7 +296,6 @@ contains
 !!!_  & msg_i - message dispatcher (to override std)
   subroutine msg_i &
        & (fmt, v, mdl, u)
-    use TOUZA_Std,only: choice, std_msg=>msg, gen_tag
     implicit none
     character(len=*),intent(in)          :: fmt
     integer,         intent(in)          :: v
