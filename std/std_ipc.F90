@@ -1,7 +1,7 @@
 !!!_! std_ipc.F90 - touza/std intrinsic procedures compatible gallery
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 25 2023
-#define TIME_STAMP 'Time-stamp: <2025/07/17 08:19:07 fuyuki std_ipc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:08:18 fuyuki std_ipc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023-2025
@@ -41,7 +41,6 @@
 #define _SUBR_SX 4  /* subroutine (special for getcwd) */
 !!!_@ TOUZA_Std_env - standard environments
 module TOUZA_Std_ipc
-  use TOUZA_Std_prc,only: KI32, KI64
   use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
 !!!_ = declaration
 !!!_  - default

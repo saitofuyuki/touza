@@ -1,7 +1,7 @@
 !!!_! nio_control.F90 - TOUZA/Nio control center
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 12 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/10 12:46:18 fuyuki nio_control.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 08:40:22 fuyuki nio_control.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -88,7 +88,7 @@ contains
   subroutine init &
        & (ierr, u, levv, mode, stdv, icomm, nctrl)
     use TOUZA_Nio_std,   only: control_mode, control_deep, is_first_force
-    use TOUZA_Nio_std,   only: ns_init=>init, choice, get_size_bytes, KDBL
+    use TOUZA_Nio_std,   only: ns_init=>init, choice
     use TOUZA_Nio_header,only: nh_init=>init
     use TOUZA_Nio_record,only: nr_init=>init
     use TOUZA_Nio_cache, only: nc_init=>init
@@ -131,7 +131,7 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Nio_std,   only: control_mode, control_deep, is_first_force
-    use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
+    use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal
     use TOUZA_Nio_header,only: nh_diag=>diag
     use TOUZA_Nio_record,only: nr_diag=>diag
     use TOUZA_Nio_cache, only: nc_diag=>diag
@@ -419,7 +419,7 @@ contains
     if (ierr.eq.0) then
        ch = is_cache_bind(b)
        if (ch.ge.0) then
-          call show_cache(ierr, ch, tag, u, levv)
+          call show_cache(ierr, ch, tag, utmp, levv)
        else
           ierr = _ERROR(ERR_NOT_IMPLEMENTED)
        endif
@@ -430,8 +430,7 @@ contains
        & (ierr,   status, &
        &  handle, item,   timel, timeh, func, iniv, inir)
     use TOUZA_Nio_std,only: KTGT=>KDBL
-    use TOUZA_Nio_std,only: choice
-    use TOUZA_Nio_cache,only: cache_var_id, cache_time_rec, grp_suite
+    use TOUZA_Nio_cache,only: cache_var_id, cache_time_rec
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: status        ! current status

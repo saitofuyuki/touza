@@ -1,7 +1,7 @@
 !!!_! std_env.F90 - touza/std standard environments
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/08/28 15:05:14 fuyuki std_env.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:06:32 fuyuki std_env.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -705,7 +705,7 @@ contains
              endif
           endif
        endif
-101    format('stdu:', I0, ' = ', I0, 1x, L, 1x, A)
+101    format('stdu:', I0, ' = ', I0, 1x, L1, 1x, A)
        if (VCHECK_DEBUG(lv)) then
           write(txt, 101, IOSTAT=jerr) jchk, ierr, OPND, trim(TA)
           call msg_mdl(txt, __MDL__)
@@ -879,7 +879,6 @@ contains
     use TOUZA_Std_mwe,only: MPI_Bcast
 #  endif
 #endif
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -1017,7 +1016,6 @@ contains
 !!!_  & brute_force_recl_unit_w - lazy trial to find file storage unit (ii)
   subroutine brute_force_recl_unit_w &
        & (ierr, lunit, utest)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(out) :: ierr
     integer,intent(out) :: lunit
@@ -1529,7 +1527,6 @@ contains
     use TOUZA_Std_mwe,only: MPI_Bcast
 #  endif
 #endif
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -1583,8 +1580,7 @@ contains
   subroutine check_strm &
        & (ierr, ibuf, u, lbs, levtry)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_fun,only: new_unit_tmp, new_unit
-    use TOUZA_Std_prc,only: KDBL, KFLT
+    use TOUZA_Std_fun,only: new_unit
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: ibuf(*)
@@ -1620,7 +1616,6 @@ contains
   subroutine brute_force_stream_unit &
        & (ierr, lustr, utest, u)
     use TOUZA_Std_log,only: msg_mdl
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: lustr
@@ -1970,7 +1965,6 @@ contains
     use TOUZA_Std_mwe,only: MPI_Bcast
 #  endif
 #endif
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -2045,8 +2039,8 @@ contains
     endif
     if (ierr.ne.0) then
        if (VCHECK_NORMAL(lv)) then
-101       format('eof check failed = ', I0)
-          write(txt, 101, IOSTAT=jerr) ierr
+101       format('eof check failed = ', I0, 1x, I0)
+          write(txt, 101, IOSTAT=jerr) ierr, j       ! dummy j, no meaning
           call msg_mdl(txt, __MDL__, u)
        endif
     else if (keof.eq.0) then
@@ -2312,7 +2306,6 @@ contains
 
   PURE &
   function get_size_bytes_la (mold, n) result(l)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI64
     implicit none
     integer(kind=KMEM) :: l
@@ -2323,7 +2316,6 @@ contains
   end function get_size_bytes_la
   PURE &
   function get_size_bytes_li (mold, n) result(l)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI64
     implicit none
     integer(kind=KMEM) :: l
@@ -2333,7 +2325,6 @@ contains
   end function get_size_bytes_li
   PURE &
   function get_size_bytes_ll (mold, n) result(l)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI64
     implicit none
     integer(kind=KMEM) :: l
@@ -2343,7 +2334,6 @@ contains
   end function get_size_bytes_ll
   PURE &
   function get_size_bytes_lf (mold, n) result(l)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI64
     implicit none
     integer(kind=KMEM) :: l
@@ -2353,7 +2343,6 @@ contains
   end function get_size_bytes_lf
   PURE &
   function get_size_bytes_ld (mold, n) result(l)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI64
     implicit none
     integer(kind=KMEM) :: l
@@ -2365,7 +2354,6 @@ contains
 !!!_  & get_mems_bytes - get members from byte-length
   PURE &
   function get_mems_bytes_a (l, mold) result(n)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI32
     implicit none
     integer(kind=KMEM) :: n
@@ -2376,7 +2364,6 @@ contains
   end function get_mems_bytes_a
   PURE &
   function get_mems_bytes_i (l, mold) result(n)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI32
     implicit none
     integer(kind=KMEM) :: n
@@ -2386,7 +2373,6 @@ contains
   end function get_mems_bytes_i
   PURE &
   function get_mems_bytes_l (l, mold) result(n)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI32
     implicit none
     integer(kind=KMEM) :: n
@@ -2396,7 +2382,6 @@ contains
   end function get_mems_bytes_l
   PURE &
   function get_mems_bytes_f (l, mold) result(n)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI32
     implicit none
     integer(kind=KMEM) :: n
@@ -2406,7 +2391,6 @@ contains
   end function get_mems_bytes_f
   PURE &
   function get_mems_bytes_d (l, mold) result(n)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI32
     implicit none
     integer(kind=KMEM) :: n
@@ -2417,7 +2401,6 @@ contains
 
   PURE &
   function get_mems_bytes_la (l, mold) result(n)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KMEM=>KI64
     implicit none
     integer(kind=KMEM) :: n
@@ -2428,7 +2411,6 @@ contains
   end function get_mems_bytes_la
   PURE &
   function get_mems_bytes_li (l, mold) result(n)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI32,KMEM=>KI64
     implicit none
     integer(kind=KMEM) :: n
@@ -2438,7 +2420,6 @@ contains
   end function get_mems_bytes_li
   PURE &
   function get_mems_bytes_ll (l, mold) result(n)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KI64,KMEM=>KI64
     implicit none
     integer(kind=KMEM) :: n
@@ -2448,7 +2429,6 @@ contains
   end function get_mems_bytes_ll
   PURE &
   function get_mems_bytes_lf (l, mold) result(n)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KFLT,KMEM=>KI64
     implicit none
     integer(kind=KMEM) :: n
@@ -2458,7 +2438,6 @@ contains
   end function get_mems_bytes_lf
   PURE &
   function get_mems_bytes_ld (l, mold) result(n)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_prc,only: KTGT=>KDBL,KMEM=>KI64
     implicit none
     integer(kind=KMEM) :: n
@@ -2549,7 +2528,6 @@ contains
   end subroutine join_path_array
 
   subroutine join_path_mod(ierr, path, base)
-    use TOUZA_Std_utl,only:join_list
     implicit none
     integer,         intent(out)   :: ierr
     character(len=*),intent(inout) :: path

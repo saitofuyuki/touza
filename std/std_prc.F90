@@ -1,7 +1,7 @@
 !!!_! std_prc.F90 - TOUZA/Std precision(kind) manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Sep 6 2020
-#define TIME_STAMP 'Time-stamp: <2025/05/23 09:02:29 fuyuki std_prc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 21:03:48 fuyuki std_prc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -261,11 +261,14 @@ contains
        endif
        if (diag_counts.eq.0.or.IAND(md,MODE_FORCE).gt.0) then
 101       format(__TAG__, A)
+102       format(__TAG__, 'depth: ', I0)
           if (VCHECK_NORMAL(lv)) then
              if (utmp.ge.0) then
                 write(utmp, 101) TIME_STAMP
+                write(utmp, 102) lc
              else
                 write(*,    101) TIME_STAMP
+                write(*,    102) lc
              endif
           endif
           if (VCHECK_INFO(lv)) then
@@ -328,6 +331,14 @@ contains
 
     if (md.ge.MODE_SURFACE) then
        if (fine_counts.eq.0.or.IAND(md,MODE_FORCE).gt.0) then
+102       format(__TAG__, 'depth: ', I0)
+          if (VCHECK_NORMAL(lv)) then
+             if (utmp.ge.0) then
+                write(utmp, 102) lc
+             else
+                write(*,    102) lc
+             endif
+          endif
           if (VCHECK_DEBUG(lv)) then
 311          format(STD_FORMAT_FUN(__MDL__, 'finalize'), 'fine[', I0, '] ', I0, 1x, I0, 1x, I0)
              if (utmp.ge.0) then

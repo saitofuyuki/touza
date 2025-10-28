@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/17 11:09:03 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 10:54:17 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023,2024,2025
@@ -224,7 +224,7 @@ contains
   subroutine init &
        & (ierr, u, levv, mode, stdv, icomm, ncache, sep)
     use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
-    use TOUZA_Nio_std,   only: ns_init=>init, choice, get_size_bytes, KDBL
+    use TOUZA_Nio_std,   only: ns_init=>init, choice
     ! use TOUZA_Nio_header,only: nh_init=>init
     use TOUZA_Nio_record,only: nr_init=>init
     use TOUZA_Nio_axis,only: na_init=>init
@@ -273,7 +273,7 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Nio_std,   only: control_mode,  control_deep, is_first_force
-    use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
+    use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal
     ! use TOUZA_Nio_header,only: nh_diag=>diag
     use TOUZA_Nio_record,only: nr_diag=>diag
     use TOUZA_Nio_axis,only: na_diag=>diag
@@ -383,7 +383,7 @@ contains
   subroutine cache_open_read &
        & (ierr, handle, path, flag, unit)
     use TOUZA_Nio_std,only: choice
-    use TOUZA_Nio_std,only: reg_entry, new_unit, sus_open
+    use TOUZA_Nio_std,only: new_unit, sus_open
     use TOUZA_Nio_std,only: is_msglev_WARNING, msg
     implicit none
     integer,         intent(out) :: ierr
@@ -435,7 +435,6 @@ contains
 !!!_  - cache_close
   subroutine cache_close &
        & (ierr, handle, path)
-    use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: handle
@@ -534,7 +533,6 @@ contains
   end function cache_group_n
 
   integer function cache_group_j(idx, handle) result(h)
-    use TOUZA_Nio_std,only: choice
     implicit none
     integer,intent(in) :: idx
     integer,intent(in) :: handle
@@ -595,7 +593,6 @@ contains
 
 !!!_  & cache_group_coors() - return number of coordinates in a group or total
   integer function cache_group_coors(handle) result(n)
-    use TOUZA_Nio_std,only: choice
     implicit none
     integer,intent(in) :: handle
     integer jc
@@ -681,7 +678,6 @@ contains
 
 !!!_  & cache_var_size() - return number of variables in a group or total
   integer function cache_var_size(handle) result(n)
-    use TOUZA_Nio_std,only: choice
     implicit none
     integer,intent(in) :: handle
     integer jc
@@ -760,7 +756,6 @@ contains
 
 !!!_  & cache_var_len() - return array size of variable
   integer function cache_var_len(handle, vid) result(n)
-    use TOUZA_Nio_std,only: choice
     implicit none
     integer,intent(in) :: handle
     integer,intent(in) :: vid
@@ -784,7 +779,6 @@ contains
 !!!_  - cache_rec_time - return time string
   subroutine cache_rec_time_a &
        & (ierr, val, handle, vid, rec)
-    use TOUZA_Nio_std,only: choice
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: val
     integer,         intent(in)  :: handle
@@ -812,7 +806,6 @@ contains
 !!!_  - cache_rec_date - return date string
   subroutine cache_rec_date_a &
        & (ierr, val, handle, vid, rec)
-    use TOUZA_Nio_std,only: choice
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: val
     integer,         intent(in)  :: handle
@@ -1034,7 +1027,6 @@ contains
   subroutine cache_get_header(ierr, head, handle, vid, rec)
     use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_std,only: WHENCE_BEGIN
-    use TOUZA_Nio_header,only: get_item
     use TOUZA_Nio_record,only: nio_read_header
     implicit none
     integer,         intent(out) :: ierr
@@ -1573,7 +1565,6 @@ contains
     if (ierr.eq.0) call show_group(ierr, c, tag=tag, u=utmp, levv=lv)
   end subroutine show_cache_t
   subroutine show_cache_h(ierr, handle, tag, u, levv)
-    use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: handle
@@ -1621,7 +1612,6 @@ contains
 !!!_  & show_group
   subroutine show_group_t &
        & (ierr, c, gser, tag, u, levv)
-    use TOUZA_Nio_std,only: choice, join_list, is_msglev_DETAIL, is_msglev_INFO
     implicit none
     integer,         intent(out)         :: ierr
     type(cache_t),   intent(in)          :: c
@@ -1664,7 +1654,7 @@ contains
 
   subroutine show_group_i &
        & (ierr, grp, var, rpos, rlen, tag, u, levv)
-    use TOUZA_Nio_std,only: choice, join_list, is_msglev_DETAIL, is_msglev_INFO
+    use TOUZA_Nio_std,only: choice, join_list, is_msglev_DETAIL
     implicit none
     integer,            intent(out)         :: ierr
     type(group_t),      intent(in)          :: grp
@@ -2273,7 +2263,7 @@ contains
 
 !!!_  - collect_coor
   subroutine collect_coor(ierr, c, flag)
-    use TOUZA_Nio_std, only: find_first, choice
+    use TOUZA_Nio_std, only: find_first
     implicit none
     integer,      intent(out)         :: ierr
     type(cache_t),intent(inout)       :: c
@@ -2283,7 +2273,7 @@ contains
     integer jc, jc2, nc, mc
     integer nttl
     integer ls, jerr
-    integer f
+    ! integer f
     character(len=litem*2) :: str
     character(len=litem),allocatable :: xtmp(:)
     integer,             allocatable :: xbgn(:), xend(:)
@@ -2362,7 +2352,7 @@ contains
        c%ncoor = nttl
     endif
     if (ierr.eq.0) then
-       f = choice(coll_default, flag)
+       ! f = choice(coll_default, flag)
 201    format(A, A, I0)
        ls = max(1, len_trim(dup_sep))
        if (IAND(flag, allow_coor_dup).eq.0) then
@@ -2391,7 +2381,6 @@ contains
 
 !!!_  - settle_group
   subroutine settle_group(ierr, grp, jvoff, jgrp, flag)
-    use TOUZA_Nio_std,only: choice
     use TOUZA_Nio_record,only: put_header_cprop
     use TOUZA_Nio_header,only: put_item, hi_ITEM, hi_DFMT, hi_TITL1, hi_ETTL1, hi_UNIT
     implicit none
@@ -2407,10 +2396,10 @@ contains
     integer jerr
     integer ls
     character(len=litem*2) :: str
-    integer f
+    ! integer f
 
     ierr = 0
-    f = choice(coll_default, flag)
+    ! f = choice(coll_default, flag)
     ls = max(1, len_trim(dup_sep))
     jvb = jvoff
     jve = jvb + grp%nvar
@@ -2571,7 +2560,6 @@ contains
 !!!_  - new_var
   subroutine new_var &
        & (ierr, grp, jvar, head)
-    use TOUZA_Nio_std,only: choice, parse_number
     use TOUZA_Nio_record,only: get_header_cprop
     use TOUZA_Nio_header
     implicit none
@@ -2687,7 +2675,7 @@ contains
 
 !!!_  & group_search_var()
   integer function group_search_var(grp, head) result(v)
-    use TOUZA_Nio_record,only: get_header_cprop, get_header_cname
+    use TOUZA_Nio_record,only: get_header_cprop
     use TOUZA_Nio_header
     implicit none
     type(group_t),   intent(in)  :: grp
@@ -2886,7 +2874,7 @@ contains
 !!!_  & cache_read_header
   subroutine cache_read_header &
        & (ierr, head, handle, vid, rec, krect)
-    use TOUZA_Nio_std,only: KIOFS, WHENCE_BEGIN, set_if_present, sus_getpos
+    use TOUZA_Nio_std,only: set_if_present
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: head(*)
     integer,         intent(in)  :: handle, vid
@@ -2913,7 +2901,6 @@ contains
 !!!_  & cache_var_read
   subroutine cache_var_read_i &
        & (ierr, d, handle, vid, rec, start, count, blog)
-    use TOUZA_Nio_std,only: KIOFS, WHENCE_BEGIN
     use TOUZA_Nio_record,only: nio_read_data
     integer,intent(out)         :: ierr
     integer,intent(out)         :: d(*)
@@ -2956,7 +2943,7 @@ contains
   end subroutine cache_var_read_i
   subroutine cache_var_read_f &
        & (ierr, d, handle, vid, rec, start, count, blog)
-    use TOUZA_Nio_std,only: KTGT=>KFLT, KIOFS, WHENCE_BEGIN
+    use TOUZA_Nio_std,only: KTGT=>KFLT
     use TOUZA_Nio_record,only: nio_read_data
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(out)         :: d(*)
@@ -3000,7 +2987,7 @@ contains
   end subroutine cache_var_read_f
   subroutine cache_var_read_d &
        & (ierr, d, handle, vid, rec, start, count, blog)
-    use TOUZA_Nio_std,only: KTGT=>KDBL, KIOFS, WHENCE_BEGIN
+    use TOUZA_Nio_std,only: KTGT=>KDBL
     use TOUZA_Nio_record,only: nio_read_data
     integer,        intent(out)         :: ierr
     real(kind=KTGT),intent(out)         :: d(*)
@@ -3192,7 +3179,7 @@ contains
 !!!_  & store_cache_lset
   subroutine store_cache_lset &
        & (ierr, centr, l0, l1, swap)
-    use TOUZA_Std,only: sus_eswap
+    use TOUZA_Nio_std,only: sus_eswap
     implicit none
     integer,            intent(out) :: ierr
     character(len=*),   intent(out) :: centr
@@ -3217,7 +3204,7 @@ contains
 !!!_  & store_cache_aset
   subroutine store_cache_aset &
        & (ierr, centr, a0, a1, swap)
-    use TOUZA_Std,only: parse_number
+    use TOUZA_Nio_std,only: parse_number
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(out) :: centr
@@ -3699,7 +3686,6 @@ contains
 
 !!!_  - query_gserial - name to group query
   integer function query_gserial(grp, name, jbgn, jend) result(gser)
-    use TOUZA_Nio_std,only: choice
     implicit none
     type(group_t),   intent(in) :: grp(0:*)
     character(len=*),intent(in) :: name
@@ -3716,7 +3702,6 @@ contains
   end function query_gserial
 !!!_  - query_vserial - name to variable query
   integer function query_vserial(var, name, jbgn, jend) result(vser)
-    use TOUZA_Nio_std,only: choice
     implicit none
     type(var_t),     intent(in) :: var(0:*)
     character(len=*),intent(in) :: name

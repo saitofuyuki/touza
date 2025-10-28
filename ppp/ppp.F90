@@ -1,7 +1,7 @@
 !!!_! ppp.F90 - touza/ppp ppp manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 26 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/17 23:42:50 fuyuki ppp.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 14:22:13 fuyuki ppp.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -34,6 +34,8 @@ module TOUZA_Ppp
   use TOUZA_Ppp_amng,only: is_child_agent
   use TOUZA_Ppp_amng,only: diag_maps_batch, show_status
   use TOUZA_Ppp_amng,only: lagent
+  use TOUZA_Ppp_amng,only: set_monitoring
+  use TOUZA_Ppp_amng,only: monitor_none, monitor_def, monitor_simple, monitor_verbose
 
   use TOUZA_Ppp_king,only: get_king, set_king, is_king
   use TOUZA_Ppp_king,only: diag_cache
@@ -72,6 +74,8 @@ module TOUZA_Ppp
   public :: is_child_agent
   public :: diag_maps_batch, show_status
   public :: lagent
+  public :: set_monitoring
+  public :: monitor_none, monitor_def, monitor_simple, monitor_verbose
 
   public :: get_king, set_king, is_king
   public :: diag_cache

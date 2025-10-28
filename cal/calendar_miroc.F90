@@ -1,7 +1,7 @@
 !!!_! calendar_miroc.F90 - touza/calendar: miroc compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2025/07/16 15:57:56 fuyuki calendar_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 08:27:02 fuyuki calendar_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -243,7 +243,8 @@ contains
        & (mode,      auto, &
        &  ifpar,     jfpar, &
        &  perpetual, idatpp)
-    use TOUZA_Cal,only: p_error, p_ideal, p_grego_i, p_grego_l, p_user
+    use TOUZA_Cal,only: p_error, p_ideal, p_grego_i, p_grego_l
+    ! use TOUZA_Cal,only: p_user
     implicit none
     integer,intent(out) :: mode
     logical,intent(out) :: auto

@@ -3,7 +3,7 @@
 #
 # Maintainer: SAITO Fuyuki
 # Created: Jun 5 2020
-# Time-stamp: <2025/08/26 22:25:38 fuyuki configure.ac>
+# Time-stamp: <2025/10/27 13:19:14 fuyuki configure.ac>
 
 AC_PREREQ([2.71])
 
@@ -226,6 +226,9 @@ AC_ARG_ENABLE([mod-dependencies],
 AM_CONDITIONAL([enable_module_dependencies], [
   test "x$use_mod_dependencies" != xno \
   && test x"$ax_f90_modext" != xunknown])
+
+AC_SUBST([CLEANEXTS])
+AC_SUBST([MOSTLYCLEANEXTS])
 
 dnl AM_CONDITIONAL([am__fastdepFC], [false])
 

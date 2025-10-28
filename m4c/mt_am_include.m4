@@ -1,7 +1,7 @@
 dnl Filename:   touza/m4c/mt_am_include.m4
 dnl Maintainer: SAITO Fuyuki
 dnl Created:    Jun 16 2020
-dnl Time-stamp: <2025/08/22 12:40:55 fuyuki mt_am_include.m4>
+dnl Time-stamp: <2025/10/27 13:20:43 fuyuki mt_am_include.m4>
 
 dnl Copyright: 2020-2025 JAMSTEC
 dnl Licensed under the Apache License, Version 2.0
@@ -19,6 +19,12 @@ AX_NULL=''
 AX_ADD_AM_MACRO_STATIC([
 CLEANFILES =
 MOSTLYCLEANFILES =
+
+CLEANEXTS = @CLEANEXTS@
+MOSTLYCLEANEXTS = @MOSTLYCLEANEXTS@
+
+CLEANFILES += ${AX_DOLLAR}(CLEANEXTS)
+MOSTLYCLEANFILES += ${AX_DOLLAR}(MOSTLYCLEANEXTS)
 
 LIST_MODFILES = .modfiles
 

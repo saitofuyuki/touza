@@ -1,7 +1,7 @@
 !!!_! ppp_amng.F90 - TOUZA/ppp agent manager (xmcomm core replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 25 2022
-#define TIME_STAMP 'Time-stamp: <2025/08/28 15:08:41 fuyuki ppp_amng.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 10:41:05 fuyuki ppp_amng.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -81,6 +81,11 @@ module TOUZA_Ppp_amng
 
   integer,parameter :: agent_unset = -2
   integer,parameter :: agent_stack = -1
+
+  integer,parameter,public :: monitor_none = -1
+  integer,parameter,public :: monitor_def = 0         ! refer verbose level
+  integer,parameter,public :: monitor_simple = 1
+  integer,parameter,public :: monitor_verbose = 1
 !!!_ + type
   type aprop_t
      character(len=lagent) :: name = ' '            ! agent string (aka communicator indicator)
@@ -109,6 +114,8 @@ module TOUZA_Ppp_amng
   integer,save :: lev_verbose = PPP_MSG_LEVEL
   integer,save :: err_default = ERR_NO_INIT
   integer,save :: ulog = unit_global
+
+  integer,save :: lev_monitor = 0    ! default
 #define __MDL__ 'a'
 # define _ERROR(E) (E - ERR_MASK_PPP_AMNG)
 !!!_  - others
@@ -149,6 +156,7 @@ module TOUZA_Ppp_amng
   public mod_agent_order
   public agents_translate
   public switch_agent,  push_agent, pop_agent, top_agent
+  public set_monitoring
   public inquire_agent, is_member
   public query_agent,   source_agent, check_agent, base_agent, clone_agent
   public trace_agent
@@ -157,7 +165,7 @@ module TOUZA_Ppp_amng
 !!!_ + common interfaces
 contains
 !!!_  & init
-  subroutine init(ierr, u, levv, mode, stdv, icomm, nstack, nagent)
+  subroutine init(ierr, u, levv, mode, stdv, icomm, nstack, nagent, levm)
     use TOUZA_Ppp_std,only: control_mode, control_deep, is_first_force
     use TOUZA_Ppp_std,only: choice, ps_init=>init
     use TOUZA_Ppp_std,only: gen_tag
@@ -168,6 +176,7 @@ contains
     integer,intent(in),optional :: icomm
     integer,intent(in),optional :: nstack
     integer,intent(in),optional :: nagent
+    integer,intent(in),optional :: levm    ! monitor level
     integer lv, md, lmd
 
     ierr = 0
@@ -194,6 +203,9 @@ contains
           if (ierr.eq.0) call init_table(ierr, nagent)
           if (ierr.eq.0) call init_stack(ierr, nstack)
           if (ierr.eq.0) call init_world(ierr, u=ulog)
+       endif
+       if (is_first_force(init_counts, mode)) then
+          if (ierr.eq.0) call set_monitoring(ierr, levm)
        endif
        init_counts = init_counts + 1
        if (ierr.ne.0) err_default = _ERROR(ERR_FAILURE_INIT)
@@ -225,6 +237,9 @@ contains
              if (is_msglev_normal(lv)) call msg(TIME_STAMP, __MDL__, utmp)
           endif
           if (ierr.eq.0) then
+             if (is_msglev_normal(lv)) then
+                call msg('(''monitor level = '', I0)', (/lev_monitor/), __MDL__, utmp)
+             endif
              if (is_msglev_normal(lv)) call diag_batch(ierr, utmp)
           endif
        endif
@@ -342,7 +357,7 @@ contains
   subroutine diag_table &
        & (ierr, u)
     use TOUZA_Ppp_std,only: get_wni_safe, get_ni, get_gni, msg, diag_htable
-    use TOUZA_Ppp_std,only: comp_comms, comp_groups, cc_unequal, cc_both_null
+    use TOUZA_Ppp_std,only: comp_comms, comp_groups, cc_both_null
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -415,7 +430,7 @@ contains
 !!!_  - diag_stack
   subroutine diag_stack &
        & (ierr, u)
-    use TOUZA_Ppp_std,only: msg, choice
+    use TOUZA_Ppp_std,only: msg
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -492,7 +507,8 @@ contains
     character(len=128) :: txt
     character(len=32)  :: ttgt
 
-    integer jrbgn, jrend, mm
+    integer jrbgn, jrend
+    ! integer mm
     integer nrtgt, irtgt
 
     ierr = 0
@@ -505,7 +521,7 @@ contains
 
     do jrbgn = 0, nrref - 1, map_div
        jrend = min(nrref, jrbgn + map_div) - 1
-       mm = jrend - jrbgn + 1
+       ! mm = jrend - jrbgn + 1
        if (present(fmt_rr)) then
           write(rr, fmt_rr) jrbgn, jrend
        else
@@ -543,7 +559,8 @@ contains
     character(len=128) :: txt
     character(len=32)  :: ttgt
 
-    integer jrbgn, jrend, mm
+    integer jrbgn, jrend
+    ! integer mm
     integer nrtgt, irtgt
 
     ierr = 0
@@ -567,7 +584,7 @@ contains
           endif
           do jrbgn = 0, nrref - 1, map_div
              jrend = min(nrref, jrbgn + map_div) - 1
-             mm = jrend - jrbgn + 1
+             ! mm = jrend - jrbgn + 1
              if (present(fmt_rr)) then
                 write(rr, fmt_rr) jrbgn, jrend
              else
@@ -678,53 +695,49 @@ contains
 
   end subroutine diag_map_string
 !!!_  & show_stack_simple
-!   subroutine show_stack_simple(ierr, iagent, dir, levv, u)
-!     use TOUZA_Ppp_std,only: choice, msg
-!     implicit none
-!     integer,intent(out) :: ierr
-!     integer,intent(in)  :: iagent
-!     integer,intent(in)  :: dir
-!     integer,intent(in),optional  :: u
-!     integer,intent(in),optional  :: levv
-!     integer lv, utmp
-!     character(len=256) :: buf
-!     integer jt
-
-!     ierr = 0
-!     lv = choice(lev_verbose, levv)
-!     utmp = get_logu(u, ulog)
-
-! 101 format('stack: << ', I0, ':', A)
-! 102 format('stack: <> ', I0, ':', A)
-! 103 format('stack: >> ', I0, ':', A)
-!     if (dir.lt.0) then
-!        jt = astack(jstack + 1)
-!        write(buf, 101) jt, trim(atblp(jt)%name)
-!     else if (dir.eq.0) then
-!        jt = iagent
-!        write(buf, 102) jt, trim(atblp(jt)%name)
-!     else
-!        jt = iagent
-!        write(buf, 103) jt, trim(atblp(jt)%name)
-!     endif
-!     call msg(buf, __MDL__, utmp)
-!   end subroutine show_stack_simple
-
-!!!_  & show_stack
-  subroutine show_stack(ierr, iagent, dir, levv, u)
-    use TOUZA_Ppp_std,only: choice, msg_mon
+  subroutine show_stack_simple(ierr, iagent, dir, u)
+    use TOUZA_Ppp_std,only: msg_mon
     implicit none
     integer,intent(out) :: ierr
     integer,intent(in)  :: iagent
     integer,intent(in)  :: dir
     integer,intent(in),optional  :: u
-    integer,intent(in),optional  :: levv
-    integer lv, utmp
+    integer utmp
+    character(len=256) :: buf
+    integer jt
+
+    ierr = 0
+    utmp = get_logu(u, ulog)
+
+101 format('stack: << ', I0, ':', A)
+102 format('stack: <> ', I0, ':', A)
+103 format('stack: >> ', I0, ':', A)
+    if (dir.lt.0) then
+       jt = astack(jstack + 1)
+       write(buf, 101) jt, trim(atblp(jt)%name)
+    else if (dir.eq.0) then
+       jt = iagent
+       write(buf, 102) jt, trim(atblp(jt)%name)
+    else
+       jt = iagent
+       write(buf, 103) jt, trim(atblp(jt)%name)
+    endif
+    call msg_mon(buf, mon_tag(1:lmt), utmp)
+  end subroutine show_stack_simple
+
+!!!_  & show_stack
+  subroutine show_stack(ierr, iagent, dir, u)
+    use TOUZA_Ppp_std,only: msg_mon
+    implicit none
+    integer,intent(out) :: ierr
+    integer,intent(in)  :: iagent
+    integer,intent(in)  :: dir
+    integer,intent(in),optional  :: u
+    integer utmp
     character(len=256) :: buf, b
     integer js, jt
 
     ierr = 0
-    lv = choice(lev_verbose, levv)
     utmp = get_logu(u, ulog)
     buf = 'stack:'
 
@@ -790,6 +803,31 @@ contains
     enddo
   end subroutine show_status
 !!!_ + manipulation
+!!!_  - set_monitoring - monitoring level
+  subroutine set_monitoring &
+       & (ierr, levm)
+    use TOUZA_Ppp_std,only: choice
+    use TOUZA_Ppp_std,only: is_msglev_NORMAL, is_msglev_INFO
+    implicit none
+    integer,intent(out)         :: ierr
+    integer,intent(in),optional :: levm
+
+    integer lm, lv
+    ierr = 0
+    lm = choice(monitor_def, levm)
+    lv = lev_verbose
+    if (lm.eq.monitor_def) then
+       if (is_msglev_INFO(lv)) then
+          lm = monitor_verbose
+       else if  (is_msglev_NORMAL(lv)) then
+          lm = monitor_simple
+       else
+          lm = monitor_none
+       endif
+    endif
+    lev_monitor = lm
+  end subroutine set_monitoring
+
 !!!_  & query_agent() - return agent id from NAME
   integer function query_agent &
        & (name, iaref) &
@@ -840,7 +878,6 @@ contains
        & (ierr,   &
        &  iagent, source, &
        &  irank,  nrank,  icomm, igroup, name, ismem)
-    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out)          :: ierr
     integer,         intent(in), optional :: iagent
@@ -963,8 +1000,11 @@ contains
     a = min(+1, max(-1, choice(0, lev)))
     jstack = jstack + a
     if (jstack.lt.0.or.jstack.ge.lstack) ierr = -1
-    ! if (ierr.eq.0) call show_stack_simple(ierr, iagent, a)
-    if (ierr.eq.0) call show_stack(ierr, iagent, a)
+    if (lev_monitor.eq.monitor_simple) then
+       if (ierr.eq.0) call show_stack_simple(ierr, iagent, a)
+    else if (lev_monitor.eq.monitor_verbose) then
+       if (ierr.eq.0) call show_stack(ierr, iagent, a)
+    endif
     if (a.ge.0) then
        if (iagent.lt.0.or.iagent.ge.matbl) ierr = -1
        if (ierr.eq.0) astack(jstack) = iagent
@@ -1071,7 +1111,7 @@ contains
 !!!_  & new_agent_root
   subroutine new_agent_root &
        & (ierr, icomm, name, switch)
-    use TOUZA_Ppp_std,only: get_ni, get_comm, choice, choice_a
+    use TOUZA_Ppp_std,only: get_comm, choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in),optional :: icomm
@@ -1133,7 +1173,7 @@ contains
 
     integer nt, ntx
     integer,parameter :: lttbl = latbl
-    character(len=lagent) :: affils(1)
+    ! character(len=lagent) :: affils(1)
     character(len=lagent) :: aname
     character(len=lagent) :: tci(lttbl)
     integer               :: tui(lttbl)
@@ -1197,7 +1237,7 @@ contains
     endif
     if (ierr.eq.0) then
        if (ntx.eq.ncol) then
-          affils(1) = tci(icol + 1)
+          ! affils(1) = tci(icol + 1)
           call new_agent_table &
                & (ierr, icol, ncol, tci(1:ncol), tui(1:ncol), src, switch)
           return
@@ -1232,7 +1272,7 @@ contains
 !!!_  & new_agent_table - core procedure of new_agent_color
   subroutine new_agent_table &
        & (ierr, icolor, ncolor, tci, tui, src, switch)
-    use TOUZA_Ppp_std,only: choice, get_ni, msg, is_msglev_debug
+    use TOUZA_Ppp_std,only: choice, get_ni
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: icolor
@@ -1287,7 +1327,7 @@ contains
 !!!_  & new_agent_family
   subroutine new_agent_family &
        & (ierr, affils, src, switch)
-    use TOUZA_Ppp_std,only: choice, get_ni, msg, is_msglev_debug
+    use TOUZA_Ppp_std,only: choice, get_ni
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: affils(:)  ! (affiliaion) array of agents to belong to
@@ -1399,7 +1439,7 @@ contains
 !!!_  & new_agent_spinoff
   subroutine new_agent_spinoff &
        & (ierr, name, iagent, switch)
-    use TOUZA_Ppp_std,only: msg, choice
+    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: name      ! new name
@@ -1435,7 +1475,7 @@ contains
 !!!_  & mod_agent_order - reorder rank in agent/group
   subroutine mod_agent_order &
        & (ierr, atgt, opr, keys, iagent)
-    use TOUZA_Ppp_std,only: msg, MPI_UNDEFINED
+    use TOUZA_Ppp_std,only: MPI_UNDEFINED
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: atgt      ! target agent
@@ -1671,7 +1711,6 @@ contains
   integer function source_agent &
        & (iagent) &
        & result(n)
-    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,intent(in),optional :: iagent
     n = check_agent(iagent)
@@ -1683,7 +1722,6 @@ contains
   integer function root_agent &
        & (iagent) &
        & result(n)
-    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,intent(in),optional :: iagent
     n = check_agent(iagent)
@@ -1702,7 +1740,6 @@ contains
        &  tgu,  &
        &  tui,  nt, src, names)
     use TOUZA_Ppp_std,only: MPI_Group_rank, MPI_UNDEFINED
-    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(out)         :: jau
@@ -1754,7 +1791,6 @@ contains
        & (ierr, &
        &  tgr,  &
        &  tci,  tui,  nt, affils, src)
-    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: tgr(:)
@@ -1896,7 +1932,6 @@ contains
 !!!_  & add_entry_group
   subroutine add_entry_group &
        & (ierr, iagent, name, igroup, src, flag)
-    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: iagent
@@ -1928,7 +1963,6 @@ contains
 !!!_  & add_entry_copy
   subroutine add_entry_copy &
        & (ierr, iagent, name, iaref, src, flag)
-    use TOUZA_Ppp_std,only: choice
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: iagent
@@ -2388,7 +2422,6 @@ contains
   subroutine batch_group_split &
        & (ierr,   ranks,  tbl_gr, &
        &  tbl_ci, ntotal, affils, icomm, igsrc, ir)
-    use TOUZA_Ppp_std,only: MPI_UNDEFINED, MPI_COMM_NULL
     use TOUZA_Ppp_std,only: MPI_INTEGER
 #  if HAVE_FORTRAN_MPI_MPI_BCAST == 1
     use TOUZA_Ppp_std,only: MPI_Bcast
@@ -2448,7 +2481,6 @@ contains
   subroutine batch_group_color &
        & (ierr,   ranks,  tbl_gr, &
        &  icolor, ncolor, icomm, igsrc, ir)
-    use TOUZA_Ppp_std,only: MPI_UNDEFINED, MPI_COMM_NULL
     use TOUZA_Ppp_std,only: MPI_INTEGER
 #  if HAVE_FORTRAN_MPI_MPI_BCAST == 1
     use TOUZA_Ppp_std,only: MPI_Bcast
@@ -2506,7 +2538,7 @@ contains
   subroutine gen_comm_unit &
        & (ierr,   tbl_gu, &
        &  tbl_ui, tbl_gr, ntotal, icomm)
-    use TOUZA_Ppp_std,only: choice, MPI_UNDEFINED,  MPI_COMM_NULL, MPI_GROUP_EMPTY
+    use TOUZA_Ppp_std,only: MPI_GROUP_EMPTY
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: tbl_gu(0:*)
@@ -2573,7 +2605,7 @@ contains
 !!!_  & get_cnr
   subroutine get_cnr &
        & (ierr, icomm, irank, nrank)
-    use TOUZA_Ppp_std,only: get_comm, get_ni, choice
+    use TOUZA_Ppp_std,only: get_ni
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: icomm
@@ -2619,7 +2651,6 @@ contains
   integer function add_agent_core &
        & (name, source) &
        & result(n)
-    use TOUZA_Ppp_std,only: choice
     implicit none
     character(len=*),intent(in) :: name
     integer,         intent(in) :: source
@@ -2784,7 +2815,6 @@ program test_ppp_amng
   stop
 contains
   subroutine test_ppp_agent(icomm, color, ktest)
-    use TOUZA_Std,only: get_ni
     implicit none
     integer,intent(in) :: icomm
     integer,intent(in) :: color
