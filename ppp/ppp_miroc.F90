@@ -1,7 +1,7 @@
 !!!_! ppp_miroc.F90 - TOUZA/Ppp MIROC compatible interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/08/19 18:05:29 fuyuki ppp_miroc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 10:46:52 fuyuki ppp_miroc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -186,8 +186,9 @@ contains
        & (ierr, u, levv, mode, stdv, icomm)
     use TOUZA_Ppp,only: ppp_init=>init
     use TOUZA_Ppp_std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Ppp_std,only: choice, is_msglev_NORMAL
-    use TOUZA_Ppp_std,only: mwe_init, bld_init
+    use TOUZA_Ppp_std,only: choice
+    ! use TOUZA_Ppp_std,only: mwe_init
+    use TOUZA_Ppp_std,only: bld_init
     use TOUZA_Emu,only: usi_init
     implicit none
     integer,intent(out)         :: ierr
@@ -230,7 +231,8 @@ contains
     use TOUZA_Ppp,only: ppp_diag=>diag
     use TOUZA_Ppp_std,only: ppp_msg=>msg
     use TOUZA_Ppp_std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Ppp_std,only: mwe_diag, get_logu, choice, is_msglev_NORMAL
+    ! use TOUZA_Ppp_std,only: mwe_diag
+    use TOUZA_Ppp_std,only: get_logu, choice, is_msglev_NORMAL
     use TOUZA_Ppp_std,only: bld_diag
     use TOUZA_Emu,only: usi_diag
     implicit none
@@ -249,20 +251,20 @@ contains
     if (md.ge.MODE_SURFACE) then
        if (is_first_force(diag_counts, mode)) then
           if (is_msglev_normal(lv)) then
-             if (ierr.eq.0) call ppp_msg(TIME_STAMP, __MDL__, u)
+             if (ierr.eq.0) call ppp_msg(TIME_STAMP, __MDL__, utmp)
              if (ierr.eq.0) call ppp_msg('(''primary sysin : '', A)', &
-                  & (/primary_sysin/), __MDL__, u)
+                  & (/primary_sysin/), __MDL__, utmp)
           endif
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
           chmd = MODE_SURFACE
-          if (ierr.eq.0) call ppp_diag(ierr, u, levv, lmd)
-          if (ierr.eq.0) call bld_diag(ierr, u, levv, chmd)
+          if (ierr.eq.0) call ppp_diag(ierr, utmp, levv, lmd)
+          if (ierr.eq.0) call bld_diag(ierr, utmp, levv, chmd)
        endif
        if (md.ge.MODE_DEEP) then
           ! if (ierr.eq.0) call mwe_diag(ierr, u, levv, lmd)
-          if (ierr.eq.0) call usi_diag(ierr, u, levv, lmd)
+          if (ierr.eq.0) call usi_diag(ierr, utmp, levv, lmd)
        endif
        diag_counts = diag_counts + 1
     endif
@@ -271,7 +273,8 @@ contains
 
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
-    use TOUZA_Ppp_std,only: mwe_finalize, bld_finalize
+    ! use TOUZA_Ppp_std,only: mwe_finalize
+    use TOUZA_Ppp_std,only: bld_finalize
     use TOUZA_Ppp,only: ppp_finalize=>finalize
     use TOUZA_Ppp_std,only: control_mode, control_deep, is_first_force
     use TOUZA_Ppp_std,only: get_logu, choice, trace_fine
@@ -369,9 +372,9 @@ contains
 !!!_  & init_sysio - XCKINI compatible procedure
   subroutine init_sysio &
        & (ierr, cdir, cagent, cid, config, greeting, flag)
-    use TOUZA_Ppp_std,only: lpath, choice
+    use TOUZA_Ppp_std,only: lpath
     use TOUZA_Ppp_std,only: set_defu
-    use TOUZA_Emu,only: open_bind_sysin, search_sysin_colored
+    use TOUZA_Emu,only: open_bind_sysin
     use TOUZA_Emu,only: get_sysu, open_bind_sysout
     use TOUZA_Emu,only: update_ranks
     use TOUZA_PPP,only: inquire_agent
@@ -394,8 +397,7 @@ contains
     integer ifpar, jfpar
     integer ncolor, icolor
     character(len=lpath) :: csysin
-    integer ncs
-    integer f
+    ! integer ncs
     logical bworld
 
     ierr = 0
@@ -405,8 +407,7 @@ contains
     icolor = icolor_world
     ncolor = ncolor_world
 
-    f = choice(flag_default, flag)
-    ncs = 0
+    ! ncs = 0
 
     call search_sysin(ierr, csysin, cdir, cagent, config, flag)
     if (cdir.ne.' ') then
@@ -452,12 +453,8 @@ contains
 !!!_  & search_sysin
   subroutine search_sysin &
        & (ierr, csysin, cdir, cagent, config, flag)
-    use TOUZA_Ppp_std,only: lpath, choice, choice_a
-    use TOUZA_Ppp_std,only: set_defu
-    use TOUZA_Emu,only: open_bind_sysin, search_sysin_colored
-    use TOUZA_Emu,only: get_sysu, open_bind_sysout
-    use TOUZA_Emu,only: update_ranks
-    use TOUZA_PPP,only: inquire_agent
+    use TOUZA_Ppp_std,only: choice, choice_a
+    use TOUZA_Emu,only: search_sysin_colored
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(out)         :: csysin
@@ -469,11 +466,11 @@ contains
     integer ncolor, icolor
     integer ncs
     integer f
-    logical bworld
+    ! logical bworld
 
     ierr = 0
 
-    bworld = (cdir.eq.' ')
+    ! bworld = (cdir.eq.' ')
 
     icolor = icolor_world
     ncolor = ncolor_world
@@ -533,7 +530,7 @@ contains
   subroutine switch_dir &
        & (ierr, dir, u)
     use TOUZA_Ppp_std,only: ipc_GETCWD, ipc_CHDIR, lpath
-    use TOUZA_Ppp_std,only: get_logu, choice, is_unit_star
+    use TOUZA_Ppp_std,only: get_logu, is_unit_star
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: dir
@@ -570,7 +567,7 @@ contains
 !!!_  & init_world
   subroutine init_world &
        & (ierr, nrank, irank)
-    use TOUZA_Ppp_std,only: get_ni, get_wni, safe_mpi_init
+    use TOUZA_Ppp_std,only: get_wni, safe_mpi_init
     implicit none
     integer,intent(out) :: ierr
     integer,intent(out) :: nrank, irank
@@ -591,7 +588,7 @@ contains
        &  nrank,  irank,  ifpar,  jfpar)
     use TOUZA_Ppp_std,only: lpath
     use TOUZA_Ppp_std,only: is_eof_ss
-    use TOUZA_Ppp_std,only: get_logu, choice, is_unit_star
+    use TOUZA_Ppp_std,only: get_logu, is_unit_star
     use TOUZA_Ppp_std,only: trace_err
     use TOUZA_PPP,only: lagent
     implicit none
@@ -639,7 +636,7 @@ contains
     integer nmem
     integer mreq, jprv, jnxt, mleft
     integer jerr
-    character(len=lpath) :: defd
+    ! character(len=lpath) :: defd
 #if HAVE_FORTRAN_OPEN_IOMSG
     character(len=128) :: tmsg
 #endif
@@ -654,7 +651,7 @@ contains
     cid = ' '
 
     nmem = -1
-    defd = ' '
+    ! defd = ' '
     mreq = 0
     jprv = 0
     rewind(unit=ifpar, IOSTAT=ierr)
@@ -1068,7 +1065,6 @@ contains
   subroutine query_handle(IAGNT, HCTZ)
     use TOUZA_Emu,only: get_sysu
     use TOUZA_Ppp,only: query_agent
-    use TOUZA_Ppp_std,only: msg
     implicit none
     integer,         intent(out) :: IAGNT
     character(len=*),intent(in)  :: HCTZ     ! <CI>
@@ -1245,7 +1241,7 @@ subroutine XCKINI_ils(AFFILS, N, ICROOT)
   use TOUZA_Ppp_miroc,only: init, diag, terminate
   use TOUZA_Ppp_miroc,only: init_rainbow, switch_dir
   use TOUZA_Ppp_miroc,only: lverify
-  use TOUZA_Ppp_amng, only: lagent, inquire_agent
+  use TOUZA_Ppp_amng, only: lagent
   use TOUZA_Ppp_std, only: lpath
   implicit none
   character(len=*),intent(in)  :: AFFILS(*) ! array of agents I belong to.
@@ -1417,7 +1413,7 @@ end subroutine XMabort0
 subroutine XMFinal(OBARR)
   use TOUZA_Ppp_miroc,only: nproc_quit, icomm_quit, finalize
 #if OPT_USE_MPI
-  use MPI,only: MPI_Barrier, MPI_Finalize, MPI_Finalized
+  use MPI,only: MPI_Barrier
 #endif
   use TOUZA_Ppp_std,only: safe_mpi_finalize, banner
   implicit none

@@ -1,7 +1,7 @@
 !!!_! emu_msg.F90 - touza/emu usubs::msgs emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 12 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/17 09:31:37 fuyuki emu_msg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 08:20:43 fuyuki emu_msg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -113,7 +113,7 @@ contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std,only: msg_grp, choice, log_init
+    use TOUZA_Std,only: choice, log_init
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u

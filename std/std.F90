@@ -1,7 +1,7 @@
 !!!_! std.F90 - touza/std interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2025/08/28 15:18:46 fuyuki std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:17:02 fuyuki std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -19,8 +19,8 @@
 module TOUZA_Std
 !!!_ + Declaration
 !!!_  - modules
-  use TOUZA_Std_prc,only: prc_init=>init, prc_diag=>diag, prc_finalize=>finalize, pset_defu=>set_defu
-  use TOUZA_Std_utl,only: utl_init=>init, utl_diag=>diag, utl_finalize=>finalize, uset_defu=>set_defu
+  use TOUZA_Std_prc,only: prc_init=>init, prc_diag=>diag, prc_finalize=>finalize
+  use TOUZA_Std_utl,only: utl_init=>init, utl_diag=>diag, utl_finalize=>finalize
   use TOUZA_Std_env,only: env_init=>init, env_diag=>diag, env_finalize=>finalize
   use TOUZA_Std_log,only: log_init=>init, log_diag=>diag, log_finalize=>finalize
   use TOUZA_Std_fun,only: fun_init=>init, fun_diag=>diag, fun_finalize=>finalize
@@ -39,7 +39,7 @@ module TOUZA_Std
   use TOUZA_Std_prc,only: check_real_mantissa
   use TOUZA_Std_prc,only: diag_real_props
 
-  use TOUZA_Std_utl,only: choice, choice_a
+  use TOUZA_Std_utl,only: choice, choice_a, achoice
   use TOUZA_Std_utl,only: set_if_present
   use TOUZA_Std_utl,only: condop, condrep
   use TOUZA_Std_utl,only: chcount
@@ -242,7 +242,7 @@ module TOUZA_Std
   public :: check_real_mantissa
   public :: diag_real_props
 
-  public :: choice, choice_a
+  public :: choice, choice_a, achoice
   public :: set_if_present
   public :: condop, condrep
   public :: chcount

@@ -1,7 +1,7 @@
 !!!_! nio_nctcdf.F90 - TOUZA/Nio nanchatte netcdf interface
 ! Maintainer: SAITO Fuyuki
 ! Created: Jul 28 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/16 15:57:24 fuyuki nio_nctcdf.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 08:42:09 fuyuki nio_nctcdf.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -78,7 +78,7 @@ contains
   subroutine init &
        & (ierr, u, levv, mode, stdv, maxf)
     use TOUZA_Nio_std,   only: control_mode, control_deep, is_first_force
-    use TOUZA_Nio_std,   only: ns_init=>init, choice, get_size_bytes, KDBL
+    use TOUZA_Nio_std,   only: ns_init=>init, choice
     use TOUZA_Nio_header,only: nh_init=>init
     implicit none
     integer,intent(out)         :: ierr
@@ -120,7 +120,7 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Nio_std,   only: control_mode, control_deep, is_first_force
-    use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
+    use TOUZA_Nio_std,   only: ns_diag=>diag, choice, msg, is_msglev_normal
     use TOUZA_Nio_header,only: nh_diag=>diag
     implicit none
     integer,intent(out)         :: ierr
@@ -220,7 +220,7 @@ contains
 !!!_  - nct_open_read
   subroutine nct_open_read &
        & (ierr, handle, path, action)
-    use TOUZA_Nio_header,only: nitem, litem
+    ! use TOUZA_Nio_header,only: nitem, litem
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: handle

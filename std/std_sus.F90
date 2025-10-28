@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2025/07/17 09:13:32 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 11:14:38 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -352,7 +352,7 @@ contains
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Std_utl,only: control_mode, control_deep, is_first_force
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_log,only: msg_mdl, is_msglev_normal
+    use TOUZA_Std_log,only: msg_mdl
     ! use TOUZA_Std_prc,only: prc_diag=>diag
     ! use TOUZA_Std_utl,only: utl_diag=>diag, choice
     ! use TOUZA_Std_fun,only: fun_diag=>diag
@@ -767,7 +767,7 @@ contains
   subroutine sus_check_irec &
        & (ierr, u, swap, dir, jopos, whence)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_env,only: conv_b2strm, is_eof_ss
+    use TOUZA_Std_env,only: conv_b2strm
     implicit none
     integer,parameter :: KISEP=KI32
     integer,            intent(out)          :: ierr
@@ -836,7 +836,7 @@ contains
   subroutine sus_check_lrec &
        & (ierr, u, swap, dir, jopos, whence)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_env,only: conv_b2strm, is_eof_ss
+    use TOUZA_Std_env,only: conv_b2strm
     implicit none
     integer,parameter :: KISEP=KI64
     integer,            intent(out)          :: ierr
@@ -2245,7 +2245,6 @@ contains
 !!!_  & sus_read_lrec - read a record with 64bit-marker
   subroutine sus_read_lrec_i &
        & (ierr, u, v, n, swap)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI64, KARG=KI32
@@ -2287,7 +2286,6 @@ contains
   end subroutine sus_read_lrec_i
   subroutine sus_read_lrec_l &
        & (ierr, u, v, n, swap)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI64, KARG=KI64
@@ -2329,7 +2327,6 @@ contains
   end subroutine sus_read_lrec_l
   subroutine sus_read_lrec_f &
        & (ierr, u, v, n, swap)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI64, KARG=KFLT
@@ -2371,7 +2368,6 @@ contains
   end subroutine sus_read_lrec_f
   subroutine sus_read_lrec_d &
        & (ierr, u, v, n, swap)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI64, KARG=KDBL
@@ -2413,7 +2409,6 @@ contains
   end subroutine sus_read_lrec_d
   subroutine sus_read_lrec_a &
        & (ierr, u, v, n, swap)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss
     implicit none
     integer,parameter :: KISEP=KI64
@@ -3299,7 +3294,6 @@ contains
 !!!_   & suspend_read_irec_foot
   subroutine suspend_read_irec_foot &
        & (ierr, u, sw, swap)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,parameter :: KISEP=KI32
     integer,intent(out)         :: ierr
@@ -3326,7 +3320,6 @@ contains
 !!!_   & sus_slice_read_irec_[ilfda]
   subroutine sus_slice_read_irec_i &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_unit_strm
     use TOUZA_Std_env,only: get_size_bytes, get_size_strm
     implicit none
@@ -3413,7 +3406,6 @@ contains
   end subroutine sus_slice_read_irec_i
   subroutine sus_slice_read_irec_l &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_unit_strm
     use TOUZA_Std_env,only: get_size_bytes, get_size_strm
     implicit none
@@ -3500,7 +3492,6 @@ contains
   end subroutine sus_slice_read_irec_l
   subroutine sus_slice_read_irec_f &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_unit_strm
     use TOUZA_Std_env,only: get_size_bytes, get_size_strm
     use TOUZA_Std_log,only: trace_err
@@ -3598,7 +3589,6 @@ contains
   end subroutine sus_slice_read_irec_f
   subroutine sus_slice_read_irec_d &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_unit_strm
     use TOUZA_Std_env,only: get_size_bytes, get_size_strm
     implicit none
@@ -3685,7 +3675,6 @@ contains
   end subroutine sus_slice_read_irec_d
   subroutine sus_slice_read_irec_a &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_unit_strm
     use TOUZA_Std_env,only: get_size_bytes, get_size_strm
     implicit none
@@ -3773,7 +3762,6 @@ contains
 !!!_  & sus_edit_slice_irec - edit subarray on a record  with 32-bit marker
   subroutine sus_edit_slice_irec_i &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_unit_strm
     use TOUZA_Std_env,only: get_size_bytes, get_size_strm
     implicit none
@@ -3861,7 +3849,6 @@ contains
   end subroutine sus_edit_slice_irec_i
   subroutine sus_edit_slice_irec_l &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_unit_strm
     use TOUZA_Std_env,only: get_size_bytes, get_size_strm
     implicit none
@@ -3949,7 +3936,6 @@ contains
   end subroutine sus_edit_slice_irec_l
   subroutine sus_edit_slice_irec_f &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_unit_strm
     use TOUZA_Std_env,only: get_size_bytes, get_size_strm
     implicit none
@@ -4037,7 +4023,6 @@ contains
   end subroutine sus_edit_slice_irec_f
   subroutine sus_edit_slice_irec_d &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_unit_strm
     use TOUZA_Std_env,only: get_size_bytes, get_size_strm
     implicit none
@@ -4125,7 +4110,6 @@ contains
   end subroutine sus_edit_slice_irec_d
   subroutine sus_edit_slice_irec_a &
        & (ierr, u, v, bes, r, swap, sub, div, lmem)
-    use TOUZA_Std_utl,only: choice
     use TOUZA_Std_env,only: conv_b2strm, get_mems_bytes, is_eof_ss, get_unit_strm
     use TOUZA_Std_env,only: get_size_bytes, get_size_strm
     implicit none
@@ -5979,7 +5963,6 @@ contains
   end subroutine sus_write_d
   subroutine sus_write_a &
        & (ierr, u, v, n, swap, pos, whence)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,            intent(out)         :: ierr
     integer,            intent(in)          :: u
@@ -5990,7 +5973,7 @@ contains
     integer,            intent(in),optional :: whence
     integer(KIND=KIOFS) :: apos
 
-    if (present(swap)) continue
+    if (present(swap)) continue ! dummy
     if (present(pos)) then
        apos = sus_pos_r2abs(pos, u, whence)
        write(UNIT=u, IOSTAT=ierr, POS=apos) V(1:n)
@@ -6136,7 +6119,6 @@ contains
   end subroutine sus_pad_d
   subroutine sus_pad_a &
        & (ierr, u, v, n, swap, pos, whence)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,parameter :: KARG=KDBL, KBUF=KI64
     integer,            intent(out)         :: ierr
@@ -6149,7 +6131,7 @@ contains
     integer(KIND=KIOFS) :: apos
     integer j
 
-    if (present(swap)) continue
+    if (present(swap)) continue ! dummy
     if (present(pos)) then
        apos = sus_pos_r2abs(pos, u, whence)
        write(UNIT=u, IOSTAT=ierr, POS=apos) (V, j = 0, n - 1)
@@ -6307,7 +6289,6 @@ contains
   end subroutine sus_read_d
   subroutine sus_read_a &
        & (ierr, u, v, n, swap, pos, whence)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,            intent(out)         :: ierr
     integer,            intent(in)          :: u
@@ -6318,7 +6299,7 @@ contains
     integer,            intent(in),optional :: whence
     integer(KIND=KIOFS) :: apos
 
-    if (present(swap)) continue
+    if (present(swap)) continue ! dummy
     if (present(pos)) then
        apos = sus_pos_r2abs(pos, u, whence)
        read(UNIT=u, IOSTAT=ierr, POS=apos) V(1:n)
@@ -6792,7 +6773,6 @@ contains
 !!!_  & choice_b - choice_a wrapper, use d if blank
   subroutine choice_b &
        & (v, d, a)
-    use TOUZA_Std_utl,only: choice_a
     implicit none
     character(len=*),intent(out)         :: v
     character(len=*),intent(in)          :: d  ! default
@@ -7032,9 +7012,7 @@ contains
     do j = 0, r - 1
        m = max(1, l) * (bes(2, j) - bes(1, j))
        l = max(1, l) * bes(3, j)
-       if (m.eq.l) then
-          continue
-       else
+       if (m.ne.l) then
           itr(rr) = m
           stp(rr) = s
           s = s + n * (l - m)

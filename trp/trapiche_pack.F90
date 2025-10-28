@@ -1,7 +1,7 @@
 !!!_! trapiche_pack.F90 - TOUZA/Trapiche integer packing/unpacking
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2025/08/26 22:22:03 fuyuki trapiche_pack.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 08:30:25 fuyuki trapiche_pack.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -375,7 +375,7 @@ contains
 !!!_  & pack_trim_full - trim arrays according to its range (case if full bits)
   subroutine pack_trim_full_i &
        & (ierr, minc, nbits, icanaz, mem, nbskp, kxsp)
-    use TOUZA_Trp_std,only: choice, first_bit
+    ! use TOUZA_Trp_std,only: first_bit
     implicit none
     integer,parameter :: KICNZ = KI32
     integer,            intent(out)   :: ierr
@@ -530,7 +530,6 @@ contains
        & (ierr,   icanaz, &
        &  ibagaz, mem,    nbits, kpack, &
        &  lofs,   rsrc,   nfil,  bes,   nr)
-    use TOUZA_Trp_std,only: choice
     implicit none
     integer,parameter :: KIBGZ = KI32, KICNZ = KI32
     integer,            intent(out) :: ierr
@@ -593,7 +592,6 @@ contains
        & (ierr,   icanaz, &
        &  ibagaz, mem,    nbits, kpack, &
        &  dunp,   nunp)
-    use TOUZA_Trp_std,only: choice
     implicit none
     integer,parameter :: KIBGZ = KI32, KICNZ = KI32
     integer,            intent(out) :: ierr
@@ -748,7 +746,6 @@ contains
   subroutine pack_restore_seq_head_ii &
        & (ierr,   cofs,  bofs,  icanaz, &
        &  ibagaz, mem,   nbits, org,    skip)
-    use TOUZA_Trp_std,only: choice
     implicit none
     integer,parameter :: KIBGZ = KI32, KICNZ = KI32
 
@@ -929,7 +926,6 @@ contains
   subroutine pack_restore_seq_ii &
        & (ierr,   icanaz, &
        &  ibagaz, mem,    nbits)
-    use TOUZA_Trp_std,only: choice
     implicit none
     integer,parameter :: KIBGZ = KI32, KICNZ = KI32
 
@@ -2526,7 +2522,7 @@ contains
 !!!_   & show_packed_trn
   subroutine show_packed_trn_i &
        & (ierr, ibagaz, mem, nbits, tag, u)
-    use TOUZA_Trp_std,only: binstr, choice, choice_a
+    use TOUZA_Trp_std,only: binstr, choice
     implicit none
     integer,parameter :: KIBGZ = KI32
     integer,            intent(out)         :: ierr
@@ -2579,7 +2575,7 @@ contains
 
   subroutine show_packed_trn_l &
        & (ierr, ibagaz, mem, nbits, tag, u)
-    use TOUZA_Trp_std,only: binstr, choice, choice_a
+    use TOUZA_Trp_std,only: binstr, choice
     implicit none
     integer,parameter :: KIBGZ = KI64
     integer,            intent(out)         :: ierr
@@ -2633,7 +2629,7 @@ contains
 !!!_   & show_packed_seq
   subroutine show_packed_seq_i &
        & (ierr, ibagaz, mem, nbits, tag, u)
-    use TOUZA_Trp_std,only: binstr, choice, choice_a
+    use TOUZA_Trp_std,only: binstr, choice
     implicit none
     integer,parameter :: KIBGZ = KI32
     integer,            intent(out)         :: ierr
@@ -2681,7 +2677,7 @@ contains
 
   subroutine show_packed_seq_l &
        & (ierr, ibagaz, mem, nbits, tag, u)
-    use TOUZA_Trp_std,only: binstr, choice, choice_a
+    use TOUZA_Trp_std,only: binstr, choice
     implicit none
     integer,parameter :: KIBGZ = KI64
     integer,            intent(out)         :: ierr
@@ -2771,7 +2767,8 @@ contains
     integer,parameter :: nbits = 1
     integer,parameter :: lbits = bit_size(mold)
     integer jcbgn, jcend, jcnxt
-    integer jbbgn, jbend, rbbgn, rbend, jb, rb     ! j: element  r: mod
+    integer jbbgn, jbend, rbbgn, rbend, rb     ! j: element  r: mod
+    ! integer jb
     integer mr_c,  cspan_c,  dspan_c
     integer mr_b,  cspan_b,  dspan_b
     integer idx(0:nr-1), next(0:nr), span(0:nr-1)
@@ -2827,7 +2824,7 @@ contains
           exit loop_cont
        enddo loop_cont
        ! remnant
-       jb = jcend / lbits
+       ! jb = jcend / lbits
        rb = mod(jcend, lbits)
        jcend = jcend + lbits - rb
        ! non-active
@@ -2890,7 +2887,8 @@ contains
     integer,parameter :: nbits = 1
     integer,parameter :: lbits = bit_size(mold)
     integer jcbgn, jcend, jcnxt, jc
-    integer jbbgn, jbend, rbbgn, rbend, jb, rb     ! j: element  r: mod
+    integer jbbgn, jbend, rbbgn, jb, rb     ! j: element  r: mod
+    ! integer rbend
     integer mr_c,  cspan_c,  dspan_c
     integer mr_b,  cspan_b,  dspan_b
     integer idx(0:nr-1), next(0:nr), span(0:nr-1)
@@ -2923,7 +2921,7 @@ contains
        jbbgn = jcbgn / lbits            ! safe_div(jcbgn, nbits=1, lbits)
        rbbgn = mod(jcbgn, lbits)        ! safe_mod(jcbgn, nbits=1, lbits)
        jbend = jcend / lbits
-       rbend = mod(jcend, lbits)
+       ! rbend = mod(jcend, lbits)
        !  e     b
        ! [xxxxx]+(... )
        jset = jset + SUM(popcount_tab(imask(jbend:jbbgn-1)))
@@ -3070,8 +3068,10 @@ contains
     integer(kind=KIBGZ),intent(in)  :: mold
 
     integer,parameter :: lbits = bit_size(mold)
-    integer jgb, jge, ngi, ngx, ngz
-    integer jmb, jme, rmb, rme
+    integer jgb, jge, ngx, ngz
+    ! integer ngi
+    integer jmb, jme, rme
+    ! integer rmb
     integer idx(0:nr-1), next(0:nr), span(0:nr-1)
     integer gstep(0:nr), lstep(0:nr)
     integer jr, nri
@@ -3086,7 +3086,7 @@ contains
     ! nri, continuous ranks
     nri = continuous_ranks(next, nr, nbits, lbits)
     ! ngi, innermost span
-    ngi = max(0, span(0))
+    ! ngi = max(0, span(0))
     ! ngx, conitinuous span
     ngx = 1 + SUM((span(0:nri-1) - 1) * gstep(0:nri-1))
     ! ngz, discontinuous step
@@ -3102,7 +3102,7 @@ contains
        jge = jgb + ngx
        ! continuous active span
        jmb = safe_div(jgb, nbits, lbits)
-       rmb = safe_mod(jgb, nbits, lbits)
+       ! rmb = safe_mod(jgb, nbits, lbits)
        jme = safe_div(jge, nbits, lbits)
        rme = safe_mod(jge, nbits, lbits)
        dsrc(1, n) = jmb
@@ -3173,8 +3173,10 @@ contains
     integer(kind=KIBGZ),intent(in)  :: mold
 
     integer,parameter :: lbits = bit_size(mold)
-    integer jgb, jge, ngi, ngx, ngz
-    integer jmb, jme, rmb, rme
+    integer jgb, jge, ngx, ngz
+    ! integer ngi
+    integer jmb, jme, rme
+    ! integer rmb
     integer idx(0:nr-1), next(0:nr), span(0:nr-1)
     integer gstep(0:nr), lstep(0:nr)
     integer jr, nri
@@ -3189,7 +3191,7 @@ contains
     ! nri, continuous ranks
     nri = continuous_ranks(next, nr, nbits, lbits)
     ! ngi, innermost span
-    ngi = max(0, span(0))
+    ! ngi = max(0, span(0))
     ! ngx, conitinuous span
     ngx = 1 + SUM((span(0:nri-1) - 1) * gstep(0:nri-1))
     ! ngz, discontinuous step
@@ -3207,7 +3209,7 @@ contains
     loop_main: do
        ! nonactive span jge:jgb
        jmb = safe_div(jgb, nbits, lbits)
-       rmb = safe_mod(jgb, nbits, lbits)
+       ! rmb = safe_mod(jgb, nbits, lbits)
        ! write(*, *) 'runl', n, jme, jmb, '/', jge, jgb
        rsrc(n) = jmb - jme
        n = n + 1
@@ -3286,7 +3288,8 @@ contains
 
     integer,parameter :: lbits = bit_size(mold)
     integer jcbgn, jcend
-    integer jbbgn, jbend, rbbgn, rbend     ! j: element  r: mod
+    integer jbbgn, jbend, rbend     ! j: element  r: mod
+    ! integer rbbgn
     integer idx(0:nr-1), next(0:nr), span(0:nr-1)
     integer gstep(0:nr)
     integer jr
@@ -3328,7 +3331,7 @@ contains
     loop_main: do
        ! nonactive span jcend[prev]:jcbgn
        jbbgn = safe_div(jcbgn, nbits, lbits)
-       rbbgn = safe_mod(jcbgn, nbits, lbits)
+       ! rbbgn = safe_mod(jcbgn, nbits, lbits)
        rfil(nfil) = jbbgn - jbend
        nfil = nfil + 1
        ! continuous active span jcbgn:jcend[new]

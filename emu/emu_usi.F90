@@ -1,7 +1,7 @@
 !!!_! emu_usi.F90 - touza/emu usysio emulation
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/22 15:28:09 fuyuki emu_usi.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 11:18:02 fuyuki emu_usi.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -237,7 +237,8 @@ contains
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
     use TOUZA_Std,only: choice
-    use TOUZA_Std,only: mwe_finalize, arg_finalize, log_finalize, env_finalize, fun_finalize
+    use TOUZA_Std,only: mwe_finalize, arg_finalize, env_finalize, fun_finalize
+    ! use TOUZA_Std,only: log_finalize
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -428,7 +429,7 @@ contains
   end subroutine open_bind_sysin
 !!!_  & open_bind_sysout - YYSYSO compatible
   subroutine open_bind_sysout(ierr, usys, file, sfx, u)
-    use TOUZA_Std,only: choice, ndigits
+    use TOUZA_Std,only: ndigits
     use TOUZA_Std,only: get_wni, uout, is_msglev_INFO, new_unit
     implicit none
     integer,         intent(out)         :: ierr
@@ -473,8 +474,8 @@ contains
              sbuf = sfx_sysout
           endif
           call gen_path(f, pbuf, sbuf, max(0, ir), nd)
-       else
-          continue
+       ! else
+       !    continue
        endif
        inquire(NUMBER=usys, OPENED=bo, FILE=f, IOSTAT=ierr)
        if (ierr.eq.0) then
@@ -516,9 +517,6 @@ contains
 !!!_  & open_sysin_primary - open /primary/ SYSIN file
   subroutine open_sysin_primary &
        & (ierr, uprim, file, pos, u)
-    use TOUZA_Std,only: is_msglev_WARNING, is_msglev_INFO
-    use TOUZA_Std,only: new_unit
-    use TOUZA_Std,only: get_wni
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(out)         :: uprim    ! primary unit
@@ -589,7 +587,7 @@ contains
   subroutine search_sysin_colored &
        & (num, file, idx, pfx, sfx, digits, u)
     use TOUZA_Std,only: choice, choice_a, get_logu
-    use TOUZA_Std,only: is_msglev_INFO, is_msglev_DEBUG
+    use TOUZA_Std,only: is_msglev_DEBUG
     implicit none
     integer,         intent(out)         :: num      ! number or error code
     character(len=*),intent(out)         :: file
@@ -736,7 +734,6 @@ contains
 !!!_ + Deprecated
 !!!_  & legacy_open_sysin - YYSYSI compatible
   subroutine legacy_open_sysin(ierr, u)
-    use TOUZA_Std,only: choice
     use TOUZA_Std,only: parse, get_nparam, get_param
     use TOUZA_Std,only: get_wni, uin, is_msglev_INFO, new_unit
     implicit none

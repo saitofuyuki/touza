@@ -1,10 +1,10 @@
 !!!_! emu.F90 - touza/emu interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 6 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/16 18:04:45 fuyuki emu.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 11:06:03 fuyuki emu.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2020-2023
+! Copyright (C) 2020-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -40,7 +40,7 @@ contains
 !!!_  & init
   subroutine init(ierr, u, levv, mode, stdv, icomm)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std,only: msg_grp, choice
+    use TOUZA_Std,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -111,7 +111,7 @@ contains
 !!!_  & finalize
   subroutine finalize(ierr, u, levv, mode)
     use TOUZA_Std,only: control_mode, control_deep, is_first_force
-    use TOUZA_Std,only: choice, is_msglev_NORMAL, msg_grp
+    use TOUZA_Std,only: choice
     use TOUZA_Std,only: get_logu
     use TOUZA_Std,only: trace_fine
     implicit none

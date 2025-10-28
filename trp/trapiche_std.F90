@@ -1,7 +1,7 @@
 !!!_! trapiche_std.F90 - TOUZA/Trapiche utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 30 2021
-#define TIME_STAMP 'Time-stamp: <2025/08/28 15:27:16 fuyuki trapiche_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:28:32 fuyuki trapiche_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -229,7 +229,7 @@ contains
 !!!_  & msg - message dispatcher
   subroutine msg_txt &
        & (txt, mdl, u)
-    use TOUZA_Std,only: choice, std_msg=>msg, gen_tag
+    use TOUZA_Std,only: std_msg=>msg, gen_tag
     implicit none
     character(len=*),intent(in)          :: txt
     character(len=*),intent(in),optional :: mdl
@@ -242,7 +242,7 @@ contains
 
   subroutine msg_i &
        & (fmt, v, mdl, u)
-    use TOUZA_Std,only: choice, std_msg=>msg, gen_tag
+    use TOUZA_Std,only: std_msg=>msg, gen_tag
     implicit none
     character(len=*),intent(in)          :: fmt
     integer,         intent(in)          :: v
