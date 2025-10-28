@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2025/10/28 11:17:12 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/30 08:49:39 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2025
@@ -420,9 +420,18 @@ contains
     character(len=*),intent(in),optional :: tag
     integer utmp
 
+    type(arg_chunk_t)   :: dchunk(1)
+    character(len=ltag) :: dtags(1)
+    character(len=lval) :: dvals(1)
+
     utmp = choice(ulog, u)
-    call report_chunks &
-         & (ierr, achunk, mchunk, lchunk, atags, avals, utmp, tag)
+    if (associated(achunk)) then
+       call report_chunks &
+            & (ierr, achunk, mchunk, lchunk, atags, avals, utmp, tag)
+    else
+       call report_chunks &
+            & (ierr, dchunk, mchunk, lchunk, dtags, dvals, utmp, tag)
+    endif
   end subroutine diag_chunks
 
 !!!_  & diag_palias
@@ -434,10 +443,17 @@ contains
     integer,         intent(in),optional :: u
     character(len=*),intent(in),optional :: tag
     integer utmp
+    character(len=ltag) :: pdummy(1)
 
+    ierr = 0
     utmp = choice(ulog, u)
-    call report_palias &
-         & (ierr, ptags, malias, lalias, utmp, tag)
+    if (associated(ptags)) then
+       call report_palias &
+            & (ierr, ptags, malias, lalias, utmp, tag)
+    else
+       call report_palias &
+            & (ierr, pdummy, malias, lalias, utmp, tag)
+    endif
   end subroutine diag_palias
 
 !!!_ + argument chunk manager
