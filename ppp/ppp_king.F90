@@ -1,7 +1,7 @@
 !!!_! ppp_king.F90 - TOUZA/ppp king control (xmcomm/xmking replacement)
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2025/08/28 14:34:58 fuyuki ppp_king.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 10:41:55 fuyuki ppp_king.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -214,7 +214,6 @@ contains
 !!!_  - diag_cache
   subroutine diag_cache &
        & (ierr, u)
-    use TOUZA_Ppp_std,only: MPI_COMM_WORLD
     use TOUZA_Ppp_std,only: get_wni_safe, msg, diag_htable
     use TOUZA_Ppp_amng,only: lagent, inquire_agent
     implicit none
@@ -380,7 +379,6 @@ contains
 !!!_  - bind_king
   subroutine bind_king &
        & (ierr, king, pat, jasrc, jadef)
-    use TOUZA_Ppp_amng,only: query_agent, inquire_agent
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: king
@@ -426,7 +424,7 @@ contains
 !!!_  - set_king
   subroutine set_king &
        & (ierr, king, pat, adef)
-    use TOUZA_Ppp_amng,only: query_agent, source_agent, inquire_agent
+    use TOUZA_Ppp_amng,only: query_agent, source_agent
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(in)  :: king

@@ -2,7 +2,7 @@
 ! Maintainer:  SAITO Fuyuki
 ! Created: May 17 2019 (for flageolet)
 ! Cloned: Sep 8 2020 (original: xsrc/parser.F90)
-#define TIME_STAMP 'Time-stamp: <2025/07/17 09:12:50 fuyuki std_arg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 11:17:12 fuyuki std_arg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2019-2025
@@ -209,7 +209,7 @@ contains
     ! use TOUZA_Std_utl,only: utl_init=>init   ! included by TOUZA_Std_env
     ! use TOUZA_Std_log,only: log_init=>init   ! included by TOUZA_Std_env
     use TOUZA_Std_env,only: env_init=>init
-    use TOUZA_Std_utl,only: choice, choice_a
+    use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in),optional :: u
@@ -700,8 +700,7 @@ contains
 
 !!!_  & parse - batch parser
   subroutine parse (ierr, levv)
-    use TOUZA_Std_log,only: msg_mdl
-    use TOUZA_Std_fun,only: new_unit
+    use TOUZA_Std_log,only: msg_mdl, is_msglev_DETAIL
     use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(out)         :: ierr
@@ -713,7 +712,7 @@ contains
     ierr = err_default
     if (nparam.ge.0) then
        lu = get_logu(ulog)
-       call msg_mdl('parse twice.', __MDL__, lu)
+       if (is_msglev_DETAIL(lv)) call msg_mdl('parse twice.', __MDL__, lu)
        return
     endif
 
@@ -729,7 +728,6 @@ contains
 !!!_   & parse_chunk_command
   subroutine parse_chunk_command &
        & (ierr, jchorg)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: jchorg
@@ -1183,7 +1181,6 @@ contains
 !!!_  & get_param - get parameter (positional argument)
   subroutine get_param_a &
        & (ierr, val, jpos, def, unset)
-    use TOUZA_Std_utl,only: choice_a
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: val
@@ -1401,7 +1398,6 @@ contains
 !!!_  & get_option - get option (key/value argument)
   subroutine get_option_a &
        & (ierr, val, tag, def, ref, unset)
-    use TOUZA_Std_utl,only: set_if_present
     implicit none
     integer,         intent(out)            :: ierr
     character(len=*),intent(inout)          :: val
@@ -1424,7 +1420,6 @@ contains
 
   subroutine get_option_i &
        & (ierr, val, tag, def, ref, unset)
-    use TOUZA_Std_utl,only: set_if_present
     implicit none
     integer,         intent(out)            :: ierr
     integer,         intent(inout)          :: val
@@ -1448,7 +1443,6 @@ contains
   subroutine get_option_f &
        & (ierr, val, tag, def, ref, unset)
     use TOUZA_Std_prc,only: KTGT=>KFLT
-    use TOUZA_Std_utl,only: set_if_present
     implicit none
     integer,         intent(out)            :: ierr
     real(kind=KTGT), intent(inout)          :: val
@@ -1472,7 +1466,6 @@ contains
   subroutine get_option_d &
        & (ierr, val, tag, def, ref, unset)
     use TOUZA_Std_prc,only: KTGT=>KDBL
-    use TOUZA_Std_utl,only: set_if_present
     implicit none
     integer,         intent(out)            :: ierr
     real(kind=KTGT), intent(inout)          :: val
@@ -1495,7 +1488,6 @@ contains
 
   subroutine get_option_ia &
        & (ierr, vals, tag, def, ref, sep, unset)
-    use TOUZA_Std_utl,only: set_if_present
     implicit none
     integer,         intent(out)            :: ierr
     integer,         intent(inout)          :: vals(:)
@@ -1520,7 +1512,6 @@ contains
   subroutine get_option_fa &
        & (ierr, vals, tag, def, ref, sep, unset)
     use TOUZA_Std_prc,only: KTGT=>KFLT
-    use TOUZA_Std_utl,only: set_if_present
     implicit none
     integer,         intent(out)            :: ierr
     real(kind=KTGT), intent(inout)          :: vals(:)
@@ -1545,7 +1536,6 @@ contains
   subroutine get_option_da &
        & (ierr, vals, tag, def, ref, sep, unset)
     use TOUZA_Std_prc,only: KTGT=>KDBL
-    use TOUZA_Std_utl,only: set_if_present
     implicit none
     integer,         intent(out)            :: ierr
     real(kind=KTGT), intent(inout)          :: vals(:)
@@ -2129,7 +2119,7 @@ contains
   subroutine report_palias &
        & (ierr, &
        &  tt,  mt,  lt, ulog, tag)
-    use TOUZA_Std_utl,only: choice, choice_a
+    use TOUZA_Std_utl,only: choice_a
     use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,          intent(out)         :: ierr
@@ -2169,7 +2159,7 @@ contains
   subroutine report_chunks &
        & (ierr, &
        &  ach,  mch,  lch, gt, gv, ulog, tag)
-    use TOUZA_Std_utl,only: choice, choice_a
+    use TOUZA_Std_utl,only: choice_a
     use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,          intent(out)         :: ierr
@@ -2307,7 +2297,6 @@ contains
 !!!_  & tag_search - return entry and chunk
   subroutine tag_search &
        & (jentr, jch, tag, ach, mch, ttbl, refidx)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,          intent(out)         :: jentr
     integer,          intent(out)         :: jch
@@ -2334,7 +2323,6 @@ contains
 !!!_  - tag_search_walk
   subroutine tag_search_walk &
        & (jentr, jch, tag, ach, ttbl)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,          intent(inout) :: jentr
     integer,          intent(inout) :: jch
@@ -2454,9 +2442,7 @@ contains
        if (bu) then
           if (present(def)) then
              val = def
-          else if (choice(.false.,unset)) then
-             continue
-          else
+          else if (.not.choice(.false.,unset)) then
              ierr = _ERROR(ERR_NEED_ARGUMENT)
           endif
        else
@@ -2492,9 +2478,7 @@ contains
        if (bu) then
           if (present(def)) then
              val = def
-          else if (choice(.false.,unset)) then
-             continue
-          else
+          else if (.not.choice(.false.,unset)) then
              ierr = _ERROR(ERR_NEED_ARGUMENT)
           endif
        else
@@ -2530,9 +2514,7 @@ contains
        if (bu) then
           if (present(def)) then
              val = def
-          else if (choice(.false.,unset)) then
-             continue
-          else
+          else if (.not.choice(.false.,unset)) then
              ierr = _ERROR(ERR_NEED_ARGUMENT)
           endif
        else
@@ -2567,9 +2549,7 @@ contains
        if (bu) then
           if (present(def)) then
              val = def
-          else if (choice(.false.,unset)) then
-             continue
-          else
+          else if (.not.choice(.false.,unset)) then
              ierr = _ERROR(ERR_NEED_ARGUMENT)
           endif
        else
@@ -2612,9 +2592,7 @@ contains
        if (bu) then
           if (present(def)) then
              vals(:) = def
-          else if (us) then
-             continue
-          else
+          else if (.not.us) then
              ierr = _ERROR(ERR_NEED_ARGUMENT)
           endif
        else
@@ -2679,9 +2657,7 @@ contains
        if (bu) then
           if (present(def)) then
              vals(:) = def
-          else if (us) then
-             continue
-          else
+          else if (.not.us) then
              ierr = _ERROR(ERR_NEED_ARGUMENT)
           endif
        else
@@ -2746,9 +2722,7 @@ contains
        if (bu) then
           if (present(def)) then
              vals(:) = def
-          else if (us) then
-             continue
-          else
+          else if (.not.us) then
              ierr = _ERROR(ERR_NEED_ARGUMENT)
           endif
        else
@@ -2824,9 +2798,7 @@ contains
     if (ierr.eq.0) then
        if (present(def)) then
           val = def
-       else if (choice(.false.,unset)) then
-          continue
-       else
+       else if (.not.choice(.false.,unset)) then
           ierr = _ERROR(ERR_NEED_ARGUMENT)
        endif
     endif
@@ -2845,9 +2817,7 @@ contains
     if (ierr.eq.0) then
        if (present(def)) then
           val = def
-       else if (choice(.false.,unset)) then
-          continue
-       else
+       else if (.not.choice(.false.,unset)) then
           ierr = _ERROR(ERR_NEED_ARGUMENT)
        endif
     endif
@@ -2866,9 +2836,7 @@ contains
     if (ierr.eq.0) then
        if (present(def)) then
           val = def
-       else if (choice(.false.,unset)) then
-          continue
-       else
+       else if (.not.choice(.false.,unset)) then
           ierr = _ERROR(ERR_NEED_ARGUMENT)
        endif
     endif
@@ -2886,9 +2854,7 @@ contains
     if (ierr.eq.0) then
        if (present(def)) then
           val = def
-       else if (choice(.false.,unset)) then
-          continue
-       else
+       else if (.not.choice(.false.,unset)) then
           ierr = _ERROR(ERR_NEED_ARGUMENT)
        endif
     endif
@@ -2909,9 +2875,7 @@ contains
     if (ierr.eq.0) then
        if (present(def)) then
           vals(:) = def
-       else if (choice(.false.,unset)) then
-          continue
-       else
+       else if (.not.choice(.false.,unset)) then
           ierr = _ERROR(ERR_NEED_ARGUMENT)
        endif
     endif
@@ -2935,9 +2899,7 @@ contains
     if (ierr.eq.0) then
        if (present(def)) then
           vals(:) = def
-       else if (choice(.false.,unset)) then
-          continue
-       else
+       else if (.not.choice(.false.,unset)) then
           ierr = _ERROR(ERR_NEED_ARGUMENT)
        endif
     endif
@@ -2961,9 +2923,7 @@ contains
     if (ierr.eq.0) then
        if (present(def)) then
           vals(:) = def
-       else if (choice(.false.,unset)) then
-          continue
-       else
+       else if (.not.choice(.false.,unset)) then
           ierr = _ERROR(ERR_NEED_ARGUMENT)
        endif
     endif

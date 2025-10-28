@@ -1,7 +1,7 @@
 !!!_! calendar.F90 - TOUZA/Cal manager
 ! Maintainer: SAITO Fuyuki
 ! Created: May 31 2020
-#define TIME_STAMP 'Time-stamp: <2025/07/18 10:30:47 fuyuki calendar.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:27:30 fuyuki calendar.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -189,7 +189,7 @@ contains
        &  u,     levv,   mode,  stdv, &
        &  ncals, global, auto)
 #   define __PROC__ 'init'
-    use TOUZA_Cal_primitive,only: msg, choice, control_mode, control_deep
+    use TOUZA_Cal_primitive,only: choice, control_mode, control_deep
     use TOUZA_Cal_core,only: core_init=>init
     implicit none
     integer,intent(out)         :: ierr
@@ -324,7 +324,6 @@ contains
   subroutine alloc &
        & (ierr, ncals)
 #   define __PROC__ 'alloc'
-    use TOUZA_Cal_core,only: core_init=>init
     implicit none
     integer,intent(out) :: ierr
     integer,intent(in)  :: ncals

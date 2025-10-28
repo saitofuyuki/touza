@@ -1,7 +1,7 @@
 !!!_! std_utl.F90 - touza/std utilities
 ! Maintainer: SAITO Fuyuki
 ! Created: Jun 4 2020
-#define TIME_STAMP 'Time-stamp: <2025/08/28 19:19:52 fuyuki std_utl.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 11:13:26 fuyuki std_utl.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -17,7 +17,6 @@
 #include "touza_std.h"
 !!!_@ TOUZA_Std_utl - small utilities
 module TOUZA_Std_utl
-  use TOUZA_Std_prc, only: KFLT, KDBL, KI64, KQPL
 # define __MDL__ 'utl'
 # define __TAG__ STD_FORMAT_MDL('utl')
 # define _ERROR(E) (E - ERR_MASK_STD_UTL)
@@ -729,8 +728,8 @@ contains
        v = a
     else if (present(d)) then
        v = d
-    else
-       continue
+    ! else
+    !    continue
     endif
     return
   end subroutine choice_str
@@ -908,7 +907,7 @@ contains
 !!!_  & is_symbol()
   logical function is_symbol_def (str) result(b)
     implicit none
-    character(len=*),intent(in)          :: str
+    character(len=*),intent(in) :: str
     integer,parameter :: la = IACHAR('a'), lz = IACHAR('z')
     integer,parameter :: ua = IACHAR('A'), uz = IACHAR('Z')
     integer,parameter :: d0 = IACHAR('0'), d9 = IACHAR('9')
@@ -1039,8 +1038,9 @@ contains
     character(len=*),intent(in),optional :: sep
     integer,         intent(in),optional :: clipl, cliph
 
-    integer stt
-    integer,parameter :: stt_wait = 0, stt_set = 1, stt_rep = 2, stt_range = 3
+    ! ! reserved
+    ! integer stt
+    ! integer,parameter :: stt_wait = 0, stt_set = 1, stt_rep = 2, stt_range = 3
 
     integer jstr, lstr
     integer j, j0, n
@@ -1095,7 +1095,7 @@ contains
 
     minrep = max(2, choice(0, nrep))
 
-    stt = stt_wait
+    ! stt = stt_wait
     j = 0
     jstr = 0
     do
@@ -1234,8 +1234,8 @@ contains
 !!!_  & compact_string
   subroutine compact_string_f &
        & (ierr, str, v, fmt, ldelim, rdelim, append, mag, decp)
+    use TOUZA_Std_prc, only: KTGT=>KFLT
     implicit none
-    integer,parameter :: KTGT=KFLT
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: str
     real(kind=KTGT), intent(in)          :: v
@@ -1315,8 +1315,8 @@ contains
   end subroutine compact_string_f
   subroutine compact_string_d &
        & (ierr, str, v, fmt, ldelim, rdelim, append, mag, decp)
+    use TOUZA_Std_prc, only: KTGT=>KDBL
     implicit none
-    integer,parameter :: KTGT=KDBL
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: str
     real(kind=KTGT), intent(in)          :: v

@@ -1,7 +1,7 @@
 !!!_! nio_axis.F90 - TOUZA/Nio axis record special
 ! Maintainer: SAITO Fuyuki
 ! Created: Apr 4 2024
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:41:24 fuyuki nio_axis.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 08:31:26 fuyuki nio_axis.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2024, 2025
@@ -98,7 +98,7 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Nio_std,only: control_mode,  control_deep, is_first_force
-    use TOUZA_Nio_std,only: ns_diag=>diag, choice, msg, is_msglev_normal, is_msglev_info
+    use TOUZA_Nio_std,only: ns_diag=>diag, choice, msg, is_msglev_normal
     ! use TOUZA_Nio_header,only: nh_diag=>diag
     use TOUZA_Nio_record,only: nr_diag=>diag
     implicit none

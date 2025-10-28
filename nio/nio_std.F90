@@ -1,7 +1,7 @@
 !!!_! nio_std.F90 - TOUZA/Nio utilities (and bridge to Std)
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2021
-#define TIME_STAMP 'Time-stamp: <2025/05/23 11:04:01 fuyuki nio_std.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 11:03:59 fuyuki nio_std.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -36,7 +36,9 @@ module TOUZA_Nio_std
   use TOUZA_Std,only: kendi_file,       kendi_mem,      check_bodr_unit,  check_byte_order
   use TOUZA_Std,only: endian_BIG,       endian_LITTLE,  endian_OTHER
   use TOUZA_Std,only: is_eof_ss
-  use TOUZA_Std,only: new_unit,         search_from_last
+  use TOUZA_Std,only: set_category_bound, set_category_default
+  use TOUZA_Std,only: new_unit,         search_from_head, search_from_last
+  use TOUZA_Std,only: kucat_black
   use TOUZA_Std,only: is_file_opened
   use TOUZA_Std,only: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
   use TOUZA_Std,only: sus_open,         sus_close
@@ -99,7 +101,9 @@ module TOUZA_Nio_std
   public :: kendi_file,       kendi_mem,      check_bodr_unit,  check_byte_order
   public :: endian_BIG,       endian_LITTLE,  endian_OTHER
   public :: is_eof_ss
-  public :: new_unit,         search_from_last
+  public :: set_category_bound, set_category_default
+  public :: new_unit,         search_from_head, search_from_last
+  public :: kucat_black
   public :: is_file_opened
   public :: WHENCE_BEGIN,     WHENCE_ABS,     WHENCE_CURRENT,   WHENCE_END
   public :: sus_open,         sus_close
@@ -249,7 +253,7 @@ contains
 !!!_  & msg_txt - message dispatcher (to override std)
   subroutine msg_txt &
        & (txt, mdl, u)
-    use TOUZA_Std,only: choice, std_msg=>msg
+    use TOUZA_Std,only: std_msg=>msg
     implicit none
     character(len=*),intent(in)          :: txt
     character(len=*),intent(in),optional :: mdl
@@ -262,7 +266,6 @@ contains
 !!!_  & msg_aa - message dispatcher (to override std)
   subroutine msg_aa &
        & (fmt, v, mdl, u)
-    use TOUZA_Std,only: choice
     implicit none
     character(len=*),intent(in)          :: fmt
     character(len=*),intent(in)          :: v(:)
@@ -275,7 +278,6 @@ contains
 !!!_  & msg_i - message dispatcher (to override std)
   subroutine msg_i &
        & (fmt, v, mdl, u)
-    use TOUZA_Std,only: choice
     implicit none
     character(len=*),intent(in)          :: fmt
     integer,         intent(in)          :: v

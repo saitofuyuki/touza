@@ -1,7 +1,7 @@
 !!!_! std_htb.F90 - touza/std simple hash table manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Jan 28 2022
-#define TIME_STAMP 'Time-stamp: <2025/08/26 22:13:57 fuyuki std_htb.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 11:17:45 fuyuki std_htb.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022-2025
@@ -337,9 +337,9 @@ contains
                 call msg_mdl('(''init = '', I0)', (/init_counts/), __MDL__, utmp)
              endif
           endif
-          if (VCHECK_DETAIL(lv)) then
-             continue
-          endif
+          ! if (VCHECK_DETAIL(lv)) then
+          !    continue
+          ! endif
        endif
        lmd = control_deep(md, mode)
        if (md.ge.MODE_SHALLOW) then
@@ -398,7 +398,6 @@ contains
   subroutine init_system_tables &
        & (ierr, memk, memw, memc)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: memk, memw, memc
@@ -1832,7 +1831,6 @@ contains
   integer function new_ctable &
        & (mem, nstt, def, grow) &
        & result(jctrl)
-    use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,         intent(in) :: mem
     integer,optional,intent(in) :: nstt
@@ -2004,7 +2002,6 @@ contains
 
 !!!_  & save_status
   subroutine save_status_j(ierr, jctrl, entr, status, k)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(in)    :: jctrl
@@ -2039,7 +2036,6 @@ contains
 
 !!!_  & load_status
   subroutine load_status_j(ierr, status, jctrl, entr, k)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(out)   :: ierr
     integer,         intent(inout) :: status(0:)
@@ -2323,7 +2319,6 @@ contains
        & (ierr,   wtb,  &
        &  lim,    root,   seed,  eini)
     use TOUZA_Std_utl,only: choice
-    use TOUZA_Std_log,only: msg_mdl
     implicit none
     integer,         intent(out)   :: ierr
     type(wtable_t),  intent(inout) :: wtb
@@ -2394,7 +2389,6 @@ contains
 !!!_  & reg_item
   subroutine reg_item &
        & (ierr, handle, wh, flag, akey, ikey)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(out)         :: handle
@@ -2416,7 +2410,6 @@ contains
 !!!_  & reg_item_core
   subroutine reg_item_core &
        & (ierr, handle, wtb, flag, akey, ikey)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(out)         :: handle
@@ -2520,7 +2513,6 @@ contains
 !!!_  & reg_alias_core
   subroutine reg_alias_core &
        & (ierr, handle, wtb, flag, akey, ikey)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     integer,         intent(in)          :: handle

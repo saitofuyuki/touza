@@ -1,7 +1,7 @@
 !!!_! calendar_core.F90 - TOUZA/Cal core
 ! Maintainer: SAITO Fuyuki
 ! Created: Fri Jul 25 2011
-#define TIME_STAMP 'Time-stamp: <2025/07/17 09:37:58 fuyuki calendar_core.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:26:48 fuyuki calendar_core.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2011-2025
@@ -207,7 +207,7 @@ contains
 !!!_ + common interfaces
 !!!_  & init - initialization
   subroutine init (ierr, u, levv, mode, stdv)
-    use TOUZA_Cal_primitive,only: primitive_init=>init, msg, choice
+    use TOUZA_Cal_primitive,only: primitive_init=>init, choice
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(in),optional :: u
@@ -243,7 +243,7 @@ contains
 !!!_  & diag
   subroutine diag(ierr, u, levv, mode)
     use TOUZA_Cal_primitive,only: primitive_diag=>diag
-    use TOUZA_Cal_primitive,only: choice, msg, msglev_normal, msglev_warning
+    use TOUZA_Cal_primitive,only: choice, msg, msglev_normal
     use TOUZA_Cal_primitive,only: control_mode, control_deep
     implicit none
     integer,intent(out)         :: ierr

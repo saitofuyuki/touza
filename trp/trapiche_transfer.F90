@@ -1,10 +1,10 @@
 !!!_! trapiche_transfer.F90 - TOUZA/Trapiche(trapiche) communication
 ! Maintainer: SAITO Fuyuki
 ! Created: May 21 2022
-#define TIME_STAMP 'Time-stamp: <2025/08/28 15:26:11 fuyuki trapiche_transfer.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 11:08:22 fuyuki trapiche_transfer.F90>'
 !!!_! MANIFESTO
 !
-! Copyright (C) 2022,2023
+! Copyright (C) 2022-2025
 !           Japan Agency for Marine-Earth Science and Technology
 !
 ! Licensed under the Apache License, Version 2.0
@@ -167,18 +167,18 @@ contains
 #  if HAVE_FORTRAN_MPI_MPI_ISEND == 1
     use TOUZA_Trp_std,only: MPI_Isend
 #  endif
-    use TOUZA_Std,only: KDBL
-    use TOUZA_Trp_float,only: encode_alloc, retrieve_nbgz, KB_HEAD, show_bagazo_props
+    use TOUZA_Trp_std,only: KTGT=>KDBL
+    use TOUZA_Trp_float,only: encode_alloc, retrieve_nbgz, KB_HEAD
+    ! use TOUZA_Trp_float,only: show_bagazo_props
     implicit none
-    integer,parameter :: KTGT  = KDBL
     integer,parameter :: KMTGT = MPI_INTEGER
     integer,        intent(out) :: ierr
-    real(kind=KDBL),intent(in)  :: v(0:*)
+    real(kind=KTGT),intent(in)  :: v(0:*)
     integer,        intent(in)  :: n
     integer,        intent(in)  :: irank, icomm
     integer,        intent(in)  :: ktag
     integer,        intent(out) :: ireq
-    real(kind=KDBL),intent(in)  :: vmiss
+    real(kind=KTGT),intent(in)  :: vmiss
     integer,        intent(in)  :: mbits
     integer,        intent(in)  :: xbits, xtop, xbtm
     integer,        intent(in)  :: kcode
@@ -227,19 +227,18 @@ contains
 #  if HAVE_FORTRAN_MPI_MPI_IRECV == 1
     use TOUZA_Trp_std,only: MPI_Irecv
 #  endif
-    use TOUZA_Std,only: KDBL
-    use TOUZA_Trp_float,only: decode_alloc, retrieve_nbgz, KB_HEAD
+    use TOUZA_Trp_std,only: KTGT=>KDBL
+    use TOUZA_Trp_float,only: decode_alloc
     use TOUZA_Trp_float,only: retrieve_ncnz, KCODE_MANUAL
     implicit none
-    integer,parameter :: KTGT  = KDBL
     integer,parameter :: KMTGT = MPI_INTEGER
     integer,        intent(out) :: ierr
-    real(kind=KDBL),intent(out) :: v(0:*)
+    real(kind=KTGT),intent(out) :: v(0:*)
     integer,        intent(in)  :: n
     integer,        intent(in)  :: irank, icomm
     integer,        intent(in)  :: ktag
     integer,        intent(out) :: ireq
-    real(kind=KDBL),intent(in)  :: vmiss
+    real(kind=KTGT),intent(in)  :: vmiss
 
     integer nw, nc
     integer istt(MPI_STATUS_SIZE)
@@ -461,7 +460,7 @@ contains
 
   subroutine set_test_array &
        & (ierr, v, n, ksign, xbits)
-    use TOUZA_Trp_float,only: show_pattern_float
+    ! use TOUZA_Trp_float,only: show_pattern_float
     implicit none
     integer,        intent(out) :: ierr
     real(kind=KDBL),intent(out) :: V(0:*)

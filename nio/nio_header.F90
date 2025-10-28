@@ -1,7 +1,7 @@
 !!!_! nio_header.F90 - TOUZA/Nio header sub records
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 21 2021
-#define TIME_STAMP 'Time-stamp: <2025/07/17 10:48:27 fuyuki nio_header.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:38:41 fuyuki nio_header.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -846,7 +846,7 @@ contains
   end subroutine store_item_d
   subroutine store_item_jdate &
        & (ierr, head, dt, item, fmt, tol)
-    use TOUZA_Nio_std,only: choice_a, choice
+    use TOUZA_Nio_std,only: choice
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: head(*)
@@ -1003,7 +1003,6 @@ contains
   end subroutine restore_item_d
   subroutine restore_item_jdate &
        & (ierr, head, dt, item, fmt)
-    use TOUZA_Nio_std,only: choice_a
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(in)          :: head(*)
@@ -1284,7 +1283,7 @@ contains
 !!!_  - unparse_date_tuple
   subroutine unparse_date_tuple &
        & (ierr, str, dt, fmt)
-    use TOUZA_Nio_std,only: choice_a, choice
+    use TOUZA_Nio_std,only: choice_a
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(inout)       :: str

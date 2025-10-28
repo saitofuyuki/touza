@@ -1,7 +1,7 @@
 !!!_! std_mwe.F90 - touza/std MPI wrapper emulator
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/08/28 15:24:48 fuyuki std_mwe.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:02:16 fuyuki std_mwe.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -467,7 +467,7 @@ contains
 !!!_  & get_gni - return rank and size from group (guard MPI_GROUP_NULL)
   subroutine get_gni &
        & (ierr, igrp, nrank, irank)
-    use TOUZA_Std_utl,only: choice, set_if_present
+    use TOUZA_Std_utl,only: set_if_present
     implicit none
     integer,intent(out)          :: ierr
     integer,intent(in)           :: igrp
@@ -508,7 +508,7 @@ contains
 !!!_  & get_wni - get properties of MPI_COMM_WORLD
   subroutine get_wni &
        & (ierr, nrank, irank, icomm)
-    use TOUZA_Std_utl,only: choice, set_if_present
+    use TOUZA_Std_utl,only: set_if_present
     implicit none
     integer,intent(out)          :: ierr
     integer,intent(out),optional :: nrank
@@ -553,7 +553,7 @@ contains
 !!!_  & get_wni_safe - get properties of MPI_COMM_WORLD (safer)
   subroutine get_wni_safe &
        & (ierr, nrank, irank, icomm)
-    use TOUZA_Std_utl,only: choice, set_if_present
+    use TOUZA_Std_utl,only: set_if_present
     implicit none
     integer,intent(out)          :: ierr
     integer,intent(out),optional :: nrank

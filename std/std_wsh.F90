@@ -1,7 +1,7 @@
 !!!_! std_wsh.F90 - touza/std standard work-sharing
 ! Maintainer: SAITO Fuyuki
 ! Created: May 30 2020
-#define TIME_STAMP 'Time-stamp: <2025/05/23 08:38:37 fuyuki std_wsh.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/27 22:00:31 fuyuki std_wsh.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -321,7 +321,6 @@ contains
     call diag_wsize_core(ierr, txt, n, u, levv)
   end subroutine diag_wsize_l
   subroutine diag_wsize_f(ierr, txt, v, u, levv)
-    use TOUZA_Std_utl,only: choice
     implicit none
     integer,parameter :: KARG=KFLT
     integer,         intent(out)            :: ierr
