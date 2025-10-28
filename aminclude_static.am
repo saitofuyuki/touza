@@ -1,10 +1,16 @@
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Tue Oct  7 21:43:59 JST 2025
+# from AX_AM_MACROS_STATIC on Tue Oct 28 13:03:42 JST 2025
 
 BUILD_AUX  =    $(top_srcdir)/build-aux
 CLEANFILES =
 MOSTLYCLEANFILES =
+
+CLEANEXTS = @CLEANEXTS@
+MOSTLYCLEANEXTS = @MOSTLYCLEANEXTS@
+
+CLEANFILES += $(CLEANEXTS)
+MOSTLYCLEANFILES += $(MOSTLYCLEANEXTS)
 
 LIST_MODFILES = .modfiles
 
