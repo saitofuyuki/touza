@@ -1,7 +1,7 @@
 !!!_! trapiche_float.F90 - TOUZA/Trapiche(trapiche) floating-point (dis)assembler
 ! Maintainer: SAITO Fuyuki
 ! Created: Mar 1 2021
-#define TIME_STAMP 'Time-stamp: <2025/10/27 22:33:33 fuyuki trapiche_float.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/29 22:27:24 fuyuki trapiche_float.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -15,6 +15,12 @@
 #endif
 #include "touza_trp.h"
 !!!_* macros
+#ifndef    TEST_TRAPICHE_FLOAT
+#  define  TEST_TRAPICHE_FLOAT 0
+#endif
+#if TEST_TRAPICHE_FLOAT == 2
+#  define OPT_TRAPICHE_INTEL_SPECIALS 1
+#endif
 !!!_ + system dependent workarounds
 #ifndef    OPT_PROHIBIT_AUTO_WORKAROUND
 #  define  OPT_PROHIBIT_AUTO_WORKAROUND 0
@@ -29,9 +35,17 @@
 #     define OPT_TRAPICHE_SX_SPECIALS 1
 #     endif
 #  endif
+#  if __INTEL_COMPILER
+#     ifndef OPT_TRAPICHE_INTEL_SPECIALS
+#     define OPT_TRAPICHE_INTEL_SPECIALS 1
+#     endif
+#  endif
 #endif /* not OPT_TRAPICHE_PROHIBIT_WORKAROUND */
 #ifndef   OPT_TRAPICHE_SX_SPECIALS
 #  define OPT_TRAPICHE_SX_SPECIALS 0
+#endif
+#ifndef   OPT_TRAPICHE_INTEL_SPECIALS
+#  define OPT_TRAPICHE_INTEL_SPECIALS 0
 #endif
 !!!_  - where or do-if
 #ifndef    OPT_PREFER_WHERE
@@ -285,7 +299,12 @@ module TOUZA_Trp_float
 #if OPT_TRAPICHE_SX_SPECIALS
   interface XSETSX
      module procedure XSETSX_d, XSETSX_f
-end interface XSETSX
+  end interface XSETSX
+#endif
+#if OPT_TRAPICHE_INTEL_SPECIALS
+  interface XPNINT
+     module procedure XPNINT_d, XPNINT_f
+  end interface XPNINT
 #endif
 !!!_  - public procedures
   public init, diag, finalize
@@ -313,6 +332,12 @@ contains
 #else
 #  define _EXPONENT(A)  EXPONENT(A)
 #  define _SET_EXPONENT SET_EXPONENT
+#endif
+!!!_  - _ANINT_POS - ANINT(A) for positive A
+#if OPT_TRAPICHE_INTEL_SPECIALS
+#  define _ANINT_POS(A)  XPNINT(A)
+#else
+#  define _ANINT_POS(A)  ANINT(A)
 #endif
 !!!_ + common interfaces
 !!!_  & init
@@ -513,9 +538,12 @@ contains
 #   endif
 
     ierr = 0 * choice(0, u)
-#   if OPT_TRAPICHE_SX_SPECIALS
-    call msg('(''sx special procedures enabled '', I0)', &
+    call msg('(''sx special procedures '', I0)', &
          & OPT_TRAPICHE_SX_SPECIALS, __MDL__, u)
+    call msg('(''intel special procedures '', I0)', &
+         & OPT_TRAPICHE_INTEL_SPECIALS, __MDL__, u)
+
+#   if OPT_TRAPICHE_SX_SPECIALS
     if (HAVE_FORTRAN_AMT.eq.0) then
        ierr = -1
        call msg('not found amt()', __MDL__, u)
@@ -556,6 +584,8 @@ contains
        endif
     enddo
 #   endif /* OPT_TRAPICHE_SX_SPECIALS */
+#   if OPT_TRAPICHE_INTEL_SPECIALS
+#   endif /* OPT_TRAPICHE_INTEL_SPECIALS */
   end subroutine diag_system
 
 !!!_ + user subroutines (batch)
@@ -1796,7 +1826,7 @@ contains
           iwl(j) = 0
           bmiss = .TRUE.
        else
-          vt = ANINT(_SET_EXPONENT(abs(vsrc(j)), mbits+kxone))
+          vt = _ANINT_POS(_SET_EXPONENT(abs(vsrc(j)), mbits+kxone))
           kx = _EXPONENT(vsrc(j)) + (_EXPONENT(vt) - (mbits+kxone))
           if      (kx.gt.kxmax) then
              ! nan or infinity
@@ -1928,7 +1958,7 @@ contains
              iwh(j) = KX_INF
              binf = .TRUE.
           else
-             vh = ANINT(_SET_EXPONENT(abs(vsrc(j)), mbits+kxone))
+             vh = _ANINT_POS(_SET_EXPONENT(abs(vsrc(j)), mbits+kxone))
              kx = _EXPONENT(vsrc(j)) + (_EXPONENT(vh) - (mbits+kxone))
              vh = _SET_EXPONENT(vh, ixshh)
              iwh(j) = int(vh - vmskh)
@@ -2049,7 +2079,7 @@ contains
              iwh(j) = KX_INF
              binf = .TRUE.
           else
-             vh = ANINT(_SET_EXPONENT(abs(vsrc(j)), mbits+kxone))
+             vh = _ANINT_POS(_SET_EXPONENT(abs(vsrc(j)), mbits+kxone))
              kx = _EXPONENT(vsrc(j)) + (_EXPONENT(vh) - (mbits+kxone))
              vh = _SET_EXPONENT(vh, ixshh)
              iwh(j) = int(vh - vmskh)
@@ -4444,6 +4474,30 @@ contains
     return
   end function XSETSX_f
 #endif /* OPT_TRAPICHE_SX_SPECIALS */
+!!!_  & XPNINT() - positive only ANINT() for Intel system
+#if OPT_TRAPICHE_INTEL_SPECIALS
+  ELEMENTAL &
+  function XPNINT_d(A) &
+       & result(V)
+    use TOUZA_Trp_std,only: KRTGT=>KDBL
+    implicit none
+    real(kind=KRTGT) :: V
+    real(kind=KRTGT),intent(in) :: A
+    real(kind=KRTGT),parameter :: H=0.5_KRTGT
+    V = AINT(A + H)
+    return
+  end function XPNINT_d
+  function XPNINT_f(A) &
+       & result(V)
+    use TOUZA_Trp_std,only: KRTGT=>KFLT
+    implicit none
+    real(kind=KRTGT) :: V
+    real(kind=KRTGT),intent(in) :: A
+    real(kind=KRTGT),parameter :: H=0.5_KRTGT
+    V = AINT(A + H)
+    return
+  end function XPNINT_f
+#endif /* OPT_TRAPICHE_INTEL_SPECIALS */
 !!!_ + compare_report - check results (array)
   subroutine compare_report_d &
        & (ierr, va, vb, n, fmt, tag, u)
@@ -4587,7 +4641,7 @@ contains
 end module TOUZA_Trp_float
 
 !!!_@ test_trapiche_float - test program
-#ifdef TEST_TRAPICHE_FLOAT
+#if TEST_TRAPICHE_FLOAT
 program test_trapiche_float
   use TOUZA_Std_arg, only: parse, get_option, arg_init=>init, arg_diag=>diag
   use TOUZA_Std_prc, only: diag_real_props
@@ -4633,7 +4687,7 @@ program test_trapiche_float
 
 101 format(A, ' = ', I0)
 
-  call init(ierr, levv=-1, stdv=+9)
+  call init(ierr, levv=+1, stdv=+9)
   ! write(*, 101) 'init', ierr
   if (ierr.eq.0) call diag(ierr)
   if (ierr.eq.0) call diag_real_props(ierr, mold)
