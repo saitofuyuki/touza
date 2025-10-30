@@ -1,7 +1,7 @@
 !!!_! emu_ugg.F90 - touza/emu geography geometry geodesy
 ! Maintainer: SAITO Fuyuki
 ! Created: Dec 23 2022
-#define TIME_STAMP 'Time-stamp: <2025/10/28 11:19:17 fuyuki emu_ugg.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/30 08:54:27 fuyuki emu_ugg.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024, 2025
@@ -2271,12 +2271,12 @@ contains
 
 !!!_  & psgp_gla_tr - extract lat properties from cache
   subroutine psgp_gla_tr_d &
-       & (glat, cla, cco)
+       & (glat, cla)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(out) :: glat(*)
     real(kind=KTGT),intent(in)  :: cla(*)
-    real(kind=KTGT),intent(in)  :: cco(*)
+    ! real(kind=KTGT),intent(in)  :: cco(*)
 
     _SIN(glat) = cla(icache_psgp_sinla)
     _COS(glat) = cla(icache_psgp_cosla)
@@ -2284,12 +2284,12 @@ contains
 
 !!!_  & psgp_sinlat - extract sine lat properties from cache
   PURE &
-  function psgp_sinlat_d (cla, cco) result(v)
+  function psgp_sinlat_d (cla) result(v)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT) :: v
     real(kind=KTGT),intent(in)  :: cla(*)
-    real(kind=KTGT),intent(in)  :: cco(*)
+    ! real(kind=KTGT),intent(in)  :: cco(*)
 
     v = cla(icache_psgp_sinla)
   end function psgp_sinlat_d
@@ -2962,16 +2962,16 @@ contains
     v = (((a * a) * (pi_(ONE))) * aco) * TWO
 
   end function psgp_surf_area_d
-!!!_  & psgp_xlo - solve (x, lon) from (y, lat)
+!!!_  & psgp_xlo_tr - solve (x, lon) from (y, lat)
   subroutine psgp_xlo_tr_d &
-       & (x, dlo, y, cla, cco, xs, sf)
+       & (x, dlo, y, cla, xs, sf)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(out)          :: x
     real(kind=KTGT),intent(out)          :: dlo(*)
     real(kind=KTGT),intent(in)           :: y
     real(kind=KTGT),intent(in)           :: cla(*)
-    real(kind=KTGT),intent(in)           :: cco(*)
+    ! real(kind=KTGT),intent(in)           :: cco(*)
     real(kind=KTGT),intent(in)           :: xs   ! sign of sin(dlo) or x
     real(kind=KTGT),intent(out),optional :: sf
 
@@ -3018,7 +3018,7 @@ contains
     real(kind=KTGT) :: tla(ncache_psgp_la)
 
     call psgp_cachela(tla, lat, cco)
-    call psgp_xlo_tr(x, dlo, y, tla, cco, xs, sf)
+    call psgp_xlo_tr(x, dlo, y, tla, xs, sf)
   end subroutine psgp_xlo_once_tr_d
 
 !!!_  & psgp_ylo - solve (y,lon) from (x,lat)
@@ -4970,7 +4970,7 @@ contains
 
     real(kind=KTGT) :: loro, laro
 
-    wacs = stp_wsphere_wproj_tr(lon, lat, csco)
+    wacs = stp_wsphere_wproj_tr(lon, lat)
     zacs = stp_w2zproj_atr(wacs, csco)
 
     if (zacs(JAMP).eq.0.0_KTGT) then
@@ -5029,13 +5029,13 @@ contains
 !!!_  & stp_wsphere_wproj() - transform from w-sphere to w-plane projection
   PURE &
   function stp_wsphere_wproj_tr_d &
-       & (lon, lat, csco) &
+       & (lon, lat) &
        & result (wacs)
     use TOUZA_Std,only: KTGT=>KDBL
     implicit none
     real(kind=KTGT),intent(in) :: lon(NTRIG)   ! geological coordinates
     real(kind=KTGT),intent(in) :: lat(NTRIG)
-    real(kind=KTGT),intent(in) :: csco(*)
+    ! real(kind=KTGT),intent(in) :: csco(*)
     real(kind=KTGT) :: wacs(NATRI)
 
     real(kind=KTGT),parameter :: ONE = 1.0_KTGT
@@ -7242,7 +7242,7 @@ contains
 125 format(2x, 'ylo:', L1, '--', ES16.8, 1x, 2ES16.8, 1x, ES10.3)
 132 format(2x, 'xla:', 3L1, ES16.8, 1x, 2ES16.8)
 133 format(2x, 'yla:', 3L1, ES16.8, 1x, 2ES16.8)
-    call psgp_xlo_tr(xt, dlo, xxc(2), cla2, cco2, xxc(1))
+    call psgp_xlo_tr(xt, dlo, xxc(2), cla2, xxc(1))
     if (undet) then
        write(*, 124) is_same_coor(xt, xxc(1)), xt, dlo, xt-xxc(1)
     else
@@ -7289,7 +7289,7 @@ contains
     ! write(*, 121) 'sin', 'dlon', _SIN(dlo), sin(_LONGI(rr) - _LONGI(llorg))
     ! write(*, 121) 'cos', 'dlon', _COS(dlo), cos(_LONGI(rr) - _LONGI(llorg))
 
-    call psgp_xlo_tr(xt, dlo, xxc(2), cla3, cco3, xxc(1))
+    call psgp_xlo_tr(xt, dlo, xxc(2), cla3, xxc(1))
     if (undet) then
        write(*, 124) is_same_coor(xt, xxc(1)), xt, dlo, xt-xxc(1)
     else

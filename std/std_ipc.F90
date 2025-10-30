@@ -1,7 +1,7 @@
 !!!_! std_ipc.F90 - touza/std intrinsic procedures compatible gallery
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 25 2023
-#define TIME_STAMP 'Time-stamp: <2025/10/27 22:08:18 fuyuki std_ipc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 23:12:39 fuyuki std_ipc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2023-2025
@@ -335,8 +335,13 @@ contains
 
     do jp = 0, lbits + 1
        do ll = 0, lbits + 2 - jp
-          iref = IBITS(isrc, jp, ll)
-          ians = ipc_IBITS(isrc, jp, ll)
+          if (ll.gt.lbits .or. jp + ll.gt.lbits) then
+             iref = -1
+             ians = -1
+          else
+             iref = IBITS(isrc, jp, ll)
+             ians = ipc_IBITS(isrc, jp, ll)
+          endif
 101       format('IBITS(', I0, ',', I0, ',', I0, ') ', &
                & L1, 1x, A, 1x, A)
           if (iref.ne.ians .or. is_msglev_DEBUG(lv)) then
@@ -652,6 +657,29 @@ program test_std_ipc
 
   integer ierr
 
+#if HAVE_FORTRAN_GET_COMMAND_ARGUMENT
+  integer ja, na, ksw
+  character(len=128) :: arg
+#endif
+
+#if HAVE_FORTRAN_GET_COMMAND_ARGUMENT
+  na = command_argument_count()
+  if (na.eq.0) then
+     write(*, *) 'Need argument [0-1]'
+     stop
+  endif
+  ja = 1
+  call get_command_argument(ja, arg, status=ierr)
+  if (ierr.eq.0) read(arg, *, iostat=ierr) ksw
+  if (ierr.ne.0) then
+     write(*, *) 'something went wrong: ', ierr
+     stop
+  endif
+#else
+  ksw = 0
+  write(*, *) 'Run only case 0'
+#endif
+
   ierr = 0
   call init(ierr)
   if (ierr.eq.0) call diag(ierr)
@@ -667,12 +695,12 @@ program test_std_ipc
   ierr = 0
   call test_hypot(ierr, 3.0_KRTGT, 4.0_KRTGT)
   F = (H / 8.0_KRTGT)
-  call test_hypot(ierr, 3.0_KRTGT * F, 4.0_KRTGT * F)
+  call test_hypot(ierr, 3.0_KRTGT * F, 4.0_KRTGT * F, ksw)
 
-  call test_invht(ierr, 2.0_KRTGT)
-  call test_invht(ierr, 1.0_KRTGT)
-  call test_invht(ierr, 0.5_KRTGT)
-  call test_invht(ierr, 0.0_KRTGT)
+  call test_invht(ierr, 2.0_KRTGT, ksw)
+  call test_invht(ierr, 1.0_KRTGT, ksw)
+  call test_invht(ierr, 0.5_KRTGT, ksw)
+  call test_invht(ierr, 0.0_KRTGT, ksw)
 
   call test_etime(ierr)
 
@@ -682,49 +710,90 @@ program test_std_ipc
   if (ierr.ne.0) call ipc_EXIT(ierr)
   stop
 contains
-  subroutine test_hypot(ierr, x, y)
+  subroutine test_hypot(ierr, x, y, ksw)
     integer,intent(out) :: ierr
     real(kind=KRTGT),intent(in) :: x, y
+    integer,optional,intent(in) :: ksw
 
     real(kind=KRTGT) :: zt, zr, zi
+    real(kind=KRTGT),parameter :: h = SQRT(HUGE(0.0_KRTGT))
+    logical skip_raw
 
     ierr = 0
     zt = ipc_HYPOT(x, y)
     zi = HYPOT(x, y)
-    zr = sqrt(x**2 + y**2)
 
-101 format('hypot:', A, 1x, 2E16.8, 1x E24.16)
+    skip_raw = (x.ge.h .or. y.ge.h)
+    if (skip_raw) then
+       if (present(ksw)) then
+          skip_raw = ksw.eq.0
+       endif
+    endif
+
+    if (skip_raw) then
+       zr = -1.0_KRTGT
+    else
+       zr = sqrt(x**2 + y**2)
+    endif
+
+101 format('hypot:', A, 1x, 2E16.8, 1x, E24.16)
     write(*, 101) 'ipc',       x, y, zt
     write(*, 101) 'intrinsic', x, y, zi
     write(*, 101) 'raw',       x, y, zr
 
   end subroutine test_hypot
 
-  subroutine test_invht(ierr, x)
+  subroutine test_invht(ierr, x, ksw)
     integer,intent(out) :: ierr
     real(kind=KRTGT),intent(in) :: x
+    integer,optional,intent(in) :: ksw
+    integer kskip
 
     real(kind=KRTGT) :: zs, zc, zt
     real(kind=KRTGT) :: ys, yc, yt
 
+    real(kind=KRTGT),parameter :: ZERO = 0.0_KRTGT
+    real(kind=KRTGT),parameter :: ONE  = 1.0_KRTGT
+    real(kind=KRTGT),parameter :: HNAN = - HUGE(ZERO)
+
     ierr = 0
-    zt = ipc_ATANH(x)
-    zc = ipc_ACOSH(x)
+    if (present(ksw)) then
+       kskip = ksw
+    else
+       kskip = 0
+    endif
+
+    ! atanh:  -1 < x < 1
+    if (kskip.ne.0.or.abs(x).lt.ONE) then
+       zt = ipc_ATANH(x)
+#      if HAVE_FORTRAN_ATANH
+         yt = ATANH(x)
+#      else
+         yt = HNAN
+#      endif
+    else
+       yt = HNAN
+       zt = HNAN
+    endif
+
+    ! acosh:  1 <= x
+    if (kskip.ne.0.or.x.ge.ONE) then
+       zc = ipc_ACOSH(x)
+#      if HAVE_FORTRAN_ACOSH
+         yc = ACOSH(x)
+#      else
+         yc = - HUGE(0.0_KRTGT)
+#      endif
+    else
+       yc = HNAN
+       zc = HNAN
+    endif
+
     zs = ipc_ASINH(x)
-#if HAVE_FORTRAN_ACOSH
-    yc = ACOSH(x)
-#else
-    yc = - HUGE(0.0_KRTGT)
-#endif
 #if HAVE_FORTRAN_ASINH
     ys = ASINH(x)
 #else
     ys = - HUGE(0.0_KRTGT)
-#endif
-#if HAVE_FORTRAN_ATANH
-    yt = ATANH(x)
-#else
-    yt = - HUGE(0.0_KRTGT)
 #endif
 
 101 format('invht:', A, 1x, 2ES24.16, 1x, ES24.16)

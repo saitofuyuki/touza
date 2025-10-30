@@ -334,9 +334,9 @@ contains
     if (ierr.eq.0) call msg_macro(ierr, '__INTEL_COMPILER', __INTEL_COMPILER, ulog)
     if (ierr.eq.0) call msg_macro(ierr, '__INTEL_COMPILER_BUILD_DATE ', __INTEL_COMPILER_BUILD_DATE, ulog)
     if (ierr.eq.0) call msg_macro(ierr, '__INTEL_COMPILER_UPDATE', __INTEL_COMPILER_UPDATE, ulog)
-#else /* not __INTEL_COMPILER__ */
+#else /* not __INTEL_COMPILER */
     if (ierr.eq.0) call msg_macro(ierr, '__INTEL_COMPILER', ' ', ulog)
-#endif /* not __INTEL_COMPILER__ */
+#endif /* not __INTEL_COMPILER */
     return
   end subroutine check_intel
 

@@ -1,7 +1,7 @@
 !!!_! nio_record.F90 - TOUZA/Nio record interfaces
 ! Maintainer: SAITO Fuyuki
 ! Created: Oct 29 2021
-#define TIME_STAMP 'Time-stamp: <2025/10/28 08:55:53 fuyuki nio_record.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/29 07:56:32 fuyuki nio_record.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -9977,11 +9977,14 @@ contains
 !!!_  & parse_record_fmt - parse format
   subroutine parse_record_fmt &
        & (ierr, kfmt, str)
+    use TOUZA_Nio_header,only: litem
     use TOUZA_Nio_std,only: parse_number
     implicit none
     integer,         intent(out) :: ierr
     integer,         intent(out) :: kfmt
     character(len=*),intent(in)  :: str
+
+    character(len=litem * 2) :: sbuf
     integer kk
     integer je
 
@@ -9990,7 +9993,9 @@ contains
     je = index(str, sep_subvitem)
     if (je.eq.0) je = len_trim(str) + 1
 
-    select case (str(1:1))
+    sbuf = str
+
+    select case (sbuf(1:1))
     case ('U')
        kfmt = 0
     case ('M')
@@ -10002,14 +10007,14 @@ contains
     end select
 
     if (ierr.eq.0) then
-       select case (str(2:2))
+       select case (sbuf(2:2))
        case ('R')
-          select case (str(3:3))
+          select case (sbuf(3:3))
           case ('C')
              if (kfmt.ne.0) then
                 ierr = _ERROR(ERR_UNKNOWN_FORMAT)
              else
-                if (str(4:4).eq.'2') then
+                if (sbuf(4:4).eq.'2') then
                    kfmt = kfmt + GFMT_URC2
                 else
                    kfmt = kfmt + GFMT_URC
@@ -10017,7 +10022,7 @@ contains
              endif
           case ('Y', 'X')
              kfmt = kfmt + GFMT_URY
-             call parse_number(ierr, kk, str(4:je-1), -1)
+             call parse_number(ierr, kk, sbuf(4:je-1), -1)
              if (ierr.eq.0) then
                 if (kk.gt.(GFMT_URYend - GFMT_URY)) ierr = -1
                 if (kk.lt.1) ierr = _ERROR(ERR_UNKNOWN_FORMAT)
@@ -10032,7 +10037,7 @@ contains
              !    ierr = 0
              ! endif
           case default
-             call parse_number(ierr, kk, str(3:je-1), -1)
+             call parse_number(ierr, kk, sbuf(3:je-1), -1)
              if (ierr.eq.0) then
                 if (kk.eq.4) then
                    kfmt = kfmt + GFMT_UR4
@@ -10046,7 +10051,7 @@ contains
              endif
           end select
        case ('I')
-          call parse_number(ierr, kk, str(3:je-1), -1)
+          call parse_number(ierr, kk, sbuf(3:je-1), -1)
           if (ierr.eq.0) then
              if (kk.eq.1) then
                 kfmt = kfmt + GFMT_UI1

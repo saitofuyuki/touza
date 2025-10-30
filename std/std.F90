@@ -108,7 +108,7 @@ module TOUZA_Std
   use TOUZA_Std_mwe,only: MPI_MIN,           MPI_MAX
   use TOUZA_Std_mwe,only: MPI_ANY_TAG,       MPI_ANY_SOURCE
   use TOUZA_Std_mwe,only: MPI_DOUBLE_PRECISION
-  use TOUZA_Std_mwe,only: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  use TOUZA_Std_mwe,only: MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
   use TOUZA_Std_mwe,only: MPI_COMM_CREATE,   MPI_COMM_SPLIT, MPI_COMM_GROUP
   use TOUZA_Std_mwe,only: MPI_COMM_SIZE,     MPI_COMM_RANK
   use TOUZA_Std_mwe,only: MPI_WAIT, MPI_BARRIER
@@ -137,6 +137,9 @@ module TOUZA_Std
 #endif
 #if HAVE_FORTRAN_MPI_MPI_GATHER == 1
   use TOUZA_Std_mwe,only: MPI_Gather
+#endif
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS == 1
+  use TOUZA_Std_mwe,only: MPI_Group_translate_ranks
 #endif
 
   use TOUZA_Std_fun,only: set_category_bound, set_category_default
@@ -312,7 +315,7 @@ module TOUZA_Std
   public :: MPI_MIN,           MPI_MAX
   public :: MPI_ANY_TAG,       MPI_ANY_SOURCE
   public :: MPI_DOUBLE_PRECISION
-  public :: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  public :: MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
   public :: MPI_COMM_CREATE,   MPI_COMM_SPLIT, MPI_COMM_GROUP
   public :: MPI_COMM_SIZE,     MPI_COMM_RANK
   public :: MPI_WAIT, MPI_BARRIER
@@ -341,6 +344,9 @@ module TOUZA_Std
 #endif
 #if HAVE_FORTRAN_MPI_MPI_GATHER == 1
   public :: MPI_Gather
+#endif
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS == 1
+  public :: MPI_Group_translate_ranks
 #endif
 
   public :: set_category_bound, set_category_default

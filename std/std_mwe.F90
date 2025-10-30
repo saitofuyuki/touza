@@ -32,7 +32,7 @@ module TOUZA_Std_mwe
   use mpi,only: MPI_COMM_SIZE,     MPI_COMM_RANK
   use mpi,only: MPI_COMM_CREATE,   MPI_COMM_SPLIT, MPI_COMM_GROUP
   use mpi,only: MPI_COMM_COMPARE, MPI_GROUP_COMPARE
-  use mpi,only: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  use mpi,only: MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
   use mpi,only: MPI_ABORT, MPI_WAIT,  MPI_BARRIER
   use mpi,only: MPI_PROBE, MPI_GET_COUNT
 #endif
@@ -56,6 +56,9 @@ module TOUZA_Std_mwe
 #endif
 #if HAVE_FORTRAN_MPI_MPI_GATHER == 1
   use mpi,only: MPI_Gather
+#endif
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS == 1
+  use mpi,only: MPI_Group_translate_ranks
 #endif
 
   use TOUZA_Std_log,only: unit_global,  trace_fine,   trace_control
@@ -138,7 +141,7 @@ module TOUZA_Std_mwe
   public :: MPI_COMM_SIZE,     MPI_COMM_RANK
   public :: MPI_COMM_CREATE,   MPI_COMM_SPLIT, MPI_COMM_GROUP
   public :: MPI_COMM_COMPARE, MPI_GROUP_COMPARE
-  public :: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  public :: MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
   public :: MPI_ABORT, MPI_WAIT,  MPI_BARRIER
   public :: MPI_PROBE, MPI_GET_COUNT
 #if HAVE_FORTRAN_MPI_MPI_BCAST == 1
@@ -161,6 +164,9 @@ module TOUZA_Std_mwe
 #endif
 #if HAVE_FORTRAN_MPI_MPI_GATHER == 1
   public :: MPI_Gather
+#endif
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS == 1
+  public :: MPI_Group_translate_ranks
 #endif
 !!!_  - misc
   character(len=128) tmsg
@@ -851,12 +857,12 @@ contains
 #endif /* not OPT_USE_MPI */
 #if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS
 #else
-  subroutine MPI_GROUP_TRANSLATE_RANKS &
+  subroutine MPI_Group_translate_ranks &
        & (GROUP1, N, RANKS1, GROUP2, RANKS2, IERROR)
     implicit none
     INTEGER GROUP1, N, RANKS1(*), GROUP2, RANKS2(*), IERROR
     IERROR = ERR_NOT_IMPLEMENTED
-  end subroutine MPI_GROUP_TRANSLATE_RANKS
+  end subroutine MPI_Group_translate_ranks
 #endif
 end module TOUZA_Std_mwe
 !!!_@ test_std_mpi - test program

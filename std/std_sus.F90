@@ -2,7 +2,7 @@
 ! Maintainer: SAITO Fuyuki
 ! Transferred: Dec 24 2021
 ! Created: Oct 17 2021 (nng_io)
-#define TIME_STAMP 'Time-stamp: <2025/10/28 11:14:38 fuyuki std_sus.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 23:18:58 fuyuki std_sus.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -8108,7 +8108,7 @@ contains
           md = min(nd, nm - jb)
           je = jb + md
           post = je.lt.nm
-          if (ierr.eq.0) call sus_write_irec(ierr, u, vi(jb:je), md, swap, pre, post)
+          if (ierr.eq.0) call sus_write_irec(ierr, u, vi(jb:je-1), md, swap, pre, post)
           pre = .TRUE.
        enddo
     enddo

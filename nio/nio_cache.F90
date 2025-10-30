@@ -1,7 +1,7 @@
 !!!_! nio_cache.F90 - TOUZA/Nio cache-record extension
 ! Maintainer: SAITO Fuyuki
 ! Created: Nov 9 2022
-#define TIME_STAMP 'Time-stamp: <2025/10/28 10:54:17 fuyuki nio_cache.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/30 09:45:55 fuyuki nio_cache.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022,2023,2024,2025
@@ -565,13 +565,15 @@ contains
     integer jc, gid
     jc = is_valid(handle) ! check gid also
     ierr = min(0, jc)
-    if (ierr.eq.0) gid = extr_h2group(handle)
-    if (ierr.eq.0) ierr = min(0, gid)
     if (ierr.eq.0) then
-       if (gid.eq.grp_suite) then
-          name = group_suite
-       else
-          name = ctables(jc)%g(gid)%name
+       gid = extr_h2group(handle)
+       ierr = min(0, gid)
+       if (ierr.eq.0) then
+          if (gid.eq.grp_suite) then
+             name = group_suite
+          else
+             name = ctables(jc)%g(gid)%name
+          endif
        endif
     endif
   end subroutine cache_group_name
@@ -1687,7 +1689,7 @@ contains
 122 format(A, 3x, 'C', 1x, A)
 131 format(A, 1x, '<', A, '>', 1x, I0, 1x, I0)
 201 format(Z8.8, '+', Z0)
-151 format(A, 3x, I0, 1x '{', I0, '}')
+151 format(A, 3x, I0, 1x, '{', I0, '}')
 
 
     if (present(tag)) then

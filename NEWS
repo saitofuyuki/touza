@@ -1,10 +1,28 @@
 # TOUZA news
 # Maintainer: SAITO Fuyuki
-# Time-stamp: <2025/10/28 13:02:04 fuyuki NEWS>
+# Time-stamp: <2025/10/30 10:19:21 fuyuki NEWS>
 
 TOUZA news - user-visible changes
 
 Please refer ChangeLog and git log for more information.
+
+* Changes in 1.17.0 from 1.16.9
+** Beta-release for miroc-7 default
+** [SEREVE] Workaround for Intel compiler.
+A special macro OPT_TRAPICHE_INTEL_SPECIALS is Introduced in
+trapiche_float.F90, to control ANINT().
+
+Intel compiler aborts with segmentation fault when with -xHost
+argument, which is found using Intel_oneAPI 2024 on ES4 SX Aurora.
+
+After some trials, calling ANINT() is the key for the failure.
+It is strange but, it does succeed when ANINT() is replaced by a
+comparable function, using AINT().
+
+You can switch to the original procedure to define
+OPT_TRAPICHE_INTEL_SPECIALS as 0.  In the current implementation,
+this macro is set as 1 when __INTEL_COMPILER is non-zero.
+** Safer implementation to pass test-builds on miroc.
 
 * Changes in 1.16.9 from 1.16.2
 ** Import development around elemental procedure with optional arguments.

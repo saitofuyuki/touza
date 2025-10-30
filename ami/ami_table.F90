@@ -1,7 +1,7 @@
 !!!_! ami_table.F90 - TOUZA/Ami/table amida-coupler table procedures
 ! Maintainer: SAITO Fuyuki
 ! Created: May 2 2022
-#define TIME_STAMP 'Time-stamp: <2025/07/17 11:29:00 c0210 ami_table.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/30 08:56:19 fuyuki ami_table.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2022, 2023, 2024, 2025
@@ -3253,13 +3253,13 @@ contains
     adjstt(node_4) = is_adjacent_cells(gdbl(:, node_4), gdbl(:, node_3))
     adjstt(node_3) = is_adjacent_cells(gdbl(:, node_3), gdbl(:, node_1))
 
-    call psgp_gla_tr(glat(1:NTRIG, node_0), cachela(:, jmla), cco)      ! segment center
+    call psgp_gla_tr(glat(1:NTRIG, node_0), cachela(:, jmla))      ! segment center
     call psgp_dlo_tr(glon(1:NTRIG, node_0), cachelo(:, jmlo), cco)
 
-    call psgp_gla_tr(glat(1:NTRIG, node_1), cachela(:, jcla1), cco)
-    call psgp_gla_tr(glat(1:NTRIG, node_2), cachela(:, jcla2), cco)
-    call psgp_gla_tr(glat(1:NTRIG, node_3), cachela(:, jcla3), cco)
-    call psgp_gla_tr(glat(1:NTRIG, node_4), cachela(:, jcla4), cco)
+    call psgp_gla_tr(glat(1:NTRIG, node_1), cachela(:, jcla1))
+    call psgp_gla_tr(glat(1:NTRIG, node_2), cachela(:, jcla2))
+    call psgp_gla_tr(glat(1:NTRIG, node_3), cachela(:, jcla3))
+    call psgp_gla_tr(glat(1:NTRIG, node_4), cachela(:, jcla4))
 
     call psgp_dlo_tr(glon(1:NTRIG, node_1), cachelo(:, jclo1), cco)
     call psgp_dlo_tr(glon(1:NTRIG, node_2), cachelo(:, jclo2), cco)
@@ -3788,7 +3788,7 @@ contains
        select case(adjstt)
        case(stt_adjacent_y,stt_adjacent_d)
           jxtgt = jxsec
-          call psgp_xlo_tr(c, g, xpos(coor_y), cachela, cco, xpos(coor_x))
+          call psgp_xlo_tr(c, g, xpos(coor_y), cachela, xpos(coor_x))
           if (inrange(g(JSIN), glon(JSIN, jf), glon(JSIN, jt), .TRUE.)) then
              continue
           else

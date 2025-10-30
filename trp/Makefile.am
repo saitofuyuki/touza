@@ -1,9 +1,9 @@
 # TOUZA/Trp Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Feb 26 2021
-# Time-stamp: <2023/03/18 17:48:48 fuyuki Makefile.am>
+# Time-stamp: <2025/10/29 22:21:32 fuyuki Makefile.am>
 
-# Copyright (C) 2021,2022,2023
+# Copyright (C) 2021-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
@@ -67,17 +67,26 @@ test_trapiche_pack_64_LDADD = $(test_trapiche_pack_32_LDADD)
 test_trapiche_pack_64_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_PACK=64
 EXTRA_test_trapiche_pack_64_DEPENDENCIES = $(test_trapiche_pack_64_LDADD)
 
-check_PROGRAMS += test_trapiche_float test_trapiche_ctl
+check_PROGRAMS += test_trapiche_ctl
 
 test_trapiche_ctl_SOURCES = $(TEST_COMMON_SOURCES) trapiche_ctl.F90
 test_trapiche_ctl_LDADD = $(TEST_COMMON_LIBS)
 test_trapiche_ctl_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_CTL=1
 EXTRA_test_trapiche_ctl_DEPENDENCIES = $(test_trapiche_ctl_LDADD)
 
-test_trapiche_float_SOURCES = $(TEST_COMMON_SOURCES) trapiche_float.F90
-test_trapiche_float_LDADD = $(TEST_COMMON_LIBS)
-test_trapiche_float_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_FLOAT=1
-EXTRA_test_trapiche_float_DEPENDENCIES = $(test_trapiche_float_LDADD)
+check_PROGRAMS += test_trapiche_float1 test_trapiche_float2
+
+test_trapiche_float1_SOURCES = $(TEST_COMMON_SOURCES) trapiche_float.F90
+test_trapiche_float1_LDADD = $(TEST_COMMON_LIBS)
+test_trapiche_float1_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_FLOAT=1
+EXTRA_test_trapiche_float1_DEPENDENCIES = $(test_trapiche_float_LDADD)
+
+test_trapiche_float2_SOURCES = $(TEST_COMMON_SOURCES) trapiche_float.F90
+test_trapiche_float2_LDADD = $(TEST_COMMON_LIBS)
+test_trapiche_float2_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_FLOAT=2
+EXTRA_test_trapiche_float2_DEPENDENCIES = $(test_trapiche_float_LDADD)
+
+test_trapiche_float: test_trapiche_float1 test_trapiche_float2
 
 if MAINTAINER_MODE
 check_PROGRAMS += test_trapiche_pack_uip
