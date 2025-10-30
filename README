@@ -19,3 +19,6 @@ TOUZA package may be embedded in MIROC.  Not to be confused with the license of 
 
 This is a special subpackage of TOUZA to be included in the MIROC package.
 The reference revision is recorded in autorevision.h, but it may not be an official one.
+
+A complete package of the latest TOUZA can be obtained at https://github.com/saitofuyuki/touza.
+You can check NEWS and ChangeLog there for additional announcement.

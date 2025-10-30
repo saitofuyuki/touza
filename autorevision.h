@@ -2,23 +2,23 @@
 #ifndef AUTOREVISION_H
 #define AUTOREVISION_H
 
-#define VCS_TYPE		"git"
-#define VCS_BASENAME	"public"
-#define VCS_UUID		"9a261761c4ebd54bb1c70f170b6a035a99a92914"
+#define VCS_TYPE		'git'
+#define VCS_BASENAME	'public'
+#define VCS_UUID		'9a261761c4ebd54bb1c70f170b6a035a99a92914'
 #define VCS_NUM			1011
-#define VCS_DATE		"2025-10-30T01:21:25Z"
-#define VCS_BRANCH		"public"
-#define VCS_TAG			"Release-1.17.0"
-#define VCS_TAG_OPENPGP	""
+#define VCS_DATE		'2025-10-30T01:24:12Z'
+#define VCS_BRANCH		'public'
+#define VCS_TAG			'Release-1.17.0'
+#define VCS_TAG_OPENPGP	' '
 #define VCS_TICK		0
-#define VCS_EXTRA		""
+#define VCS_EXTRA		' '
 
-#define VCS_ACTION_STAMP	"2025-10-30T01:21:25Z!saitofuyuki@jamstec.go.jp"
-#define VCS_FULL_HASH		"9a4723d51f8d06acfd6d1acb7917180f5c8de54b"
-#define VCS_COMMIT_OPENPGP	""
-#define VCS_SHORT_HASH		"9a4723d5"
+#define VCS_ACTION_STAMP	'2025-10-30T01:24:12Z!saitofuyuki@jamstec.go.jp'
+#define VCS_FULL_HASH		'71fb50ddcda2e8170ceb095303902c363df48a09'
+#define VCS_COMMIT_OPENPGP	' '
+#define VCS_SHORT_HASH		'71fb50dd'
 
-#define VCS_WC_MODIFIED		0
+#define VCS_WC_MODIFIED		1
 
 #endif
 
