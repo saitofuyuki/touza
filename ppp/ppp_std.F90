@@ -38,7 +38,7 @@ module TOUZA_Ppp_std
   use TOUZA_Std,only: MPI_STATUS_SIZE, MPI_GROUP_EMPTY, MPI_INTEGER, MPI_CHARACTER
   use TOUZA_Std,only: MPI_MIN, MPI_MAX
   use TOUZA_Std,only: MPI_ANY_TAG,     MPI_ANY_SOURCE
-  use TOUZA_Std,only: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  use TOUZA_Std,only: MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
   use TOUZA_Std,only: MPI_COMM_SIZE, MPI_COMM_RANK, MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
   use TOUZA_Std,only: MPI_WAIT, MPI_BARRIER, MPI_ABORT
   use TOUZA_Std,only: MPI_Probe, MPI_Get_count
@@ -63,6 +63,10 @@ module TOUZA_Ppp_std
 #if HAVE_FORTRAN_MPI_MPI_IRECV == 1
   use TOUZA_Std,only: MPI_Irecv
 #endif
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS == 1
+  use TOUZA_Std,only: MPI_Group_translate_ranks
+#endif
+
   use TOUZA_Std,only: is_eof_ss
   use TOUZA_Std,only: lpath
   use TOUZA_Std,only: ipc_getcwd,  ipc_chdir
@@ -118,7 +122,7 @@ module TOUZA_Ppp_std
   public :: MPI_INTEGER, MPI_CHARACTER
   public :: MPI_MIN, MPI_MAX
   public :: MPI_ANY_TAG, MPI_ANY_SOURCE
-  public :: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
+  public :: MPI_GROUP_SIZE, MPI_GROUP_RANK, MPI_GROUP_UNION
   public :: MPI_COMM_SIZE, MPI_COMM_RANK, MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP
   public :: MPI_WAIT, MPI_BARRIER, MPI_ABORT
   public :: MPI_Probe, MPI_Get_count
@@ -143,6 +147,10 @@ module TOUZA_Ppp_std
 #if HAVE_FORTRAN_MPI_MPI_ISEND == 1
   public :: MPI_Isend
 #endif
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS == 1
+  public :: MPI_Group_translate_ranks
+#endif
+
 !!!_ + common interfaces
 contains
 !!!_  & init
