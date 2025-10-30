@@ -17,15 +17,15 @@
 # TOUZA/Trp Makefile.am
 # Maintainer:  SAITO Fuyuki
 # Created: Feb 26 2021
-# Time-stamp: <2023/03/18 17:48:48 fuyuki Makefile.am>
+# Time-stamp: <2025/10/29 22:21:32 fuyuki Makefile.am>
 
-# Copyright (C) 2021,2022,2023
+# Copyright (C) 2021-2025
 #           Japan Agency for Marine-Earth Science and Technology
 # Licensed under the Apache License, Version 2.0
 #   (https://www.apache.org/licenses/LICENSE-2.0)
 
 # aminclude_static.am generated automatically by Autoconf
-# from AX_AM_MACROS_STATIC on Tue Oct 28 13:03:40 JST 2025
+# from AX_AM_MACROS_STATIC on Thu Oct 30 10:21:04 JST 2025
 
 
 VPATH = @srcdir@
@@ -112,8 +112,9 @@ target_triplet = @target@
 @BUILD_WITH_MPI_TRUE@am__append_4 = trapiche_transfer.F90
 check_PROGRAMS = test_trapiche_std$(EXEEXT) \
 	test_trapiche_pack_32$(EXEEXT) test_trapiche_pack_64$(EXEEXT) \
-	test_trapiche_float$(EXEEXT) test_trapiche_ctl$(EXEEXT) \
-	$(am__EXEEXT_1) $(am__EXEEXT_2) test_trapiche$(EXEEXT)
+	test_trapiche_ctl$(EXEEXT) test_trapiche_float1$(EXEEXT) \
+	test_trapiche_float2$(EXEEXT) $(am__EXEEXT_1) $(am__EXEEXT_2) \
+	test_trapiche$(EXEEXT)
 @MAINTAINER_MODE_TRUE@am__append_5 = test_trapiche_pack_uip
 @BUILD_WITH_MPI_TRUE@am__append_6 = test_trapiche_transfer
 subdir = trp
@@ -157,10 +158,14 @@ am_test_trapiche_ctl_OBJECTS =  \
 	test_trapiche_ctl-trapiche_ctl.$(OBJEXT)
 test_trapiche_ctl_OBJECTS = $(am_test_trapiche_ctl_OBJECTS)
 test_trapiche_ctl_DEPENDENCIES = $(am__DEPENDENCIES_2)
-am_test_trapiche_float_OBJECTS =  \
-	test_trapiche_float-trapiche_float.$(OBJEXT)
-test_trapiche_float_OBJECTS = $(am_test_trapiche_float_OBJECTS)
-test_trapiche_float_DEPENDENCIES = $(am__DEPENDENCIES_2)
+am_test_trapiche_float1_OBJECTS =  \
+	test_trapiche_float1-trapiche_float.$(OBJEXT)
+test_trapiche_float1_OBJECTS = $(am_test_trapiche_float1_OBJECTS)
+test_trapiche_float1_DEPENDENCIES = $(am__DEPENDENCIES_2)
+am_test_trapiche_float2_OBJECTS =  \
+	test_trapiche_float2-trapiche_float.$(OBJEXT)
+test_trapiche_float2_OBJECTS = $(am_test_trapiche_float2_OBJECTS)
+test_trapiche_float2_DEPENDENCIES = $(am__DEPENDENCIES_2)
 am_test_trapiche_pack_32_OBJECTS =  \
 	test_trapiche_pack_32-trapiche_pack.$(OBJEXT)
 test_trapiche_pack_32_OBJECTS = $(am_test_trapiche_pack_32_OBJECTS)
@@ -253,7 +258,8 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libtouza_local_la_SOURCES) $(test_trapiche_SOURCES) \
-	$(test_trapiche_ctl_SOURCES) $(test_trapiche_float_SOURCES) \
+	$(test_trapiche_ctl_SOURCES) $(test_trapiche_float1_SOURCES) \
+	$(test_trapiche_float2_SOURCES) \
 	$(test_trapiche_pack_32_SOURCES) \
 	$(test_trapiche_pack_64_SOURCES) \
 	$(test_trapiche_pack_uip_SOURCES) \
@@ -261,7 +267,8 @@ SOURCES = $(libtouza_local_la_SOURCES) $(test_trapiche_SOURCES) \
 	$(test_trapiche_std_SOURCES) $(test_trapiche_transfer_SOURCES)
 DIST_SOURCES = $(am__libtouza_local_la_SOURCES_DIST) \
 	$(test_trapiche_SOURCES) $(test_trapiche_ctl_SOURCES) \
-	$(test_trapiche_float_SOURCES) \
+	$(test_trapiche_float1_SOURCES) \
+	$(test_trapiche_float2_SOURCES) \
 	$(test_trapiche_pack_32_SOURCES) \
 	$(test_trapiche_pack_64_SOURCES) \
 	$(test_trapiche_pack_uip_SOURCES) $(test_trapiche_std_SOURCES) \
@@ -614,10 +621,14 @@ test_trapiche_ctl_SOURCES = $(TEST_COMMON_SOURCES) trapiche_ctl.F90
 test_trapiche_ctl_LDADD = $(TEST_COMMON_LIBS)
 test_trapiche_ctl_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_CTL=1
 EXTRA_test_trapiche_ctl_DEPENDENCIES = $(test_trapiche_ctl_LDADD)
-test_trapiche_float_SOURCES = $(TEST_COMMON_SOURCES) trapiche_float.F90
-test_trapiche_float_LDADD = $(TEST_COMMON_LIBS)
-test_trapiche_float_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_FLOAT=1
-EXTRA_test_trapiche_float_DEPENDENCIES = $(test_trapiche_float_LDADD)
+test_trapiche_float1_SOURCES = $(TEST_COMMON_SOURCES) trapiche_float.F90
+test_trapiche_float1_LDADD = $(TEST_COMMON_LIBS)
+test_trapiche_float1_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_FLOAT=1
+EXTRA_test_trapiche_float1_DEPENDENCIES = $(test_trapiche_float_LDADD)
+test_trapiche_float2_SOURCES = $(TEST_COMMON_SOURCES) trapiche_float.F90
+test_trapiche_float2_LDADD = $(TEST_COMMON_LIBS)
+test_trapiche_float2_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_FLOAT=2
+EXTRA_test_trapiche_float2_DEPENDENCIES = $(test_trapiche_float_LDADD)
 test_trapiche_pack_uip_SOURCES = $(TEST_COMMON_SOURCES) trapiche_pack.F90
 test_trapiche_pack_uip_LDADD = $(TEST_COMMON_LIBS)
 test_trapiche_pack_uip_CPPFLAGS = $(AM_CPPFLAGS) -DTEST_TRAPICHE_PACK=32 -DTEST_UINTPACK=1
@@ -716,9 +727,13 @@ test_trapiche_ctl$(EXEEXT): $(test_trapiche_ctl_OBJECTS) $(test_trapiche_ctl_DEP
 	@rm -f test_trapiche_ctl$(EXEEXT)
 	$(AM_V_FCLD)$(FCLINK) $(test_trapiche_ctl_OBJECTS) $(test_trapiche_ctl_LDADD) $(LIBS)
 
-test_trapiche_float$(EXEEXT): $(test_trapiche_float_OBJECTS) $(test_trapiche_float_DEPENDENCIES) $(EXTRA_test_trapiche_float_DEPENDENCIES) 
-	@rm -f test_trapiche_float$(EXEEXT)
-	$(AM_V_FCLD)$(FCLINK) $(test_trapiche_float_OBJECTS) $(test_trapiche_float_LDADD) $(LIBS)
+test_trapiche_float1$(EXEEXT): $(test_trapiche_float1_OBJECTS) $(test_trapiche_float1_DEPENDENCIES) $(EXTRA_test_trapiche_float1_DEPENDENCIES) 
+	@rm -f test_trapiche_float1$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_trapiche_float1_OBJECTS) $(test_trapiche_float1_LDADD) $(LIBS)
+
+test_trapiche_float2$(EXEEXT): $(test_trapiche_float2_OBJECTS) $(test_trapiche_float2_DEPENDENCIES) $(EXTRA_test_trapiche_float2_DEPENDENCIES) 
+	@rm -f test_trapiche_float2$(EXEEXT)
+	$(AM_V_FCLD)$(FCLINK) $(test_trapiche_float2_OBJECTS) $(test_trapiche_float2_LDADD) $(LIBS)
 
 test_trapiche_pack_32$(EXEEXT): $(test_trapiche_pack_32_OBJECTS) $(test_trapiche_pack_32_DEPENDENCIES) $(EXTRA_test_trapiche_pack_32_DEPENDENCIES) 
 	@rm -f test_trapiche_pack_32$(EXEEXT)
@@ -784,11 +799,17 @@ test_trapiche_ctl-trapiche_ctl.o: trapiche_ctl.F90
 test_trapiche_ctl-trapiche_ctl.obj: trapiche_ctl.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_trapiche_ctl_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_trapiche_ctl-trapiche_ctl.obj `if test -f 'trapiche_ctl.F90'; then $(CYGPATH_W) 'trapiche_ctl.F90'; else $(CYGPATH_W) '$(srcdir)/trapiche_ctl.F90'; fi`
 
-test_trapiche_float-trapiche_float.o: trapiche_float.F90
-	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_trapiche_float_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_trapiche_float-trapiche_float.o `test -f 'trapiche_float.F90' || echo '$(srcdir)/'`trapiche_float.F90
+test_trapiche_float1-trapiche_float.o: trapiche_float.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_trapiche_float1_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_trapiche_float1-trapiche_float.o `test -f 'trapiche_float.F90' || echo '$(srcdir)/'`trapiche_float.F90
 
-test_trapiche_float-trapiche_float.obj: trapiche_float.F90
-	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_trapiche_float_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_trapiche_float-trapiche_float.obj `if test -f 'trapiche_float.F90'; then $(CYGPATH_W) 'trapiche_float.F90'; else $(CYGPATH_W) '$(srcdir)/trapiche_float.F90'; fi`
+test_trapiche_float1-trapiche_float.obj: trapiche_float.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_trapiche_float1_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_trapiche_float1-trapiche_float.obj `if test -f 'trapiche_float.F90'; then $(CYGPATH_W) 'trapiche_float.F90'; else $(CYGPATH_W) '$(srcdir)/trapiche_float.F90'; fi`
+
+test_trapiche_float2-trapiche_float.o: trapiche_float.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_trapiche_float2_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_trapiche_float2-trapiche_float.o `test -f 'trapiche_float.F90' || echo '$(srcdir)/'`trapiche_float.F90
+
+test_trapiche_float2-trapiche_float.obj: trapiche_float.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_trapiche_float2_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_trapiche_float2-trapiche_float.obj `if test -f 'trapiche_float.F90'; then $(CYGPATH_W) 'trapiche_float.F90'; else $(CYGPATH_W) '$(srcdir)/trapiche_float.F90'; fi`
 
 test_trapiche_pack_32-trapiche_pack.o: trapiche_pack.F90
 	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_trapiche_pack_32_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS) -c -o test_trapiche_pack_32-trapiche_pack.o `test -f 'trapiche_pack.F90' || echo '$(srcdir)/'`trapiche_pack.F90
@@ -1315,6 +1336,8 @@ $(UINTPACK): $(MIROCH)
 
 $(MIROCH):
 	touch $@
+
+test_trapiche_float: test_trapiche_float1 test_trapiche_float2
 
 distclean-local:
 	if test -h $(test_helpd); then rm -f $(test_helpd); else true; fi
