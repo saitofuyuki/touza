@@ -1,3 +1,11 @@
+Release-1.17.0 / 2025-10-30
+===========================
+
+  * For miroc7 release, beta.
+  * safer implementation.
+  * trp: (float) [FATAL] OPT_TRAPICHE_INTEL_SPECIALS to control ANINT().
+  * std, ppp: [severe] MPI_Group_translate_ranks declaration for intel.
+
 Release-1.16.9 / 2025-10-28
 ===========================
 
