@@ -34,7 +34,6 @@
 module TOUZA_Ppp_king
 !!!_ + modules
   use TOUZA_Ppp_std,only: get_logu,     unit_global,  trace_fine,   trace_control
-  use TOUZA_Ppp_std,only: MPI_GROUP_TRANSLATE_RANKS
 !!!_ + default
   implicit none
   private
@@ -316,6 +315,9 @@ contains
   subroutine get_king_i &
        & (ierr, king, mdl, jaref, adef)
     use TOUZA_Ppp_std,only: MPI_UNDEFINED
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS == 1
+    use TOUZA_Ppp_std,only: MPI_Group_translate_ranks
+#endif
     use TOUZA_Ppp_amng,only: query_agent, source_agent, inquire_agent
     implicit none
     integer,                  intent(out) :: ierr
@@ -460,6 +462,9 @@ contains
        & (king, iaref, iasrc, pat) &
        & result(n)
     use TOUZA_Ppp_amng,only: inquire_agent
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS == 1
+    use TOUZA_Ppp_std,only: MPI_Group_translate_ranks
+#endif
     implicit none
     integer,         intent(in)  :: king
     integer,         intent(in)  :: iaref

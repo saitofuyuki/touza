@@ -1,7 +1,7 @@
 !!!_! trapiche_pack.F90 - TOUZA/Trapiche integer packing/unpacking
 ! Maintainer: SAITO Fuyuki
 ! Created: Feb 26 2021
-#define TIME_STAMP 'Time-stamp: <2025/10/28 08:30:25 fuyuki trapiche_pack.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/30 09:56:03 fuyuki trapiche_pack.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2021-2025
@@ -75,17 +75,29 @@ module TOUZA_Trp_pack
   end interface pack_restore_trn
 
   interface pack_store_trn_sp1
-     module procedure pack_store_trn_sp1_ii, pack_store_trn_sp1_ll
+     module procedure pack_store_trn_sp1_ii
+# if TEST_TRAPICHE_PACK == 64
+     module procedure pack_store_trn_sp1_ll
+# endif
   end interface pack_store_trn_sp1
   interface pack_restore_trn_sp1
-     module procedure pack_restore_trn_sp1_ii, pack_restore_trn_sp1_ll
+     module procedure pack_restore_trn_sp1_ii
+# if TEST_TRAPICHE_PACK == 64
+     module procedure pack_restore_trn_sp1_ll
+# endif
   end interface pack_restore_trn_sp1
 
   interface pack_store_trn_spdiv
-     module procedure pack_store_trn_spdiv_ii, pack_store_trn_spdiv_ll
+     module procedure pack_store_trn_spdiv_ii
+# if TEST_TRAPICHE_PACK == 64
+     module procedure pack_store_trn_spdiv_ll
+# endif
   end interface pack_store_trn_spdiv
   interface pack_restore_trn_spdiv
-     module procedure pack_restore_trn_spdiv_ii, pack_restore_trn_spdiv_ll
+     module procedure pack_restore_trn_spdiv_ii
+# if TEST_TRAPICHE_PACK == 64
+     module procedure pack_restore_trn_spdiv_ll
+# endif
   end interface pack_restore_trn_spdiv
 
   interface pack_store_seq
@@ -96,10 +108,16 @@ module TOUZA_Trp_pack
   end interface pack_restore_seq
 
   interface pack_store_seq_sp1
-     module procedure pack_store_seq_sp1_ii, pack_store_seq_sp1_ll
+     module procedure pack_store_seq_sp1_ii
+# if TEST_TRAPICHE_PACK == 64
+     module procedure pack_store_seq_sp1_ll
+# endif
   end interface pack_store_seq_sp1
   interface pack_restore_seq_sp1
-     module procedure pack_restore_seq_sp1_ii, pack_restore_seq_sp1_ll
+     module procedure pack_restore_seq_sp1_ii
+# if TEST_TRAPICHE_PACK == 64
+     module procedure pack_restore_seq_sp1_ll
+# endif
   end interface pack_restore_seq_sp1
 
   interface pack_store_str
@@ -110,10 +128,16 @@ module TOUZA_Trp_pack
   end interface pack_restore_str
 
   interface pack_store_str_sp1
-     module procedure pack_store_str_sp1_ii, pack_store_str_sp1_ll
+     module procedure pack_store_str_sp1_ii
+# if TEST_TRAPICHE_PACK == 64
+     module procedure pack_store_str_sp1_ll
+# endif
   end interface pack_store_str_sp1
   interface pack_restore_str_sp1
-     module procedure pack_restore_str_sp1_ii, pack_restore_str_sp1_ll
+     module procedure pack_restore_str_sp1_ii
+# if TEST_TRAPICHE_PACK == 64
+     module procedure pack_restore_str_sp1_ll
+# endif
   end interface pack_restore_str_sp1
 
   interface count_packed
@@ -302,6 +326,7 @@ contains
 
 !!!_ + user subroutines
 !!!_  & pack_trim - trim arrays according to its range
+#if 0 /* RESERVED */
   subroutine pack_trim_i &
        & (ierr, minc, nbits, icanaz, mem, nbskp, kxsp)
     use TOUZA_Trp_std,only: choice, first_bit
@@ -370,9 +395,10 @@ contains
     endif
 
   end subroutine pack_trim_i
+#endif /* 0 RESERVED */
 
-#if 0 /* meta comment */
 !!!_  & pack_trim_full - trim arrays according to its range (case if full bits)
+#if 0 /* RESERVED */
   subroutine pack_trim_full_i &
        & (ierr, minc, nbits, icanaz, mem, nbskp, kxsp)
     ! use TOUZA_Trp_std,only: first_bit
@@ -435,7 +461,7 @@ contains
     endif
 
   end subroutine pack_trim_full_i
-#endif /* meta comment */
+#endif /* 0 RESERVED */
 
 !!!_  & pack_store - pack_store dispatcher
   subroutine pack_store_ii &
@@ -1125,6 +1151,7 @@ contains
     return
   end subroutine pack_store_seq_sp1_ii
 
+# if TEST_TRAPICHE_PACK == 64
   subroutine pack_store_seq_sp1_ll &
        & (ierr,   ibagaz, &
        &  icanaz, mem,   nbits)
@@ -1143,6 +1170,7 @@ contains
 
     return
   end subroutine pack_store_seq_sp1_ll
+# endif
 
 !!!_  & pack_restore_seq - sequential unpacking special (1/32)
   subroutine pack_restore_seq_sp1_ii &
@@ -1213,6 +1241,7 @@ contains
 
   end subroutine pack_restore_seq_sp1_ii
 
+# if TEST_TRAPICHE_PACK == 64
   subroutine pack_restore_seq_sp1_ll &
        & (ierr,   icanaz, &
        &  ibagaz, mem,   nbits)
@@ -1230,6 +1259,7 @@ contains
     ierr = _ERROR(ERR_NOT_IMPLEMENTED)
 
   end subroutine pack_restore_seq_sp1_ll
+# endif
 
 !!!_  & pack_store_str - sequential packing (strides)
   subroutine pack_store_str_ii &
@@ -1558,6 +1588,7 @@ contains
     return
   end subroutine pack_store_str_sp1_ii
 
+# if TEST_TRAPICHE_PACK == 64
   subroutine pack_store_str_sp1_ll &
        & (ierr,   ibagaz, &
        &  icanaz, mem,   nbits)
@@ -1582,6 +1613,7 @@ contains
 
     return
   end subroutine pack_store_str_sp1_ll
+# endif
 
 !!!_  & pack_restore_str_sp - sequential unpacking (strides) special 1/32
   subroutine pack_restore_str_sp1_ii &
@@ -1656,6 +1688,7 @@ contains
     return
   end subroutine pack_restore_str_sp1_ii
 
+# if TEST_TRAPICHE_PACK == 64
   subroutine pack_restore_str_sp1_ll &
        & (ierr,   icanaz, &
        &  ibagaz, mem,   nbits)
@@ -1680,6 +1713,7 @@ contains
 
     return
   end subroutine pack_restore_str_sp1_ll
+# endif
 
 !!!_  & pack_store_trn - transposed packing
   subroutine pack_store_trn_ii &
@@ -2092,6 +2126,7 @@ contains
 
   end subroutine pack_store_trn_sp1_ii
 
+# if TEST_TRAPICHE_PACK == 64
   subroutine pack_store_trn_sp1_ll &
        & (ierr,   ibagaz, &
        &  icanaz, mem,   nbits)
@@ -2105,6 +2140,7 @@ contains
     integer,            intent(in)  :: nbits        ! target bit sizes
     ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_store_trn_sp1_ll
+# endif
 
 !!!_  & pack_restore_trn_sp1 - transposed unpacking special (1/32)
   subroutine pack_restore_trn_sp1_ii &
@@ -2187,6 +2223,7 @@ contains
        enddo
     endif
   end subroutine pack_restore_trn_sp1_ii
+# if TEST_TRAPICHE_PACK == 64
   subroutine pack_restore_trn_sp1_ll &
        & (ierr,   icanaz, &
        &  ibagaz, mem,   nbits)
@@ -2203,6 +2240,7 @@ contains
 
     ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_restore_trn_sp1_ll
+#endif
 
 !!!_  & pack_store_trn_spdiv - transposed packing special (32 divisor)
   subroutine pack_store_trn_spdiv_ii &
@@ -2262,6 +2300,7 @@ contains
        ibagaz(jbbgn:jbend-1) = IOR(ibagaz(jbbgn:jbend-1), ISHFT(_IBITS(icanaz(jcbgn:jcend-1), 0, nbits), msh))
     enddo
   end subroutine pack_store_trn_spdiv_ii
+# if TEST_TRAPICHE_PACK == 64
   subroutine pack_store_trn_spdiv_ll &
        & (ierr,   ibagaz, &
        &  icanaz, mem,   nbits)
@@ -2278,6 +2317,7 @@ contains
 
     ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_store_trn_spdiv_ll
+# endif
 
 !!!_  & pack_restore_trn_spdiv - transposed unpacking special (32 divisor)
   subroutine pack_restore_trn_spdiv_ii &
@@ -2331,6 +2371,7 @@ contains
     enddo
   end subroutine pack_restore_trn_spdiv_ii
 
+# if TEST_TRAPICHE_PACK == 64
   subroutine pack_restore_trn_spdiv_ll &
        & (ierr,   icanaz, &
        &  ibagaz, mem,   nbits)
@@ -2347,6 +2388,7 @@ contains
 
     ierr = _ERROR(ERR_NOT_IMPLEMENTED)
   end subroutine pack_restore_trn_spdiv_ll
+# endif
 
 !!!_  & unparse_relleno - packing method id
   subroutine unparse_relleno (ierr, str, kpack)
@@ -3264,7 +3306,7 @@ contains
     case (RELLENO_SEQUENTIAL,RELLENO_STRIDE)
        call gen_bfc_slice_seq_i(ierr, dunp, nunp, rfil, nfil, nbits, mem, bes, nr, mold)
     case (RELLENO_TRANSPOSE)
-       call gen_bfc_slice_trn_i(ierr, dunp, nunp, rfil, nfil, nbits, mem, bes, nr, mold)
+       ! call gen_bfc_slice_trn_i(ierr, dunp, nunp, rfil, nfil, nbits, mem, bes, nr, mold)
        ierr = _ERROR(ERR_NOT_IMPLEMENTED)
     case default
        ierr = _ERROR(ERR_INVALID_SWITCH)
@@ -3382,6 +3424,7 @@ contains
   end subroutine gen_bfc_slice_seq_i
 
 !!!_  & gen_bfc_slice_trn - 1/32 (mask) generate bagaz/filter/canaz
+#if 0 /* RESERVED */
   subroutine gen_bfc_slice_trn_i &
        & (ierr,  dunp, nunp, rfil, nfil, &
        &  nbits, mem,  bes,  nr,   mold)
@@ -3431,6 +3474,8 @@ contains
        write(*, *) 'bfc/trn:bagaz ', jz, jbbgn, jbend, jobgn, joend, jcbgn, jcend, jcorg
     enddo
   end subroutine gen_bfc_slice_trn_i
+#endif /* 0 RESERVED */
+
 !!!_  & set_loop_slice
   subroutine set_loop_slice &
        & (jgorg, gstep, gnext, lspan, bes, nr)
@@ -3613,8 +3658,8 @@ contains
        & (nbits, nmem, kpack) &
        & result(m)
     implicit none
-    integer,intent(in) :: nbits ! + to encode, - to decode
-    integer,intent(in) :: nmem
+    integer,intent(in) :: nbits ! (reserved) + to encode, - to decode
+    integer,intent(in) :: nmem  ! (reserved)
     integer,intent(in) :: kpack
     integer,parameter :: mmask = RELLENO_MANUAL - 1
     m = IAND(mmask, kpack)
@@ -3626,8 +3671,8 @@ contains
        & (nbits, nmem, kpack) &
        & result(b)
     implicit none
-    integer,intent(in) :: nbits ! + to encode, - to decode
-    integer,intent(in) :: nmem
+    integer,intent(in) :: nbits ! (reserved) + to encode, - to decode
+    integer,intent(in) :: nmem  ! (reserved)
     integer,intent(in) :: kpack
     b = IAND(RELLENO_MANUAL, kpack).ne.0
   end function is_enabled_manual

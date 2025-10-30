@@ -1,7 +1,7 @@
 !!!_! std_prc.F90 - TOUZA/Std precision(kind) manager
 ! Maintainer: SAITO Fuyuki
 ! Created: Sep 6 2020
-#define TIME_STAMP 'Time-stamp: <2025/10/27 21:03:48 fuyuki std_prc.F90>'
+#define TIME_STAMP 'Time-stamp: <2025/10/28 22:21:10 fuyuki std_prc.F90>'
 !!!_! MANIFESTO
 !
 ! Copyright (C) 2020-2025
@@ -1375,6 +1375,33 @@ program test_std_prc
 #if OPT_REAL_QUADRUPLE_DIGITS > 0
   real(kind=KQPL) :: VQPL = 0.0
 #endif
+#if HAVE_FORTRAN_GET_COMMAND_ARGUMENT
+  integer ja, na, k
+  character(len=128) :: arg
+#endif
+  logical swdnm, swinf
+
+#if HAVE_FORTRAN_GET_COMMAND_ARGUMENT
+  na = command_argument_count()
+  if (na.eq.0) then
+     write(*, *) 'Need argument [0-3]'
+     stop
+  endif
+  ja = 1
+  call get_command_argument(ja, arg, status=ierr)
+  if (ierr.eq.0) read(arg, *, iostat=ierr) k
+  if (ierr.ne.0) then
+     write(*, *) 'something went wrong: ', ierr
+     stop
+  endif
+#else
+  k = 0
+  write(*, *) 'Run only case 0'
+#endif
+  swdnm = IAND(k, 1).ne.0
+  swinf = IAND(k, 2).ne.0
+107 format('test[', I0, '] ', L1, L1)
+  write (*, 107) k, swdnm, swinf
 
   call init(ierr)
   if (ierr.eq.0) call diag(ierr, levv=-1)
@@ -1397,7 +1424,7 @@ program test_std_prc
 #endif
   endif
 
-  if (ierr.eq.0) call init_set_switches(ierr, .TRUE., .TRUE.)
+  if (ierr.eq.0) call init_set_switches(ierr, inf=swinf, dnm=swdnm)
   if (ierr.eq.0) then
      call check_real_props(istt, VDBL, levv=10)
      call check_real_props(istt, VFLT, levv=10)

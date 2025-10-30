@@ -32,7 +32,7 @@ module TOUZA_Ppp_amng
 !!!_ + modules
   use TOUZA_Ppp_std,only: MPI_COMM_NULL, MPI_GROUP_NULL
   use TOUZA_Ppp_std,only: get_logu,     unit_global,  trace_fine,   trace_control
-  use TOUZA_Ppp_std,only: MPI_GROUP_TRANSLATE_RANKS, MPI_GROUP_SIZE, MPI_GROUP_RANK
+  use TOUZA_Ppp_std,only: MPI_GROUP_SIZE, MPI_GROUP_RANK
   use TOUZA_Ppp_std,only: MPI_COMM_CREATE, MPI_COMM_SPLIT, MPI_COMM_GROUP, MPI_GROUP_UNION
 !!!_ + default
   implicit none
@@ -609,6 +609,9 @@ contains
   subroutine diag_map_string &
        & (ierr, map, iagent, iref, irbgn, irend, md, sep)
     use TOUZA_Ppp_std,only: get_gni, choice, choice_a
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS == 1
+    use TOUZA_Ppp_std,only: MPI_Group_translate_ranks
+#endif
     implicit none
     integer,         intent(out)         :: ierr
     character(len=*),intent(out)         :: map
@@ -1476,6 +1479,9 @@ contains
   subroutine mod_agent_order &
        & (ierr, atgt, opr, keys, iagent)
     use TOUZA_Ppp_std,only: MPI_UNDEFINED
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS == 1
+    use TOUZA_Ppp_std,only: MPI_Group_translate_ranks
+#endif
     implicit none
     integer,         intent(out) :: ierr
     character(len=*),intent(in)  :: atgt      ! target agent
@@ -1628,6 +1634,9 @@ contains
   subroutine agents_translate_i &
        & (ierr, irtgt, iatgt, irsrc, iasrc)
     use TOUZA_Ppp_std,only: MPI_UNDEFINED
+#if HAVE_FORTRAN_MPI_MPI_GROUP_TRANSLATE_RANKS == 1
+    use TOUZA_Ppp_std,only: MPI_Group_translate_ranks
+#endif
     implicit none
     integer,intent(out)         :: ierr
     integer,intent(out)         :: irtgt
