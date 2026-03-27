@@ -213,7 +213,7 @@ contains
 #endif
     if (ierr.eq.0) call msg_macro(ierr, 'VCS_UUID', VCS_UUID, ulog)
     if (ierr.eq.0) call msg_macro(ierr, 'VCS_NUM',  VCS_NUM, ulog)
-    if (ierr.eq.0) call msg_macro(ierr, 'VCS_DATA', VCS_DATE, ulog)
+    if (ierr.eq.0) call msg_macro(ierr, 'VCS_DATA', VCS_DATA, ulog)
     if (ierr.eq.0) call msg_macro(ierr, 'VCS_BRANCH', VCS_BRANCH, ulog)
     if (ierr.eq.0) call msg_macro(ierr, 'VCS_TAG', VCS_TAG, ulog)
     if (ierr.eq.0) call msg_macro(ierr, 'VCS_TICK', VCS_TICK, ulog)

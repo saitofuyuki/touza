@@ -130,7 +130,7 @@ $(check_targets_all):
 	$(MAKE) check TESTS=`echo "$@" | sed -e 's/^check-//'`
 
 $(WTEST): $(srcdir)/$(WTESTin)
-	@if sed -e 's!@srcdir@!$(srcdir)!g' \
+	@if sed -e 's![@]srcdir[@]!$(srcdir)!g' \
 	        -e 's![@]FC_COMPILER_VENDOR[@]!@FC_COMPILER_VENDOR@!' \
 		$(srcdir)/$(WTESTin) > $@; \
 	then chmod +x $@; \
