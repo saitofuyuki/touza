@@ -1,4 +1,4 @@
-#!/usr/bin/zsh -f
+#!@ZSH@ -f
 # Time-stamp: <2025/02/14 17:02:36 fuyuki demo_stp.sh.in>
 
 exe=./test_emu_ugg

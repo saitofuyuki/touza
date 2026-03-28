@@ -47,6 +47,9 @@ endif
 ${AX_NULL}AM_FCFLAGS_MODULE=
 ${AX_NULL}AM_FCFLAGS+=${AX_DOLLAR}(AM_FCFLAGS_MODULE)
 
+am__touza_gen_script = @if ${AX_DOLLAR}(1) > ${AX_DOLLAR}@; then chmod +x ${AX_DOLLAR}@; else rm -f ${AX_DOLLAR}@; false; fi
+am__touza_distclean_logdir = @if test -d ${AX_DOLLAR}(1); then rm -rf ${AX_DOLLAR}(1); else :; fi
+
 moddir      = @moddir@
 install-exec-hook: install-mod
 uninstall-hook: uninstall-mod

@@ -121,20 +121,17 @@ $(TESTS):
 check_targets_all = check-record
 
 distclean-local: distclean-logdir
+	@if test -h $(test_helpd); then rm -f $(test_helpd); else true; fi
 
 distclean-logdir:
-	@if test -d $(WTEST_LOGDIR); then rm -rf $(WTEST_LOGDIR); else :; fi
+	$(call am__touza_distclean_logdir,$(WTEST_LOGDIR))
 
 $(check_targets_all):
 	echo TESTS=`echo "$@" | sed -e 's/^check-//'` >&2
 	$(MAKE) check TESTS=`echo "$@" | sed -e 's/^check-//'`
 
 $(WTEST): $(srcdir)/$(WTESTin)
-	@if sed -e 's!@srcdir@!$(srcdir)!g' \
-	        -e 's![@]FC_COMPILER_VENDOR[@]!@FC_COMPILER_VENDOR@!' \
-		$(srcdir)/$(WTESTin) > $@; \
-	then chmod +x $@; \
-	else rm -f $@; fi
+	$(call am__touza_gen_script,sed -e 's![@]srcdir[@]!$(srcdir)!g' -e 's![@]FC_COMPILER_VENDOR[@]!@FC_COMPILER_VENDOR@!' $(srcdir)/$(WTESTin))
 
 test_nio_cache_SOURCES = $(TEST_COMMON_SOURCES) nio_cache.F90
 test_nio_cache_LDADD = $(TEST_COMMON_LIBS)
@@ -184,9 +181,6 @@ $(CAL_SWITCH):
 	@cp $(srcdir)/../cal/$@ .
 
 test_helpd	=	bin
-
-distclean-local:
-	if test -h $(test_helpd); then rm -f $(test_helpd); else true; fi
 
 link-bin:
 	@sub=$(test_helpd); bin=$(srcdir)/$${sub}; \

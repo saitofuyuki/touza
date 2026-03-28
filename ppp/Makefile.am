@@ -88,10 +88,7 @@ EXTRA_DIST+=$(WTCin)
 
 $(WTC): $(srcdir)/$(WTCin)
 	@echo "Generate $@."
-	@if sed -e 's![@]srcdir@!$(srcdir)!g' \
-			-e 's![@]MPIRUN@!$(MPIRUN)!g' $(srcdir)/$(WTCin) > $@; \
-	then chmod +x $@; \
-	else rm -f $@; false; fi
+	$(call am__touza_gen_script,sed -e 's![@]srcdir@!$(srcdir)!g' -e 's![@]MPIRUN@!$(MPIRUN)!g' $(srcdir)/$(WTCin))
 
 include Makedep.inc
 

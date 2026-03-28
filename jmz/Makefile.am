@@ -101,22 +101,16 @@ $(chak_OBJECTS): $(noinst_LTLIBRARIES)
 chak_opr.lo $(chak_opr_OBJECTS): $(chak_lib_OBJECTS) $(chak_to_include)
 
 jmzdepf90: jmzdepf90.sh.in
-	sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@
-	chmod +x $@
+	$(call am__touza_gen_script,sed -e 's![@]ZSH[@]!$(ZSH)!g' < $<)
 
 demo-chak.sh: demo-chak.sh.in
-	@sed -e 's,[@]ZSH[@],$(ZSH),g' \
-         -e 's,[@]srcdir[@],$(srcdir),g' \
-		$< >$@; chmod +x $@
+	$(call am__touza_gen_script,sed -e 's![@]ZSH[@]!$(ZSH)!g' -e 's![@]srcdir[@]!$(srcdir)!g' $<)
 
 demo-convoy.sh: demo-convoy.sh.in
-	@sed -e 's,[@]ZSH[@],$(ZSH),g' \
-         -e 's,[@]srcdir[@],$(srcdir),g' \
-		$< >$@; chmod +x $@
+	$(call am__touza_gen_script,sed -e 's![@]ZSH[@]!$(ZSH)!g' -e 's![@]srcdir[@]!$(srcdir)!g' $<)
 
 ocheck.sh: ocheck.sh.in
-	@sed -e 's,[@]CHAK[@],$(abs_builddir)/$(CHAK),g' \
-		 -e 's,[@]CHAK_OPTS[@],$(CHAK_OPTS),g' < $< >$@; chmod +x $@
+	$(call am__touza_gen_script,sed -e 's![@]CHAK[@]!$(abs_builddir)/$(CHAK)!g' -e 's![@]CHAK_OPTS[@]!$(CHAK_OPTS)!g' < $<)
 
 gtfna: $(GTEML_SRC) gtfna.in
 gtfnb: $(GTEML_SRC) gtfnb.in
@@ -133,24 +127,10 @@ gtfna gtfnb:
 	chmod +x $@
 
 wtest_gt.sh: wtest_gt.sh.in
-	@if test -e $<; then \
-		sed -e 's,[@]ZSH[@],$(ZSH),g' \
-            -e 's,[@]PACKAGE_STRING[@],$(PACKAGE_STRING),g' \
-            -e 's,[@]TOUZA_VERSION[@],$(TOUZA_VERSION),g' \
-            -e 's,[@]VERSION[@],$(VERSION),g' \
-            -e 's,[@]TR[@],$(TR),g' \
-            -e 's,[@]srcdir[@],$(srcdir),g' \
-            -e 's,[@]builddir[@],$(builddir),g' \
-            -e 's,[@]CHAK[@],$(bindir)/$(CHAK),g' \
-			 < $< >$@; \
-		chmod +x $@; \
-	fi
+	$(call am__touza_gen_script,sed -e 's![@]ZSH[@]!$(ZSH)!g' -e 's![@]PACKAGE_STRING[@]!$(PACKAGE_STRING)!g' -e 's![@]TOUZA_VERSION[@]!$(TOUZA_VERSION)!g' -e 's![@]VERSION[@]!$(VERSION)!g' -e 's![@]TR[@]!$(TR)!g' -e 's![@]srcdir[@]!$(srcdir)!g' -e 's![@]builddir[@]!$(builddir)!g' -e 's![@]CHAK[@]!$(bindir)/$(CHAK)!g' < $<)
 
 genx2.sh: genx2.sh.in
-	@if test -e $<; then \
-		sed -e 's,[@]ZSH[@],$(ZSH),g' < $< >$@; \
-		chmod +x $@; \
-	fi
+	$(call am__touza_gen_script,sed -e 's![@]ZSH[@]!$(ZSH)!g' < $<)
 
 EXTRA_DIST += jmzdepf90.sh.in $(chak_to_include)
 EXTRA_DIST += README-jmz.org
