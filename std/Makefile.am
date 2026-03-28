@@ -82,12 +82,7 @@ test_std_env_LDADD = $(TEST_COMMON_LIBS)
 EXTRA_test_std_env_DEPENDENCIES = $(test_std_env_LDADD)
 
 $(WTE): $(srcdir)/$(WTEin)
-	@if sed -e 's!@XENV@!$(builddir)/test_stdenv!g' \
-		-e 's!@TEST_FILE_UNIT_BGN@!$(TEST_FILE_UNIT_BGN)!g'  \
-		-e 's!@TEST_FILE_UNIT_END@!$(TEST_FILE_UNIT_END)!g' \
-		$(srcdir)/$(WTEin) > $@; \
-	then chmod +x $@; \
-	else rm -f $@; fi
+	$(call am__touza_gen_script,sed -e 's!@XENV@!$(builddir)/test_stdenv!g' -e 's!@TEST_FILE_UNIT_BGN@!$(TEST_FILE_UNIT_BGN)!g' -e 's!@TEST_FILE_UNIT_END@!$(TEST_FILE_UNIT_END)!g' $(srcdir)/$(WTEin))
 
 check_PROGRAMS += test_std_sus
 test_std_sus_SOURCES = std_sus.F90

@@ -42,15 +42,10 @@ EXTRA_DIST+=$(WTCin)
 distclean-local: distclean-logdir
 
 distclean-logdir:
-	@if test -d $(WTC_LOGDIR); then rm -rf $(WTC_LOGDIR); else :; fi
+	$(call am__touza_distclean_logdir,$(WTC_LOGDIR))
 
 $(WTC): $(srcdir)/$(WTCin)
-	if sed -e 's!@XNEW@!$(builddir)/test_calendar_comp!g' \
-			-e 's!@XOLD@!$(builddir)/test_calendar_trad!g' \
-			-e 's!@XMAT@!$(builddir)/test_calendar_matsiro!g' \
-			-e 's!@XILS@!$(builddir)/test_calendar_ils!g' $(srcdir)/$(WTCin) > $@; \
-		then chmod +x $@; \
-		else rm -f $@; fi
+	$(call am__touza_gen_script,sed -e 's!@XNEW@!$(builddir)/test_calendar_comp!g' -e 's!@XOLD@!$(builddir)/test_calendar_trad!g' -e 's!@XMAT@!$(builddir)/test_calendar_matsiro!g' -e 's!@XILS@!$(builddir)/test_calendar_ils!g' $(srcdir)/$(WTCin))
 
 LOG_COMPILER	=	$(builddir)/$(WTC)
 TEST_NUM		=	0
